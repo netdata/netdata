@@ -272,7 +272,7 @@ func BatchDirDecode(buf []byte, itemCount uint32, packedAreaLen uint32) ([]Batch
 	}
 
 	out := make([]BatchEntry, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		base := i * 8
 		off := ne.Uint32(buf[base : base+4])
 		length := ne.Uint32(buf[base+4 : base+8])
@@ -296,7 +296,7 @@ func BatchDirValidate(buf []byte, itemCount uint32, packedAreaLen uint32) error 
 	if len(buf) < dirSize {
 		return ErrTruncated
 	}
-	for i := 0; i < count; i++ {
+	for i := range count {
 		base := i * 8
 		off := ne.Uint32(buf[base : base+4])
 		length := ne.Uint32(buf[base+4 : base+8])

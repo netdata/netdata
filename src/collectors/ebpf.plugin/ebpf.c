@@ -1158,6 +1158,12 @@ void ebpf_stop_threads(int sig)
 #endif
     netdata_mutex_unlock(&mutex_cgroup_shm);
 
+    // Join the cgroup integration thread before ebpf_exit() tears down the netipc cache it reads.
+    if (cgroup_integration_thread.thread) {
+        nd_thread_join(cgroup_integration_thread.thread);
+        cgroup_integration_thread.thread = NULL;
+    }
+
     usec_t before_checks_ut = now_monotonic_usec();
     if (!ebpf_pre_exit_check_done) {
         ebpf_check_before2go();

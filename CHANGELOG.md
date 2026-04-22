@@ -46,6 +46,10 @@
 - Build(deps): bump github.com/Azure/azure-sdk-for-go/sdk/azcore from 1.21.0 to 1.21.1 in /src/go ([#22230](https://github.com/netdata/netdata/issues/22230))
 - Fix(go.d/snmp): use snmpEngineTime as primary uptime source ([#22231](https://github.com/netdata/netdata/issues/22231))
 - Improve UUID handling in SQLite functions and error reporting ([#22233](https://github.com/netdata/netdata/issues/22233))
+- Ebpf.plugin: fix PID accounting shared-memory pool leak and 100% CPU spin ([#22232](https://github.com/netdata/netdata/issues/22232))
+- Feat: replace cgroups-ebpf SHM transport with netipc IPC ([#22221](https://github.com/netdata/netdata/issues/22221))
+- Feat(topology/snmp): SNMP L2/L3 topology engine and collector ([#22109](https://github.com/netdata/netdata/issues/22109))
+- Feat(netflow): NetFlow/IPFIX/sFlow flow analysis plugin ([#22111](https://github.com/netdata/netdata/issues/22111))
 
 ## [2.10.0] - 2026-04-09
 

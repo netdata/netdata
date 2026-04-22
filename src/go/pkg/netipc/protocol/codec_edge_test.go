@@ -831,7 +831,7 @@ func TestBatchBuilderFinishNoCompaction(t *testing.T) {
 	}
 
 	// Verify access
-	for i := uint32(0); i < count; i++ {
+	for i := range count {
 		_, err := BatchItemGet(buf[:total], count, i)
 		if err != nil {
 			t.Fatalf("item %d: %v", i, err)

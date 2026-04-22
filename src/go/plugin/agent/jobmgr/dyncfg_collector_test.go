@@ -874,6 +874,10 @@ func (cb *collectorSeqTestCallbacks) ExtractKey(fn dyncfg.Function) (key, name s
 	return cb.mgr.collectorCallbacks.ExtractKey(fn)
 }
 
+func (cb *collectorSeqTestCallbacks) ValidateJobName(name string) error {
+	return dyncfg.JobNameRuleStrict(name)
+}
+
 func (cb *collectorSeqTestCallbacks) ParseAndValidate(fn dyncfg.Function, _ string) (confgroup.Config, error) {
 	cfg, ok := cb.parsed[fn.Command()]
 	if !ok {

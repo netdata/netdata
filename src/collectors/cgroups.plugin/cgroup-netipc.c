@@ -90,12 +90,8 @@ static bool cgroups_snapshot_handler(void *user __maybe_unused,
         }
     }
 
-    netdata_mutex_unlock(&cgroup_root_mutex);
-
     bool log_zero_generation = false;
     bool log_truncated_generation = false;
-
-    netdata_mutex_lock(&cgroup_root_mutex);
 
     if (count == 0 && last_logged_zero_generation != snapshot_generation) {
         last_logged_zero_generation = snapshot_generation;

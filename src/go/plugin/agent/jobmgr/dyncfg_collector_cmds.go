@@ -114,7 +114,7 @@ func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 
 	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
-	if err := dyncfg.ValidateJobName(jn); err != nil {
+	if err := dyncfg.JobNameRuleStrict(jn); err != nil {
 		m.Warningf("dyncfg: %s: module %s: unacceptable job name '%s': %v", cmd, mn, jn, err)
 		m.dyncfgResponder.SendCodef(fn, 400, "Unacceptable job name '%s': %v.", jn, err)
 		return

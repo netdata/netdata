@@ -142,10 +142,7 @@ Before configuring the collector:
 
 #### Options
 
-The following options can be defined globally: `update_every`, `autodetection_retry`.
-
-There is no module-wide `topology:` block in `snmp.conf`.
-SNMP topology discovery is handled by the separate `snmp_topology` collector using devices registered by SNMP jobs.
+The following options can be defined globally: update_every, autodetection_retry.
 
 
 <details open><summary>Config options</summary>
@@ -444,6 +441,53 @@ Network interface metrics from cached SNMP data, including traffic rates, packet
 | Multicast In | float | packets/s | hidden | Rate of multicast packets (destined for a group) received per second. Common in video streaming, multicast applications, and routing protocols. |
 | Multicast Out | float | packets/s | hidden | Rate of multicast packets transmitted per second. |
 
+### Network Topology
+
+Provides the agent-wide SNMP topology view built from all currently running topology-enabled SNMP jobs.
+
+This function reads cached LLDP/CDP data collected by the independent topology refresh loop and returns a topology schema (devices, links, and stats). No additional SNMP requests are triggered when calling this function.
+
+Use cases:
+- Discover Layer 2 neighbors and link mapping
+- Validate cabling and port connections
+- Identify adjacent devices that are discovered but not monitored
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Snmp:topology` |
+| Require Cloud | no |
+| Performance | Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many discovered neighbors may return many rows |
+| Security | Exposes discovered device identifiers, interface/port identifiers, and management addresses only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed |
+| Availability | Available when:<br/>• The collector has completed at least one successful topology refresh cycle<br/>• LLDP/CDP topology data is present in cache from the last successful topology refresh<br/>• Returns HTTP 503 if topology cache is not ready yet |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Nodes Identity | select | Choose actor identity strategy. `ip` collapses nodes by management IP and removes non-IP inferred actors. `mac` keeps MAC-oriented identities. | yes | ip | IP (default), MAC |
+| Map | select | Select the topology map mode. Defaults to the managed-device LLDP/CDP view. Other modes progressively include inferred devices and lower-confidence links. | yes | lldp_cdp_managed | LLDP/CDP/Managed Devices Map (default), High Confidence Inferred Map, All Devices (Low Confidence) |
+| Infer Strategy | select | Select the inference algorithm used for FDB/STP/CDP correlation. | yes | fdb_minimum_knowledge | FDB Minimum-Knowledge (Baseline) (default), STP Parent Tree, FDB Pairwise Minimum-Knowledge, STP + FDB Correlated, CDP + FDB Hybrid |
+| Focus On | multiselect | Limit depth filtering to selected managed SNMP roots. The static default is `all_devices`; additional `ip:<address>` options are supplied dynamically from the current managed SNMP jobs. | yes | all_devices | All Devices (default) |
+| Focus Depth | select | Limit topology expansion hops from the focus roots. `all` disables depth filtering. | yes | all | All (default), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 |
+
+#### Returns
+
+Agent-wide topology data in a JSON schema suitable for cross-agent aggregation.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| schema_version | integer |  |  | Topology schema version. |
+| agent_id | string |  |  | Netdata Agent or vnode identifier that collected the data. |
+| collected_at | string |  |  | Collection timestamp in RFC 3339 format. |
+| devices | array |  |  | List of devices (local and discovered). |
+| links | array |  |  | List of discovered links (LLDP/CDP). |
+| stats | object |  |  | Summary stats (device/link counts). |
+
 
 
 ## Troubleshooting
@@ -561,3 +605,6 @@ Table metrics are usually the slowest and often determine the total collection t
 1. Do logs show “skipping data collection”?  
 2. Does *Internal → Stats* show collection time > `update_every`?  
 3. Increase `update_every` until skips disappear.
+
+
+

@@ -266,10 +266,7 @@ func (s *Session) sendInner(hdr *protocol.Header, payload []byte) error {
 		return wrapErr(ErrBadParam, "packet_size too small")
 	}
 
-	firstChunkPayload := len(payload)
-	if firstChunkPayload > chunkPayloadBudget {
-		firstChunkPayload = chunkPayloadBudget
-	}
+	firstChunkPayload := min(len(payload), chunkPayloadBudget)
 
 	remainingAfterFirst := len(payload) - firstChunkPayload
 	continuationChunks := uint32(0)
@@ -289,10 +286,7 @@ func (s *Session) sendInner(hdr *protocol.Header, payload []byte) error {
 	offset := firstChunkPayload
 	for ci := uint32(1); ci < chunkCount; ci++ {
 		remaining := len(payload) - offset
-		thisChunk := remaining
-		if thisChunk > chunkPayloadBudget {
-			thisChunk = chunkPayloadBudget
-		}
+		thisChunk := min(remaining, chunkPayloadBudget)
 
 		chk := protocol.ChunkHeader{
 			Magic:           protocol.MagicChunk,
