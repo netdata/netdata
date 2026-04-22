@@ -2,6 +2,9 @@
 
 #include "../libnetdata.h"
 
+// "JSON parser failed: " prefix (20 chars) + json-c error string (< 60 chars) + NUL
+#define JSON_PARSER_ERROR_MSG_MAX 256
+
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
     buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
@@ -29,9 +32,8 @@ struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER 
     struct json_object *jobj = json_tokener_parse_ex(tokener, buffer_tostring(payload), (int)buffer_strlen(payload));
     if (json_tokener_get_error(tokener) != json_tokener_success) {
         const char *error_msg = json_tokener_error_desc(json_tokener_get_error(tokener));
-        size_t tmp_size = strlen(error_msg) + 100;
-        CLEAN_CHAR_P *tmp = mallocz(tmp_size);
-        snprintf(tmp, tmp_size, "JSON parser failed: %s", error_msg);
+        char tmp[JSON_PARSER_ERROR_MSG_MAX];
+        snprintfz(tmp, sizeof(tmp), "JSON parser failed: %s", error_msg ? error_msg : "unknown error");
         json_tokener_free(tokener);
         *code = rrd_call_function_error(output, tmp, HTTP_RESP_INTERNAL_SERVER_ERROR);
         return NULL;
@@ -68,9 +70,8 @@ int json_parse_payload_or_error(BUFFER *payload, BUFFER *error, json_parse_funct
     struct json_object *jobj = json_tokener_parse_ex(tokener, buffer_tostring(payload), (int)buffer_strlen(payload));
     if (json_tokener_get_error(tokener) != json_tokener_success) {
         const char *error_msg = json_tokener_error_desc(json_tokener_get_error(tokener));
-        size_t tmp_size = strlen(error_msg) + 100;
-        CLEAN_CHAR_P *tmp = mallocz(tmp_size);
-        snprintf(tmp, tmp_size, "JSON parser failed: %s", error_msg);
+        char tmp[JSON_PARSER_ERROR_MSG_MAX];
+        snprintfz(tmp, sizeof(tmp), "JSON parser failed: %s", error_msg ? error_msg : "unknown error");
         json_tokener_free(tokener);
         buffer_strcat(error, tmp);
         return HTTP_RESP_BAD_REQUEST;

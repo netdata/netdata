@@ -2,6 +2,9 @@
 
 #include "../libnetdata.h"
 
+// keep in sync with RRDVAR_MAX_LENGTH in health/rrdvar.h
+#define RRDVAR_MAX_LENGTH 1024
+
 // --------------------------------------------------------------------------------------------------------------------
 // RRD string sanitization (for units, title, family, context, plugin, module)
 //
@@ -198,7 +201,12 @@ char *rrdset_strncpyz_name(char *dst, const char *src, size_t dst_size_minus_1) 
 
 bool rrdvar_fix_name(char *variable) {
     size_t len = strlen(variable);
-    CLEAN_CHAR_P *buf = strdupz(variable);
+
+    char buf[RRDVAR_MAX_LENGTH + 1];
+    if(unlikely(len >= sizeof(buf)))
+        len = sizeof(buf) - 1;
+
+    memcpy(buf, variable, len + 1);
     sanitize_chart_name(variable, variable, len + 1);
     return memcmp(buf, variable, len + 1) != 0;
 }
