@@ -857,6 +857,7 @@ int main(int argc, char **argv) {
 
         if(unlikely(print_tree_and_exit)) {
             print_hierarchy(root_of_pids());
+            netdata_mutex_unlock(&apps_and_stdout_mutex);
             exit(0);
         }
 
