@@ -2872,7 +2872,7 @@ modules:
                 - name: threads
             - name: ad.replication_threads_getting_nc_changes_holding_semaphore
               description: DRA threads getting NC changes holding semaphore
-              unit: threads/s
+              unit: threads
               chart_type: line
               dimensions:
                 - name: threads
