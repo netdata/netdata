@@ -1077,11 +1077,10 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
     worker_is_busy(WORKER_JOB_DETECTION_COLLECT_STATS);
 
     ml_machine_learning_stats_t mls_copy = {};
+    ml_machine_learning_stats_t host_mls = {};
+    calculated_number_t host_anomaly_rate = 0.0;
 
     if (host->ml_running) {
-        netdata_mutex_lock(&host->mutex);
-        host->mls = {};
-
         /*
          * prediction/detection stats
         */
@@ -1098,20 +1097,20 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 
             ml_machine_learning_stats_t chart_mls = chart->mls;
 
-            host->mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
-            host->mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;
+            host_mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
+            host_mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;
 
-            host->mls.num_metric_type_constant += chart_mls.num_metric_type_constant;
-            host->mls.num_metric_type_variable += chart_mls.num_metric_type_variable;
+            host_mls.num_metric_type_constant += chart_mls.num_metric_type_constant;
+            host_mls.num_metric_type_variable += chart_mls.num_metric_type_variable;
 
-            host->mls.num_training_status_untrained += chart_mls.num_training_status_untrained;
-            host->mls.num_training_status_pending_without_model += chart_mls.num_training_status_pending_without_model;
-            host->mls.num_training_status_trained += chart_mls.num_training_status_trained;
-            host->mls.num_training_status_pending_with_model += chart_mls.num_training_status_pending_with_model;
-            host->mls.num_training_status_silenced += chart_mls.num_training_status_silenced;
+            host_mls.num_training_status_untrained += chart_mls.num_training_status_untrained;
+            host_mls.num_training_status_pending_without_model += chart_mls.num_training_status_pending_without_model;
+            host_mls.num_training_status_trained += chart_mls.num_training_status_trained;
+            host_mls.num_training_status_pending_with_model += chart_mls.num_training_status_pending_with_model;
+            host_mls.num_training_status_silenced += chart_mls.num_training_status_silenced;
 
-            host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
-            host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
+            host_mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
+            host_mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
 
             if (spinlock_trylock(&host->context_anomaly_rate_spinlock))
             {
@@ -1137,20 +1136,30 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         }
         rrdset_foreach_done(rsp);
 
-        host->host_anomaly_rate = 0.0;
-        size_t NumActiveDimensions = host->mls.num_anomalous_dimensions + host->mls.num_normal_dimensions;
-        if (NumActiveDimensions)
-              host->host_anomaly_rate = static_cast<double>(host->mls.num_anomalous_dimensions) / NumActiveDimensions;
+        size_t num_active_dimensions = host_mls.num_anomalous_dimensions + host_mls.num_normal_dimensions;
+        if (num_active_dimensions)
+            host_anomaly_rate = static_cast<double>(host_mls.num_anomalous_dimensions) / num_active_dimensions;
 
-        mls_copy = host->mls;
+        bool publish_stats = false;
 
+        // Publish the final host snapshot after chart traversal so chart
+        // deletion cannot block other host->mutex users for the full walk.
+        netdata_mutex_lock(&host->mutex);
+        if (host->ml_running) {
+            host->mls = host_mls;
+            host->host_anomaly_rate = host_anomaly_rate;
+            mls_copy = host->mls;
+            publish_stats = true;
+        }
         netdata_mutex_unlock(&host->mutex);
 
-        worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
-        ml_update_dimensions_chart(host, mls_copy);
+        if (publish_stats) {
+            worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
+            ml_update_dimensions_chart(host, mls_copy);
 
-        worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0, owa);
+            worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
+            ml_update_host_and_detection_rate_charts(host, host_anomaly_rate * 10000.0, owa);
+        }
     } else {
         host->host_anomaly_rate = 0.0;
     }
