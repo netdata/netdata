@@ -25,7 +25,7 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
         period = EBPF_DEFAULT_LIFETIME;
 
     st->thread = NULL;
-    em->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_FUNCTION_RUNNING);
     em->lifetime = period;
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -427,7 +427,7 @@ static void ebpf_function_socket_manipulation(
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (ebpf_module_enabled_get(em) > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_socket_clean_judy_array_unsafe();
@@ -443,8 +443,9 @@ static void ebpf_function_socket_manipulation(
     } else {
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (period < 0)
-            em->lifetime = (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING) ? EBPF_NON_FUNCTION_LIFE_TIME :
-                                                                                   EBPF_DEFAULT_LIFETIME;
+            em->lifetime = (ebpf_module_enabled_get(em) != NETDATA_THREAD_EBPF_FUNCTION_RUNNING) ?
+                               EBPF_NON_FUNCTION_LIFE_TIME :
+                               EBPF_DEFAULT_LIFETIME;
     }
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 
