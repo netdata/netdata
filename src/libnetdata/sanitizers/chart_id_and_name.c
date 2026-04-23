@@ -2,8 +2,10 @@
 
 #include "../libnetdata.h"
 
-// keep in sync with RRDVAR_MAX_LENGTH in health/rrdvar.h
+// defined again in health/rrdvar.h — keep both in sync
+#ifndef RRDVAR_MAX_LENGTH
 #define RRDVAR_MAX_LENGTH 1024
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // RRD string sanitization (for units, title, family, context, plugin, module)

@@ -49,13 +49,27 @@ inline NETDATA_DOUBLE average(const NETDATA_DOUBLE *series, size_t entries) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+// periods up to this size use a stack buffer to avoid heap overhead
+#define MOVING_AVERAGE_STACK_PERIOD 32
+
 NETDATA_DOUBLE moving_average(const NETDATA_DOUBLE *series, size_t entries, size_t period) {
     if(unlikely(period == 0))
         return 0.0;
 
     size_t i, count;
     NETDATA_DOUBLE sum = 0, avg = 0;
-    NETDATA_DOUBLE *p = callocz(period, sizeof(*p));
+
+    NETDATA_DOUBLE stack_buf[MOVING_AVERAGE_STACK_PERIOD];
+    NETDATA_DOUBLE *heap_p = NULL;
+    NETDATA_DOUBLE *p;
+
+    if(period <= MOVING_AVERAGE_STACK_PERIOD) {
+        memset(stack_buf, 0, period * sizeof(*stack_buf));
+        p = stack_buf;
+    } else {
+        heap_p = callocz(period, sizeof(*heap_p));
+        p = heap_p;
+    }
 
     for(i = 0, count = 0; i < entries; i++) {
         NETDATA_DOUBLE value = series[i];
@@ -74,7 +88,7 @@ NETDATA_DOUBLE moving_average(const NETDATA_DOUBLE *series, size_t entries, size
         count++;
     }
 
-    freez(p);
+    freez(heap_p);
     return avg;
 }
 

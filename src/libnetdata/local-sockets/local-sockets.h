@@ -23,6 +23,9 @@
 
 #define UID_UNSET (uid_t)(UINT32_MAX)
 
+// max cmdline bytes read from /proc/<pid>/cmdline — reader-side guard must match
+#define LOCAL_SOCKETS_CMDLINE_MAX 8192
+
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for keeping the namespaces
 // key and value is the namespace inode
@@ -583,7 +586,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
     struct dirent *proc_entry;
     char filename[FILENAME_MAX + 1];
     char comm[TASK_COMM_LEN];
-    char cmdline[8192];
+    char cmdline[LOCAL_SOCKETS_CMDLINE_MAX];
     const char *cmdline_trimmed;
     uint64_t net_ns_inode;
 
@@ -1579,9 +1582,9 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         if(read(spawn_server_instance_read_fd(si), &len, sizeof(len)) != sizeof(len))
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
-        if(len > 8192) {
-            // matches the writer-side cmdline[8192] stack buffer; exceeding it means a broken pipe protocol
-            local_sockets_log(ls, "cmdline length %zu from child exceeds limit (8192), aborting namespace socket collection", len);
+        if(len > LOCAL_SOCKETS_CMDLINE_MAX) {
+            // broken pipe protocol: writer caps at LOCAL_SOCKETS_CMDLINE_MAX bytes
+            local_sockets_log(ls, "cmdline length %zu from child exceeds limit (%d), aborting namespace socket collection", len, LOCAL_SOCKETS_CMDLINE_MAX);
             break;
         }
 
