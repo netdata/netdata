@@ -300,10 +300,12 @@ static void string_index_delete(STRING *string) {
 
 ALWAYS_INLINE
 STRING *string_strdupz(const char *str) {
-    if(unlikely(!str)) return NULL;
+    size_t length = 0;
+    if(likely(str))
+        length = strlen(str);
 
-    size_t length = strlen(str);
     if(unlikely(!length)) return NULL;
+
     length++;
     uint8_t partition = string_partition_str(str);
     STRING *string = string_index_search(str, length, partition);
