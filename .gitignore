@@ -192,6 +192,9 @@ build-*/
 # ignore rules for go plugin code
 src/go/plugin/go.d/bin/
 src/go/plugin/go.d/vendor
+# Test fixtures from https://github.com/netdata/testdata
+# Used by tests with: go test -tags=topology_fixtures ./...
+src/go/testdata
 
 # ignore files used with msi installer
 packaging/windows/*.msi
