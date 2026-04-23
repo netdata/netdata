@@ -189,6 +189,11 @@ static bool wrap_parse_array_item_object(json_object *jobj_in, size_t *count,
 // Test helpers
 // ============================================================================
 
+static bool json_function_payload_fail_with_error(json_object *jobj __maybe_unused, void *data, BUFFER *error) {
+    buffer_strcat(error, (const char *)data);
+    return false;
+}
+
 #define T(cond, msg) do { \
     if (!(cond)) { fprintf(stderr, "  FAILED: %s\n", msg); failed++; } \
 } while(0)
@@ -1913,6 +1918,60 @@ static int test_parse_array_item_object(void) {
     return failed;
 }
 
+// ----------------------------------------------------------------------------
+// json_parse_function_payload_or_error() error path:
+//   callback error should be capped and explicitly truncated
+// ----------------------------------------------------------------------------
+static int test_parse_function_payload_error_cap(void) {
+    int failed = 0;
+    BUFFER *payload = buffer_create(0, NULL);
+    BUFFER *output = buffer_create(0, NULL);
+    char long_error[1024];
+    int code = 0;
+
+    memset(long_error, 'A', sizeof(long_error) - 1);
+    long_error[sizeof(long_error) - 1] = '\0';
+
+    buffer_strcat(payload, "{}");
+
+    struct json_object *result = json_parse_function_payload_or_error(output, payload, &code,
+                                                                      json_function_payload_fail_with_error,
+                                                                      long_error);
+
+    T(result == NULL, "function_payload_error_cap: callback failure should return NULL");
+    T(code == HTTP_RESP_BAD_REQUEST, "function_payload_error_cap: callback failure should return bad request");
+
+    json_object *response = json_tokener_parse(buffer_tostring(output));
+    T(response != NULL, "function_payload_error_cap: output should be valid JSON");
+
+    const char *error_msg = NULL;
+    if(response) {
+        json_object *error_obj = NULL;
+        T(json_object_object_get_ex(response, "errorMessage", &error_obj),
+          "function_payload_error_cap: response should include errorMessage");
+
+        if(error_obj)
+            error_msg = json_object_get_string(error_obj);
+    }
+
+    T(error_msg != NULL, "function_payload_error_cap: errorMessage should be readable");
+    T(error_msg && strncmp(error_msg, "JSON parser failed: ", strlen("JSON parser failed: ")) == 0,
+      "function_payload_error_cap: errorMessage should include parser prefix");
+    T(error_msg && strstr(error_msg, "...") != NULL,
+      "function_payload_error_cap: errorMessage should explicitly indicate truncation");
+    T(error_msg && strlen(error_msg) < sizeof(long_error) - 1,
+      "function_payload_error_cap: errorMessage should be shorter than the original callback error");
+    T(buffer_strlen(output) < sizeof(long_error),
+      "function_payload_error_cap: output JSON should stay smaller than the original callback error");
+
+    if(response)
+        json_object_put(response);
+    buffer_free(output);
+    buffer_free(payload);
+
+    return failed;
+}
+
 // ============================================================================
 // Entry point
 // ============================================================================
@@ -1942,6 +2001,7 @@ int json_c_parser_unittest(void) {
         { "SUBOBJECT",          test_parse_subobject },
         { "ARRAY",              test_parse_array },
         { "ARRAY_ITEM_OBJECT",  test_parse_array_item_object },
+        { "FUNCTION_PAYLOAD_ERROR_CAP", test_parse_function_payload_error_cap },
         { NULL, NULL }
     };
 
