@@ -365,6 +365,49 @@ static void test_kmeans_scoring()
     ML_TEST_ASSERT_DOUBLE_EQ(score_eq, 0.0, 1e-9, "equal min/max should return 0");
 }
 
+// Test: converting an empty ml_kmeans_t must produce deterministic zeroed centers.
+static void test_kmeans_inlined_empty_source_is_zero_initialized()
+{
+    fprintf(stderr, "  test_kmeans_inlined_empty_source_is_zero_initialized...\n");
+
+    ml_kmeans_t empty_km;
+    empty_km.cluster_centers.clear();
+    empty_km.min_dist = 1.5;
+    empty_km.max_dist = 9.5;
+    empty_km.after = 11;
+    empty_km.before = 22;
+
+    ml_kmeans_inlined_t constructed(empty_km);
+    ML_TEST_ASSERT(constructed.after == empty_km.after, "constructed empty model should preserve 'after'");
+    ML_TEST_ASSERT(constructed.before == empty_km.before, "constructed empty model should preserve 'before'");
+    ML_TEST_ASSERT_DOUBLE_EQ(constructed.min_dist, empty_km.min_dist, 0.0, "constructed empty model should preserve min_dist");
+    ML_TEST_ASSERT_DOUBLE_EQ(constructed.max_dist, empty_km.max_dist, 0.0, "constructed empty model should preserve max_dist");
+    for (size_t center = 0; center < constructed.cluster_centers.size(); center++) {
+        ML_TEST_ASSERT(constructed.cluster_centers[center].size() == 6, "constructed empty-source centers must keep fixed-size geometry");
+        for (long i = 0; i < constructed.cluster_centers[center].size(); i++) {
+            char msg[160];
+            snprintf(msg, sizeof(msg), "constructed empty-source center[%zu](%ld) should be zero", center, i);
+            ML_TEST_ASSERT_DOUBLE_EQ(constructed.cluster_centers[center](i), 0.0, 0.0, msg);
+        }
+    }
+
+    ml_kmeans_inlined_t assigned;
+    for (int i = 0; i < 6; i++) {
+        assigned.cluster_centers[0](i) = 10.0 + i;
+        assigned.cluster_centers[1](i) = 20.0 + i;
+    }
+    assigned = empty_km;
+
+    for (size_t center = 0; center < assigned.cluster_centers.size(); center++) {
+        ML_TEST_ASSERT(assigned.cluster_centers[center].size() == 6, "empty-source centers must keep fixed-size geometry");
+        for (long i = 0; i < assigned.cluster_centers[center].size(); i++) {
+            char msg[160];
+            snprintf(msg, sizeof(msg), "empty-source center[%zu](%ld) should be zero", center, i);
+            ML_TEST_ASSERT_DOUBLE_EQ(assigned.cluster_centers[center](i), 0.0, 0.0, msg);
+        }
+    }
+}
+
 // Test: circular buffer linearization produces the same result as std::rotate
 static void test_circular_buffer_equivalence()
 {
@@ -960,6 +1003,7 @@ extern "C" int ml_unittest()
     test_features_zero_smooth_matches_one();
     test_kmeans_scoring();
     test_full_pipeline();
+    test_kmeans_inlined_empty_source_is_zero_initialized();
     test_circular_buffer_equivalence();
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();

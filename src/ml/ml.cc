@@ -861,6 +861,21 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         // Apply sampling during lag feature extraction
         ml_features_preprocess(&features, worker->training_samples, sampling_ratio);
 
+        // Preprocessing can still leave fewer than 2 vectors after smoothing, lag extraction,
+        // or sampling, and k-means cannot build 2 cluster centers from that input.
+        if (worker->training_samples.size() < 2) {
+            spinlock_lock(&dim->slock);
+
+            dim->mt = METRIC_TYPE_CONSTANT;
+            dim->suppression_anomaly_counter = 0;
+            dim->suppression_window_counter = 0;
+            dim->training_in_progress = false;
+
+            spinlock_unlock(&dim->slock);
+
+            return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
+        }
+
         ml_kmeans_init(&dim->kmeans);
         ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
     }

@@ -33,21 +33,16 @@ struct ml_kmeans_inlined_t {
     time_t after;
     time_t before;
 
-    ml_kmeans_inlined_t() : min_dist(0), max_dist(0), after(0), before(0)
+    ml_kmeans_inlined_t() : cluster_centers{}, min_dist(0), max_dist(0), after(0), before(0)
     {
     }
 
-    explicit ml_kmeans_inlined_t(const ml_kmeans_t &km)
+    explicit ml_kmeans_inlined_t(const ml_kmeans_t &km) : cluster_centers{}, min_dist(km.min_dist), max_dist(km.max_dist), after(km.after), before(km.before)
     {
         if (km.cluster_centers.size() == 2) {
             cluster_centers[0] = km.cluster_centers[0];
             cluster_centers[1] = km.cluster_centers[1];
         }
-
-        min_dist = km.min_dist;
-        max_dist = km.max_dist;
-        after = km.after;
-        before = km.before;
     }
 
     ml_kmeans_inlined_t &operator=(const ml_kmeans_t &km)
@@ -55,6 +50,9 @@ struct ml_kmeans_inlined_t {
         if (km.cluster_centers.size() == 2) {
             cluster_centers[0] = km.cluster_centers[0];
             cluster_centers[1] = km.cluster_centers[1];
+        }
+        else {
+            cluster_centers = std::array<DSample, 2>{};
         }
         min_dist = km.min_dist;
         max_dist = km.max_dist;
