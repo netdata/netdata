@@ -49,8 +49,9 @@ void child_check_fds(void) {
 static void test_int_fds_echo_loop(SPAWN_INSTANCE *si, const char *msg, size_t iterations) {
     if(!msg || !*msg) return;
 
-    size_t ulen = strlen(msg);
-    if(unlikely(ulen > (size_t)(SSIZE_MAX / 2)))
+    const size_t max_msg_len = (size_t)(SSIZE_MAX / 2);
+    size_t ulen = strnlen(msg, max_msg_len + 1);
+    if(unlikely(ulen > max_msg_len))
         return;
 
     ssize_t len = (ssize_t)ulen;
@@ -88,7 +89,14 @@ static void test_int_fds_echo_loop(SPAWN_INSTANCE *si, const char *msg, size_t i
 }
 
 static void test_popen_echo_loop(POPEN_INSTANCE *pi, const char *msg, size_t iterations) {
-    size_t len = strlen(msg);
+    if(!msg || !*msg) return;
+
+    const size_t max_msg_len =
+        ((size_t)(INT_MAX / 2) < (size_t)(SSIZE_MAX / 2)) ? (size_t)(INT_MAX / 2) : (size_t)(SSIZE_MAX / 2);
+    size_t len = strnlen(msg, max_msg_len + 1);
+    if(unlikely(len > max_msg_len))
+        return;
+
     size_t buffer_size = len * 2;
     CLEAN_CHAR_P *buffer = mallocz(buffer_size);
 
