@@ -150,6 +150,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
         return NULL;
 
+    if(!argv || !argv[0] || !*argv[0])
+        return NULL;
+
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 }, pipe_stderr[2] = { -1, -1 };
 
     errno_clear();

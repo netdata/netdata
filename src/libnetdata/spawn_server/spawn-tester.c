@@ -50,6 +50,9 @@ static void test_int_fds_echo_loop(SPAWN_INSTANCE *si, const char *msg, size_t i
     if(!msg || !*msg) return;
 
     size_t ulen = strlen(msg);
+    if(unlikely(ulen > (size_t)(SSIZE_MAX / 2)))
+        return;
+
     ssize_t len = (ssize_t)ulen;
     size_t buffer_size = ulen * 2;
     CLEAN_CHAR_P *buffer = mallocz(buffer_size);

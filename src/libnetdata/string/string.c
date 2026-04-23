@@ -134,10 +134,8 @@ STRING *string_dup(STRING *string) {
 }
 
 // Search the index and return an ACQUIRED string entry, or NULL
-static STRING *string_index_search(const char *str, size_t length) {
+static STRING *string_index_search(const char *str, size_t length, uint8_t partition) {
     STRING *string;
-
-    uint8_t partition = string_partition_str(str);
 
     // Find the string in the index
     // With a read-lock so that multiple readers can use the index concurrently.
@@ -177,10 +175,8 @@ static STRING *string_index_search(const char *str, size_t length) {
 // The returned entry is ACQUIRED, and it can either be:
 //   1. a new item inserted, or
 //   2. an item found in the index that is not currently deleted
-static STRING *string_index_insert(const char *str, size_t length) {
+static STRING *string_index_insert(const char *str, size_t length, uint8_t partition) {
     STRING *string;
-
-    uint8_t partition = string_partition_str(str);
 
     rw_spinlock_write_lock(&string_base[partition].spinlock);
 
@@ -198,8 +194,7 @@ static STRING *string_index_insert(const char *str, size_t length) {
 
         if (unlikely(Rc == PJERR)) {
             fatal(
-                "STRING: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
-                str,
+                "STRING: Cannot insert entry to JudyHS, JU_ERRNO_* == %u, ID == %d",
                 JU_ERRNO(&J_Error),
                 JU_ERRID(&J_Error));
         }
@@ -210,7 +205,8 @@ static STRING *string_index_insert(const char *str, size_t length) {
         // a new item added to the index
         long mem_size = (long)sizeof(STRING) + (long)length;
         string = mallocz(mem_size);
-        strcpy((char *)string->str, str);
+        memcpy((char *)string->str, str, length - 1);
+        ((char *)string->str)[length - 1] = '\0';
         string->length = length;
         string->refcount = 1;
         
@@ -306,19 +302,16 @@ ALWAYS_INLINE
 STRING *string_strdupz(const char *str) {
     if(unlikely(!str || !*str)) return NULL;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    uint8_t partition = string_partition_str(str);
-#endif
-
     size_t length = strlen(str) + 1;
-    STRING *string = string_index_search(str, length);
+    uint8_t partition = string_partition_str(str);
+    STRING *string = string_index_search(str, length, partition);
 
     while(!string) {
         // The search above did not find anything,
         // We loop here, because during insert we may find an entry that is being deleted by another thread.
         // So, we have to let it go and retry to insert it again.
 
-        string = string_index_insert(str, length);
+        string = string_index_insert(str, length, partition);
     }
 
     // statistics
@@ -336,17 +329,11 @@ ALWAYS_INLINE
 STRING *string_strndupz(const char *str, size_t len) {
     if(unlikely(!str || !*str || !len)) return NULL;
 
-#ifdef NETDATA_INTERNAL_CHECKS
     uint8_t partition = string_partition_str(str);
-#endif
 
-    CLEAN_CHAR_P *buf = mallocz(len + 1);
-    memcpy(buf, str, len);
-    buf[len] = '\0';
-
-    STRING *string = string_index_search(buf, len + 1);
+    STRING *string = string_index_search(str, len + 1, partition);
     while(!string)
-        string = string_index_insert(buf, len + 1);
+        string = string_index_insert(str, len + 1, partition);
 
     string_stats_atomic_increment(partition, active_references);
 
