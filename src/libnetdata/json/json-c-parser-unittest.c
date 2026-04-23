@@ -1972,6 +1972,50 @@ static int test_parse_function_payload_error_cap(void) {
     return failed;
 }
 
+// ----------------------------------------------------------------------------
+// json_parse_function_payload_or_error() error path:
+//   empty callback error should fall back to "unknown error"
+// ----------------------------------------------------------------------------
+static int test_parse_function_payload_empty_error_fallback(void) {
+    int failed = 0;
+    BUFFER *payload = buffer_create(0, NULL);
+    BUFFER *output = buffer_create(0, NULL);
+    int code = 0;
+
+    buffer_strcat(payload, "{}");
+
+    struct json_object *result = json_parse_function_payload_or_error(output, payload, &code,
+                                                                      json_function_payload_fail_with_error,
+                                                                      "");
+
+    T(result == NULL, "function_payload_empty_error_fallback: callback failure should return NULL");
+    T(code == HTTP_RESP_BAD_REQUEST, "function_payload_empty_error_fallback: callback failure should return bad request");
+
+    json_object *response = json_tokener_parse(buffer_tostring(output));
+    T(response != NULL, "function_payload_empty_error_fallback: output should be valid JSON");
+
+    const char *error_msg = NULL;
+    if(response) {
+        json_object *error_obj = NULL;
+        T(json_object_object_get_ex(response, "errorMessage", &error_obj),
+          "function_payload_empty_error_fallback: response should include errorMessage");
+
+        if(error_obj)
+            error_msg = json_object_get_string(error_obj);
+    }
+
+    T(error_msg != NULL, "function_payload_empty_error_fallback: errorMessage should be readable");
+    T(error_msg && strcmp(error_msg, "JSON parser failed: unknown error") == 0,
+      "function_payload_empty_error_fallback: empty callback error should use the unknown error fallback");
+
+    if(response)
+        json_object_put(response);
+    buffer_free(output);
+    buffer_free(payload);
+
+    return failed;
+}
+
 // ============================================================================
 // Entry point
 // ============================================================================
@@ -2002,6 +2046,7 @@ int json_c_parser_unittest(void) {
         { "ARRAY",              test_parse_array },
         { "ARRAY_ITEM_OBJECT",  test_parse_array_item_object },
         { "FUNCTION_PAYLOAD_ERROR_CAP", test_parse_function_payload_error_cap },
+        { "FUNCTION_PAYLOAD_EMPTY_ERROR_FALLBACK", test_parse_function_payload_empty_error_fallback },
         { NULL, NULL }
     };
 

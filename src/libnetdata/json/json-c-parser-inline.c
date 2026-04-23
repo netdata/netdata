@@ -6,14 +6,15 @@
 #define JSON_PARSER_ERROR_MSG_MAX 256
 #define JSON_PARSER_ERROR_PREFIX "JSON parser failed: "
 #define JSON_PARSER_ERROR_TRUNCATION_SUFFIX "..."
+#define JSON_PARSER_UNKNOWN_ERROR "unknown error"
 
 static void json_parser_format_error(char *dst, size_t dst_size, const char *error_msg, size_t error_len) {
     if(unlikely(!dst_size))
         return;
 
     if(!error_msg || !*error_msg) {
-        error_msg = "unknown error";
-        error_len = strlen(error_msg);
+        error_msg = JSON_PARSER_UNKNOWN_ERROR;
+        error_len = sizeof(JSON_PARSER_UNKNOWN_ERROR) - 1;
     }
 
     const size_t prefix_len = sizeof(JSON_PARSER_ERROR_PREFIX) - 1;
@@ -67,7 +68,7 @@ struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER 
     if (json_tokener_get_error(tokener) != json_tokener_success) {
         const char *error_msg = json_tokener_error_desc(json_tokener_get_error(tokener));
         char tmp[JSON_PARSER_ERROR_MSG_MAX];
-        json_parser_format_error(tmp, sizeof(tmp), error_msg, error_msg ? strlen(error_msg) : 0);
+        json_parser_format_error(tmp, sizeof(tmp), error_msg, error_msg ? strnlen(error_msg, JSON_PARSER_ERROR_MSG_MAX) : 0);
         json_tokener_free(tokener);
         *code = rrd_call_function_error(output, tmp, HTTP_RESP_INTERNAL_SERVER_ERROR);
         return NULL;
@@ -104,7 +105,7 @@ int json_parse_payload_or_error(BUFFER *payload, BUFFER *error, json_parse_funct
     if (json_tokener_get_error(tokener) != json_tokener_success) {
         const char *error_msg = json_tokener_error_desc(json_tokener_get_error(tokener));
         char tmp[JSON_PARSER_ERROR_MSG_MAX];
-        json_parser_format_error(tmp, sizeof(tmp), error_msg, error_msg ? strlen(error_msg) : 0);
+        json_parser_format_error(tmp, sizeof(tmp), error_msg, error_msg ? strnlen(error_msg, JSON_PARSER_ERROR_MSG_MAX) : 0);
         json_tokener_free(tokener);
         buffer_strcat(error, tmp);
         return HTTP_RESP_BAD_REQUEST;
