@@ -26,6 +26,16 @@ typedef struct LOG_FORWARDER {
 
 static void log_forwarder_thread_func(void *arg);
 
+static inline size_t log_forwarder_max_pfds(void) {
+    size_t max_nfds = SIZE_MAX / sizeof(struct pollfd);
+    size_t max_poll_nfds = (size_t)(nfds_t)-1;
+
+    if(max_poll_nfds < max_nfds)
+        max_nfds = max_poll_nfds;
+
+    return max_nfds;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // helper functions
 
@@ -258,6 +268,7 @@ static void log_forwarder_thread_func(void *arg) {
     LOG_FORWARDER *lf = (LOG_FORWARDER *)arg;
     struct pollfd *pfds = NULL;
     size_t pfds_capacity = 0;
+    const size_t max_pfds = log_forwarder_max_pfds();
 
     while (1) {
         spinlock_lock(&lf->spinlock);
@@ -274,13 +285,21 @@ static void log_forwarder_thread_func(void *arg) {
         }
 
         // Count the number of fds
-        size_t nfds = 1 + log_forwarder_remove_deleted_unsafe(lf);
+        size_t entries = log_forwarder_remove_deleted_unsafe(lf);
+        internal_fatal(entries > max_pfds - 1,
+                       "Log forwarder: too many file descriptors to poll (%zu > %zu)",
+                       entries + 1, max_pfds);
+        size_t nfds = 1 + entries;
 
         // Reuse the pollfd array across iterations to avoid heap churn in the worker loop.
         if (unlikely(nfds > pfds_capacity)) {
             size_t new_capacity = pfds_capacity ? pfds_capacity : 1;
-            while (new_capacity < nfds)
+            while (new_capacity < nfds) {
+                internal_fatal(new_capacity > max_pfds / 2,
+                               "Log forwarder: pollfd capacity overflow while growing to %zu fds",
+                               nfds);
                 new_capacity *= 2;
+            }
 
             pfds = reallocz(pfds, new_capacity * sizeof(*pfds));
             pfds_capacity = new_capacity;
@@ -290,7 +309,7 @@ static void log_forwarder_thread_func(void *arg) {
         pfds[0].fd = lf->pipe_fds[PIPE_READ];
         pfds[0].events = POLLIN;
 
-        int idx = 1;
+        size_t idx = 1;
         for(LOG_FORWARDER_ENTRY *entry = lf->entries; entry ; entry = entry->next, idx++) {
             pfds[idx].fd = entry->fd;
             pfds[idx].events = POLLIN;
