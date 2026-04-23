@@ -300,7 +300,8 @@ static void string_index_delete(STRING *string) {
 
 ALWAYS_INLINE
 STRING *string_strdupz(const char *str) {
-    if(unlikely(!str || !*str)) return NULL;
+    if(unlikely(!str)) return NULL;
+    if(unlikely(!*str)) return NULL;
 
     size_t length = strlen(str) + 1;
     uint8_t partition = string_partition_str(str);
@@ -776,6 +777,22 @@ int string_unittest(size_t entries) {
         }
         else
             fprintf(stderr, "OK: string is properly handling different strings\n");
+
+        STRING *s_null = string_strdupz(NULL);
+        if(s_null != NULL) {
+            errors++;
+            fprintf(stderr, "ERROR: NULL string input should return NULL\n");
+        }
+        else
+            fprintf(stderr, "OK: NULL string input returns NULL\n");
+
+        STRING *s_empty = string_strdupz("");
+        if(s_empty != NULL) {
+            errors++;
+            fprintf(stderr, "ERROR: empty string input should return NULL\n");
+        }
+        else
+            fprintf(stderr, "OK: empty string input returns NULL\n");
 
         usec_t start_ut, end_ut;
         STRING **strings = mallocz(entries * sizeof(STRING *));
