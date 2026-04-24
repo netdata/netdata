@@ -304,6 +304,21 @@ modules:
                 - For custom patterns: set `log_type: regexp` and configure `regexp_config.pattern` with a regex containing named groups matching the known fields
                 - For JSON logs: set `log_type: json` and configure `json_config.mapping`
                 - For LTSV logs: set `log_type: ltsv` and configure `ltsv_config.mapping`
+          - name: Unmatched lines due to non-standard log fields or extra columns
+            description: |
+              Persistent unmatched entries appear even with auto-detection enabled.
+
+              **Cause:**
+              The log format includes fields not in the known-fields list (for example, custom headers, upstream timing, or unique IDs), preventing CSV auto-detection from matching any predefined format.
+
+              **Resolution:**
+              Set `log_type: csv` explicitly and specify `csv_config.format` using the known field variables that match the log's column order. Alternatively, use `log_type: regexp` with a `regexp_config.pattern` that captures only the known fields and ignores extras.
+          - name: Suppressing the alert for known benign unmatched lines
+            description: |
+              The web_log_1m_unmatched alert fires continuously but the unmatched lines are intentional (for example, health check logs in a different format).
+
+              **Resolution:**
+              Customize the alert threshold in `health.d/web_log.conf` by copying the web_log_1m_unmatched template and adjusting the warn condition, or silence notifications via Netdata Cloud alert configuration.
     alerts:
       - name: web_log_1m_unmatched
         metric: web_log.excluded_requests
