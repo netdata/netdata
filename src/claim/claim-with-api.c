@@ -485,6 +485,9 @@ bool claim_agent_from_split_files(void) {
         unlink(filename);
     }
 
+    freez(token);
+    freez(rooms);
+
     return ret;
 }
 

@@ -2595,8 +2595,9 @@ static void start_metadata_hosts(uv_work_t *req)
 
     store_alert_transitions((struct judy_list_t *)worker->pending_alert_list, true, false);
 
-    if (!SHUTDOWN_REQUESTED(config))
-        store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
+    // This helper already skips database scheduling once shutdown starts, but it
+    // still has to release the worker-owned Judy list on that path.
+    store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
 
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
@@ -2605,8 +2606,11 @@ static void start_metadata_hosts(uv_work_t *req)
     COMPUTE_DURATION(report_duration, "us", all_started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_DEBUG, "Checking all hosts completed in %s", report_duration);
 
+    // This helper already skips dimension deletion once shutdown starts, but it
+    // still has to release the worker-owned Judy list on that path.
+    do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
+
     if (!SHUTDOWN_REQUESTED(config)) {
-        do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
         run_metadata_cleanup(config);
     }
 
