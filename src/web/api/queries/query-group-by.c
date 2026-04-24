@@ -7,6 +7,10 @@ static inline bool group_by_is_separator(char c) {
 }
 
 static inline bool group_by_token_matches(const char *token, size_t len, const char *name) {
+    // Keep the dereference-site null check explicit before calling strlen().
+    if(!name)
+        return false;
+
     return strlen(name) == len && !strncmp(token, name, len);
 }
 
