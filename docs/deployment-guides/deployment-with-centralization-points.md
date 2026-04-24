@@ -2,6 +2,18 @@
 
 ***Parents*** are Netdata Agents that collect and store data from other Agents ("***Children***"). They act as centralization points for your observability data.
 
+## Quick Setup
+
+1. **Install Netdata on your Parent node** — Use the [getting started guide](/docs/getting-started-netdata/guide.md) to install Netdata on the system that will act as your Parent.
+
+2. **Generate an API key and configure the Parent** — Run `uuidgen` to create an API key, then edit `stream.conf` on the Parent to accept incoming connections. See [Configuring Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) for the full procedure.
+
+3. **Configure each Child to stream to the Parent** — Edit `stream.conf` on every Child and set the `destination` to your Parent's address. Follow the [configuration reference](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) for details.
+
+4. **Restart Netdata on both Parent and Children** — Apply changes by [restarting the Agent](/docs/netdata-agent/start-stop-restart.md) on every node.
+
+5. **Verify streaming is working** — Check the Parent's dashboard for Child nodes, or use `journalctl` to confirm streaming connections as described in the [configuration guide](/docs/observability-centralization-points/metrics-centralization-points/configuration.md).
+
 ## How It Works
 
 1. **You designate some Agents as Parents** - Configure them to receive streaming data
@@ -200,6 +212,6 @@ flowchart TB
 
 :::tip
 
-Check out our [Parent-Child Deployment Guide](/docs/deployment-guides/deployment-with-centralization-points.md) for step-by-step instructions.
+Check out our [Parent-Child configuration guide](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) for step-by-step instructions.
 
 :::
