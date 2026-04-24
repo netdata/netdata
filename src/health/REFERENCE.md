@@ -1630,6 +1630,17 @@ The following variables are available in alert notification templates and custom
 |   `${calc_param_values}`    | The values of the variables in the evaluated expression                                                                                      |
 |     `${total_warnings}`     | The total number of alarms in WARNING state on the host                                                                                      |
 |     `${total_critical}`     | The total number of alarms in CRITICAL state on the host                                                                                     |
+|   `${total_warn_alarms}`    | A list of all alarms currently in WARNING state on the host                                                                                  |
+|   `${total_crit_alarms}`    | A list of all alarms currently in CRITICAL state on the host                                                                                 |
+|     `${classification}`     | The classification field from the alarm configuration                                                                                        |
+|   `${edit_command_line}`    | The command to edit the alarm, with the line number                                                                                          |
+|  `${child_machine_guid}`    | The machine_guid of the child node                                                                                                           |
+|     `${transition_id}`      | The unique transition ID of this alert state change                                                                                          |
+|        `${summary}`         | The summary text of the alert                                                                                                                |
+|        `${context}`         | The context of the chart (e.g., system.cpu)                                                                                                  |
+|       `${component}`        | The component type of the alert                                                                                                              |
+|          `${type}`          | The type of the alert                                                                                                                        |
+|    `${url_value_string}`    | Same as `${value_string}` but URL encoded                                                                                                    |
 
 ## Related Pages
 
