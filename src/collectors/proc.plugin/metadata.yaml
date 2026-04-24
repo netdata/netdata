@@ -4046,19 +4046,67 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          description: "This is netdata main configuration file"
         options:
-          description: ""
+          description: |
+            There are two ways to configure NFS Client monitoring:
+
+            - **Disable the entire module**: Add an entry in the `[plugin:proc]` section.
+            - **Toggle individual charts**: Use options in the `[plugin:proc:/proc/net/rpc/nfs]` section.
+
+            Add the entry `'/proc/net/rpc/nfs = no'` to the `[plugin:proc]` section of `netdata.conf` to disable the NFS Client module entirely. To selectively enable or disable individual NFS Client charts, configure the boolean options listed below in the `[plugin:proc:/proc/net/rpc/nfs]` section.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: /proc/net/rpc/nfs
+              description: "Enables or disables the NFS Client module. Set in the `[plugin:proc]` section."
+              default_value: yes
+              required: false
+            - name: network
+              description: "NFS Client network statistics (UDP/TCP operations). Set in the `[plugin:proc:/proc/net/rpc/nfs]` section."
+              default_value: yes
+              required: false
+            - name: rpc
+              description: "NFS Client RPC statistics. Set in the `[plugin:proc:/proc/net/rpc/nfs]` section."
+              default_value: yes
+              required: false
+            - name: NFS v2 procedures
+              description: "NFS v2 Client remote procedure call statistics. Set in the `[plugin:proc:/proc/net/rpc/nfs]` section."
+              default_value: yes
+              required: false
+            - name: NFS v3 procedures
+              description: "NFS v3 Client remote procedure call statistics. Set in the `[plugin:proc:/proc/net/rpc/nfs]` section."
+              default_value: yes
+              required: false
+            - name: NFS v4 procedures
+              description: "NFS v4 Client remote procedure call statistics. Set in the `[plugin:proc:/proc/net/rpc/nfs]` section."
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
-            title: ""
-          list: []
+            title: "Config"
+          list:
+            - name: Disable NFS Client monitoring
+              description: "Add to the `[plugin:proc]` section to disable the entire NFS Client module."
+              config: |
+                [plugin:proc]
+                  /proc/net/rpc/nfs = no
+              folding:
+                enabled: false
+            - name: Disable individual NFS Client charts
+              description: "Toggle specific NFS Client charts by setting options in the `[plugin:proc:/proc/net/rpc/nfs]` section."
+              config: |
+                [plugin:proc:/proc/net/rpc/nfs]
+                  network = no
+                  rpc = no
+                  NFS v2 procedures = no
+                  NFS v3 procedures = no
+                  NFS v4 procedures = no
+              folding:
+                enabled: false
     troubleshooting:
       problems:
         list: []
@@ -4146,19 +4194,92 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          description: "This is netdata main configuration file"
         options:
-          description: ""
+          description: |
+            There are two ways to configure NFS Server monitoring:
+
+            - **Disable the entire module**: Add an entry in the `[plugin:proc]` section.
+            - **Toggle individual charts**: Use options in the `[plugin:proc:/proc/net/rpc/nfsd]` section.
+
+            Add the entry `'/proc/net/rpc/nfsd = no'` to the `[plugin:proc]` section of `netdata.conf` to disable the NFS Server module entirely. To selectively enable or disable individual NFS Server charts, configure the boolean options listed below in the `[plugin:proc:/proc/net/rpc/nfsd]` section.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: /proc/net/rpc/nfsd
+              description: "Enables or disables the NFS Server module. Set in the `[plugin:proc]` section."
+              default_value: yes
+              required: false
+            - name: read cache
+              description: "NFS Server read cache statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
+            - name: file handles
+              description: "NFS Server file handle statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
+            - name: I/O
+              description: "NFS Server I/O statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
+            - name: threads
+              description: "NFS Server thread statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
+            - name: network
+              description: "NFS Server network statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
+            - name: rpc
+              description: "NFS Server RPC statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
+            - name: NFS v2 procedures
+              description: "NFS v2 Server remote procedure call statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
+            - name: NFS v3 procedures
+              description: "NFS v3 Server remote procedure call statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
+            - name: NFS v4 procedures
+              description: "NFS v4 Server remote procedure call statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
+            - name: NFS v4 operations
+              description: "NFS v4 Server operation statistics. Set in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
-            title: ""
-          list: []
+            title: "Config"
+          list:
+            - name: Disable NFS Server monitoring
+              description: "Add to the `[plugin:proc]` section to disable the entire NFS Server module."
+              config: |
+                [plugin:proc]
+                  /proc/net/rpc/nfsd = no
+              folding:
+                enabled: false
+            - name: Disable individual NFS Server charts
+              description: "Toggle specific NFS Server charts by setting options in the `[plugin:proc:/proc/net/rpc/nfsd]` section."
+              config: |
+                [plugin:proc:/proc/net/rpc/nfsd]
+                  read cache = no
+                  file handles = no
+                  I/O = no
+                  threads = no
+                  network = no
+                  rpc = no
+                  NFS v2 procedures = no
+                  NFS v3 procedures = no
+                  NFS v4 procedures = no
+                  NFS v4 operations = no
+              folding:
+                enabled: false
     troubleshooting:
       problems:
         list: []

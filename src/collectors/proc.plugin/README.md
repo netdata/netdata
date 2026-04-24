@@ -248,6 +248,53 @@ So, to disable performance metrics for all loop devices you could add `performan
   # mismatch_cnt filename to monitor = /sys/block/%s/md/mismatch_cnt
 ```
 
+## Monitoring NFS
+
+`proc.plugin` monitors NFS Client and NFS Server statistics from `/proc/net/rpc/nfs` and `/proc/net/rpc/nfsd` respectively.
+
+### Disabling NFS monitoring
+
+To disable an entire NFS module, add its entry to the `[plugin:proc]` section of `netdata.conf`:
+
+```text
+[plugin:proc]
+  # /proc/net/rpc/nfs = yes
+  # /proc/net/rpc/nfsd = yes
+```
+
+Set the value to `no` to disable the module.
+
+### NFS Client per-chart configuration
+
+To toggle individual NFS Client charts, use the options in the `[plugin:proc:/proc/net/rpc/nfs]` section:
+
+```text
+[plugin:proc:/proc/net/rpc/nfs]
+  # network = yes
+  # rpc = yes
+  # NFS v2 procedures = yes
+  # NFS v3 procedures = yes
+  # NFS v4 procedures = yes
+```
+
+### NFS Server per-chart configuration
+
+To toggle individual NFS Server charts, use the options in the `[plugin:proc:/proc/net/rpc/nfsd]` section:
+
+```text
+[plugin:proc:/proc/net/rpc/nfsd]
+  # read cache = yes
+  # file handles = yes
+  # I/O = yes
+  # threads = yes
+  # network = yes
+  # rpc = yes
+  # NFS v2 procedures = yes
+  # NFS v3 procedures = yes
+  # NFS v4 procedures = yes
+  # NFS v4 operations = yes
+```
+
 ## Monitoring CPUs
 
 The `/proc/stat` module monitors CPU utilization, interrupts, context switches, processes started/running, thermal
