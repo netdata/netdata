@@ -282,12 +282,18 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                 }
 
                 uint32_t message_len = header.len - sizeof(opcode);
-                char message[message_len + 1];
+                if(message_len + 1 > wth->cmd.buffer_size) {
+                    wth->cmd.buffer = reallocz(wth->cmd.buffer, message_len + 1);
+                    wth->cmd.buffer_size = message_len + 1;
+                }
+
+                char *message = wth->cmd.buffer;
                 bytes = read_pipe_block(wth->cmd.pipe[PIPE_READ], message, message_len);
                 if(bytes != message_len) {
                     netdata_log_error("WEBSOCKET[%zu]: Failed to read broadcast message from pipe", wth->id);
                     continue;
                 }
+                message[message_len] = '\0';
 
                 // Ensure we have the complete message
                 if(header.len != sizeof(WEBSOCKET_OPCODE) + message_len) {
@@ -567,6 +573,9 @@ void websocket_thread(void *ptr) {
         close(wth->cmd.pipe[PIPE_WRITE]);
         wth->cmd.pipe[PIPE_WRITE] = -1;
     }
+
+    freez(wth->cmd.buffer);
+    wth->cmd.buffer_size = 0;
 
     // Mark thread as not running
     spinlock_lock(&wth->spinlock);
