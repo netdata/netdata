@@ -83,11 +83,10 @@ static RRDR_OPTIONS rrdr_options_parse_one_n(const char *o, size_t len) {
 
     if(!o || !len) return ret;
 
-    for(int i = 0; rrdr_options[i].name ; i++) {
+    for(int i = 0; ; i++) {
         const char *name = rrdr_options[i].name;
-        // Keep the dereference-site null check explicit before calling strlen().
         if(!name)
-            continue;
+            break;
 
         if (strlen(name) == len && !strncmp(o, name, len)) {
             ret |= rrdr_options[i].value;
