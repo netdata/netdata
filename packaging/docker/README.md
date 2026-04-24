@@ -11,6 +11,12 @@ We don’t officially support using Docker’s `--user` option or Docker Compose
 
 You can create a new Agent container with `docker run` or `docker-compose`, then access the dashboard at `http://NODE:19999`.
 
+:::note
+
+Netdata Cloud connectivity is entirely optional. The local dashboard at `http://NODE:19999` is fully functional without any Cloud connection. You can claim the node later if you want Cloud features such as centralized Dashboards and user management.
+
+:::
+
 The Netdata container requires specific **privileges** and **mounts** to provide full monitoring capabilities equivalent to a direct host installation. Below is a list of required components and their purposes.
 
 <details open>
