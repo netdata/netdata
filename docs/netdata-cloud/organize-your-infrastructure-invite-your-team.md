@@ -51,6 +51,12 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 
 :::
 
+:::note
+
+The "All nodes" Room is a system-managed Room that cannot be renamed, deleted, or left. It always contains every node in the Space. Create additional Rooms to organize nodes by service, location, or any other strategy.
+
+:::
+
 ## Organize Your Infrastructure
 
 ### Room Organization Strategies
