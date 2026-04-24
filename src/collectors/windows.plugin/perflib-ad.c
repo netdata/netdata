@@ -232,7 +232,7 @@ netdata_ad_address_book_client_sessions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
             "address_book",
             "ad.address_book_client_sessions",
             "Address book client sessions",
-            "sessions/s",
+            "sessions",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_ADDRESS_BOOK_CLIENT_SESSIONS,
@@ -240,7 +240,7 @@ netdata_ad_address_book_client_sessions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
             RRDSET_TYPE_LINE);
 
         rd_address_book_client_sessions =
-            rrddim_add(st_address_book_client_sessions, "sessions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_address_book_client_sessions, "sessions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -841,7 +841,7 @@ netdata_ad_replication_highest_usn_issued(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
             "replication",
             "ad.replication_highest_usn_issued",
             "Highest replication issued update sequence number",
-            "usn",
+            "usn/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_REPLICATION_HIGHEST_USN_ISSUED,
@@ -849,7 +849,7 @@ netdata_ad_replication_highest_usn_issued(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
             RRDSET_TYPE_LINE);
 
         rd_replication_highest_usn_issued =
-            rrddim_add(st_replication_highest_usn_issued, "issued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st_replication_highest_usn_issued, "issued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     // Windows exposes the 64-bit USN as separate high/low perf counters.
@@ -1506,7 +1506,7 @@ static void netdata_ad_security_descriptor_propagation_access_wait(
             "directory",
             "ad.security_descriptor_propagation_access_wait",
             "Security descriptor propagation access wait",
-            "seconds/s",
+            "seconds",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_SECURITY_DESCRIPTOR_PROPAGATION_ACCESS_WAIT_TOTAL_SECONDS,
@@ -1514,7 +1514,7 @@ static void netdata_ad_security_descriptor_propagation_access_wait(
             RRDSET_TYPE_LINE);
 
         rd_security_descriptor_propagation_access_wait =
-            rrddim_add(st_security_descriptor_propagation_access_wait, "wait", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_security_descriptor_propagation_access_wait, "wait", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -1959,7 +1959,7 @@ static void netdata_ad_atq_queue_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 "queue",
                 "ad.atq_outstanding_requests",
                 "Outstanding requests",
-                "requests/s",
+                "requests",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibAD",
                 PRIO_AD_OUTSTANDING_REQUEST,
@@ -1967,7 +1967,7 @@ static void netdata_ad_atq_queue_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 RRDSET_TYPE_LINE);
 
             rd_atq_outstanding_requests =
-                rrddim_add(st_atq_outstanding_requests, "outstanding", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st_atq_outstanding_requests, "outstanding", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         rrddim_set_by_pointer(
@@ -1996,14 +1996,14 @@ static void netdata_ad_atq_estimated_delay(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             "queue",
             "ad.atq_estimated_delay",
             "Estimated queue delay",
-            "seconds/s",
+            "seconds",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_ATQ_ESTIMATED_DELAY,
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_atq_estimated_delay = rrddim_add(st_atq_estimated_delay, "delay", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        rd_atq_estimated_delay = rrddim_add(st_atq_estimated_delay, "delay", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -2378,7 +2378,7 @@ static void netdata_ad_replication_inbound_values_dns_only(
             NULL,
             "replication",
             "ad.replication_inbound_values_dns_only",
-            "DRA replication inbound values DNS only",
+            "DRA replication inbound values DNs only",
             "values/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
@@ -2562,7 +2562,7 @@ static void netdata_ad_replication_outbound_values_dns_only(
             NULL,
             "replication",
             "ad.replication_outbound_values_dns_only",
-            "DRA replication outbound values DNS only",
+            "DRA replication outbound values DNs only",
             "values/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",

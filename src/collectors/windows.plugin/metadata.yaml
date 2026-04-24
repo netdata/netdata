@@ -2445,7 +2445,7 @@ modules:
                 - name: proxy_search
             - name: ad.address_book_client_sessions
               description: Address book client sessions
-              unit: sessions/s
+              unit: sessions
               chart_type: line
               dimensions:
                 - name: sessions
@@ -2533,7 +2533,7 @@ modules:
                 - name: committed
             - name: ad.replication_highest_usn_issued
               description: Highest replication issued update sequence number
-              unit: usn
+              unit: usn/s
               chart_type: line
               dimensions:
                 - name: issued
@@ -2635,7 +2635,7 @@ modules:
                 - name: queued
             - name: ad.security_descriptor_propagation_access_wait
               description: Security descriptor propagation access wait
-              unit: seconds/s
+              unit: seconds
               chart_type: line
               dimensions:
                 - name: wait
@@ -2755,13 +2755,13 @@ modules:
                 - name: sessions
             - name: ad.atq_outstanding_requests
               description: Outstanding requests
-              unit: requests/s
+              unit: requests
               chart_type: line
               dimensions:
                 - name: outstanding
             - name: ad.atq_estimated_delay
               description: Estimated queue delay
-              unit: seconds/s
+              unit: seconds
               chart_type: line
               dimensions:
                 - name: delay
