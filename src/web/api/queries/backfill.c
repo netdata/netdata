@@ -46,7 +46,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
         return rc;
 
     size_t added = 0;
-    struct backfill_dim_work *array[dimensions];
+    struct backfill_dim_work *array[200];
 
     if(backfill_globals.running) {
         struct backfill_request *br = aral_callocz(backfill_globals.ar_br);
@@ -225,7 +225,7 @@ void backfill_thread(void *ptr) {
     size_t threads = netdata_conf_cpus() / 2;
     if(threads < 2) threads = 2;
     if(threads > 16) threads = 16;
-    ND_THREAD *th[threads - 1];
+    ND_THREAD *th[15];
 
     for(size_t t = 0; t < threads - 1 ;t++) {
         char tag[15];
@@ -258,4 +258,3 @@ void backfill_thread(void *ptr) {
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
-

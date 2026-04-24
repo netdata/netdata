@@ -123,7 +123,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
         return 0;
     }
 
-    long weight[nd_profile.storage_tiers];
+    long weight[RRD_STORAGE_TIERS];
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 

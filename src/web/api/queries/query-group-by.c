@@ -2,39 +2,54 @@
 
 #include "query-internal.h"
 
-RRDR_GROUP_BY group_by_parse(const char *group_by_txt) {
-    char src[strlen(group_by_txt) + 1];
-    strcatz(src, 0, group_by_txt, sizeof(src));
-    char *s = src;
+static inline bool group_by_is_separator(char c) {
+    return c == ',' || c == '|' || c == ' ';
+}
 
+static inline bool group_by_token_matches(const char *token, size_t len, const char *name) {
+    return strlen(name) == len && !strncmp(token, name, len);
+}
+
+RRDR_GROUP_BY group_by_parse(const char *group_by_txt) {
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_NONE;
 
-    while(s) {
-        char *key = strsep_skip_consecutive_separators(&s, ",| ");
-        if (!key || !*key) continue;
+    if(!group_by_txt || !*group_by_txt)
+        return group_by;
 
-        if (strcmp(key, "selected") == 0)
+    const char *s = group_by_txt;
+    while(*s) {
+        while(*s && group_by_is_separator(*s))
+            s++;
+
+        const char *key = s;
+        while(*s && !group_by_is_separator(*s))
+            s++;
+
+        size_t len = (size_t)(s - key);
+        if(!len) continue;
+
+        if (group_by_token_matches(key, len, "selected"))
             group_by |= RRDR_GROUP_BY_SELECTED;
 
-        if (strcmp(key, "dimension") == 0)
+        if (group_by_token_matches(key, len, "dimension"))
             group_by |= RRDR_GROUP_BY_DIMENSION;
 
-        if (strcmp(key, "instance") == 0)
+        if (group_by_token_matches(key, len, "instance"))
             group_by |= RRDR_GROUP_BY_INSTANCE;
 
-        if (strcmp(key, "percentage-of-instance") == 0)
+        if (group_by_token_matches(key, len, "percentage-of-instance"))
             group_by |= RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE;
 
-        if (strcmp(key, "label") == 0)
+        if (group_by_token_matches(key, len, "label"))
             group_by |= RRDR_GROUP_BY_LABEL;
 
-        if (strcmp(key, "node") == 0)
+        if (group_by_token_matches(key, len, "node"))
             group_by |= RRDR_GROUP_BY_NODE;
 
-        if (strcmp(key, "context") == 0)
+        if (group_by_token_matches(key, len, "context"))
             group_by |= RRDR_GROUP_BY_CONTEXT;
 
-        if (strcmp(key, "units") == 0)
+        if (group_by_token_matches(key, len, "units"))
             group_by |= RRDR_GROUP_BY_UNITS;
     }
 
@@ -224,4 +239,3 @@ void rrd2rrdr_set_timestamps(RRDR *r) {
                    "QUERY: wrong last timestamp in the query, expected %ld, found %ld",
                    before_wanted, r->t[points_wanted - 1]);
 }
-
