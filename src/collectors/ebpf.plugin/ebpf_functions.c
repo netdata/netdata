@@ -8,6 +8,30 @@
  *  EBPF FUNCTION COMMON
  *****************************************************************/
 
+typedef struct ebpf_function_thread_start {
+    ebpf_module_t *em;
+    void (*start_routine)(void *);
+    bool ready;
+    bool run;
+} ebpf_function_thread_start_t;
+
+static void ebpf_function_thread_start(void *ptr)
+{
+    ebpf_function_thread_start_t *ctx = ptr;
+
+    // Keep the new thread parked until its owner publishes the module state.
+    while (!__atomic_load_n(&ctx->ready, __ATOMIC_ACQUIRE))
+        tinysleep();
+
+    bool run = __atomic_load_n(&ctx->run, __ATOMIC_ACQUIRE);
+    ebpf_module_t *em = ctx->em;
+    void (*start_routine)(void *) = ctx->start_routine;
+    freez(ctx);
+
+    if (run)
+        start_routine(em);
+}
+
 /**
  * Function Start thread
  *
@@ -24,16 +48,40 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
     if (period <= 0)
         period = EBPF_DEFAULT_LIFETIME;
 
-    st->thread = NULL;
-    em->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
-    em->lifetime = period;
-
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_log_info("Starting thread %s with lifetime = %d", em->info.thread_name, period);
 #endif
 
-    st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
-    return st->thread ? 0 : 1;
+    ebpf_function_thread_start_t *ctx = callocz(1, sizeof(*ctx));
+    ctx->em = em;
+    ctx->start_routine = st->start_routine;
+
+    ND_THREAD *thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_function_thread_start, ctx);
+    if (!thread) {
+        freez(ctx);
+        return 1;
+    }
+
+    bool run = true;
+    netdata_mutex_lock(&ebpf_exit_cleanup);
+    if (ebpf_plugin_stop())
+        run = false;
+    else {
+        st->thread = thread;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_FUNCTION_RUNNING);
+        em->lifetime = period;
+    }
+    __atomic_store_n(&ctx->run, run, __ATOMIC_RELEASE);
+    __atomic_store_n(&ctx->ready, true, __ATOMIC_RELEASE);
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
+
+    if (!run) {
+        nd_thread_signal_cancel(thread);
+        nd_thread_join(thread);
+        return 1;
+    }
+
+    return 0;
 }
 
 /*****************************************************************
@@ -427,26 +475,25 @@ static void ebpf_function_socket_manipulation(
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (ebpf_module_enabled_get(em) > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_socket_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         collect_pids |= 1 << EBPF_MODULE_SOCKET_IDX;
-        netdata_mutex_lock(&ebpf_exit_cleanup);
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR, "Cannot start thread.");
-            netdata_mutex_unlock(&ebpf_exit_cleanup);
             return;
         }
     } else {
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (period < 0)
-            em->lifetime = (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING) ? EBPF_NON_FUNCTION_LIFE_TIME :
-                                                                                   EBPF_DEFAULT_LIFETIME;
+            em->lifetime = (ebpf_module_enabled_get(em) != NETDATA_THREAD_EBPF_FUNCTION_RUNNING) ?
+                               EBPF_NON_FUNCTION_LIFE_TIME :
+                               EBPF_DEFAULT_LIFETIME;
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
-    netdata_mutex_unlock(&ebpf_exit_cleanup);
 
     BUFFER *wb = buffer_create(4096, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);

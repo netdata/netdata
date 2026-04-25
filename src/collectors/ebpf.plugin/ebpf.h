@@ -335,12 +335,26 @@ static inline bool ebpf_plugin_stop(void)
            nd_thread_signaled_to_cancel();
 }
 
+// `enabled` is sampled from stats/shutdown paths without a single shared mutex.
+// Keep those state transitions defined without changing the plugin's lock layout.
+static inline enum ebpf_threads_status ebpf_module_enabled_get(ebpf_module_t *em)
+{
+    return __atomic_load_n(&em->enabled, __ATOMIC_RELAXED);
+}
+
+static inline void ebpf_module_enabled_set(ebpf_module_t *em, enum ebpf_threads_status enabled)
+{
+    __atomic_store_n(&em->enabled, enabled, __ATOMIC_RELAXED);
+}
+
 static inline bool ebpf_module_thread_has_valid_state(ebpf_module_t *em)
 {
-    if (likely(em->enabled == NETDATA_THREAD_EBPF_RUNNING || em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING))
+    enum ebpf_threads_status enabled = ebpf_module_enabled_get(em);
+
+    if (likely(enabled == NETDATA_THREAD_EBPF_RUNNING || enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING))
         return true;
 
-    collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)em->enabled);
+    collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)enabled);
     return false;
 }
 

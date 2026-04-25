@@ -409,7 +409,7 @@ void ebpf_set_thread_mode(netdata_run_mode_t lmode)
 
 void ebpf_enable_specific_chart(ebpf_module_t *em, int disable_cgroup)
 {
-    em->enabled = NETDATA_THREAD_EBPF_RUNNING;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_RUNNING);
 
     if (!disable_cgroup) {
         em->cgroup_charts = CONFIG_BOOLEAN_YES;
@@ -527,7 +527,7 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
 
     network_viewer_opt.enabled = enabled;
     if (enabled) {
-        if (!ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled)
+        if (!ebpf_module_enabled_get(&ebpf_modules[EBPF_MODULE_SOCKET_IDX]))
             ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_cgroups);
 
         parse_network_viewer_section(&collector_config);
@@ -1225,7 +1225,7 @@ void ebpf_parse_ips_unsafe(const char *ptr)
  */
 void ebpf_create_apps_for_module(ebpf_module_t *em, ebpf_target_t *root)
 {
-    if (em->enabled < NETDATA_THREAD_EBPF_STOPPING && em->apps_charts && em->functions.apps_routine)
+    if (ebpf_module_enabled_get(em) < NETDATA_THREAD_EBPF_STOPPING && em->apps_charts && em->functions.apps_routine)
         em->functions.apps_routine(em, root);
 }
 
@@ -1609,7 +1609,7 @@ void disable_all_global_charts()
 {
     int i;
     for (i = 0; ebpf_modules[i].info.thread_name; i++) {
-        ebpf_modules[i].enabled = NETDATA_THREAD_EBPF_NOT_RUNNING;
+        ebpf_module_enabled_set(&ebpf_modules[i], NETDATA_THREAD_EBPF_NOT_RUNNING);
         ebpf_modules[i].global_charts = 0;
     }
 }
