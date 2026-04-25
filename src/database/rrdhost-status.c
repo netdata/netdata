@@ -149,8 +149,19 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     uint32_t collected_metrics = UINT32_MAX;
     uint32_t replicating_instances = UINT32_MAX;
 
-    time_t since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
-    STREAM_HANDSHAKE reason = host->stream.rcv.status.reason;
+    time_t last_connected;
+    time_t last_disconnected;
+    uint32_t connections;
+    STREAM_HANDSHAKE reason;
+
+    rrdhost_receiver_lock(host);
+    last_connected = host->stream.rcv.status.last_connected;
+    last_disconnected = host->stream.rcv.status.last_disconnected;
+    connections = host->stream.rcv.status.connections;
+    reason = host->stream.rcv.status.reason;
+    rrdhost_receiver_unlock(host);
+
+    time_t since = MAX(last_connected, last_disconnected);
 
     if (online) {
         if (db_status == RRDHOST_DB_STATUS_INITIALIZING)
@@ -169,7 +180,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             status = RRDHOST_INGEST_STATUS_ONLINE;
     }
     else {
-        if(!host->stream.rcv.status.connections)
+        if(!connections)
             status = RRDHOST_INGEST_STATUS_ARCHIVED;
         else
             status = RRDHOST_INGEST_STATUS_OFFLINE;
@@ -215,7 +226,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
         else
             s->ingest.type = RRDHOST_INGEST_TYPE_ARCHIVED;
 
-        s->ingest.id = host->stream.rcv.status.connections;
+        s->ingest.id = connections;
     }
 
     return status;
@@ -395,4 +406,3 @@ RRDHOST_INGEST_STATUS rrdhost_get_ingest_status(RRDHOST *host, time_t now) {
     RRDHOST_DB_STATUS db_status = rrdhost_status_db(host, now, NULL, flags, online);
     return rrdhost_status_ingest(host, NULL, flags, db_status, online);
 }
-
