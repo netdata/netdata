@@ -153,6 +153,30 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 | `NETDATA_MAJOR_VERSION_UPDATES` | If set to a value other than 0, then new major versions will be installed without user confirmation. Must be set to a non-zero value for automated updates to install new major versions.                                                                                                        | 0               |
 | `NETDATA_NO_SYSTEMD_JOURNAL`    | If set to a value other than 0, skip attempting to install the `netdata-plugin-systemd-journal` package on supported systems on update. The updater will install this optional package by default on supported systems if this option is not set. It only affects systems using native packages. | 0               |
 
+## Switching Release Channels
+
+By default, `kickstart.sh` uses the **nightly** release channel. To switch to the **stable** channel during an update, pass `--stable-channel`:
+
+```bash
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --stable-channel
+```
+
+To switch back to the **nightly** channel, pass `--nightly-channel`:
+
+```bash
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --nightly-channel
+```
+
+You can also use `--release-channel <channel>` to specify either `stable` or `nightly` explicitly.
+
+:::note
+
+To pin a specific version, combine `--install-version` with a full semantic version (X.Y.Z, for example `2.10.0`). If the version string is not full semver, the channel defaults to nightly.
+
+:::
+
+For a comparison of the two channels, see [Platform Support](/packaging/PLATFORM_SUPPORT.md).
+
 ## Quick Reference
 
 ### Update Commands by Installation Type
@@ -167,3 +191,5 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 | **macOS (Homebrew)**       | Homebrew               | `brew upgrade netdata`                                                                                     |
 | **Manual Git**             | Git + installer        | See [manual installation steps](#update-methods-by-platform)                                               |
 | **Windows**                | MSI installer          | Download and run latest installer                                                                          |
+| **Channel switch (stable)**| Kickstart script       | `sh /tmp/netdata-kickstart.sh --stable-channel`                                                            |
+| **Channel switch (nightly)**| Kickstart script      | `sh /tmp/netdata-kickstart.sh --nightly-channel`                                                           |
