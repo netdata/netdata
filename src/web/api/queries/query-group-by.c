@@ -6,12 +6,11 @@ static inline bool group_by_is_separator(char c) {
     return c == ',' || c == '|' || c == ' ';
 }
 
-static inline bool group_by_token_matches(const char *token, size_t len, const char *name) {
-    // Keep the dereference-site null check explicit before calling strlen().
+static inline bool group_by_token_matches(const char *token, size_t len, const char *name, size_t name_len) {
     if(!name)
         return false;
 
-    return strlen(name) == len && !strncmp(token, name, len);
+    return name_len == len && !strncmp(token, name, len);
 }
 
 RRDR_GROUP_BY group_by_parse(const char *group_by_txt) {
@@ -32,28 +31,28 @@ RRDR_GROUP_BY group_by_parse(const char *group_by_txt) {
         size_t len = (size_t)(s - key);
         if(!len) continue;
 
-        if (group_by_token_matches(key, len, "selected"))
+        if (group_by_token_matches(key, len, "selected", sizeof("selected") - 1))
             group_by |= RRDR_GROUP_BY_SELECTED;
 
-        if (group_by_token_matches(key, len, "dimension"))
+        if (group_by_token_matches(key, len, "dimension", sizeof("dimension") - 1))
             group_by |= RRDR_GROUP_BY_DIMENSION;
 
-        if (group_by_token_matches(key, len, "instance"))
+        if (group_by_token_matches(key, len, "instance", sizeof("instance") - 1))
             group_by |= RRDR_GROUP_BY_INSTANCE;
 
-        if (group_by_token_matches(key, len, "percentage-of-instance"))
+        if (group_by_token_matches(key, len, "percentage-of-instance", sizeof("percentage-of-instance") - 1))
             group_by |= RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE;
 
-        if (group_by_token_matches(key, len, "label"))
+        if (group_by_token_matches(key, len, "label", sizeof("label") - 1))
             group_by |= RRDR_GROUP_BY_LABEL;
 
-        if (group_by_token_matches(key, len, "node"))
+        if (group_by_token_matches(key, len, "node", sizeof("node") - 1))
             group_by |= RRDR_GROUP_BY_NODE;
 
-        if (group_by_token_matches(key, len, "context"))
+        if (group_by_token_matches(key, len, "context", sizeof("context") - 1))
             group_by |= RRDR_GROUP_BY_CONTEXT;
 
-        if (group_by_token_matches(key, len, "units"))
+        if (group_by_token_matches(key, len, "units", sizeof("units") - 1))
             group_by |= RRDR_GROUP_BY_UNITS;
     }
 

@@ -78,18 +78,29 @@ static inline bool rrdr_options_is_separator(char c) {
     return c == ',' || c == ' ' || c == '|';
 }
 
+static inline bool rrdr_option_token_matches(const char *token, size_t len, const char *name) {
+    if(!name)
+        return false;
+
+    for(size_t i = 0; i < len; i++) {
+        if(!name[i] || token[i] != name[i])
+            return false;
+    }
+
+    return name[len] == '\0';
+}
+
 static RRDR_OPTIONS rrdr_options_parse_one_n(const char *o, size_t len) {
     RRDR_OPTIONS ret = 0;
 
     if(!o || !len) return ret;
 
-    for(int i = 0; rrdr_options[i].name ; i++) {
+    for(int i = 0; ; i++) {
         const char *name = rrdr_options[i].name;
-        // Keep the dereference-site null check explicit before calling strlen().
         if(!name)
-            continue;
+            break;
 
-        if (strlen(name) == len && !strncmp(o, name, len)) {
+        if (rrdr_option_token_matches(o, len, name)) {
             ret |= rrdr_options[i].value;
             break;
         }
