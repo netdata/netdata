@@ -153,8 +153,8 @@ bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opc
     spinlock_lock(&wth->spinlock);
 
     // Write command header
-    ssize_t bytes = write(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header.cmd));
-    if(bytes != sizeof(header.cmd)) {
+    ssize_t bytes = write(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header));
+    if(bytes != sizeof(header)) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write command header to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
@@ -281,7 +281,15 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                     continue;
                 }
 
+                if(header.len < sizeof(opcode)) {
+                    netdata_log_error("WEBSOCKET[%zu]: Broadcast command header.len %u is too small", wth->id, header.len);
+                    continue;
+                }
                 uint32_t message_len = header.len - sizeof(opcode);
+                if(message_len > WS_MAX_OUTGOING_FRAME_SIZE) {
+                    netdata_log_error("WEBSOCKET[%zu]: Broadcast message too large: %u bytes", wth->id, message_len);
+                    continue;
+                }
                 if(message_len + 1 > wth->cmd.buffer_size) {
                     wth->cmd.buffer = reallocz(wth->cmd.buffer, message_len + 1);
                     wth->cmd.buffer_size = message_len + 1;
@@ -294,12 +302,6 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                     continue;
                 }
                 message[message_len] = '\0';
-
-                // Ensure we have the complete message
-                if(header.len != sizeof(WEBSOCKET_OPCODE) + message_len) {
-                    netdata_log_error("WEBSOCKET[%zu]: Broadcast command size mismatch", wth->id);
-                    continue;
-                }
                 
                 // Send to all clients in this thread
                 spinlock_lock(&wth->clients_spinlock);
