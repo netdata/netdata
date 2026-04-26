@@ -1073,7 +1073,10 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
             buffer_flush(w->url_path_decoded);
             buffer_strcat(w->url_path_decoded, "/");
             buffer_strcat(w->url_path_decoded, url);
-            return func(host, w, (char *)buffer_tostring(w->url_path_decoded));
+            char *mutable_path = strdupz(buffer_tostring(w->url_path_decoded));
+            int rc = func(host, w, mutable_path);
+            freez(mutable_path);
+            return rc;
         }
     }
 
