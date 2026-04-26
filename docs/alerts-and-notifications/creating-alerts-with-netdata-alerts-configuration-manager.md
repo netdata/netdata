@@ -43,9 +43,11 @@ You can choose from different ways to trigger alerts based on your monitoring ne
 |---------------------|---------------------------------------------------------|
 | **Standard**        | Fires when a metric crosses a set value                 |
 | **Metric Variance** | Fires based on variation in values over time            |
-| **Anomaly Rate**    | Fires when the anomaly rate exceeds a certain threshold |
+| **Anomaly Rate**    | Fires when the ML-calculated anomaly rate exceeds a certain threshold. See [ML Anomaly Detection](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md) for how anomaly rates are computed. |
 
 Choose the type that best suits the behavior you want to monitor.
+
+The Anomaly Rate type uses Netdata's built-in ML models. You can configure it from any chart's alert bell icon by selecting Anomaly Rate as the detection type, or use the [Alert Configuration Reference](/src/health/REFERENCE.md) for manual configuration with `anomaly-bit` lookups.
 
 ## Metrics Lookup & Filters
 
