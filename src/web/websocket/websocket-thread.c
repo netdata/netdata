@@ -575,6 +575,7 @@ void websocket_thread(void *ptr) {
     }
 
     freez(wth->cmd.buffer);
+    wth->cmd.buffer = NULL;
     wth->cmd.buffer_size = 0;
 
     // Mark thread as not running
