@@ -206,7 +206,6 @@ modules:
               unit: "bytes"
               chart_type: line
               dimensions:
-                - name: total
                 - name: resident
             - name: mem.system_pool_allocs
               description: System Pool Allocations
