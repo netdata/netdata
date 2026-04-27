@@ -77,7 +77,13 @@ static char *transform_log_path_setting(const char *setting, bool for_display) {
     CLEAN_CONST_CHAR_P *translated = for_display
         ? os_translate_msys_to_windows_path(output)
         : os_translate_windows_to_msys_path(output);
-    const char *safe_translated = translated ? translated : (output ? output : "");
+    const char *safe_translated;
+    if(translated)
+        safe_translated = translated;
+    else if(output)
+        safe_translated = output;
+    else
+        safe_translated = "";
     size_t safe_translated_len = strlen(safe_translated);
 
     if(output == copy)

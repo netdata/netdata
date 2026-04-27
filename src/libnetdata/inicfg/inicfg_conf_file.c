@@ -61,7 +61,12 @@ static const char *inicfg_windows_path_list_for_display(const char *value, char 
 
     dst[0] = '\0';
     size_t len = 0;
-    size_t value_len = strlen(value ? value : "");
+    const char *safe_value;
+    if(value)
+        safe_value = value;
+    else
+        safe_value = "";
+    size_t value_len = strlen(safe_value);
 
     const char *segment_start = value;
     while (true) {
