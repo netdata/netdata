@@ -128,6 +128,12 @@ The `time_group` parameter in `aggregations.time` controls how data points withi
 | `trimmed-median` | Median after trimming outliers (set trim % in `time_group_options`) | Robust median excluding extremes |
 | `extremes` | Min and max values | Show value range per interval |
 
+:::important
+
+When using `time_group` values other than `min`, `max`, `average`, or `sum`, specify `"tier": 0` in the request to ensure correct results. Advanced aggregation functions require per-second (non-aggregated) data.
+
+:::
+
 :::tip
 
 For complete parameter reference, including additional aggregation functions and advanced grouping options, see the [Query Metrics skill documentation](/docs/netdata-ai/skills/query-netdata-cloud-metrics.md).

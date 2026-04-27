@@ -320,33 +320,8 @@ Controls how raw data points within each time interval are combined into one val
 | `incremental-sum` | | Difference between last and first value in interval |
 | `countif` | | Count values matching condition. Set condition in `time_group_options`: `">0"`, `"=0"`, `"!=0"`, `"<=10"` |
 | `percentile` | | Percentile. Set percentile value in `time_group_options`: `"95"`, `"99"` |
-| `percentile25` | | 25th percentile |
-| `percentile50` | | 50th percentile (same as median) |
-| `percentile75` | | 75th percentile |
-| `percentile80` | | 80th percentile |
-| `percentile90` | | 90th percentile |
-| `percentile95` | | 95th percentile |
-| `percentile97` | | 97th percentile |
-| `percentile98` | | 98th percentile |
-| `percentile99` | | 99th percentile |
 | `trimmed-mean` | | Mean after trimming outliers. Set trim % in `time_group_options` |
-| `trimmed-mean1` | | Trimmed mean excluding 1% of extreme values from each tail |
-| `trimmed-mean2` | | Trimmed mean excluding 2% of extreme values from each tail |
-| `trimmed-mean3` | | Trimmed mean excluding 3% of extreme values from each tail |
-| `trimmed-mean5` | | Trimmed mean excluding 5% of extreme values from each tail |
-| `trimmed-mean10` | | Trimmed mean excluding 10% of extreme values from each tail |
-| `trimmed-mean15` | | Trimmed mean excluding 15% of extreme values from each tail |
-| `trimmed-mean20` | | Trimmed mean excluding 20% of extreme values from each tail |
-| `trimmed-mean25` | | Trimmed mean excluding 25% of extreme values from each tail |
 | `trimmed-median` | | Median after trimming outliers. Set trim % in `time_group_options` |
-| `trimmed-median1` | | Trimmed median excluding 1% of extreme values from each tail |
-| `trimmed-median2` | | Trimmed median excluding 2% of extreme values from each tail |
-| `trimmed-median3` | | Trimmed median excluding 3% of extreme values from each tail |
-| `trimmed-median5` | | Trimmed median excluding 5% of extreme values from each tail |
-| `trimmed-median10` | | Trimmed median excluding 10% of extreme values from each tail |
-| `trimmed-median15` | | Trimmed median excluding 15% of extreme values from each tail |
-| `trimmed-median20` | | Trimmed median excluding 20% of extreme values from each tail |
-| `trimmed-median25` | | Trimmed median excluding 25% of extreme values from each tail |
 | `extremes` | | Min and max values per interval |
 
 :::important
