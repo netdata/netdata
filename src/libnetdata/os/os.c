@@ -54,12 +54,14 @@ char *os_translate_msys_to_windows_path(const char *src) {
         }
     }
 
-    size_t src_len = src ? strlen(src) : 0;
+    size_t src_len = 0;
+    if (src)
+        src_len = strlen(src);
     char *converted_path = mallocz(src_len + 3);
     size_t i = 0;
     size_t j = 0;
 
-    if (isalpha((unsigned char)src[0]) && src[1] == ':') {
+    if (src_len >= 2 && isalpha((unsigned char)src[0]) && src[1] == ':') {
         converted_path[j++] = (char)toupper((unsigned char)src[0]);
         converted_path[j++] = ':';
         i = 2;
@@ -69,7 +71,7 @@ char *os_translate_msys_to_windows_path(const char *src) {
             i++;
         }
     }
-    else if (src[0] == '/' && isalpha((unsigned char)src[1]) && (src[2] == '/' || src[2] == '\0')) {
+    else if (src_len >= 3 && src[0] == '/' && isalpha((unsigned char)src[1]) && (src[2] == '/' || src[2] == '\0')) {
         converted_path[j++] = (char)toupper((unsigned char)src[1]);
         converted_path[j++] = ':';
         i = 2;
@@ -79,7 +81,7 @@ char *os_translate_msys_to_windows_path(const char *src) {
             i++;
         }
     }
-    else if ((src[0] == '\\' && src[1] == '\\') || (src[0] == '/' && src[1] == '/')) {
+    else if (src_len >= 2 && ((src[0] == '\\' && src[1] == '\\') || (src[0] == '/' && src[1] == '/'))) {
         converted_path[j++] = '\\';
         converted_path[j++] = '\\';
         i = 2;
@@ -123,13 +125,15 @@ const char *os_translate_windows_to_msys_path(const char *src) {
         freez(converted_path);
     }
 
-    size_t src_len = src ? strlen(src) : 0;
+    size_t src_len = 0;
+    if (src)
+        src_len = strlen(src);
     char *converted_path = mallocz(src_len + 3);
     size_t converted_size_fallback = src_len + 3;
     size_t i = 0;
     size_t j = 0;
 
-    if (isalpha((unsigned char)src[0]) && src[1] == ':') {
+    if (src_len >= 2 && isalpha((unsigned char)src[0]) && src[1] == ':') {
         converted_path[j++] = '/';
         if (j < converted_size_fallback - 1)
             converted_path[j++] = (char)tolower((unsigned char)src[0]);
@@ -140,7 +144,7 @@ const char *os_translate_windows_to_msys_path(const char *src) {
             i++; // consume the separator so the loop below doesn't emit it again
         }
     }
-    else if ((src[0] == '\\' && src[1] == '\\') || (src[0] == '/' && src[1] == '/')) {
+    else if (src_len >= 2 && ((src[0] == '\\' && src[1] == '\\') || (src[0] == '/' && src[1] == '/'))) {
         converted_path[j++] = '/';
         if (j < converted_size_fallback - 1)
             converted_path[j++] = '/';
