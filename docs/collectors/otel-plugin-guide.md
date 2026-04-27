@@ -909,7 +909,105 @@ When binding to `0.0.0.0`, ensure that firewall or network policy restricts acce
    - Use absolute paths
    - Verify directory exists and is readable by netdata user
 
-## Additional Resources
+## Advanced Pipeline Patterns
+
+### Convert logs to metrics
+
+Counting log entries by severity or content is a common pattern. Instead of searching logs after an incident, track error rates as metrics and alert on them in real time.
+
+The **count connector** bridges the logs pipeline to the metrics pipeline:
+
+```yaml
+receivers:
+  journald:
+    directory: /var/log/journal
+    priority: info
+    start_at: end
+
+connectors:
+  count:
+    logs:
+      warning.log.count:
+        description: Warning or higher severity entries.
+        conditions:
+          - 'Int(body["PRIORITY"]) <= 4'
+
+processors:
+  transform:
+    error_mode: ignore
+    metric_statements:
+      - context: metric
+        statements:
+          - set(unit, "{message}") where IsMatch(name, "log.count$")
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [journald]
+      exporters: [count, otlp]
+    metrics:
+      receivers: [count]
+      processors: [transform]
+      exporters: [otlp]
+```
+
+The logs pipeline sends data to both the OTLP exporter and the count connector. The connector emits counts as metrics, which the metrics pipeline transforms and sends to Netdata.
+
+Customize conditions with OTTL expressions:
+
+```yaml
+# Count entries containing a keyword
+conditions:
+  - 'IsMatch(body["MESSAGE"], "(?i)out of memory|OOM")'
+
+# Count entries from a specific source
+conditions:
+  - 'body["SYSLOG_IDENTIFIER"] == "sshd" and Int(body["PRIORITY"]) <= 3'
+```
+
+### Parse unstructured logs
+
+The `transform` processor parses JSON log lines into structured attributes:
+
+```yaml
+processors:
+  transform:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - merge_maps(attributes, ParseJSON(body), "insert")
+```
+
+This transforms `{"level":"error","msg":"connection refused"}` into separate attributes you can search and filter on.
+
+Other common transformations:
+
+```yaml
+# Set severity from parsed attribute
+- set(severity_text, attributes["level"])
+
+# Add static attribute
+- set(attributes["environment"], "production")
+
+# Drop matching entries
+- set(attributes["drop"], true) where IsMatch(body, "(?i)health.check")
+```
+
+For the full list of functions, see [OTTL documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/pkg/ottl).
+
+### Create alerts on derived metrics
+
+Once log-derived metrics appear as charts, configure health alerts in Netdata:
+
+1. Find the chart name in the Netdata dashboard under **OpenTelemetry**
+2. Create an alert using the [health alerts reference](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md)
 
 - [Netdata OTel plugin reference](https://github.com/netdata/netdata/tree/master/src/crates/netdata-otel/otel-plugin)
 - [OpenTelemetry Collector documentation](https://opentelemetry.io/docs/collector/)
