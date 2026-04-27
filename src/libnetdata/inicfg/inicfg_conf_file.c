@@ -61,11 +61,14 @@ static const char *inicfg_windows_path_list_for_display(const char *value, char 
 
     dst[0] = '\0';
     size_t len = 0;
+    size_t value_len = strlen(value);
 
     const char *segment_start = value;
     while (true) {
         const char *separator = strchr(segment_start, ':');
-        size_t segment_len = separator ? (size_t)(separator - segment_start) : strlen(segment_start);
+        size_t segment_len = separator
+            ? (size_t)(separator - segment_start)
+            : value_len - (size_t)(segment_start - value);
 
         char segment[CONFIG_MAX_VALUE + 1];
         if (segment_len > CONFIG_MAX_VALUE)
@@ -181,7 +184,7 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
         line++;
 
         s = trim(buffer);
-        if(!s || *s == '#') {
+        if(!s || !*s || *s == '#') {
             netdata_log_debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
             continue;
         }

@@ -54,7 +54,7 @@ char *os_translate_msys_to_windows_path(const char *src) {
         }
     }
 
-    size_t src_len = strlen(src);
+    size_t src_len = src ? strlen(src) : 0;
     char *converted_path = mallocz(src_len + 3);
     size_t i = 0;
     size_t j = 0;
@@ -123,7 +123,7 @@ const char *os_translate_windows_to_msys_path(const char *src) {
         freez(converted_path);
     }
 
-    size_t src_len = strlen(src);
+    size_t src_len = src ? strlen(src) : 0;
     char *converted_path = mallocz(src_len + 3);
     size_t converted_size_fallback = src_len + 3;
     size_t i = 0;
