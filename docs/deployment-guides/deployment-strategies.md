@@ -72,6 +72,95 @@ Edit `stream.conf` on the Child using the [edit-config](/docs/netdata-agent/conf
 **Perfect for:** IoT devices, containers, or any resource-constrained system.
 
 
+### Docker Compose for Parent and Child
+
+Use these Docker Compose examples to deploy a Parent-Child streaming setup using containers. Each example uses the standard `netdata/netdata` image.
+
+**Parent `docker-compose.yml`:**
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata-parent
+    hostname: netdata-parent
+    pid: host
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  netdataconfig:
+  netdatalib:
+  netdatacache:
+```
+
+:::tip
+
+After starting the container, edit `stream.conf` inside it to add your `[API_KEY]` section with `enabled = yes`, following the [Parent stream.conf example](#parent-with-tiered-storage) above. Access the container with `docker exec -it netdata-parent bash`, then run `./etc/netdata/edit-config stream.conf`.
+
+:::
+
+**Child `docker-compose.yml`:**
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata-child
+    hostname: netdata-child
+    pid: host
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+
+volumes:
+  netdataconfig:
+  netdatalib:
+  netdatacache:
+```
+
+:::tip
+
+After starting the container, edit `stream.conf` inside it to set `destination = PARENT_IP_ADDRESS:19999` and `api key = API_KEY`, following the [Child stream.conf example](#lightweight-child-configuration) above. For a lightweight setup, also apply the [lightweight Child `netdata.conf`](#lightweight-child-configuration) settings. Access the container with `docker exec -it netdata-child bash`, then run `./etc/netdata/edit-config stream.conf` and `./etc/netdata/edit-config netdata.conf`.
+
+:::
+
+
 ### Parent with Tiered Storage
 
 This example helps you configure a Parent with multiple [tiers of metrics storage](/src/database/README.md#tiers) to store different time ranges at different resolutions, for 10 Children with about 2k metrics each. Retention in each tier is restricted both in time and storage space, whichever is met first. See [retention settings](/src/database/CONFIGURATION.md#retention-settings) for fine-tuning retention.
