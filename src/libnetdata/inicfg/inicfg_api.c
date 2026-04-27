@@ -61,8 +61,10 @@ static char *transform_log_path_setting(const char *setting, bool for_display) {
 
     CLEAN_CHAR_P *copy = strdupz(setting);
     char *output = strrchr(copy, '@');
+    size_t prefix_len = 0;
 
     if(output) {
+        prefix_len = (size_t)(output - copy);
         *output = '\0';
         output++;
     }
@@ -75,12 +77,13 @@ static char *transform_log_path_setting(const char *setting, bool for_display) {
     CLEAN_CONST_CHAR_P *translated = for_display
         ? os_translate_msys_to_windows_path(output)
         : os_translate_windows_to_msys_path(output);
+    const char *safe_translated = translated ? translated : output;
 
     if(output == copy)
-        return strdupz(translated);
+        return strdupz(safe_translated);
 
-    BUFFER *wb = buffer_create(strlen(copy) + strlen(translated) + 2, NULL);
-    buffer_sprintf(wb, "%s@%s", copy, translated);
+    BUFFER *wb = buffer_create(prefix_len + strlen(safe_translated) + 2, NULL);
+    buffer_sprintf(wb, "%s@%s", copy, safe_translated);
     char *result = strdupz(buffer_tostring(wb));
     buffer_free(wb);
 
@@ -88,26 +91,35 @@ static char *transform_log_path_setting(const char *setting, bool for_display) {
 }
 
 static bool windows_native_path_p(const char *value) {
+    if(!value || !*value)
+        return false;
+
     return (isalpha((unsigned char)value[0]) && value[1] == ':') ||
            ((value[0] == '\\' && value[1] == '\\') || (value[0] == '/' && value[1] == '/'));
 }
 
 static bool windows_path_list_needs_reformat_p(const char *value) {
+    if(!value || !*value)
+        return false;
+
     return strchr(value, ';') || strchr(value, '\\') || windows_native_path_p(value);
 }
 
 static STRING *reformat_path_list(STRING *value) {
     const char *src = string2str(value);
+    size_t src_len = string_strlen(value);
     if(!windows_path_list_needs_reformat_p(src))
         return value;
 
-    BUFFER *wb = buffer_create(strlen(src) + 1, NULL);
+    BUFFER *wb = buffer_create(src_len + 1, NULL);
     bool first = true;
     const char *segment_start = src;
 
     while(true) {
         const char *separator = strchr(segment_start, ';');
-        size_t segment_len = separator ? (size_t)(separator - segment_start) : strlen(segment_start);
+        size_t segment_len = separator
+            ? (size_t)(separator - segment_start)
+            : src_len - (size_t)(segment_start - src);
 
         CLEAN_CHAR_P *segment = strndupz(segment_start, segment_len);
         char *trimmed = trim(segment);
@@ -141,7 +153,7 @@ static STRING *reformat_quoted_path_list(STRING *value) {
     if(!num_words)
         return value;
 
-    BUFFER *wb = buffer_create(strlen(string2str(value)) + 1, NULL);
+    BUFFER *wb = buffer_create(string_strlen(value) + 1, NULL);
     for(size_t i = 0; i < num_words; i++) {
         CLEAN_CONST_CHAR_P *converted = os_translate_windows_to_msys_path(words[i]);
         if(i)
