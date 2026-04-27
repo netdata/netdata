@@ -800,23 +800,15 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
            rrdhost_hostname(host));
 }
 
-void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
-    if(!host) return;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRD: 'host:%s' freeing memory...",
-           rrdhost_hostname(host));
-
-    // ------------------------------------------------------------------------
-    // first remove it from the indexes, so that it will not be discoverable
-
+static void rrdhost_unlink___while_having_rrd_wrlock(RRDHOST *host) {
+    // Remove it from the indexes first, so blocking teardown cannot rediscover it.
     rrdhost_index_del_by_guid(host);
 
     if (host->prev)
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(localhost, host, prev, next);
+}
 
-    // ------------------------------------------------------------------------
-
+static void rrdhost_free_unlinked(RRDHOST *host) {
     rrdhost_cleanup_data_collection_and_health(host);
 
     // ------------------------------------------------------------------------
@@ -845,6 +837,23 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
     string_freez(host->stream.snd.api_key);
     string_freez(host->stream.snd.destination);
     freez(host);
+}
+
+void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
+    if(!host) return;
+
+    rrdhost_unlink___while_having_rrd_wrlock(host);
+    rrdhost_free_unlinked(host);
+}
+
+void rrdhost_free___without_having_rrd_wrlock(RRDHOST *host) {
+    if(!host) return;
+
+    rrd_wrlock();
+    rrdhost_unlink___while_having_rrd_wrlock(host);
+    rrd_wrunlock();
+
+    rrdhost_free_unlinked(host);
 }
 
 void rrdhost_free_all(void) {
