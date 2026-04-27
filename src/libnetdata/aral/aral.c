@@ -474,10 +474,17 @@ static ALWAYS_INLINE ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_hav
 }
 
 // Atomically claims an allocated slot for freeing.
+// Returns NULL on a concurrent double-free or stale free, leaving the
+// decode helper's NULL assertion to the load path only.
 static ALWAYS_INLINE ARAL_PAGE *aral_claim_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *ptr, bool *marked) {
     uint8_t *data = ptr;
     uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.element_ptr_offset];
     uintptr_t tagged_page = __atomic_exchange_n(page_ptr, 0, __ATOMIC_ACQ_REL);
+
+    if(unlikely(!tagged_page)) {
+        *marked = false;
+        return NULL;
+    }
 
     return aral_decode_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, tagged_page, marked);
 }
@@ -1056,7 +1063,7 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     bool marked;
     ARAL_PAGE *page = aral_claim_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, &marked);
     if(unlikely(!page))
-        fatal("ARAL: '%s' double free or stale free of pointer %p", ar->config.name, ptr);
+        fatal("ARAL: '%s' double free, stale free, or corrupted pointer %p", ar->config.name, ptr);
 
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.deallocators, 1, __ATOMIC_RELAXED);
