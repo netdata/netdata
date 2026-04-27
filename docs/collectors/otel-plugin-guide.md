@@ -8,7 +8,7 @@ It transforms OpenTelemetry's event-based metrics into Netdata's fixed-interval 
 
 :::info
 
-The plugin automatically creates Netdata charts from incoming metrics with full alerting support. Logs are written to journal files and can be explored through the Netdata Logs tab.
+The plugin automatically creates Netdata charts from incoming metrics with full alerting support. Logs are written to journal files and can be explored through the Netdata logs interface.
 
 :::
 
@@ -20,7 +20,7 @@ This means charts are created automatically from incoming OTLP data points witho
 
 ## How It Works
 
-When an OpenTelemetry source sends data to Netdata:
+When an OpenTelemetry source, eg. the OpenTelemetry collector or an application annotated with the OpenTelemetry SDK, sends data to Netdata:
 
 1. **Data arrives** via OTLP/gRPC on the configured endpoint (default: `127.0.0.1:4317`)
 2. **MetricsService** or **LogsService** processes the request
@@ -55,6 +55,10 @@ When an OpenTelemetry source sends data to Netdata:
                                             │ Database & Charts   │
                                             └──────────────────────┘
 ```
+
+## Prerequisites
+
+The Netdata OTel plugin requires the **OpenTelemetry Collector Contrib** distribution. See the [OpenTelemetry Collector installation documentation](https://opentelemetry.io/docs/collector/) for setup instructions.
 
 ## Configuration
 
@@ -134,6 +138,8 @@ logs:
 - Per-metric `interval_secs` overrides also auto-derive grace period using the same `5 * interval` rule
 
 ## Examples
+
+The following examples show **OpenTelemetry Collector configuration** (otelcol), not the Netdata plugin config. See the Prerequisites section for installing the OTel Collector.
 
 ### Example: Host Metrics Receiver
 
