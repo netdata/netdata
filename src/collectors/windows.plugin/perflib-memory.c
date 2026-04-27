@@ -274,9 +274,10 @@ static void do_memory_swap_pages_chart(
             update_every,
             RRDSET_TYPE_AREA);
 
-        // Windows page size is 4096 bytes; divide by 1024 to report in KiB/s
-        localSwap.rd_page_read = rrddim_add(localSwap.pages, "in",  NULL,  4096, 1024, RRD_ALGORITHM_INCREMENTAL);
-        localSwap.rd_page_write = rrddim_add(localSwap.pages, "out", NULL, -4096, 1024, RRD_ALGORITHM_INCREMENTAL);
+        // divide by 1024 to convert bytes to KiB/s
+        collected_number page_size = (collected_number)os_get_system_page_size();
+        localSwap.rd_page_read = rrddim_add(localSwap.pages, "in",  NULL,  page_size, 1024, RRD_ALGORITHM_INCREMENTAL);
+        localSwap.rd_page_write = rrddim_add(localSwap.pages, "out", NULL, -page_size, 1024, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(localSwap.pages, localSwap.rd_page_read, page_input);
