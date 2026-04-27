@@ -308,25 +308,24 @@ Controls how raw data points within each time interval are combined into one val
 
 | Value | Aliases | Description |
 |-------|---------|-------------|
-| `average` | `avg`, `mean` | Mean value **(default)** |
+| `average` | `avg` | Mean value **(default)** |
 | `min` | | Minimum value |
 | `max` | | Maximum value |
 | `sum` | | Sum of values |
 | `median` | | Median value |
 | `stddev` | | Standard deviation |
 | `cv` | | Coefficient of variation (stddev/mean) |
-| `ses` | `ema` | Single exponential smoothing |
+| `ses` | | Single exponential smoothing |
 | `des` | | Double exponential smoothing |
 | `incremental-sum` | | Difference between last and first value in interval |
 | `countif` | | Count values matching condition. Set condition in `time_group_options`: `">0"`, `"=0"`, `"!=0"`, `"<=10"` |
 | `percentile` | | Percentile. Set percentile value in `time_group_options`: `"95"`, `"99"` |
 | `trimmed-mean` | | Mean after trimming outliers. Set trim % in `time_group_options` |
 | `trimmed-median` | | Median after trimming outliers. Set trim % in `time_group_options` |
-| `extremes` | | Min and max values per interval |
 
 :::important
 
-When specifying any `time_group` except `min`, `max`, `avg`, `sum`, you MUST specify `tier: 0` to ensure a non-aggregated tier is used.
+When using `time_group` values other than `min`, `max`, `average`, or `sum`, you MUST specify `"tier": 0` in the `window` object to ensure a non-aggregated storage tier is used. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where advanced functions like `median`, `stddev`, `ses`, `des`, `percentile`, `countif`, `trimmed-mean`, `trimmed-median`, and `extremes` cannot work correctly.
 
 :::
 

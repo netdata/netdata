@@ -130,7 +130,7 @@ The `time_group` parameter in `aggregations.time` controls how data points withi
 
 :::important
 
-When using `time_group` values other than `min`, `max`, `average`, or `sum`, specify `"tier": 0` in the request to ensure correct results. Advanced aggregation functions require per-second (non-aggregated) data.
+When using `time_group` values other than `min`, `max`, `average`, or `sum`, you MUST specify `"tier": 0` in the `window` object to ensure a non-aggregated storage tier is used. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where advanced functions like `median`, `stddev`, `ses`, `des`, `percentile`, `countif`, `trimmed-mean`, `trimmed-median`, and `extremes` cannot work correctly.
 
 :::
 
