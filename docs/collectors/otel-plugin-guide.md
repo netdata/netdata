@@ -58,7 +58,14 @@ When an OpenTelemetry source, eg. the OpenTelemetry collector or an application 
 
 ## Prerequisites
 
-The Netdata OTel plugin requires the **OpenTelemetry Collector Contrib** distribution. See the [OpenTelemetry Collector installation documentation](https://opentelemetry.io/docs/collector/) for setup instructions.
+The Netdata OTel plugin requires the **OpenTelemetry Collector Contrib** distribution.
+
+| Method | Installation Link |
+|--------|-------------|
+| Linux (DEB/RPM) | [Install on Linux](https://opentelemetry.io/docs/collector/install/binary/linux) |
+| Docker | [Install with Docker](https://opentelemetry.io/docs/collector/install/docker) |
+| Windows | [Install on Windows](https://opentelemetry.io/docs/collector/install/binary/windows) |
+| All methods | [Installation overview](https://opentelemetry.io/docs/collector/install) |
 
 ## Configuration
 
@@ -1010,7 +1017,10 @@ Once log-derived metrics appear as charts, configure health alerts in Netdata:
 2. Create an alert using the [health alerts reference](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md)
 
 - [Netdata OTel plugin reference](https://github.com/netdata/netdata/tree/master/src/crates/netdata-otel/otel-plugin)
+- [Install OpenTelemetry Collector on Linux](https://opentelemetry.io/docs/collector/install/binary/linux)
+- [Install OpenTelemetry Collector with Docker](https://opentelemetry.io/docs/collector/install/docker)
 - [OpenTelemetry Collector documentation](https://opentelemetry.io/docs/collector/)
+- [OpenTelemetry Collector installation overview](https://opentelemetry.io/docs/collector/install)
 - [OpenTelemetry Collector Contrib receivers](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver)
 - [Host Metrics receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver)
 - [Prometheus receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)
