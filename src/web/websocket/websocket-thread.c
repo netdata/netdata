@@ -142,6 +142,10 @@ bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opc
     }
 
     uint32_t message_len = strlen(message);
+    if(message_len > WS_MAX_OUTGOING_FRAME_SIZE) {
+        netdata_log_error("WEBSOCKET[%zu]: Broadcast message too large: %u bytes", wth ? wth->id : 0, message_len);
+        return false;
+    }
 
     // Prepare command
     struct pipe_header header = {
@@ -288,6 +292,16 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                 uint32_t message_len = header.len - sizeof(opcode);
                 if(message_len > WS_MAX_OUTGOING_FRAME_SIZE) {
                     netdata_log_error("WEBSOCKET[%zu]: Broadcast message too large: %u bytes", wth->id, message_len);
+                    // Drain the payload to keep the pipe synchronized for subsequent commands.
+                    char drain_buf[4096];
+                    uint32_t remaining = message_len;
+                    while(remaining > 0) {
+                        size_t chunk = (remaining < sizeof(drain_buf)) ? remaining : sizeof(drain_buf);
+                        ssize_t drained = read_pipe_block(wth->cmd.pipe[PIPE_READ], drain_buf, chunk);
+                        if(drained <= 0)
+                            return; // EAGAIN with no progress or error: stop rather than parse garbage
+                        remaining -= (uint32_t)drained;
+                    }
                     continue;
                 }
                 if(message_len + 1 > wth->cmd.buffer_size) {
