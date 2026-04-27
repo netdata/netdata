@@ -338,6 +338,12 @@ When using `time_group` values other than `min`, `max`, `average`, or `sum`, you
 | `trimmed-mean` | Trim percentage | `"5"`, `"10"` |
 | `trimmed-median` | Trim percentage | `"5"`, `"10"` |
 
+:::important
+
+When using `time_group` values other than `min`, `max`, `average`, or `sum`, you MUST specify `"tier": 0` in the `window` object to ensure a non-aggregated storage tier is used. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where advanced functions like `median`, `stddev`, `ses`, `des`, `percentile`, `countif`, `trimmed-mean`, `trimmed-median`, and `extremes` cannot work correctly.
+
+:::
+
 ---
 
 ### aggregations.metrics[] — Dimension Aggregation
