@@ -1,0 +1,79 @@
+[package]
+name = "netflow-plugin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "netflow-plugin"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+allocative = { workspace = true }
+async-trait = { workspace = true }
+bitflags = { workspace = true }
+bitvec = { workspace = true }
+bytesize = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+journal-common = { workspace = true }
+journal-core = { workspace = true }
+journal-engine = { workspace = true }
+journal-index = { workspace = true }
+journal-log-writer = { workspace = true }
+journal-registry = { workspace = true }
+humantime = { workspace = true }
+humantime-serde = { workspace = true }
+hashbrown = { workspace = true }
+libc = { workspace = true }
+ipnet = { workspace = true }
+ipnet-trie = { workspace = true }
+itoa = { workspace = true }
+jaq-core = { workspace = true }
+jaq-json = { workspace = true, features = ["serde"] }
+jaq-std = { workspace = true }
+maxminddb = { workspace = true }
+memchr = { workspace = true }
+memmap2 = { workspace = true }
+netflow_parser = { workspace = true }
+netgauze-bgp-pkt = { workspace = true }
+netgauze-bmp-pkt = { workspace = true, features = ["codec"] }
+notify = { workspace = true }
+roaring = { workspace = true, features = ["allocative"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+sflow-parser = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+regex = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }
+reqwest = { workspace = true, features = ["json", "rustls"] }
+schemars = { workspace = true }
+socket2 = { workspace = true }
+tonic = { workspace = true, features = ["transport", "tls-native-roots"] }
+tonic-prost = { workspace = true }
+prost = { workspace = true }
+rustc-hash = { workspace = true }
+thiserror = { workspace = true }
+fst = { workspace = true }
+rmp-serde = { workspace = true }
+
+rt = { workspace = true }
+netdata-plugin-error = { workspace = true }
+netdata-plugin-protocol = { workspace = true }
+
+[dev-dependencies]
+etherparse = { workspace = true }
+pcap-file = { workspace = true }
+proptest = { workspace = true }
+protoc-bin-vendored = { workspace = true }
+tempfile = { workspace = true }
+tonic-prost-build = { workspace = true }
+uuid = { workspace = true }

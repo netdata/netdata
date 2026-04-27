@@ -1,0 +1,64 @@
+# Supplemental topology profile for STP-derived bridge links.
+# Sources: BRIDGE-MIB dot1dBase + dot1dStpPortTable.
+
+metadata:
+  device:
+    fields:
+      bridge_base_address:
+        symbol:
+          OID: 1.3.6.1.2.1.17.1.1
+          name: dot1dBaseBridgeAddress
+          format: hex
+      stp_designated_root:
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.5
+          name: dot1dStpDesignatedRoot
+          format: hex
+
+metrics:
+  - MIB: BRIDGE-MIB
+    table:
+      OID: 1.3.6.1.2.1.17.2.15.1
+      name: dot1dStpPortTable
+    symbols:
+      # Numeric anchor to force row emission.
+      - OID: 1.3.6.1.2.1.17.2.15.1.3
+        name: _topology_stp_port_entry
+    metric_tags:
+      - tag: stp_port
+        index: 1
+      - tag: stp_port_priority
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.2
+          name: dot1dStpPortPriority
+      - tag: stp_port_state
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.3
+          name: dot1dStpPortState
+      - tag: stp_port_enable
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.4
+          name: dot1dStpPortEnable
+      - tag: stp_port_path_cost
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.5
+          name: dot1dStpPortPathCost
+      - tag: stp_port_designated_root
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.6
+          name: dot1dStpPortDesignatedRoot
+          format: hex
+      - tag: stp_port_designated_cost
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.7
+          name: dot1dStpPortDesignatedCost
+      - tag: stp_port_designated_bridge
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.8
+          name: dot1dStpPortDesignatedBridge
+          format: hex
+      - tag: stp_port_designated_port
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.9
+          name: dot1dStpPortDesignatedPort
+          format: hex

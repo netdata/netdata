@@ -209,14 +209,20 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
     rfc3339_datetime_ut(h.last_modified_ut_rfc3339, sizeof(h.last_modified_ut_rfc3339), h.last_modified_ut, 2, true);
     nd_machine_guid = h;
 
-    // Ensure the registry directory exists.
-    if (access(pathname, W_OK) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "MACHINE_GUID: cannot access directory '%s'. Attempting to create it.", pathname);
-
-        errno_clear();
-        if (mkdir(pathname, 0775) != 0 && errno != EEXIST) {
+    // Avoid a check-then-create race; mkdir() + EEXIST is sufficient.
+    errno_clear();
+    if (mkdir(pathname, 0775) != 0) {
+        if (errno != EEXIST) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot create directory '%s'", pathname);
             // Even if directory creation fails, continue with in-memory GUID.
+            return h;
+        }
+
+        // EEXIST — verify it is actually a directory.
+        struct stat st;
+        if (stat(pathname, &st) != 0 || !S_ISDIR(st.st_mode)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "MACHINE_GUID: path '%s' exists but is not a directory", pathname);
             return h;
         }
     }

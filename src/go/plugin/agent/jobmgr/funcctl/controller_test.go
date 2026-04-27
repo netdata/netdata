@@ -282,8 +282,9 @@ func TestDispatchHelpers(t *testing.T) {
 
 			case "build params":
 				cases := map[string]struct{}{
-					"build accepted params":                  {},
-					"build required params uses select type": {},
+					"build accepted params":                        {},
+					"build required params uses select type":       {},
+					"build required params agent-wide omits __job": {},
 				}
 
 				for caseName := range cases {
@@ -297,7 +298,8 @@ func TestDispatchHelpers(t *testing.T) {
 								{ID: "extra"},
 							}
 
-							assert.Equal(t, []string{"__job", "__sort", "db", "extra"}, buildAcceptedParams(methodParams))
+							assert.Equal(t, []string{"__job", "__sort", "db", "extra"}, buildAcceptedParams(methodParams, true))
+							assert.Equal(t, []string{"__sort", "db", "extra"}, buildAcceptedParams(methodParams, false))
 
 						case "build required params uses select type":
 							controller := New(Options{})
@@ -319,7 +321,7 @@ func TestDispatchHelpers(t *testing.T) {
 									{ID: "total_time", Name: "By Total Time", Default: true},
 								},
 							}}
-							params := controller.buildRequiredParams("postgres", methodParams)
+							params := controller.buildRequiredParams("postgres", methodParams, true)
 
 							assert.Len(t, params, 2)
 							for _, param := range params {
@@ -336,6 +338,30 @@ func TestDispatchHelpers(t *testing.T) {
 
 							assert.Equal(t, "__job", params[0]["id"])
 							assert.Equal(t, "__sort", params[1]["id"])
+
+						case "build required params agent-wide omits __job":
+							controller := New(Options{})
+							controller.RegisterModules(collectorapi.Registry{
+								"snmp": collectorapi.Creator{
+									Methods: func() []funcapi.MethodConfig {
+										return []funcapi.MethodConfig{{ID: "topology:snmp", AgentWide: true}}
+									},
+								},
+							})
+							controller.registry.addJob("snmp", "router", newTestRuntimeJob("snmp", "router", true))
+
+							methodParams := []funcapi.ParamConfig{{
+								ID:        "topology_view",
+								Name:      "Topology View",
+								Selection: funcapi.ParamSelect,
+								Options: []funcapi.ParamOption{
+									{ID: "l2", Name: "L2", Default: true},
+								},
+							}}
+							params := controller.buildRequiredParams("snmp", methodParams, false)
+
+							assert.Len(t, params, 1)
+							assert.Equal(t, "topology_view", params[0]["id"])
 						}
 					})
 				}
@@ -344,10 +370,31 @@ func TestDispatchHelpers(t *testing.T) {
 	}
 }
 
+func TestParseArgsParams(t *testing.T) {
+	args := []string{
+		"__job:snmp-a",
+		"view=detailed",
+		"labels:src_ip,dst_ip",
+		"info",
+		"invalid",
+		"empty:",
+		"=novalue",
+	}
+
+	got := parseArgsParams(args)
+
+	assert.Equal(t, []string{"snmp-a"}, got["__job"])
+	assert.Equal(t, []string{"detailed"}, got["view"])
+	assert.Equal(t, []string{"src_ip", "dst_ip"}, got["labels"])
+	assert.NotContains(t, got, "invalid")
+	assert.NotContains(t, got, "empty")
+}
+
 func TestControllerLifecycleHooks(t *testing.T) {
 	tests := map[string]struct{}{
 		"register modules does not register static methods yet":        {},
 		"first job start registers static methods once":                {},
+		"topology methods register direct alias":                       {},
 		"job stop unregisters job methods":                             {},
 		"cleanup unregisters static methods":                           {},
 		"cleanup with api configured still unregisters static methods": {},
@@ -379,6 +426,23 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
 
 				assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
+
+			case "topology methods register direct alias":
+				controller.RegisterModules(collectorapi.Registry{
+					"snmp": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "topology:snmp", Aliases: []string{"topology:snmp"}}}
+						},
+					},
+				})
+
+				controller.OnJobStart(newTestRuntimeJob("snmp", "edge-router", true))
+
+				assert.ElementsMatch(t, []string{"snmp:topology:snmp", "topology:snmp"}, reg.registeredNames())
+
+				controller.Cleanup()
+
+				assert.ElementsMatch(t, []string{"snmp:topology:snmp", "topology:snmp"}, reg.unregisteredNames())
 
 			case "job stop unregisters job methods":
 				controller.RegisterModules(collectorapi.Registry{

@@ -58,6 +58,10 @@ func (cb *collectorCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, 
 	return key, jn, true
 }
 
+func (cb *collectorCallbacks) ValidateJobName(name string) error {
+	return dyncfg.JobNameRuleStrict(name)
+}
+
 func (cb *collectorCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (confgroup.Config, error) {
 	mn, ok := cb.mgr.extractModuleName(fn.ID())
 	if !ok {

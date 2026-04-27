@@ -189,6 +189,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
 	}
+	ddsnmp.DeviceRegistry.Unregister(c.deviceRegistryKey())
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()
 	}

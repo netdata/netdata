@@ -204,8 +204,10 @@ static int unittest_stress(void) {
     fprintf(stderr, "\nStress testing waiting queue...\n");
 
     WAITQ wq = WAITQ_INITIALIZER;
-    const size_t num_priorities = 4;
-    const size_t total_threads = num_priorities * THREADS_PER_PRIORITY;
+    enum {
+        WAITQ_STRESS_NUM_PRIORITIES = 4,
+        WAITQ_STRESS_TOTAL_THREADS = WAITQ_STRESS_NUM_PRIORITIES * THREADS_PER_PRIORITY
+    };
 
     // Test both with and without sleep
     for(int test = 0; test < 2; test++) {
@@ -216,12 +218,12 @@ static int unittest_stress(void) {
                 TEST_DURATION_SEC, with_sleep ? "with" : "without");
 
         // Prepare thread stats and args
-        THREAD_STATS stats[total_threads];
-        struct thread_args thread_args[total_threads];
-        ND_THREAD *threads[total_threads];
+        THREAD_STATS stats[WAITQ_STRESS_TOTAL_THREADS];
+        struct thread_args thread_args[WAITQ_STRESS_TOTAL_THREADS];
+        ND_THREAD *threads[WAITQ_STRESS_TOTAL_THREADS];
 
         fprintf(stderr, "Starting %zu threads for %ds test %s sleep...\n",
-                total_threads,
+                (size_t)WAITQ_STRESS_TOTAL_THREADS,
                 TEST_DURATION_SEC,
                 with_sleep ? "with" : "without");
 
@@ -264,12 +266,12 @@ static int unittest_stress(void) {
         __atomic_store_n(&stop_flag, true, __ATOMIC_RELEASE);
 
         // Wait for threads and collect stats
-        fprintf(stderr, "Waiting for %zu threads to finish...\n", total_threads);
-        for(size_t i = 0; i < total_threads; i++)
+        fprintf(stderr, "Waiting for %zu threads to finish...\n", (size_t)WAITQ_STRESS_TOTAL_THREADS);
+        for(size_t i = 0; i < WAITQ_STRESS_TOTAL_THREADS; i++)
             nd_thread_join(threads[i]);
 
         // Print stats
-        print_thread_stats(stats, total_threads, TEST_DURATION_SEC * USEC_PER_SEC);
+        print_thread_stats(stats, WAITQ_STRESS_TOTAL_THREADS, TEST_DURATION_SEC * USEC_PER_SEC);
     }
 
     waitq_destroy(&wq);

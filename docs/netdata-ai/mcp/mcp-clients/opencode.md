@@ -56,7 +56,7 @@ or firewall changes needed.
 
 **Prerequisites:**
 
-- Netdata Cloud account with Business plan
+- Netdata Cloud account with a Paid plan
 - Nodes claimed to Netdata Cloud
 - API token with `scope:mcp`
   ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))

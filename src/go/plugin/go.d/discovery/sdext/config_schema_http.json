@@ -1,0 +1,286 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "HTTP Service Discovery",
+    "description": "Fetches JSON or YAML service discovery items from an HTTP endpoint.",
+    "type": "object",
+    "properties": {
+      "discoverer": {
+        "title": "Discoverer",
+        "type": "object",
+        "properties": {
+          "http": {
+            "title": "HTTP",
+            "type": "object",
+            "properties": {
+              "url": {
+                "title": "URL",
+                "description": "HTTP endpoint that returns a bare array or an object with an items array.",
+                "type": "string",
+                "format": "uri"
+              },
+              "method": {
+                "title": "Method",
+                "description": "HTTP method used to fetch discovery items.",
+                "type": "string"
+              },
+              "headers": {
+                "title": "Headers",
+                "description": "HTTP request headers.",
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "body": {
+                "title": "Body",
+                "description": "Optional HTTP request body.",
+                "type": "string"
+              },
+              "username": {
+                "title": "Username",
+                "description": "Basic authentication username.",
+                "type": "string"
+              },
+              "password": {
+                "title": "Password",
+                "description": "Basic authentication password.",
+                "type": "string"
+              },
+              "bearer_token_file": {
+                "title": "Bearer token file",
+                "description": "Path to a file containing a bearer token. The file is read for each request.",
+                "type": "string"
+              },
+              "interval": {
+                "title": "Poll interval",
+                "description": "How often to fetch the endpoint. Set to 0 for a one-shot fetch.",
+                "type": "string",
+                "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+                "default": "1m"
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "HTTP request timeout, in seconds.",
+                "type": "number",
+                "minimum": 0.1,
+                "default": 2
+              },
+              "format": {
+                "title": "Response format",
+                "description": "Response format. Auto uses Content-Type when clear, then tries JSON before YAML.",
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "json",
+                  "yaml"
+                ],
+                "default": "auto"
+              },
+              "not_follow_redirects": {
+                "title": "Do not follow redirects",
+                "type": "boolean"
+              },
+              "proxy_url": {
+                "title": "Proxy URL",
+                "type": "string"
+              },
+              "proxy_username": {
+                "title": "Proxy username",
+                "type": "string"
+              },
+              "proxy_password": {
+                "title": "Proxy password",
+                "type": "string"
+              },
+              "tls_ca": {
+                "title": "TLS CA",
+                "description": "Path to CA certificate used to verify the endpoint.",
+                "type": "string"
+              },
+              "tls_cert": {
+                "title": "TLS certificate",
+                "description": "Path to client TLS certificate.",
+                "type": "string"
+              },
+              "tls_key": {
+                "title": "TLS key",
+                "description": "Path to client TLS key.",
+                "type": "string"
+              },
+              "tls_skip_verify": {
+                "title": "Skip TLS verification",
+                "type": "boolean"
+              },
+              "force_http2": {
+                "title": "Force HTTP/2",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "url"
+            ]
+          }
+        },
+        "required": [
+          "http"
+        ]
+      },
+      "services": {
+        "title": "Service rules",
+        "description": "- Match fetched HTTP discovery items and generate collector configurations.\n- Generated job configs must include `name` and `module`; `module` is the collector name, for example `httpcheck` or `ping`.\n- If a generated config omits `module`, the rule ID is used as `module`; rely on this only for curated rules where the rule ID is the intended collector.\n- `.Item` contains the fetched item. String items expose the string as `.Item`; object items expose fields under `.Item`.",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "Rule ID",
+              "description": "Unique identifier for this rule. If config_template omits module, this value is used as the module. Use that fallback only when the rule ID is the intended collector name.",
+              "type": "string"
+            },
+            "match": {
+              "title": "Match expression",
+              "description": "Go template expression that must evaluate to 'true' for the rule to match the fetched item.",
+              "type": "string"
+            },
+            "config_template": {
+              "title": "Config template",
+              "description": "Go template that generates the data collection job configuration in YAML format. Generated configs must include name and module unless module is intentionally filled from the rule ID.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "match"
+          ]
+        }
+      }
+    },
+    "required": [
+      "discoverer",
+      "services"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Discovery",
+          "fields": [
+            "discoverer"
+          ]
+        },
+        {
+          "title": "Services",
+          "fields": [
+            "services"
+          ]
+        }
+      ]
+    },
+    "discoverer": {
+      "http": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {
+              "title": "Request",
+              "fields": [
+                "url",
+                "format",
+                "not_follow_redirects",
+                "interval",
+                "timeout",
+                "method",
+                "body"
+              ]
+            },
+            {
+              "title": "Auth",
+              "fields": [
+                "username",
+                "password",
+                "bearer_token_file"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_ca",
+                "tls_cert",
+                "tls_key",
+                "tls_skip_verify"
+              ]
+            },
+            {
+              "title": "Proxy",
+              "fields": [
+                "proxy_url",
+                "proxy_username",
+                "proxy_password",
+                "force_http2"
+              ]
+            },
+            {
+              "title": "Headers",
+              "fields": [
+                "headers"
+              ]
+            }
+          ]
+        },
+        "url": {
+          "ui:placeholder": "https://example.com/netdata/go.d/jobs.yaml"
+        },
+        "method": {
+          "ui:widget": "hidden"
+        },
+        "body": {
+          "ui:widget": "hidden"
+        },
+        "interval": {
+          "ui:placeholder": "1m",
+          "ui:help": "Examples: 30s, 1m, 5m. Use 0 for one-shot fetch."
+        },
+        "format": {
+          "ui:placeholder": "auto",
+          "ui:widget": "radio",
+          "ui:options": {
+            "inline": true
+          }
+        },
+        "password": {
+          "ui:widget": "password"
+        },
+        "proxy_password": {
+          "ui:widget": "password"
+        },
+        "force_http2": {
+          "ui:widget": "hidden"
+        }
+      }
+    },
+    "services": {
+      "ui:listFlavour": "list",
+      "items": {
+        "id": {
+          "ui:placeholder": "httpcheck"
+        },
+        "match": {
+          "ui:widget": "textarea",
+          "ui:placeholder": "{{ true }}",
+          "ui:help": "| Field | Description |\n|-------|-------------|\n| `.Item` | Fetched item. Object fields are under `.Item`, for example `.Item.url`. String items expose the string itself. |\n| `.TUID` | Stable target unique ID. |\n| `.Hash` | Stable content-sensitive target hash. |"
+        },
+        "config_template": {
+          "ui:widget": "textarea",
+          "ui:placeholder": "name: {{ .TUID }}\nmodule: httpcheck\nurl: {{ .Item }}"
+        }
+      }
+    }
+  }
+}

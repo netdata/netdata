@@ -317,7 +317,13 @@ static void do_eval_expression(
 }
 
 // returns the number of runnable alerts
-static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run) {
+//
+// The caller owns `owa` and provides it so a single arena can be reused
+// across all hosts of one iteration (and, in the multi-threaded variant,
+// across all hosts a single worker processes). The arena is reset between
+// alerts inside this function, so peak memory stays bounded by one alert's
+// scratch no matter how many hosts flow through it.
+static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run, ONEWAYALLOC *owa) {
     size_t runnable = 0;
     struct health_alert_status_counts status_counts = { 0 };
     bool snapshot_complete = true;
@@ -369,9 +375,22 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             return;
     }
 
+    // Reuse the caller-provided arena across every alert's DB lookup. Each
+    // alert's scratch (RRDR + query state) is released via onewayalloc_reset
+    // at the top of the next iteration — trims the page list back to a
+    // single head page. Net effect: one mmap/munmap for the whole health
+    // iteration, regardless of host count or alert count.
+
     // the first loop is to lookup values from the db
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
+        // Reclaim the previous alert's query scratch before starting the
+        // next one. The arena is reused across every alert of every host in
+        // this iteration, so this reset trims trailing pages left by the
+        // previous alert (same host or prior host). No-op only on the very
+        // first alert after the arena was created.
+        onewayalloc_reset(owa);
+
         if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
             snapshot_complete = false;
             break;
@@ -464,7 +483,8 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     break;
             }
 
-            int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
+            int ret = rrdset2value_api_v1_with_owa(owa,
+                                          rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
                                           rc->config.after, rc->config.before, rc->config.time_group, group_options,
                                           0, rc->config.options | RRDR_OPTION_SELECTED_TIER,
                                           &rc->db_after,&rc->db_before,
@@ -781,14 +801,20 @@ static void health_event_loop(void) {
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
         uint64_t loop = __atomic_add_fetch(&health_evloop_iteration, 1, __ATOMIC_RELAXED);
 
+        // Single onewayalloc arena reused across every host in this iteration —
+        // one mmap/munmap pair for the whole cycle instead of per host.
+        ONEWAYALLOC *iter_owa = onewayalloc_create(0);
+
         RRDHOST *host;
         dfe_start_reentrant(rrdhost_root_index, host) {
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
 
-            health_event_loop_for_host(host, apply_hibernation_delay, now, &next_run);
+            health_event_loop_for_host(host, apply_hibernation_delay, now, &next_run, iter_owa);
         }
         dfe_done(host);
+
+        onewayalloc_destroy(iter_owa);
 
         if(unlikely(!service_running(SERVICE_HEALTH)))
             break;

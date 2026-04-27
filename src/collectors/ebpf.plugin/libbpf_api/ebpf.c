@@ -532,7 +532,7 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
     int value;
 
     // It is not necessary to report more information.
-    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING)
+    if (ebpf_module_enabled_get(em) > NETDATA_THREAD_EBPF_FUNCTION_RUNNING)
         value = -1;
     else
         value = 1;

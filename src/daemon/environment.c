@@ -75,6 +75,7 @@ void set_environment_for_plugins_and_scripts(void) {
     verify_required_directory("NETDATA_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
     verify_required_directory("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
     verify_required_directory("NETDATA_STOCK_CONFIG_DIR", netdata_configured_stock_config_dir, false, 0);
+    verify_required_directory("NETDATA_STOCK_DATA_DIR", netdata_configured_stock_data_dir, false, 0);
     verify_required_directory("NETDATA_PLUGINS_DIR", netdata_configured_primary_plugins_dir, false, 0);
     verify_required_directory("NETDATA_WEB_DIR", netdata_configured_web_dir, false, 0);
     verify_required_directory("NETDATA_CACHE_DIR", netdata_configured_cache_dir, true, 0775);

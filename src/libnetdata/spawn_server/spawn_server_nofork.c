@@ -28,21 +28,44 @@ static volatile bool spawn_server_exit = false;
 static volatile bool spawn_server_sigchld = false;
 static SPAWN_REQUEST *spawn_server_requests = NULL;
 
+static size_t spawn_server_max_unix_socket_path_length(void) {
+    struct sockaddr_un server_addr = { 0 };
+    return sizeof(server_addr.sun_path) - 1;
+}
+
+static bool spawn_server_set_unix_socket_path(struct sockaddr_un *server_addr, const char *path, bool log, const char *action) {
+    const size_t max_path_length = sizeof(server_addr->sun_path) - 1;
+
+    if(strlen(path) > max_path_length) {
+        errno = ENAMETOOLONG;
+        if(log)
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "%s '%s': exceeds the %zu-byte AF_UNIX limit",
+                   action, path, max_path_length);
+        return false;
+    }
+
+    strncpyz(server_addr->sun_path, path, max_path_length);
+    return true;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 static int connect_to_spawn_server(const char *path, bool log) {
     int sock = -1;
+    struct sockaddr_un server_addr = {
+        .sun_family = AF_UNIX,
+    };
+
+    if(!spawn_server_set_unix_socket_path(&server_addr, path, log,
+                                          "SPAWN PARENT: Cannot connect() to spawn server on path"))
+        return -1;
 
     if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         if(log)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: cannot create socket() to connect to spawn server.");
         return -1;
     }
-
-    struct sockaddr_un server_addr = {
-        .sun_family = AF_UNIX,
-    };
-    strcpy(server_addr.sun_path, path);
 
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         if(log)
@@ -956,15 +979,19 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
         return false;
     }
 
+    struct sockaddr_un server_addr = {
+        .sun_family = AF_UNIX,
+    };
+
+    if(!spawn_server_set_unix_socket_path(&server_addr, server->path, true,
+                                          "SPAWN SERVER: Cannot listen on path"))
+        return false;
+
     if ((server->sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to create socket()");
         return false;
     }
 
-    struct sockaddr_un server_addr = {
-        .sun_family = AF_UNIX,
-    };
-    strcpy(server_addr.sun_path, server->path);
     unlink(server->path);
     errno = 0;
 
@@ -1053,13 +1080,38 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         runtime_directory = "/tmp";
 
     char path[1024];
+    int path_length;
+    const size_t max_path_length = spawn_server_max_unix_socket_path_length();
     if(name && *name) {
         server->name = strdupz(name);
-        snprintf(path, sizeof(path), "%s/netdata-spawn-%s.sock", runtime_directory, name);
+        path_length = snprintf(path, sizeof(path), "%s/netdata-spawn-%s.sock", runtime_directory, name);
     }
     else {
         server->name = strdupz("unnamed");
-        snprintf(path, sizeof(path), "%s/netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
+        path_length = snprintf(path, sizeof(path), "%s/netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
+    }
+
+    if(path_length < 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: failed to generate socket path for '%s'",
+               server->name);
+        goto cleanup;
+    }
+
+    if((size_t)path_length >= sizeof(path)) {
+        errno = ENAMETOOLONG;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: socket path for '%s' in runtime directory '%s' was truncated (needed %d chars plus NUL, buffer is %zu bytes)",
+               server->name, runtime_directory, path_length, sizeof(path));
+        goto cleanup;
+    }
+
+    if((size_t)path_length > max_path_length) {
+        errno = ENAMETOOLONG;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: socket path for '%s' in runtime directory '%s' exceeds the %zu-byte AF_UNIX limit",
+               server->name, runtime_directory, max_path_length);
+        goto cleanup;
     }
 
     server->path = strdupz(path);

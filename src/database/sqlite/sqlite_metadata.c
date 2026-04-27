@@ -499,8 +499,9 @@ void sql_load_node_id(RRDHOST *host)
     param = 0;
     int rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW)) {
-        if (likely(sqlite3_column_bytes(res, 0) == sizeof(nd_uuid_t)))
-            set_host_node_id(host, (nd_uuid_t *)sqlite3_column_blob(res, 0));
+        nd_uuid_t node_id;
+        if (likely(sqlite3_column_uuid_copy(res, 0, node_id)))
+            set_host_node_id(host, &node_id);
         else
             set_host_node_id(host, NULL);
     }
@@ -1298,14 +1299,19 @@ static bool run_cleanup_loop(
     uint32_t l_checked = 0;
     uint32_t l_deleted = 0;
     while (!time_expired && sqlite3_step_monitored(res) == SQLITE_ROW) {
+        nd_uuid_t uuid = {0};
+
         if (unlikely(SHUTDOWN_REQUESTED(config)))
             break;
 
         *row_id = sqlite3_column_int64(res, 1);
-        rc = check_cb((nd_uuid_t *)sqlite3_column_blob(res, 0), check_stmt, check_flag);
+        if (unlikely(!sqlite3_column_uuid_copy(res, 0, uuid)))
+            continue;
+
+        rc = check_cb(&uuid, check_stmt, check_flag);
 
         if (rc == true) {
-            action_cb((nd_uuid_t *)sqlite3_column_blob(res, 0), action_stmt, action_flag);
+            action_cb(&uuid, action_stmt, action_flag);
             l_deleted++;
 //            if (false == sql_metadata_wal_size_acceptable())
 //                (void) sqlite3_wal_checkpoint(db_meta, NULL);
@@ -1747,14 +1753,15 @@ static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
 
     can_continue = true;
     while (can_continue && sqlite3_step_monitored(*res) == SQLITE_ROW) {
-        if (sqlite3_column_bytes(*res, 0) != sizeof(nd_uuid_t))
+        nd_uuid_t dim_uuid;
+
+        if (!sqlite3_column_uuid_copy(*res, 0, dim_uuid))
             continue;
 
-        nd_uuid_t *dim_uuid = (nd_uuid_t *)sqlite3_column_blob(*res, 0);
         int64_t dimension_id = sqlite3_column_int64(*res, 1);
 
-        if (dimension_can_be_deleted(dim_uuid, NULL, false)) {
-            delete_dimension_by_rowid(&dim_del_stmt, dimension_id, dim_uuid);
+        if (dimension_can_be_deleted(&dim_uuid, NULL, false)) {
+            delete_dimension_by_rowid(&dim_del_stmt, dimension_id, &dim_uuid);
             (*deleted)++;
         }
         (*checked)++;
@@ -2145,15 +2152,15 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 
     usec_t started_ut = now_monotonic_usec();
     while (sqlite3_step(res) == SQLITE_ROW) {
-        nd_uuid_t *uuid = (nd_uuid_t *)sqlite3_column_blob(res, 0);
-        if (!uuid || sqlite3_column_bytes(res, 0) != sizeof(nd_uuid_t))
+        nd_uuid_t uuid;
+        if (!sqlite3_column_uuid_copy(res, 0, uuid))
             continue;
 
         for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++) {
             if (unlikely(!multidb_ctx[tier]))
                 continue;
 
-            populate_cb(mrg, (Word_t)multidb_ctx[tier], uuid);
+            populate_cb(mrg, (Word_t)multidb_ctx[tier], &uuid);
         }
         count++;
     }
@@ -2595,8 +2602,9 @@ static void start_metadata_hosts(uv_work_t *req)
 
     store_alert_transitions((struct judy_list_t *)worker->pending_alert_list, true, false);
 
-    if (!SHUTDOWN_REQUESTED(config))
-        store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
+    // This helper already skips database scheduling once shutdown starts, but it
+    // still has to release the worker-owned Judy list on that path.
+    store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
 
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
@@ -2605,8 +2613,11 @@ static void start_metadata_hosts(uv_work_t *req)
     COMPUTE_DURATION(report_duration, "us", all_started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_DEBUG, "Checking all hosts completed in %s", report_duration);
 
+    // This helper already skips dimension deletion once shutdown starts, but it
+    // still has to release the worker-owned Judy list on that path.
+    do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
+
     if (!SHUTDOWN_REQUESTED(config)) {
-        do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
         run_metadata_cleanup(config);
     }
 

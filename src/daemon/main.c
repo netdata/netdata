@@ -221,6 +221,7 @@ int progress_unittest(void);
 int dyncfg_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
+int statistical_unittest(void);
 int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
@@ -444,6 +445,7 @@ int netdata_main(int argc, char **argv) {
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
+                            if (statistical_unittest()) return 1;
                             if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;
                             if (yaml_unittest()) return 1;

@@ -14,6 +14,7 @@ typedef enum __attribute__((packed)) {
     BIB_PACKAGING_CONFIGURE_OPTIONS,
     BIB_DIR_USER_CONFIG,
     BIB_DIR_STOCK_CONFIG,
+    BIB_DIR_STOCK_DATA,
     BIB_DIR_CACHE,
     BIB_DIR_LIB,
     BIB_DIR_PLUGINS,
@@ -215,6 +216,14 @@ static struct {
                 .print = "Stock Configurations",
                 .json = "stock_config",
                 .value = LIBCONFIG_DIR,
+        },
+        [BIB_DIR_STOCK_DATA] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Stock Data Files",
+                .json = "stock_data",
+                .value = STOCK_DATA_DIR,
         },
         [BIB_DIR_CACHE] = {
                 .category = BIC_DIRECTORIES,
@@ -1542,6 +1551,7 @@ static void populate_packaging_info() {
 static void populate_directories(void) {
     build_info_set_value(BIB_DIR_USER_CONFIG, netdata_configured_user_config_dir);
     build_info_set_value(BIB_DIR_STOCK_CONFIG, netdata_configured_stock_config_dir);
+    build_info_set_value(BIB_DIR_STOCK_DATA, netdata_configured_stock_data_dir);
     build_info_set_value(BIB_DIR_CACHE, netdata_configured_cache_dir);
     build_info_set_value(BIB_DIR_LIB, netdata_configured_varlib_dir);
     build_info_set_value(BIB_DIR_PLUGINS, netdata_configured_primary_plugins_dir);

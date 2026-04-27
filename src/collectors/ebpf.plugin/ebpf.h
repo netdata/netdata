@@ -6,6 +6,7 @@
 #ifndef __FreeBSD__
 #include <linux/perf_event.h>
 #endif
+#include <stdatomic.h>
 #include <stdint.h>
 #include <errno.h>
 #include <signal.h>
@@ -23,6 +24,7 @@
 #include "libbpf_api/ebpf.h"
 
 #include "collectors/cgroups.plugin/sys_fs_cgroup.h"
+#include "libnetdata/netipc/netipc_netdata.h"
 
 #include "ebpf_apps.h"
 #include "ebpf_functions.h"
@@ -269,9 +271,9 @@ extern struct ebpf_pid_stat *ebpf_root_of_pids;
 extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
-extern int shm_fd_ebpf_cgroup;
-extern sem_t *shm_sem_ebpf_cgroup;
+extern _Atomic int ebpf_cgroup_systemd_enabled;
+extern _Atomic int ebpf_cgroup_integration_active;
+extern _Atomic int send_cgroup_chart;
 extern netdata_mutex_t mutex_cgroup_shm;
 extern size_t ebpf_all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
@@ -328,6 +330,36 @@ extern volatile sig_atomic_t ebpf_stop_signal;
 extern bool ebpf_plugin_exit;
 extern uint64_t collect_pids;
 
+static inline void ebpf_cgroup_systemd_enabled_set(int value)
+{
+    atomic_store_explicit(&ebpf_cgroup_systemd_enabled, value, memory_order_release);
+}
+
+static inline int ebpf_cgroup_systemd_enabled_get(void)
+{
+    return atomic_load_explicit(&ebpf_cgroup_systemd_enabled, memory_order_acquire);
+}
+
+static inline void ebpf_cgroup_integration_active_set(int value)
+{
+    atomic_store_explicit(&ebpf_cgroup_integration_active, value, memory_order_release);
+}
+
+static inline int ebpf_cgroup_integration_active_get(void)
+{
+    return atomic_load_explicit(&ebpf_cgroup_integration_active, memory_order_acquire);
+}
+
+static inline void ebpf_send_cgroup_chart_set(int value)
+{
+    atomic_store_explicit(&send_cgroup_chart, value, memory_order_release);
+}
+
+static inline int ebpf_send_cgroup_chart_get(void)
+{
+    return atomic_load_explicit(&send_cgroup_chart, memory_order_acquire);
+}
+
 static inline bool ebpf_plugin_stop(void)
 {
     return __atomic_load_n(&ebpf_plugin_exit, __ATOMIC_ACQUIRE) ||
@@ -335,12 +367,26 @@ static inline bool ebpf_plugin_stop(void)
            nd_thread_signaled_to_cancel();
 }
 
+// `enabled` is sampled from stats/shutdown paths without a single shared mutex.
+// Keep those state transitions defined without changing the plugin's lock layout.
+static inline enum ebpf_threads_status ebpf_module_enabled_get(ebpf_module_t *em)
+{
+    return __atomic_load_n(&em->enabled, __ATOMIC_RELAXED);
+}
+
+static inline void ebpf_module_enabled_set(ebpf_module_t *em, enum ebpf_threads_status enabled)
+{
+    __atomic_store_n(&em->enabled, enabled, __ATOMIC_RELAXED);
+}
+
 static inline bool ebpf_module_thread_has_valid_state(ebpf_module_t *em)
 {
-    if (likely(em->enabled == NETDATA_THREAD_EBPF_RUNNING || em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING))
+    enum ebpf_threads_status enabled = ebpf_module_enabled_get(em);
+
+    if (likely(enabled == NETDATA_THREAD_EBPF_RUNNING || enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING))
         return true;
 
-    collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)em->enabled);
+    collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)enabled);
     return false;
 }
 

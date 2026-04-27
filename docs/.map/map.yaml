@@ -680,9 +680,6 @@ sidebar:
                   label: JetBrains IDEs
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/jetbrains-ides.md
               - meta:
-                  label: Netdata Web Client
-                  edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/netdata-web-client.md
-              - meta:
                   label: Claude Code
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/claude-code.md
               - meta:

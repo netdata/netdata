@@ -76,6 +76,64 @@ curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://ap
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/data?contexts=system.cpu&after=-600
 ```
 
+**Advanced Metric Queries with Aggregation**
+
+For more advanced queries with aggregation, use the POST endpoint with a JSON body. This allows you to query metrics with time aggregation (like average values) and control grouping and filtering.
+
+```console
+TOKEN="YOUR_API_TOKEN"
+SPACE="YOUR_SPACE_ID"
+ROOM="YOUR_ROOM_ID"
+
+read -r -d '' PAYLOAD <<'EOF'
+{
+  "scope": {"contexts": ["system.cpu"]},
+  "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
+  "window": {"after": -600, "before": 0, "points": 5},
+  "aggregations": {
+    "metrics": [{"group_by": ["selected"], "aggregation": "sum"}],
+    "time": {"time_group": "average"}
+  },
+  "format": "json2",
+  "options": ["jsonwrap", "minify", "unaligned"],
+  "timeout": 30000
+}
+EOF
+
+curl -s -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  -d "$PAYLOAD"
+```
+
+**Time Aggregation Options**
+
+The `time_group` parameter in `aggregations.time` controls how data points within each time interval are combined:
+
+| Option | Description | Use Case |
+|--------|-------------|----------|
+| `average` | Mean value (default) | Average resource consumption over time |
+| `min` | Minimum value | Find lowest values in each interval |
+| `max` | Maximum value | Find spikes or peaks |
+| `sum` | Sum of values | Total volume transferred (counters) |
+| `median` | Median value | Robust central tendency |
+| `stddev` | Standard deviation | Measure of variability |
+| `ses` | Single exponential smoothing | Trend-aware smoothing |
+| `des` | Double exponential smoothing | Trend + seasonality smoothing |
+| `incremental-sum` | Difference between last and first value | Change over interval |
+| `percentile` | Generic percentile (set value in `time_group_options`) | e.g., 95th percentile latency |
+| `countif` | Count values matching condition (set condition in `time_group_options`) | e.g., count samples above threshold |
+| `trimmed-mean` | Mean after trimming outliers (set trim % in `time_group_options`) | Robust average excluding extremes |
+| `trimmed-median` | Median after trimming outliers (set trim % in `time_group_options`) | Robust median excluding extremes |
+| `extremes` | Min and max values | Show value range per interval |
+
+:::important
+
+When using `time_group` values other than `min`, `max`, `average`, or `sum`, you MUST specify `"tier": 0` in the `window` object to ensure a non-aggregated storage tier is used. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where advanced functions like `median`, `stddev`, `ses`, `des`, `percentile`, `countif`, `trimmed-mean`, `trimmed-median`, and `extremes` cannot work correctly.
+
+:::
+
 **Get context information**
 
 ```console

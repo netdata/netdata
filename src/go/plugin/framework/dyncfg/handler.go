@@ -21,6 +21,10 @@ type Callbacks[C Config] interface {
 	// Includes all validation (including heavy checks like module instantiation).
 	ParseAndValidate(fn Function, name string) (C, error)
 
+	// ValidateJobName enforces the domain's job-name policy. Called before
+	// ParseAndValidate so cheap name-format rejections happen without parsing payload.
+	ValidateJobName(name string) error
+
 	// Start creates a work unit and starts it. Owns the full start lifecycle
 	// including pre-start cleanup and post-fail retry scheduling.
 	// Return CodedError to override EnableFailCode.
@@ -437,7 +441,7 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 		return
 	}
 
-	if err := ValidateJobName(name); err != nil {
+	if err := h.cb.ValidateJobName(name); err != nil {
 		h.api.SendCodef(fn, 400, "invalid job name '%s': %v.", name, err)
 		return
 	}
