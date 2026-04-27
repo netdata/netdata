@@ -134,12 +134,6 @@ When using `time_group` values other than `min`, `max`, `average`, or `sum`, spe
 
 :::
 
-:::tip
-
-For complete parameter reference, including additional aggregation functions and advanced grouping options, see the [Query Metrics skill documentation](/docs/netdata-ai/skills/query-netdata-cloud-metrics.md).
-
-:::
-
 **Get context information**
 
 ```console
