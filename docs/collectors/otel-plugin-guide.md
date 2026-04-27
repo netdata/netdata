@@ -919,3 +919,5 @@ When binding to `0.0.0.0`, ensure that firewall or network policy restricts acce
 - [Redis receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver)
 - [NGINX receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/nginxreceiver)
 - [PostgreSQL receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/postgresqlexreceiver)
+- [Transforming telemetry](https://opentelemetry.io/docs/collector/transforming-telemetry/)
+- [OTTEL (OpenTelemetry Transformation Language)](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/pkg/ottl/README.md)
