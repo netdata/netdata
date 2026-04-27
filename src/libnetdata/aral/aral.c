@@ -431,11 +431,7 @@ static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void
 // --------------------------------------------------------------------------------------------------------------------
 // Tagging the pointer with the 'marked' flag
 
-// Retrieving the pointer and the 'marked' flag
-static ALWAYS_INLINE ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *ptr, bool *marked) {
-    uint8_t *data = ptr;
-    uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.element_ptr_offset];
-    uintptr_t tagged_page = __atomic_load_n(page_ptr, __ATOMIC_ACQUIRE);  // Atomically load the tagged pointer
+static ALWAYS_INLINE ARAL_PAGE *aral_decode_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *ptr, uintptr_t tagged_page, bool *marked) {
     *marked = (tagged_page & 1) != 0;  // Extract the LSB as the 'marked' flag
     ARAL_PAGE *page = (ARAL_PAGE *)(tagged_page & ~1);  // Mask out the LSB to get the original pointer
 
@@ -466,6 +462,31 @@ static ALWAYS_INLINE ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_hav
     internal_fatal((uintptr_t)page % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
 
     return page;
+}
+
+// Retrieving the pointer and the 'marked' flag
+static ALWAYS_INLINE ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *ptr, bool *marked) {
+    uint8_t *data = ptr;
+    uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.element_ptr_offset];
+    uintptr_t tagged_page = __atomic_load_n(page_ptr, __ATOMIC_ACQUIRE);  // Atomically load the tagged pointer
+
+    return aral_decode_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, tagged_page, marked);
+}
+
+// Atomically claims an allocated slot for freeing.
+// Returns NULL on a concurrent double-free or stale free, leaving the
+// decode helper's NULL assertion to the load path only.
+static ALWAYS_INLINE ARAL_PAGE *aral_claim_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *ptr, bool *marked) {
+    uint8_t *data = ptr;
+    uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.element_ptr_offset];
+    uintptr_t tagged_page = __atomic_exchange_n(page_ptr, 0, __ATOMIC_ACQ_REL);
+
+    if(unlikely(!tagged_page)) {
+        *marked = false;
+        return NULL;
+    }
+
+    return aral_decode_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, tagged_page, marked);
 }
 
 static ALWAYS_INLINE void aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *page, void *ptr, bool marked) {
@@ -1036,14 +1057,13 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
 
     if(unlikely(!ptr)) return;
 
-    // get the page pointer
+    // Atomically claim the trailer: the losing thread of a concurrent
+    // double-free observes a NULL pointer and fatal()s here, while only the
+    // winner enqueues the slot back to the free list.
     bool marked;
-    ARAL_PAGE *page = aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, &marked);
-
-    // Clear the embedded trailer before publishing the slot back to the free lists.
-    // This makes stale/double frees fail through the null-page check instead of
-    // dereferencing a stale ARAL_PAGE pointer while the slot is idle.
-    aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, NULL, ptr, false);
+    ARAL_PAGE *page = aral_claim_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, &marked);
+    if(unlikely(!page))
+        fatal("ARAL: '%s' double free, stale free, or corrupted pointer %p", ar->config.name, ptr);
 
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.deallocators, 1, __ATOMIC_RELAXED);
