@@ -42,4 +42,8 @@ Reports appear in the Insights tab and are downloadable as PDFs. An email notifi
 - Compresses them into a structured context (summaries, correlations, timelines)
 - Uses a model to synthesize explanations and recommended actions from that context
 
- 
+## Availability and usage
+
+- Available in Netdata Cloud for Business and Free Trial
+- Each generated report consumes 1 AI credit (10 free per month on eligible plans)
+- Data privacy: metrics are summarized into structured context; your data is not used to train foundation models
