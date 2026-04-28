@@ -298,8 +298,16 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                     while(remaining > 0) {
                         size_t chunk = (remaining < sizeof(drain_buf)) ? remaining : sizeof(drain_buf);
                         ssize_t drained = read_pipe_block(wth->cmd.pipe[PIPE_READ], drain_buf, chunk);
-                        if(drained <= 0)
-                            return; // EAGAIN with no progress or error: stop rather than parse garbage
+                        if(drained <= 0) {
+                            // Cannot complete drain: close the pipe so the next poll cycle does not
+                            // try to parse the leftover payload bytes as a new pipe_header.
+                            netdata_log_error("WEBSOCKET[%zu]: Failed to fully drain oversized broadcast payload, closing command pipe to avoid desynchronization", wth->id);
+                            if(wth->cmd.pipe[PIPE_READ] != -1) {
+                                close(wth->cmd.pipe[PIPE_READ]);
+                                wth->cmd.pipe[PIPE_READ] = -1;
+                            }
+                            return;
+                        }
                         remaining -= (uint32_t)drained;
                     }
                     continue;
