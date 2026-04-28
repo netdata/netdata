@@ -21,7 +21,7 @@ In the tables below, **Community** refers to Netdata Cloud Community and **Busin
 
 :::note
 
-Netdata offers two paid plans: **Homelab** for personal and home lab environments, and **Business** for commercial and enterprise use. Both plans unlock the same feature set — the difference is the licensing terms and intended use case. Visit [Netdata Cloud pricing](https://app.netdata.cloud/billing) for details.
+Netdata Cloud offers two paid plans: **Homelab** for personal and home lab environments, and **Business** for commercial and enterprise use. Both plans unlock the same feature set — the difference is the licensing terms and intended use case. Visit [Netdata Cloud pricing](https://netdata.cloud/pricing) for details.
 
 :::
 
@@ -109,7 +109,7 @@ When accessing Netdata via Agent/Parent MCP:
 - **Without Cloud connection**: MCP can access public functions and metrics, but sensitive functions follow the same restrictions as the dashboard
 - **With Cloud connection**: MCP inherits the user's Cloud permissions, enabling access to sensitive functions for authenticated users
 
-For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mcp/README.md).
+For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mcp).
 
 ## How to Enable Features
 
