@@ -518,6 +518,44 @@ docker run -d --name=netdata \
 
 :::
 
+## Updating your Docker container
+
+Docker containers are not upgraded in-place. To update, you pull a new image and recreate the container. Your configuration and metrics data are preserved in persistent volumes (`netdataconfig`, `netdatalib`, `netdatacache`) across container recreation.
+
+<Tabs>
+<TabItem value="docker_run" label="docker run">
+
+1. Pull the latest image:
+
+   ```bash
+   docker pull netdata/netdata:stable
+   ```
+
+2. Stop and remove the existing container:
+
+   ```bash
+   docker stop netdata && docker rm netdata
+   ```
+
+3. Recreate the container using your original `docker run` command.
+
+</TabItem>
+<TabItem value="docker compose" label="docker-compose">
+
+```bash
+docker-compose pull && docker-compose up -d
+```
+
+</TabItem>
+</Tabs>
+
+:::tip
+
+- Use the `stable` tag to pull only stable releases. The `latest` tag (the default) pulls the most recent build, which may include nightly builds. See [Docker tags](#docker-tags) for all available tags.
+- If you manage containers through a third-party platform (such as CasaOS or Portainer), use that platform's update interface to pull the new image and recreate the container.
+
+:::
+
 ## Docker tags
 
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
