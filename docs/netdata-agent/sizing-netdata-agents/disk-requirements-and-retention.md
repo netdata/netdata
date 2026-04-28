@@ -45,7 +45,13 @@ Netdata Agent metrics storage is limited to 3 GiB by default (configurable), usi
 
 Data is deleted when it reaches **either** the size limit or the time limit, whichever comes first. The number of metrics collected determines how far back in time retention extends within the size limit.
 
-In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 5 days of high resolution (per-second) data, about 1 month of medium resolution (per-minute) data, and about 1.7 years of low resolution (per-hour) data.
+
+:::note
+
+At higher ingestion rates the per-tier size limit is reached before the time limit, so actual retention depends on both the number of metrics collected and the configured size limit. You can increase the size limit per tier to extend retention.
+
+:::
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
