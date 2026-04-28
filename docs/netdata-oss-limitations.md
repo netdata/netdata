@@ -12,6 +12,12 @@ Netdata implements a layered access control system to protect sensitive informat
 | **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier) |
 | **Netdata Cloud Business** | Signed in with a paid subscription |
 
+:::note
+
+In the tables below, **Community** refers to Netdata Cloud Community and **Business** refers to Netdata Cloud Business.
+
+:::
+
 ## Why Access Controls Exist
 
 Netdata functions can expose sensitive system information:
@@ -127,15 +133,15 @@ The 5-node limit on multi-node dashboards applies to Community plans:
 
 When using parent-child streaming architectures, the access level for your dashboards depends on whether you connect to Netdata Cloud:
 
-| Deployment Type | Access Level | Sensitive Functions | AI Features | Dashboard Access |
-|-----------------|--------------|---------------------|-------------|------------------|
+| Deployment Type | Access Level | Sensitive Functions | AI-Powered Features | UI & Management Access |
+|-----------------|--------------|---------------------|---------------------|------------------------|
 | **Parent-Child WITHOUT Cloud** | Anonymous | Blocked | Not available | Local dashboard only |
 | **Parent-Child WITH Cloud (Community)** | Community | Unlocked for authenticated users | Available | Cloud dashboards |
 | **Parent-Child WITH Cloud (Business)** | Business | Unlocked for authenticated users | Available | Cloud dashboards + Dynamic Configuration |
 
 :::note
 
-Streaming API keys authenticate the data connection between Children and Parents, but they do not unlock sensitive dashboard functions. Only Netdata Cloud authentication grants access to sensitive functions, AI features, and advanced configuration options.
+Streaming API keys authenticate the data connection between Children and Parents, but they do not unlock sensitive dashboard functions. Only Netdata Cloud authentication grants access to sensitive functions, AI-powered features (alert explanations, insights), and advanced configuration options.
 
 :::
 
