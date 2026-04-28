@@ -21,7 +21,7 @@ In the tables below, **Community** refers to Netdata Cloud Community and **Busin
 
 :::note
 
-Netdata Cloud offers two paid plans: **Homelab** for personal and home lab environments, and **Business** for commercial and enterprise use. Both plans unlock the same feature set — the difference is the licensing terms and intended use case. Visit [Netdata Cloud pricing](https://netdata.cloud/pricing) for details.
+Netdata Cloud offers paid plans: **Homelab** for personal and home lab environments, and **Business** for commercial and enterprise use. Each plan provides different feature sets and capabilities. Visit [Netdata Cloud pricing](https://netdata.cloud/pricing) for details.
 
 :::
 
@@ -123,10 +123,10 @@ Once signed in, you'll have access to all sensitive functions (processes, logs, 
 
 ### Enable Dynamic Configuration
 
-Dynamic Configuration requires a Homelab or Business subscription:
+Dynamic Configuration requires a Business subscription:
 
 1. **Sign in to Netdata Cloud**
-2. **Upgrade to Homelab or Business** from the billing settings
+2. **Upgrade to Business** from the billing settings
 3. **Access Dynamic Configuration** from the settings menu on any connected node
 
 ### Increase Node Limits
@@ -169,4 +169,4 @@ For more information about setting up parent-child streaming, see [Parents: Your
 | **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
 | **RBAC & SSO**            | N/A         | Not available | Full access |
 
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to Homelab or Business for full configuration control and unlimited scale.
+Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for additional capabilities.
