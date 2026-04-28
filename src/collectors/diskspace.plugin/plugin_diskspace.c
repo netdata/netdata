@@ -1099,6 +1099,12 @@ void diskspace_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
 
+    // Initialize shared state before publishing the function endpoint, so that
+    // diskspace_function_mount_points cannot fire against an uninitialized
+    // mutex or a NULL dict_mountpoints.
+    netdata_mutex_init(&slow_mountinfo_mutex);
+    diskspace_mountpoints_init();
+
     rrd_function_add_inline(localhost, NULL, "mount-points", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
                             RRDFUNCTIONS_DISKSPACE_HELP,
@@ -1131,9 +1137,6 @@ void diskspace_main(void *ptr) {
             &dictionary_stats_category_collectors,
             sizeof(struct zfs_cache_entry));
     }
-
-    netdata_mutex_init(&slow_mountinfo_mutex);
-    diskspace_mountpoints_init();
 
     struct slow_worker_data slow_worker_data = { .update_every = update_every };
 
