@@ -39,20 +39,33 @@ Netdata provides three API versions that you can access with API tokens:
 
 ## Common Endpoints
 
-With appropriate API tokens, you can access endpoints including:
+### Netdata Cloud endpoints
 
-- `/api/v2/nodes` - Node information
-- `/api/v2/data` - Multi-dimensional data queries
-- `/api/v2/contexts` - Context metadata
-- `/api/v2/weights` - Metric scoring/correlation
-- `/api/v2/q` - Full-text search
-- `/api/v1/info` - Agent information
-- `/api/v1/charts` - Chart information
-- `/api/v1/data` - Single node data queries
+These endpoints are available when querying via `app.netdata.cloud`:
 
-:::info
+| Endpoint | Description | Method |
+|:---------|:------------|:-------|
+| `/api/v2/spaces` | Space listing | GET |
+| `/api/v2/nodes` | Node information | GET |
+| `/api/v2/data` | Multi-dimensional data queries | GET |
+| `/api/v2/contexts` | Context metadata | GET |
+| `/api/v2/weights` | Metric scoring/correlation | GET |
+| `/api/v2/q` | Full-text search | GET |
+| `/api/v3/spaces/{spaceID}/rooms/{roomID}/data` | Advanced metric queries with aggregation | POST |
 
-Currently, Netdata Cloud is not exposing the stable API.
+### Agent-only endpoints
+
+These endpoints are available only on local Netdata Agent instances and cannot be accessed through Netdata Cloud:
+
+| Endpoint | Description |
+|:---------|:------------|
+| `/api/v1/info` | Agent information |
+| `/api/v1/charts` | Chart information |
+| `/api/v1/data` | Single node data queries |
+
+:::note
+
+v1 and v2 APIs are deprecated and maintained for backwards compatibility only. New integrations should use v3 exclusively. For Cloud metric queries, the POST endpoint `/api/v3/spaces/{spaceID}/rooms/{roomID}/data` is recommended.
 
 :::
 
@@ -139,3 +152,17 @@ When using `time_group` values other than `min`, `max`, `average`, or `sum`, you
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/contexts
 ```
+
+## Troubleshooting
+
+### HTTP 404 errors
+
+If you receive a 404 when querying Netdata Cloud, you may be using an Agent-only endpoint. v1 endpoints (`/api/v1/info`, `/api/v1/charts`, `/api/v1/data`) are only available on local Agent instances, not through Cloud. Use the Cloud-compatible endpoints listed in [Common Endpoints](#common-endpoints) instead.
+
+### HTTP 401/403 errors
+
+Verify your API token is valid and has the correct scope. Check the [Available Scopes](#available-scopes) table to ensure your token grants access to the required endpoints.
+
+### Empty results
+
+For data queries returning empty results, verify that `contexts` is set in your query parameters (for GET requests) or that `scope.contexts` is set in your payload (for POST requests). Also ensure the target nodes are online and streaming data.
