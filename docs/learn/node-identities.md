@@ -164,9 +164,32 @@ Each virtual node GUID must be unique across your entire infrastructure. Using t
 
 :::
 
+### Dynamic Configuration (UI)
+
+You can also create and manage virtual nodes through the Netdata Cloud UI using the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md).
+
+:::important
+
+Netdata Cloud paid subscription is required.
+
+:::
+
+1. Go to **Nodes** and select the node where you want to create the virtual node.
+2. Click the :gear: (**Configure this node**) button.
+3. Under **Collectors**, locate the **Vnodes** section and click **+** to add a new virtual node.
+4. Fill in the **hostname** and **guid** fields, then submit.
+
+:::warning
+
+**Vnode must be registered before use**
+
+Before referencing a vnode in a collector job (for example, setting the `vnode` option), the vnode must already exist — either via file-based configuration in `/etc/netdata/vnodes/` or through the Dynamic Configuration Manager. If you see the error "The specified vnode '...' is not registered," the vnode has not been loaded into the Agent. For file-based vnodes, verify the YAML file is in the correct directory with valid format and that the `hostname` field matches the name you are referencing, then [restart Netdata](/docs/netdata-agent/start-stop-restart.md).
+
+:::
+
 ### How Virtual Nodes Work
 
-1. Go collector reads vnode configuration
+1. The Agent loads vnode configuration from `/etc/netdata/vnodes/` files and from the Dynamic Configuration Manager into a unified store
 2. Metrics are tagged with the vnode's GUID instead of the Agent's Machine GUID
 3. Cloud sees the vnode as a separate node in your Space
 4. Parent nodes store vnode metadata alongside Children metadata

@@ -85,6 +85,20 @@ To create a virtual node for your Windows server:
         url: http://203.0.113.10:9182/metrics
     ```
 
+:::tip
+
+**Using the Dynamic Configuration Manager**
+
+If you have a Netdata Cloud paid subscription, you can also create virtual nodes through the UI. Go to **Nodes**, select the node, click :gear: (**Configure this node**), find **Vnodes** under **Collectors**, and click **+** to add a new virtual node. See the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) documentation for details.
+
+:::
+
+:::warning
+
+The vnode must be registered before you reference it in a collector job. If you see "The specified vnode is not registered," verify the vnode exists — for file-based vnodes, check that the YAML file is in `/etc/netdata/vnodes/` with valid format and that the `hostname` field matches the name you are referencing, then [restart Netdata](/docs/netdata-agent/start-stop-restart.md).
+
+:::
+
 ## Host labels
 
 ### Tag your systems for smarter monitoring
