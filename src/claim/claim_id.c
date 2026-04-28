@@ -51,7 +51,7 @@ bool claim_id_set_str(const char *claim_id_str) {
 }
 
 ND_UUID claim_id_get_uuid(void) {
-    static ND_UUID uuid;
+    ND_UUID uuid;
     spinlock_lock(&claim.spinlock);
     uuid = claim.claim_uuid;
     spinlock_unlock(&claim.spinlock);

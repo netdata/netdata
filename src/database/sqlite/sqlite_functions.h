@@ -121,6 +121,47 @@ uint64_t sqlite_get_db_space(sqlite3 *db);
 int get_free_page_count(sqlite3 *database);
 int get_database_page_count(sqlite3 *database);
 
+// Return a pointer to the UUID blob stored in column iCol when the current row
+// contains a BLOB with exactly sizeof(nd_uuid_t) bytes. The caller must pass a
+// valid statement positioned on a row. The returned pointer refers to
+// SQLite-owned memory and is only valid until the statement is stepped, reset,
+// or finalized. Returns NULL for NULL, non-BLOB, or malformed values.
+static inline const nd_uuid_t *sqlite3_column_uuid_ptr(sqlite3_stmt *res, int iCol) {
+    if (sqlite3_column_type(res, iCol) != SQLITE_BLOB)
+        return NULL;
+
+    const void *uuid = sqlite3_column_blob(res, iCol);
+    if (!uuid || sqlite3_column_bytes(res, iCol) != sizeof(nd_uuid_t))
+        return NULL;
+
+    return (const nd_uuid_t *)uuid;
+}
+
+// Copy the UUID stored in column iCol into dst. The caller must pass a valid
+// statement positioned on a row and a writable destination UUID buffer.
+// Returns true on success, false when the column does not contain a valid UUID blob.
+static inline bool sqlite3_column_uuid_copy(sqlite3_stmt *res, int iCol, nd_uuid_t dst) {
+    const nd_uuid_t *uuid = sqlite3_column_uuid_ptr(res, iCol);
+    if (!uuid)
+        return false;
+
+    uuid_copy(dst, *uuid);
+    return true;
+}
+
+// Convert the UUID stored in column iCol to lowercase text in out. The caller
+// must pass a valid statement positioned on a row and a writable buffer large
+// enough for UUID_STR_LEN bytes. Returns true on success, false when the column
+// does not contain a valid UUID blob.
+static inline bool sqlite3_column_uuid_unparse_lower(sqlite3_stmt *res, int iCol, char *out) {
+    const nd_uuid_t *uuid = sqlite3_column_uuid_ptr(res, iCol);
+    if (!uuid)
+        return false;
+
+    uuid_unparse_lower(*uuid, out);
+    return true;
+}
+
 int sqlite_library_init(void);
 void sqlite_library_shutdown(void);
 

@@ -119,3 +119,102 @@ func TestServiceEngine_compose(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceEngine_composeHTTPItems(t *testing.T) {
+	tests := map[string]struct {
+		configYAML  string
+		target      model.Target
+		wantConfigs []confgroup.Config
+	}{
+		"full job pass-through preserves module": {
+			configYAML: `
+- id: "passthrough"
+  match: '{{ true }}'
+  config_template: |
+    {{ .Item | toYaml }}
+`,
+			target: &itemTarget{Item: map[string]any{
+				"module": "nginx",
+				"name":   "local",
+				"url":    "http://127.0.0.1/stub_status",
+			}},
+			wantConfigs: []confgroup.Config{
+				{"module": "nginx", "name": "local", "url": "http://127.0.0.1/stub_status"},
+			},
+		},
+		"full job pass-through preserves numeric fields": {
+			configYAML: `
+- id: "passthrough"
+  match: '{{ true }}'
+  config_template: |
+    {{ .Item | toYaml }}
+`,
+			target: &itemTarget{Item: map[string]any{
+				"module": "httpcheck",
+				"name":   "api",
+				"url":    "http://127.0.0.1/health",
+				"port":   float64(80),
+			}},
+			wantConfigs: []confgroup.Config{
+				{"module": "httpcheck", "name": "api", "url": "http://127.0.0.1/health", "port": 80},
+			},
+		},
+		"endpoint object fills module from rule id": {
+			configYAML: `
+- id: "httpcheck"
+  match: '{{ hasKey .Item "url" }}'
+  config_template: |
+    name: {{ .Item.name }}
+    url: {{ .Item.url }}
+`,
+			target: &itemTarget{Item: map[string]any{
+				"name": "api",
+				"url":  "http://127.0.0.1/health",
+			}},
+			wantConfigs: []confgroup.Config{
+				{"module": "httpcheck", "name": "api", "url": "http://127.0.0.1/health"},
+			},
+		},
+		"scalar endpoint string uses TUID": {
+			configYAML: `
+- id: "httpcheck"
+  match: '{{ kindIs "string" .Item }}'
+  config_template: |
+    name: {{ .TUID }}
+    url: {{ .Item }}
+`,
+			target: &itemTarget{Item: "http://127.0.0.1/health", tuid: "http_item_1"},
+			wantConfigs: []confgroup.Config{
+				{"module": "httpcheck", "name": "http_item_1", "url": "http://127.0.0.1/health"},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var cfg []ServiceRuleConfig
+			err := yaml.Unmarshal([]byte(test.configYAML), &cfg)
+			require.NoErrorf(t, err, "yaml unmarshalling of services config")
+
+			svr, err := newServiceEngine(cfg)
+			require.NoErrorf(t, err, "service engine creation")
+
+			assert.Equal(t, test.wantConfigs, svr.compose(test.target))
+		})
+	}
+}
+
+type itemTarget struct {
+	model.Base
+	Item any
+	tuid string
+}
+
+func (t itemTarget) TUID() string {
+	if t.tuid != "" {
+		return t.tuid
+	}
+	return "item"
+}
+
+func (t itemTarget) Hash() uint64 { return 1 }

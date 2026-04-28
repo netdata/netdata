@@ -1,0 +1,319 @@
+# Topology-focused LLDP profile for robust multi-vendor discovery.
+#
+# Required contract:
+# - lldpLocPortTable
+# - lldpRemTable
+# - lldpRemManAddrTable
+#
+# Why:
+# - lldpRemManAddrTable is broadly implemented and provides stable remote identity.
+# - lldpRemTable provides the remote chassis/sysname/port fields required for
+#   LLDP link construction and Enlinkd-parity matching passes.
+# - This topology profile keeps the LLDP remote projection minimal and focused
+#   on link identity fields to limit walk overhead.
+
+metadata:
+  device:
+    fields:
+      lldp_loc_chassis_id:
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.2.0
+          name: lldpLocChassisId
+      lldp_loc_chassis_id_subtype:
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.1.0
+          name: lldpLocChassisIdSubtype
+          mapping:
+            1: chassisComponent
+            2: interfaceAlias
+            3: portComponent
+            4: macAddress
+            5: networkAddress
+            6: interfaceName
+            7: local
+      lldp_loc_sys_name:
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.3.0
+          name: lldpLocSysName
+      lldp_loc_sys_desc:
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.4.0
+          name: lldpLocSysDesc
+      lldp_loc_sys_cap_supported:
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.5.0
+          name: lldpLocSysCapSupported
+          format: hex
+      lldp_loc_sys_cap_enabled:
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.6.0
+          name: lldpLocSysCapEnabled
+          format: hex
+
+metrics:
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.3.7
+      name: lldpLocPortTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.3.7.1.2
+        name: _topology_lldp_loc_port_entry
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 1
+      - tag: lldp_loc_port_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.7.1.3
+          name: lldpLocPortId
+      - tag: lldp_loc_port_id_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.7.1.2
+          name: lldpLocPortIdSubtype
+        mapping:
+          1: interfaceAlias
+          2: portComponent
+          3: macAddress
+          4: networkAddress
+          5: interfaceName
+          6: agentCircuitId
+          7: local
+      - tag: lldp_loc_port_desc
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.7.1.4
+          name: lldpLocPortDesc
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.3.8
+      name: lldpLocManAddrTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.3.8.1.1
+        name: _topology_lldp_loc_man_addr_entry
+    metric_tags:
+      - tag: lldp_loc_mgmt_addr_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.1
+          name: lldpLocManAddrSubtype
+      - tag: lldp_loc_mgmt_addr
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.2
+          name: lldpLocManAddr
+          format: hex
+      - tag: lldp_loc_mgmt_addr_if_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.4
+          name: lldpLocManAddrIfSubtype
+      - tag: lldp_loc_mgmt_addr_if_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.5
+          name: lldpLocManAddrIfId
+      - tag: lldp_loc_mgmt_addr_oid
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.6
+          name: lldpLocManAddrOID
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.4.1
+      name: lldpRemTable
+    symbols:
+      # Use a required numeric column to ensure rows are emitted by ddsnmp.
+      - OID: 1.0.8802.1.1.2.1.4.1.1.6
+        name: _topology_lldp_rem_entry
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 2
+      - tag: lldp_rem_index
+        index: 3
+      - tag: lldp_rem_chassis_id_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.4
+          name: lldpRemChassisIdSubtype
+        mapping:
+          1: chassisComponent
+          2: interfaceAlias
+          3: portComponent
+          4: macAddress
+          5: networkAddress
+          6: interfaceName
+          7: local
+      - tag: lldp_rem_chassis_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.5
+          name: lldpRemChassisId
+      - tag: lldp_rem_port_id_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.6
+          name: lldpRemPortIdSubtype
+        mapping:
+          1: interfaceAlias
+          2: portComponent
+          3: macAddress
+          4: networkAddress
+          5: interfaceName
+          6: agentCircuitId
+          7: local
+      - tag: lldp_rem_port_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.7
+          name: lldpRemPortId
+      - tag: lldp_rem_port_desc
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.8
+          name: lldpRemPortDesc
+      - tag: lldp_rem_sys_name
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.9
+          name: lldpRemSysName
+      - tag: lldp_rem_sys_desc
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.10
+          name: lldpRemSysDesc
+      - tag: lldp_rem_sys_cap_supported
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.11
+          name: lldpRemSysCapSupported
+          format: hex
+      - tag: lldp_rem_sys_cap_enabled
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.12
+          name: lldpRemSysCapEnabled
+          format: hex
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.4.2
+      name: lldpRemManAddrTable
+    symbols:
+      # Primary anchor for implementations that expose columns .1/.2
+      # (e.g. MikroTik).
+      - OID: 1.0.8802.1.1.2.1.4.2.1.1
+        name: _topology_lldp_rem_man_addr_entry
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 2
+      - tag: lldp_rem_index
+        index: 3
+      - tag: lldp_rem_mgmt_addr_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.1
+          name: lldpRemManAddrSubtype
+      - tag: lldp_rem_mgmt_addr
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.2
+          name: lldpRemManAddr
+          format: hex
+      - tag: lldp_rem_mgmt_addr_len
+        index: 5
+      - tag: lldp_rem_mgmt_addr_octet_1
+        index: 6
+      - tag: lldp_rem_mgmt_addr_octet_2
+        index: 7
+      - tag: lldp_rem_mgmt_addr_octet_3
+        index: 8
+      - tag: lldp_rem_mgmt_addr_octet_4
+        index: 9
+      - tag: lldp_rem_mgmt_addr_octet_5
+        index: 10
+      - tag: lldp_rem_mgmt_addr_octet_6
+        index: 11
+      - tag: lldp_rem_mgmt_addr_octet_7
+        index: 12
+      - tag: lldp_rem_mgmt_addr_octet_8
+        index: 13
+      - tag: lldp_rem_mgmt_addr_octet_9
+        index: 14
+      - tag: lldp_rem_mgmt_addr_octet_10
+        index: 15
+      - tag: lldp_rem_mgmt_addr_octet_11
+        index: 16
+      - tag: lldp_rem_mgmt_addr_octet_12
+        index: 17
+      - tag: lldp_rem_mgmt_addr_octet_13
+        index: 18
+      - tag: lldp_rem_mgmt_addr_octet_14
+        index: 19
+      - tag: lldp_rem_mgmt_addr_octet_15
+        index: 20
+      - tag: lldp_rem_mgmt_addr_octet_16
+        index: 21
+      - tag: lldp_rem_mgmt_addr_if_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.3
+          name: lldpRemManAddrIfSubtype
+      - tag: lldp_rem_mgmt_addr_if_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.4
+          name: lldpRemManAddrIfId
+      - tag: lldp_rem_mgmt_addr_oid
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.5
+          name: lldpRemManAddrOID
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.4.2
+      name: lldpRemManAddrTable
+    symbols:
+      # Compatibility anchor for implementations that expose .3/.4/.5 but
+      # not .1/.2 (e.g. XS1930). Address bytes are reconstructed from index.
+      - OID: 1.0.8802.1.1.2.1.4.2.1.3
+        name: _topology_lldp_rem_man_addr_compat_entry
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 2
+      - tag: lldp_rem_index
+        index: 3
+      - tag: lldp_rem_mgmt_addr_subtype
+        index: 4
+      - tag: lldp_rem_mgmt_addr
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.2
+          name: lldpRemManAddr
+          format: hex
+      - tag: lldp_rem_mgmt_addr_len
+        index: 5
+      - tag: lldp_rem_mgmt_addr_octet_1
+        index: 6
+      - tag: lldp_rem_mgmt_addr_octet_2
+        index: 7
+      - tag: lldp_rem_mgmt_addr_octet_3
+        index: 8
+      - tag: lldp_rem_mgmt_addr_octet_4
+        index: 9
+      - tag: lldp_rem_mgmt_addr_octet_5
+        index: 10
+      - tag: lldp_rem_mgmt_addr_octet_6
+        index: 11
+      - tag: lldp_rem_mgmt_addr_octet_7
+        index: 12
+      - tag: lldp_rem_mgmt_addr_octet_8
+        index: 13
+      - tag: lldp_rem_mgmt_addr_octet_9
+        index: 14
+      - tag: lldp_rem_mgmt_addr_octet_10
+        index: 15
+      - tag: lldp_rem_mgmt_addr_octet_11
+        index: 16
+      - tag: lldp_rem_mgmt_addr_octet_12
+        index: 17
+      - tag: lldp_rem_mgmt_addr_octet_13
+        index: 18
+      - tag: lldp_rem_mgmt_addr_octet_14
+        index: 19
+      - tag: lldp_rem_mgmt_addr_octet_15
+        index: 20
+      - tag: lldp_rem_mgmt_addr_octet_16
+        index: 21
+      - tag: lldp_rem_mgmt_addr_if_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.3
+          name: lldpRemManAddrIfSubtype
+      - tag: lldp_rem_mgmt_addr_if_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.4
+          name: lldpRemManAddrIfId
+      - tag: lldp_rem_mgmt_addr_oid
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.5
+          name: lldpRemManAddrOID

@@ -431,7 +431,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 
 | Integration | Description |
 |-------------|-------------|
-| [Active Directory](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/active_directory.md) | This collector monitors Active Directory IO and queries. |
+| [Active Directory](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/active_directory.md) | This collector monitors Active Directory directory operations, replication, LDAP activity, binds, queueing, database, cleanup, security descriptor propagation, and SAM metrics. |
 | [Active Directory Certificate Service](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/active_directory_certificate_service.md) | This collector monitors Active Directory Certificate Services statistics. |
 | [Active Directory Federation Service](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/active_directory_federation_service.md) | This collector monitors Active Directory Federation Services statistics. |
 | [Alamos FE2 server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/alamos_fe2_server.md) | Keep tabs on Alamos FE2 systems for improved performance and management. |

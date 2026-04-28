@@ -5,7 +5,7 @@ use crate::file::{
     EntryItemsType,
     cursor::{JournalCursor, Location},
     file::{EntryDataIterator, FieldDataIterator, FieldIterator, JournalFile},
-    filter::{JournalFilter, LogicalOp},
+    filter::{FilterExpr, JournalFilter, LogicalOp},
     object::{DataObject, FieldObject, HashableObject},
     offset_array::Direction,
     value_guard::ValueGuard,
@@ -25,6 +25,75 @@ pub struct JournalReader<'a, M: MemoryMap> {
 
     // Field name remapping support
     remapping_registry: FieldMap,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::file::{JournalFileOptions, JournalWriter, MmapMut};
+    use tempfile::TempDir;
+
+    fn test_uuid(seed: u8) -> uuid::Uuid {
+        uuid::Uuid::from_bytes([seed; 16])
+    }
+
+    fn create_test_journal() -> (TempDir, JournalFile<MmapMut>) {
+        let dir = TempDir::new().expect("create temp dir");
+        let journal_dir = dir.path().join("journals");
+        std::fs::create_dir_all(&journal_dir).expect("create journal dir");
+        let path = journal_dir.join("system.journal");
+        let repo_file =
+            crate::repository::File::from_path(&path).expect("test journal path should parse");
+
+        let mut journal_file = JournalFile::create(
+            &repo_file,
+            JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3)),
+        )
+        .expect("create journal");
+        let mut writer =
+            JournalWriter::new(&mut journal_file, 1, test_uuid(4)).expect("create writer");
+        let payloads = [b"MESSAGE=test".as_slice(), b"PRIORITY=6".as_slice()];
+        writer
+            .add_entry(&mut journal_file, &payloads, 1_000_000, 100)
+            .expect("write entry");
+
+        (dir, journal_file)
+    }
+
+    #[test]
+    fn build_filter_returns_expr_and_consumes_pending_filter() {
+        let (_dir, journal_file) = create_test_journal();
+        let mut reader = JournalReader::<MmapMut>::default();
+        reader.add_match(b"MESSAGE=test");
+
+        let expr = reader
+            .build_filter(&journal_file)
+            .expect("build filter")
+            .expect("resolved filter expr");
+
+        assert!(!matches!(expr, FilterExpr::None));
+        assert!(reader.filter.is_none(), "pending filter should be consumed");
+        assert!(
+            reader
+                .build_filter(&journal_file)
+                .expect("second build")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn build_filter_failure_keeps_pending_filter() {
+        let (_dir, journal_file) = create_test_journal();
+        let mut reader = JournalReader::<MmapMut>::default();
+        reader.filter = Some(JournalFilter::default());
+
+        assert!(reader.build_filter(&journal_file).is_err());
+        assert!(
+            reader.filter.is_some(),
+            "pending filter should remain after build failure"
+        );
+        assert!(reader.build_filter(&journal_file).is_err());
+    }
 }
 
 impl<M: MemoryMap> std::fmt::Debug for JournalReader<'_, M> {
@@ -75,6 +144,30 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         }
 
         self.cursor.step(journal_file, direction)
+    }
+
+    /// Build the pending filter expression (if any) and return it.
+    ///
+    /// After `add_match` / `add_disjunction` calls, the filter is stored inside
+    /// the reader in an unresolved form.  This method resolves it against
+    /// `journal_file`'s hash table and returns the resulting [`FilterExpr`].
+    /// On success, the internal pending filter is consumed; subsequent calls
+    /// return `Ok(None)` until new matches are added. If resolution fails, the
+    /// pending filter remains installed so the caller can retry or fall back.
+    ///
+    /// This is useful when the caller wants to drive iteration through
+    /// [`JournalCursor`] directly rather than through [`JournalReader::step`].
+    /// The returned filter is not installed on the reader cursor; callers that
+    /// need cursor-based iteration should set it on their own cursor.
+    pub fn build_filter(&mut self, journal_file: &JournalFile<M>) -> Result<Option<FilterExpr>> {
+        self.drop_guards();
+        if let Some(filter) = self.filter.as_mut() {
+            let expr = filter.build(journal_file)?;
+            self.filter = None;
+            Ok(Some(expr))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Adds a match filter for the given field=value pair.

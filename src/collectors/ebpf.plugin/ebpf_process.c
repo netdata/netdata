@@ -464,9 +464,8 @@ static void ebpf_update_process_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
             ebpf_publish_process_t *out = &pids->ps;
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_PROCESS_IDX << 1))))
                 continue;
 
             ebpf_publish_process_t *in = &local_pid->process;
@@ -962,7 +961,7 @@ static void ebpf_process_exit(void *pptr)
 
     if (!process_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
@@ -971,7 +970,14 @@ static void ebpf_process_exit(void *pptr)
     collect_pids &= ~(1 << EBPF_MODULE_PROCESS_IDX);
     netdata_mutex_unlock(&lock);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
+    // Drop this module's bits from the shared PID pool so its slots don't
+    // stay pinned if the plugin keeps running after the module stops.
+    if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+        netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_PROCESS_IDX);
+        sem_post(shm_mutex_ebpf_integration);
+    }
+
+    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_process_cgroup_charts(em);
@@ -998,7 +1004,7 @@ static void ebpf_process_exit(void *pptr)
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
     process_pid_fd = -1;
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1417,8 +1423,8 @@ static void ebpf_process_send_cgroup_data(ebpf_module_t *em)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
-        if (send_cgroup_chart) {
+    if (ebpf_cgroup_systemd_enabled_get()) {
+        if (ebpf_send_cgroup_chart_get()) {
             ebpf_create_systemd_process_charts(em);
         }
 
@@ -1508,8 +1514,8 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
             break;
 
         uint32_t pid = root->pid;
-        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
-        if (!local_pid)
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+        if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_PROCESS_IDX << 1))))
             continue;
 
         ebpf_publish_process_t *in = &local_pid->process;
@@ -1556,7 +1562,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
             netdata_ebpf_pid_stats_t *local_pid =
                 netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_PROCESS_IDX);
             if (!local_pid)
-                continue;
+                goto end_process_loop;
 
             ebpf_publish_process_t *w = &local_pid->process;
 
@@ -1568,7 +1574,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
                 w->release_call = process_stat_vector[0].release_call;
                 w->task_err = process_stat_vector[0].task_err;
             } else {
-                if (kill((pid_t)key, 0)) { // No PID found
+                if (kill((pid_t)key, 0) == -1 && errno == ESRCH) {
                     if (netdata_ebpf_reset_shm_pointer_unsafe(tbl_pid_stats_fd, key, NETDATA_EBPF_PIDS_PROCESS_IDX))
                         memset(w, 0, sizeof(*w));
                 }
@@ -1642,7 +1648,7 @@ static void process_collector(ebpf_module_t *em)
                 netdata_mutex_lock(&collect_data_mutex);
                 collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
-                if (cgroups && shm_ebpf_cgroup.header) {
+                if (cgroups && ebpf_cgroup_integration_active_get()) {
                     ebpf_update_process_cgroup();
                 }
                 netdata_mutex_unlock(&collect_data_mutex);
@@ -1669,7 +1675,7 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_apps_data(apps_groups_root_target, em);
             }
 
-            if (cgroups && shm_ebpf_cgroup.header) {
+            if (cgroups && ebpf_cgroup_integration_active_get()) {
                 if (!ebpf_plugin_stop())
                     ebpf_process_send_cgroup_data(em);
             }
@@ -1795,7 +1801,8 @@ void ebpf_process_thread(void *ptr)
     CLEANUP_FUNCTION_REGISTER(ebpf_process_exit) cleanup_ptr = em;
 
     if (!ebpf_module_thread_has_valid_state(em)) {
-        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPING);
         netdata_mutex_lock(&ebpf_exit_cleanup);
         ebpf_update_disabled_plugin_stats(em);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -1806,7 +1813,8 @@ void ebpf_process_thread(void *ptr)
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
     if (ebpf_process_enable_tracepoints()) {
-        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPING);
     }
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 
@@ -1816,7 +1824,8 @@ void ebpf_process_thread(void *ptr)
 
     set_local_pointers();
     if (ebpf_process_load_bpf(em)) {
-        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPING);
     }
 
     int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {

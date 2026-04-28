@@ -1,0 +1,96 @@
+---
+name: SNMP Simulator Tests
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/snmp-sim-tests.yml'
+      - 'src/go/plugin/go.d/collector/snmp/**'
+      - 'src/go/plugin/go.d/collector/snmp_topology/**'
+      - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
+      - 'src/go/pkg/topology/**'
+  pull_request:
+    paths:
+      - '.github/workflows/snmp-sim-tests.yml'
+      - 'src/go/plugin/go.d/collector/snmp/**'
+      - 'src/go/plugin/go.d/collector/snmp_topology/**'
+      - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
+      - 'src/go/pkg/topology/**'
+
+jobs:
+  simulator-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: src/go/go.mod
+
+      - name: Prepare snmpsim data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/snmpsim-data
+          cp src/go/plugin/go.d/collector/snmp_topology/testdata/snmprec/arubaos-cx_10.10.snmprec /tmp/snmpsim-data/lldp1.snmprec
+          cp src/go/plugin/go.d/collector/snmp_topology/testdata/snmprec/aos6.snmprec /tmp/snmpsim-data/lldp2.snmprec
+          cp src/go/plugin/go.d/collector/snmp_topology/testdata/snmprec/ciscosb_sg350x-24p.snmprec /tmp/snmpsim-data/cdp1.snmprec
+
+      - name: Start snmpsim
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y snmp
+
+          docker run -d --name snmpsim-v2 -p 1161:161/udp -v /tmp/snmpsim-data:/usr/local/snmpsim/data tandrup/snmpsim:v0.4@sha256:a080b493042d91c4cec9282a83403e334660ed1c2c71e7e3afa920c3f1c42d7e
+          docker run -d --name snmpsim-v3 -p 1162:161/udp -e EXTRA_FLAGS='--v3-only --v3-user=testuser --v3-auth-key=authpass1 --v3-auth-proto=MD5 --v3-priv-key=privpass1 --v3-priv-proto=AES' -v /tmp/snmpsim-data:/usr/local/snmpsim/data tandrup/snmpsim:v0.4@sha256:a080b493042d91c4cec9282a83403e334660ed1c2c71e7e3afa920c3f1c42d7e
+
+          wait_for_simulator() {
+            local name=$1
+            shift
+
+            for _ in $(seq 1 30); do
+              if "$@" >/dev/null 2>&1; then
+                return 0
+              fi
+              sleep 1
+            done
+
+            echo "${name} did not become ready within 30 seconds"
+            docker logs "${name}" || true
+            return 1
+          }
+
+          wait_for_simulator snmpsim-v2 \
+            snmpget -v2c -c lldp1 127.0.0.1:1161 1.3.6.1.2.1.1.1.0
+
+          wait_for_simulator snmpsim-v3 \
+            snmpget -v3 -l authPriv -u testuser -a MD5 -A authpass1 -x AES -X privpass1 -n lldp1 127.0.0.1:1162 1.3.6.1.2.1.1.1.0
+
+      - name: Run integration tests
+        env:
+          NETDATA_SNMPSIM_ENDPOINT: 127.0.0.1:1161
+          NETDATA_SNMPSIM_COMMUNITIES: lldp1,lldp2,cdp1
+          NETDATA_SNMPSIM_V3_ENDPOINT: 127.0.0.1:1162
+          NETDATA_SNMPSIM_V3_CONTEXTS: lldp1,lldp2,cdp1
+          NETDATA_SNMPSIM_V3_USER: testuser
+          NETDATA_SNMPSIM_V3_SECURITY_LEVEL: authPriv
+          NETDATA_SNMPSIM_V3_AUTH_PROTO: md5
+          NETDATA_SNMPSIM_V3_AUTH_KEY: authpass1
+          NETDATA_SNMPSIM_V3_PRIV_PROTO: aes
+          NETDATA_SNMPSIM_V3_PRIV_KEY: privpass1
+        run: |
+          cd src/go
+          go test -tags=integration ./plugin/go.d/collector/snmp_topology
+
+      - name: Stop snmpsim
+        if: always()
+        run: |
+          docker rm -f snmpsim-v2 || true
+          docker rm -f snmpsim-v3 || true

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-internals.h"
+#include "cgroup-netipc.h"
 
 // discovery cgroup thread worker jobs
 #define WORKER_DISCOVERY_INIT               0
@@ -12,11 +13,10 @@
 #define WORKER_DISCOVERY_UPDATE             6
 #define WORKER_DISCOVERY_CLEANUP            7
 #define WORKER_DISCOVERY_COPY               8
-#define WORKER_DISCOVERY_SHARE              9
-#define WORKER_DISCOVERY_LOCK              10
+#define WORKER_DISCOVERY_LOCK               9
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 11
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 11
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
 struct cgroup *discovered_cgroup_root = NULL;
@@ -25,10 +25,7 @@ char cgroup_chart_id_prefix[] = "cgroup_";
 char services_chart_id_prefix[] = "systemd_";
 const char *cgroups_rename_script = NULL;
 
-// Shared memory with information from detected cgroups
-netdata_ebpf_cgroup_shm_t shm_cgroup_ebpf = {NULL, NULL};
-int shm_fd_cgroup_ebpf = -1;
-sem_t *shm_mutex_cgroup_ebpf = SEM_FAILED;
+// (legacy SHM globals removed — replaced by netipc in cgroup-netipc.c)
 
 // ----------------------------------------------------------------------------
 
@@ -278,28 +275,6 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
 
     substitute_dots_in_id(cg->chart_id);
     cg->hash_chart_id = simple_hash(cg->chart_id);
-}
-
-static void is_cgroup_procs_exist(netdata_ebpf_cgroup_shm_body_t *out, char *id) {
-    struct stat buf;
-
-    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_cpuset_base, id);
-    if (likely(stat(out->path, &buf) == 0)) {
-        return;
-    }
-
-    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_blkio_base, id);
-    if (likely(stat(out->path, &buf) == 0)) {
-        return;
-    }
-
-    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_memory_base, id);
-    if (likely(stat(out->path, &buf) == 0)) {
-        return;
-    }
-
-    out->path[0] = '\0';
-    out->enabled = 0;
 }
 
 static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
@@ -813,47 +788,6 @@ static inline void discovery_copy_discovered_cgroups_to_reader() {
     cgroup_root = discovered_cgroup_root;
 }
 
-static inline void discovery_share_cgroups_with_ebpf() {
-    struct cgroup *cg;
-    int count;
-    struct stat buf;
-
-    if (shm_mutex_cgroup_ebpf == SEM_FAILED) {
-        return;
-    }
-    sem_wait(shm_mutex_cgroup_ebpf);
-
-    for (cg = cgroup_root, count = 0; cg && count < cgroup_root_max; cg = cg->next, count++) {
-        netdata_ebpf_cgroup_shm_body_t *ptr = &shm_cgroup_ebpf.body[count];
-        char *prefix = (is_cgroup_systemd_service(cg)) ? services_chart_id_prefix : cgroup_chart_id_prefix;
-        snprintfz(ptr->name, CGROUP_EBPF_NAME_SHARED_LENGTH - 1, "%s%s", prefix, cg->chart_id);
-        ptr->hash = simple_hash(ptr->name);
-        ptr->options = cg->options;
-        ptr->enabled = cg->enabled;
-        if (cgroup_use_unified_cgroups) {
-            snprintfz(ptr->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_unified_base, cg->id);
-            if (likely(stat(ptr->path, &buf) == -1)) {
-                ptr->path[0] = '\0';
-                ptr->enabled = 0;
-            }
-        } else {
-            is_cgroup_procs_exist(ptr, cg->id);
-        }
-
-        netdata_log_debug(D_CGROUP, "cgroup shared: NAME=%s, ENABLED=%d", ptr->name, ptr->enabled);
-    }
-
-    if (unlikely(cg != NULL)) {
-        nd_log_limit_static_global_var(erl, 3600, 0);
-        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_WARNING,
-                     "CGROUP: shared memory buffer full (%d cgroups). Some cgroups were not shared with eBPF.",
-                     cgroup_root_max);
-    }
-
-    shm_cgroup_ebpf.header->cgroup_root_count = count;
-    sem_post(shm_mutex_cgroup_ebpf);
-}
-
 static inline void discovery_find_all_cgroups_v1() {
     if (cgroup_enable_cpuacct) {
         if (discovery_find_walkdir(cgroup_cpuacct_base, NULL) == -1) {
@@ -1040,87 +974,6 @@ static int discovery_is_cgroup_duplicate(struct cgroup *cg) {
 }
 
 // ----------------------------------------------------------------------------
-// ebpf shared memory
-
-static void netdata_cgroup_ebpf_set_values(size_t length)
-{
-    sem_wait(shm_mutex_cgroup_ebpf);
-
-    shm_cgroup_ebpf.header->cgroup_max = cgroup_root_max;
-    shm_cgroup_ebpf.header->systemd_enabled = CONFIG_BOOLEAN_YES;
-    shm_cgroup_ebpf.header->body_length = length;
-
-    sem_post(shm_mutex_cgroup_ebpf);
-}
-
-static void netdata_cgroup_ebpf_initialize_shm()
-{
-    // Unlink any existing shared memory and semaphore to start fresh.
-    // This prevents truncating memory that another process might be using.
-    // Existing mappings in other processes remain valid until they unmap.
-    (void) shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
-    (void) sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
-
-    shm_fd_cgroup_ebpf = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_CREAT | O_RDWR, 0660);
-    if (shm_fd_cgroup_ebpf < 0) {
-        collector_error("Cannot initialize shared memory used by cgroup and eBPF, integration won't happen.");
-        return;
-    }
-
-    size_t length = sizeof(netdata_ebpf_cgroup_shm_header_t) + cgroup_root_max * sizeof(netdata_ebpf_cgroup_shm_body_t);
-    if (ftruncate(shm_fd_cgroup_ebpf, length)) {
-        collector_error("Cannot set size for shared memory.");
-        goto end_init_shm;
-    }
-
-    shm_cgroup_ebpf.header = (netdata_ebpf_cgroup_shm_header_t *)
-        nd_mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_cgroup_ebpf, 0);
-
-    if (unlikely(MAP_FAILED == shm_cgroup_ebpf.header)) {
-        shm_cgroup_ebpf.header = NULL;
-        collector_error("Cannot map shared memory used between cgroup and eBPF, integration won't happen");
-        goto end_init_shm;
-    }
-    shm_cgroup_ebpf.body = (netdata_ebpf_cgroup_shm_body_t *) ((char *)shm_cgroup_ebpf.header +
-                                                               sizeof(netdata_ebpf_cgroup_shm_header_t));
-
-    shm_mutex_cgroup_ebpf = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT,
-                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, 1);
-
-    if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
-        netdata_cgroup_ebpf_set_values(length);
-        return;
-    }
-
-    collector_error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
-    nd_munmap(shm_cgroup_ebpf.header, length);
-    shm_cgroup_ebpf.header = NULL;
-
-    end_init_shm:
-    close(shm_fd_cgroup_ebpf);
-    shm_fd_cgroup_ebpf = -1;
-    (void) shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
-}
-
-static void cgroup_cleanup_ebpf_integration()
-{
-    if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
-        sem_close(shm_mutex_cgroup_ebpf);
-        (void) sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
-    }
-
-    if (shm_cgroup_ebpf.header) {
-        shm_cgroup_ebpf.header->cgroup_root_count = 0;
-        nd_munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
-    }
-
-    if (shm_fd_cgroup_ebpf > 0) {
-        close(shm_fd_cgroup_ebpf);
-    }
-    (void) shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
-}
-
-// ----------------------------------------------------------------------------
 // cgroup network interfaces
 
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
@@ -1296,8 +1149,7 @@ static inline void discovery_find_all_cgroups() {
 
     netdata_mutex_unlock(&cgroup_root_mutex);
 
-    worker_is_busy(WORKER_DISCOVERY_SHARE);
-    discovery_share_cgroups_with_ebpf();
+    // cgroup metadata is now served on-demand via netipc (cgroup-netipc.c)
 
     netdata_log_debug(D_CGROUP, "done searching for cgroups");
 }
@@ -1317,7 +1169,6 @@ void cgroup_discovery_worker(void *ptr)
     worker_register_job_name(WORKER_DISCOVERY_UPDATE,             "update");
     worker_register_job_name(WORKER_DISCOVERY_CLEANUP,            "cleanup");
     worker_register_job_name(WORKER_DISCOVERY_COPY,               "copy");
-    worker_register_job_name(WORKER_DISCOVERY_SHARE,              "share");
     worker_register_job_name(WORKER_DISCOVERY_LOCK,               "lock");
 
     entrypoint_parent_process_comm = simple_pattern_create(
@@ -1328,7 +1179,7 @@ void cgroup_discovery_worker(void *ptr)
 
     service_register(NULL, NULL, NULL);
 
-    netdata_cgroup_ebpf_initialize_shm();
+    cgroup_netipc_init();
 
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
@@ -1343,6 +1194,9 @@ void cgroup_discovery_worker(void *ptr)
         discovery_find_all_cgroups();
     }
 
+    // Stop the netipc server first so its worker threads cannot iterate cgroup_root while we free it.
+    cgroup_netipc_cleanup();
+
     // free all cgroups
     netdata_mutex_lock(&cgroup_root_mutex);
     while(cgroup_root) {
@@ -1353,7 +1207,6 @@ void cgroup_discovery_worker(void *ptr)
     netdata_mutex_unlock(&cgroup_root_mutex);
 
     collector_info("discovery thread stopped");
-    cgroup_cleanup_ebpf_integration();
     worker_unregister();
     service_exits();
     __atomic_store_n(&discovery_thread.exited, 1, __ATOMIC_RELEASE);

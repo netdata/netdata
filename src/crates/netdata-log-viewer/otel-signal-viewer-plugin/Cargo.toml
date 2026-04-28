@@ -31,7 +31,6 @@ foyer = { workspace = true }
 # Configuration support
 anyhow = { workspace = true }
 bytesize = { workspace = true }
-bytesize-serde = { workspace = true }
 num_cpus = "1"
 serde_yaml = { workspace = true }
 parking_lot = { workspace = true }

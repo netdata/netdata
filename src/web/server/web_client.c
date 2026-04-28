@@ -274,6 +274,13 @@ void web_client_request_done(struct web_client *w) {
     web_client_disable_tracking_required(w);
     web_client_disable_keepalive(w);
 
+    // Clear URL-derived flags between requests. PATH_IS_MCP is re-set
+    // during the next URL decode; clearing it here makes sure a keepalive
+    // connection cannot carry the previous request's classification into
+    // a new request that fails before URL decoding runs (e.g., malformed
+    // request line, unsupported method).
+    web_client_flag_clear(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
+
     w->header_parse_tries = 0;
     w->header_parse_last_size = 0;
 
@@ -860,6 +867,15 @@ void web_client_build_http_header(struct web_client *w) {
         http_header_content_type(w->response.header_output, w->response.data->content_type);
     }
 
+    // MCP-specific CORS: widen the allowlist + advertise exposed
+    // headers only for MCP transport endpoints (/mcp, /sse). The flag
+    // is set once during URL decoding; see WEB_CLIENT_FLAG_PATH_IS_MCP.
+    bool is_mcp_path = web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
+
+    if(is_mcp_path && w->mode != HTTP_REQUEST_MODE_OPTIONS)
+        buffer_strcat(w->response.header_output,
+                      "Access-Control-Expose-Headers: Mcp-Session-Id\r\n");
+
     if(unlikely(web_x_frame_options))
         buffer_sprintf(w->response.header_output, "X-Frame-Options: %s\r\n", web_x_frame_options);
 
@@ -880,10 +896,25 @@ void web_client_build_http_header(struct web_client *w) {
     }
 
     if(w->mode == HTTP_REQUEST_MODE_OPTIONS) {
+        // Methods, max-age, and the base header allowlist are identical
+        // for every OPTIONS preflight. MCP preflights append the extra
+        // request headers the SDK uses: mcp-protocol-version,
+        // mcp-session-id, last-event-id (SSE resumption), authorization
+        // (bearer tokens). DELETE is *not* advertised — the MCP handlers
+        // currently return 405 for it, and advertising it would let the
+        // preflight succeed only for the real request to fail. Add DELETE
+        // here when the handlers learn session teardown.
         buffer_strcat(w->response.header_output,
                 "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-                        "Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie, pragma, cache-control, x-auth-token, x-netdata-auth, x-transaction-id\r\n"
-                        "Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
+                        "Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie, pragma, cache-control, x-auth-token, x-netdata-auth, x-transaction-id");
+
+        if(is_mcp_path)
+            buffer_strcat(w->response.header_output,
+                          ", authorization, mcp-protocol-version, mcp-session-id, last-event-id");
+
+        buffer_strcat(w->response.header_output,
+                      "\r\n"
+                              "Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
         );
     }
     else {
@@ -1822,6 +1853,11 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
         // do not overwrite this if it is already filled
         buffer_strcat(w->url_as_received, path_and_query_string);
 
+    // PATH_IS_MCP is a function of the URL alone; clear and re-derive on
+    // every decode so keepalived connections reusing the same web_client
+    // for a different URL see a fresh value.
+    web_client_flag_clear(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
+
     if(w->mode == HTTP_REQUEST_MODE_STREAM) {
         // in stream mode, there is no path
 
@@ -1850,6 +1886,20 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
             buffer_strcat(w->url_query_string_decoded, "");
             buffer_strcat(w->url_path_decoded, buffer);
         }
+
+        // Classify path: set PATH_IS_MCP when the URL addresses one of
+        // Netdata's MCP transport endpoints (/mcp or /sse, and their
+        // subpaths). Done here — at URL-decoding time — so the flag is
+        // available later both to the URL dispatcher and to the response
+        // header builder, including for OPTIONS preflights which bypass
+        // the dispatcher. Matching requires a path-segment boundary so a
+        // hypothetical /mcpfoo does not leak through.
+        const char *decoded_path = buffer_tostring(w->url_path_decoded);
+        size_t decoded_path_len = buffer_strlen(w->url_path_decoded);
+        if(decoded_path_len >= 4
+           && (memcmp(decoded_path, "/mcp", 4) == 0 || memcmp(decoded_path, "/sse", 4) == 0)
+           && (decoded_path_len == 4 || decoded_path[4] == '/'))
+            web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
     }
 }
 

@@ -992,6 +992,7 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
         return;
 
     struct aclk_sync_cfg_t *aclk_host_config = callocz(1, sizeof(struct aclk_sync_cfg_t));
+    spinlock_init(&aclk_host_config->pending_ctx_spinlock);
     if (node_id && !uuid_is_null(*node_id))
         uuid_unparse_lower(*node_id, aclk_host_config->node_id);
 
@@ -1221,6 +1222,22 @@ void destroy_aclk_config(RRDHOST *host)
     }
 
     struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_RELAXED);
+    if (!old_aclk_host_config)
+        return;
+
+    // detach pending checkpoint strings under lock, to avoid racing with save/replay
+    spinlock_lock(&old_aclk_host_config->pending_ctx_spinlock);
+    char *pending_claim_id = old_aclk_host_config->pending_ctx_claim_id;
+    char *pending_node_id = old_aclk_host_config->pending_ctx_node_id;
+    old_aclk_host_config->pending_ctx_claim_id = NULL;
+    old_aclk_host_config->pending_ctx_node_id = NULL;
+    old_aclk_host_config->pending_ctx_version_hash = 0;
+    old_aclk_host_config->pending_ctx_saved_monotonic_s = 0;
+    __atomic_store_n(&old_aclk_host_config->pending_ctx_checkpoint, false, __ATOMIC_RELEASE);
+    spinlock_unlock(&old_aclk_host_config->pending_ctx_spinlock);
+
+    freez(pending_claim_id);
+    freez(pending_node_id);
     freez(old_aclk_host_config);
 }
 

@@ -14,6 +14,39 @@ The system consists of three components:
 - [**Netdata Parents**](/docs/deployment-guides/deployment-with-centralization-points.md): Optional centralization points for aggregating data from multiple agents (Netdata Parents are the same software component as Netdata Agents, configured as Parents)
 - [**Netdata Cloud**](/docs/netdata-cloud/README.md): A smart control plane for unifying multiple independent Netdata Agents and Parents, providing horizontal scalability, role based access control, access from anywhere, centralized alerts notifications, team collaboration, AI insights, and more.
 
+The following diagram shows how Netdata components connect:
+
+```mermaid
+flowchart TB
+    C1("Child Agent 1")
+    C2("Child Agent 2")
+    C3("Child Agent 3")
+
+    P1("**Parent 1**")
+    P2("**Parent 2**")
+
+    NC("**Netdata Cloud**<br/>Dashboards, Alerts, AI")
+
+    C1 -->|streaming| P1
+    C2 -->|streaming| P1
+    C3 -->|streaming| P2
+    C2 -.->|failover| P2
+    P1 <-->|replication| P2
+    P1 <-->|ACLK| NC
+    P2 <-->|ACLK| NC
+
+    classDef child fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef parent fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef cloud fill: #e8f4fd, stroke: #4a90e2, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+
+    class C1 child
+    class C2 child
+    class C3 child
+    class P1 parent
+    class P2 parent
+    class NC cloud
+```
+
 ## Performance at a Glance
 
 |                      Aspect |                 Netdata                  |     Industry Standard     |

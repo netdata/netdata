@@ -121,6 +121,7 @@ int rrdcontext_find_chart_uuid(RRDSET *st, nd_uuid_t *store_uuid);
 
 void rrdcontext_hub_checkpoint_command(void *cmd);
 void rrdcontext_hub_stop_streaming_command(void *cmd);
+void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host);
 
 
 // ----------------------------------------------------------------------------

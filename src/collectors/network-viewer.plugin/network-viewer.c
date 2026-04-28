@@ -1176,6 +1176,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         return;
 
     NV_TOPOLOGY_CONTEXT *ctx = data;
+    bool hidden_listen_socket = (n->direction == SOCKET_DIRECTION_LISTEN && !ctx->options.sockets_listening);
     ctx->sockets_total++;
 
     char local_ip[INET6_ADDRSTRLEN] = "";
@@ -1223,6 +1224,19 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
             local_actor = dictionary_set(ctx->local_ips, local_ip, &tmp, sizeof(tmp));
         }
         local_actor->sockets++;
+    }
+
+    if(hidden_listen_socket) {
+        NV_PROCESS_ACTOR hidden_owner = {
+            .pid = n->pid,
+            .ppid = n->ppid,
+            .uid = n->uid,
+            .net_ns_inode = n->net_ns_inode,
+        };
+        snprintf(hidden_owner.process, sizeof(hidden_owner.process), "%s", process_name);
+        topology_register_endpoint_owner(ctx, n->net_ns_inode, n->local.protocol, local_ip, n->local.port, &hidden_owner, true);
+        ctx->skipped_sockets++;
+        return;
     }
 
     char process_key[NV_TOPOLOGY_KEY_MAX];
@@ -1290,7 +1304,8 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     }
 
     bool remote_is_self = topology_ip_belongs_to_self(ctx, remote_ip, remote_address_space);
-    bool create_endpoint_actor = (!remote_is_self || n->direction == SOCKET_DIRECTION_LISTEN);
+    bool self_owned_listen_socket = (n->direction == SOCKET_DIRECTION_LISTEN && remote_is_self);
+    bool create_endpoint_actor = !remote_is_self;
     if(create_endpoint_actor) {
         char endpoint_actor_key[NV_TOPOLOGY_KEY_MAX];
         topology_actor_id_for_remote_endpoint(ctx, remote_ip, remote_address_space, endpoint_actor_key, sizeof(endpoint_actor_key));
@@ -1304,14 +1319,23 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         ra->sockets++;
     }
 
+    if(self_owned_listen_socket) {
+        ctx->skipped_sockets++;
+        return;
+    }
+
     const struct socket_endpoint *server_endpoint = NULL;
     uint16_t endpoint_port = n->remote.port;
     switch(n->direction) {
         case SOCKET_DIRECTION_LISTEN:
+            server_endpoint = &n->local;
+            endpoint_port = n->local.port;
+            break;
+
         case SOCKET_DIRECTION_INBOUND:
         case SOCKET_DIRECTION_LOCAL_INBOUND:
             server_endpoint = &n->local;
-            endpoint_port = n->local.port;
+            endpoint_port = n->remote.port;
             break;
 
         case SOCKET_DIRECTION_OUTBOUND:
@@ -1499,7 +1523,9 @@ static bool topology_prepare_context(NV_TOPOLOGY_CONTEXT *ctx, usec_t now_ut, co
 
     LS_STATE ls = {
         .config = {
-            .listening = ctx->options.sockets_listening,
+            // Always collect listeners so inbound/outbound socket classification
+            // remains stable across topology socket filters.
+            .listening = true,
             .local = ctx->options.sockets_local,
             .inbound = ctx->options.sockets_inbound,
             .outbound = ctx->options.sockets_outbound,

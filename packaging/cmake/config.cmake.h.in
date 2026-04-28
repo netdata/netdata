@@ -177,6 +177,7 @@
 #cmakedefine CACHE_DIR "@CACHE_DIR@"
 #cmakedefine CONFIG_DIR "@CONFIG_DIR@"
 #cmakedefine LIBCONFIG_DIR "@LIBCONFIG_DIR@"
+#cmakedefine STOCK_DATA_DIR "@STOCK_DATA_DIR@"
 #cmakedefine LOG_DIR "@LOG_DIR@"
 #cmakedefine PLUGINS_DIR "@PLUGINS_DIR@"
 #cmakedefine WEB_DIR "@WEB_DIR@"

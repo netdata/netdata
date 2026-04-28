@@ -46,7 +46,7 @@ no local setup, no bridges, no firewall changes.
 
 ### Prerequisites
 
-1. **Netdata Cloud account** with a **Business plan**
+1. **Netdata Cloud account** with a **Paid plan**
 2. **API token** with `scope:mcp` — [Create one in API Tokens settings](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md)
 3. **Nodes claimed to Netdata Cloud** —
    The Cloud MCP server can only access nodes
@@ -161,7 +161,7 @@ Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
 - Verify your API token has `scope:mcp`
 - Ensure the token is passed as `Authorization: Bearer <token>` (not as a query parameter)
 - Check that your Netdata Cloud subscription
-  includes a space in the Business plan
+  includes a space in a Paid plan
 
 #### No Nodes Visible
 
@@ -636,7 +636,6 @@ For detailed configuration instructions for specific AI clients, see:
 - [Cursor](/docs/netdata-ai/mcp/mcp-clients/cursor.md) - AI-powered code editor
 - [Visual Studio Code](/docs/netdata-ai/mcp/mcp-clients/vs-code.md) - VS Code with MCP support
 - [JetBrains IDEs](/docs/netdata-ai/mcp/mcp-clients/jetbrains-ides.md) - IntelliJ, PyCharm, WebStorm, etc.
-- [Netdata Web Client](/docs/netdata-ai/mcp/mcp-clients/netdata-web-client.md) - Built-in web-based AI chat
 
 **DevOps Copilots:**
 - [Claude Code](/docs/netdata-ai/mcp/mcp-clients/claude-code.md) - Anthropic's CLI for Claude

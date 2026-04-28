@@ -697,9 +697,12 @@ type mockDdSnmpCollector struct {
 	pms  []*ddsnmp.ProfileMetrics
 	meta map[string]ddsnmp.MetaTag
 	err  error
+
+	collectCalls int
 }
 
 func (m *mockDdSnmpCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
+	m.collectCalls++
 	return m.pms, m.err
 }
 
