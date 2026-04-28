@@ -227,7 +227,7 @@ static void do_memory_swap_operations_chart(
             "operations/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMemory",
-            NETDATA_CHART_PRIO_MEM_SWAPIO,
+            NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
             update_every,
             RRDSET_TYPE_STACKED);
 
