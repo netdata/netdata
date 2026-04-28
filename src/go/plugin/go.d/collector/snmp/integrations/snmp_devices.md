@@ -363,6 +363,68 @@ jobs:
 
 There are no alerts configured by default for this integration.
 
+### Creating custom health alarms for SNMP metrics
+
+Since no alerts are configured by default, you can create custom health alarm templates in `/etc/netdata/health.d/` targeting the SNMP chart contexts for your device.
+
+:::tip
+
+Chart contexts depend on the SNMP profile applied to your device. Check the **Metrics** tab on the device's dashboard to find the exact chart identifiers. All SNMP profile metrics use the chart context pattern `snmp.device_prof_<metric_name>`.
+
+:::
+
+#### Bandwidth threshold example
+
+The following alarm triggers a warning when inbound traffic on an SNMP interface exceeds 800 Mbps. It targets the per-interface traffic chart from the default IF-MIB profile (`snmp.device_prof_ifTraffic`), which reports values in `bit/s` (already scaled from octets by the profile).
+
+```yaml
+template: snmp_interface_bandwidth
+      on: snmp.device_prof_ifTraffic
+   lookup: average -1m unaligned of in
+    units: bit/s
+    every: 10s
+     warn: $this > 800000000
+     info: Inbound traffic on interface ${label:interface} exceeds 800 Mbps
+       to: sysadmin
+```
+
+To alert on outbound traffic, change the lookup dimension from `in` to `out`.
+
+#### Device reachability example
+
+If ping is enabled for the SNMP device, you can detect when the device becomes unreachable using the built-in ping chart (`snmp.device_ping_rtt`):
+
+```yaml
+template: snmp_device_unreachable
+      on: snmp.device_ping_rtt
+   lookup: average -1m unaligned of avg
+    every: 10s
+     crit: $this == nan
+     info: SNMP device is unreachable (ping failing)
+       to: sysadmin
+```
+
+For per-interface link-down detection, target the interface operational status chart from the IF-MIB profile:
+
+```yaml
+template: snmp_interface_link_down
+      on: snmp.device_prof_ifOperStatus
+   lookup: average -1m unaligned percentage of up
+    units: %
+    every: 10s
+     crit: $this < 100
+     info: Interface ${label:interface} is not operationally up
+       to: sysadmin
+```
+
+:::note
+
+The chart contexts in these examples (`snmp.device_prof_ifTraffic`, `snmp.device_prof_ifOperStatus`, `snmp.device_ping_rtt`) are based on the standard IF-MIB profile. If you use a vendor-specific profile, the metric names and chart contexts will differ. Always verify chart identifiers on your Netdata dashboard before creating alarms.
+
+:::
+
+See the [Alert Configuration Reference](https://learn.netdata.cloud/docs/alerts-and-notifications/alert-configuration-reference) for complete alarm template syntax and options.
+
 
 ## Metrics
 

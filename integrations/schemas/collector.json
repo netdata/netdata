@@ -225,6 +225,10 @@
           "troubleshooting": {
             "$ref": "./shared.json#/$defs/troubleshooting"
           },
+          "alerts_guidance": {
+            "type": "string",
+            "description": "Optional markdown content rendered after the alerts section. Use for guidance on creating custom health alarms specific to this collector."
+          },
           "alerts": {
             "type": "array",
             "description": "The list of configured alerts shipped with Netdata for this collector.",

@@ -12,3 +12,8 @@ The following alerts are available:
 [% else %]
 There are no alerts configured by default for this integration.
 [% endif %]
+[% if entry.alerts_guidance %]
+
+[[ entry.alerts_guidance ]]
+
+[% endif %]
