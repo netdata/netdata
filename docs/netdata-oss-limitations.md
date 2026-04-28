@@ -109,7 +109,7 @@ When accessing Netdata via Agent/Parent MCP:
 - **Without Cloud connection**: MCP can access public functions and metrics, but sensitive functions follow the same restrictions as the dashboard
 - **With Cloud connection**: MCP inherits the user's Cloud permissions, enabling access to sensitive functions for authenticated users
 
-For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mcp).
+For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mcp/README.md).
 
 ## How to Enable Features
 
