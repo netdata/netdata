@@ -1187,22 +1187,23 @@ static time_t find_uuid_first_time(
             if (journal_start_time_s < global_first_time_s)
                 global_first_time_s = journal_start_time_s;
 
-            struct journal_metric_list *uuid_list =
-                (struct journal_metric_list *)((uint8_t *)j2_header + j2_header->metric_offset);
-            struct uuid_first_time_s *uuid_original_entry;
-
+            size_t metric_offset = j2_header->metric_offset;
             size_t journal_metric_count = j2_header->metric_count;
             size_t metric_list_size;
-            if (__builtin_mul_overflow(journal_metric_count, sizeof(*uuid_list), &metric_list_size) ||
-                j2_header->metric_offset > journal_v2_file_size ||
-                metric_list_size > journal_v2_file_size - j2_header->metric_offset) {
+            if (__builtin_mul_overflow(journal_metric_count, sizeof(struct journal_metric_list), &metric_list_size) ||
+                metric_offset > journal_v2_file_size ||
+                metric_list_size > journal_v2_file_size - metric_offset) {
                 nd_log_daemon(NDLP_ERR,
                               "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
-                              "(metric_offset=%"PRIu32", list_size=%zu, file_size=%zu), skipping it",
-                              file_path, j2_header->metric_offset, metric_list_size, journal_v2_file_size);
+                              "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping it",
+                              file_path, metric_offset, metric_list_size, journal_v2_file_size);
                 journal_access_failed = true;
                 goto release_journal;
             }
+
+            struct journal_metric_list *uuid_list =
+                (struct journal_metric_list *)((uint8_t *)j2_header + metric_offset);
+            struct uuid_first_time_s *uuid_original_entry;
 
             size_t journal_search_start = 0; // Start of remaining search space
             any_matching = false;
