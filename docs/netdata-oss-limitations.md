@@ -4,17 +4,24 @@ This document explains the access control policies that govern feature availabil
 
 ## Overview
 
-Netdata implements a layered access control system to protect sensitive information while keeping core monitoring capabilities freely available. The system distinguishes between three access levels:
+Netdata implements a layered access control system to protect sensitive information while keeping core monitoring capabilities freely available. The system distinguishes between four access levels:
 
 | Access Level | Description |
 |--------------|-------------|
 | **Anonymous** | Using the Netdata dashboard without signing in |
 | **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier) |
-| **Netdata Cloud Business** | Signed in with a paid subscription |
+| **Netdata Cloud Homelab** | Signed in with a Homelab (paid) subscription |
+| **Netdata Cloud Business** | Signed in with a Business (paid) subscription |
 
 :::note
 
 In the tables below, **Community** refers to Netdata Cloud Community and **Business** refers to Netdata Cloud Business.
+
+:::
+
+:::note
+
+Netdata offers two paid plans: **Homelab** for personal and home lab environments, and **Business** for commercial and enterprise use. Both plans unlock the same feature set — the difference is the licensing terms and intended use case. Visit [Netdata Cloud pricing](https://app.netdata.cloud/billing) for details.
 
 :::
 
@@ -116,17 +123,17 @@ Once signed in, you'll have access to all sensitive functions (processes, logs, 
 
 ### Enable Dynamic Configuration
 
-Dynamic Configuration requires a Business subscription:
+Dynamic Configuration requires a Homelab or Business subscription:
 
 1. **Sign in to Netdata Cloud**
-2. **Upgrade to Business** from the billing settings
+2. **Upgrade to Homelab or Business** from the billing settings
 3. **Access Dynamic Configuration** from the settings menu on any connected node
 
 ### Increase Node Limits
 
 The 5-node limit on multi-node dashboards applies to Community plans:
 
-1. **Upgrade to Business** for unlimited nodes
+1. **Upgrade to Homelab or Business** for unlimited nodes
 2. **Or select preferred nodes** in Space settings to choose which 5 nodes appear in multi-node views
 
 ## Parent-Child Deployments and Access Levels
@@ -162,4 +169,4 @@ For more information about setting up parent-child streaming, see [Parents: Your
 | **Custom Dashboards** | 1 per agent | 1 per room | Unlimited |
 | **RBAC & SSO** | N/A | Not available | Full access |
 
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to Business for full configuration control and unlimited scale.
+Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to Homelab or Business for full configuration control and unlimited scale.
