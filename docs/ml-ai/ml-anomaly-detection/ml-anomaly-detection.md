@@ -258,6 +258,49 @@ On a freshly installed agent, ML begins detecting anomalies within 10 minutes. H
 
 **Operational tip**: During the first 48 hours after deployment, expect elevated anomaly rates. This is normal as the system learns your infrastructure's patterns. Use this period to observe ML behavior but avoid making critical decisions based solely on early anomaly detection.
 
+## Creating Anomaly-Based Health Alerts
+
+You can create health alerts that trigger based on anomaly rates instead of raw metric values by using the `anomaly-bit` option in your alert's `lookup` line. When `anomaly-bit` is enabled, the lookup returns 100 for anomalous data points and 0 for normal ones, so the average over a time window gives you the anomaly rate as a percentage.
+
+### Anomaly-rate alert
+
+The following template triggers when the anomaly rate on `system.cpu` exceeds the defined thresholds:
+
+```text
+ template: ml_5min_cpu_chart
+       on: system.cpu
+   lookup: average -5m anomaly-bit of *
+     calc: $this
+    units: %
+    every: 30s
+     warn: $this > (($status >= $WARNING)  ? (5) : (20))
+     crit: $this > (($status == $CRITICAL) ? (20) : (100))
+     info: rolling 5min anomaly rate for system.cpu chart
+```
+
+### Pairing with actual values
+
+An anomaly-rate alert tells you *something is unusual*, but not *what the actual numbers are*. To get the real values in the same notification, create a companion alert on the raw metric:
+
+```text
+ alarm: cpu_usage_5min
+    on: system.cpu
+lookup: average -5m of user,system
+ units: %
+ every: 30s
+  warn: $this > 80
+  crit: $this > 95
+  info: average CPU utilization over the last 5 minutes
+```
+
+When the anomaly alert fires, the companion alert provides the concrete values — for example, "CPU anomaly rate 35%" together with "CPU utilization 92%".
+
+:::tip
+
+Use `foreach` instead of `of` to get a separate alert per dimension (e.g., per CPU state). For the full alert syntax, see the [health configuration reference](/src/health/REFERENCE.md).
+
+:::
+
 ## Getting Started
 
 ML is enabled by default in recent Netdata versions. To use anomaly detection:
