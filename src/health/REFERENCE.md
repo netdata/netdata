@@ -555,8 +555,11 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 | `sum`         | Return sum of all dimensions (default)                  |
 | `min2max`     | Return delta between min and max of dimensions          |
 | `unaligned`   | Prevent shifting query window to multiples of duration  |
+| `anomaly-bit` | Query anomaly bits (0 or 100) instead of raw values, enabling anomaly-rate-based alerting |
 | `match-ids`   | Match dimensions by IDs (default)                       |
 | `match-names` | Match dimensions by names                               |
+
+When `anomaly-bit` is used, each data point returns 100 (anomalous) or 0 (normal). Averaging over a time window yields the anomaly rate as a percentage. For more details and practical examples, see the [ML anomaly detection documentation](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md).
 
 **Example:**
 
