@@ -1,4 +1,4 @@
-# Monitor Nginx or Apache web server log files
+# Monitor Nginx, Apache, or IIS web server log files
 
 Parsing web server log files with Netdata, revealing the volume of redirects, requests and other metrics, can give you a better overview of your infrastructure.
 
@@ -9,7 +9,8 @@ ever. In one test on a system with SSD storage, the collector consistently parse
 200ms, using ~30% of a single core.
 
 The [web_log](/src/go/plugin/go.d/collector/weblog/README.md) collector is currently compatible
-with [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
+with [Nginx](https://nginx.org/en/), [Apache](https://httpd.apache.org/), and
+[Microsoft IIS](https://www.iis.net/).
 
 This guide will walk you through using the new Go-based web log collector to turn the logs these web servers
 constantly write to into real-time insights into your infrastructure.
@@ -88,6 +89,41 @@ Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate metho
 The web log collector is capable of parsing custom Nginx and Apache log formats and presenting them as charts, but we'll leave that topic for a separate guide.
 
 We do have [extensive documentation](/src/go/plugin/go.d/collector/weblog/README.md) on how to build custom parsing for Nginx and Apache logs.
+
+## IIS
+
+The web_log collector supports Microsoft IIS W3C Extended Log Format using the CSV parser. The default `web_log.conf` ships an IIS job that assumes the Netdata Agent runs on Windows Subsystem for Linux (WSL) with access to the Windows IIS log directory.
+
+The IIS W3C format fields map to web_log known fields as follows:
+
+| IIS field      | web_log field      |
+|----------------|--------------------|
+| s-ip           | $host              |
+| cs-method      | $request_method    |
+| cs-uri-stem    | $request_uri       |
+| s-port         | $server_port       |
+| c-ip           | $remote_addr       |
+| sc-status      | $status            |
+| time-taken     | $request_time      |
+
+Fields not needed for metrics (date, time, cs-uri-query, cs-username, User-Agent, Referer, sc-substatus, sc-win32-status) are represented as `-` in the format string.
+
+To configure an IIS job, edit `go.d/web_log.conf`:
+
+```yaml
+jobs:
+  - name: iis
+    path: /mnt/c/inetpub/logs/LogFiles/W3SVC1/u_ex*.log
+    log_type: csv
+    csv_config:
+      format: '- - $host $request_method $request_uri - $server_port - $remote_addr - - $status - - $request_time'
+```
+
+:::note
+
+This configuration assumes the Netdata Agent runs on WSL with the Windows `C:` drive mounted at `/mnt/c/`. Adjust the path if your IIS log directory is in a different location.
+
+:::
 
 ## Tweak web log collector alerts
 

@@ -16,6 +16,7 @@ modules:
         - httpd
         - nginx
         - lighttpd
+        - iis
         - logs
       info_provided_to_referring_integrations:
         description: ""
@@ -273,7 +274,17 @@ modules:
           folding:
             title: Config
             enabled: true
-          list: []
+          list:
+            - name: IIS on WSL
+              description: |
+                Monitor Microsoft IIS W3C Extended Log Format files when running the Netdata Agent on Windows Subsystem for Linux (WSL).
+              config: |
+                jobs:
+                  - name: iis
+                    path: /mnt/c/inetpub/logs/LogFiles/W3SVC1/u_ex*.log
+                    log_type: csv
+                    csv_config:
+                      format: '- - $host $request_method $request_uri - $server_port - $remote_addr - - $status - - $request_time'
     troubleshooting:
       problems:
         list:
