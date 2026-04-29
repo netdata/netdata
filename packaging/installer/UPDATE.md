@@ -142,7 +142,7 @@ If you installed Netdata with any optional parameters, such as `--install-prefix
 
 Docker-based installations are updated by pulling a new image and recreating the container. Persistent volumes preserve your configuration and metrics data across updates.
 
-For detailed instructions, see [Updating your Docker container](/packaging/docker/README.md#updating-your-docker-container).
+For detailed instructions, see [Update your Netdata Docker container](/packaging/docker/README.md#update-your-netdata-docker-container).
 
 <br/>
 </details>
@@ -176,5 +176,5 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 | **custom**                 | System package manager | Use your system's package manager                                                                          |
 | **macOS (Homebrew)**       | Homebrew               | `brew upgrade netdata`                                                                                     |
 | **Manual Git**             | Git + installer        | See [manual installation steps](#update-methods-by-platform)                                               |
-| **Docker (OCI)**           | Image pull + recreate  | See [Docker update instructions](/packaging/docker/README.md#updating-your-docker-container)                |
+| **Docker (OCI)**           | Image pull + recreate  | See [Docker update instructions](/packaging/docker/README.md#update-your-netdata-docker-container)                |
 | **Windows**                | MSI installer          | Download and run latest installer                                                                          |
