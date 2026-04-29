@@ -50,6 +50,20 @@ Unlike Prometheus, Netdata allows each dimension to have different algorithms an
 
 :::
 
+:::note
+
+Some Netdata charts use a **negative multiplier** on certain dimensions to display them on opposite sides of the x-axis (e.g., AREA charts showing *read* above and *write* below). When exported to Prometheus via the `average` or `sum` source, these dimensions produce negative values.
+
+This applies to cgroup I/O charts (`cgroup.io`, `cgroup.serviced_ops`, `cgroup.throttle_io`, `cgroup.throttle_serviced_ops`) where the `write` dimension uses `multiplier=-1`. For example, `netdata_cgroup_io_KiB_persec_average{dimension="write"}` will always be negative. To query the absolute value:
+
+```promql
+abs(netdata_cgroup_io_KiB_persec_average{dimension="write"})
+```
+
+With the `as-collected` source, the raw kernel counter values are exported before the multiplier is applied, so values appear positive.
+
+:::
+
 #### 2. Average
 
 Sends metrics as they appear on the dashboard. All metrics become gauges in their dashboard units. This is the easiest to work with.
