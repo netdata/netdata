@@ -462,6 +462,69 @@ You can run the socket proxy in its own Docker Compose file and leave it on a pr
 
 :::
 
+### Docker Swarm
+
+You can deploy the Netdata Agent across all nodes in a Docker Swarm cluster using a stack file. With `mode: global`, Swarm schedules one Netdata container on every node, giving you per-node monitoring without manual placement.
+
+Create a file named `docker-stack.yml` with the following content, then deploy it with `docker stack deploy -c docker-stack.yml netdata`.
+
+The stack uses the same privileges, capabilities, and volume mounts described in the [Recommended way](#recommended-way) section. Review the [Privileges](#create-a-new-netdata-agent-container) and [Mounts](#create-a-new-netdata-agent-container) tables for details on what each mount provides.
+
+```yaml
+version: '3.8'
+services:
+  netdata:
+    image: netdata/netdata
+    pid: host
+    network_mode: host
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/dbus:/run/dbus:ro
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+volumes:
+  netdataconfig:
+  netdatalib:
+  netdatacache:
+```
+
+:::note
+
+In Docker Swarm, bind-mounted host paths refer to the filesystem of the node where each container instance lands. With `mode: global`, every node runs its own Netdata Agent, so each container reads from its local host — which is the intended behavior.
+
+:::
+
+:::tip
+
+- When using `netdata/netdata` without a tag, Docker pulls the latest image by default. To run the stable version, replace it with `netdata/netdata:stable`.
+- If you plan to connect the nodes to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+
+:::
+
+:::note
+
+All Swarm nodes must have the required host paths and devices available for bind mounts (`/proc`, `/sys`, `/var/run/docker.sock`, and so on). For GPU monitoring, add the `deploy.resources.reservations.devices` configuration shown in the [NVIDIA GPUs section](#with-nvidia-gpus-monitorning) to the stack's `deploy` block.
+
+:::
+
 ### Rootless mode
 
 Netdata can be run successfully in a non-root environment, such as [rootless Docker](https://docs.docker.com/engine/security/rootless/).
