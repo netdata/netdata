@@ -1190,8 +1190,15 @@ static time_t find_uuid_first_time(
             size_t metric_offset = j2_header->metric_offset;
             size_t journal_metric_count = j2_header->metric_count;
             size_t metric_list_size;
-            if (__builtin_mul_overflow(journal_metric_count, sizeof(struct journal_metric_list), &metric_list_size) ||
-                metric_offset > journal_v2_file_size ||
+            if (__builtin_mul_overflow(journal_metric_count, sizeof(struct journal_metric_list), &metric_list_size)) {
+                nd_log_daemon(NDLP_ERR,
+                              "DBENGINE: metric list size overflow in journalfile \"%s\" "
+                              "(metric_count=%zu, entry_size=%zu), skipping it",
+                              file_path, journal_metric_count, sizeof(struct journal_metric_list));
+                journal_access_failed = true;
+                goto release_journal;
+            }
+            if (metric_offset > journal_v2_file_size ||
                 metric_list_size > journal_v2_file_size - metric_offset) {
                 nd_log_daemon(NDLP_ERR,
                               "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
