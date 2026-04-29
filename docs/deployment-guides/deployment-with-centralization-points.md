@@ -43,6 +43,12 @@ This **distributed yet centralized** approach gives you the benefits of both dec
 | **Multi-Node Dashboards Without Netdata Cloud** | Aggregates data from all your nodes for centralized dashboards                                 | You get Cloud-like functionality in environments that prefer or require on-premises solutions |
 | **Restricted Netdata Cloud Access**             | Acts as a bridge when your monitored systems can't connect to Netdata Cloud                    | You can still use Cloud features despite firewall restrictions or security policies           |
 
+:::note
+
+Multi-node dashboard views on a single Parent are limited to 5 nodes at the Anonymous and Community access levels. For the full feature availability breakdown, see [Access Control and Feature Availability](/docs/netdata-oss-limitations.md).
+
+:::
+
 ## How Multiple Parents Work
 
 <details>
