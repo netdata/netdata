@@ -73,6 +73,11 @@ modules:
               default_value: 10
               required: false
               group: Target
+            - name: expected_prefix
+              description: "If an endpoint does not return at least one metric with the specified prefix, the data is not processed."
+              default_value: ""
+              required: false
+              group: Target
 
             - name: selector
               description: Time series selector (filter).
@@ -131,6 +136,11 @@ modules:
 
             - name: label_prefix
               description: "Optional prefix added to all labels of all charts. Labels will be formatted as `prefix_name`."
+              default_value: ""
+              required: false
+              group: Customization
+            - name: app
+              description: "If set, this value will be used in the chart context as prometheus.{app}.{metric_name}."
               default_value: ""
               required: false
               group: Customization
