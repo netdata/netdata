@@ -79,6 +79,54 @@ When `edit-config` opens the file on Windows, it uses the `nano` editor.
 - Exit: press `Ctrl + X`.
 - Exit after editing: press `Ctrl + X`. If nano asks whether to save modified content, press `Y` to save your changes or `N` to discard them.
 
+## Custom metrics with PowerShell scripts
+
+You can collect custom metrics from PowerShell scripts using the [Nagios Plugins and Custom Scripts](/src/go/plugin/scripts.d/collector/nagios/integrations/nagios_plugins_and_custom_scripts.md) integration. Netdata automatically invokes `.ps1` scripts through `powershell.exe` with `-NoProfile -ExecutionPolicy Bypass` — your script just needs to follow the Nagios plugin output format (exit code and optional performance data).
+
+### Quick setup
+
+1. **Create your script** — write a `.ps1` file that outputs status text with optional performance data and exits with code `0` (OK), `1` (WARNING), `2` (CRITICAL), or `3` (UNKNOWN). Save it to a known location, for example `C:\Netdata\checks\`:
+
+   ```powershell
+   $value = 85
+   Write-Host "OK - Value is $value | my_metric=$value;;;0;100"
+   exit 0
+   ```
+
+2. **Test it manually** from PowerShell:
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Netdata\checks\check_example.ps1"
+   echo "Exit code: $LASTEXITCODE"
+   ```
+
+3. **Configure the collector** — in the Netdata MSYS2 environment, edit `scripts.d/nagios.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files):
+
+   ```bash
+   cd /etc/netdata
+   ./edit-config scripts.d/nagios.conf
+   ```
+
+   Add a job entry pointing to your script:
+
+   ```yaml
+   jobs:
+     - name: my_check
+       plugin: C:\Netdata\checks\check_example.ps1
+       timeout: 10s
+       check_interval: 1m
+   ```
+
+4. [Restart the Netdata Agent](/docs/netdata-agent/start-stop-restart.md) for the new configuration to take effect.
+
+:::tip
+
+In a parent-child streaming setup, the collector runs on the Agent where the script is installed. To collect custom metrics from a child Node, install and configure the script directly on that child Node.
+
+:::
+
+For the complete configuration reference, a full PowerShell example, alert details, and troubleshooting, see the [Nagios Plugins and Custom Scripts](/src/go/plugin/scripts.d/collector/nagios/integrations/nagios_plugins_and_custom_scripts.md) integration documentation.
+
 ## Related Windows documentation
 
 - [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md)
