@@ -50,6 +50,12 @@ Unlike Prometheus, Netdata allows each dimension to have different algorithms an
 
 :::
 
+:::note
+
+Some Netdata dimensions use a **negative multiplier** by design. For example, cgroup I/O charts apply a `-1` multiplier to the `write` dimension so that read and write appear as opposing areas on the dashboard. When using the **as-collected** data source, these dimensions export as negative values. Use the **average** or **sum** data source to get dashboard-consistent (positive) values.
+
+:::
+
 #### 2. Average
 
 Sends metrics as they appear on the dashboard. All metrics become gauges in their dashboard units. This is the easiest to work with.
