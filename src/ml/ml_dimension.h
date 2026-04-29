@@ -42,13 +42,13 @@ public:
     DimensionLookupInfo(const char *MachineGuid, STRING *ChartId, STRING *DimensionId)
         : ChartId(ChartId), DimensionId(DimensionId)
     {
-        memcpy(this->MachineGuid.data(), MachineGuid, this->MachineGuid.size());
+        snprintf(this->MachineGuid.data(), this->MachineGuid.size(), "%s", MachineGuid);
     }
 
     DimensionLookupInfo(const char *MachineGuid, const char *ChartId, const char *DimensionId)
         : ChartId(ChartId), DimensionId(DimensionId)
     {
-        memcpy(this->MachineGuid.data(), MachineGuid, this->MachineGuid.size());
+        snprintf(this->MachineGuid.data(), this->MachineGuid.size(), "%s", MachineGuid);
     }
 
     const char *machineGuid() const
