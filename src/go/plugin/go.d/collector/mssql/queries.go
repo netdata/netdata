@@ -101,6 +101,26 @@ WHERE object_name LIKE '%Databases%'
   );
 `
 
+// queryDatabaseLogCounters gets per-database transaction log size and activity counters
+const queryDatabaseLogCounters = `
+SELECT
+  RTRIM(pc.instance_name) AS database_name,
+  RTRIM(pc.counter_name) AS counter_name,
+  pc.cntr_value
+FROM sys.dm_os_performance_counters AS pc
+INNER JOIN sys.databases AS d
+  ON d.database_id = DB_ID(RTRIM(pc.instance_name))
+WHERE pc.object_name LIKE '%Databases%'
+  AND pc.instance_name NOT IN ('_Total', 'mssqlsystemresource')
+  AND d.database_id > 4
+  AND pc.counter_name IN (
+    'Log File(s) Size (KB)',
+    'Log File(s) Used Size (KB)',
+    'Log Truncations',
+    'Log Shrinks'
+  );
+`
+
 // queryDatabaseLocks gets per-database lock metrics
 const queryDatabaseLocks = `
 SELECT
