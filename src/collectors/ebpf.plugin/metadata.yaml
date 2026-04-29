@@ -1661,7 +1661,8 @@ modules:
               unit: "connections/s"
               chart_type: line
               dimensions:
-                - name: connection_tcp
+                - name: connected_tcp
+                - name: connected_udp
             - name: ip.tcp_outbound_conn
               description: TCP outbound connections.
               unit: "connections/s"
@@ -1695,7 +1696,7 @@ modules:
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: retransmited
+                - name: retransmitted
             - name: ip.udp_functions
               description: UDP calls
               unit: "calls/s"
