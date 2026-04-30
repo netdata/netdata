@@ -8,6 +8,31 @@ Netdata by default should need 100MB to 200MB of RAM, depending on the number of
 
 This number can be lowered by limiting the number of Database Tiers or switching Database modes. For more information, check [the Database section of our documentation](/src/database/README.md).
 
+### RAM mode sizing
+
+In `ram` mode, each metric sample uses 4 bytes. Memory is allocated in 4 KiB pages (1024 samples per page), so each metric's ring buffer is rounded up to the next page boundary.
+
+The formula for ring buffer memory:
+
+```text
+Ring buffer RAM = METRICS × ceil(RETENTION_SECONDS / 1024) × 4 KiB
+```
+
+**Example**: A Child collecting 2000 metrics with 1200 seconds of retention:
+
+```text
+Per metric: ceil(1200 / 1024) × 4 KiB = 2 × 4 KiB = 8 KiB
+Total ring buffers: 2000 × 8 KiB ≈ 15.6 MiB
+```
+
+Without page alignment, the raw byte count is 2000 × 1200 × 4 bytes ≈ 9.6 MB. Page alignment increases memory when retention is not a multiple of 1024 seconds.
+
+:::tip
+
+For Children streaming metrics to a Parent, `ram` mode is ideal because the ring buffer only needs to retain enough samples to buffer during network outages. See [Disk Requirements & Retention](disk-requirements-and-retention.md#ram) for configuration details.
+
+:::
+
 ## Parents
 
 | Description                          |         Scope         | RAM Required |                      Notes                       |
