@@ -134,8 +134,10 @@ void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const cha
             k = rrdmetric_acquired_name(rma);
             if(unlikely(!k || !*k))
                 k = rrdmetric_acquired_id(rma);
-            if(unlikely(!k || !*k))
+            if(unlikely(!k || !*k)) {
+                internal_error(true, "QUERY: dimension at index %ld has empty id and name; skipping it", c);
                 continue;
+            }
             id = k;
             name = k;
         }
