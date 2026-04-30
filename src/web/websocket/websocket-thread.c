@@ -105,6 +105,29 @@ struct pipe_header {
     };
 };
 
+static ssize_t write_pipe_block(int fd, const void *buffer, size_t size) {
+    const char *buf = buffer;
+    ssize_t total_written = 0;
+
+    while (total_written < (ssize_t) size) {
+        ssize_t bytes = write(fd, buf + total_written, size - total_written);
+
+        if (bytes < 0) {
+            if (errno == EINTR)
+                continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                return total_written;
+            return -1;
+        }
+        else if (bytes == 0)
+            return total_written;
+
+        total_written += bytes;
+    }
+
+    return total_written;
+}
+
 // Send command to a thread
 bool websocket_thread_send_command(WEBSOCKET_THREAD *wth, uint8_t cmd, uint32_t id) {
     if(!wth || wth->cmd.pipe[PIPE_WRITE] == -1) {
@@ -122,8 +145,8 @@ bool websocket_thread_send_command(WEBSOCKET_THREAD *wth, uint8_t cmd, uint32_t 
     spinlock_lock(&wth->spinlock);
 
     // Write command header
-    ssize_t bytes = write(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header));
-    if(bytes != sizeof(header)) {
+    ssize_t bytes = write_pipe_block(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header));
+    if(bytes != (ssize_t)sizeof(header)) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write command header to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
@@ -158,24 +181,24 @@ bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opc
     spinlock_lock(&wth->spinlock);
 
     // Write command header
-    ssize_t bytes = write(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header));
-    if(bytes != sizeof(header)) {
+    ssize_t bytes = write_pipe_block(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header));
+    if(bytes != (ssize_t)sizeof(header)) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write command header to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
     }
 
     // Write the opcode
-    bytes = write(wth->cmd.pipe[PIPE_WRITE], &opcode, sizeof(opcode));
-    if(bytes != sizeof(opcode)) {
+    bytes = write_pipe_block(wth->cmd.pipe[PIPE_WRITE], &opcode, sizeof(opcode));
+    if(bytes != (ssize_t)sizeof(opcode)) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write broadcast opcode to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
     }
 
     // Write the message
-    bytes = write(wth->cmd.pipe[PIPE_WRITE], message, message_len);;
-    if(bytes != message_len) {
+    bytes = write_pipe_block(wth->cmd.pipe[PIPE_WRITE], message, message_len);
+    if(bytes != (ssize_t)message_len) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write broadcast message to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
