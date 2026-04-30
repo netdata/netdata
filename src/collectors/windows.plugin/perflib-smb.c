@@ -4,6 +4,8 @@
 #include "windows-internals.h"
 
 struct smb_share {
+    usec_t last_collected;
+
     RRDSET *st_current_open_file_count;
     RRDSET *st_tree_connect_count;
     RRDSET *st_received_bytes;
@@ -46,11 +48,30 @@ static void smb_share_initialize(struct smb_share *share)
     share->filesOpened.key = "Files Opened/sec";
 }
 
+static void smb_share_cleanup(struct smb_share *share)
+{
+    rrdset_is_obsolete___safe_from_collector_thread(share->st_current_open_file_count);
+    rrdset_is_obsolete___safe_from_collector_thread(share->st_tree_connect_count);
+    rrdset_is_obsolete___safe_from_collector_thread(share->st_received_bytes);
+    rrdset_is_obsolete___safe_from_collector_thread(share->st_write_requests);
+    rrdset_is_obsolete___safe_from_collector_thread(share->st_read_requests);
+    rrdset_is_obsolete___safe_from_collector_thread(share->st_metadata_requests);
+    rrdset_is_obsolete___safe_from_collector_thread(share->st_sent_bytes);
+    rrdset_is_obsolete___safe_from_collector_thread(share->st_files_opened);
+}
+
 static void dict_smb_share_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct smb_share *share = value;
 
     smb_share_initialize(share);
+}
+
+static void dict_smb_share_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct smb_share *share = value;
+
+    smb_share_cleanup(share);
 }
 
 static void initialize(void)
@@ -59,6 +80,7 @@ static void initialize(void)
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct smb_share));
 
     dictionary_register_insert_callback(smb_shares, dict_smb_share_insert_cb, NULL);
+    dictionary_register_delete_callback(smb_shares, dict_smb_share_delete_cb, NULL);
 }
 
 static void smb_share_chart(
@@ -110,6 +132,8 @@ static bool do_smb_server_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
     if (!pObjectType)
         return false;
 
+    usec_t now_ut = now_monotonic_usec();
+
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
@@ -120,6 +144,7 @@ static bool do_smb_server_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
         struct smb_share *share = dictionary_set(smb_shares, windows_shared_buffer, NULL, sizeof(*share));
+        share->last_collected = now_ut;
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->currentOpenFileCount);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->treeConnectCount);
@@ -233,6 +258,18 @@ static bool do_smb_server_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
             "files/s",
             PRIO_SMB_SERVER_SHARES_FILES_OPENED,
             "opened");
+    }
+
+    // delete entries not seen in this collection cycle
+    {
+        struct smb_share *share;
+        dfe_start_write(smb_shares, share)
+        {
+            if (share->last_collected < now_ut)
+                dictionary_del(smb_shares, share_dfe.name);
+        }
+        dfe_done(share);
+        dictionary_garbage_collect(smb_shares);
     }
 
     return true;
