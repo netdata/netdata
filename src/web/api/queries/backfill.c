@@ -42,11 +42,11 @@ static struct {
 bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_request_data *data) {
     bool rc = false;
     size_t dimensions = dictionary_entries(st->rrddim_root_index);
-    if(!dimensions || dimensions > 200)
+    if(!dimensions)
         return rc;
 
     size_t added = 0;
-    struct backfill_dim_work *array[200];
+    struct backfill_dim_work **array = mallocz(dimensions * sizeof(*array));
 
     if(backfill_globals.running) {
         struct backfill_request *br = aral_callocz(backfill_globals.ar_br);
@@ -96,6 +96,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
         }
     }
 
+    freez(array);
     return rc;
 }
 
