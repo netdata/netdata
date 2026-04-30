@@ -193,6 +193,60 @@ flowchart TB
     class E1 complete
 ```
 
+## Isolated Multi-Site Deployments
+
+When your infrastructure spans multiple sites that have **no network connectivity between them** (air-gapped, separate VPCs, or restricted environments), you can still achieve a unified observability view using Netdata Cloud.
+
+Each site runs its own independent Parent (or a [Parent cluster](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md) for HA within the site). Every Parent connects directly to Netdata Cloud via the Agent-to-Cloud link (ACLK) — **no inter-site connectivity, VPN, or centralized streaming is required**. Netdata Cloud queries all Parents in parallel and presents a unified Dashboard across every site, so you see all Nodes regardless of their physical location.
+
+For Parent setup instructions, see the [deployment guide](/docs/deployment-guides/deployment-with-centralization-points.md). For details on how Netdata Cloud selects among multiple data sources, see the [FAQ on Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/faq.md).
+
+```mermaid
+flowchart TB
+    Cloud("**Netdata Cloud**")
+
+    subgraph SiteA["Site A"]
+        PA1("**Parent A**")
+        CA1("Child 1")
+        CA2("Child 2")
+        CA1 -->|stream| PA1
+        CA2 -->|stream| PA1
+    end
+
+    subgraph SiteB["Site B"]
+        PB1("**Parent B**")
+        CB1("Child 1")
+        CB2("Child 2")
+        CB1 -->|stream| PB1
+        CB2 -->|stream| PB1
+    end
+
+    subgraph SiteC["Site C"]
+        PC1("**Parent C**")
+        CC1("Child 1")
+        CC2("Child 2")
+        CC1 -->|stream| PC1
+        CC2 -->|stream| PC1
+    end
+
+    PA1 -.->|ACLK| Cloud
+    PB1 -.->|ACLK| Cloud
+    PC1 -.->|ACLK| Cloud
+
+    classDef cloud fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000
+    classDef parent fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000
+    classDef child fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000
+    class Cloud cloud
+    class PA1,PB1,PC1 parent
+    class CA1,CA2,CB1,CB2,CC1,CC2 child
+```
+
+:::note
+
+No traffic flows between sites. Each Parent maintains its own independent outbound connection to Netdata Cloud. Sites remain fully isolated from each other.
+
+:::
+
 ## Advantages of Netdata's Approach
 
 Netdata provides several benefits over other observability solutions:
