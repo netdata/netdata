@@ -135,7 +135,7 @@ Notes:
 <a id="option-customization-url-patterns"></a>
 ##### url_patterns
 
-"URL pattern" scope metrics will be collected for each URL pattern. 
+"URL pattern" scope metrics will be collected for each URL pattern.
 
 Option syntax:
 
@@ -449,5 +449,53 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep web_log
 ```
+
+### High percentage of unparsed log lines (web_log_1m_unmatched alert)
+
+This alert indicates that more than 1% of log lines could not be parsed by the web_log collector over the last minute.
+
+**Common causes:**
+- Custom log format not matching any of the predefined formats
+- Log format has changed on the web server
+- Using a non-standard log format without proper configuration
+
+**Diagnostic steps:**
+
+1. Run the collector in debug mode to see unparsed lines:
+   ```bash
+   cd /usr/libexec/netdata/plugins.d/
+   sudo -u netdata -s
+   ./go.d.plugin -d -m web_log
+   ```
+
+2. Check the debug output for lines marked as unmatched to understand what format they have.
+
+**Resolution:**
+
+- If using a custom log format, configure `log_type` and the appropriate parser config:
+  - For CSV formats: set `log_type: csv` and configure `csv_config.format` to match your log format
+  - For custom patterns: set `log_type: regexp` and configure `regexp_config.pattern` with a regex containing named groups matching the known fields
+  - For JSON logs: set `log_type: json` and configure `json_config.mapping`
+  - For LTSV logs: set `log_type: ltsv` and configure `ltsv_config.mapping`
+
+
+### Unmatched lines due to non-standard log fields or extra columns
+
+Persistent unmatched entries appear even with auto-detection enabled.
+
+**Cause:**
+The log format includes fields not in the known-fields list (for example, custom headers, upstream timing, or unique IDs), preventing CSV auto-detection from matching any predefined format.
+
+**Resolution:**
+Set `log_type: csv` explicitly and specify `csv_config.format` using the known field variables that match the log's column order. Alternatively, use `log_type: regexp` with a `regexp_config.pattern` that captures only the known fields and ignores extras.
+
+
+### Suppressing the alert for known benign unmatched lines
+
+The web_log_1m_unmatched alert fires continuously but the unmatched lines are intentional (for example, health check logs in a different format).
+
+**Resolution:**
+Customize the alert threshold in `health.d/web_log.conf` by copying the web_log_1m_unmatched template and adjusting the warn condition, or silence notifications via Netdata Cloud alert configuration.
+
 
 

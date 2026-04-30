@@ -24,7 +24,9 @@ ARG BUILD_ARCH
 ENV BUILD_ARCH=$BUILD_ARCH
 
 # Copy source
-COPY . /opt/netdata.git
+COPY --exclude='**/.git' \
+     --exclude='**/Dockerfile' \
+     . /opt/netdata.git
 WORKDIR /opt/netdata.git
 
 # Install from source
@@ -66,7 +68,29 @@ RUN mkdir -p /app/usr/sbin/ \
     mkdir -p /deps/etc && \
     cp -rp /deps/etc /app/usr/local/etc && \
     chmod -R o+rX /app && \
-    chmod +x /app/usr/sbin/run.sh
+    chmod +x /app/usr/sbin/run.sh && \
+    # Apply the permissions per https://learn.netdata.cloud/docs/collecting-metrics#file-permissions-and-ownership
+    # TODO: "5" is used for the "others" bit, not consistent with the documentation
+    chmod 0755 /app/usr/libexec/netdata/plugins.d/*.plugin && \
+    for name in cgroup-network \
+                local-listeners \
+                apps.plugin \
+                debugfs.plugin \
+                freeipmi.plugin \
+                go.d.plugin \
+                perf.plugin \
+                ndsudo \
+                slabinfo.plugin \
+                network-viewer.plugin \
+                otel-plugin \
+                otel-signal-viewer-plugin \
+                systemd-journal.plugin; do \
+        [ -f "/app/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/app/usr/libexec/netdata/plugins.d/$name"; \
+    done && \
+    # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
+    find /app/var/lib/netdata /app/var/cache/netdata -type d -exec chmod 0770 {} \; && \
+    find /app/var/lib/netdata /app/var/cache/netdata -type f -exec chmod 0660 {} \; && \
+    chmod 0700 /app/var/lib/netdata/cloud.d
 
 #####################################################################
 # This image contains preinstalled dependencies
@@ -108,27 +132,31 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stderr /var/log/netdata/error.log && \
     ln -sf /dev/stderr /var/log/netdata/daemon.log && \
     ln -sf /dev/stdout /var/log/netdata/collector.log && \
-    ln -sf /dev/stdout /var/log/netdata/health.log
+    ln -sf /dev/stdout /var/log/netdata/health.log && \
+    chown -R ${NETDATA_UID}:0 /var/log/netdata
 
-COPY --from=builder /app /
+# Using chmod/chown command with a "RUN" instruction to set the permission/ownership
+# would bloat the image significantly, so we set the permission bits in the builder stage
+# and then copy the files with the correct ownership.
+# Own everything by root group due to https://github.com/netdata/netdata/pull/6543
+COPY --from=builder --chown=0:0 --parents \
+    /app/./usr/sbin/ \
+    /app/./usr/share/netdata \
+    /app/./usr/libexec/netdata \
+    /app/./usr/local/etc \
+    /app/./etc/netdata \
+    /
+COPY --from=builder --chown=${NETDATA_UID}:0 --parents \
+    /app/./usr/lib/netdata \
+    /app/./var/cache/netdata \
+    /app/./var/lib/netdata \
+    /
 
-# Create netdata user and apply the permissions as described in
-# https://docs.netdata.cloud/docs/netdata-security/#netdata-directories, but own everything by root group due to https://github.com/netdata/netdata/pull/6543
+# Create netdata user
 # hadolint ignore=DL3013
 RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
     adduser --system --no-create-home --shell /usr/sbin/nologin --uid ${NETDATA_UID} --home /etc/netdata --group "${DOCKER_USR}" && \
-    chown -R root:root \
-        /etc/netdata \
-        /usr/share/netdata \
-        /usr/libexec/netdata && \
-    chown -R netdata:root \
-        /usr/lib/netdata \
-        /var/cache/netdata \
-        /var/lib/netdata \
-        /var/log/netdata && \
-    chown -R netdata:netdata /var/lib/netdata/cloud.d && \
-    chmod 0700 /var/lib/netdata/cloud.d && \
-    chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
+    chown -R ${NETDATA_UID}:${NETDATA_GID} /var/lib/netdata/cloud.d && \
     for name in cgroup-network \
                 local-listeners \
                 apps.plugin \
@@ -142,11 +170,8 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 otel-plugin \
                 otel-signal-viewer-plugin \
                 systemd-journal.plugin; do \
-        [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
+        [ -f "/usr/libexec/netdata/plugins.d/$name" ] && test $(stat -c %a "/usr/libexec/netdata/plugins.d/$name") = "4755"; \
     done && \
-    # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
-    find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
-    find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
     cp -va /etc/netdata /etc/netdata.stock
 
 ENTRYPOINT ["/usr/sbin/run.sh"]
