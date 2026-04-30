@@ -45,7 +45,7 @@
             description: "Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to."
             required: true
             detailed_description: |
-              In Microsoft Teams the channel name is encoded in the URI after `/IncomingWebhook/`. You can define multiple channels like this: `CHANNEL1` `CHANNEL2`.
+              In Microsoft Teams the channel name is encoded in the URI after `/IncomingWebhook/`. You must replace the encoded channel name in `MSTEAMS_WEBHOOK_URL` with the literal placeholder `CHANNEL`. At runtime, the notification system replaces `CHANNEL` in the webhook URL with the channel name from `DEFAULT_RECIPIENT_MSTEAMS` or `role_recipients_msteams`. You can define multiple channels like this: `CHANNEL1` `CHANNEL2`.
 
               All roles will default to this variable if left unconfigured.
 
@@ -58,6 +58,10 @@
               role_recipients_msteams[proxyadmin]="CHANNEL5"
               role_recipients_msteams[sitemgr]="CHANNEL6"
               ```
+
+              **Power Automate workflows:** If you are using a Power Automate workflow URL instead of a native Teams webhook, the URL format is different (for example `https://prod-XX.westus.logic.azure.com:443/workflows/...`) and does not contain an encoded channel name. In this case, set `DEFAULT_RECIPIENT_MSTEAMS` to any non-empty descriptive string (for example `alerts` or `powerautomate`). The notification system substitutes the recipient value for the literal string `CHANNEL` in the webhook URL; if `CHANNEL` does not appear in the URL, the URL is used as-is and the recipient value serves as a label.
+
+              For per-role routing with Power Automate, add `&channel=CHANNEL` as a query parameter to the workflow URL so the substitution mechanism works, then use distinct channel names per role in `role_recipients_msteams`.
       examples:
         folding:
           enabled: true
@@ -74,6 +78,17 @@
               SEND_MSTEAMS="YES"
               MSTEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/IncomingWebhook/CHANNEL/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
               DEFAULT_RECIPIENT_MSTEAMS="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+          - name: 'Power Automate Configuration'
+            folding:
+              enabled: true
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # Microsoft Teams via Power Automate workflow
+
+              SEND_MSTEAMS="YES"
+              MSTEAMS_WEBHOOK_URL="https://prod-XX.westus.logic.azure.com:443/workflows/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+              DEFAULT_RECIPIENT_MSTEAMS="alerts"
   troubleshooting:
     problems:
       list: []
