@@ -10,4 +10,6 @@
 [% include 'overview/authentication.md' %]
 [% elif entry.integration_type == 'logs' %]
 [% include 'overview/logs.md' %]
+[% elif entry.integration_type == 'service_discovery' %]
+[% include 'overview/service_discovery.md' %]
 [% endif %]
