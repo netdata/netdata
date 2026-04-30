@@ -159,7 +159,7 @@ bool websocket_thread_send_command(WEBSOCKET_THREAD *wth, uint8_t cmd, uint32_t 
 }
 
 bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opcode, const char *message) {
-    if(!wth || wth->cmd.pipe[PIPE_WRITE] == -1) {
+    if(!wth || !message || wth->cmd.pipe[PIPE_WRITE] == -1) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to send command - pipe is not initialized", wth ? wth->id : 0);
         return false;
     }
