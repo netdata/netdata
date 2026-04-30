@@ -44,6 +44,12 @@ Netdata v2.3.0 introduces two alerts specific to permanent nodes:
 | `streaming_never_connected` | A permanent node has never connected to a Parent.       |
 | `streaming_disconnected`    | A previously connected permanent node has disconnected. |
 
+:::note
+
+These alerts are configured with `to: silent` by default — they trigger but do not send notifications. To receive notifications, override the alert recipient in a custom `health.d/streaming.conf` (e.g., set `to: sysadmin`), or enable [Centralized Cloud Notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md) for your Space. These alerts apply only to permanent child nodes on Parent nodes. Standalone Agents (no Parent) rely on Cloud's MQTT keepalive for offline detection.
+
+:::
+
 ## Automatic Node Instance Cleanup in Netdata Cloud
 
 Netdata Cloud automatically removes inactive nodes to keep your dashboards clean and organized.
