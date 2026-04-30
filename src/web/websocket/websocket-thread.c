@@ -141,11 +141,12 @@ bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opc
         return false;
     }
 
-    uint32_t message_len = strlen(message);
-    if(message_len > WS_MAX_OUTGOING_FRAME_SIZE) {
-        netdata_log_error("WEBSOCKET[%zu]: Broadcast message too large: %u bytes", wth ? wth->id : 0, message_len);
+    size_t message_len_sz = strlen(message);
+    if(message_len_sz > UINT32_MAX || message_len_sz > WS_MAX_OUTGOING_FRAME_SIZE) {
+        netdata_log_error("WEBSOCKET[%zu]: Broadcast message too large: %zu bytes", wth ? wth->id : 0, message_len_sz);
         return false;
     }
+    uint32_t message_len = (uint32_t)message_len_sz;
 
     // Prepare command
     struct pipe_header header = {
