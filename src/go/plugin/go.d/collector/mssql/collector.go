@@ -50,12 +50,13 @@ func New() *Collector {
 
 		charts: instanceCharts.Copy(),
 
-		seenDatabases:      make(map[string]bool),
-		seenWaitTypes:      make(map[string]bool),
-		seenLockTypes:      make(map[string]bool),
-		seenLockStatsTypes: make(map[string]bool),
-		seenJobs:           make(map[string]bool),
-		seenReplications:   make(map[string]bool),
+		seenDatabases:        make(map[string]bool),
+		seenDatabasesWithLog: make(map[string]bool),
+		seenWaitTypes:        make(map[string]bool),
+		seenLockTypes:        make(map[string]bool),
+		seenLockStatsTypes:   make(map[string]bool),
+		seenJobs:             make(map[string]bool),
+		seenReplications:     make(map[string]bool),
 
 		seenAGs:                make(map[string]bool),
 		seenAGReplicas:         make(map[string]bool),
@@ -155,12 +156,13 @@ type Collector struct {
 
 	version string
 
-	seenDatabases      map[string]bool
-	seenWaitTypes      map[string]bool
-	seenLockTypes      map[string]bool
-	seenLockStatsTypes map[string]bool
-	seenJobs           map[string]bool
-	seenReplications   map[string]bool
+	seenDatabases        map[string]bool
+	seenDatabasesWithLog map[string]bool
+	seenWaitTypes        map[string]bool
+	seenLockTypes        map[string]bool
+	seenLockStatsTypes   map[string]bool
+	seenJobs             map[string]bool
+	seenReplications     map[string]bool
 
 	hadrEnabled  bool // true if Always On AG is enabled on this instance
 	hadrChecked  bool // true after the HADR check has been performed

@@ -141,6 +141,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
+cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
 option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
 cmake_dependent_option(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER "Enable OTel signal viewer plugin" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
@@ -3354,17 +3355,19 @@ if(ENABLE_PLUGIN_GO)
             DESTINATION usr/libexec/netdata/plugins.d)
 
     # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
-    if (OS_WINDOWS)
-        set(ND_MCP_NAME nd-mcp.exe)
-    else()
-        set(ND_MCP_NAME nd-mcp)
-    endif()
+    if(ENABLE_ND_MCP)
+        if (OS_WINDOWS)
+            set(ND_MCP_NAME nd-mcp.exe)
+        else()
+            set(ND_MCP_NAME nd-mcp)
+        endif()
 
-    add_go_target(nd-mcp-target ${ND_MCP_NAME} src/web/mcp/bridges/stdio-golang .)
-    install(PROGRAMS
-            ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
-            COMPONENT plugin-go
-            DESTINATION "${BINDIR}")
+        add_go_target(nd-mcp-target ${ND_MCP_NAME} src/web/mcp/bridges/stdio-golang .)
+        install(PROGRAMS
+                ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
+                COMPONENT plugin-go
+                DESTINATION "${BINDIR}")
+    endif()
 endif()
 
 #

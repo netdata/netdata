@@ -86,6 +86,12 @@
 - Chore: bootstrap repo for cross-tool AI agent compatibility ([#22295](https://github.com/netdata/netdata/issues/22295))
 - Fix memory-safety and correctness bugs surfaced by Coverity audit (part 8) ([#22293](https://github.com/netdata/netdata/issues/22293))
 - Fix ARAL double-free race ([#22294](https://github.com/netdata/netdata/issues/22294))
+- Agents: add coverity-audit, sonarqube-audit, graphql-audit skills ([#22296](https://github.com/netdata/netdata/issues/22296))
+- Fix(diskspace): initialize mountpoint state before slow worker ([#22298](https://github.com/netdata/netdata/issues/22298))
+- Add missing memory metrics (windows.plugin) ([#22164](https://github.com/netdata/netdata/issues/22164))
+- Docs: add Docker container update instructions ([#22311](https://github.com/netdata/netdata/issues/22311))
+- Docs: add Log sources section to Logs tab documentation ([#22312](https://github.com/netdata/netdata/issues/22312))
+- Fix(packaging): Reduce docker image size by setting the permission bits in the builder stage ([#21902](https://github.com/netdata/netdata/issues/21902))
 
 ## [2.10.0] - 2026-04-09
 
