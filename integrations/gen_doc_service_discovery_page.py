@@ -84,7 +84,7 @@ services:
         "notes": [
             "`disabled: yes` keeps the file on disk but turns the pipeline off.",
             "Editing a stock file requires restarting the agent. UI-managed pipelines apply live.",
-            "Stock files for `docker`, `http`, `net_listeners`, and `snmp` ship with Netdata. The `k8s` stock file ships in the [Netdata Helm chart](https://github.com/netdata/helmchart) — use the UI on non-Helm Kubernetes deployments.",
+            "Where each discoverer's stock conf ships (with the Netdata package, with the Helm chart, or not at all) is documented on its per-discoverer page.",
         ],
     },
     "rule_eval": {
@@ -221,7 +221,7 @@ services:
     "mixing": {
         "heading": "## Mixing discoverers",
         "body": [
-            "All five discoverers can run simultaneously. Each `/etc/netdata/go.d/sd/<kind>.conf` is independent. The same target can theoretically be discovered by more than one discoverer (for example, a containerised application appears in both `docker` and `net_listeners`); each discoverer's pipeline is independent and may produce its own job.",
+            "All discoverers can run simultaneously. Each `/etc/netdata/go.d/sd/<kind>.conf` is independent. The same target can theoretically be discovered by more than one discoverer (for example, a containerised application appears in both `docker` and `net_listeners`); each discoverer's pipeline is independent and may produce its own job.",
             "Use `disabled: yes` at the top of a stock file to keep it on disk but turn the pipeline off.",
             "UI-managed pipelines and file-based pipelines coexist. UI-managed pipelines apply live; file-based pipelines require an agent restart to reload.",
         ],
@@ -331,30 +331,20 @@ def get_jinja_env():
     return _jinja_env
 
 
-# Hand-curated short summary for the discoverers table.
-# Per-discoverer metadata can override these via `meta.tagline` if we add that field later.
-DISCOVERER_TAGLINES = {
-    "net_listeners": "Local processes that listen on TCP/UDP ports.",
-    "docker": "Running containers on the local Docker daemon.",
-    "http": "Items returned by an HTTP/HTTPS endpoint (JSON or YAML).",
-    "k8s": "Pods and services in a Kubernetes cluster.",
-    "snmp": "SNMP-capable devices on configured network subnets.",
-}
-
-
 def build_discoverers_context(integrations: Any) -> List[Dict[str, str]]:
     items = []
     for integ in collect_sd_integrations(integrations):
         meta = integ.get("meta", {})
         kind = meta.get("kind", "")
         name = meta.get("name", "")
+        tagline = meta.get("tagline", "")
         readme_link = get_sd_readme_link(integ)
         items.append({
             "name": name,
             "kind": kind,
             "config_file": f"/etc/netdata/go.d/sd/{kind}.conf",
             "name_link": f'[{name}]({readme_link})' if readme_link else name,
-            "tagline": DISCOVERER_TAGLINES.get(kind, "See per-discoverer page."),
+            "tagline": tagline,
         })
     return items
 

@@ -26,6 +26,10 @@
           "type": "string",
           "description": "Display name shown in docs, sidebar, and the SD hub page."
         },
+        "tagline": {
+          "type": "string",
+          "description": "One-line summary of what this discoverer finds, used in the SD hub page table. Should fit on one line in a markdown table cell."
+        },
         "link": {
           "type": "string",
           "description": "Reference link for the underlying technology or protocol (Wikipedia page, vendor page, RFC, etc.)."
@@ -35,7 +39,7 @@
           "description": "Icon filename hosted at https://netdata.cloud/img/."
         }
       },
-      "required": ["kind", "name", "link", "icon_filename"]
+      "required": ["kind", "name", "tagline", "link", "icon_filename"]
     },
     "overview": {
       "type": "object",

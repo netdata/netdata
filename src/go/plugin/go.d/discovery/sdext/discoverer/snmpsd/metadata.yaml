@@ -4,6 +4,7 @@ id: 'service-discovery-snmp'
 meta:
   kind: 'snmp'
   name: 'SNMP'
+  tagline: 'SNMP-capable devices on configured network subnets.'
   link: 'https://en.wikipedia.org/wiki/Simple_Network_Management_Protocol'
   icon_filename: 'SNMP.png'
 keywords:

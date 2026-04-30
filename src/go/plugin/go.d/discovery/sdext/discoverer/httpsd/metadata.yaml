@@ -4,6 +4,7 @@ id: 'service-discovery-http'
 meta:
   kind: 'http'
   name: 'HTTP endpoint'
+  tagline: 'Items returned by an HTTP/HTTPS endpoint (JSON or YAML).'
   link: 'https://datatracker.ietf.org/doc/html/rfc9110'
   icon_filename: 'http.svg'
 keywords:

@@ -42,7 +42,7 @@ services:
 
 - `disabled: yes` keeps the file on disk but turns the pipeline off.
 - Editing a stock file requires restarting the agent. UI-managed pipelines apply live.
-- Stock files for `docker`, `http`, `net_listeners`, and `snmp` ship with Netdata. The `k8s` stock file ships in the [Netdata Helm chart](https://github.com/netdata/helmchart) — use the UI on non-Helm Kubernetes deployments.
+- Where each discoverer's stock conf ships (with the Netdata package, with the Helm chart, or not at all) is documented on its per-discoverer page.
 
 
 ## Rule evaluation semantics
@@ -168,7 +168,7 @@ Each discoverer has its own page covering its options, target variables, evaluat
 
 ## Mixing discoverers
 
-All five discoverers can run simultaneously. Each `/etc/netdata/go.d/sd/<kind>.conf` is independent. The same target can theoretically be discovered by more than one discoverer (for example, a containerised application appears in both `docker` and `net_listeners`); each discoverer's pipeline is independent and may produce its own job.
+All discoverers can run simultaneously. Each `/etc/netdata/go.d/sd/<kind>.conf` is independent. The same target can theoretically be discovered by more than one discoverer (for example, a containerised application appears in both `docker` and `net_listeners`); each discoverer's pipeline is independent and may produce its own job.
 
 Use `disabled: yes` at the top of a stock file to keep it on disk but turn the pipeline off.
 

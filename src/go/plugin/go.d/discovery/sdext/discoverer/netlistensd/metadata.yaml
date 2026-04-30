@@ -4,6 +4,7 @@ id: 'service-discovery-net_listeners'
 meta:
   kind: 'net_listeners'
   name: 'Local listening processes'
+  tagline: 'Local processes that listen on TCP/UDP ports.'
   link: 'https://en.wikipedia.org/wiki/Berkeley_sockets'
   icon_filename: 'netdata.png'
 keywords:

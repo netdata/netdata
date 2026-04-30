@@ -4,6 +4,7 @@ id: 'service-discovery-docker'
 meta:
   kind: 'docker'
   name: 'Docker'
+  tagline: 'Running containers on the local Docker daemon.'
   link: 'https://www.docker.com/'
   icon_filename: 'docker.svg'
 keywords:

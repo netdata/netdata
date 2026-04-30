@@ -4,6 +4,7 @@ id: 'service-discovery-k8s'
 meta:
   kind: 'k8s'
   name: 'Kubernetes'
+  tagline: 'Pods and services in a Kubernetes cluster.'
   link: 'https://kubernetes.io/'
   icon_filename: 'kubernetes.svg'
 keywords:
