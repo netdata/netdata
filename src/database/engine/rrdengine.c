@@ -1221,10 +1221,8 @@ static time_t find_uuid_first_time(
                     continue;
 
                 any_matching = true;
-                if (journal_search_start >= journal_metric_count) {
-                    not_matching_bsearches += (count - index);
+                if (journal_search_start >= journal_metric_count)
                     break;
-                }
 
                 struct journal_metric_list *live_entry = &uuid_list[journal_search_start];
                 // Check if we avoid bsearch
@@ -1245,10 +1243,8 @@ static time_t find_uuid_first_time(
                 size_t found_index = live_entry - uuid_list;
                 journal_search_start = found_index + 1; // Next search starts after this match
 
-                if (journal_search_start >= journal_metric_count) {
-                    not_matching_bsearches += (count - index - 1);
+                if (journal_search_start >= journal_metric_count)
                     break;
-                }
 
                 uuid_original_entry->pages_found += live_entry->entries;
                 uuid_original_entry->df_matched++;
@@ -1268,7 +1264,6 @@ static time_t find_uuid_first_time(
                 }
             }
         } else {
-            nd_log_daemon(NDLP_ERR, "DBENGINE: failed to access journalfile \"%s\", skipping it", file_path);
             journal_access_failed = true;
         }
 
