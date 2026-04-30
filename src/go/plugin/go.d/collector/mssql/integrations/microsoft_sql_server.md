@@ -425,11 +425,13 @@ jobs:
 
 ## Alerts
 
+
 The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ mssql_database_log_percent_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf) | mssql.database_log_percent_used | SQL Server transaction log percent used has been above 90% for the last 15 minutes |
+
 
 ## Metrics
 
@@ -1064,4 +1066,6 @@ Ensure SQL Server is configured for mixed mode authentication if using SQL login
 
 The monitoring user needs VIEW SERVER STATE permission.
 Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
+
+
 
