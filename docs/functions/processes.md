@@ -6,6 +6,7 @@
 - **Type**: Simple Table (real-time snapshot)
 - **Availability**: Linux, Windows, FreeBSD, macOS
 - **Required Access**: View Agent Config for command line visibility
+- **Requires Netdata Cloud**: Yes
 
 ### System Equivalents
 
@@ -226,6 +227,7 @@ Use full-text search in `CmdLine` to find processes launched with specific param
 - **Data Type**: Real-time snapshot (no historical data)
 - **Child Processes**: Only terminated children are accumulated; running children appear separately
 - **Platform Variations**: Some fields may not be available on all operating systems (e.g., certain I/O metrics on macOS)
+- **Netdata Cloud**: This function requires Netdata Cloud to execute. For details, see [Why are some functions only available on Netdata Cloud?](/docs/top-monitoring-netdata-functions.md#why-are-some-functions-only-available-on-netdata-cloud)
 
 ## Related Functions
 
