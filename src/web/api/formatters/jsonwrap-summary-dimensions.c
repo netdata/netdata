@@ -1,4 +1,4 @@
-    // SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "jsonwrap.h"
 #include "jsonwrap-internal.h"
@@ -134,6 +134,8 @@ void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const cha
             k = rrdmetric_acquired_name(rma);
             if(unlikely(!k || !*k))
                 k = rrdmetric_acquired_id(rma);
+            if(unlikely(!k || !*k))
+                continue;
             id = k;
             name = k;
         }
@@ -147,8 +149,6 @@ void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const cha
         }
 
         z = dictionary_set(dict, k, NULL, sizeof(*z));
-        if(unlikely(!z))
-            continue;
         if(!z->id) {
             z->id = id;
             z->name = name;
