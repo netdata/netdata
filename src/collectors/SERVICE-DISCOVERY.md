@@ -159,6 +159,10 @@ Each discoverer has its own page covering its options, target variables, evaluat
 
 | Discoverer | Kind | Stock conf | Discovers |
 |:-----------|:-----|:-----------|:----------|
+| [Docker](/src/go/plugin/go.d/discovery/sdext/discoverer/dockersd/README.md) | `docker` | `/etc/netdata/go.d/sd/docker.conf` | Running containers on the local Docker daemon. |
+| [HTTP endpoint](/src/go/plugin/go.d/discovery/sdext/discoverer/httpsd/README.md) | `http` | `/etc/netdata/go.d/sd/http.conf` | Items returned by an HTTP/HTTPS endpoint (JSON or YAML). |
+| [Kubernetes](/src/go/plugin/go.d/discovery/sdext/discoverer/k8ssd/README.md) | `k8s` | `/etc/netdata/go.d/sd/k8s.conf` | Pods and services in a Kubernetes cluster. |
+| [Local listening processes](/src/go/plugin/go.d/discovery/sdext/discoverer/netlistensd/README.md) | `net_listeners` | `/etc/netdata/go.d/sd/net_listeners.conf` | Local processes that listen on TCP/UDP ports. |
 | [SNMP](/src/go/plugin/go.d/discovery/sdext/discoverer/snmpsd/README.md) | `snmp` | `/etc/netdata/go.d/sd/snmp.conf` | SNMP-capable devices on configured network subnets. |
 
 
