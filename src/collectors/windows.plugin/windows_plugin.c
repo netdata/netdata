@@ -116,7 +116,7 @@ static struct proc_module {
      .func = do_PerflibSMB,
      .rd = NULL,
      .thread = NULL,
-     .cleanup = NULL},
+     .cleanup = do_PerflibSMB_cleanup},
     {.name = "PerflibObjects",
      .dim = "PerflibObjects",
      .enabled = CONFIG_BOOLEAN_YES,

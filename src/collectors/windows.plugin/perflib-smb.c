@@ -275,6 +275,12 @@ static bool do_smb_server_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
     return true;
 }
 
+void do_PerflibSMB_cleanup(void)
+{
+    dictionary_destroy(smb_shares);
+    smb_shares = NULL;
+}
+
 int do_PerflibSMB(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
