@@ -74,6 +74,69 @@ Replace:
 $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "netdata-x64.msi"; msiexec /qn /i netdata-x64.msi TOKEN=<YOUR_TOKEN> ROOMS=<YOUR_ROOMS>
 ```
 
+## Configuring as a Child Agent (Streaming)
+
+After installing the Windows Agent, you can configure it to stream metrics to a parent Netdata node instead of (or in addition to) connecting directly to Netdata Cloud.
+
+### Edit stream.conf
+
+On Windows, the streaming configuration file is located at:
+
+```
+C:\Program Files\Netdata\etc\netdata\stream.conf
+```
+
+Edit it in an elevated PowerShell session:
+
+```powershell
+notepad "C:\Program Files\Netdata\etc\netdata\stream.conf"
+```
+
+Add or update the `[stream]` section:
+
+```ini
+[stream]
+    enabled = yes
+    destination = PARENT_IP_ADDRESS:19999
+    api key = YOUR-API-KEY-HERE
+```
+
+Replace `PARENT_IP_ADDRESS` with the IP or hostname of your parent Netdata node, and `YOUR-API-KEY-HERE` with the API key configured on the parent.
+
+:::note
+
+The API key must match between the child's `stream.conf` and the parent's `[API_KEY]` section. Generate one on the parent with `uuidgen`. For advanced options (SSL, multiple parents, buffer sizing), see the [Parent-Child Configuration Reference](src/streaming/README.md).
+
+:::
+
+### Restart the Netdata Service
+
+After editing `stream.conf`, restart the Netdata Windows service:
+
+```powershell
+Restart-Service netdata
+```
+
+### End-to-End Silent Install with Streaming
+
+The following PowerShell script combines silent installation with streaming configuration:
+
+```powershell
+$ProgressPreference = 'SilentlyContinue'
+Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "netdata-x64.msi"
+msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
+
+$streamConf = "C:\Program Files\Netdata\etc\netdata\stream.conf"
+$streamContent = @"
+[stream]
+    enabled = yes
+    destination = 203.0.113.10:19999
+    api key = 11111111-2222-3333-4444-555555555555
+"@
+Set-Content -Path $streamConf -Value $streamContent -Force
+Restart-Service netdata
+```
+
 ## Graphical Installation (GUI)
 
 1. Download the `.msi` installer.
