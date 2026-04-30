@@ -175,9 +175,15 @@ modules:
     setup:
       prerequisites:
         list:
-          - title: Enable monitoring interface
+          - title: Set up ODBC connectivity to IBM i SQL services
             description: |
-              Ensure the IBM i (AS/400) monitoring interface is accessible.
+              The collector queries IBM i SQL services (such as `QSYS2.SYSTEM_STATUS()`, `QSYS2.ACTIVE_JOB_INFO()`, and `QSYS2.SYSDISKSTAT`) through an ODBC connection. To make this interface accessible:
+
+              1. Ensure your IBM i system runs version 7.2 or later with SQL services enabled.
+              2. Install **unixODBC** 2.3 or later on the Netdata Agent host.
+              3. Install the **IBM i Access Client Solutions** ODBC driver on the Netdata Agent host.
+              4. Configure an ODBC DSN or connection string pointing to your IBM i system.
+              5. Verify connectivity by running an ODBC test query against the IBM i host.
       configuration:
         file:
           name: ibm.d/as400.conf
