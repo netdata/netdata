@@ -325,12 +325,10 @@ struct aral_concurrency_race_hook {
 
 static struct aral_concurrency_race_hook aral_concurrency_race_hook = { 0 };
 
-#ifdef NETDATA_INTERNAL_CHECKS
 // Counter incremented every time aral_claim_page_pointer_after_element___wait_for_unmark
 // enters the cold path (i.e. observed UNMARKING in the trailer). Tests poll
 // this to verify they actually exercised the cold path before completing.
 static size_t aral_freez_unmarking_observed_count = 0;
-#endif
 
 // Arm the concurrency race hook for a (ar, ptr, stage) match.
 // Sets the match fields first, then publishes `enabled = true` with a
@@ -2153,14 +2151,11 @@ static int aral_concurrency_test_unmark_last_marked_on_page(void) {
     ARAL *ar = aral_create("aral-conc-7", sizeof(struct aral_unittest_entry),
                            0, 0, NULL, "aral-conc-7", NULL, false, false, false);
 
-    // Allocate two unmarked items first to keep used_elements > 0 after we
-    // unmark the marked item (otherwise the page becomes empty).
-    struct aral_unittest_entry *u1 = aral_mallocz(ar);
-    *u1 = UNITTEST_ITEM;
-    struct aral_unittest_entry *u2 = aral_mallocz(ar);
-    *u2 = UNITTEST_ITEM;
-
-    // Allocate one marked item (this is the only marked one).
+    // Single marked allocation. After unmarking, marked_elements drops to 0
+    // while used_elements stays at 1 (unmarking does not free the slot), which
+    // triggers the unmark branch in aral_unmark_allocation that takes
+    // aral_lock and moves the page from the marked-pages list to the
+    // unmarked-pages list.
     struct aral_unittest_entry *m1 = aral_mallocz_marked(ar);
     *m1 = UNITTEST_ITEM;
 
@@ -2184,8 +2179,6 @@ static int aral_concurrency_test_unmark_last_marked_on_page(void) {
         errors++;
     }
 
-    aral_freez(ar, u1);
-    aral_freez(ar, u2);
     aral_freez(ar, m1);
     aral_destroy(ar);
     return errors;
