@@ -1812,6 +1812,67 @@ static ARAL_PAGE *aral_concurrency_test_decode(ARAL *ar, void *ptr, bool *marked
     return aral_decode_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, tagged, marked);
 }
 
+// Common setup for tests that need a marked guard and a marked test entry on
+// the same page. Captures used/marked counters at setup time so each test can
+// verify the expected delta after its scenario runs.
+struct aral_concurrency_test_fixture {
+    ARAL *ar;
+    struct aral_unittest_entry *guard;
+    struct aral_unittest_entry *entry;
+    ARAL_PAGE *page;
+    uint32_t used0;
+    uint32_t marked0;
+};
+
+// Initialize the fixture. Returns true on success. On failure (guard/entry
+// landed on different pages), the aral and allocations are torn down and
+// false is returned; the caller should bubble up an error.
+static bool aral_concurrency_test_fixture_init(struct aral_concurrency_test_fixture *f, const char *name) {
+    f->ar = aral_create(name, sizeof(struct aral_unittest_entry),
+                        0, 0, NULL, name, NULL, false, false, false);
+
+    // Guard is allocated marked so it lives on the same (marked) page as the
+    // test entry. Marked and unmarked allocations use separate page lists.
+    f->guard = aral_mallocz_marked(f->ar);
+    *f->guard = UNITTEST_ITEM;
+
+    f->entry = aral_mallocz_marked(f->ar);
+    *f->entry = UNITTEST_ITEM;
+
+    bool m = false;
+    f->page = aral_concurrency_test_decode(f->ar, f->entry, &m);
+    bool gm = false;
+    ARAL_PAGE *guard_page = aral_concurrency_test_decode(f->ar, f->guard, &gm);
+    if(guard_page != f->page) {
+        fprintf(stderr, "    setup: guard and entry are not on the same page (guard=%p entry=%p)\n",
+                (void*)guard_page, (void*)f->page);
+        aral_freez(f->ar, f->entry);
+        aral_freez(f->ar, f->guard);
+        aral_destroy(f->ar);
+        return false;
+    }
+    f->used0 = f->page->page_lock.used_elements;
+    f->marked0 = f->page->page_lock.marked_elements;
+    return true;
+}
+
+// Teardown when the test entry was already freed by the scenario.
+// Frees the guard, destroys the aral, resets the concurrency hook.
+static void aral_concurrency_test_fixture_teardown(struct aral_concurrency_test_fixture *f) {
+    aral_freez(f->ar, f->guard);
+    aral_destroy(f->ar);
+    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+}
+
+// Teardown when the test entry is still allocated (e.g. failure path before
+// the scenario could free it). Frees both entry and guard.
+static void aral_concurrency_test_fixture_teardown_with_entry(struct aral_concurrency_test_fixture *f) {
+    aral_freez(f->ar, f->entry);
+    aral_freez(f->ar, f->guard);
+    aral_destroy(f->ar);
+    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+}
+
 // Test 1: clean unmark on a marked allocation. No concurrency.
 // Expects: marked counter -1, used counter unchanged, slot trailer becomes UNMARKED.
 static int aral_concurrency_test_clean_unmark(void) {
@@ -1893,45 +1954,24 @@ static int aral_concurrency_test_clean_freez_marked(void) {
     int errors = 0;
     fprintf(stderr, "  test 3: clean freez of a marked allocation\n");
 
-    ARAL *ar = aral_create("aral-conc-3", sizeof(struct aral_unittest_entry),
-                           0, 0, NULL, "aral-conc-3", NULL, false, false, false);
+    struct aral_concurrency_test_fixture f;
+    if(!aral_concurrency_test_fixture_init(&f, "aral-conc-3"))
+        return 1;
 
-    struct aral_unittest_entry *guard = aral_mallocz_marked(ar);
-    *guard = UNITTEST_ITEM;
+    aral_freez(f.ar, f.entry);
 
-    struct aral_unittest_entry *entry = aral_mallocz_marked(ar);
-    *entry = UNITTEST_ITEM;
-
-    bool m = false;
-    ARAL_PAGE *page = aral_concurrency_test_decode(ar, entry, &m);
-    bool gm = false;
-    ARAL_PAGE *guard_page = aral_concurrency_test_decode(ar, guard, &gm);
-    if(guard_page != page) {
-        fprintf(stderr, "    setup: guard and entry are not on the same page (guard=%p entry=%p)\n",
-                (void*)guard_page, (void*)page);
-        aral_freez(ar, entry);
-        aral_freez(ar, guard);
-        aral_destroy(ar);
-        return errors + 1;
-    }
-    uint32_t used0 = page->page_lock.used_elements;
-    uint32_t marked0 = page->page_lock.marked_elements;
-
-    aral_freez(ar, entry);
-
-    if(page->page_lock.used_elements != used0 - 1) {
+    if(f.page->page_lock.used_elements != f.used0 - 1) {
         fprintf(stderr, "    used_elements: %u -> %u (expected %u)\n",
-                used0, page->page_lock.used_elements, used0 - 1);
+                f.used0, f.page->page_lock.used_elements, f.used0 - 1);
         errors++;
     }
-    if(page->page_lock.marked_elements != marked0 - 1) {
+    if(f.page->page_lock.marked_elements != f.marked0 - 1) {
         fprintf(stderr, "    marked_elements: %u -> %u (expected %u)\n",
-                marked0, page->page_lock.marked_elements, marked0 - 1);
+                f.marked0, f.page->page_lock.marked_elements, f.marked0 - 1);
         errors++;
     }
 
-    aral_freez(ar, guard);
-    aral_destroy(ar);
+    aral_concurrency_test_fixture_teardown(&f);
     return errors;
 }
 
@@ -1952,47 +1992,21 @@ static int aral_concurrency_test_freez_wins(void) {
     int errors = 0;
     fprintf(stderr, "  test 4: race - freez wins claim before unmark CAS\n");
 
-    ARAL *ar = aral_create("aral-conc-4", sizeof(struct aral_unittest_entry),
-                           0, 0, NULL, "aral-conc-4", NULL, false, false, false);
-
-    // Guard is allocated marked so it lives on the same (marked) page as
-    // the test entry. Marked and unmarked allocations use separate page
-    // lists, so an unmarked guard would not keep the tested page alive.
-    struct aral_unittest_entry *guard = aral_mallocz_marked(ar);
-    *guard = UNITTEST_ITEM;
-
-    struct aral_unittest_entry *entry = aral_mallocz_marked(ar);
-    *entry = UNITTEST_ITEM;
-
-    bool m = false;
-    ARAL_PAGE *page = aral_concurrency_test_decode(ar, entry, &m);
-    bool gm = false;
-    ARAL_PAGE *guard_page = aral_concurrency_test_decode(ar, guard, &gm);
-    if(guard_page != page) {
-        fprintf(stderr, "    setup: guard and entry are not on the same page (guard=%p entry=%p)\n",
-                (void*)guard_page, (void*)page);
-        aral_freez(ar, entry);
-        aral_freez(ar, guard);
-        aral_destroy(ar);
-        return errors + 1;
-    }
-    uint32_t used0 = page->page_lock.used_elements;
-    uint32_t marked0 = page->page_lock.marked_elements;
+    struct aral_concurrency_test_fixture f;
+    if(!aral_concurrency_test_fixture_init(&f, "aral-conc-4"))
+        return 1;
 
     aral_concurrency_race_hook = (struct aral_concurrency_race_hook){
-        .ar = ar, .target_ptr = entry,
+        .ar = f.ar, .target_ptr = f.entry,
         .stage = ARAL_CONCURRENCY_RACE_UNMARK_BEFORE_CAS, .enabled = true,
     };
 
-    struct aral_concurrency_test_args ctx = { ar, entry };
+    struct aral_concurrency_test_args ctx = { f.ar, f.entry };
     ND_THREAD *unmark_thread = nd_thread_create("UNMARK", NETDATA_THREAD_OPTION_DONT_LOG,
                                                 aral_concurrency_test_unmark_thread, &ctx);
     if(!unmark_thread) {
         fprintf(stderr, "    failed to create unmark thread\n");
-        aral_freez(ar, entry);
-        aral_freez(ar, guard);
-        aral_destroy(ar);
-        aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+        aral_concurrency_test_fixture_teardown_with_entry(&f);
         return errors + 1;
     }
 
@@ -2003,29 +2017,27 @@ static int aral_concurrency_test_freez_wins(void) {
 
     // Disable hook for the freez we are about to run (it would otherwise also pause).
     __atomic_store_n(&aral_concurrency_race_hook.enabled, false, __ATOMIC_RELAXED);
-    aral_freez(ar, entry);
+    aral_freez(f.ar, f.entry);
 
     __atomic_store_n(&aral_concurrency_race_hook.release, true, __ATOMIC_RELEASE);
     nd_thread_join(unmark_thread);
 
-    if(page->page_lock.used_elements != used0 - 1) {
+    if(f.page->page_lock.used_elements != f.used0 - 1) {
         fprintf(stderr, "    used_elements: %u -> %u (expected %u)\n",
-                used0, page->page_lock.used_elements, used0 - 1);
+                f.used0, f.page->page_lock.used_elements, f.used0 - 1);
         errors++;
     }
-    if(page->page_lock.marked_elements != marked0 - 1) {
+    if(f.page->page_lock.marked_elements != f.marked0 - 1) {
         fprintf(stderr, "    marked_elements: %u -> %u (expected %u; %u would mean unmark double-decremented)\n",
-                marked0, page->page_lock.marked_elements, marked0 - 1, marked0 - 2);
+                f.marked0, f.page->page_lock.marked_elements, f.marked0 - 1, f.marked0 - 2);
         errors++;
     }
 
-    aral_freez(ar, guard);
-    aral_destroy(ar);
-    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+    aral_concurrency_test_fixture_teardown(&f);
     return errors;
 }
 
-// Test 5: race - unmark wins the trailer transition, then freez runs.
+// Tests 5 and 6: race - unmark wins the trailer transition, then freez runs.
 // Pause unmark AFTER its trailer transition (UNMARKING on v2, UNMARKED on
 // master) but BEFORE the page-lock counter update. Run freez concurrently:
 // on v2 it should observe UNMARKING, restore, and spin until unmark publishes
@@ -2038,61 +2050,40 @@ static int aral_concurrency_test_freez_wins(void) {
 // exact race the v2 protocol closes.
 //
 // v2: counters end consistent: used -1, marked -1.
-static int aral_concurrency_test_unmark_wins_transition(void) {
+//
+// Test 5 sleeps 10ms before releasing unmark to let freez settle into its
+// cold-path spin; test 6 releases immediately to also catch regressions in
+// the very first iteration of the cold path.
+static int aral_concurrency_test_unmark_wins_impl(const char *aral_name, usec_t grace_us) {
     int errors = 0;
-    fprintf(stderr, "  test 5: race - unmark transitions trailer, freez races counter update\n");
 
-    ARAL *ar = aral_create("aral-conc-5", sizeof(struct aral_unittest_entry),
-                           0, 0, NULL, "aral-conc-5", NULL, false, false, false);
-
-    // Guard is allocated marked so it lives on the same (marked) page as
-    // the test entry. Marked and unmarked allocations use separate page
-    // lists, so an unmarked guard would not keep the tested page alive.
-    struct aral_unittest_entry *guard = aral_mallocz_marked(ar);
-    *guard = UNITTEST_ITEM;
-
-    struct aral_unittest_entry *entry = aral_mallocz_marked(ar);
-    *entry = UNITTEST_ITEM;
-
-    bool m = false;
-    ARAL_PAGE *page = aral_concurrency_test_decode(ar, entry, &m);
-    bool gm = false;
-    ARAL_PAGE *guard_page = aral_concurrency_test_decode(ar, guard, &gm);
-    if(guard_page != page) {
-        fprintf(stderr, "    setup: guard and entry are not on the same page (guard=%p entry=%p)\n",
-                (void*)guard_page, (void*)page);
-        aral_freez(ar, entry);
-        aral_freez(ar, guard);
-        aral_destroy(ar);
-        return errors + 1;
-    }
-    uint32_t used0 = page->page_lock.used_elements;
-    uint32_t marked0 = page->page_lock.marked_elements;
+    struct aral_concurrency_test_fixture f;
+    if(!aral_concurrency_test_fixture_init(&f, aral_name))
+        return 1;
 
     aral_concurrency_race_hook = (struct aral_concurrency_race_hook){
-        .ar = ar, .target_ptr = entry,
+        .ar = f.ar, .target_ptr = f.entry,
         .stage = ARAL_CONCURRENCY_RACE_UNMARK_AFTER_CAS, .enabled = true,
     };
 
-    struct aral_concurrency_test_args ctx = { ar, entry };
+    struct aral_concurrency_test_args ctx = { f.ar, f.entry };
     ND_THREAD *unmark_thread = nd_thread_create("UNMARK", NETDATA_THREAD_OPTION_DONT_LOG,
                                                 aral_concurrency_test_unmark_thread, &ctx);
     if(!unmark_thread) {
         fprintf(stderr, "    failed to create unmark thread\n");
-        aral_freez(ar, entry);
-        aral_freez(ar, guard);
-        aral_destroy(ar);
-        aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+        aral_concurrency_test_fixture_teardown_with_entry(&f);
         return errors + 1;
     }
 
     if(!aral_unittest_wait_for_flag(&aral_concurrency_race_hook.waiting, 5 * USEC_PER_SEC)) {
         fprintf(stderr, "    unmark thread did not pause after trailer transition\n");
         errors++;
+        __atomic_store_n(&aral_concurrency_race_hook.release, true, __ATOMIC_RELEASE);
+        nd_thread_join(unmark_thread);
+        aral_concurrency_test_fixture_teardown_with_entry(&f);
+        return errors;
     }
 
-    // Run freez in a separate thread so it can spin (waiting for unmark to
-    // publish the final state) while we release the paused unmark.
     __atomic_store_n(&aral_concurrency_race_hook.enabled, false, __ATOMIC_RELAXED);
     ND_THREAD *freez_thread = nd_thread_create("FREEZ", NETDATA_THREAD_OPTION_DONT_LOG,
                                                aral_concurrency_test_freez_thread, &ctx);
@@ -2102,121 +2093,40 @@ static int aral_concurrency_test_unmark_wins_transition(void) {
         nd_thread_join(unmark_thread);
         // unmark completed - it transitioned the slot to UNMARKED but did not
         // free it. We must free entry too.
-        aral_freez(ar, entry);
-        aral_freez(ar, guard);
-        aral_destroy(ar);
-        aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+        aral_concurrency_test_fixture_teardown_with_entry(&f);
         return errors + 1;
     }
 
-    // Give freez a moment to actually start spinning (best-effort; correctness
-    // does not depend on it).
-    sleep_usec(10 * USEC_PER_MS);
+    if(grace_us > 0)
+        sleep_usec(grace_us);
 
     __atomic_store_n(&aral_concurrency_race_hook.release, true, __ATOMIC_RELEASE);
     nd_thread_join(unmark_thread);
     nd_thread_join(freez_thread);
 
-    if(page->page_lock.used_elements != used0 - 1) {
+    if(f.page->page_lock.used_elements != f.used0 - 1) {
         fprintf(stderr, "    used_elements: %u -> %u (expected %u)\n",
-                used0, page->page_lock.used_elements, used0 - 1);
+                f.used0, f.page->page_lock.used_elements, f.used0 - 1);
         errors++;
     }
-    if(page->page_lock.marked_elements != marked0 - 1) {
+    if(f.page->page_lock.marked_elements != f.marked0 - 1) {
         fprintf(stderr, "    marked_elements: %u -> %u (expected %u)\n",
-                marked0, page->page_lock.marked_elements, marked0 - 1);
+                f.marked0, f.page->page_lock.marked_elements, f.marked0 - 1);
         errors++;
     }
 
-    aral_freez(ar, guard);
-    aral_destroy(ar);
-    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+    aral_concurrency_test_fixture_teardown(&f);
     return errors;
 }
 
-// Test 6: race - freez wins the page_lock after unmark CAS but before the
-// counter decrement. On v2 this is impossible because unmark holds the trailer
-// in UNMARKING and freez waits in the claim. On master this is the textbook
-// race; freez observes the trailer as UNMARKED and decrements used while
-// marked is still high.
-//
-// Same setup as test 5 but verifies the same end state under different timing
-// (no sleep before release). This catches the regression if the v2 cold-path
-// loop is broken.
+static int aral_concurrency_test_unmark_wins_transition(void) {
+    fprintf(stderr, "  test 5: race - unmark transitions trailer, freez races counter update\n");
+    return aral_concurrency_test_unmark_wins_impl("aral-conc-5", 10 * USEC_PER_MS);
+}
+
 static int aral_concurrency_test_unmark_wins_no_grace(void) {
-    int errors = 0;
     fprintf(stderr, "  test 6: race - same as test 5, no grace period before release\n");
-
-    ARAL *ar = aral_create("aral-conc-6", sizeof(struct aral_unittest_entry),
-                           0, 0, NULL, "aral-conc-6", NULL, false, false, false);
-
-    // Guard is allocated marked so it lives on the same (marked) page as
-    // the test entry. Marked and unmarked allocations use separate page
-    // lists, so an unmarked guard would not keep the tested page alive.
-    struct aral_unittest_entry *guard = aral_mallocz_marked(ar);
-    *guard = UNITTEST_ITEM;
-
-    struct aral_unittest_entry *entry = aral_mallocz_marked(ar);
-    *entry = UNITTEST_ITEM;
-
-    bool m = false;
-    ARAL_PAGE *page = aral_concurrency_test_decode(ar, entry, &m);
-    bool gm = false;
-    ARAL_PAGE *guard_page = aral_concurrency_test_decode(ar, guard, &gm);
-    if(guard_page != page) {
-        fprintf(stderr, "    setup: guard and entry are not on the same page (guard=%p entry=%p)\n",
-                (void*)guard_page, (void*)page);
-        aral_freez(ar, entry);
-        aral_freez(ar, guard);
-        aral_destroy(ar);
-        return errors + 1;
-    }
-    uint32_t used0 = page->page_lock.used_elements;
-    uint32_t marked0 = page->page_lock.marked_elements;
-
-    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){
-        .ar = ar, .target_ptr = entry,
-        .stage = ARAL_CONCURRENCY_RACE_UNMARK_AFTER_CAS, .enabled = true,
-    };
-
-    struct aral_concurrency_test_args ctx = { ar, entry };
-    ND_THREAD *unmark_thread = nd_thread_create("UNMARK", NETDATA_THREAD_OPTION_DONT_LOG,
-                                                aral_concurrency_test_unmark_thread, &ctx);
-    if(!unmark_thread) {
-        fprintf(stderr, "    failed to create unmark thread\n");
-        aral_freez(ar, entry);
-        aral_freez(ar, guard);
-        aral_destroy(ar);
-        aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
-        return errors + 1;
-    }
-
-    aral_unittest_wait_for_flag(&aral_concurrency_race_hook.waiting, 5 * USEC_PER_SEC);
-    __atomic_store_n(&aral_concurrency_race_hook.enabled, false, __ATOMIC_RELAXED);
-
-    ND_THREAD *freez_thread = nd_thread_create("FREEZ", NETDATA_THREAD_OPTION_DONT_LOG,
-                                               aral_concurrency_test_freez_thread, &ctx);
-    __atomic_store_n(&aral_concurrency_race_hook.release, true, __ATOMIC_RELEASE);
-
-    nd_thread_join(unmark_thread);
-    if(!freez_thread) {
-        fprintf(stderr, "    failed to create freez thread\n");
-        // unmark already ran and unmarked the slot; entry is still allocated
-        aral_freez(ar, entry);
-        aral_freez(ar, guard);
-        aral_destroy(ar);
-        aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
-        return errors + 1;
-    }
-    nd_thread_join(freez_thread);
-
-    if(page->page_lock.used_elements != used0 - 1) errors++;
-    if(page->page_lock.marked_elements != marked0 - 1) errors++;
-
-    aral_freez(ar, guard);
-    aral_destroy(ar);
-    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
-    return errors;
+    return aral_concurrency_test_unmark_wins_impl("aral-conc-6", 0);
 }
 
 // Test 7: unmark of the last marked element on a page triggers a list move
@@ -2626,10 +2536,6 @@ int aral_unittest(size_t elements) {
     aral_destroy(auc.ar);
 
     errors += aral_stress_test(2, elements, 10);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    errors += aral_unittest_concurrency();
-#endif
 
     int total_errors = auc.errors + errors;
     fprintf(stderr, "ARAL unittest: %s (%d errors)\n", total_errors ? "FAILED" : "PASSED", total_errors);
