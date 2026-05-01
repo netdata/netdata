@@ -234,3 +234,87 @@ For resource-constrained systems, consider these adjustments:
 | **Skipping Hosts and Charts**     | `hosts to skip from training`          | -                | Excludes specific child hosts from training. Default `!*` means no hosts are skipped.                                                    |
 |                                   | `charts to skip from training`         | -                | Excludes charts from anomaly detection. By default, Netdata-related charts are excluded.                                                 |
 | **Model Retention**               | `delete models older than`             | `1d` - `7d`      | How long old models are stored. Default `7d` removes unused models after seven days.                                                     |
+
+## Configuring Anomaly-Based Alerts
+
+Netdata's ML anomaly detection automatically covers **all collected metrics**, including custom Prometheus/OpenMetrics metrics. No additional ML configuration is needed for custom metrics — they are processed by the same k-means models as built-in system metrics.
+
+:::note
+
+If you have added custom Prometheus metrics, make sure the corresponding charts are not matched by the `charts to skip from training` pattern in `[ml]`. The default (`netdata.*`) only skips Netdata's internal charts.
+
+:::
+
+### Three Levels of Anomaly Alerting
+
+Netdata provides three levels of granularity for anomaly-based alerts. Each level requires a different approach:
+
+| Level            | What It Monitors                                  | Template Scope            |
+|------------------|---------------------------------------------------|---------------------------|
+| **Node-level**   | Overall anomaly rate across all metrics on the node | Single built-in template  |
+| **Per-chart**    | Aggregate anomaly rate for all dimensions of one chart | One template per chart context |
+| **Per-dimension** | Anomaly rate for each individual dimension within a chart | One template per chart context |
+
+#### Node-Level Alerts
+
+The node-level alert uses the built-in `anomaly_detection.anomaly_rate` chart. A default template (`ml_1min_node_ar`) ships in `health.d/ml.conf` but is set to `silent` — it triggers internally but does not send notifications.
+
+To enable node-level anomaly notifications:
+
+1. [Edit `netdata.conf`](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
+2. Add or modify a health configuration file (for example, create `health.d/ml_custom.conf` in your config directory) with the node-level template, changing `to: silent` to your desired notification role.
+3. [Restart Netdata](/docs/netdata-agent/start-stop-restart.md).
+
+Example node-level template from `health.d/ml.conf`:
+
+```text
+ template: ml_1min_node_ar
+       on: anomaly_detection.anomaly_rate
+    lookup: average -1m of anomaly_rate
+      calc: $this
+     units: %
+     every: 30s
+      warn: $this > 1
+       to: sysadmin
+```
+
+#### Per-Chart and Per-Dimension Alerts
+
+Per-chart and per-dimension anomaly alerts use the `anomaly-bit` lookup option in health templates. The `on:` line specifies a chart **context**, and the template applies only to charts matching that context.
+
+:::important
+
+Health templates match a specific chart context — there is **no wildcard "all charts" option**. To monitor anomaly rates for multiple custom metrics, you must create a separate template for each chart context.
+
+:::
+
+**Per-chart** — monitors the aggregate anomaly rate across all dimensions of a chart:
+
+```text
+template: ml_5min_registrations_total_chart
+      on: prometheus.registrations_total
+  lookup: average -5m anomaly-bit of *
+    calc: $this
+   units: %
+   every: 30s
+    warn: $this > 20
+     to: sysadmin
+```
+
+**Per-dimension** — monitors each dimension independently using `foreach *`:
+
+```text
+template: ml_5min_registrations_total_dims
+      on: prometheus.registrations_total
+  lookup: average -5m anomaly-bit foreach *
+    calc: $this
+   units: %
+   every: 30s
+    warn: $this > (($status >= $WARNING)  ? (5) : (20))
+    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+     to: sysadmin
+```
+
+To find the chart context for your custom metrics, hover over the date on any chart in the Netdata dashboard and look at the tooltip — the context appears after the comma (for example, `prometheus.registrations_total`).
+
+For more examples of `anomaly-bit` alert templates, see the commented examples in `health.d/ml.conf`. For full details on the `anomaly-bit` lookup option and health template syntax, refer to the [Alert Configuration Reference](/src/health/REFERENCE.md).
