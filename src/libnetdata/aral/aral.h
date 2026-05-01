@@ -130,6 +130,10 @@ void aral_unmark_allocation(ARAL *ar, void *ptr);
 
 int aral_unittest(size_t elements);
 
+#ifdef NETDATA_INTERNAL_CHECKS
+int aral_unittest_concurrency(void);
+#endif
+
 #endif // NETDATA_TRACE_ALLOCATIONS
 
 #endif // ARAL_H

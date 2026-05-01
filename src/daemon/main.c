@@ -479,6 +479,15 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return aral_unittest(10000);
                         }
+                        else if(strcmp(optarg, "aralconcurrency") == 0) {
+                            unittest_running = true;
+#ifdef NETDATA_INTERNAL_CHECKS
+                            return aral_unittest_concurrency();
+#else
+                            fprintf(stderr, "aralconcurrency requires NETDATA_INTERNAL_CHECKS\n");
+                            return 1;
+#endif
+                        }
                         else if(strcmp(optarg, "waitqtest") == 0) {
                             unittest_running = true;
                             return unittest_waiting_queue();
