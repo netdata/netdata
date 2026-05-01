@@ -12,6 +12,32 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configurati
   mode = dbengine
 ```
 
+## Data Storage Directory
+
+When using `dbengine` mode, Netdata stores metric data on disk under the cache directory. By default this is `/var/cache/netdata`.
+
+To change the storage location, use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) to open `netdata.conf` and set the `cache` option under `[directories]`:
+
+```text
+[directories]
+    cache = /var/cache/netdata
+```
+
+Within the cache directory, dbengine creates a separate subdirectory for each tier:
+
+| Tier | Subdirectory |
+|------|--------------|
+| 0 | `dbengine/` |
+| 1 | `dbengine-tier1/` |
+| 2 | `dbengine-tier2/` |
+| N | `dbengine-tierN/` |
+
+:::tip
+
+In a Parent-Child setup, the Parent stores all metrics — both its own and those streamed from Children — in this directory. Ensure adequate disk space is available at the chosen location.
+
+:::
+
 ## Tiers
 
 ### Retention Settings
