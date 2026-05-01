@@ -10,7 +10,7 @@ The Logs tab displays log entries from the following sources:
 - **otel-logs** — displays logs received via OpenTelemetry (OTLP) log ingestion. See the [OpenTelemetry Signal Viewer plugin](/src/crates/netdata-log-viewer/otel-signal-viewer-plugin/README.md) for setup and configuration.
 - **Windows Event Logs** — reads Windows event logs on Windows Nodes. See the [Windows Events Plugin Reference](/src/collectors/windows-events.plugin/README.md) for supported event channels and configuration.
 
-You can also display custom application logs, such as web server access logs, under the systemd-journal source by piping them into `systemd` journald using [log2journal](/src/collectors/log2journal/README.md) and [systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md). For example, use the built-in `nginx-combined` log2journal configuration to pipe nginx access logs.
+You can also display custom application logs, such as web server access logs, under the systemd-journal source by piping them into `systemd` journald using [log2journal](/src/collectors/log2journal/README.md) and [systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md). For example, use the built-in `nginx-combined` log2journal configuration to pipe nginx access logs, or `nginx-json` if your nginx outputs JSON-formatted logs.
 
 :::tip
 
