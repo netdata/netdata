@@ -124,14 +124,14 @@ void *aral_mallocz_internal(ARAL *ar, bool marked);
 void aral_freez_internal(ARAL *ar, void *ptr);
 void aral_destroy_internal(ARAL *ar);
 
-void aral_unmark_allocation(ARAL *ar, void *ptr);
-
 #endif // NETDATA_TRACE_ALLOCATIONS
 
 // --------------------------------------------------------------------------------------------------------------------
-// Unittest entry points - kept outside the NETDATA_TRACE_ALLOCATIONS branch
-// so they remain visible to callers (e.g. main.c -W aralconcurrency) in both
-// build modes.
+// Declarations that do not depend on the NETDATA_TRACE_ALLOCATIONS macro
+// shape, kept outside the conditional so callers in any compilation unit
+// can see them in both build modes.
+
+void aral_unmark_allocation(ARAL *ar, void *ptr);
 
 int aral_unittest(size_t elements);
 
