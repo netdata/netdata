@@ -244,6 +244,10 @@ To enable TLS, provide the path to your certificate and private key in the `[web
 
 Both files must be readable by the `netdata` user. If any of these files are missing or can't be read, Netdata will fall back to using HTTP. For a parent-child connection, only the parent needs these settings.
 
+:::note
+You do **not** need to uncomment or explicitly set `ssl key` and `ssl certificate` in `netdata.conf`. These settings default to `/etc/netdata/ssl/key.pem` and `/etc/netdata/ssl/cert.pem` respectively. If your certificates are placed at these default paths, Netdata automatically detects and uses them on restart.
+:::
+
 For test purposes, generate self-signed certificates with the following command:
 
 ```bash
