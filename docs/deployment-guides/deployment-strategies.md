@@ -187,6 +187,123 @@ This example guides you through setting up active-active Parents that sync with 
 ```
 
 
+### Docker Parent-Child Configuration
+
+You can run the parent-child streaming architecture entirely in Docker. This section covers the streaming-specific additions to a standard Docker Compose setup. For the base Docker installation (privileges, mounts, volumes), see the [Docker installation guide](/packaging/docker/README.md).
+
+#### Parent Docker Compose
+
+The Parent needs tiered dbengine storage and a `stream.conf` that accepts incoming streams.
+
+1. Create a `stream.conf` file on the host:
+
+   ```ini
+   [YOUR-API-KEY]
+       enabled = yes
+       type = api
+   ```
+
+   Generate an API key with `uuidgen` and replace `YOUR-API-KEY` with it.
+
+2. Create `docker-compose.yml` for the Parent:
+
+   ```yaml
+   services:
+     netdata:
+       image: netdata/netdata
+       container_name: netdata-parent
+       hostname: netdata-parent
+       pid: host
+       network_mode: host
+       restart: unless-stopped
+       cap_add:
+         - SYS_PTRACE
+         - SYS_ADMIN
+       security_opt:
+         - apparmor:unconfined
+       volumes:
+         - ./netdataconfig:/etc/netdata
+         - netdatalib:/var/lib/netdata
+         - netdatacache:/var/cache/netdata
+         - /:/host/root:ro,rslave
+         - /etc/passwd:/host/etc/passwd:ro
+         - /etc/group:/host/etc/group:ro
+         - /etc/localtime:/host/etc/localtime:ro
+         - /proc:/host/proc:ro
+         - /sys:/host/sys:ro
+         - /etc/os-release:/host/etc/os-release:ro
+         - /var/log:/host/var/log:ro
+         - /var/run/docker.sock:/var/run/docker.sock:ro
+
+   volumes:
+     netdatalib:
+     netdatacache:
+   ```
+
+3. Copy `stream.conf` into the configuration directory and edit `netdata.conf` for tiered storage as shown in the [Parent with Tiered Storage](#parent-with-tiered-storage) example above.
+
+   :::tip
+
+   Mount your `stream.conf` by placing it inside the `./netdataconfig/` bind mount directory (e.g. `./netdataconfig/stream.conf`), or copy it into the container with `docker cp netdata-parent:/etc/netdata/stream.conf ./stream.conf`, edit it, and restart with `docker restart netdata-parent`.
+
+   :::
+
+#### Child Docker Compose
+
+The Child streams metrics to the Parent, uses RAM-only storage, and disables ML and health checks.
+
+1. Create a `stream.conf` file on the Child host:
+
+   ```ini
+   [stream]
+       enabled = yes
+       destination = PARENT_IP_ADDRESS:19999
+       api key = YOUR-API-KEY
+   ```
+
+2. Create `docker-compose.yml` for the Child:
+
+   ```yaml
+   services:
+     netdata:
+       image: netdata/netdata
+       container_name: netdata-child
+       hostname: netdata-child
+       pid: host
+       network_mode: host
+       restart: unless-stopped
+       cap_add:
+         - SYS_PTRACE
+         - SYS_ADMIN
+       security_opt:
+         - apparmor:unconfined
+       volumes:
+         - ./netdataconfig:/etc/netdata
+         - netdatalib:/var/lib/netdata
+         - netdatacache:/var/cache/netdata
+         - /:/host/root:ro,rslave
+         - /etc/passwd:/host/etc/passwd:ro
+         - /etc/group:/host/etc/group:ro
+         - /etc/localtime:/host/etc/localtime:ro
+         - /proc:/host/proc:ro
+         - /sys:/host/sys:ro
+         - /etc/os-release:/host/etc/os-release:ro
+         - /var/log:/host/var/log:ro
+         - /var/run/docker.sock:/var/run/docker.sock:ro
+
+   volumes:
+     netdatalib:
+     netdatacache:
+   ```
+
+3. Edit `netdata.conf` on the Child for lightweight operation as shown in the [Lightweight Child Configuration](#lightweight-child-configuration) example above, and place `stream.conf` in the configuration directory.
+
+   :::note
+
+   The Child uses the same Docker privileges and mounts as a standalone Agent. The only differences are the `netdata.conf` (ram mode, disabled ML/health) and `stream.conf` (streaming destination). For details on `stream.conf` options, see the [Parent-Child Configuration Reference](/src/streaming/README.md).
+
+   :::
+
 ## Further Reading
 
 We strongly recommend the following configuration changes for production deployments:
