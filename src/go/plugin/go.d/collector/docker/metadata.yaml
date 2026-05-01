@@ -122,7 +122,49 @@ modules:
                     address: 'tcp://203.0.113.10:2375'
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: Skipping Data Collection Warnings
+            description: |
+              If you see "skipping data collection: previous run is still in progress" messages in the logs, the Docker collector is taking longer than its `update_every` interval (default 1 second) to complete a collection cycle.
+
+              Each cycle makes multiple Docker API calls — system info, image listing, and up to four container list requests (one per health status). Collection can exceed 1 second when there are many containers, slow Docker socket responses, or when `collect_container_size` is enabled.
+
+              **Step 1: Check the Logs**
+
+              [Look for messages](#getting-logs) like:
+
+              ```text
+              level=info msg="skipping data collection: previous run is still in progress for 1.001s (interval 1s)" plugin=go.d collector=docker job=local
+              level=warn msg="skipping data collection: previous run is still in progress for 2.000s (skipped 2 times in a row, interval 1s)" plugin=go.d collector=docker job=local
+              ```
+
+              **Step 2: Increase `update_every`**
+
+              Edit `go.d/docker.conf` and set `update_every` to a value higher than the observed collection duration:
+
+              ```yaml
+              jobs:
+                - name: local
+                  address: 'unix:///var/run/docker.sock'
+                  update_every: 2
+              ```
+
+              :::note
+
+              - The default `update_every` is 1 second. With many containers, 2–5 seconds is often needed.
+              - Enabling `collect_container_size` significantly increases collection time.
+              - Start with `update_every: 2` and increase if skip messages persist.
+
+              :::
+
+              **Step 3: Restart Netdata**
+
+              After changing the configuration, [restart the Netdata Agent](https://learn.netdata.cloud/docs/netdata-agent/start-stop-restart).
+
+              **Quick Checklist**
+              1. Do logs show "skipping data collection" for the Docker collector?
+              2. Is `update_every` at the default of 1 second?
+              3. Increase `update_every` to 2 or higher until skips stop.
     alerts:
       - name: docker_container_unhealthy
         metric: docker.container_health_status
