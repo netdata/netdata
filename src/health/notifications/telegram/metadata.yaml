@@ -49,7 +49,7 @@
             detailed_description: |
               All roles will default to this variable if left unconfigured.
 
-              The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
+              The `DEFAULT_RECIPIENT_TELEGRAM` can be edited in the following entries at the bottom of the same file:
 
               ```text
               role_recipients_telegram[sysadmin]="-49999333324"
