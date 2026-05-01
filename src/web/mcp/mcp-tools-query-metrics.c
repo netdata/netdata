@@ -279,12 +279,8 @@ typedef struct {
 
 // Interrupt callback for query execution
 static bool mcp_query_interrupt_callback(void *data) {
-    mcp_query_interrupt_data *int_data = (mcp_query_interrupt_data *)data;
-    
-    // Check if the MCP client is still valid and connected
-    if (!int_data || !int_data->mcpc)
-        return false;
-        
+    (void)data;
+
     // Real implementations might check for client disconnection or timeout
     // Here we're just returning false to indicate "no interrupt"
     return false;
