@@ -1011,9 +1011,9 @@ void aral_unmark_allocation(ARAL *ar, void *ptr) {
     if(unlikely(!ptr)) return;
 
     // Must be a CAS, not load-then-store: aral_freez_internal can concurrently
-    // atomic-exchange the trailer to 0, and a non-atomic store here would
-    // overwrite that 0 and leave the slot on the free list with a non-zero
-    // trailer pointing back at its old page.
+    // atomic-exchange the trailer to 0, and a store based on an earlier load
+    // (even an atomic store) could overwrite that 0 and leave the slot on the
+    // free list with a non-zero trailer pointing back at its old page.
     //
     // On CAS failure (freez won, or already unmarked, or slot was reallocated)
     // we must NOT touch page counters - freez's atomic claim is the sole owner
@@ -1029,9 +1029,13 @@ void aral_unmark_allocation(ARAL *ar, void *ptr) {
                                     false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
         return;
 
-    ARAL_PAGE *page = (ARAL_PAGE *)desired;
-    internal_fatal(!page, "Trailer had marked bit set but no page pointer");
-    internal_fatal((uintptr_t)page % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
+    // Decode from the pre-CAS tagged value to keep the standard validation
+    // (NULL check, ARAL-address-space check under NETDATA_ARAL_INTERNAL_CHECKS,
+    //  alignment check). marked is guaranteed true here - we just CAS'd from a
+    //  value with the marked bit set.
+    bool was_marked;
+    ARAL_PAGE *page = aral_decode_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, expected, &was_marked);
+    (void)was_marked;
 
     aral_page_lock(ar, page);
     internal_fatal(!page->page_lock.marked_elements, "Marked counter going negative.");
