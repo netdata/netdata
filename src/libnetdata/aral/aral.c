@@ -332,8 +332,34 @@ static struct aral_concurrency_race_hook aral_concurrency_race_hook = { 0 };
 static size_t aral_freez_unmarking_observed_count = 0;
 #endif
 
+// Arm the concurrency race hook for a (ar, ptr, stage) match.
+// Sets the match fields first, then publishes `enabled = true` with a
+// release-store. Paired with the acquire-load in aral_concurrency_race_pause,
+// this guarantees a reader that observes enabled==true sees fully-published
+// match fields. Without this ordering the compiler is free to publish
+// `enabled` before the other fields, causing the pause to miss.
+static inline void aral_concurrency_race_hook_arm(ARAL *ar, void *target_ptr,
+                                                  enum aral_concurrency_race_stage stage) {
+    aral_concurrency_race_hook.ar = ar;
+    aral_concurrency_race_hook.target_ptr = target_ptr;
+    aral_concurrency_race_hook.stage = stage;
+    aral_concurrency_race_hook.waiting = false;
+    aral_concurrency_race_hook.release = false;
+    __atomic_store_n(&aral_concurrency_race_hook.enabled, true, __ATOMIC_RELEASE);
+}
+
+// Reset the hook. Callers should only invoke this after every concurrent
+// reader is known to have stopped (i.e. all racing threads have been joined).
+static inline void aral_concurrency_race_hook_reset(void) {
+    __atomic_store_n(&aral_concurrency_race_hook.enabled, false, __ATOMIC_RELEASE);
+    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+}
+
 static ALWAYS_INLINE void aral_concurrency_race_pause(ARAL *ar, void *ptr, enum aral_concurrency_race_stage stage) {
-    if(unlikely(__atomic_load_n(&aral_concurrency_race_hook.enabled, __ATOMIC_RELAXED) &&
+    // Acquire-load on `enabled` pairs with the release-store in
+    // aral_concurrency_race_hook_arm so that if we observe enabled==true,
+    // the other match fields are fully published.
+    if(unlikely(__atomic_load_n(&aral_concurrency_race_hook.enabled, __ATOMIC_ACQUIRE) &&
                 aral_concurrency_race_hook.ar == ar &&
                 aral_concurrency_race_hook.target_ptr == ptr &&
                 aral_concurrency_race_hook.stage == stage)) {
@@ -1776,19 +1802,13 @@ static int aral_detect_acquire_to_page_lock_race(void) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// Concurrency tests for the unmark / freez state-machine.
+// Concurrency tests for the unmark / freez state machine.
 //
 // Each scenario uses the aral_concurrency_race_hook to deterministically pause
-// one operation at a known point so a second operation can race it. The tests
-// cover both the "trailer transition" race (caught by the UNMARKING state in
-// the v2 protocol) and the simpler "freez wins" / "unmark wins" outcomes.
-//
-// To run on master (no v2 fix), the tests still exercise meaningful races:
-//   - Tests 4/5 will trigger the very assertions the v2 protocol prevents
-//     ("This allocation does is not marked", "marked > used", or downstream
-//     SEGVs in the freez path), demonstrating the bug.
-//   - Tests 1-3 are bug-independent sanity checks that pass on both master
-//     and the fix.
+// one operation at a known point so a second operation can race it. Tests 4-6
+// drive both sides through the trailer transition concurrently and verify
+// that page counters end consistent and no assertion fires; tests 1-3 are
+// bug-independent sanity checks for the unmark / freez API contract.
 
 struct aral_concurrency_test_args {
     ARAL *ar;
@@ -1861,7 +1881,7 @@ static bool aral_concurrency_test_fixture_init(struct aral_concurrency_test_fixt
 static void aral_concurrency_test_fixture_teardown(struct aral_concurrency_test_fixture *f) {
     aral_freez(f->ar, f->guard);
     aral_destroy(f->ar);
-    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+    aral_concurrency_race_hook_reset();
 }
 
 // Teardown when the test entry is still allocated (e.g. failure path before
@@ -1870,7 +1890,7 @@ static void aral_concurrency_test_fixture_teardown_with_entry(struct aral_concur
     aral_freez(f->ar, f->entry);
     aral_freez(f->ar, f->guard);
     aral_destroy(f->ar);
-    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+    aral_concurrency_race_hook_reset();
 }
 
 // Test 1: clean unmark on a marked allocation. No concurrency.
@@ -1996,10 +2016,7 @@ static int aral_concurrency_test_freez_wins(void) {
     if(!aral_concurrency_test_fixture_init(&f, "aral-conc-4"))
         return 1;
 
-    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){
-        .ar = f.ar, .target_ptr = f.entry,
-        .stage = ARAL_CONCURRENCY_RACE_UNMARK_BEFORE_CAS, .enabled = true,
-    };
+    aral_concurrency_race_hook_arm(f.ar, f.entry, ARAL_CONCURRENCY_RACE_UNMARK_BEFORE_CAS);
 
     struct aral_concurrency_test_args ctx = { f.ar, f.entry };
     ND_THREAD *unmark_thread = nd_thread_create("UNMARK", NETDATA_THREAD_OPTION_DONT_LOG,
@@ -2061,10 +2078,7 @@ static int aral_concurrency_test_unmark_wins_impl(const char *aral_name, usec_t 
     if(!aral_concurrency_test_fixture_init(&f, aral_name))
         return 1;
 
-    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){
-        .ar = f.ar, .target_ptr = f.entry,
-        .stage = ARAL_CONCURRENCY_RACE_UNMARK_AFTER_CAS, .enabled = true,
-    };
+    aral_concurrency_race_hook_arm(f.ar, f.entry, ARAL_CONCURRENCY_RACE_UNMARK_AFTER_CAS);
 
     struct aral_concurrency_test_args ctx = { f.ar, f.entry };
     ND_THREAD *unmark_thread = nd_thread_create("UNMARK", NETDATA_THREAD_OPTION_DONT_LOG,
@@ -2216,10 +2230,7 @@ static int aral_concurrency_test_stress(void) {
     size_t i;
     for(i = 0; i < pool_size; i++) {
         // Arm the hook to pause unmark just after its CAS to UNMARKING.
-        aral_concurrency_race_hook = (struct aral_concurrency_race_hook){
-            .ar = ar, .target_ptr = pool[i],
-            .stage = ARAL_CONCURRENCY_RACE_UNMARK_AFTER_CAS, .enabled = true,
-        };
+        aral_concurrency_race_hook_arm(ar, pool[i], ARAL_CONCURRENCY_RACE_UNMARK_AFTER_CAS);
 
         struct aral_concurrency_test_args ctx = { ar, pool[i] };
 
@@ -2281,11 +2292,11 @@ static int aral_concurrency_test_stress(void) {
         nd_thread_join(freez_thread);
 
         // Reset the hook for the next iteration.
-        aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+        aral_concurrency_race_hook_reset();
     }
 
     // Defensive reset: any early break above could have left the hook armed.
-    aral_concurrency_race_hook = (struct aral_concurrency_race_hook){ 0 };
+    aral_concurrency_race_hook_reset();
 
     // Free pool entries that were not freed by a successful loop iteration.
     // On normal completion i == pool_size and this loop is empty. On early
