@@ -47,6 +47,12 @@ Subscription cancellations do not take effect immediately. When you submit a can
 
 Please refer to the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page for more information on what each plan provides.
 
+:::tip
+
+To check which features your current plan supports, see [Feature Availability by Access Level](/docs/netdata-oss-limitations.md#feature-availability-by-access-level).
+
+:::
+
 ## View Plan and Billing Information
 
 ### Prerequisites

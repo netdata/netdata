@@ -224,6 +224,6 @@ Enable, Edit and Add actions over specific notification methods will only be all
 
 :::note
 
-Netdata Cloud paid subscription required for all actions except "List All" in Dynamic Configuration Manager.
+Netdata Cloud Business subscription required for all actions except "List All" in Dynamic Configuration Manager.
 
 :::
