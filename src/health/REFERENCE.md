@@ -985,15 +985,22 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 
 **What's Available:** All dimensions of all charts, including all alerts, in fullname format.
 
-**Format:** `CHART.VARIABLE`
+**Format:** `CHART.VARIABLE` or `${CHART.VARIABLE}`
 
 - `CHART` can be either chart ID or chart name
-- Both formats are supported
+- Both `$chart.dim` and `${chart.dim}` formats are supported
 
 **Examples:**
 
 - `$system.cpu.user` - User CPU from system.cpu chart
 - `$disk.sda.reads` - Read operations from sda disk chart
+- `${net.eth0.received}` - Received bytes from net.eth0 chart (brace syntax)
+
+:::tip
+
+Host Variables are the primary mechanism for creating alerts that combine metrics from **different charts or contexts**. Use them in the `calc`, `warn`, or `crit` lines to reference any dimension from any chart on the same node. See [Example 8](#example-8-cross-context-alert--combining-metrics-from-different-charts) for a complete cross-context alert configuration.
+
+:::
 
 #### Special Variables
 
@@ -1304,6 +1311,56 @@ template: ml_5min_node
 - Uses `anomaly_detection.anomaly_rate` chart
 - Monitors `anomaly_rate` dimension
 - Covers all ML-enabled dimensions across the node
+
+<br/>
+</details>
+
+<details>
+<summary><strong>Example 8: Cross-Context Alert — Combining Metrics from Different Charts</strong></summary><br/>
+
+**Scenario:** Detect imbalanced load by comparing network throughput with CPU usage. When network traffic is high but CPU is low (or vice versa), it may indicate misconfiguration, a bottleneck, or underutilized resources.
+
+**Why This Matters:** Host Variables allow an alert attached to one chart to reference metrics from any other chart on the same node, enabling computed results across metric contexts.
+
+```text
+template: net_traffic_vs_cpu
+      on: system.cpu
+  lookup: average -5m of user
+    calc: $this / ${net.eth0.received} * 100
+   units: cpu % per kilobyte
+   every: 30s
+    warn: $this > 80 OR ${net.eth0.received} > 10000000
+    crit: $this > 95 AND ${net.eth0.received} > 50000000
+    info: CPU vs network throughput imbalance
+```
+
+**How It Works:**
+
+| Component          | Purpose                                            | This Example                                  |
+|--------------------|----------------------------------------------------|-----------------------------------------------|
+| `on`               | The chart this alert is attached to                | `system.cpu`                                  |
+| `lookup`           | Aggregates data from the local chart               | 5-minute average of `user` dimension          |
+| `$this`            | Result of the `lookup` line                        | Average CPU user time                         |
+| `${net.eth0.received}` | Host Variable referencing another chart        | Received bytes from `net.eth0` chart          |
+| `calc`             | Combines local and remote metrics                  | CPU-to-throughput ratio                       |
+| `warn`/`crit`      | Uses `AND`/`OR` logical operators                  | Combined conditions across contexts           |
+
+**Variables Used:**
+
+- `$this` - Result of the `lookup` line (average CPU user time over 5 minutes)
+- `${net.eth0.received}` - Host Variable referencing the `received` dimension of the `net.eth0` chart
+
+:::note
+
+When a Host Variable matches multiple chart instances (for example, multiple disks or network interfaces), Netdata uses **label similarity scoring** to select the best match — the instance with the most common labels is preferred. See the [Host Variables](#host-variables) section for details.
+
+:::
+
+:::tip
+
+For more on cross-context references and the variable resolution mechanism, see the [Host Variables](#host-variables) section below.
+
+:::
 
 <br/>
 </details><br/>
