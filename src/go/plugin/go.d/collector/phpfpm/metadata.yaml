@@ -65,7 +65,7 @@ modules:
 
             - name: url
               description: PHP-FPM URL.
-              default_value: http://127.0.0.1/server-status?auto
+              default_value: http://127.0.0.1/status?full&json
               required: true
               group: Target
             - name: address
