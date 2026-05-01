@@ -3171,8 +3171,8 @@ Requires(pre): %{name}-user >= %{version}
 
 %files plugin-debugfs
 %defattr(0750,root,netdata,0750)
-# CAP_DAC_READ_SEARCH required for data collection.
-%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
+# CAP_DAC_READ_SEARCH for debugfs data collection, CAP_AUDIT_CONTROL for audit subsystem monitoring.
+%caps(cap_dac_read_search,cap_audit_control=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
 
 %package plugin-journal-viewer
 Summary: Transitional dummy package

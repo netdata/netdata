@@ -49,6 +49,7 @@ int do_PerflibHyperV(int update_every, usec_t dt);
 int do_PerflibExchange(int update_every, usec_t dt __maybe_unused);
 int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
+int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
 
 // Cleanup
 void do_GetHardwareInfo_cleanup();
@@ -56,6 +57,7 @@ void do_Sensors_cleanup();
 void do_GetServicesStatus_cleanup();
 void do_GetSystemCPU_cleanup();
 void do_GetPowerSupply_cleanup();
+void do_PerflibSMB_cleanup();
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
@@ -349,7 +351,16 @@ enum PERFLIB_PRIO {
     PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_SUCCESS,
     PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_FAILURE,
     PRIO_ASPNET_FORM_AUTHENTICATION_SUCCESS,
-    PRIO_ASPNET_FORM_AUTHENTICATION_FAILURE
+    PRIO_ASPNET_FORM_AUTHENTICATION_FAILURE,
+
+    PRIO_SMB_SERVER_SHARES_CURRENT_OPEN_FILE_COUNT,
+    PRIO_SMB_SERVER_SHARES_TREE_CONNECT_COUNT,
+    PRIO_SMB_SERVER_SHARES_RECEIVED_BYTES,
+    PRIO_SMB_SERVER_SHARES_WRITE_REQUESTS,
+    PRIO_SMB_SERVER_SHARES_READ_REQUESTS,
+    PRIO_SMB_SERVER_SHARES_METADATA_REQUESTS,
+    PRIO_SMB_SERVER_SHARES_SENT_BYTES,
+    PRIO_SMB_SERVER_SHARES_FILES_OPENED
 };
 
 #endif //NETDATA_WINDOWS_PLUGIN_H

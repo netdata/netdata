@@ -425,7 +425,12 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ mssql_database_log_percent_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf) | mssql.database_log_percent_used | SQL Server transaction log percent used has been above 90% for the last 15 minutes |
 
 
 ## Metrics
@@ -492,6 +497,9 @@ Metrics:
 | mssql.database_log_flushes | flushes | flushes/s | • | • |
 | mssql.database_log_flushed | flushed | bytes/s | • | • |
 | mssql.database_log_growths | growths | growths | • | • |
+| mssql.database_log_file_size | used, free | bytes | • | • |
+| mssql.database_log_percent_used | used | percentage | • | • |
+| mssql.database_log_truncations_shrinks | truncations, shrinks | events/s | • | • |
 | mssql.database_io_stall | read, write | ms | • | • |
 | mssql.database_data_file_size | size | bytes | • | • |
 | mssql.database_backup_restore_throughput | throughput | bytes/s | • | • |

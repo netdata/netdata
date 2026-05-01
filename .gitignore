@@ -1,5 +1,13 @@
 # Secrets
 gcs-credentials.json
+/.env
+
+# Per-user local working directory (audits, scratch, drafts, temp artifacts).
+# AI agents that follow AGENTS.md treat this as the place to write run-time data.
+/.local/
+
+# Cross-tool AI agent private overrides (per-user, not for sharing)
+**/AGENTS.local.md
 
 .deps
 .libs
@@ -218,4 +226,11 @@ run-ibm.sh
 
 tmp/
 
-build-and-install.sh
+build*.sh
+install.sh
+
+.claude/settings.json
+.codex
+.mcpregistry_github_token
+.mcpregistry_registry_token
+.playwright-mcp/

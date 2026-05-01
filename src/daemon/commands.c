@@ -389,9 +389,7 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
         host->node_id = UUID_ZERO;
         buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been unregistered",
                        rrdhost_hostname(host), host->machine_guid);
-        rrd_wrlock();
-        rrdhost_free___while_having_rrd_wrlock(host);
-        rrd_wrunlock();
+        rrdhost_free___without_having_rrd_wrlock(host);
         return 1;
     }
 

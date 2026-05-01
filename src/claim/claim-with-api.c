@@ -279,8 +279,6 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     if(unlikely(!headers_with_content_type)) {
         claim_agent_failure_reason_set("Cannot append Content-Type header to the claim request");
         curl_easy_cleanup(curl);
-        if(headers)
-            curl_slist_free_all(headers);
         *can_retry = false;
         return false;
     }
