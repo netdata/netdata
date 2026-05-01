@@ -602,15 +602,16 @@ bool stream_parent_connect_to_one_unsafe(
         return false;
     }
 
-    STREAM_PARENT *array[size];
+    STREAM_PARENT **array = callocz(size, sizeof(*array));
     usec_t now_ut = now_realtime_usec();
+    bool rc = false;
 
     // fetch stream info for all of them and put them in the array
     size_t count = 0, skipped_but_useful = 0, skipped_not_useful = 0, potential = 0;
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d && count < size ; d = d->next) {
         if (nd_thread_signaled_to_cancel()) {
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
-            return false;
+            goto cleanup;
         }
 
         // make sure they all have a random number
@@ -740,7 +741,7 @@ bool stream_parent_connect_to_one_unsafe(
             pulse_host_status(host, PULSE_HOST_STATUS_SND_NO_DST, 0);
         }
 
-        return false;
+        goto cleanup;
     }
 
     // order the parents in the array the way we want to connect
@@ -831,7 +832,7 @@ bool stream_parent_connect_to_one_unsafe(
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
             host->stream.snd.status.reason = STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP;
             pulse_host_status(host, PULSE_HOST_STATUS_SND_OFFLINE, host->stream.snd.status.reason);
-            return false;
+            goto cleanup;
         }
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -873,7 +874,8 @@ bool stream_parent_connect_to_one_unsafe(
             sender_sock->error = ND_SOCK_ERR_NONE;
             host->stream.snd.status.reason = STREAM_HANDSHAKE_SP_CONNECTED;
             pulse_host_status(host, PULSE_HOST_STATUS_SND_CONNECTING, host->stream.snd.status.reason);
-            return true;
+            rc = true;
+            goto cleanup;
         }
         else {
             stream_parent_nd_sock_error_to_reason(d, sender_sock);
@@ -889,7 +891,10 @@ bool stream_parent_connect_to_one_unsafe(
     }
 
     pulse_host_status(host, PULSE_HOST_STATUS_SND_OFFLINE, 0);
-    return false;
+
+cleanup:
+    freez(array);
+    return rc;
 }
 
 bool stream_parent_connect_to_one(

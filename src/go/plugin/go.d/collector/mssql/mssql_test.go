@@ -152,6 +152,68 @@ func TestCollector_Collect(t *testing.T) {
 		notWantMetrics []string
 		checkCollector func(t *testing.T, c *Collector)
 	}{
+		"database log counters: complete unordered rows": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryDatabaseLogCounters).WillReturnRows(
+					sqlmock.NewRows([]string{"database_name", "counter_name", "cntr_value"}).
+						AddRow("AppDB", "Log Shrinks", int64(2)).
+						AddRow("AppDB", "Log File(s) Used Size (KB)", int64(256)).
+						AddRow("AppDB", "Log Truncations", int64(3)).
+						AddRow("AppDB", "Log File(s) Size (KB)", int64(1024)),
+				)
+			},
+			collectFn: func(c *Collector, mx map[string]int64) error { return c.collectDatabaseLogCounters(mx) },
+			wantMetrics: map[string]int64{
+				"database_appdb_log_size_used":    256 * 1024,
+				"database_appdb_log_size_free":    768 * 1024,
+				"database_appdb_log_percent_used": 2500,
+				"database_appdb_log_truncations":  3,
+				"database_appdb_log_shrinks":      2,
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				assert.True(t, c.seenDatabasesWithLog["AppDB"])
+			},
+		},
+		"database log counters: missing used skips size and percent": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryDatabaseLogCounters).WillReturnRows(
+					sqlmock.NewRows([]string{"database_name", "counter_name", "cntr_value"}).
+						AddRow("AppDB", "Log File(s) Size (KB)", int64(1024)).
+						AddRow("AppDB", "Log Truncations", int64(3)),
+				)
+			},
+			collectFn: func(c *Collector, mx map[string]int64) error { return c.collectDatabaseLogCounters(mx) },
+			wantMetrics: map[string]int64{
+				"database_appdb_log_truncations": 3,
+			},
+			notWantMetrics: []string{
+				"database_appdb_log_size_used",
+				"database_appdb_log_size_free",
+				"database_appdb_log_percent_used",
+			},
+		},
+		"database log counters: used greater than size clamps free": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryDatabaseLogCounters).WillReturnRows(
+					sqlmock.NewRows([]string{"database_name", "counter_name", "cntr_value"}).
+						AddRow("AppDB", "Log File(s) Size (KB)", int64(100)).
+						AddRow("AppDB", "Log File(s) Used Size (KB)", int64(150)),
+				)
+			},
+			collectFn: func(c *Collector, mx map[string]int64) error { return c.collectDatabaseLogCounters(mx) },
+			wantMetrics: map[string]int64{
+				"database_appdb_log_size_used":    150 * 1024,
+				"database_appdb_log_size_free":    0,
+				"database_appdb_log_percent_used": 15000,
+			},
+		},
+		"database log counters: query error": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryDatabaseLogCounters).WillReturnError(fmt.Errorf("access denied"))
+			},
+			collectFn: func(c *Collector, mx map[string]int64) error { return c.collectDatabaseLogCounters(mx) },
+			wantErr:   true,
+		},
 		"ag health: success": {
 			prepareMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(queryAGHealth).WillReturnRows(

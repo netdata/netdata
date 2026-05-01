@@ -285,7 +285,7 @@ Transform troubleshooting from complex queries to natural conversation. Ask ques
 <details>
 <summary><strong>Model Context Protocol (MCP) Integration</strong></summary><br/>
 
-MCP is available via Netdata Cloud for infrastructure-wide access (Business/Homelab plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
+MCP is available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
 
 **Why this matters:** Use your existing AI tools or our standalone web chat with choice of AI providers. Query live metrics, logs, processes, network connections, and system state securely.
 

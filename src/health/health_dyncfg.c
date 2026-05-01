@@ -6,6 +6,19 @@
 
 static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap);
 
+static char *health_dyncfg_alert_prototype_id_strdupz(const char *alert_name) {
+    size_t prefix_len = strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX);
+    size_t alert_name_len = strlen(alert_name);
+    size_t id_len = prefix_len + 1 + alert_name_len;
+    char *id = mallocz(id_len + 1);
+
+    int written = snprintfz(id, id_len + 1, DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
+    internal_fatal((size_t)written != id_len,
+                   "HEALTH DYNCFG: failed to build dyncfg id for alert '%s'", alert_name);
+
+    return id;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // parse the json object of an alert definition
 
@@ -632,9 +645,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
         return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "no alert prototype is available by the name given");
 
     RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
-
-    char alert_name_dyncfg[strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX) + strlen(alert_name) + 10];
-    snprintfz(alert_name_dyncfg, sizeof(alert_name_dyncfg), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
+    CLEAN_CHAR_P *alert_name_dyncfg = health_dyncfg_alert_prototype_id_strdupz(alert_name);
 
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -744,9 +755,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYNCFG_CMDS cmd, const char *add_name,
                      BUFFER *payload, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                      BUFFER *result, HTTP_ACCESS access __maybe_unused, const char *source, void *data __maybe_unused) {
-
-    char buf[strlen(id) + 1];
-    memcpy(buf, id, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(id);
 
     char *words[100] = { NULL };
     size_t num_words = quoted_strings_splitter_dyncfg_id(buf, words, 100);
@@ -780,14 +789,13 @@ int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYN
 }
 
 void health_dyncfg_unregister_all_prototypes(void) {
-    char key[HEALTH_CONF_MAX_LINE];
     RRD_ALERT_PROTOTYPE *ap;
 
     // remove dyncfg
     // it is ok if they are not added before
 
     dfe_start_read(health_globals.prototypes.dict, ap) {
-        snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
+        CLEAN_CHAR_P *key = health_dyncfg_alert_prototype_id_strdupz(string2str(ap->config.name));
         dyncfg_del(localhost, key);
     }
     dfe_done(ap);
@@ -795,13 +803,12 @@ void health_dyncfg_unregister_all_prototypes(void) {
 }
 
 static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
-    char key[HEALTH_CONF_MAX_LINE];
+    CLEAN_CHAR_P *key = health_dyncfg_alert_prototype_id_strdupz(string2str(ap->config.name));
 
 //    bool trace = false;
 //    if(string_strcmp(ap->config.name, "ram_available") == 0)
 //        trace = true;
 
-    snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
     dyncfg_add(localhost, key, "/health/alerts/prototypes",
                ap->_internal.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
                ap->config.source_type, string2str(ap->config.source),

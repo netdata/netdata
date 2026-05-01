@@ -376,9 +376,9 @@ int websocket_protocol_send_close(WS_CLIENT *wsc, WEBSOCKET_CLOSE_CODE code, con
         reason_len = 123; // Truncate reason to fit
     }
 
-    // Use stack buffer for close frame payload (max 125 bytes per RFC 6455)
+    // Control frames are capped at 125 bytes, so a fixed stack buffer is sufficient.
     size_t payload_len = 2 + reason_len;
-    char payload[payload_len];
+    char payload[125];
 
     // Set status code in network byte order (big-endian)
     uint16_t code_value = (uint16_t)code;

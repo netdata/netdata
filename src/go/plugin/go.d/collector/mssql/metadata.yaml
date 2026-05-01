@@ -400,7 +400,11 @@ modules:
             description: |
               The monitoring user needs VIEW SERVER STATE permission.
               Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
-    alerts: []
+    alerts:
+      - name: mssql_database_log_percent_used
+        metric: mssql.database_log_percent_used
+        info: SQL Server transaction log percent used has been above 90% for the last 15 minutes
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.
@@ -1155,6 +1159,26 @@ modules:
               chart_type: line
               dimensions:
                 - name: growths
+            - name: mssql.database_log_file_size
+              description: Transaction Log File Size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: mssql.database_log_percent_used
+              description: Transaction Log Space Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: mssql.database_log_truncations_shrinks
+              description: Transaction Log Truncations and Shrinks
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: truncations
+                - name: shrinks
             - name: mssql.database_io_stall
               description: I/O Stall Time
               unit: ms

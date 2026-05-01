@@ -49,35 +49,87 @@ inline NETDATA_DOUBLE average(const NETDATA_DOUBLE *series, size_t entries) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+// periods up to this size use a stack buffer to avoid heap overhead
+#define MOVING_AVERAGE_STACK_PERIOD 32
+
 NETDATA_DOUBLE moving_average(const NETDATA_DOUBLE *series, size_t entries, size_t period) {
-    if(unlikely(period <= 0))
+    // Keep the zero-period fast path while making the rolling window size
+    // unambiguously non-zero for the arithmetic below.
+    const size_t window = period ? period : 1;
+
+    if(unlikely(period == 0))
         return 0.0;
 
     size_t i, count;
     NETDATA_DOUBLE sum = 0, avg = 0;
-    NETDATA_DOUBLE p[period];
 
-    for(count = 0; count < period ; count++)
-        p[count] = 0.0;
+    NETDATA_DOUBLE stack_buf[MOVING_AVERAGE_STACK_PERIOD];
+    NETDATA_DOUBLE *heap_p = NULL;
+    NETDATA_DOUBLE *p;
+
+    if(window <= MOVING_AVERAGE_STACK_PERIOD) {
+        memset(stack_buf, 0, window * sizeof(*stack_buf));
+        p = stack_buf;
+    } else {
+        heap_p = callocz(window, sizeof(*heap_p));
+        p = heap_p;
+    }
 
     for(i = 0, count = 0; i < entries; i++) {
         NETDATA_DOUBLE value = series[i];
         if(unlikely(!netdata_double_isnumber(value))) continue;
+        size_t slot = count % window;
 
-        if(unlikely(count < period)) {
+        if(unlikely(count < window)) {
             sum += value;
-            avg = (count == period - 1) ? sum / (NETDATA_DOUBLE)period : 0;
+            avg = (count == window - 1) ? sum / (NETDATA_DOUBLE)window : 0;
         }
         else {
-            sum = sum - p[count % period] + value;
-            avg = sum / (NETDATA_DOUBLE)period;
+            sum = sum - p[slot] + value;
+            avg = sum / (NETDATA_DOUBLE)window;
         }
 
-        p[count % period] = value;
+        p[slot] = value;
         count++;
     }
 
+    freez(heap_p);
     return avg;
+}
+
+static int statistical_unittest_assert_close(const char *name, NETDATA_DOUBLE expected, NETDATA_DOUBLE actual) {
+    if(ABS(expected - actual) <= 0.000001)
+        return 0;
+
+    fprintf(stderr, "statistical_unittest: %s failed, expected " NETDATA_DOUBLE_FORMAT ", got " NETDATA_DOUBLE_FORMAT "\n",
+            name, expected, actual);
+    return 1;
+}
+
+int statistical_unittest(void) {
+    int errors = 0;
+
+    NETDATA_DOUBLE series[] = { 1, 2, 3, 4, 5 };
+    NETDATA_DOUBLE heap_series[MOVING_AVERAGE_STACK_PERIOD + 8];
+
+    for(size_t i = 0; i < sizeof(heap_series) / sizeof(heap_series[0]); i++)
+        heap_series[i] = (NETDATA_DOUBLE)(i + 1);
+
+    errors += statistical_unittest_assert_close("moving_average(period=0)", 0.0,
+                                                moving_average(series, sizeof(series) / sizeof(series[0]), 0));
+    errors += statistical_unittest_assert_close("moving_average(stack path)", 4.0,
+                                                moving_average(series, sizeof(series) / sizeof(series[0]), 3));
+    errors += statistical_unittest_assert_close("moving_average(heap path)",
+                                                ((NETDATA_DOUBLE)(sizeof(heap_series) / sizeof(heap_series[0])) + 1.0) / 2.0,
+                                                moving_average(heap_series, sizeof(heap_series) / sizeof(heap_series[0]),
+                                                               sizeof(heap_series) / sizeof(heap_series[0])));
+
+    if(errors)
+        fprintf(stderr, "statistical_unittest: %d errors found\n", errors);
+    else
+        fprintf(stderr, "statistical_unittest: all tests passed\n");
+
+    return errors ? 1 : 0;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

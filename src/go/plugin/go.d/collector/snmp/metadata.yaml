@@ -646,6 +646,138 @@ modules:
             Exposes interface names, operational status, and traffic counters only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed
           availability: |
             Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet
+
+        - id: topology
+          name: Network Topology
+          description: |
+            Provides the agent-wide SNMP topology view built from all currently running topology-enabled SNMP jobs.
+
+            This function reads cached LLDP/CDP data collected by the independent topology refresh loop and returns a topology schema (devices, links, and stats). No additional SNMP requests are triggered when calling this function.
+
+            Use cases:
+            - Discover Layer 2 neighbors and link mapping
+            - Validate cabling and port connections
+            - Identify adjacent devices that are discovered but not monitored
+          parameters:
+            - id: nodes_identity
+              name: Nodes Identity
+              description: Choose actor identity strategy. `ip` collapses nodes by management IP and removes non-IP inferred actors. `mac` keeps MAC-oriented identities.
+              type: select
+              required: true
+              default: ip
+              options:
+                - id: ip
+                  name: IP
+                  default: true
+                - id: mac
+                  name: MAC
+            - id: map_type
+              name: Map
+              description: Select the topology map mode. Defaults to the managed-device LLDP/CDP view. Other modes progressively include inferred devices and lower-confidence links.
+              type: select
+              required: true
+              default: lldp_cdp_managed
+              options:
+                - id: lldp_cdp_managed
+                  name: LLDP/CDP/Managed Devices Map
+                  default: true
+                - id: high_confidence_inferred
+                  name: High Confidence Inferred Map
+                - id: all_devices_low_confidence
+                  name: All Devices (Low Confidence)
+            - id: inference_strategy
+              name: Infer Strategy
+              description: Select the inference algorithm used for FDB/STP/CDP correlation.
+              type: select
+              required: true
+              default: fdb_minimum_knowledge
+              options:
+                - id: fdb_minimum_knowledge
+                  name: FDB Minimum-Knowledge (Baseline)
+                  default: true
+                - id: stp_parent_tree
+                  name: STP Parent Tree
+                - id: fdb_pairwise_minimum_knowledge
+                  name: FDB Pairwise Minimum-Knowledge
+                - id: stp_fdb_correlated
+                  name: STP + FDB Correlated
+                - id: cdp_fdb_hybrid
+                  name: CDP + FDB Hybrid
+            - id: managed_snmp_device_focus
+              name: Focus On
+              description: Limit depth filtering to selected managed SNMP roots. The static default is `all_devices`; additional `ip:<address>` options are supplied dynamically from the current managed SNMP jobs.
+              type: multiselect
+              required: true
+              default: all_devices
+              options:
+                - id: all_devices
+                  name: All Devices
+                  default: true
+            - id: depth
+              name: Focus Depth
+              description: Limit topology expansion hops from the focus roots. `all` disables depth filtering.
+              type: select
+              required: true
+              default: all
+              options:
+                - id: all
+                  name: All
+                  default: true
+                - id: "0"
+                  name: "0"
+                - id: "1"
+                  name: "1"
+                - id: "2"
+                  name: "2"
+                - id: "3"
+                  name: "3"
+                - id: "4"
+                  name: "4"
+                - id: "5"
+                  name: "5"
+                - id: "6"
+                  name: "6"
+                - id: "7"
+                  name: "7"
+                - id: "8"
+                  name: "8"
+                - id: "9"
+                  name: "9"
+                - id: "10"
+                  name: "10"
+          returns:
+            description: Agent-wide topology data in a JSON schema suitable for cross-agent aggregation.
+            columns:
+              - name: schema_version
+                type: integer
+                unit: ""
+                description: Topology schema version.
+              - name: agent_id
+                type: string
+                unit: ""
+                description: Netdata Agent or vnode identifier that collected the data.
+              - name: collected_at
+                type: string
+                unit: ""
+                description: Collection timestamp in RFC 3339 format.
+              - name: devices
+                type: array
+                unit: ""
+                description: List of devices (local and discovered).
+              - name: links
+                type: array
+                unit: ""
+                description: List of discovered links (LLDP/CDP).
+              - name: stats
+                type: object
+                unit: ""
+                description: Summary stats (device/link counts).
+          performance: |
+            Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many discovered neighbors may return many rows
+          security: |
+            Exposes discovered device identifiers, interface/port identifiers, and management addresses only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed
+          availability: |
+            Available when:<br/>• The collector has completed at least one successful topology refresh cycle<br/>• LLDP/CDP topology data is present in cache from the last successful topology refresh<br/>• Returns HTTP 503 if topology cache is not ready yet
     metrics:
       folding:
         title: Metrics

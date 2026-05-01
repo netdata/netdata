@@ -243,8 +243,10 @@ static inline char *sqlite3_uuid_unparse_strdupz(sqlite3_stmt *res, int iCol) {
 
     if(sqlite3_column_type(res, iCol) == SQLITE_NULL)
         uuid_str[0] = '\0';
-    else
-        uuid_unparse_lower(*((nd_uuid_t *) sqlite3_column_blob(res, iCol)), uuid_str);
+    else if (!sqlite3_column_uuid_unparse_lower(res, iCol, uuid_str)) {
+        error_report("ACLK ALERT: Got invalid UUID blob at column %d. Returning empty string.", iCol);
+        uuid_str[0] = '\0';
+    }
 
     return strdupz(uuid_str);
 }
@@ -424,7 +426,9 @@ void health_alarm_log_populate(
     time_t duration = sqlite3_column_int64(res, DURATION);
     alarm_log->duration =  (duration > 0) ? duration : 0;
 
-    alarm_log->non_clear_duration = sqlite3_column_int64(res, NON_CLEAR_DURATION);
+    int64_t non_clear_duration = sqlite3_column_int64(res, NON_CLEAR_DURATION);
+    alarm_log->non_clear_duration = (non_clear_duration <= 0) ? 0 :
+                                    (non_clear_duration > UINT32_MAX) ? UINT32_MAX : (uint32_t)non_clear_duration;
 
     alarm_log->status = rrdcalc_status_to_proto_enum(current_status);
     alarm_log->old_status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS)sqlite3_column_int64(res, OLD_STATUS));

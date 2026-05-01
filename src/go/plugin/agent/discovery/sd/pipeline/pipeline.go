@@ -64,9 +64,6 @@ type (
 		// new
 		svr composer
 	}
-	classificator interface {
-		classify(model.Target) model.Tags
-	}
 	composer interface {
 		compose(model.Target) []confgroup.Config
 	}

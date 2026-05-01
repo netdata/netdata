@@ -189,6 +189,11 @@ static bool wrap_parse_array_item_object(json_object *jobj_in, size_t *count,
 // Test helpers
 // ============================================================================
 
+static bool json_function_payload_fail_with_error(json_object *jobj __maybe_unused, void *data, BUFFER *error) {
+    buffer_strcat(error, (const char *)data);
+    return false;
+}
+
 #define T(cond, msg) do { \
     if (!(cond)) { fprintf(stderr, "  FAILED: %s\n", msg); failed++; } \
 } while(0)
@@ -1448,6 +1453,34 @@ static int test_parse_txt2rfc3339(void) {
 }
 
 // ----------------------------------------------------------------------------
+// RFC3339 formatter regression coverage
+// ----------------------------------------------------------------------------
+static int test_format_rfc3339(void) {
+    int failed = 0;
+    char buffer[RFC3339_MAX_LENGTH];
+    usec_t parsed;
+    size_t len;
+
+    len = rfc3339_datetime_ut(buffer, sizeof(buffer), 123456, 3, true);
+    T(len == strlen("1970-01-01T00:00:00.123Z") && strcmp(buffer, "1970-01-01T00:00:00.123Z") == 0,
+      "format_rfc3339: 3 digits truncate microseconds");
+
+    len = rfc3339_datetime_ut(buffer, sizeof(buffer), 123456, 7, true);
+    T(len == strlen("1970-01-01T00:00:00.1234560Z") && strcmp(buffer, "1970-01-01T00:00:00.1234560Z") == 0,
+      "format_rfc3339: 7 digits keep microseconds and pad trailing zero");
+    parsed = rfc3339_parse_ut(buffer, NULL);
+    T(parsed == 123456, "format_rfc3339: 7-digit output parses back to the same microseconds");
+
+    len = rfc3339_datetime_ut(buffer, sizeof(buffer), 1, 9, true);
+    T(len == strlen("1970-01-01T00:00:00.000001000Z") && strcmp(buffer, "1970-01-01T00:00:00.000001000Z") == 0,
+      "format_rfc3339: 9 digits preserve leading zeros and pad nanoseconds");
+    parsed = rfc3339_parse_ut(buffer, NULL);
+    T(parsed == 1, "format_rfc3339: 9-digit output parses back to the same microseconds");
+
+    return failed;
+}
+
+// ----------------------------------------------------------------------------
 // TXT2PATTERN — branches:
 //   key found: string "*"→NULL, string other→string_strdupz,
 //              other+OPT→skip, other+REQ→error, other+STRICT→error
@@ -1913,6 +1946,104 @@ static int test_parse_array_item_object(void) {
     return failed;
 }
 
+// ----------------------------------------------------------------------------
+// json_parse_function_payload_or_error() error path:
+//   callback error should be capped and explicitly truncated
+// ----------------------------------------------------------------------------
+static int test_parse_function_payload_error_cap(void) {
+    int failed = 0;
+    BUFFER *payload = buffer_create(0, NULL);
+    BUFFER *output = buffer_create(0, NULL);
+    char long_error[1024];
+    int code = 0;
+
+    memset(long_error, 'A', sizeof(long_error) - 1);
+    long_error[sizeof(long_error) - 1] = '\0';
+
+    buffer_strcat(payload, "{}");
+
+    struct json_object *result = json_parse_function_payload_or_error(output, payload, &code,
+                                                                      json_function_payload_fail_with_error,
+                                                                      long_error);
+
+    T(result == NULL, "function_payload_error_cap: callback failure should return NULL");
+    T(code == HTTP_RESP_BAD_REQUEST, "function_payload_error_cap: callback failure should return bad request");
+
+    json_object *response = json_tokener_parse(buffer_tostring(output));
+    T(response != NULL, "function_payload_error_cap: output should be valid JSON");
+
+    const char *error_msg = NULL;
+    if(response) {
+        json_object *error_obj = NULL;
+        T(json_object_object_get_ex(response, "errorMessage", &error_obj),
+          "function_payload_error_cap: response should include errorMessage");
+
+        if(error_obj)
+            error_msg = json_object_get_string(error_obj);
+    }
+
+    T(error_msg != NULL, "function_payload_error_cap: errorMessage should be readable");
+    T(error_msg && strncmp(error_msg, "JSON parser failed: ", strlen("JSON parser failed: ")) == 0,
+      "function_payload_error_cap: errorMessage should include parser prefix");
+    T(error_msg && strstr(error_msg, "...") != NULL,
+      "function_payload_error_cap: errorMessage should explicitly indicate truncation");
+    T(error_msg && strlen(error_msg) < sizeof(long_error) - 1,
+      "function_payload_error_cap: errorMessage should be shorter than the original callback error");
+    T(buffer_strlen(output) < sizeof(long_error),
+      "function_payload_error_cap: output JSON should stay smaller than the original callback error");
+
+    if(response)
+        json_object_put(response);
+    buffer_free(output);
+    buffer_free(payload);
+
+    return failed;
+}
+
+// ----------------------------------------------------------------------------
+// json_parse_function_payload_or_error() error path:
+//   empty callback error should fall back to "unknown error"
+// ----------------------------------------------------------------------------
+static int test_parse_function_payload_empty_error_fallback(void) {
+    int failed = 0;
+    BUFFER *payload = buffer_create(0, NULL);
+    BUFFER *output = buffer_create(0, NULL);
+    int code = 0;
+
+    buffer_strcat(payload, "{}");
+
+    struct json_object *result = json_parse_function_payload_or_error(output, payload, &code,
+                                                                      json_function_payload_fail_with_error,
+                                                                      "");
+
+    T(result == NULL, "function_payload_empty_error_fallback: callback failure should return NULL");
+    T(code == HTTP_RESP_BAD_REQUEST, "function_payload_empty_error_fallback: callback failure should return bad request");
+
+    json_object *response = json_tokener_parse(buffer_tostring(output));
+    T(response != NULL, "function_payload_empty_error_fallback: output should be valid JSON");
+
+    const char *error_msg = NULL;
+    if(response) {
+        json_object *error_obj = NULL;
+        T(json_object_object_get_ex(response, "errorMessage", &error_obj),
+          "function_payload_empty_error_fallback: response should include errorMessage");
+
+        if(error_obj)
+            error_msg = json_object_get_string(error_obj);
+    }
+
+    T(error_msg != NULL, "function_payload_empty_error_fallback: errorMessage should be readable");
+    T(error_msg && strcmp(error_msg, "JSON parser failed: unknown error") == 0,
+      "function_payload_empty_error_fallback: empty callback error should use the unknown error fallback");
+
+    if(response)
+        json_object_put(response);
+    buffer_free(output);
+    buffer_free(payload);
+
+    return failed;
+}
+
 // ============================================================================
 // Entry point
 // ============================================================================
@@ -1936,12 +2067,15 @@ int json_c_parser_unittest(void) {
         { "TXT2BUFFER",         test_parse_txt2buffer },
         { "TXT2UUID",           test_parse_txt2uuid },
         { "TXT2RFC3339",        test_parse_txt2rfc3339 },
+        { "FORMAT_RFC3339",     test_format_rfc3339 },
         { "TXT2PATTERN",        test_parse_txt2pattern },
         { "TXT2ENUM",           test_parse_txt2enum },
         { "ARRAY_OF_TXT2BITMAP", test_parse_array_of_txt2bitmap },
         { "SUBOBJECT",          test_parse_subobject },
         { "ARRAY",              test_parse_array },
         { "ARRAY_ITEM_OBJECT",  test_parse_array_item_object },
+        { "FUNCTION_PAYLOAD_ERROR_CAP", test_parse_function_payload_error_cap },
+        { "FUNCTION_PAYLOAD_EMPTY_ERROR_FALLBACK", test_parse_function_payload_empty_error_fallback },
         { NULL, NULL }
     };
 

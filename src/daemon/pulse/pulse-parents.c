@@ -305,7 +305,7 @@ static void chart_by_reason(struct by_reason *b, const char *id, const char *con
             , RRDSET_TYPE_LINE
         );
 
-        for(size_t i = 0; i < STREAM_HANDSHAKE_NEGATIVE_MAX ;i++) {
+        for(int i = 0; i < STREAM_HANDSHAKE_NEGATIVE_MAX ;i++) {
             char buf[1024];
             if(!i)
                 strncpyz(buf, "connected", sizeof(buf) - 1);

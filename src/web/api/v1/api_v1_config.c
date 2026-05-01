@@ -40,18 +40,20 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
 
     size_t len = strlen(action) + (id ? strlen(id) : 0) + strlen(path) + (add_name ? strlen(add_name) : 0) + 100;
 
-    char cmd[len];
+    char *cmd = mallocz(len);
     if(strcmp(action, "tree") == 0)
-        snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " tree '%s' '%s'", path, id?id:"");
+        snprintfz(cmd, len, PLUGINSD_FUNCTION_CONFIG " tree '%s' '%s'", path, id?id:"");
     else {
         DYNCFG_CMDS c = dyncfg_cmds2id(action);
         if(!id || !*id || !dyncfg_is_valid_id(id)) {
             rrd_call_function_error(w->response.data, "Invalid id", HTTP_RESP_BAD_REQUEST);
+            freez(cmd);
             return HTTP_RESP_BAD_REQUEST;
         }
 
         if(c == DYNCFG_CMD_NONE) {
             rrd_call_function_error(w->response.data, "Invalid action", HTTP_RESP_BAD_REQUEST);
+            freez(cmd);
             return HTTP_RESP_BAD_REQUEST;
         }
 
@@ -69,12 +71,13 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
 
             if(!add_name || !*add_name || !dyncfg_is_valid_id(add_name)) {
                 rrd_call_function_error(w->response.data, "Invalid name", HTTP_RESP_BAD_REQUEST);
+                freez(cmd);
                 return HTTP_RESP_BAD_REQUEST;
             }
-            snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s %s", id, dyncfg_id2cmd_one(c), add_name);
+            snprintfz(cmd, len, PLUGINSD_FUNCTION_CONFIG " %s %s %s", id, dyncfg_id2cmd_one(c), add_name);
         }
         else
-            snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s", id, dyncfg_id2cmd_one(c));
+            snprintfz(cmd, len, PLUGINSD_FUNCTION_CONFIG " %s %s", id, dyncfg_id2cmd_one(c));
     }
 
     CLEAN_BUFFER *source = buffer_create(100, NULL);
@@ -88,5 +91,6 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
                                 web_client_interrupt_callback, w,
                                 w->payload, buffer_tostring(source), false);
 
+    freez(cmd);
     return code;
 }

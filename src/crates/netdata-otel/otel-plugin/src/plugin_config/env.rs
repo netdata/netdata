@@ -3,10 +3,10 @@ use bytesize::ByteSize;
 use std::env;
 use std::time::Duration;
 
+use super::PluginConfigOverride;
 use super::endpoint::EndpointConfigOverride;
 use super::logs::LogsConfigOverride;
 use super::metrics::MetricsConfigOverride;
-use super::PluginConfigOverride;
 
 /// Read an environment variable, returning `None` if not set and an error if not valid UTF-8.
 fn read_env(name: &str) -> Result<Option<String>> {
@@ -77,9 +77,21 @@ impl PluginConfigOverride {
         let logs = LogsConfigOverride::from_env()?;
 
         Ok(Self {
-            endpoint: if endpoint.has_overrides() { Some(endpoint) } else { None },
-            metrics: if metrics.has_overrides() { Some(metrics) } else { None },
-            logs: if logs.has_overrides() { Some(logs) } else { None },
+            endpoint: if endpoint.has_overrides() {
+                Some(endpoint)
+            } else {
+                None
+            },
+            metrics: if metrics.has_overrides() {
+                Some(metrics)
+            } else {
+                None
+            },
+            logs: if logs.has_overrides() {
+                Some(logs)
+            } else {
+                None
+            },
         })
     }
 }
@@ -128,18 +140,10 @@ impl LogsConfigOverride {
     fn from_env() -> Result<Self> {
         Ok(Self {
             journal_dir: env_var("NETDATA_OTEL_LOGS_JOURNAL_DIR")?,
-            size_of_journal_file: parse_env_bytesize(
-                "NETDATA_OTEL_LOGS_SIZE_OF_JOURNAL_FILE",
-            )?,
-            entries_of_journal_file: parse_env_var(
-                "NETDATA_OTEL_LOGS_ENTRIES_OF_JOURNAL_FILE",
-            )?,
-            number_of_journal_files: parse_env_var(
-                "NETDATA_OTEL_LOGS_NUMBER_OF_JOURNAL_FILES",
-            )?,
-            size_of_journal_files: parse_env_bytesize(
-                "NETDATA_OTEL_LOGS_SIZE_OF_JOURNAL_FILES",
-            )?,
+            size_of_journal_file: parse_env_bytesize("NETDATA_OTEL_LOGS_SIZE_OF_JOURNAL_FILE")?,
+            entries_of_journal_file: parse_env_var("NETDATA_OTEL_LOGS_ENTRIES_OF_JOURNAL_FILE")?,
+            number_of_journal_files: parse_env_var("NETDATA_OTEL_LOGS_NUMBER_OF_JOURNAL_FILES")?,
+            size_of_journal_files: parse_env_bytesize("NETDATA_OTEL_LOGS_SIZE_OF_JOURNAL_FILES")?,
             duration_of_journal_files: parse_env_duration(
                 "NETDATA_OTEL_LOGS_DURATION_OF_JOURNAL_FILES",
             )?,

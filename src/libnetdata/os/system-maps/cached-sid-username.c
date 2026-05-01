@@ -103,19 +103,20 @@ static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
 
     size_t tmp_size = sizeof(SID_VALUE) + size;
     size_t tmp_key_size = sizeof(SID_KEY) + size;
-    uint8_t buf[tmp_size];
-    SID_VALUE *tmp = (SID_VALUE *)&buf;
+    SID_VALUE *tmp = mallocz(tmp_size);
     memcpy(&tmp->key.sid, sid, size);
     tmp->key.len = size;
 
     spinlock_lock(&sid_globals.spinlock);
     SID_VALUE *found = simple_hashtable_get_SID(&sid_globals.hashtable, &tmp->key, tmp_key_size);
     spinlock_unlock(&sid_globals.spinlock);
-    if(found) return found;
+    if(found) {
+        freez(tmp);
+        return found;
+    }
 
     // allocate the SID_VALUE
-    found = mallocz(tmp_size);
-    memcpy(found, buf, tmp_size);
+    found = tmp;
 
     lookup_user_in_system(found);
 

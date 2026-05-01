@@ -70,9 +70,14 @@ typedef enum __attribute__((packed)) {
     WEB_CLIENT_FLAG_ACCEPT_SSE              = (1 << 26),
     WEB_CLIENT_FLAG_ACCEPT_TEXT             = (1 << 27),
     WEB_CLIENT_FLAG_MCP_PREVIEW_KEY         = (1 << 28), // Authorization header matched MCP preview key
+    WEB_CLIENT_FLAG_PATH_IS_MCP             = (1 << 29), // URL path is /mcp[/...] or /sse[/...] — set during URL decoding so it's also available for OPTIONS preflights (which skip the URL dispatcher)
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2|WEB_CLIENT_FLAG_PATH_IS_V3)
+// PATH_IS_MCP is intentionally *not* in the reset mask: it is set during
+// URL decoding, not during URL dispatch, so resetting it here (which runs
+// after decoding but before dispatch on POST/GET/etc.) would wipe it
+// before the response builder could read it.
 #define web_client_reset_path_flags(w) (w)->flags &= ~(WEB_CLIENT_FLAG_PATH_WITH_VERSION|WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH|WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION)
 
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))

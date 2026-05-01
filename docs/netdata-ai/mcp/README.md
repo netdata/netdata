@@ -46,7 +46,7 @@ no local setup, no bridges, no firewall changes.
 
 ### Prerequisites
 
-1. **Netdata Cloud account** with a **Business plan**
+1. **Netdata Cloud account** with a **Paid plan**
 2. **API token** with `scope:mcp` — [Create one in API Tokens settings](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md)
 3. **Nodes claimed to Netdata Cloud** —
    The Cloud MCP server can only access nodes
@@ -81,6 +81,36 @@ Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN
 For more details, see [API Tokens](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md).
 
 ### Connection Configuration
+
+#### Claude Code (One-Line Setup)
+
+If you're using [Claude Code](https://www.anthropic.com/claude-code), you can register the Netdata Cloud MCP server from any session with a single command — no JSON editing required:
+
+```bash
+claude mcp add --transport http --scope user netdata-cloud \
+  https://app.netdata.cloud/api/v1/mcp \
+  --header "Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with a token that has `scope:mcp` — see [Creating an API Token](#creating-an-api-token) above, or go directly to **User Settings → API Tokens** in [Netdata Cloud](https://app.netdata.cloud).
+
+**Scope flags:**
+
+- `--scope user` — available in all your projects on this machine (recommended for personal use)
+- `--scope local` — this project only, private to you (default when `--scope` is omitted)
+- `--scope project` — this project, checked into `.mcp.json` and shared with your team (do **not** use with a raw token; reference an environment variable instead)
+
+**Useful companion commands:**
+
+```bash
+claude mcp list                          # show all configured servers and their connection status
+claude mcp get netdata-cloud             # show the configuration for this server
+claude mcp remove netdata-cloud -s user  # remove the server (match the scope you added with)
+```
+
+Restart the Claude Code session after adding the server so the new tools load.
+
+For more Claude Code options — including connecting to a local Netdata Agent or Parent — see the [Claude Code guide](/docs/netdata-ai/mcp/mcp-clients/claude-code.md).
 
 #### Generic MCP Client (HTTP Transport)
 
@@ -131,7 +161,7 @@ Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
 - Verify your API token has `scope:mcp`
 - Ensure the token is passed as `Authorization: Bearer <token>` (not as a query parameter)
 - Check that your Netdata Cloud subscription
-  includes a space in the Business plan
+  includes a space in a Paid plan
 
 #### No Nodes Visible
 
@@ -606,7 +636,6 @@ For detailed configuration instructions for specific AI clients, see:
 - [Cursor](/docs/netdata-ai/mcp/mcp-clients/cursor.md) - AI-powered code editor
 - [Visual Studio Code](/docs/netdata-ai/mcp/mcp-clients/vs-code.md) - VS Code with MCP support
 - [JetBrains IDEs](/docs/netdata-ai/mcp/mcp-clients/jetbrains-ides.md) - IntelliJ, PyCharm, WebStorm, etc.
-- [Netdata Web Client](/docs/netdata-ai/mcp/mcp-clients/netdata-web-client.md) - Built-in web-based AI chat
 
 **DevOps Copilots:**
 - [Claude Code](/docs/netdata-ai/mcp/mcp-clients/claude-code.md) - Anthropic's CLI for Claude

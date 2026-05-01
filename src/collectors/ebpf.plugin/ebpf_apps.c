@@ -914,7 +914,7 @@ void ebpf_parse_proc_files()
         if (ebpf_plugin_stop())
             break;
 
-        if (kill(pids->pid, 0)) { // No PID found
+        if (kill(pids->pid, 0) == -1 && errno == ESRCH) {
             ebpf_pid_data_t *next = pids->next;
             ebpf_reset_specific_pid_data(pids);
             pids = next;

@@ -295,15 +295,19 @@ void health_init_prototypes(void) {
 
 static inline struct pattern_array *health_config_add_key_to_values(struct pattern_array *pa, const char *input_key, char *value)
 {
-    char key[HEALTH_CONF_MAX_LINE + 1];
-    char data[HEALTH_CONF_MAX_LINE + 1];
+    size_t value_len = strlen(value);
+    size_t input_key_len = input_key ? strlen(input_key) : 0;
+    size_t key_len = value_len > input_key_len ? value_len : input_key_len;
+    size_t pair_len = key_len + value_len + 4;
+    char *key = mallocz(key_len + 1);
+    char *data = mallocz(value_len + 1);
+    char *pair = mallocz(pair_len);
 
     char *s = value;
     size_t i = 0;
 
-    char pair[HEALTH_CONF_MAX_LINE + 1];
     if (input_key)
-        strncpyz(key, input_key, HEALTH_CONF_MAX_LINE);
+        strncpyz(key, input_key, key_len);
     else
         key[0] = '\0';
 
@@ -311,14 +315,14 @@ static inline struct pattern_array *health_config_add_key_to_values(struct patte
         if (*s == '=') {
             //hold the key
             data[i]='\0';
-            strncpyz(key, data, HEALTH_CONF_MAX_LINE);
+            strncpyz(key, data, key_len);
             i=0;
         } else if (*s == ' ') {
             data[i]='\0';
             if (data[0]=='!')
-                snprintfz(pair, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
+                snprintfz(pair, pair_len, "!%s=%s ", key, data + 1);
             else
-                snprintfz(pair, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+                snprintfz(pair, pair_len, "%s=%s ", key, data);
 
             pa = pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
             i=0;
@@ -330,12 +334,16 @@ static inline struct pattern_array *health_config_add_key_to_values(struct patte
     data[i]='\0';
     if (data[0]) {
         if (data[0]=='!')
-            snprintfz(pair, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
+            snprintfz(pair, pair_len, "!%s=%s ", key, data + 1);
         else
-            snprintfz(pair, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+            snprintfz(pair, pair_len, "%s=%s ", key, data);
 
         pa = pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
     }
+
+    freez(key);
+    freez(data);
+    freez(pair);
 
     return pa;
 }

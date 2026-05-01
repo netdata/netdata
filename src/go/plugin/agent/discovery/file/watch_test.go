@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWatcher_New(t *testing.T) {
@@ -174,6 +175,56 @@ func TestWatcher_Run(t *testing.T) {
 					discovery: discovery,
 					afterRun: func() {
 						tmp.writeYAML(filename, cfg)
+					},
+					expectedGroups: expected,
+				}
+				return sim
+			},
+		},
+		"add file while write is still settling": {
+			createSim: func(tmp *tmpDir) discoverySim {
+				reg := confgroup.Registry{
+					"module": {},
+				}
+				cfg := sdConfig{
+					{
+						"name":   "name",
+						"module": "module",
+					},
+				}
+				filename := tmp.join("module.conf")
+				discovery := prepareDiscovery(t, Config{
+					Registry: reg,
+					Watch:    []string{tmp.join("*.conf")},
+				})
+				setWatcherEventSettle(t, discovery, 50*time.Millisecond)
+				expected := []*confgroup.Group{
+					{
+						Source: filename,
+						Configs: []confgroup.Config{
+							{
+								"name":                "name",
+								"module":              "module",
+								"update_every":        collectorapi.UpdateEvery,
+								"autodetection_retry": collectorapi.AutoDetectionRetry,
+								"priority":            collectorapi.Priority,
+								"__provider__":        "file watcher",
+								"__source_type__":     confgroup.TypeStock,
+								"__source__":          fmt.Sprintf("discoverer=file_watcher,file=%s", filename),
+							},
+						},
+					},
+				}
+
+				sim := discoverySim{
+					discovery: discovery,
+					afterRun: func() {
+						tmp.writeString(filename, "")
+						go func() {
+							time.Sleep(10 * time.Millisecond)
+							tmp.writeYAML(filename, cfg)
+						}()
+						time.Sleep(250 * time.Millisecond)
 					},
 					expectedGroups: expected,
 				}
@@ -375,5 +426,18 @@ func TestWatcher_Run(t *testing.T) {
 
 			test.createSim(tmp).run(t)
 		})
+	}
+}
+
+func setWatcherEventSettle(t *testing.T, discovery *Discovery, delay time.Duration) {
+	t.Helper()
+	require.NotNil(t, discovery)
+
+	for _, dd := range discovery.discoverers {
+		w, ok := dd.(*Watcher)
+		if !ok {
+			continue
+		}
+		w.eventSettle = delay
 	}
 }

@@ -625,8 +625,15 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
 
     bool existing = false;
     bool *found = dictionary_set(dirs, dirname, &existing, sizeof(existing));
-    if (*found)
+    if (unlikely(!found)) {
+        netdata_log_error("Cannot track visited directory '%s' (dictionary_set failed); stopping recursion", dirname);
+        closedir(dir);
         return;
+    }
+    if (*found) {
+        closedir(dir);
+        return;
+    }
     *found = true;
 
     // Read each entry in the directory.
@@ -637,7 +644,7 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
         ssize_t len = snprintfz(full_path, sizeof(full_path), "%s/%s", dirname, entry->d_name);
 
         if (entry->d_type == DT_DIR) {
-            nd_journal_directory_scan_recursively(files, dirs, full_path, depth++);
+            nd_journal_directory_scan_recursively(files, dirs, full_path, depth + 1);
         } else if (entry->d_type == DT_REG && is_journal_file(full_path, len, NULL)) {
             if (files)
                 dictionary_set(files, full_path, NULL, 0);
@@ -652,7 +659,7 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
                 // The symbolic link points to a directory
                 char resolved_path[FILENAME_MAX + 1];
                 if (realpath(full_path, resolved_path) != NULL) {
-                    nd_journal_directory_scan_recursively(files, dirs, resolved_path, depth++);
+                    nd_journal_directory_scan_recursively(files, dirs, resolved_path, depth + 1);
                 }
             } else if (S_ISREG(info.st_mode) && is_journal_file(full_path, len, NULL)) {
                 if (files)
