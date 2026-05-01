@@ -2213,7 +2213,7 @@ static int aral_concurrency_test_unmark_last_marked_on_page(void) {
 // is freed.
 static int aral_concurrency_test_stress(void) {
     int errors = 0;
-    const size_t pool_size = 256;  // many enough to span multiple pages
+    const size_t pool_size = 256;  // large enough to span multiple pages
     fprintf(stderr, "  test 8: coordinated race stress - %zu pointers, deterministic UNMARKING for each\n", pool_size);
 
     ARAL *ar = aral_create("aral-conc-stress", sizeof(struct aral_unittest_entry),
