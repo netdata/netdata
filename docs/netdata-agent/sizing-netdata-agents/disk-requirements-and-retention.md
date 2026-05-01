@@ -49,6 +49,21 @@ In practice, with default settings and an ingestion rate of about 4,000 metrics 
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
+### Monitoring Per-Tier Storage Consumption
+
+Netdata provides built-in charts for monitoring per-tier retention utilization under the **dbengine retention** chart family in the Netdata dashboard. Each tier has its own chart with two dimensions:
+
+- **space**: the percentage of configured disk space currently used
+- **time**: the percentage of configured time retention currently used
+
+:::tip
+
+To view these charts, open the Netdata dashboard and navigate to **Netdata** → **dbengine retention**.
+
+:::
+
+For more details, see [Monitoring Retention Utilization](/src/database/README.md#monitoring-retention-utilization).
+
 **Configuring dbengine mode and retention**:
 
 - Enable dbengine mode: The dbengine mode is already the default, so no configuration change is necessary. For reference, the dbengine mode can be configured by setting `[db].mode` to `dbengine` in `netdata.conf`.
