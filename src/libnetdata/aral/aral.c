@@ -1030,6 +1030,7 @@ void aral_unmark_allocation(ARAL *ar, void *ptr) {
         return;
 
     ARAL_PAGE *page = (ARAL_PAGE *)desired;
+    internal_fatal(!page, "Trailer had marked bit set but no page pointer");
     internal_fatal((uintptr_t)page % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
 
     aral_page_lock(ar, page);
