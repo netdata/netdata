@@ -1893,6 +1893,23 @@ static void aral_concurrency_test_fixture_teardown_with_entry(struct aral_concur
     aral_concurrency_race_hook_reset();
 }
 
+// Verify the page counters reflect exactly one freez of the test entry:
+// used and marked each decremented by 1. Returns the error count to add.
+static int aral_concurrency_test_check_counters_after_one_freez(struct aral_concurrency_test_fixture *f) {
+    int errors = 0;
+    if(f->page->page_lock.used_elements != f->used0 - 1) {
+        fprintf(stderr, "    used_elements: %u -> %u (expected %u)\n",
+                f->used0, f->page->page_lock.used_elements, f->used0 - 1);
+        errors++;
+    }
+    if(f->page->page_lock.marked_elements != f->marked0 - 1) {
+        fprintf(stderr, "    marked_elements: %u -> %u (expected %u)\n",
+                f->marked0, f->page->page_lock.marked_elements, f->marked0 - 1);
+        errors++;
+    }
+    return errors;
+}
+
 // Test 1: clean unmark on a marked allocation. No concurrency.
 // Expects: marked counter -1, used counter unchanged, slot trailer becomes UNMARKED.
 static int aral_concurrency_test_clean_unmark(void) {
@@ -1980,16 +1997,7 @@ static int aral_concurrency_test_clean_freez_marked(void) {
 
     aral_freez(f.ar, f.entry);
 
-    if(f.page->page_lock.used_elements != f.used0 - 1) {
-        fprintf(stderr, "    used_elements: %u -> %u (expected %u)\n",
-                f.used0, f.page->page_lock.used_elements, f.used0 - 1);
-        errors++;
-    }
-    if(f.page->page_lock.marked_elements != f.marked0 - 1) {
-        fprintf(stderr, "    marked_elements: %u -> %u (expected %u)\n",
-                f.marked0, f.page->page_lock.marked_elements, f.marked0 - 1);
-        errors++;
-    }
+    errors += aral_concurrency_test_check_counters_after_one_freez(&f);
 
     aral_concurrency_test_fixture_teardown(&f);
     return errors;
@@ -2118,16 +2126,7 @@ static int aral_concurrency_test_unmark_wins_impl(const char *aral_name, usec_t 
     nd_thread_join(unmark_thread);
     nd_thread_join(freez_thread);
 
-    if(f.page->page_lock.used_elements != f.used0 - 1) {
-        fprintf(stderr, "    used_elements: %u -> %u (expected %u)\n",
-                f.used0, f.page->page_lock.used_elements, f.used0 - 1);
-        errors++;
-    }
-    if(f.page->page_lock.marked_elements != f.marked0 - 1) {
-        fprintf(stderr, "    marked_elements: %u -> %u (expected %u)\n",
-                f.marked0, f.page->page_lock.marked_elements, f.marked0 - 1);
-        errors++;
-    }
+    errors += aral_concurrency_test_check_counters_after_one_freez(&f);
 
     aral_concurrency_test_fixture_teardown(&f);
     return errors;
