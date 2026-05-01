@@ -1,0 +1,26 @@
+{
+  "174374": {
+    "vni": 174374,
+    "type": "L2",
+    "vxlanIf": "ONTEP1_174374",
+    "numMacs": 42,
+    "numArpNd": 0,
+    "numRemoteVteps": 1,
+    "tenantVrf": "default",
+    "remoteVteps": [
+      "10.0.0.13"
+    ]
+  },
+  "172192": {
+    "vni": 172192,
+    "type": "L2",
+    "vxlanIf": "ONTEP1_172192",
+    "numMacs": 0,
+    "numArpNd": 23,
+    "numRemoteVteps": "n/a",
+    "tenantVrf": "default",
+    "remoteVteps": [
+      "10.0.0.13"
+    ]
+  }
+}

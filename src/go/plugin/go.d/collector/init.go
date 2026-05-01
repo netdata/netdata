@@ -11,6 +11,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor"
 	// _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/as400" // Moved to ibm.d.plugin (requires CGO)
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/beanstalk"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/bgp"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/bind"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/boinc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cassandra"

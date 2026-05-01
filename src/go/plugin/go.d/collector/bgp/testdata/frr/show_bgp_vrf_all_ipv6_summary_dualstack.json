@@ -1,0 +1,18 @@
+{
+  "default": {
+    "ipv6Unicast": {
+      "as": 64512,
+      "ribCount": 3,
+      "peers": {
+        "192.0.2.2": {
+          "remoteAs": 64513,
+          "msgRcvd": 100,
+          "msgSent": 90,
+          "peerUptimeMsec": 10000,
+          "pfxRcd": 3,
+          "state": "Established"
+        }
+      }
+    }
+  }
+}

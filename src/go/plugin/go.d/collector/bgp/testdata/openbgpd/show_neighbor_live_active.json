@@ -1,0 +1,91 @@
+{
+  "neighbors": [
+    {
+      "remote_as": "65020",
+      "description": "test-peer",
+      "remote_addr": "192.0.2.2",
+      "state": "Active",
+      "last_updown": "Never",
+      "last_updown_sec": -1,
+      "config": {
+        "template": false,
+        "cloned": false,
+        "passive": true,
+        "down": false,
+        "multihop": false,
+        "ttl_security": false,
+        "holdtime": 0,
+        "min_holdtime": 0,
+        "announce_capabilities": true,
+        "capabilities": {
+          "as4byte": true,
+          "refresh": true,
+          "enhanced_refresh": false,
+          "multiprotocol": [
+            "IPv4 unicast"
+          ],
+          "graceful_restart": {
+            "eor": true,
+            "restart": false
+          }
+        }
+      },
+      "stats": {
+        "last_read": "Never",
+        "last_read_sec": -1,
+        "last_write": "Never",
+        "last_write_sec": -1,
+        "prefixes": {
+          "sent": 0,
+          "received": 0
+        },
+        "message": {
+          "sent": {
+            "open": 0,
+            "notifications": 0,
+            "updates": 0,
+            "keepalives": 0,
+            "route_refresh": 0,
+            "total": 0
+          },
+          "received": {
+            "open": 0,
+            "notifications": 0,
+            "updates": 0,
+            "keepalives": 0,
+            "route_refresh": 0,
+            "total": 0
+          }
+        },
+        "update": {
+          "sent": {
+            "updates": 0,
+            "withdraws": 0,
+            "eor": 0
+          },
+          "received": {
+            "updates": 0,
+            "withdraws": 0,
+            "eor": 0
+          },
+          "pending": {
+            "updates": 0,
+            "withdraws": 0
+          }
+        },
+        "route-refresh": {
+          "sent": {
+            "request": 0,
+            "borr": 0,
+            "eorr": 0
+          },
+          "received": {
+            "request": 0,
+            "borr": 0,
+            "eorr": 0
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+bgp_legacy BGP master4 up 1514768400 Established
+  Description:        Legacy peer
+  BGP state:          Established
+    Neighbor address: 198.51.100.1
+    Neighbor AS:      64497
+    Local AS:         64496
+  Routes:             12 imported, 1 filtered, 34 exported, 100 preferred
+  Route change stats:     received   rejected   filtered    ignored   accepted
+    Import updates:              1          2          3          4          5
+    Import withdraws:            6          7        ---          9         10
+    Export updates:             11         12         13        ---         15
+    Export withdraws:           16        ---        ---        ---         18

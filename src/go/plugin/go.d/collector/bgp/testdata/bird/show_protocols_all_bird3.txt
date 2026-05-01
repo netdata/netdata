@@ -1,0 +1,39 @@
+BIRD 3.1.0 ready.
+Name       Proto      Table      State  Since         Info
+device1    Device     ---        up     06:17:34.575
+  Created:            06:17:34.575
+
+static4    Static     master4    up     06:17:34.575
+  Created:            06:17:34.575
+  Channel ipv4
+    State:          UP
+    Import state:   UP
+    Export state:   DOWN
+    Table:          master4
+    Preference:     200
+    Input filter:   ACCEPT
+    Output filter:  REJECT
+    Routes:         1 imported, 0 exported, 1 preferred
+    Route change stats:     received   rejected   filtered    ignored   RX limit      limit   accepted
+      Import updates:              1          0          0          0          0          0          1
+      Import withdraws:            0          0        ---          0        ---        ---          0
+      Export updates:              0          0          0          0        ---          0          0
+      Export withdraws:            0        ---        ---          0        ---        ---          0
+
+bgp4       BGP        ---        start  06:17:34.575  Active
+  Description:        IPv4 upstream
+  Created:            06:17:34.575
+  BGP state:          Active
+    Neighbor address: 198.51.100.2
+    Neighbor AS:      65001
+    Local AS:         64512
+    Connect delay:    1.200/5
+  Channel ipv4
+    State:          DOWN
+    Import state:   DOWN
+    Export state:   DOWN
+    Table:          master4
+    Preference:     100
+    Input filter:   ACCEPT
+    Output filter:  ACCEPT
+    IGP IPv4 table: master4

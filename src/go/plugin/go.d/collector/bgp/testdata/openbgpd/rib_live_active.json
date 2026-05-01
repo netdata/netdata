@@ -1,0 +1,27 @@
+{
+  "rib": [
+    {
+      "prefix": "203.0.113.0/24",
+      "aspath": "",
+      "exit_nexthop": "0.0.0.0",
+      "true_nexthop": "0.0.0.0",
+      "neighbor": {
+        "description": "LOCAL",
+        "remote_addr": "???",
+        "bgp_id": "192.0.2.254"
+      },
+      "valid": true,
+      "best": true,
+      "source": "internal",
+      "announced": true,
+      "ovs": "not-found",
+      "origin": "IGP",
+      "metric": 0,
+      "localpref": 100,
+      "weight": 0,
+      "dmetric": 5,
+      "last_update": "00:00:05",
+      "last_update_sec": 5
+    }
+  ]
+}

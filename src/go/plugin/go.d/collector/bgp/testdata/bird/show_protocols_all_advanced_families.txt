@@ -1,0 +1,76 @@
+bgp_adv   BGP      master4  up     2026-04-03 07:00:00  Established
+  Description: Advanced families
+  BGP state: Established
+  Neighbor address: 198.51.100.2
+  Neighbor AS: 65010
+  Local AS: 64512
+  Channel ipv4 multicast
+    Table: mcast4
+    Routes: 10 imported, 1 filtered, 12 exported, 9 preferred
+    Import updates: 11 0 0 0 11
+    Import withdraws: 1 0 0 0 1
+    Export updates: 21 0 0 0 21
+    Export withdraws: 2 0 0 0 2
+  Channel ipv6 multicast
+    Table: mcast6
+    Routes: 20 imported, 2 filtered, 22 exported, 19 preferred
+    Import updates: 12 0 0 0 12
+    Import withdraws: 3 0 0 0 3
+    Export updates: 24 0 0 0 24
+    Export withdraws: 4 0 0 0 4
+  Channel ipv4 mpls
+    Table: label4
+    Routes: 30 imported, 3 filtered, 32 exported, 29 preferred
+    Import updates: 13 0 0 0 13
+    Import withdraws: 5 0 0 0 5
+    Export updates: 27 0 0 0 27
+    Export withdraws: 6 0 0 0 6
+  Channel ipv6 mpls
+    Table: label6
+    Routes: 40 imported, 4 filtered, 42 exported, 39 preferred
+    Import updates: 14 0 0 0 14
+    Import withdraws: 7 0 0 0 7
+    Export updates: 30 0 0 0 30
+    Export withdraws: 8 0 0 0 8
+  Channel vpn4 mpls
+    Table: vpn4tab
+    Routes: 50 imported, 5 filtered, 52 exported, 49 preferred
+    Import updates: 15 0 0 0 15
+    Import withdraws: 9 0 0 0 9
+    Export updates: 33 0 0 0 33
+    Export withdraws: 10 0 0 0 10
+  Channel vpn6 mpls
+    Table: vpn6tab
+    Routes: 60 imported, 6 filtered, 62 exported, 59 preferred
+    Import updates: 16 0 0 0 16
+    Import withdraws: 11 0 0 0 11
+    Export updates: 36 0 0 0 36
+    Export withdraws: 12 0 0 0 12
+  Channel vpn4 multicast
+    Table: mvpn4tab
+    Routes: 70 imported, 7 filtered, 72 exported, 69 preferred
+    Import updates: 17 0 0 0 17
+    Import withdraws: 13 0 0 0 13
+    Export updates: 39 0 0 0 39
+    Export withdraws: 14 0 0 0 14
+  Channel vpn6 multicast
+    Table: mvpn6tab
+    Routes: 80 imported, 8 filtered, 82 exported, 79 preferred
+    Import updates: 18 0 0 0 18
+    Import withdraws: 15 0 0 0 15
+    Export updates: 42 0 0 0 42
+    Export withdraws: 16 0 0 0 16
+  Channel flow4
+    Table: flow4tab
+    Routes: 90 imported, 9 filtered, 92 exported, 89 preferred
+    Import updates: 19 0 0 0 19
+    Import withdraws: 17 0 0 0 17
+    Export updates: 45 0 0 0 45
+    Export withdraws: 18 0 0 0 18
+  Channel flow6
+    Table: flow6tab
+    Routes: 100 imported, 10 filtered, 102 exported, 99 preferred
+    Import updates: 20 0 0 0 20
+    Import withdraws: 19 0 0 0 19
+    Export updates: 48 0 0 0 48
+    Export withdraws: 20 0 0 0 20

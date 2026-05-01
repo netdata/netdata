@@ -1,0 +1,56 @@
+{
+	"rib": [
+		{
+			"prefix": "23.42.1.0/24",
+			"aspath": "1111",
+			"exit_nexthop": "200.100.25.7",
+			"true_nexthop": "200.100.25.7",
+			"neighbor": {
+				"remote_addr": "200.100.25.7",
+				"bgp_id": "200.100.25.7"
+			},
+			"valid": true,
+			"source": "external",
+			"ovs": "not-found",
+			"origin": "IGP",
+			"metric": 50,
+			"localpref": 100,
+			"weight": 0,
+			"last_update": "05w3d19h",
+			"communities": [
+				"20119:3"
+			],
+			"large_communities": [
+				"54987:1:1"
+			],
+			"extended_communities": [
+				"[0] 11000:0",
+				"rt 65000:11000",
+                "[0] 0x8000000000000000"
+			]
+		},
+		{
+			"prefix": "fc29:bac0:167::/48",
+			"aspath": "1111",
+			"exit_nexthop": "2212:100:f::1:1",
+			"true_nexthop": "2212:100:f::1:1",
+			"neighbor": {
+				"remote_addr": "2212:100:f::1:1",
+				"bgp_id": "172.11.111.1"
+			},
+			"valid": true,
+			"source": "external",
+			"ovs": "valid",
+			"origin": "IGP",
+			"metric": 0,
+			"localpref": 100,
+			"weight": 0,
+			"last_update": "05w3d19h",
+			"communities": [
+				"13335:10167",
+				"13335:19000",
+				"13335:31000"
+			]
+		}
+	]
+}

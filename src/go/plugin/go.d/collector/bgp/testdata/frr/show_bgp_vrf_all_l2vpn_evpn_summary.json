@@ -1,0 +1,17 @@
+{
+  "default": {
+    "as": 65001,
+    "ribCount": 5,
+    "peers": {
+      "192.168.0.2": {
+        "remoteAs": 65002,
+        "msgRcvd": 50,
+        "msgSent": 55,
+        "peerUptimeMsec": 3600000,
+        "pfxRcd": 4,
+        "pfxSnt": 4,
+        "state": "Established"
+      }
+    }
+  }
+}

@@ -1,0 +1,224 @@
+{
+	"neighbors": [
+		{
+			"remote_as": "123",
+			"group": "clients",
+			"remote_addr": "200.100.25.7",
+			"bgpid": "206.100.25.7",
+			"state": "Established",
+			"last_updown": "01w0d16h",
+			"config": {
+				"template": false,
+				"cloned": false,
+				"passive": true,
+				"down": false,
+				"multihop": false,
+				"max_prefix": 577,
+				"max_prefix_restart": 15,
+				"ttl_security": false,
+				"holdtime": 0,
+				"min_holdtime": 0,
+				"announce_capabilities": true,
+				"capabilities": {
+					"as4byte": true,
+					"refresh": true,
+					"multiprotocol": [
+						"IPv4 unicast"
+					],
+					"graceful_restart": {
+						"eor": true,
+						"restart": false
+					}
+				}
+			},
+			"stats": {
+				"last_read": "00:00:08",
+				"last_write": "00:00:08",
+				"prefixes": {
+					"sent": 864,
+					"received": 1
+				},
+				"message": {
+					"sent": {
+						"open": 1,
+						"notifications": 0,
+						"updates": 460,
+						"keepalives": 22152,
+						"route_refresh": 0,
+						"total": 22613
+					},
+					"received": {
+						"open": 1,
+						"notifications": 0,
+						"updates": 2,
+						"keepalives": 22158,
+						"route_refresh": 0,
+						"total": 22161
+					}
+				},
+				"update": {
+					"sent": {
+						"updates": 897,
+						"withdraws": 7,
+						"eor": 0
+					},
+					"received": {
+						"updates": 1,
+						"withdraws": 0,
+						"eor": 1
+					}
+				}
+			},
+			"session": {
+				"holdtime": 90,
+				"keepalive": 30,
+				"local": {
+					"address": "206.126.225.254",
+					"port": 179,
+					"capabilities": {
+						"as4byte": true,
+						"refresh": true,
+						"multiprotocol": [
+							"IPv4 unicast"
+						],
+						"graceful_restart": {
+							"eor": true,
+							"restart": false
+						}
+					}
+				},
+				"remote": {
+					"address": "206.126.225.7",
+					"port": 37237,
+					"capabilities": {
+						"as4byte": true,
+						"refresh": false,
+						"multiprotocol": [
+							"IPv4 unicast",
+							"IPv6 unicast",
+							"IPv4 vpn",
+							"IPv6 vpn"
+						]
+					}
+				},
+				"capabilities": {
+					"as4byte": true,
+					"refresh": false,
+					"multiprotocol": [
+						"IPv4 unicast"
+					]
+				}
+			}
+		},
+		{
+			"remote_as": "12346",
+			"group": "clients",
+			"remote_addr": "2000:1:2::3",
+			"bgpid": "1.2.3.4",
+			"state": "Established",
+			"last_updown": "01w0d16h",
+			"config": {
+				"template": false,
+				"cloned": false,
+				"passive": true,
+				"down": false,
+				"multihop": false,
+				"max_prefix": 747,
+				"max_prefix_restart": 15,
+				"ttl_security": false,
+				"holdtime": 0,
+				"min_holdtime": 0,
+				"announce_capabilities": true,
+				"capabilities": {
+					"as4byte": true,
+					"refresh": true,
+					"multiprotocol": [
+						"IPv6 unicast"
+					],
+					"graceful_restart": {
+						"eor": true,
+						"restart": false
+					}
+				}
+			},
+			"stats": {
+				"last_read": "00:00:08",
+				"last_write": "00:00:07",
+				"prefixes": {
+					"sent": 127,
+					"received": 0
+				},
+				"message": {
+					"sent": {
+						"open": 1,
+						"notifications": 0,
+						"updates": 133,
+						"keepalives": 22155,
+						"route_refresh": 0,
+						"total": 22289
+					},
+					"received": {
+						"open": 1,
+						"notifications": 0,
+						"updates": 1,
+						"keepalives": 22158,
+						"route_refresh": 0,
+						"total": 22160
+					}
+				},
+				"update": {
+					"sent": {
+						"updates": 131,
+						"withdraws": 2,
+						"eor": 0
+					},
+					"received": {
+						"updates": 0,
+						"withdraws": 0,
+						"eor": 1
+					}
+				}
+			},
+			"session": {
+				"holdtime": 90,
+				"keepalive": 30,
+				"local": {
+					"address": "fd42:1:2::3:4:5",
+					"port": 179,
+					"capabilities": {
+						"as4byte": true,
+						"refresh": true,
+						"multiprotocol": [
+							"IPv6 unicast"
+						],
+						"graceful_restart": {
+							"eor": true,
+							"restart": false
+						}
+					}
+				},
+				"remote": {
+					"address": "fd42:1:2::3:4:6",
+					"port": 43025,
+					"capabilities": {
+						"as4byte": true,
+						"refresh": false,
+						"multiprotocol": [
+							"IPv4 unicast",
+							"IPv6 unicast",
+							"IPv4 vpn",
+							"IPv6 vpn"
+						]
+					}
+				},
+				"capabilities": {
+					"as4byte": true,
+					"refresh": false,
+					"multiprotocol": [
+						"IPv6 unicast"
+					]
+				}
+			}
+		}
+	]
+}

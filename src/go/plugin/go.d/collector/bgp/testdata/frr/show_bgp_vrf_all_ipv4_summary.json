@@ -1,0 +1,112 @@
+{
+  "default": {
+    "ipv4Unicast": {
+      "routerId": "192.168.0.1",
+      "as": 64512,
+      "vrfId": 0,
+      "vrfName": "default",
+      "tableVersion": 0,
+      "ribCount": 1,
+      "ribMemory": 64,
+      "peerCount": 2,
+      "peerMemory": 39936,
+      "peers": {
+        "192.168.0.2": {
+          "remoteAs": 64513,
+          "version": 4,
+          "msgRcvd": 100,
+          "msgSent": 100,
+          "tableVersion": 0,
+          "outq": 0,
+          "inq": 0,
+          "peerUptime": "10000",
+          "peerUptimeMsec": 10000,
+          "prefixReceivedCount": 0,
+          "state": "Established",
+          "idType": "ipv4"
+        },
+        "192.168.0.3": {
+          "remoteAs": 64514,
+          "version": 4,
+          "msgRcvd": 0,
+          "msgSent": 0,
+          "tableVersion": 0,
+          "outq": 0,
+          "inq": 0,
+          "peerUptime": "never",
+          "peerUptimeMsec": 0,
+          "pfxRcd": 2,
+          "state": "Active",
+          "idType": "ipv4"
+        },
+        "192.168.0.4": {
+          "remoteAs": 64515,
+          "version": 4,
+          "msgRcvd": 0,
+          "msgSent": 0,
+          "tableVersion": 0,
+          "outq": 0,
+          "inq": 0,
+          "peerUptime": "never",
+          "peerUptimeMsec": 0,
+          "pfxRcd": 2,
+          "state": "Idle (Admin)",
+          "idType": "ipv4"
+        }
+      },
+      "totalPeers": 2,
+      "dynamicPeers": 0,
+      "bestPath": {
+        "multiPathRelax": "false"
+      }
+    }
+  },
+  "red": {
+    "ipv4Unicast": {
+      "routerId": "192.168.1.1",
+      "as": 64612,
+      "vrfId": 39,
+      "vrfName": "red",
+      "tableVersion": 0,
+      "ribCount": 0,
+      "ribMemory": 0,
+      "peerCount": 2,
+      "peerMemory": 39936,
+      "peers": {
+        "192.168.1.2": {
+          "remoteAs": 64613,
+          "version": 4,
+          "msgRcvd": 100,
+          "msgSent": 100,
+          "tableVersion": 0,
+          "outq": 0,
+          "inq": 0,
+          "peerUptime": "20000",
+          "peerUptimeMsec": 20000,
+          "prefixReceivedCount": 2,
+          "state": "Established",
+          "idType": "ipv4"
+        },
+        "192.168.1.3": {
+          "remoteAs": 64614,
+          "version": 4,
+          "msgRcvd": 200,
+          "msgSent": 200,
+          "tableVersion": 0,
+          "outq": 0,
+          "inq": 0,
+          "peerUptime": "never",
+          "peerUptimeMsec": 0,
+          "prefixReceivedCount": 0,
+          "state": "Active",
+          "idType": "ipv4"
+        }
+      },
+      "totalPeers": 2,
+      "dynamicPeers": 0,
+      "bestPath": {
+        "multiPathRelax": "false"
+      }
+    }
+  }
+}

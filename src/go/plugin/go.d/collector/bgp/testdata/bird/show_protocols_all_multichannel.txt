@@ -1,0 +1,38 @@
+1002-Name       Proto      Table      State  Since                   Info
+1002-bgp_edge   BGP        master     up     2026-04-03 06:00:00     Established
+1006-  Description:        Edge transit
+1006-  BGP state:          Established
+1006-    Neighbor address: 192.0.2.2
+1006-    Neighbor AS:      65001
+1006-    Local AS:         64512
+1006-  Channel ipv4
+1006-    Table:            master4
+1006-    Routes:           12 imported, 1 filtered, 34 exported, 10 preferred
+1006-    Route change stats:     received   rejected   filtered    ignored   accepted
+1006-      Import updates:              1          2          3          4          5
+1006-      Import withdraws:            6          7        ---          9         10
+1006-      Export updates:             11         12         13        ---         15
+1006-      Export withdraws:           16        ---        ---        ---         18
+1006-  Channel ipv6
+1006-    Table:            master6
+1006-    Routes:           3 imported, 2 filtered, 5 exported, 2 preferred
+1006-    Route change stats:     received   rejected   filtered    ignored   accepted
+1006-      Import updates:             20         21         22         23         24
+1006-      Import withdraws:           25         26        ---         28         29
+1006-      Export updates:             30         31         32        ---         34
+1006-      Export withdraws:           35        ---        ---        ---         39
+1002-bgp_backup BGP        master     start  00:05:00                Active
+1006-  Description:        Backup peer
+1006-  BGP state:          Active
+1006-    Neighbor address: 2001:db8::2
+1006-    Neighbor AS:      65002
+1006-    Local AS:         64512
+1006-  Channel ipv6
+1006-    Table:            backup6
+1006-    Routes:           1 imported, 0 filtered, 0 exported, 1 preferred
+1006-    Route change stats:     received   rejected   filtered    ignored   accepted
+1006-      Import updates:              2          0          0          0          2
+1006-      Import withdraws:            1          0        ---          0          1
+1006-      Export updates:              0          0          0        ---          0
+1006-      Export withdraws:            0        ---        ---        ---          0
+0000 OK

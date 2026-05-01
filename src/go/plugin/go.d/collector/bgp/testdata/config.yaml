@@ -1,0 +1,23 @@
+update_every: 5
+autodetection_retry: 60
+backend: frr
+socket_path: /var/run/frr/bgpd.vty
+zebra_socket_path: /var/run/frr/zebra.vty
+timeout: 2
+max_families: 10
+select_families:
+  includes:
+    - =default/ipv4/unicast
+max_peers: 50
+max_vnis: 20
+select_vnis:
+  includes:
+    - =default/172192
+deep_peer_prefix_metrics: true
+max_deep_queries_per_scrape: 8
+select_peers:
+  includes:
+    - =192.0.2.1
+  excludes:
+    - =192.0.2.2
+vnode: bgp-edge
