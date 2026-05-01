@@ -1010,18 +1010,31 @@ void aral_unmark_allocation(ARAL *ar, void *ptr) {
 
     if(unlikely(!ptr)) return;
 
-    // get the page pointer
-    bool marked;
-    ARAL_PAGE *page = aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, &marked);
+    // Must be a CAS, not load-then-store: aral_freez_internal can concurrently
+    // atomic-exchange the trailer to 0, and a non-atomic store here would
+    // overwrite that 0 and leave the slot on the free list with a non-zero
+    // trailer pointing back at its old page.
+    //
+    // On CAS failure (freez won, or already unmarked, or slot was reallocated)
+    // we must NOT touch page counters - freez's atomic claim is the sole owner
+    // of the decrement on the racing path.
+    uint8_t *data = ptr;
+    uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.element_ptr_offset];
+    uintptr_t expected = __atomic_load_n(page_ptr, __ATOMIC_ACQUIRE);
+    if(!(expected & 1))
+        return;
 
-    internal_fatal(!marked, "This allocation does is not marked");
+    uintptr_t desired = expected & ~(uintptr_t)1;
+    if(!__atomic_compare_exchange_n(page_ptr, &expected, desired,
+                                    false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+        return;
 
-    if(marked)
-        aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, page, ptr, false);
+    ARAL_PAGE *page = (ARAL_PAGE *)desired;
+    internal_fatal((uintptr_t)page % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
 
     aral_page_lock(ar, page);
-    internal_fatal(marked && !page->page_lock.marked_elements, "Marked counter going negative.");
-    bool unmark = marked && --page->page_lock.marked_elements == 0 && page->page_lock.used_elements;
+    internal_fatal(!page->page_lock.marked_elements, "Marked counter going negative.");
+    bool unmark = (--page->page_lock.marked_elements == 0) && page->page_lock.used_elements;
 
     if(unmark) {
         aral_lock(ar);
