@@ -86,6 +86,13 @@ Checkout is performed directly if there's an active plan.
 ## FAQ
 
 <details>
+<summary>What Counts as a Node?</summary>
+
+Each running Netdata Agent instance counts as one node for billing, regardless of whether it is installed on a physical server, virtual machine, container, or any other system. Only active (Live) nodes are counted; offline and stale nodes are excluded from billing. For clustered Parents, each Parent counts as one node.
+
+</details>
+
+<details>
 <summary>What Payment Methods are Accepted?</summary>
 
 Netdata accepts most major Credit/Debit Cards and Bank payments through Stripe and AWS, with more options coming soon.
