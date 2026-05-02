@@ -2038,8 +2038,9 @@ static int aral_concurrency_test_freez_wins(void) {
         errors++;
     }
 
-    // Disable hook for the freez we are about to run (it would otherwise also pause).
-    __atomic_store_n(&aral_concurrency_race_hook.enabled, false, __ATOMIC_RELAXED);
+    // The hook is armed for an UNMARK_* stage, so the freez we are about to
+    // run will not match (its only pause point is FREEZ_BEFORE_CLAIM). Just
+    // freez and let unmark resume on the release flag below.
     aral_freez(f.ar, f.entry);
 
     __atomic_store_n(&aral_concurrency_race_hook.release, true, __ATOMIC_RELEASE);
@@ -2104,7 +2105,8 @@ static int aral_concurrency_test_unmark_wins_impl(const char *aral_name, usec_t 
         return errors;
     }
 
-    __atomic_store_n(&aral_concurrency_race_hook.enabled, false, __ATOMIC_RELAXED);
+    // Hook is armed for UNMARK_AFTER_CAS - freez's FREEZ_BEFORE_CLAIM pause
+    // point will not match, so the freez thread proceeds without pausing.
     ND_THREAD *freez_thread = nd_thread_create("FREEZ", NETDATA_THREAD_OPTION_DONT_LOG,
                                                aral_concurrency_test_freez_thread, &ctx);
     if(!freez_thread) {
@@ -2242,9 +2244,9 @@ static int aral_concurrency_test_stress(void) {
             break;
         }
 
-        // Disable the hook for the freez we are about to spawn (it has its
-        // own pause point but we don't want it to fire).
-        __atomic_store_n(&aral_concurrency_race_hook.enabled, false, __ATOMIC_RELAXED);
+        // Hook is armed for UNMARK_AFTER_CAS - freez's FREEZ_BEFORE_CLAIM
+        // pause point will not match, so the freez we are about to spawn
+        // proceeds without pausing.
 
         // Snapshot the UNMARKING-cold-path counter before spawning freez.
         size_t cold_before = __atomic_load_n(&aral_freez_unmarking_observed_count, __ATOMIC_ACQUIRE);
