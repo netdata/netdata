@@ -692,6 +692,10 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
     datafile = xt_io_descr->datafile;
 
     bool still_running = ctx_is_available_for_queries(ctx);
+    if (likely(still_running && !have_error))
+        internal_fatal(!rrdeng_valid_extent_disk_size(xt_io_descr->bytes),
+                       "DBENGINE: flushed extent has invalid size %u",
+                       xt_io_descr->bytes);
 
     usec_t max_end_time_ut = 0;
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
@@ -700,7 +704,7 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
         if (descr->end_time_ut > max_end_time_ut)
             max_end_time_ut = descr->end_time_ut;
 
-        if (likely(still_running && !have_error))
+        if (likely(still_running && !have_error)) {
             pgc_open_add_hot_page(
                 (Word_t)ctx,
                 descr->metric_id,
@@ -710,6 +714,7 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
                 datafile,
                 xt_io_descr->pos,
                 xt_io_descr->bytes);
+        }
 
         page_descriptor_release(descr);
     }
