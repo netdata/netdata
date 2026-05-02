@@ -36,6 +36,8 @@ const char *os_type = "macos";
 #if defined(OS_WINDOWS)
 const char *os_type = "windows";
 
+#define OS_WINDOWS_PATH_TRANSLATION_MAX 8191
+
 char *os_translate_msys_to_windows_path(const char *src) {
     if (!src)
         return strdupz("");
@@ -54,12 +56,7 @@ char *os_translate_msys_to_windows_path(const char *src) {
         }
     }
 
-    const char *safe_src;
-    if(src)
-        safe_src = src;
-    else
-        safe_src = "";
-    size_t src_len = strlen(safe_src);
+    size_t src_len = strnlen(src, OS_WINDOWS_PATH_TRANSLATION_MAX);
     char *converted_path = mallocz(src_len + 3);
     size_t i = 0;
     size_t j = 0;
@@ -90,7 +87,7 @@ char *os_translate_msys_to_windows_path(const char *src) {
         i = 2;
     }
 
-    for (; src[i] && j < src_len + 2; i++)
+    for (; i < src_len && j < src_len + 2; i++)
         converted_path[j++] = (src[i] == '/') ? '\\' : src[i];
 
     converted_path[j] = '\0';
@@ -128,12 +125,7 @@ const char *os_translate_windows_to_msys_path(const char *src) {
         freez(converted_path);
     }
 
-    const char *safe_src;
-    if(src)
-        safe_src = src;
-    else
-        safe_src = "";
-    size_t src_len = strlen(safe_src);
+    size_t src_len = strnlen(src, OS_WINDOWS_PATH_TRANSLATION_MAX);
     char *converted_path = mallocz(src_len + 3);
     size_t converted_size_fallback = src_len + 3;
     size_t i = 0;
@@ -157,7 +149,7 @@ const char *os_translate_windows_to_msys_path(const char *src) {
         i = 2;
     }
 
-    for (; src[i] && j < converted_size_fallback - 1; i++)
+    for (; i < src_len && j < converted_size_fallback - 1; i++)
         converted_path[j++] = (src[i] == '\\') ? '/' : src[i];
 
     converted_path[j] = '\0';

@@ -84,7 +84,7 @@ static char *transform_log_path_setting(const char *setting, bool for_display) {
         safe_translated = output;
     else
         safe_translated = "";
-    size_t safe_translated_len = strlen(safe_translated);
+    size_t safe_translated_len = strnlen(safe_translated, CONFIG_MAX_VALUE + 1);
 
     if(output == copy)
         return strdupz(safe_translated);
