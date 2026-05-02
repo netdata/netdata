@@ -232,5 +232,20 @@ For resource-constrained systems, consider these adjustments:
 | **Anomaly Detection Grouping**    | `anomaly detection grouping method`    | -                | Method used to calculate node-level anomaly rate.                                                                                        |
 |                                   | `anomaly detection grouping duration`  | `1m` - `15m`     | Time window for calculating anomaly rates. Default `5m` calculates over a 5-minute rolling window.                                       |
 | **Skipping Hosts and Charts**     | `hosts to skip from training`          | -                | Excludes specific child hosts from training. Default `!*` means no hosts are skipped.                                                    |
-|                                   | `charts to skip from training`         | -                | Excludes charts from anomaly detection. By default, Netdata-related charts are excluded.                                                 |
+|                                   | `charts to skip from training`         | -                | Excludes charts from anomaly detection. `anomaly_detection.*` charts are always excluded (hardcoded). Default user-configurable value is `netdata.*`, which you can override. |
 | **Model Retention**               | `delete models older than`             | `1d` - `7d`      | How long old models are stored. Default `7d` removes unused models after seven days.                                                     |
+
+## Why Some Metrics Are Not Analyzed
+
+A metric (dimension) may not receive ML anomaly detection for one of the following reasons:
+
+- **Chart pattern exclusion** — If the chart matches a pattern in `charts to skip from training`, all its dimensions are excluded. The `anomaly_detection.*` pattern is always hardcoded and cannot be removed. The default `netdata.*` pattern can be changed or cleared in your configuration.
+- **Constant metric** — Dimensions whose values never change are classified as `METRIC_TYPE_CONSTANT` and are automatically skipped during training.
+- **Insufficient collected data** — Training requires at least `900` samples (approximately 15 minutes at the default 1-second collection interval). Models are not trained until enough data has accumulated.
+- **ML disabled or not activated** — When `enabled = no`, ML is off entirely. When `enabled = auto` (the default), ML only activates if the [Database mode](/src/database/README.md) is `dbengine`.
+
+:::tip
+
+Check the **anomaly_detection.dimensions** chart on your Node to verify how many dimensions are actively being analyzed by the ML detector.
+
+:::
