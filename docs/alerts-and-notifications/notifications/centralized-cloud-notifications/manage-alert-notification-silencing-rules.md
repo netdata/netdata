@@ -143,6 +143,12 @@ You will see configured Alert notification silencing rules for the space (if you
 **Scheduled**: Specify start and end time when the rule becomes active and inactive (time set according to your browser local timezone).
 </details>
 
+:::important
+
+Silencing rules are scoped to specific Rooms. When a Node belongs to multiple Rooms, a silencing rule in one Room does **not** silence notifications from other Rooms. To fully silence a multi-Room Node, use **All Rooms** as the scope or create individual rules in each Room where the Node resides.
+
+:::
+
 ## Step-by-Step Wizards for Common Use Cases
 
 <details>
