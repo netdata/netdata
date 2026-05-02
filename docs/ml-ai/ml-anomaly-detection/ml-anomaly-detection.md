@@ -156,7 +156,7 @@ You can see **Node Anomaly Rate (NAR)** and **Dimension Anomaly Rate (DAR)** cal
 
 ### Node-Level Anomaly Detection
 
-Netdata tracks the percentage of anomaly bits over time for you. When the **Node Anomaly Rate (NAR)** exceeds a set threshold and remains high for a period, a **node anomaly event** is triggered. These events are recorded in the `new_anomaly_event` dimension on the `anomaly_detection.anomaly_detection` chart.
+Netdata tracks the percentage of anomaly bits over time for you. When the **Node Anomaly Rate (NAR)** exceeds a set threshold and remains high for a period, a **node anomaly event** is triggered. These events are recorded in the `new_anomaly_event` dimension on the `anomaly_detection.detector_events` chart.
 
 ## Available Documentation
 
@@ -169,7 +169,7 @@ Once you enable ML, you'll have access to an **Anomaly Detection** menu with key
 
 - **`anomaly_detection.dimensions`**: Number of dimensions flagged as anomalous
 - **`anomaly_detection.anomaly_rate`**: Percentage of anomalous dimensions
-- **`anomaly_detection.anomaly_detection`**: Flags (0 or 1) indicating when an anomaly event occurs
+- **`anomaly_detection.detector_events`**: Anomaly detection events, including `above_threshold` (whether the Node Anomaly Rate exceeds the threshold) and `new_anomaly_event` (a new event triggered when the rate first crosses the threshold)
 
 These insights help you quickly assess potential issues and take action before they escalate.
 
