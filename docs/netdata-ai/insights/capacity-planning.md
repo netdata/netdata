@@ -46,7 +46,7 @@ Produce a report that justifies next‑quarter spend: show utilization trends, w
 
 ## Availability and usage
 
-- Available on Business and Free Trial plans
+- Available on Business, Homelab, and Free Trial plans
 - Each report consumes 1 AI credit (10 free per month on eligible plans)
 - Reports are saved in Insights and downloadable as PDFs
 

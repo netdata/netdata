@@ -75,7 +75,7 @@ Automate recurring investigations (weekly health, monthly optimization, SLO conf
 
 ## Availability and credits
 
-- Generally available in Netdata Cloud (Business and Free Trial)
+- Generally available in Netdata Cloud (Business, Homelab, and Free Trial)
 - Eligible Spaces receive 10 free AI runs per month; additional usage via AI Credits
 - Track usage in `Settings → Usage & Billing → AI Credits`
 

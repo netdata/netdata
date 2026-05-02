@@ -56,7 +56,7 @@ Click the **"Conversations"** button above the space selectors in Netdata Cloud.
 
 ## AI credits consumption
 
-Usage is based on AI credits (10 monthly complimentary credits on Business plans, plus the ability to top up as needed).
+Usage is based on AI credits (10 monthly complimentary credits on Business and Homelab plans, plus the ability to top up as needed).
 
 The conversations window displays a live measure of credits consumed by the current conversation:
 - Short conversations use a small fraction of a single credit
@@ -64,7 +64,7 @@ The conversations window displays a live measure of credits consumed by the curr
 
 ## Availability
 
-Real-Time Conversations are available for all users on a Business plan or free trial.
+Real-Time Conversations are available for all users on a Business plan, Homelab plan, or free trial.
 
 ## See also
 

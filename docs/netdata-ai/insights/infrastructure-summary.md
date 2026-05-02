@@ -45,7 +45,7 @@ Generate a 7‑day summary Monday morning to reconstruct what happened while the
 
 ## Availability and usage
 
-- Available in Netdata Cloud for Business and Free Trial
+- Available in Netdata Cloud for Business, Homelab, and Free Trial
 - Each generated report consumes 1 AI credit (10 free per month on eligible plans)
 - Data privacy: metrics are summarized into structured context; your data is not used to train foundation models
 

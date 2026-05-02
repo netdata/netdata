@@ -45,7 +45,7 @@ At the scheduled time, Netdata AI runs the report and delivers it to your email 
 
 ## Availability and usage
 
-- Available to Business and Free Trial plans
+- Available to Business, Homelab, and Free Trial plans
 - Each scheduled run consumes 1 AI credit (10 free/month on eligible plans)
 
 ## Tips

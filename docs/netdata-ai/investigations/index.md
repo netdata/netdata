@@ -60,7 +60,7 @@ Context:
 
 ## Availability and credits
 
-- Available to Business and Free Trial plans
+- Available to Business, Homelab, and Free Trial plans
 - Each run consumes 1 AI credit (10 free per month on eligible plans)
 
 ## Related documentation

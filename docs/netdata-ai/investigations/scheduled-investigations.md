@@ -46,6 +46,6 @@ breaches, contributing factors, and remediation recommendations.
 
 ## Availability and credits
 
-- Available on Business and Free Trial plans
+- Available on Business, Homelab, and Free Trial plans
 - 10 free AI runs/month on eligible Spaces; additional usage via AI Credits
 
