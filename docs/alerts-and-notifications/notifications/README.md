@@ -87,6 +87,18 @@ The [Netdata Assistant](https://learn.netdata.cloud/docs/machine-learning-and-an
 
 The Assistant window follows you as you navigate through dashboards, making troubleshooting faster and more efficient.
 
+### Alert Troubleshooting
+
+Alert Troubleshooting is an AI-powered feature that generates a root-cause analysis report directly from any alert. It examines the alert's history, correlates thousands of metrics across your infrastructure, and provides a root-cause hypothesis with supporting evidence.
+
+You can trigger it from:
+
+- The **"Ask AI"** button on the Alerts tab
+- The **"Troubleshoot with AI"** link in alert email notifications
+- The **Insights** tab's Alert Troubleshooting section
+
+See [AI-Powered Alert Troubleshooting](/docs/troubleshooting/troubleshoot.md) for details.
+
 ### Community Resources
 
 For more complex issues, you can access the [Alerts Troubleshooting space](https://community.netdata.cloud/c/alerts/28) in our community forum, where you'll find:

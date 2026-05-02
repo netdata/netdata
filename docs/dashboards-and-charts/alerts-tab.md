@@ -67,6 +67,12 @@ In the **Raised Alerts** tab:
     - Create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notification-silencing-rules).
     - Ask AI to troubleshoot the alert.
 
+:::tip
+
+Clicking **Ask AI** generates an AI-powered troubleshooting report that analyzes the alert's history, discovers correlated signals across your infrastructure, and proposes a root-cause hypothesis with supporting evidence. See [AI-Powered Alert Troubleshooting](/docs/troubleshooting/troubleshoot.md) for details.
+
+:::
+
 ## Creating and Tuning Alerts
 
 From the Alerts tab, you can create new alerts or tune existing ones:
