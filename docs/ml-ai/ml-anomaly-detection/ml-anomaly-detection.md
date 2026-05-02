@@ -158,6 +158,12 @@ You can see **Node Anomaly Rate (NAR)** and **Dimension Anomaly Rate (DAR)** cal
 
 Netdata tracks the percentage of anomaly bits over time for you. When the **Node Anomaly Rate (NAR)** exceeds a set threshold and remains high for a period, a **node anomaly event** is triggered. These events are recorded in the `new_anomaly_event` dimension on the `anomaly_detection.anomaly_detection` chart.
 
+:::note
+
+The stock `ml_1min_node_ar` alert template uses `to: silent`, so anomaly events are tracked in charts but **no notifications are sent**. To receive notifications via your configured channels (Discord, email, and so on), use `edit-config health.d/ml.conf` to change `to: silent` to an appropriate role such as `to: sysadmin`, then run `sudo netdatacli reload-health`.
+
+:::
+
 ## Available Documentation
 
 - **[ML Configuration](/src/ml/ml-configuration.md)** - Configuration and tuning guide
