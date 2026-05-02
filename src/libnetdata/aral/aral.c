@@ -2315,6 +2315,13 @@ static int aral_concurrency_test_stress(void) {
 }
 
 int aral_unittest_concurrency(void) {
+#if defined(FSANITIZE_ADDRESS)
+    // Under address sanitizer ARAL is bypassed entirely: mallocz/callocz/
+    // freez delegate straight to glibc and aral_unmark_allocation() is a
+    // no-op. There is no trailer protocol to test, so skip cleanly.
+    fprintf(stderr, "ARAL concurrency tests: SKIPPED (ARAL is disabled under FSANITIZE_ADDRESS)\n");
+    return 0;
+#else
     fprintf(stderr, "Running ARAL concurrency tests (unmark/freez state machine)...\n");
     int errors = 0;
     errors += aral_concurrency_test_clean_unmark();
@@ -2328,6 +2335,7 @@ int aral_unittest_concurrency(void) {
     fprintf(stderr, "ARAL concurrency tests: %s (%d errors)\n",
             errors ? "FAILED" : "PASSED", errors);
     return errors;
+#endif
 }
 
 #endif
