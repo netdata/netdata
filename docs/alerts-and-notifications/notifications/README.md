@@ -38,6 +38,7 @@ The Agent sends alerts directly from the node, even if it's offline or not conne
 
 - Email
 - Slack
+- Discord
 - PagerDuty
 - Twilio
 - Telegram
