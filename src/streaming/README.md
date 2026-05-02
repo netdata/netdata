@@ -330,7 +330,7 @@ Controls which charts are streamed.
 
 #### `allow from`
 
-Defines which Child nodes (by IP) can connect.
+Defines which Child nodes (by IP) can connect. Accepts a space-separated list of simple patterns: exact IPs, wildcards (`*`), and negations (`!`).
 
 - Allow a single IP:
 
@@ -340,6 +340,13 @@ Defines which Child nodes (by IP) can connect.
       allow from = 203.0.113.10
   ```
 
+- Allow multiple specific IPs and ranges:
+
+  ```ini
+  [API_KEY]
+      allow from = 192.168.1.5 192.168.1.6 10.*
+  ```
+
 - Allow a range but exclude one:
 
   ```ini
@@ -347,6 +354,12 @@ Defines which Child nodes (by IP) can connect.
       # Allow all 10.*.*.* addresses except 10.1.2.3
       allow from = !10.1.2.3 10.*
   ```
+
+  :::note
+
+  CIDR notation (for example `192.168.1.0/24`) is **not** supported. Use wildcard patterns such as `192.168.1.*` to approximate subnet ranges.
+
+  :::
 
 #### `db`
 
