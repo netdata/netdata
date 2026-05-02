@@ -42,6 +42,7 @@ The Agent sends alerts directly from the node, even if it's offline or not conne
 - Twilio
 - Telegram
 - Opsgenie
+- Discord
 
 ## Alert Intelligence and Severity Levels
 
