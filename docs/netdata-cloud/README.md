@@ -91,6 +91,12 @@ Netdata Cloud doesn't store your metrics or logs.
 
 :::
 
+:::tip
+
+Although Cloud does not store metrics, you can query metrics programmatically through the Cloud API using API tokens. See [API Tokens](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md) for endpoint details and usage examples.
+
+:::
+
 ## Fidelity and Resolution
 
 Netdata Cloud delivers the exact same high-quality data that Agents collect. When you view dashboards through the Cloud:
