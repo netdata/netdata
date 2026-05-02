@@ -33,6 +33,43 @@ gantt
 | `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     6 bytes     |
 | `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |    18 bytes     |
 
+### Configuring Custom Tier Resolutions
+
+You can enable up to 5 tiers by setting `storage tiers` in `netdata.conf`, and you can customize the aggregation multiplier for each tier using the `dbengine tier N update every iterations` setting. This setting controls how many data points from the previous tier are aggregated into one data point for the current tier.
+
+The default iteration multiplier is `60` for each tier, producing the default per-second / per-minute / per-hour progression. By changing this value (range: 2–255), you can create intermediate resolutions such as per-5-minute or per-5-second tiers.
+
+:::note
+
+The multiplication of all enabled tiers' `update every iterations` values must be less than `65535`.
+
+:::
+
+For example, to achieve a 4-tier retention profile with per-second, per-minute, per-5-minute, and per-hour resolutions:
+
+```text
+[db]
+    mode = dbengine
+    storage tiers = 4
+
+    # Tier 0: per-second data
+    dbengine tier 0 retention time = 14d
+
+    # Tier 1: per-minute data (60 iterations of tier 0)
+    dbengine tier 1 update every iterations = 60
+    dbengine tier 1 retention time = 35d
+
+    # Tier 2: per-5-minute data (5 iterations of tier 1)
+    dbengine tier 2 update every iterations = 5
+    dbengine tier 2 retention time = 400d
+
+    # Tier 3: per-hour data (12 iterations of tier 2)
+    dbengine tier 3 update every iterations = 12
+    dbengine tier 3 retention time = 2y
+```
+
+In this configuration, tier 2 aggregates every 5 minutes instead of the default 60 minutes, and tier 3 aggregates every 12 iterations of tier 2 (60 minutes / 5 = 12) to produce per-hour data.
+
 ### Default Disk Footprint
 
 Netdata Agent metrics storage is limited to 3 GiB by default (configurable), using 1 GiB per tier × 3 tiers. In total, with SQLite databases, alert transitions, and other metadata, expect about 4 GiB of disk usage under normal conditions. The default retention limits are:

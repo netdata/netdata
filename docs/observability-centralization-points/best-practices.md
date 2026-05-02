@@ -148,6 +148,14 @@ Adding 5–15% overhead for replication buffers, indexes, and metadata, plan for
     dbengine tier 2 retention time = 5y
 ```
 
+The `dbengine tier N update every iterations` setting controls how many data points from the previous tier are aggregated into one data point for tier `N`. The default is `60`, which means tier 1 aggregates 60 per-second samples into one per-minute sample, and tier 2 aggregates 60 per-minute samples into one per-hour sample.
+
+:::tip
+
+You can customize the iteration multiplier (range: 2–255) to create intermediate resolutions. For example, to add a per-5-minute tier, set `storage tiers = 4` and configure `dbengine tier 2 update every iterations = 5` (5 iterations of the per-minute tier 1) with a corresponding tier 3 using `dbengine tier 3 update every iterations = 12` to produce per-hour data. This enables retention profiles such as per-second, per-minute, per-5-minute, and per-hour natively within dbengine.
+
+:::
+
 ## Cost Optimization Strategies
 
 Netdata helps you keep observability efficient and cost-effective:
