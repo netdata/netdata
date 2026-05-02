@@ -8,7 +8,7 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configurati
 
 ```text
 [db]
-  # dbengine, ram, none
+  # dbengine, ram, alloc, none
   mode = dbengine
 ```
 
