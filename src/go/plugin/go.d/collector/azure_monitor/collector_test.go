@@ -33,14 +33,18 @@ import (
 )
 
 var (
-	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
-	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+	dataConfigJSON, _         = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _         = os.ReadFile("testdata/config.yaml")
+	dataConfigWorkloadJSON, _ = os.ReadFile("testdata/config_workload.json")
+	dataConfigWorkloadYAML, _ = os.ReadFile("testdata/config_workload.yaml")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON": dataConfigJSON,
-		"dataConfigYAML": dataConfigYAML,
+		"dataConfigJSON":         dataConfigJSON,
+		"dataConfigYAML":         dataConfigYAML,
+		"dataConfigWorkloadJSON": dataConfigWorkloadJSON,
+		"dataConfigWorkloadYAML": dataConfigWorkloadYAML,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -425,6 +429,10 @@ func requireArrayField(t *testing.T, m map[string]any, key string) []any {
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+}
+
+func TestCollector_ConfigurationSerialize_WorkloadVirtualNodes(t *testing.T) {
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigWorkloadJSON, dataConfigWorkloadYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -1334,40 +1342,56 @@ func TestSamplesFromQueryResponse_UsesResourceHostScope(t *testing.T) {
 	scope, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "api"}}}, "workload")
 	require.Empty(t, unsafeValue)
 
-	resourceID := "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a"
-	samples := samplesFromQueryResponse(
-		[]azmetrics.MetricData{{
-			ResourceID: ptrString(strings.ToLower(resourceID)),
-			Values: []azmetrics.Metric{
-				metricWithAvg("cpu_percent", now, 10),
-			},
-		}},
-		"postgres_flexible",
-		map[string]*metricRuntime{
-			"cpu_percent": {
-				Series: []*seriesRuntime{{
-					Aggregation: "average",
-					Kind:        azureprofiles.SeriesKindGauge,
-					Instrument:  "postgres_flexible.cpu_percent.average",
-				}},
-			},
+	tests := map[string]struct {
+		scope metrix.HostScope
+	}{
+		"default scope": {},
+		"workload scope": {
+			scope: scope,
 		},
-		map[string]resourceInfo{
-			strings.ToLower(resourceID): {
-				SubscriptionID: "sub-1",
-				ID:             resourceID,
-				UID:            "uid-a",
-				Name:           "pg-a",
-				Type:           "Microsoft.DBforPostgreSQL/flexibleServers",
-				ResourceGroup:  "rg-a",
-				Region:         "eastus",
-				HostScope:      scope,
-			},
-		},
-	)
+	}
 
-	require.Len(t, samples, 1)
-	assert.Equal(t, scope, samples[0].Scope)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			resourceID := "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a"
+			samples := samplesFromQueryResponse(
+				[]azmetrics.MetricData{{
+					ResourceID: ptrString(strings.ToLower(resourceID)),
+					Values: []azmetrics.Metric{
+						metricWithAvg("cpu_percent", now, 10),
+					},
+				}},
+				"postgres_flexible",
+				map[string]*metricRuntime{
+					"cpu_percent": {
+						Series: []*seriesRuntime{{
+							Aggregation: "average",
+							Kind:        azureprofiles.SeriesKindGauge,
+							Instrument:  "postgres_flexible.cpu_percent.average",
+						}},
+					},
+				},
+				map[string]resourceInfo{
+					strings.ToLower(resourceID): {
+						SubscriptionID: "sub-1",
+						ID:             resourceID,
+						UID:            "uid-a",
+						Name:           "pg-a",
+						Type:           "Microsoft.DBforPostgreSQL/flexibleServers",
+						ResourceGroup:  "rg-a",
+						Region:         "eastus",
+						HostScope:      tc.scope,
+					},
+				},
+			)
+
+			require.Len(t, samples, 1)
+			assert.Equal(t, tc.scope, samples[0].Scope)
+			if tc.scope.IsDefault() {
+				assert.True(t, samples[0].Scope.IsDefault())
+			}
+		})
+	}
 }
 
 func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
@@ -1665,6 +1689,182 @@ func TestCollector_WorkloadMode_QueryModeWarningWatermarks(t *testing.T) {
 	c.warnDiscoveryScopeFallbacks(state, runtime)
 	assert.Equal(t, uint64(2), c.tagsColumnMissingWarnedAt)
 	assert.Equal(t, uint64(2), c.tagsWrongShapeWarnedAt)
+}
+
+func TestCollector_WorkloadMode_QueryModeWarningDedupAcrossRefreshes(t *testing.T) {
+	const kql = "resources | project id, name, type, resourceGroup, location"
+
+	tests := map[string]struct {
+		tagsPresent   bool
+		tags          any
+		wantMissingAt func(*Collector) uint64
+		wantWrongAt   func(*Collector) uint64
+	}{
+		"missing tags column": {
+			wantMissingAt: func(c *Collector) uint64 { return c.tagsColumnMissingWarnedAt },
+		},
+		"wrong shaped tags column": {
+			tagsPresent: true,
+			tags:        "not-a-map",
+			wantWrongAt: func(c *Collector) uint64 { return c.tagsWrongShapeWarnedAt },
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			row := map[string]any{
+				"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+				"name":          "pg-a",
+				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+			}
+			if tc.tagsPresent {
+				row["tags"] = tc.tags
+			}
+
+			rg := &mockResourceGraph{resources: []map[string]any{row}}
+			c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
+			c.Config = testConfig()
+			c.Config.VirtualNodes = &VirtualNodesConfig{ByResourceTag: "workload"}
+			c.Config.Profiles.Mode = profilesModeAuto
+			c.Config.Profiles.ModeExact = nil
+			c.Config.Profiles.ModeCombined = nil
+			c.Config.Discovery.Mode = discoveryModeQuery
+			c.Config.Discovery.ModeFilters = nil
+			c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
+
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+			require.Equal(t, uint64(1), c.discovery.FetchCounter)
+			if tc.wantMissingAt != nil {
+				assert.Equal(t, uint64(1), tc.wantMissingAt(c))
+			}
+			if tc.wantWrongAt != nil {
+				assert.Equal(t, uint64(1), tc.wantWrongAt(c))
+			}
+
+			c.warnDiscoveryScopeFallbacks(c.discovery, c.runtime)
+			if tc.wantMissingAt != nil {
+				assert.Equal(t, uint64(1), tc.wantMissingAt(c))
+			}
+			if tc.wantWrongAt != nil {
+				assert.Equal(t, uint64(1), tc.wantWrongAt(c))
+			}
+
+			_, err := c.refreshDiscovery(context.Background(), true)
+			require.NoError(t, err)
+			require.Equal(t, uint64(2), c.discovery.FetchCounter)
+			if tc.wantMissingAt != nil {
+				assert.Equal(t, uint64(2), tc.wantMissingAt(c))
+			}
+			if tc.wantWrongAt != nil {
+				assert.Equal(t, uint64(2), tc.wantWrongAt(c))
+			}
+		})
+	}
+}
+
+func TestCollector_WorkloadMode_UnsafeValueReportResetsPerRefresh(t *testing.T) {
+	runtime := &collectorRuntime{
+		WorkloadResourceTagKey: "workload",
+		Profiles: []*profileRuntime{{
+			Name:         "postgres_flexible",
+			ResourceType: "Microsoft.DBforPostgreSQL/flexibleServers",
+		}},
+	}
+	base := resourceInfo{
+		SubscriptionID: "sub-1",
+		ID:             "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+		UID:            "uid-a",
+		Name:           "pg-a",
+		Type:           "Microsoft.DBforPostgreSQL/flexibleServers",
+		ResourceGroup:  "rg-a",
+		Region:         "eastus",
+	}
+	tests := map[string]struct {
+		refreshes []struct {
+			tags       []resourceTag
+			wantUnsafe map[string]int
+		}
+	}{
+		"unsafe report is scoped to the current refresh": {
+			refreshes: []struct {
+				tags       []resourceTag
+				wantUnsafe map[string]int
+			}{
+				{
+					tags:       []resourceTag{{Key: "workload", Value: "bad\none"}},
+					wantUnsafe: map[string]int{"bad\none": 1},
+				},
+				{
+					tags:       []resourceTag{{Key: "workload", Value: "bad\ntwo"}},
+					wantUnsafe: map[string]int{"bad\ntwo": 1},
+				},
+				{
+					tags: []resourceTag{{Key: "workload", Value: "api"}},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			for i, refresh := range tc.refreshes {
+				resource := base
+				resource.Tags = refresh.tags
+				fetchCounter := uint64(i + 1)
+
+				state := buildDiscoveryState([]resourceInfo{resource}, runtime, time.Unix(int64(fetchCounter), 0), 300, fetchCounter, discoveryFetchResult{})
+
+				assert.Equal(t, refresh.wantUnsafe, state.UnsafeWorkloadValues)
+			}
+		})
+	}
+}
+
+func TestCollector_WorkloadMode_DisabledLeavesQueryAndScopesDefault(t *testing.T) {
+	const kql = "resources | project id, name, type, resourceGroup, location"
+
+	tests := map[string]struct {
+		virtualNodes *VirtualNodesConfig
+	}{
+		"unset": {},
+		"whitespace": {
+			virtualNodes: &VirtualNodesConfig{ByResourceTag: " \t "},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rg := &mockResourceGraph{resources: []map[string]any{{
+				"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+				"name":          "pg-a",
+				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+			}}}
+			c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
+			c.Config = testConfig()
+			c.Config.VirtualNodes = tc.virtualNodes
+			c.Config.Profiles.Mode = profilesModeAuto
+			c.Config.Profiles.ModeExact = nil
+			c.Config.Profiles.ModeCombined = nil
+			c.Config.Discovery.Mode = discoveryModeQuery
+			c.Config.Discovery.ModeFilters = nil
+			c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
+
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+
+			assert.Equal(t, kql, rg.lastQuery())
+			assert.Empty(t, c.runtime.WorkloadResourceTagKey)
+			require.Len(t, c.discovery.Resources, 1)
+			assert.True(t, c.discovery.Resources[0].HostScope.IsDefault())
+			assert.False(t, c.tagsColumnMissingWarned)
+			assert.False(t, c.tagsWrongShapeWarned)
+		})
+	}
 }
 
 func TestCollector_InitQueryModeRejectsMalformedRows(t *testing.T) {
