@@ -58,6 +58,9 @@
   keywords:
     - sso
     - oidc
+    - ldap
+    - active-directory
+    - ad
   overview:
     authentication_description: "Integrate your organization's Authorization Servers with Netdata to better manage your team's access controls to Netdata Cloud."
     authentication_limitations: ''

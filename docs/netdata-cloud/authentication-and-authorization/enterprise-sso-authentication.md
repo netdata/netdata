@@ -53,3 +53,9 @@ Consult your provider's documentation for detailed instructions.
 ## How to Authenticate
 
 Click on the link `Sign-in with an Enterprise Single Sign-On (SSO)` and follow the instructions. If you're not authenticated on the Enterprise SSO tool, you'll be prompted to authenticate there first before being allowed to proceed to Netdata Cloud.
+
+## LDAP and Active Directory Integration
+
+Netdata Cloud does not connect directly to LDAP or Active Directory. Instead, you can authenticate LDAP/AD users through any OIDC-compatible identity provider that bridges your directory service, such as Okta or Microsoft Entra ID.
+
+Set up the [OIDC integration](https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/cloud-authentication-&-authorization-integrations/oidc) with your identity provider, then enable [SCIM](https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/cloud-authentication-&-authorization-integrations/scim) to automatically map LDAP/AD groups to Netdata roles and Room access.
