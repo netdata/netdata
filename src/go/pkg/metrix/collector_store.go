@@ -282,16 +282,19 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 		series:      make(map[string]*committedSeries, len(oldSnap.series)),
 		byName:      nil,
 	}
+	commitHostScopes := make(map[string]HostScope)
 
 	maps.Copy(next.series, oldSnap.series)
 
 	for key, staged := range c.core.active.gauges {
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 		series.value = staged.value
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.counters {
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
@@ -312,6 +315,7 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 	}
 
 	for key, staged := range c.core.active.histograms {
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		if series.desc == nil {
@@ -339,6 +343,7 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 	}
 
 	for key, staged := range c.core.active.summaries {
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		if staged.desc.mode == modeStateful && len(staged.desc.summaryQuantiles()) > 0 {
@@ -366,6 +371,7 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 	}
 
 	for key, staged := range c.core.active.stateSet {
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		series.stateSetValues = cloneStateMap(staged.states)
@@ -373,12 +379,14 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 	}
 
 	for key, staged := range c.core.active.measureSetGauges {
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 		series.measureSetValues = append(series.measureSetValues[:0], staged.values...)
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.measureSetCounters {
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		if series.desc != nil && series.desc.kind == kindMeasureSet && series.desc.measureSet != nil && series.desc.measureSet.semantics == MeasureSetSemanticsCounter && series.measureSetCurrentSeq > 0 {
@@ -396,6 +404,7 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
+	refreshCommittedHostScopes(oldSnap, next, commitHostScopes)
 	applyCollectorRetention(next.series, c.core.retention, successSeq)
 	next.collectMeta.LastAttemptSeq = c.core.active.seq
 	next.collectMeta.LastAttemptStatus = CollectStatusSuccess
@@ -443,6 +452,23 @@ func getOrCreateCommitSeries(old, next *readSnapshot, key, name, hostScopeKey st
 	series = newCommittedSeries(key, name, hostScopeKey, hostScope, labels, labelsKey, desc)
 	next.series[key] = series
 	return series
+}
+
+func refreshCommittedHostScopes(old, next *readSnapshot, scopes map[string]HostScope) {
+	if len(scopes) == 0 {
+		return
+	}
+	for key, series := range next.series {
+		scope, ok := scopes[series.hostScopeKey]
+		if !ok || hostScopeEqual(series.hostScope, scope) {
+			continue
+		}
+		series = ensureCommitSeriesMutable(old, next, key)
+		if series == nil {
+			continue
+		}
+		series.hostScope = cloneHostScope(scope)
+	}
 }
 
 func markSeriesSeen(series *committedSeries, attemptSeq, successSeq uint64) {

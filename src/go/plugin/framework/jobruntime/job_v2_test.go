@@ -1969,6 +1969,52 @@ func TestJobV2CleanupUsesPreModuleCleanupSnapshotForStaleSuppression(t *testing.
 	assert.True(t, mod.cleaned)
 }
 
+func TestJobV2CleanupDoesNotSuppressExplicitScopeForStaleJobVnode(t *testing.T) {
+	mod := &mockModuleV2{
+		store:    metrix.NewCollectorStore(),
+		template: chartTemplateV2(),
+	}
+
+	var out bytes.Buffer
+	job := newTestJobV2WithVnode(mod, &out, vnodes.VirtualNode{
+		Hostname: "node-host",
+		GUID:     "node-guid",
+		Labels: map[string]string{
+			"_node_stale_after_seconds": "60",
+		},
+	})
+	require.NoError(t, job.AutoDetection())
+
+	job.scopeStates = map[string]*jobV2ScopeState{
+		"scope-a": {
+			scopeKey: "scope-a",
+			scope: metrix.HostScope{
+				ScopeKey: "scope-a",
+				GUID:     "node-guid",
+				Hostname: "scoped-host",
+			},
+			host: jobV2HostState{
+				cleanupOwner: jobV2HostRef{kind: jobV2HostVnode, guid: "node-guid"},
+				cleanupCharts: map[string]chartengine.ChartMeta{
+					"workers_busy": {
+						Title:    "Workers Busy",
+						Family:   "Workers",
+						Context:  "workers_busy",
+						Units:    "workers",
+						Type:     chartengine.ChartTypeLine,
+						Priority: chartengine.Priority,
+					},
+				},
+			},
+		},
+	}
+
+	job.Cleanup()
+
+	assert.Contains(t, out.String(), `HOST 'node-guid'`)
+	assert.Contains(t, out.String(), "obsolete")
+}
+
 func TestJobV2CleanupNoSuccessfulEmissionsIsNoOp(t *testing.T) {
 	mod := &mockModuleV2{
 		store:    metrix.NewCollectorStore(),

@@ -18,7 +18,7 @@ type jobV2CleanupSnapshot struct {
 	staleVnodeSuppressed bool
 }
 
-func (s *jobV2HostState) captureCleanupSnapshot(vnode vnodes.VirtualNode) jobV2CleanupSnapshot {
+func (s *jobV2HostState) captureCleanupSnapshot(vnode vnodes.VirtualNode, allowStaleVnodeSuppression bool) jobV2CleanupSnapshot {
 	if s == nil {
 		return jobV2CleanupSnapshot{}
 	}
@@ -26,7 +26,7 @@ func (s *jobV2HostState) captureCleanupSnapshot(vnode vnodes.VirtualNode) jobV2C
 	return jobV2CleanupSnapshot{
 		charts:               maps.Clone(s.cleanupCharts),
 		host:                 host,
-		staleVnodeSuppressed: shouldSuppressCleanupForStaleVnode(host, vnode),
+		staleVnodeSuppressed: allowStaleVnodeSuppression && shouldSuppressCleanupForStaleVnode(host, vnode),
 	}
 }
 
@@ -43,7 +43,7 @@ func (j *JobV2) captureScopeCleanupSnapshots() []jobV2CleanupSnapshot {
 		if state == nil {
 			continue
 		}
-		snapshot := state.host.captureCleanupSnapshot(vnode)
+		snapshot := state.host.captureCleanupSnapshot(vnode, key == defaultHostScopeKey)
 		snapshot.scopeKey = key
 		snapshots = append(snapshots, snapshot)
 	}

@@ -63,6 +63,48 @@ func TestHostScopePartitionsSeriesIdentity(t *testing.T) {
 	require.NotEqual(t, defaultID, scopedID)
 }
 
+func TestHostScopeMetadataRefreshesRetainedSeries(t *testing.T) {
+	store := NewCollectorStore()
+	cc := cycleController(t, store)
+
+	scopeV1 := HostScope{
+		ScopeKey: "workload/api",
+		GUID:     "guid-api",
+		Hostname: "api",
+		Labels:   map[string]string{"_vnode_type": "azure_workload"},
+	}
+	scopeV2 := HostScope{
+		ScopeKey: "workload/api",
+		GUID:     "guid-api",
+		Hostname: "api-v2",
+		Labels:   map[string]string{"_vnode_type": "azure_workload", "region": "eastus"},
+	}
+	meter := store.Write().SnapshotMeter("azure")
+	labels := meter.LabelSet(Label{Key: "resource", Value: "vm1"})
+
+	cc.BeginCycle()
+	meter.WithHostScope(scopeV1).Gauge("requests").Observe(1, labels)
+	meter.WithHostScope(scopeV1).Gauge("errors").Observe(2, labels)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	cc.BeginCycle()
+	meter.WithHostScope(scopeV2).Gauge("requests").Observe(3, labels)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	require.Equal(t, []HostScope{scopeV2}, store.Read().HostScopes())
+
+	snapshot := store.(*storeView).core.snapshot.Load()
+	seen := 0
+	for _, series := range snapshot.series {
+		if series.hostScopeKey != scopeV2.ScopeKey {
+			continue
+		}
+		seen++
+		require.Equal(t, scopeV2, series.hostScope)
+	}
+	require.Equal(t, 2, seen)
+}
+
 func TestHostScopeVecDerivationPartitionsSeries(t *testing.T) {
 	store := NewCollectorStore()
 	cc := cycleController(t, store)
