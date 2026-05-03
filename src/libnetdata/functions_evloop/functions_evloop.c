@@ -89,29 +89,30 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
 
     nd_thread_register_canceller(rrd_functions_worker_canceller, wg);
 
-    bool last_acquired = true;
     while (true) {
-        netdata_mutex_lock(&wg->worker_mutex);
-
-        if(__atomic_load_n(&wg->workers_exit, __ATOMIC_RELAXED) || nd_thread_signaled_to_cancel()) {
-            netdata_mutex_unlock(&wg->worker_mutex);
-            break;
-        }
-
-        if(dictionary_entries(wg->worker_queue) == 0 || !last_acquired)
-            netdata_cond_wait(&wg->worker_cond_var, &wg->worker_mutex);
-
         const DICTIONARY_ITEM *acquired = NULL;
         struct functions_evloop_worker_job *j;
-        dfe_start_write(wg->worker_queue, j) {
-            if(j->running || j->cancelled)
-                continue;
 
-            acquired = dictionary_acquired_item_dup(wg->worker_queue, j_dfe.item);
-            j->running = true;
-            break;
+        netdata_mutex_lock(&wg->worker_mutex);
+
+        // Keep the scan and the wait under worker_mutex so a new-job signal
+        // cannot land after we decide to sleep but before the thread blocks.
+        while(!__atomic_load_n(&wg->workers_exit, __ATOMIC_RELAXED) && !nd_thread_signaled_to_cancel()) {
+            dfe_start_write(wg->worker_queue, j) {
+                if(j->running || __atomic_load_n(&j->cancelled, __ATOMIC_RELAXED))
+                    continue;
+
+                acquired = dictionary_acquired_item_dup(wg->worker_queue, j_dfe.item);
+                j->running = true;
+                break;
+            }
+            dfe_done(j);
+
+            if(acquired)
+                break;
+
+            netdata_cond_wait(&wg->worker_cond_var, &wg->worker_mutex);
         }
-        dfe_done(j);
 
         netdata_mutex_unlock(&wg->worker_mutex);
 
@@ -129,15 +130,12 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
             };
             ND_LOG_STACK_PUSH(lgs);
 
-            last_acquired = true;
             j = dictionary_acquired_item_value(acquired);
             j->cb(j->transaction, j->cmd, &j->stop_monotonic_ut, &j->cancelled, j->payload, j->access, j->source, j->cb_data);
             dictionary_del(wg->worker_queue, j->transaction);
             dictionary_acquired_item_release(wg->worker_queue, acquired);
             dictionary_garbage_collect(wg->worker_queue);
         }
-        else
-            last_acquired = false;
     }
 }
 
