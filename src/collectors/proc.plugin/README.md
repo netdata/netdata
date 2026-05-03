@@ -38,6 +38,37 @@ In detail, it collects metrics from:
 
 - - -
 
+## General Configuration
+
+Each module listed above can be individually enabled or disabled by setting its name to `yes` or `no` in the `[plugin:proc]` section of `netdata.conf`. When a module is disabled, it is completely skipped during collection — the corresponding `/proc` or `/sys` files are not read, and no charts are produced.
+
+For example, to collect metrics only from `/proc/stat` and `/proc/loadavg`, disable all other modules:
+
+```text
+[plugin:proc]
+    /proc/stat = yes
+    /proc/loadavg = yes
+    /proc/meminfo = no
+    /proc/vmstat = no
+    /proc/diskstats = no
+    /proc/interrupts = no
+    /proc/softirqs = no
+    /proc/net/dev = no
+    /proc/net/wireless = no
+    /proc/net/netstat = no
+    /proc/mdstat = no
+    /proc/pressure = no
+    /proc/net/stat/conntrack = no
+    /proc/net/stat/synproxy = no
+    # ... set all other listed modules to no
+```
+
+:::note
+
+Modules not explicitly listed in your configuration use their default setting, which is `yes` (enabled) for most modules. Only modules set to `no` are disabled.
+
+:::
+
 ## Monitoring Disks
 
 > Live demo of disk monitoring at: **[http://london.netdata.rocks](https://registry.my-netdata.io/#menu_disk)**

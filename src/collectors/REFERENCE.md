@@ -37,6 +37,18 @@ Most collectors and plugins are enabled by default. You can selectively disable 
    ```
 3. [Restart](/docs/netdata-agent/start-stop-restart.md) the Agent after making changes.
 
+**For proc.plugin modules**:
+
+Individual `proc.plugin` modules can be disabled in `netdata.conf` by setting the module name to `no` in the `[plugin:proc]` section:
+
+```text
+[plugin:proc]
+    /proc/meminfo = no
+    /proc/diskstats = no
+```
+
+This completely skips the module — the corresponding `/proc` or `/sys` files are not read during collection. [Restart](/docs/netdata-agent/start-stop-restart.md) the Agent after making changes.
+
 ## Adjust data collection frequency
 
 You can modify how often collectors gather metrics to optimize CPU usage. This can be done globally or for specific collectors.
