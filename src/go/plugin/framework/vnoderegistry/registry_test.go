@@ -156,7 +156,7 @@ func TestRegistryScenarios(t *testing.T) {
 				require.NoError(t, err)
 				assert.False(t, got.UpdateFirstSeen)
 
-				for i := 0; i < maxReportedMetadataStatesPerGUID+1; i++ {
+				for i := range maxReportedMetadataStatesPerGUID + 1 {
 					_, err = reg.Register("job", netdataapi.HostInfo{
 						GUID:     "node-guid",
 						Hostname: fmt.Sprintf("node-%d", i),
@@ -227,8 +227,7 @@ func TestRegistryConcurrentScenarios(t *testing.T) {
 				const owners = 64
 				var wg sync.WaitGroup
 				errs := make(chan error, owners)
-				for i := 0; i < owners; i++ {
-					i := i
+				for i := range owners {
 					wg.Go(func() {
 						info := first
 						if i%2 == 1 {
@@ -257,8 +256,7 @@ func TestRegistryConcurrentScenarios(t *testing.T) {
 
 				var wg sync.WaitGroup
 				errs := make(chan error, owners)
-				for i := 0; i < owners; i++ {
-					i := i
+				for i := range owners {
 					wg.Go(func() {
 						owner := Owner(fmt.Sprintf("job-%d", i))
 						_, err := reg.Register(owner, netdataapi.HostInfo{

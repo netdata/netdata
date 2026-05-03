@@ -513,6 +513,18 @@
         "title": "Virtual Node",
         "description": "Associates this data collection job with a Virtual Node.",
         "type": "string"
+      },
+      "virtual_nodes": {
+        "title": "Virtual Nodes",
+        "description": "Creates Azure workload virtual nodes from Azure resource tags.",
+        "type": "object",
+        "properties": {
+          "by_resource_tag": {
+            "title": "By resource tag",
+            "description": "Optional Azure resource tag key. When set, resources with this tag are emitted under a virtual node whose hostname is the tag value. In custom query mode, project `tags` in the KQL to enable tag-based virtual nodes; missing or non-object tags fall back to the default host scope.",
+            "type": "string"
+          }
+        }
       }
     },
     "required": [
@@ -578,8 +590,8 @@
       },
       "mode_query": {
         "kql": {
-          "ui:help": "Provide a custom Azure Resource Graph KQL query. The result must include resource `id`, `name`, `type`, `resourceGroup`, and `location`.",
-          "ui:placeholder": "resources | where tags.env == 'prod' | project id, name, type, resourceGroup, location",
+          "ui:help": "Provide a custom Azure Resource Graph KQL query. The result must include resource `id`, `name`, `type`, `resourceGroup`, and `location`. If `virtual_nodes.by_resource_tag` is set, project `tags` too; rows without object-shaped `tags` use the default host scope.",
+          "ui:placeholder": "resources | where tags.env == 'prod' | project id, name, type, resourceGroup, location, tags",
           "ui:widget": "textarea"
         }
       }
@@ -709,6 +721,12 @@
       "ui:help": "Optional virtual node name used to group charts from this job under a specific Netdata virtual node.",
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
+    "virtual_nodes": {
+      "by_resource_tag": {
+        "ui:help": "Optional Azure resource tag key used to create per-tag-value virtual nodes. Example: `workload` routes resources with `tags.workload=api` to a virtual node named `api`.",
+        "ui:placeholder": "workload"
+      }
+    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -720,8 +738,7 @@
             "update_every",
             "autodetection_retry",
             "query_offset",
-            "timeout",
-            "vnode"
+            "timeout"
           ]
         },
         {
@@ -746,6 +763,13 @@
           "title": "Limits",
           "fields": [
             "limits"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode",
+            "virtual_nodes"
           ]
         }
       ]

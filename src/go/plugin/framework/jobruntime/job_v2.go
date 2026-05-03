@@ -524,6 +524,7 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 		}
 		prepared.scopes = append(prepared.scopes, scopePrepared)
 	}
+	j.Debugf("v2 scope count: %d", len(j.scopeStates))
 	if len(prepared.scopes) == 0 && prepared.scopeFailure {
 		return prepared, false
 	}

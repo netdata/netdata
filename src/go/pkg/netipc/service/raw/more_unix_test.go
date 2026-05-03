@@ -150,7 +150,7 @@ func startRawPosixSessionServerN(
 	go func() {
 		defer listener.Close()
 
-		for i := 0; i < accepts; i++ {
+		for range accepts {
 			session, err := listener.Accept()
 			if err != nil {
 				srv.doneCh <- err

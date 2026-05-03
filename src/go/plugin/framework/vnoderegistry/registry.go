@@ -6,6 +6,7 @@ package vnoderegistry
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -239,7 +240,7 @@ func (r *Registry) Owners(guid string) []Owner {
 	for owner := range ent.owners {
 		owners = append(owners, owner)
 	}
-	sort.Slice(owners, func(i, j int) bool { return owners[i] < owners[j] })
+	slices.Sort(owners)
 	return owners
 }
 

@@ -30,7 +30,7 @@ func largeHandler(n int) DispatchHandler {
 		}
 		builder.SetHeader(1, 42)
 
-		for i := 0; i < n; i++ {
+		for i := range n {
 			name := fmt.Sprintf("container-%04d", i)
 			path := fmt.Sprintf("/sys/fs/cgroup/docker/%04d", i)
 			hash := simpleHash(name)
@@ -181,7 +181,7 @@ func TestStress1000Items(t *testing.T) {
 	if int(view.ItemCount) != N {
 		t.Fatalf("expected %d items, got %d", N, view.ItemCount)
 	}
-	for i := 0; i < N; i++ {
+	for i := range N {
 		item, ierr := view.Item(uint32(i))
 		if ierr != nil {
 			t.Fatalf("item %d decode error: %v", i, ierr)
@@ -265,13 +265,13 @@ func TestStress50Clients(t *testing.T) {
 
 	start := time.Now()
 
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		go func(id int) {
 			r := result{clientID: id}
 			client := NewSnapshotClient(testRunDir, svc, testClientConfig())
 			defer client.Close()
 
-			for retry := 0; retry < 200; retry++ {
+			for range 200 {
 				client.Refresh()
 				if client.Ready() {
 					break
@@ -285,7 +285,7 @@ func TestStress50Clients(t *testing.T) {
 				return
 			}
 
-			for j := 0; j < requestsPerClient; j++ {
+			for range requestsPerClient {
 				view, err := client.CallSnapshot()
 				if err != nil || view.ItemCount != 3 {
 					r.failures++
@@ -312,7 +312,7 @@ func TestStress50Clients(t *testing.T) {
 
 	totalSuccess := 0
 	totalFailure := 0
-	for i := 0; i < numClients; i++ {
+	for range numClients {
 		r := <-results
 		totalSuccess += r.successes
 		totalFailure += r.failures
@@ -354,13 +354,13 @@ func TestStressConcurrentCacheClients(t *testing.T) {
 
 	start := time.Now()
 
-	for i := 0; i < numClients; i++ {
+	for range numClients {
 		go func() {
 			r := result{}
 			cache := NewCache(testRunDir, svc, testClientConfig())
 			defer cache.Close()
 
-			for j := 0; j < requestsPerClient; j++ {
+			for range requestsPerClient {
 				updated := cache.Refresh()
 				if updated || cache.Ready() {
 					status := cache.Status()
@@ -386,7 +386,7 @@ func TestStressConcurrentCacheClients(t *testing.T) {
 
 	totalSuccess := 0
 	totalFailure := 0
-	for i := 0; i < numClients; i++ {
+	for range numClients {
 		r := <-results
 		totalSuccess += r.successes
 		totalFailure += r.failures
@@ -421,10 +421,10 @@ func TestStressRapidConnectDisconnect(t *testing.T) {
 
 	start := time.Now()
 
-	for i := 0; i < cycles; i++ {
+	for range cycles {
 		client := NewSnapshotClient(testRunDir, svc, testClientConfig())
 
-		for r := 0; r < 50; r++ {
+		for range 50 {
 			client.Refresh()
 			if client.Ready() {
 				break
@@ -483,10 +483,8 @@ func TestStressLongRunning60s(t *testing.T) {
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
 
-	for i := 0; i < numClients; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numClients {
+		wg.Go(func() {
 			cache := NewCache(testRunDir, svc, testClientConfig())
 			defer cache.Close()
 
@@ -511,7 +509,7 @@ func TestStressLongRunning60s(t *testing.T) {
 
 				time.Sleep(time.Millisecond)
 			}
-		}()
+		})
 	}
 
 	time.Sleep(duration)
@@ -588,7 +586,7 @@ func TestStressMixedTransport(t *testing.T) {
 		client := NewSnapshotClient(testRunDir, svc, ccfg)
 		defer client.Close()
 
-		for retry := 0; retry < 200; retry++ {
+		for range 200 {
 			client.Refresh()
 			if client.Ready() {
 				break
@@ -596,7 +594,7 @@ func TestStressMixedTransport(t *testing.T) {
 			time.Sleep(5 * time.Millisecond)
 		}
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			view, err := client.CallSnapshot()
 			if err == nil && view.ItemCount == 3 {
 				item0, ierr := view.Item(0)
@@ -620,7 +618,7 @@ func TestStressMixedTransport(t *testing.T) {
 		client := NewSnapshotClient(testRunDir, svc, ccfg)
 		defer client.Close()
 
-		for retry := 0; retry < 200; retry++ {
+		for range 200 {
 			client.Refresh()
 			if client.Ready() {
 				break
@@ -628,7 +626,7 @@ func TestStressMixedTransport(t *testing.T) {
 			time.Sleep(5 * time.Millisecond)
 		}
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			view, err := client.CallSnapshot()
 			if err == nil && view.ItemCount == 3 {
 				r.success++
@@ -649,7 +647,7 @@ func TestStressMixedTransport(t *testing.T) {
 		client := NewSnapshotClient(testRunDir, svc, ccfg)
 		defer client.Close()
 
-		for retry := 0; retry < 200; retry++ {
+		for range 200 {
 			client.Refresh()
 			if client.Ready() {
 				break
@@ -657,7 +655,7 @@ func TestStressMixedTransport(t *testing.T) {
 			time.Sleep(5 * time.Millisecond)
 		}
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			view, err := client.CallSnapshot()
 			if err == nil && view.ItemCount == 3 {
 				item0, ierr := view.Item(0)
@@ -673,7 +671,7 @@ func TestStressMixedTransport(t *testing.T) {
 
 	totalSuccess := 0
 	totalFailure := 0
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		r := <-results
 		t.Logf("client %d (%s): %d ok, %d fail", r.clientID, r.profile, r.success, r.failure)
 		totalSuccess += r.success

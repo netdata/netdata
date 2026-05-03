@@ -402,13 +402,13 @@ func TestConcurrentClients(t *testing.T) {
 
 	results := make(chan result, numClients)
 
-	for i := 0; i < numClients; i++ {
+	for range numClients {
 		go func() {
 			r := result{}
 			client := NewSnapshotClient(testRunDir, svc, testClientConfig())
 			defer client.Close()
 
-			for retry := 0; retry < 100; retry++ {
+			for range 100 {
 				client.Refresh()
 				if client.Ready() {
 					break
@@ -422,7 +422,7 @@ func TestConcurrentClients(t *testing.T) {
 				return
 			}
 
-			for j := 0; j < requestsPerClient; j++ {
+			for range requestsPerClient {
 				view, err := client.CallSnapshot()
 				if err != nil || view.ItemCount != 3 {
 					r.failures++
@@ -442,7 +442,7 @@ func TestConcurrentClients(t *testing.T) {
 
 	totalSuccess := 0
 	totalFailure := 0
-	for i := 0; i < numClients; i++ {
+	for range numClients {
 		r := <-results
 		totalSuccess += r.successes
 		totalFailure += r.failures
@@ -514,7 +514,7 @@ func TestStatusReporting(t *testing.T) {
 	}
 
 	// Make 3 successful calls
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_, err := client.CallSnapshot()
 		if err != nil {
 			t.Fatalf("call %d failed: %v", i, err)

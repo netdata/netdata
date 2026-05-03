@@ -4,6 +4,7 @@ package jobruntime
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -72,9 +73,7 @@ func (j *JobV2) liveScopeSet() map[string]metrix.HostScope {
 
 func (j *JobV2) scopeWorkSet(liveScopes map[string]metrix.HostScope) map[string]metrix.HostScope {
 	scopes := make(map[string]metrix.HostScope, len(liveScopes)+len(j.scopeStates))
-	for key, scope := range liveScopes {
-		scopes[key] = scope
-	}
+	maps.Copy(scopes, liveScopes)
 	// Retain previously emitted scopes until their engine emits lifecycle
 	// removals. This includes default scope when unscoped series disappear.
 	for key, state := range j.scopeStates {
