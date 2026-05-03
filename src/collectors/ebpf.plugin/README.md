@@ -299,7 +299,7 @@ You can configure the information shown with function `ebpf_socket` using the se
 ```text
 [network connections]
     enabled = yes
-    resolve hostname ips = no
+    resolve hostnames = no
     resolve service names = yes
     ports = 1-1024 !145 !domain
     hostnames = !example.com
@@ -317,7 +317,7 @@ and `145`.
 The following options are available:
 
 - `enabled`: Disable network connections monitoring. This can affect directly some funcion output.
-- `resolve hostname ips`: Enable resolving IPs to hostnames. It is disabled by default because it can be too slow.
+- `resolve hostnames`: Enable resolving IPs to hostnames. It is disabled by default because it can be too slow.
 - `resolve service names`: Convert destination ports into service names, for example, port `53` protocol `UDP` becomes `domain`.
     all names are read from /etc/services.
 - `ports`: Define the destination ports for Netdata to monitor.
