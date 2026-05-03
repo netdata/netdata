@@ -439,7 +439,11 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 		j.Warningf("collect failed: %v", err)
 		return jobV2PreparedEmission{}, false
 	}
-	j.cycle.CommitCycleSuccess()
+	if err := j.cycle.CommitCycleSuccess(); err != nil {
+		cycleOpen = false
+		j.Warningf("commit cycle failed: %v", err)
+		return jobV2PreparedEmission{}, false
+	}
 	cycleOpen = false
 
 	vnode := j.currentVnode()
