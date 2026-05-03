@@ -7,7 +7,7 @@
 - Netdata Cloud offers secure real-time monitoring without storing raw metrics.
 - Only minimal metadata passes securely through Netdata Cloud.  
   Users retain full control of their data.
-- Infrastructure is protected with strong encryption, access control, and compliance with GDPR, CCPA, PCI DSS, SOC 2, and HIPAA standards.
+- Infrastructure is protected with strong encryption, access control, compliance with GDPR and CCPA, SOC 2 Type 2 attestation, and alignment with PCI DSS and HIPAA security principles.
 - Netdata Cloud continuously evolves its security and privacy practices to meet the highest industry standards.
 
 :::
@@ -156,7 +156,7 @@ Netdata Cloud prioritizes privacy and data protection, continuously reviewing an
 | **Data Sharing**          | • No selling or sharing of personal data<br/>• Third-party services: Google Cloud/AWS (infrastructure), Stripe (payments), Analytics services                                                                             |
 | **Data Protection**       | • Encrypted ACLK for all infrastructure data<br/>• TLS encryption for all user-Cloud communication                                                                                                                        |
 | **User Control**          | • Access personal data<br/>• Correct inaccuracies<br/>• Retrieve personal data<br/>• Delete accounts<br/>• Note: Temporary maintenance may limit access                                                                   |
-| **Compliance**            | • Full compliance with GDPR and CCPA                                                                                                                                                                                      |
+| **Compliance**            | • Full compliance with GDPR and CCPA<br/>• SOC 2 Type 2 attestation achieved<br/>• Alignment with PCI DSS and HIPAA security principles (not officially certified)<br/>See [Security and Privacy Design](/docs/security-and-privacy-design/README.md) for detailed compliance and alignment information. |
 | **Data Transfer**         | • Secure, encrypted WebSocket (WSS) connections for all transfers                                                                                                                                                         |
 | **Tracking Technologies** | • With consent: analytical cookies tracked via Google Analytics, Posthog, and Gainsight PX                                                                                                                                |
 | **Data Breach Protocol**  | • Follows DPA guidelines and industry timelines<br/>• User notifications as required by data protection laws<br/>• Continuous review and updates to privacy and security practices                                        |
