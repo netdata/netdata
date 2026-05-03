@@ -191,6 +191,8 @@ func (r *storeReader) CollectMeta() CollectMeta {
 }
 
 func (r *storeReader) HostScopes() []HostScope {
+	// Scope discovery intentionally ignores this reader's active scope filter so
+	// jobruntime can enumerate all host partitions from one snapshot.
 	scopes := make(map[string]HostScope)
 	for _, s := range r.seriesView() {
 		scopes[s.hostScopeKey] = cloneHostScope(s.hostScope)

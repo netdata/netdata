@@ -5,6 +5,7 @@ package jobruntime
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -112,9 +113,15 @@ type JobV2 struct {
 	initialized bool
 	panicked    atomic.Bool
 
-	store  metrix.CollectorStore
-	cycle  metrix.CycleController
-	engine *chartengine.Engine
+	store metrix.CollectorStore
+	cycle metrix.CycleController
+
+	scopeStates           map[string]*jobV2ScopeState
+	chartTemplateYAML     []byte
+	chartTemplateRevision uint64
+	engineOptions         []chartengine.Option
+	runtimeStore          metrix.RuntimeStore
+	runtimeAggregator     *chartengine.RuntimeAggregator
 
 	prevRun time.Time
 	retries atomic.Int64
@@ -124,8 +131,6 @@ type JobV2 struct {
 	updVnode chan *vnodes.VirtualNode
 
 	vnodeRegistry *vnoderegistry.Registry
-
-	hostState jobV2HostState
 
 	ctxMu     sync.RWMutex
 	runCtx    context.Context
@@ -146,9 +151,24 @@ type JobV2 struct {
 }
 
 type jobV2PreparedEmission struct {
+	scopes       []jobV2PreparedScopeEmission
+	scopeFailure bool
+}
+
+type jobV2PreparedScopeEmission struct {
+	scope    *jobV2ScopeState
 	attempt  chartengine.PlanAttempt
 	plan     chartengine.Plan
 	decision jobV2EmissionDecision
+	output   []byte
+	live     bool
+}
+
+type jobV2ScopeState struct {
+	scopeKey string
+	scope    metrix.HostScope
+	engine   *chartengine.Engine
+	host     jobV2HostState
 }
 
 func (j *JobV2) FullName() string                 { return j.fullName }
@@ -188,38 +208,44 @@ func (j *JobV2) UpdateVnode(vnode *vnodes.VirtualNode) {
 }
 func (j *JobV2) Cleanup() {
 	j.buf.Reset()
-	snapshot := j.hostState.captureCleanupSnapshot(j.currentVnode())
-	defer j.hostState.releaseRegistryOwners(j.vnodeRegistry)
+	snapshots := j.captureScopeCleanupSnapshots()
 	j.unregisterRuntimeComponent()
 	if j.module != nil {
 		j.module.Cleanup(context.Background())
 	}
 	if !collectorapi.ShouldObsoleteCharts() {
-		return
-	}
-	if snapshot.staleVnodeSuppressed || len(snapshot.charts) == 0 {
+		j.releaseAllScopeRegistryOwners()
+		j.clearAllScopeStateAfterCleanup()
 		return
 	}
 
-	env := chartemit.EmitEnv{
-		TypeID:      j.fullName,
-		UpdateEvery: j.updateEvery,
-		Plugin:      j.pluginName,
-		Module:      j.moduleName,
-		JobName:     j.name,
-		JobLabels:   j.labels,
-	}
-	if snapshot.host.isVnode() {
-		env.HostScope = &chartemit.HostScope{GUID: snapshot.host.guid}
-	}
-	if err := chartemit.ApplyPlan(j.api, buildJobV2CleanupPlan(snapshot.charts), env); err != nil {
-		j.Warningf("cleanup apply plan failed: %v", err)
+	for _, snapshot := range snapshots {
+		if snapshot.staleVnodeSuppressed || len(snapshot.charts) == 0 {
+			continue
+		}
+
+		env := chartemit.EmitEnv{
+			TypeID:      j.fullName,
+			UpdateEvery: j.updateEvery,
+			Plugin:      j.pluginName,
+			Module:      j.moduleName,
+			JobName:     j.name,
+			JobLabels:   j.labels,
+		}
+		if snapshot.host.isVnode() {
+			env.HostScope = &chartemit.HostScope{GUID: snapshot.host.guid}
+		}
 		j.buf.Reset()
-		return
+		if err := chartemit.ApplyPlan(j.api, buildJobV2CleanupPlan(snapshot.charts), env); err != nil {
+			j.Warningf("cleanup apply plan failed for host scope %q: %v", snapshot.scopeKey, err)
+			j.buf.Reset()
+			continue
+		}
+		_, _ = io.Copy(j.out, j.buf)
+		j.buf.Reset()
 	}
-	_, _ = io.Copy(j.out, j.buf)
-	j.buf.Reset()
-	j.hostState.clearAfterCleanup()
+	j.releaseAllScopeRegistryOwners()
+	j.clearAllScopeStateAfterCleanup()
 }
 
 func (j *JobV2) AutoDetection() (err error) {
@@ -353,25 +379,38 @@ func (j *JobV2) postCheck() error {
 		opts = append(opts, chartengine.WithEnginePolicy(v.EnginePolicy()))
 	}
 
-	engine, err := chartengine.New(opts...)
-	if err != nil {
-		return err
-	}
-	if err := engine.LoadYAML([]byte(j.module.ChartTemplateYAML()), 1); err != nil {
+	templateYAML := []byte(j.module.ChartTemplateYAML())
+	if err := validateJobV2ChartTemplate(templateYAML, opts); err != nil {
 		return err
 	}
 
 	j.store = store
 	j.cycle = managed.CycleController()
-	j.engine = engine
+	j.scopeStates = make(map[string]*jobV2ScopeState)
+	j.chartTemplateYAML = templateYAML
+	j.chartTemplateRevision = 1
+	j.engineOptions = opts
+	j.runtimeStore = metrix.NewRuntimeStore()
+	j.runtimeAggregator = chartengine.NewRuntimeAggregator(j.runtimeStore)
 	if err := j.registerRuntimeComponent(); err != nil {
 		j.Warningf("runtime metrics registration failed: %v", err)
 	}
 	return nil
 }
 
+func validateJobV2ChartTemplate(templateYAML []byte, opts []chartengine.Option) error {
+	engineOpts := append([]chartengine.Option{}, opts...)
+	engineOpts = append(engineOpts, chartengine.WithRuntimeStore(nil))
+	engine, err := chartengine.New(engineOpts...)
+	if err != nil {
+		return err
+	}
+	return engine.LoadYAML(templateYAML, 1)
+}
+
 func (j *JobV2) runOnce() {
 	defer j.ResetAllOnce()
+	defer j.flushRuntimeAggregator()
 
 	j.applyPendingVnodeUpdate()
 
@@ -394,6 +433,12 @@ func (j *JobV2) runOnce() {
 	j.buf.Reset()
 }
 
+func (j *JobV2) flushRuntimeAggregator() {
+	if j != nil && j.runtimeAggregator != nil {
+		j.runtimeAggregator.Flush()
+	}
+}
+
 func (j *JobV2) applyPendingVnodeUpdate() {
 	select {
 	case vnode := <-j.updVnode:
@@ -413,7 +458,9 @@ func (j *JobV2) applyPendingVnodeUpdate() {
 		j.vnodeMu.Unlock()
 		// Registry owner release is intentionally tied to the next successful
 		// emission or cleanup, so obsolete emission can still select the old host.
-		j.hostState.invalidateDefine()
+		if state := j.scopeStates[defaultHostScopeKey]; state != nil {
+			state.host.invalidateDefine()
+		}
 	default:
 	}
 }
@@ -421,15 +468,13 @@ func (j *JobV2) applyPendingVnodeUpdate() {
 func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission, ok bool) {
 	j.panicked.Store(false)
 	cycleOpen := false
-	var attempt chartengine.PlanAttempt
-	var decision jobV2EmissionDecision
-	attemptPending := false
-	registryPrepared := false
 
 	defer func() {
 		if r := recover(); r != nil {
-			if registryPrepared {
-				j.rollbackVnodeRegistryEmission(decision)
+			j.rollbackPreparedEmission(prepared)
+			j.buf.Reset()
+			if j.runtimeAggregator != nil {
+				j.runtimeAggregator.Reset()
 			}
 			if cycleOpen {
 				// Recover path must close staged frame to keep subsequent cycles valid.
@@ -438,9 +483,7 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 					j.cycle.AbortCycle()
 				}()
 			}
-			if attemptPending {
-				attempt.Abort()
-			}
+			j.abortPreparedEmission(prepared)
 			j.panicked.Store(true)
 			j.Errorf("PANIC: %v", r)
 			if logger.Level.Enabled(slog.LevelDebug) {
@@ -464,64 +507,167 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 	}
 	cycleOpen = false
 
-	vnode := j.currentVnode()
-	decision, err := j.hostState.prepareEmission(vnode)
-	if err != nil {
-		j.Warningf("prepare host state failed: %v", err)
-		return jobV2PreparedEmission{}, false
+	liveSet := j.liveScopeSet()
+	workSet := j.scopeWorkSet(liveSet)
+	for _, scopeKey := range sortedScopeKeys(workSet) {
+		scope := workSet[scopeKey]
+		_, live := liveSet[scopeKey]
+		if !live {
+			if state := j.scopeStates[scopeKey]; state != nil {
+				scope = state.scope
+			}
+		}
+		scopePrepared, scopeOK := j.prepareScopeEmission(scope, live, sinceLastRun)
+		if !scopeOK {
+			prepared.scopeFailure = true
+			continue
+		}
+		prepared.scopes = append(prepared.scopes, scopePrepared)
 	}
-	if decision.needEngineReload {
-		j.engine.ResetMaterialized()
-		j.hostState.onEngineReload(decision.targetHost)
+	if len(prepared.scopes) == 0 && prepared.scopeFailure {
+		return prepared, false
 	}
-	attempt, err = j.engine.PreparePlan(j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-	if err != nil {
-		j.Warningf("build plan failed: %v", err)
-		return jobV2PreparedEmission{}, false
-	}
-	attemptPending = true
-	plan := attempt.Plan()
-	if err := j.prepareVnodeRegistryEmission(&decision, vnode, plan); err != nil {
-		attempt.Abort()
-		attemptPending = false
-		j.Warningf("prepare vnode registry failed: %v", err)
-		return jobV2PreparedEmission{}, false
-	}
-	registryPrepared = decision.registryOwner != ""
-
-	env := j.emitEnv(sinceLastRun, decision)
-	if err := chartemit.ApplyPlan(j.api, plan, env); err != nil {
-		j.rollbackVnodeRegistryEmission(decision)
-		registryPrepared = false
-		attempt.Abort()
-		attemptPending = false
-		j.Warningf("apply plan failed: %v", err)
-		return jobV2PreparedEmission{}, false
-	}
-	return jobV2PreparedEmission{
-		attempt:  attempt,
-		plan:     plan,
-		decision: decision,
-	}, true
+	return prepared, true
 }
 
 func (j *JobV2) finishPreparedEmission(prepared jobV2PreparedEmission) error {
-	if err := prepared.attempt.Commit(); err != nil {
-		j.rollbackVnodeRegistryEmission(prepared.decision)
-		return err
+	successes := 0
+	failures := 0
+	var finalErr error
+	for _, scope := range prepared.scopes {
+		if err := scope.attempt.Commit(); err != nil {
+			j.rollbackVnodeRegistryEmission(scope.decision)
+			failures++
+			finalErr = errors.Join(finalErr, err)
+			j.Warningf("finalize emission for host scope %q failed: %v", scope.scope.scopeKey, err)
+			continue
+		}
+		if len(scope.output) > 0 {
+			_, _ = j.out.Write(scope.output)
+		}
+		j.commitScopeEmission(scope)
+		successes++
 	}
-	if j.buf.Len() > 0 {
-		_, _ = io.Copy(j.out, j.buf)
+	if prepared.scopeFailure {
+		failures++
 	}
-	if prepared.decision.registryOwner != "" {
-		j.hostState.releaseSupersededRegistryOwners(
+	if successes == 0 && failures > 0 {
+		if finalErr != nil {
+			return finalErr
+		}
+		return fmt.Errorf("all host scope emissions failed")
+	}
+	return nil
+}
+
+func (j *JobV2) prepareScopeEmission(scope metrix.HostScope, live bool, sinceLastRun int) (prepared jobV2PreparedScopeEmission, ok bool) {
+	var attempt chartengine.PlanAttempt
+	var decision jobV2EmissionDecision
+	defer func() {
+		if r := recover(); r != nil {
+			j.rollbackVnodeRegistryEmission(decision)
+			attempt.Abort()
+			j.buf.Reset()
+			panic(r)
+		}
+		if !ok {
+			j.rollbackVnodeRegistryEmission(decision)
+			attempt.Abort()
+			j.buf.Reset()
+		}
+	}()
+
+	state, err := j.ensureScopeState(scope)
+	if err != nil {
+		j.Warningf("prepare host scope %q failed: %v", scope.ScopeKey, err)
+		return jobV2PreparedScopeEmission{}, false
+	}
+
+	if state.scopeKey == defaultHostScopeKey {
+		vnode := j.currentVnode()
+		decision, err = state.host.prepareEmission(vnode)
+		if err == nil && decision.needEngineReload {
+			state.engine.ResetMaterialized()
+		}
+		if err != nil {
+			j.Warningf("prepare default host scope failed: %v", err)
+			return jobV2PreparedScopeEmission{}, false
+		}
+	} else {
+		decision, err = state.host.prepareScopedEmission(state.scope)
+		if err == nil && decision.needEngineReload {
+			state.engine.ResetMaterialized()
+		}
+		if err != nil {
+			j.Warningf("prepare host scope %q failed: %v", state.scopeKey, err)
+			return jobV2PreparedScopeEmission{}, false
+		}
+	}
+
+	attempt, err = state.engine.PreparePlan(j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(state.scopeKey)))
+	if err != nil {
+		j.Warningf("build plan for host scope %q failed: %v", state.scopeKey, err)
+		return jobV2PreparedScopeEmission{}, false
+	}
+	plan := attempt.Plan()
+	if err := j.prepareScopeVnodeRegistryEmission(state, &decision, plan); err != nil {
+		j.Warningf("prepare vnode registry for host scope %q failed: %v", state.scopeKey, err)
+		return jobV2PreparedScopeEmission{}, false
+	}
+
+	j.buf.Reset()
+	env := j.emitEnv(sinceLastRun, decision)
+	if err := chartemit.ApplyPlan(j.api, plan, env); err != nil {
+		j.Warningf("apply plan for host scope %q failed: %v", state.scopeKey, err)
+		return jobV2PreparedScopeEmission{}, false
+	}
+	output := append([]byte(nil), j.buf.Bytes()...)
+	j.buf.Reset()
+
+	prepared = jobV2PreparedScopeEmission{
+		scope:    state,
+		attempt:  attempt,
+		plan:     plan,
+		decision: decision,
+		output:   output,
+		live:     live,
+	}
+	return prepared, true
+}
+
+func (j *JobV2) commitScopeEmission(prepared jobV2PreparedScopeEmission) {
+	if prepared.scope == nil {
+		return
+	}
+	state := prepared.scope
+	if state.scopeKey == defaultHostScopeKey || prepared.decision.registryOwner != "" {
+		keep := make(map[vnoderegistry.Owner]struct{}, 1)
+		if prepared.decision.registryOwner != "" {
+			keep[prepared.decision.registryOwner] = struct{}{}
+		}
+		state.host.releaseSupersededRegistryOwnersExcept(
 			j.vnodeRegistry,
-			prepared.decision.registryOwner,
-			j.vnodeRegistryJobOwnerPrefix(),
+			keep,
+			j.vnodeRegistryOwnerNamespacePrefix(state.scopeKey),
 		)
 	}
-	j.hostState.commitSuccessfulEmission(prepared.plan, prepared.decision)
-	return nil
+	state.host.commitSuccessfulEmission(prepared.plan, prepared.decision)
+	if !prepared.live && len(state.host.cleanupCharts) == 0 {
+		state.host.releaseRegistryOwners(j.vnodeRegistry)
+		delete(j.scopeStates, state.scopeKey)
+	}
+}
+
+func (j *JobV2) rollbackPreparedEmission(prepared jobV2PreparedEmission) {
+	for _, scope := range prepared.scopes {
+		j.rollbackVnodeRegistryEmission(scope.decision)
+	}
+}
+
+func (j *JobV2) abortPreparedEmission(prepared jobV2PreparedEmission) {
+	for _, scope := range prepared.scopes {
+		scope.attempt.Abort()
+	}
 }
 
 func (j *JobV2) emitEnv(sinceLastRun int, decision jobV2EmissionDecision) chartemit.EmitEnv {
@@ -549,17 +695,31 @@ func (j *JobV2) currentVnode() vnodes.VirtualNode {
 	return *j.vnode.Copy()
 }
 
-func (j *JobV2) prepareVnodeRegistryEmission(decision *jobV2EmissionDecision, vnode vnodes.VirtualNode, plan chartengine.Plan) error {
+func (j *JobV2) prepareScopeVnodeRegistryEmission(state *jobV2ScopeState, decision *jobV2EmissionDecision, plan chartengine.Plan) error {
 	if decision == nil || !decision.targetHost.isVnode() || len(plan.Actions) == 0 {
 		return nil
 	}
-	info := netdataapi.HostInfo{
-		GUID:     vnode.GUID,
-		Hostname: vnode.Hostname,
-		Labels:   vnode.Labels,
+	if state == nil {
+		return fmt.Errorf("nil host scope state")
 	}
-	owner := j.vnodeRegistryOwner(decision.targetHost)
-	result, err := j.vnodeRegistry.Register(owner, info)
+	if state.scopeKey == defaultHostScopeKey {
+		vnode := j.currentVnode()
+		return j.prepareVnodeRegistryEmission(decision, j.vnodeRegistryOwner(decision.targetHost), netdataapi.HostInfo{
+			GUID:     vnode.GUID,
+			Hostname: vnode.Hostname,
+			Labels:   vnode.Labels,
+		})
+	}
+	return j.prepareVnodeRegistryEmission(decision, j.vnodeRegistryScopedOwner(state.scopeKey, state.scope.GUID), metrixHostScopeInfo(state.scope))
+}
+
+func (j *JobV2) prepareVnodeRegistryEmission(decision *jobV2EmissionDecision, owner vnoderegistry.Owner, info netdataapi.HostInfo) error {
+	registryInfo := netdataapi.HostInfo{
+		GUID:     info.GUID,
+		Hostname: info.Hostname,
+		Labels:   maps.Clone(info.Labels),
+	}
+	result, err := j.vnodeRegistry.Register(owner, registryInfo)
 	if err != nil {
 		return err
 	}
@@ -602,8 +762,23 @@ func (j *JobV2) vnodeRegistryJobOwnerPrefix() string {
 	return j.vnodeRegistryOwnerPrefix() + "job" + vnodeRegistryOwnerSeparator
 }
 
+func (j *JobV2) vnodeRegistryScopedOwnerPrefix(scopeKey string) string {
+	return j.vnodeRegistryOwnerPrefix() + "scope" + vnodeRegistryOwnerSeparator + scopeKey + vnodeRegistryOwnerSeparator
+}
+
+func (j *JobV2) vnodeRegistryOwnerNamespacePrefix(scopeKey string) string {
+	if scopeKey == defaultHostScopeKey {
+		return j.vnodeRegistryJobOwnerPrefix()
+	}
+	return j.vnodeRegistryScopedOwnerPrefix(scopeKey)
+}
+
 func (j *JobV2) vnodeRegistryOwner(target jobV2HostRef) vnoderegistry.Owner {
 	return vnoderegistry.Owner(j.vnodeRegistryJobOwnerPrefix() + target.guid)
+}
+
+func (j *JobV2) vnodeRegistryScopedOwner(scopeKey, guid string) vnoderegistry.Owner {
+	return vnoderegistry.Owner(j.vnodeRegistryScopedOwnerPrefix(scopeKey) + guid)
 }
 
 func (j *JobV2) penalty() int {

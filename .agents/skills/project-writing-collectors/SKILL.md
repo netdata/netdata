@@ -72,6 +72,8 @@ The repo holds 132 go.d modules and 24 internal C plugins. Maintainer patterns l
 
 When one collector talks to N targets (SNMP devices, remote DBs, cloud APIs, IPMI hosts, vCenter clusters), each target is a **vnode** so its metrics, alerts, and RBAC behave as if it were a separate node in Netdata Cloud. Every remote-target collector wires vnodes from the start.
 
+For Go v2 collectors that route one job's samples to multiple virtual nodes, use first-class `metrix.HostScope` rather than adding vnode identity as normal metric labels. Write per-resource metrics through scoped meters or vecs such as `meter.WithHostScope(scope)`, and leave metrics unscoped when they should follow the default job vnode or global host path. Scope keys must be stable for the virtual node identity; unbounded scope cardinality has the same operational cost profile as unbounded chart/cardinality growth.
+
 ### 1.10 Cardinality discipline
 
 - A chart with thousands of dimensions, or an instance list with thousands of entries, is unusable on the dashboard. The user cannot read it.

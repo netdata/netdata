@@ -7,6 +7,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -81,15 +82,25 @@ func (s *jobV2HostState) prepareEmission(vnode vnodes.VirtualNode) (jobV2Emissio
 	return decision, nil
 }
 
-func (s *jobV2HostState) onEngineReload(target jobV2HostRef) {
-	if s == nil {
-		return
+func (s *jobV2HostState) prepareScopedEmission(scope metrix.HostScope) (jobV2EmissionDecision, error) {
+	target := jobV2HostRef{kind: jobV2HostVnode, guid: scope.GUID}
+	decision := jobV2EmissionDecision{
+		targetHost:       target,
+		needEngineReload: s != nil && s.engineHost.isSet() && s.engineHost != target,
+		hostScope:        &chartemit.HostScope{GUID: target.guid},
 	}
-	s.engineHost = target
+	return decision, nil
 }
 
 func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decision jobV2EmissionDecision) {
-	if s == nil || len(plan.Actions) == 0 {
+	if s == nil {
+		return
+	}
+	if len(plan.Actions) == 0 {
+		if decision.needEngineReload {
+			// Quiet host switches still need to finish after the scope attempt commits.
+			s.engineHost = decision.targetHost
+		}
 		return
 	}
 	s.engineHost = decision.targetHost
@@ -151,16 +162,14 @@ func (s *jobV2HostState) releaseRegistryOwners(registry *vnoderegistry.Registry)
 	}
 }
 
-func (s *jobV2HostState) releaseSupersededRegistryOwners(registry *vnoderegistry.Registry, current vnoderegistry.Owner, ownerPrefix string) {
-	if s == nil || registry == nil || current == "" || len(s.registryOwners) == 0 {
+func (s *jobV2HostState) releaseSupersededRegistryOwnersExcept(registry *vnoderegistry.Registry, current map[vnoderegistry.Owner]struct{}, ownerPrefix string) {
+	if s == nil || registry == nil || len(s.registryOwners) == 0 {
 		return
 	}
 	for owner, guid := range s.registryOwners {
-		if owner == current || !strings.HasPrefix(string(owner), ownerPrefix) {
+		if _, ok := current[owner]; ok || !strings.HasPrefix(string(owner), ownerPrefix) {
 			continue
 		}
-		// Deleting the current map entry while ranging is safe in Go; this
-		// intentionally prunes superseded job-level owners in place.
 		registry.Release(owner, guid)
 		delete(s.registryOwners, owner)
 	}

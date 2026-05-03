@@ -123,9 +123,6 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	if reader == nil {
 		return Plan{}, materializedState{}, 0, 0, 0, false, fmt.Errorf("chartengine: nil metrics reader")
 	}
-	sample := planRuntimeSample{startedAt: time.Now()}
-	defer func() { e.observeBuildSample(sample) }()
-
 	out := Plan{
 		Actions:            make([]EngineAction, 0),
 		InferredDimensions: make([]InferredDimension, 0),
@@ -137,6 +134,8 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	if e.state.outstanding != 0 {
 		return Plan{}, materializedState{}, 0, 0, 0, false, ErrOutstandingPlanAttempt
 	}
+	sample := PlanRuntimeSample{startedAt: time.Now()}
+	defer func() { e.observeBuildSample(sample) }()
 	// Failed attempt must not trigger lifecycle transitions.
 	if collectMeta.LastAttemptStatus != metrix.CollectStatusSuccess {
 		sample.skippedFailed = true

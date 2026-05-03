@@ -19,6 +19,7 @@ type engineConfig struct {
 	selectorOverride policyOverride[metrixselector.Selector]
 	runtimeStore     metrix.RuntimeStore
 	runtimeStoreSet  bool
+	runtimeObserver  func(PlanRuntimeSample)
 	log              *logger.Logger
 	seriesSelection  seriesSelectionMode
 	runtimePlanner   bool
@@ -112,6 +113,22 @@ func WithRuntimeStore(store metrix.RuntimeStore) Option {
 	return func(cfg *engineConfig) error {
 		cfg.runtimeStore = store
 		cfg.runtimeStoreSet = true
+		return nil
+	}
+}
+
+// WithRuntimeSampleObserver configures a callback for per-build runtime samples.
+//
+// The callback fires for successful builds, build errors, and collect-status
+// skips. It does not fire for pre-build contract errors such as an outstanding
+// plan attempt.
+//
+// The callback is in addition to WithRuntimeStore. Pass WithRuntimeStore(nil)
+// when samples are aggregated elsewhere and the engine should not write its own
+// runtime metrics.
+func WithRuntimeSampleObserver(fn func(PlanRuntimeSample)) Option {
+	return func(cfg *engineConfig) error {
+		cfg.runtimeObserver = fn
 		return nil
 	}
 }
