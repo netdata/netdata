@@ -283,6 +283,22 @@ log a few errors in error.log complaining about files it cannot find, but immedi
 - Memory full pressure
 - I/O pressure
 - I/O full pressure
+- Network bandwidth (received/sent)
+- Network packets (received/sent/multicast)
+- Network errors (inbound/outbound)
+- Network drops (inbound/outbound)
 
-Network interfaces are monitored by means of
-the [proc plugin](/src/collectors/proc.plugin/README.md#monitored-network-interface-metrics).
+### Per-container network metrics
+
+Netdata can collect per-container network metrics by mapping virtual network interfaces inside containers to the
+corresponding host network interfaces. This mapping is performed by the `cgroup-network` helper tool.
+
+The helper reads `/proc/1/net/dev` on the host to discover network interfaces, which requires access to the host's PID
+namespace. When Netdata runs inside a container (for example, Docker), the container must be started with:
+
+- `--pid=host` — to give Netdata access to the host's PID namespace
+- `--cap-add SYS_ADMIN` — to allow the cgroup-network helper to perform the interface mapping
+
+Without these privileges, per-container network metrics will not appear. In that case, only aggregate host-level
+network metrics from the [proc plugin](/src/collectors/proc.plugin/README.md#monitored-network-interface-metrics) are
+available.
