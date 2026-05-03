@@ -129,10 +129,51 @@ sudo ./install.sh
 
 The `install.sh` script accepts the [same parameters](/packaging/installer/methods/kickstart.md#optional-parameters-for-kickstartsh) as `kickstart.sh`, allowing you to customize your installation.
 
+## Install Using a Downloaded .gz.run File from GitHub Releases
+
+You can install Netdata directly using a `.gz.run` static build file downloaded from [GitHub Releases](https://github.com/netdata/netdata/releases). This is useful when you need a specific version or cannot use the kickstart script.
+
+:::tip
+
+The kickstart-based offline preparation method ([Step 1](#step-1-prepare-the-offline-installation-package)) is the preferred approach — it bundles all required files and handles checksums automatically. Use this manual method only when the kickstart workflow isn't suitable.
+
+:::
+
+### 1. Download the files
+
+From the [GitHub Releases](https://github.com/netdata/netdata/releases) page, download:
+
+- The `.gz.run` file for your target architecture, following the naming convention `netdata-{arch}-v{version}.gz.run` (for example, `netdata-x86_64-v2.9.0.gz.run`).
+- The `sha256sums.txt` file from the same release.
+
+Supported architectures include `x86_64`, `aarch64`, `armv7l`, and `armv6l`.
+
+### 2. Verify the download
+
+```bash
+sha256sum -c sha256sums.txt --ignore-missing
+```
+
+### 3. Run the installer
+
+```bash
+sudo sh ./netdata-x86_64-v2.9.0.gz.run --accept
+```
+
+The `--accept` flag accepts the default installation options non-interactively. Without it, the installer prompts for confirmation.
+
+:::note
+
+This installs to `/opt/netdata` by default.
+
+:::
+
+---
+
 ## Automatic Updates
 
 :::note
 
-Automatic updates are *disabled* by default for offline installations — since there’s no network connection.
+Automatic updates are *disabled* by default for offline installations — since there's no network connection.
 
 :::
