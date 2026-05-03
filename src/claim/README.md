@@ -23,7 +23,29 @@ You can find this command in three places in the UI:
 1. Open your Agent's local dashboard (normally under `IP:19999`)
 2. Sign in to your Netdata Cloud account
 3. Click the "Connect" button
-4. Follow the on-screen instructions to connect your Agent
+4. The UI asks you to verify server ownership by running a command on your server to retrieve a randomly generated UUID
+
+   :::tip
+
+   **Server ownership verification** prevents unauthorized users from claiming your Agent. The Agent generates a random session ID at startup and stores it in `/var/lib/netdata/netdata_random_session_id`. To prove you have access to the server, retrieve this UUID and paste it into the UI.
+
+   **Docker:**
+
+   ```bash
+   docker exec netdata cat /var/lib/netdata/netdata_random_session_id
+   ```
+
+   **Linux:**
+
+   ```bash
+   sudo cat /var/lib/netdata/netdata_random_session_id
+   ```
+
+   The session ID is regenerated on every Agent restart and after each claim attempt, so each verification uses a fresh value.
+
+   :::
+
+5. Follow the remaining on-screen instructions to complete the connection
 
 ### Method 2: Via Configuration File
 
