@@ -107,6 +107,43 @@ cd /opt/netdata/usr/libexec/netdata/
 ./netdata-updater.sh
 ```
 
+## Installing inside a FreeBSD Jail
+
+Netdata can run inside a FreeBSD jail, but requires additional filesystem mounts and has some collector limitations.
+
+### Required filesystem mounts
+
+Jails do not mount `procfs` by default. Process monitoring requires it:
+
+```bash
+mount -t procfs proc /proc
+```
+
+To persist across jail restarts, add to `/etc/fstab`:
+
+```
+proc /proc procfs rw 0 0
+```
+
+`devfs` is typically mounted by the jail framework, but disk and device monitoring may require a custom devfs ruleset exposing the relevant device nodes.
+
+:::important
+
+If the jail was started with `jail.conf` or `iocage`, verify that `allow.mount.procfs` and `mount.devfs` are enabled in the jail configuration.
+
+:::
+
+### Jail-specific limitations
+
+- **Hardware sensors** (temperature, fan, voltage) are generally not accessible from within a jail.
+- **SMART disk monitoring** requires devfs rules that expose the disk device nodes to the jail.
+- **Network interface metrics** depend on the jail's networking mode: shared-IP jails see only the host interface, while vnet jails have their own network stack.
+- **System metrics** require the jail to permit `sysctl` access. Most jail managers allow this by default.
+
+### Jail detection
+
+Netdata automatically detects the jail environment via the `security.jail.jailed` sysctl and reports `CONTAINER=jail` in its system info. No manual configuration is needed for detection.
+
 ## Optional Kickstart Parameters
 
 | Option                                               | Description                                                                                                |
