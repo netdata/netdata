@@ -56,13 +56,21 @@ These limits are fully configurable. See [Changing how long Netdata stores metri
 
 ## `ram`
 
-`ram` mode can help when Netdata shouldn’t introduce any disk I/O at all. In both of these modes, metric samples exist only in memory, and only while they’re collected.
+`ram` mode can help when Netdata shouldn’t introduce any disk I/O at all. In ram mode, metric samples exist only in memory, and only while they’re collected.
 
-When Netdata is configured to stream its metrics to a Metrics Observability Centralization Point (a Netdata Parent), metric samples are forwarded in real-time to that Netdata Parent. The ring buffers available in these modes are used to cache the collected samples for some time, in case there are network issues, or the Netdata Parent is restarted for maintenance.
+When Netdata is configured to stream its metrics to a Metrics Observability Centralization Point (a Netdata Parent), metric samples are forwarded in real-time to that Netdata Parent. The ring buffers available in this mode are used to cache the collected samples for some time, in case there are network issues, or the Netdata Parent is restarted for maintenance.
 
-The memory required per sample in these modes, is four bytes: `ram` mode uses `mmap()` behind the scene, and can be incremented in steps of 1024 samples (4KiB). Mode `ram` allows the use of the Linux kernel memory dedupper (Kernel-Same-Page or KSM) to deduplicate Netdata ring buffers and save memory.
+The memory required per sample in this mode is four bytes: `ram` mode uses `mmap()` behind the scenes, and can be incremented in steps of 1024 samples (4KiB). Mode `ram` allows the use of the Linux kernel memory dedupper (Kernel-Same-Page or KSM) to deduplicate Netdata ring buffers and save memory.
 
 **Configuring ram mode and retention**:
 
 - Enable ram mode: To use in-memory storage, set `[db].mode` to ram in your `netdata.conf` file. Remember, this mode won't retain historical data after restarts.
 - Adjust retention (optional): While ram mode focuses on real-time data, you can optionally control the number of samples stored in memory. Set `[db].retention` in `netdata.conf` to the desired number in seconds. Note: If the value you choose isn't a multiple of 1024, Netdata will automatically round it up to the nearest multiple.
+
+## `none`
+
+In `none` mode, Netdata does not store metrics locally at all. Metrics can only be streamed to a Netdata Parent. This mode is useful for minimal-footprint Agents that offload all storage to a central Netdata Parent via streaming.
+
+**Configuring none mode**:
+
+- Enable none mode: To disable local storage, set `[db].mode` to `none` in your `netdata.conf` file. Ensure [streaming is configured](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) so that metrics are forwarded to a Netdata Parent.

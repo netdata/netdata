@@ -22,9 +22,11 @@ Netdata offers a granular approach to data retention, allowing you to manage sto
 |  1   | middle (per minute) |    3mo     |          1 GiB          |
 |  2   |   low (per hour)    |     2y     |          1 GiB          |
 
-> **Note**
->
-> If a user sets a disk space size less than 256 MB for a tier, Netdata will automatically adjust it to 256 MB.
+:::note
+
+If a user sets a disk space size less than 256 MB for a tier, Netdata will automatically adjust it to 256 MB.
+
+:::
 
 Netdata Agent metrics storage is limited to 3 GiB by default (configurable), using 1 GiB per tier × 3 tiers. Data is deleted when it reaches **either** the size limit or the time limit, whichever comes first. The number of metrics collected determines how far back in time retention extends within the size limit.
 

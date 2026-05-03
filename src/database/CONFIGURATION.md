@@ -83,7 +83,7 @@ Netdata versions prior to v1.46.0 relied on disk space-based retention.
 |------|---------------------|------------|
 | 0    | high (per second)   | 256 MB     |
 | 1    | middle (per minute) | 128 MB     |
-| 2    | low (per hour)      | 64 GiB     |
+| 2    | low (per hour)      | 64 MB      |
 
 You can change these limits in `netdata.conf`:
 
@@ -94,9 +94,9 @@ You can change these limits in `netdata.conf`:
     # Tier 0, per second data
     dbengine multihost disk space MB = 256
     # Tier 1, per minute data
-    dbengine tier 1 multihost disk space MB = 1024
+    dbengine tier 1 multihost disk space MB = 128
     # Tier 2, per hour data
-    dbengine tier 2 multihost disk space MB = 1024
+    dbengine tier 2 multihost disk space MB = 64
 ```
 
 </details>
