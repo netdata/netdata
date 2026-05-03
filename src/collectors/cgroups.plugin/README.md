@@ -284,5 +284,30 @@ log a few errors in error.log complaining about files it cannot find, but immedi
 - I/O pressure
 - I/O full pressure
 
-Network interfaces are monitored by means of
-the [proc plugin](/src/collectors/proc.plugin/README.md#monitored-network-interface-metrics).
+### Per-container network bandwidth
+
+Netdata can show per-container network bandwidth by associating virtual network interfaces (e.g., `veth` devices) with
+their respective containers. This is handled by the `cgroup-network` helper, which:
+
+1. Detects `veth` interfaces by comparing `iflink` and `ifindex` IDs across namespaces.
+2. Detects `tun`/`tap` interfaces by inspecting `/proc/PID/fdinfo`.
+3. Detects libvirt interfaces by querying `virsh`.
+
+The `cgroup-network` binary switches into a container's namespaces using `setns()` to read its network interface state.
+This operation requires `CAP_SYS_ADMIN` capability and access to the host's network and PID namespaces.
+
+:::note
+
+When Netdata is installed as a systemd service on the host, all required capabilities — including `CAP_SYS_ADMIN` — are
+already configured in the default `netdata.service` file. No manual systemd override is needed.
+
+:::
+
+If per-container network charts are missing, verify that:
+
+- The `cgroup-network` helper binary is present and has setuid permissions (installed by default).
+- There are no capability-related errors in `error.log`.
+
+Network interface metrics themselves are collected by
+the [proc plugin](/src/collectors/proc.plugin/README.md#monitored-network-interface-metrics). The `cgroup-network`
+helper associates those metrics with the correct container so they appear under each container's dashboard section.
