@@ -76,4 +76,11 @@ or virtual-node targets.
   default job vnode/global host.
 - Collector-generated scope keys must be deterministic and stable for the target
   host/vnode identity.
+- Collector-generated host labels should include `_vnode_type=<source>` when a
+  collector creates virtual nodes from an internal mechanism rather than a
+  user-defined vnode entry. The value must identify the mechanism or source
+  without embedding high-cardinality target values.
+- Azure Monitor resource-tag virtual nodes use `_vnode_type=azure_workload`.
+  Their GUID and `ScopeKey` are the deterministic SHA1 UUID of
+  `azure_monitor:` plus the trimmed, case-preserved tag value.
 - Collectors are responsible for bounding or documenting scope cardinality risk.
