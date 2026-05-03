@@ -22,6 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -38,6 +39,7 @@ type JobV2Config struct {
 	AutoDetectEvery int
 	IsStock         bool
 	Vnode           vnodes.VirtualNode
+	VnodeRegistry   *vnoderegistry.Registry
 	FunctionOnly    bool
 	RuntimeService  runtimecomp.Service
 }
@@ -46,6 +48,10 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	var buf bytes.Buffer
 	if cfg.UpdateEvery <= 0 {
 		cfg.UpdateEvery = 1
+	}
+	registry := cfg.VnodeRegistry
+	if registry == nil {
+		registry = vnoderegistry.New()
 	}
 
 	j := &JobV2{
@@ -67,6 +73,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		buf:             &buf,
 		api:             netdataapi.New(&buf),
 		vnode:           cfg.Vnode,
+		vnodeRegistry:   registry,
 		runtimeService:  cfg.RuntimeService,
 	}
 	if j.out == nil {
@@ -115,6 +122,8 @@ type JobV2 struct {
 	vnodeMu  sync.RWMutex
 	vnode    vnodes.VirtualNode
 	updVnode chan *vnodes.VirtualNode
+
+	vnodeRegistry *vnoderegistry.Registry
 
 	hostState jobV2HostState
 
@@ -180,6 +189,7 @@ func (j *JobV2) UpdateVnode(vnode *vnodes.VirtualNode) {
 func (j *JobV2) Cleanup() {
 	j.buf.Reset()
 	snapshot := j.hostState.captureCleanupSnapshot(j.currentVnode())
+	defer j.hostState.releaseRegistryOwners(j.vnodeRegistry)
 	j.unregisterRuntimeComponent()
 	if j.module != nil {
 		j.module.Cleanup(context.Background())
@@ -392,6 +402,7 @@ func (j *JobV2) applyPendingVnodeUpdate() {
 		}
 		if j.module != nil && j.module.VirtualNode() != nil {
 			// Match v1 ownership model: do not override module-owned vnode state.
+			j.Debugf("ignoring vnode update for module-owned vnode")
 			return
 		}
 
@@ -400,6 +411,8 @@ func (j *JobV2) applyPendingVnodeUpdate() {
 		j.vnodeMu.Lock()
 		j.vnode = *next
 		j.vnodeMu.Unlock()
+		// Registry owner release is intentionally tied to the next successful
+		// emission or cleanup, so obsolete emission can still select the old host.
 		j.hostState.invalidateDefine()
 	default:
 	}
@@ -409,10 +422,15 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 	j.panicked.Store(false)
 	cycleOpen := false
 	var attempt chartengine.PlanAttempt
+	var decision jobV2EmissionDecision
 	attemptPending := false
+	registryPrepared := false
 
 	defer func() {
 		if r := recover(); r != nil {
+			if registryPrepared {
+				j.rollbackVnodeRegistryEmission(decision)
+			}
 			if cycleOpen {
 				// Recover path must close staged frame to keep subsequent cycles valid.
 				func() {
@@ -463,9 +481,18 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 	}
 	attemptPending = true
 	plan := attempt.Plan()
+	if err := j.prepareVnodeRegistryEmission(&decision, vnode, plan); err != nil {
+		attempt.Abort()
+		attemptPending = false
+		j.Warningf("prepare vnode registry failed: %v", err)
+		return jobV2PreparedEmission{}, false
+	}
+	registryPrepared = decision.registryOwner != ""
 
 	env := j.emitEnv(sinceLastRun, decision)
 	if err := chartemit.ApplyPlan(j.api, plan, env); err != nil {
+		j.rollbackVnodeRegistryEmission(decision)
+		registryPrepared = false
 		attempt.Abort()
 		attemptPending = false
 		j.Warningf("apply plan failed: %v", err)
@@ -479,11 +506,19 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 }
 
 func (j *JobV2) finishPreparedEmission(prepared jobV2PreparedEmission) error {
+	if err := prepared.attempt.Commit(); err != nil {
+		j.rollbackVnodeRegistryEmission(prepared.decision)
+		return err
+	}
 	if j.buf.Len() > 0 {
 		_, _ = io.Copy(j.out, j.buf)
 	}
-	if err := prepared.attempt.Commit(); err != nil {
-		return err
+	if prepared.decision.registryOwner != "" {
+		j.hostState.releaseSupersededRegistryOwners(
+			j.vnodeRegistry,
+			prepared.decision.registryOwner,
+			j.vnodeRegistryJobOwnerPrefix(),
+		)
 	}
 	j.hostState.commitSuccessfulEmission(prepared.plan, prepared.decision)
 	return nil
@@ -512,6 +547,63 @@ func (j *JobV2) currentVnode() vnodes.VirtualNode {
 	j.vnodeMu.RLock()
 	defer j.vnodeMu.RUnlock()
 	return *j.vnode.Copy()
+}
+
+func (j *JobV2) prepareVnodeRegistryEmission(decision *jobV2EmissionDecision, vnode vnodes.VirtualNode, plan chartengine.Plan) error {
+	if decision == nil || !decision.targetHost.isVnode() || len(plan.Actions) == 0 {
+		return nil
+	}
+	info := netdataapi.HostInfo{
+		GUID:     vnode.GUID,
+		Hostname: vnode.Hostname,
+		Labels:   vnode.Labels,
+	}
+	owner := j.vnodeRegistryOwner(decision.targetHost)
+	result, err := j.vnodeRegistry.Register(owner, info)
+	if err != nil {
+		return err
+	}
+	if result.MetadataUpdated && result.UpdateFirstSeen {
+		j.Warningf(
+			"vnode registry metadata updated for guid %q: hostname %q replaced by %q",
+			result.Info.GUID,
+			result.Previous.Hostname,
+			result.Info.Hostname,
+		)
+	}
+
+	scope := &chartemit.HostScope{GUID: decision.targetHost.guid}
+	if result.NeedDefine {
+		scope.Define = &result.Info
+	}
+	decision.hostScope = scope
+	decision.defineInfo = result.Info
+	decision.registryOwner = owner
+	decision.registryRegistration = result
+	return nil
+}
+
+func (j *JobV2) rollbackVnodeRegistryEmission(decision jobV2EmissionDecision) {
+	if decision.registryOwner != "" {
+		j.vnodeRegistry.Rollback(decision.registryOwner, decision.registryRegistration)
+	}
+}
+
+const vnodeRegistryOwnerSeparator = "\xff"
+
+func (j *JobV2) vnodeRegistryOwnerPrefix() string {
+	// Keep the separator outside valid metrix scope keys and GUIDs so owner
+	// strings remain unambiguous without allocating a structured key.
+	return j.fullName + vnodeRegistryOwnerSeparator
+}
+
+func (j *JobV2) vnodeRegistryJobOwnerPrefix() string {
+	// Keep job-level vnode owners separate from future per-scope owners.
+	return j.vnodeRegistryOwnerPrefix() + "job" + vnodeRegistryOwnerSeparator
+}
+
+func (j *JobV2) vnodeRegistryOwner(target jobV2HostRef) vnoderegistry.Owner {
+	return vnoderegistry.Owner(j.vnodeRegistryJobOwnerPrefix() + target.guid)
 }
 
 func (j *JobV2) penalty() int {

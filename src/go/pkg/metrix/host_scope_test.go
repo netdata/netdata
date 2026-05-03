@@ -88,81 +88,94 @@ func TestHostScopeVecDerivationPartitionsSeries(t *testing.T) {
 	require.False(t, ok)
 }
 
-func TestHostScopeFlattenPreservesScope(t *testing.T) {
-	store := NewCollectorStore()
-	cc := cycleController(t, store)
+func TestHostScopeFlattenPreservesScopeScenarios(t *testing.T) {
+	cases := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"histogram": {
+			run: func(t *testing.T) {
+				store := NewCollectorStore()
+				cc := cycleController(t, store)
 
-	scope := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api"}
-	hist := store.Write().SnapshotMeter("svc").WithHostScope(scope).Histogram("latency")
-	labels := store.Write().SnapshotMeter("").LabelSet(Label{Key: "route", Value: "/api"})
+				scope := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api"}
+				hist := store.Write().SnapshotMeter("svc").WithHostScope(scope).Histogram("latency")
+				labels := store.Write().SnapshotMeter("").LabelSet(Label{Key: "route", Value: "/api"})
 
-	cc.BeginCycle()
-	hist.ObservePoint(HistogramPoint{
-		Count: 3,
-		Sum:   6,
-		Buckets: []BucketPoint{
-			{UpperBound: 1, CumulativeCount: 1},
-			{UpperBound: 5, CumulativeCount: 3},
+				cc.BeginCycle()
+				hist.ObservePoint(HistogramPoint{
+					Count: 3,
+					Sum:   6,
+					Buckets: []BucketPoint{
+						{UpperBound: 1, CumulativeCount: 1},
+						{UpperBound: 5, CumulativeCount: 3},
+					},
+				}, labels)
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				defaultReader := store.Read(ReadFlatten())
+				_, ok := defaultReader.Value("svc.latency_count", Labels{"route": "/api"})
+				require.False(t, ok)
+
+				scopedReader := store.Read(ReadFlatten(), ReadHostScope(scope.ScopeKey))
+				mustValue(t, scopedReader, "svc.latency_count", Labels{"route": "/api"}, 3)
+				mustValue(t, scopedReader, "svc.latency_sum", Labels{"route": "/api"}, 6)
+				mustValue(t, scopedReader, "svc.latency_bucket", Labels{"route": "/api", HistogramBucketLabel: "1"}, 1)
+				mustValue(t, scopedReader, "svc.latency_bucket", Labels{"route": "/api", HistogramBucketLabel: "5"}, 3)
+			},
 		},
-	}, labels)
-	require.NoError(t, cc.CommitCycleSuccess())
+		"composite instruments": {
+			run: func(t *testing.T) {
+				store := NewCollectorStore()
+				cc := cycleController(t, store)
 
-	defaultReader := store.Read(ReadFlatten())
-	_, ok := defaultReader.Value("svc.latency_count", Labels{"route": "/api"})
-	require.False(t, ok)
+				scope := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api"}
+				meter := store.Write().SnapshotMeter("svc")
+				labels := meter.LabelSet(Label{Key: "route", Value: "/api"})
+				summary := meter.WithHostScope(scope).Summary("latency", WithSummaryQuantiles(0.5))
+				stateSet := meter.WithHostScope(scope).StateSet("mode", WithStateSetStates("idle", "busy"))
+				measureSet := meter.WithHostScope(scope).MeasureSetGauge(
+					"usage",
+					WithMeasureSetFields(
+						MeasureFieldSpec{Name: "used"},
+						MeasureFieldSpec{Name: "limit"},
+					),
+				)
 
-	scopedReader := store.Read(ReadFlatten(), ReadHostScope(scope.ScopeKey))
-	mustValue(t, scopedReader, "svc.latency_count", Labels{"route": "/api"}, 3)
-	mustValue(t, scopedReader, "svc.latency_sum", Labels{"route": "/api"}, 6)
-	mustValue(t, scopedReader, "svc.latency_bucket", Labels{"route": "/api", HistogramBucketLabel: "1"}, 1)
-	mustValue(t, scopedReader, "svc.latency_bucket", Labels{"route": "/api", HistogramBucketLabel: "5"}, 3)
-}
+				cc.BeginCycle()
+				summary.ObservePoint(SummaryPoint{
+					Count: 2,
+					Sum:   1,
+					Quantiles: []QuantilePoint{
+						{Quantile: 0.5, Value: 0.4},
+					},
+				}, labels)
+				stateSet.ObserveStateSet(StateSetPoint{States: map[string]bool{"busy": true}}, labels)
+				measureSet.ObserveFields(map[string]SampleValue{"used": 7, "limit": 10}, labels)
+				require.NoError(t, cc.CommitCycleSuccess())
 
-func TestHostScopeFlattenPreservesScopeForCompositeInstruments(t *testing.T) {
-	store := NewCollectorStore()
-	cc := cycleController(t, store)
+				defaultReader := store.Read(ReadFlatten())
+				_, ok := defaultReader.Value("svc.latency_count", Labels{"route": "/api"})
+				require.False(t, ok)
+				_, ok = defaultReader.Value("svc.mode", Labels{"route": "/api", "svc.mode": "busy"})
+				require.False(t, ok)
+				_, ok = defaultReader.Value("svc.usage_used", Labels{"route": "/api", MeasureSetFieldLabel: "used"})
+				require.False(t, ok)
 
-	scope := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api"}
-	meter := store.Write().SnapshotMeter("svc")
-	labels := meter.LabelSet(Label{Key: "route", Value: "/api"})
-	summary := meter.WithHostScope(scope).Summary("latency", WithSummaryQuantiles(0.5))
-	stateSet := meter.WithHostScope(scope).StateSet("mode", WithStateSetStates("idle", "busy"))
-	measureSet := meter.WithHostScope(scope).MeasureSetGauge(
-		"usage",
-		WithMeasureSetFields(
-			MeasureFieldSpec{Name: "used"},
-			MeasureFieldSpec{Name: "limit"},
-		),
-	)
-
-	cc.BeginCycle()
-	summary.ObservePoint(SummaryPoint{
-		Count: 2,
-		Sum:   1,
-		Quantiles: []QuantilePoint{
-			{Quantile: 0.5, Value: 0.4},
+				scopedReader := store.Read(ReadFlatten(), ReadHostScope(scope.ScopeKey))
+				mustValue(t, scopedReader, "svc.latency_count", Labels{"route": "/api"}, 2)
+				mustValue(t, scopedReader, "svc.latency_sum", Labels{"route": "/api"}, 1)
+				mustValue(t, scopedReader, "svc.latency", Labels{"route": "/api", SummaryQuantileLabel: "0.5"}, 0.4)
+				mustValue(t, scopedReader, "svc.mode", Labels{"route": "/api", "svc.mode": "idle"}, 0)
+				mustValue(t, scopedReader, "svc.mode", Labels{"route": "/api", "svc.mode": "busy"}, 1)
+				mustValue(t, scopedReader, "svc.usage_used", Labels{"route": "/api", MeasureSetFieldLabel: "used"}, 7)
+				mustValue(t, scopedReader, "svc.usage_limit", Labels{"route": "/api", MeasureSetFieldLabel: "limit"}, 10)
+			},
 		},
-	}, labels)
-	stateSet.ObserveStateSet(StateSetPoint{States: map[string]bool{"busy": true}}, labels)
-	measureSet.ObserveFields(map[string]SampleValue{"used": 7, "limit": 10}, labels)
-	require.NoError(t, cc.CommitCycleSuccess())
+	}
 
-	defaultReader := store.Read(ReadFlatten())
-	_, ok := defaultReader.Value("svc.latency_count", Labels{"route": "/api"})
-	require.False(t, ok)
-	_, ok = defaultReader.Value("svc.mode", Labels{"route": "/api", "svc.mode": "busy"})
-	require.False(t, ok)
-	_, ok = defaultReader.Value("svc.usage_used", Labels{"route": "/api", MeasureSetFieldLabel: "used"})
-	require.False(t, ok)
-
-	scopedReader := store.Read(ReadFlatten(), ReadHostScope(scope.ScopeKey))
-	mustValue(t, scopedReader, "svc.latency_count", Labels{"route": "/api"}, 2)
-	mustValue(t, scopedReader, "svc.latency_sum", Labels{"route": "/api"}, 1)
-	mustValue(t, scopedReader, "svc.latency", Labels{"route": "/api", SummaryQuantileLabel: "0.5"}, 0.4)
-	mustValue(t, scopedReader, "svc.mode", Labels{"route": "/api", "svc.mode": "idle"}, 0)
-	mustValue(t, scopedReader, "svc.mode", Labels{"route": "/api", "svc.mode": "busy"}, 1)
-	mustValue(t, scopedReader, "svc.usage_used", Labels{"route": "/api", MeasureSetFieldLabel: "used"}, 7)
-	mustValue(t, scopedReader, "svc.usage_limit", Labels{"route": "/api", MeasureSetFieldLabel: "limit"}, 10)
+	for name, tc := range cases {
+		t.Run(name, tc.run)
+	}
 }
 
 func TestHostScopeStatefulBaselinesArePerScope(t *testing.T) {
@@ -243,52 +256,65 @@ func TestHostScopeStatefulHistogramCumulativeWindowIsPerScope(t *testing.T) {
 	})
 }
 
-func TestHostScopeConflictFailsCommitWithoutPublishing(t *testing.T) {
-	store := NewCollectorStore()
-	cc := cycleController(t, store)
+func TestHostScopeConflictScenarios(t *testing.T) {
+	cases := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"commit fails without publishing": {
+			run: func(t *testing.T) {
+				store := NewCollectorStore()
+				cc := cycleController(t, store)
 
-	scopeA := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api"}
-	scopeB := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api-v2"}
-	meter := store.Write().SnapshotMeter("azure")
-	a := meter.WithHostScope(scopeA).Gauge("requests")
-	b := meter.WithHostScope(scopeB).Gauge("requests")
+				scopeA := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api"}
+				scopeB := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api-v2"}
+				meter := store.Write().SnapshotMeter("azure")
+				a := meter.WithHostScope(scopeA).Gauge("requests")
+				b := meter.WithHostScope(scopeB).Gauge("requests")
 
-	cc.BeginCycle()
-	a.Observe(1)
-	b.Observe(2)
-	err := cc.CommitCycleSuccess()
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrHostScopeConflict), "unexpected error: %v", err)
+				cc.BeginCycle()
+				a.Observe(1)
+				b.Observe(2)
+				err := cc.CommitCycleSuccess()
+				require.Error(t, err)
+				require.True(t, errors.Is(err, ErrHostScopeConflict), "unexpected error: %v", err)
 
-	meta := store.Read().CollectMeta()
-	require.Equal(t, CollectStatusFailed, meta.LastAttemptStatus)
-	require.Equal(t, uint64(1), meta.LastAttemptSeq)
-	require.Equal(t, uint64(0), meta.LastSuccessSeq)
+				meta := store.Read().CollectMeta()
+				require.Equal(t, CollectStatusFailed, meta.LastAttemptStatus)
+				require.Equal(t, uint64(1), meta.LastAttemptSeq)
+				require.Equal(t, uint64(0), meta.LastSuccessSeq)
 
-	_, ok := store.Read(ReadRaw(), ReadHostScope(scopeA.ScopeKey)).Value("azure.requests", nil)
-	require.False(t, ok)
-}
+				_, ok := store.Read(ReadRaw(), ReadHostScope(scopeA.ScopeKey)).Value("azure.requests", nil)
+				require.False(t, ok)
+			},
+		},
+		"multiple conflicts join errors": {
+			run: func(t *testing.T) {
+				store := NewCollectorStore()
+				cc := cycleController(t, store)
 
-func TestHostScopeMultipleConflictsJoinErrors(t *testing.T) {
-	store := NewCollectorStore()
-	cc := cycleController(t, store)
+				scopeA := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api"}
+				scopeAConflict := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api-v2"}
+				scopeB := HostScope{ScopeKey: "workload/db", GUID: "guid-db", Hostname: "db"}
+				scopeBConflict := HostScope{ScopeKey: "workload/db", GUID: "guid-db-v2", Hostname: "db"}
+				meter := store.Write().SnapshotMeter("azure")
 
-	scopeA := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api"}
-	scopeAConflict := HostScope{ScopeKey: "workload/api", GUID: "guid-api", Hostname: "api-v2"}
-	scopeB := HostScope{ScopeKey: "workload/db", GUID: "guid-db", Hostname: "db"}
-	scopeBConflict := HostScope{ScopeKey: "workload/db", GUID: "guid-db-v2", Hostname: "db"}
-	meter := store.Write().SnapshotMeter("azure")
+				cc.BeginCycle()
+				meter.WithHostScope(scopeA).Gauge("requests").Observe(1)
+				meter.WithHostScope(scopeAConflict).Gauge("requests").Observe(2)
+				meter.WithHostScope(scopeB).Gauge("requests").Observe(3)
+				meter.WithHostScope(scopeBConflict).Gauge("requests").Observe(4)
+				err := cc.CommitCycleSuccess()
+				require.Error(t, err)
+				require.True(t, errors.Is(err, ErrHostScopeConflict), "unexpected error: %v", err)
+				require.Contains(t, err.Error(), "scope_key=\"workload/api\"")
+				require.Contains(t, err.Error(), "scope_key=\"workload/db\"")
+			},
+		},
+	}
 
-	cc.BeginCycle()
-	meter.WithHostScope(scopeA).Gauge("requests").Observe(1)
-	meter.WithHostScope(scopeAConflict).Gauge("requests").Observe(2)
-	meter.WithHostScope(scopeB).Gauge("requests").Observe(3)
-	meter.WithHostScope(scopeBConflict).Gauge("requests").Observe(4)
-	err := cc.CommitCycleSuccess()
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrHostScopeConflict), "unexpected error: %v", err)
-	require.Contains(t, err.Error(), "scope_key=\"workload/api\"")
-	require.Contains(t, err.Error(), "scope_key=\"workload/db\"")
+	for name, tc := range cases {
+		t.Run(name, tc.run)
+	}
 }
 
 func TestHostScopeConcurrentWrites(t *testing.T) {
