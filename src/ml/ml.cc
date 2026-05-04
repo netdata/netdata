@@ -727,6 +727,16 @@ bool ml_should_publish_model_update(bool host_running,
 }
 
 static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
+void ml_dimension_finalize_constant_state(ml_dimension_t *dim)
+{
+    dim->mt = METRIC_TYPE_CONSTANT;
+    if (!dim->km_contexts.empty())
+        dim->ts = TRAINING_STATUS_TRAINED;
+    dim->suppression_anomaly_counter = 0;
+    dim->suppression_window_counter = 0;
+}
+
+static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
@@ -769,11 +779,7 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
         }
     }
 
-    dim->mt = METRIC_TYPE_CONSTANT;
-    dim->ts = TRAINING_STATUS_TRAINED;
-
-    dim->suppression_anomaly_counter = 0;
-    dim->suppression_window_counter = 0;
+    ml_dimension_finalize_constant_state(dim);
 
     // Add the latest model to the list of pending models to flush.
     ml_model_info_t model_info;
@@ -861,25 +867,14 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         // Apply sampling during lag feature extraction
         ml_features_preprocess(&features, worker->training_samples, sampling_ratio);
 
-        // Preprocessing can still leave fewer than 2 vectors after smoothing, lag
-        // extraction, or sampling, and k-means cannot build 2 cluster centers from
-        // that input. Match the post-training state ml_dimension_update_models would
-        // have set (mt, ts, suppression counters) so prediction re-arms training via
-        // the same self-correcting loop used after every cycle. ts is only promoted
-        // to TRAINED when prior models exist, mirroring the loadtime path above so
-        // stats don't count a model-less dimension as trained.
+        // Preprocessing can leave fewer than 2 vectors after diff/smooth/lag/sampling.
+        // k-means cannot build 2 cluster centers from that input, so reuse the
+        // post-cycle state machine and bail out before kmeans_train.
         if (worker->training_samples.size() < 2) {
             spinlock_lock(&dim->slock);
-
-            dim->mt = METRIC_TYPE_CONSTANT;
-            if (!dim->km_contexts.empty())
-                dim->ts = TRAINING_STATUS_TRAINED;
-            dim->suppression_anomaly_counter = 0;
-            dim->suppression_window_counter = 0;
+            ml_dimension_finalize_constant_state(dim);
             dim->training_in_progress = false;
-
             spinlock_unlock(&dim->slock);
-
             return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
         }
 
