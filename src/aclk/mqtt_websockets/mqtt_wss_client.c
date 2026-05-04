@@ -245,12 +245,35 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
         netdata_ssl_log_verify_error(ctx);
     }
 
-    if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT &&
-        client->ssl_flags & MQTT_WSS_SSL_ALLOW_SELF_SIGNED)
-    {
-        preverify_ok = 1;
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Self Signed Certificate Accepted as the connection was "
-                               "requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+    if (!preverify_ok && (client->ssl_flags & MQTT_WSS_SSL_ALLOW_SELF_SIGNED)) {
+        // MQTT_WSS_SSL_ALLOW_SELF_SIGNED means "this connection accepts a
+        // certificate that wouldn't pass full validation". Cover the errors
+        // that on-prem deployments routinely hit:
+        //  - leaf is self-signed (no CA at all)
+        //  - cert subject does not match the configured hostname/IP
+        //    (DNS aliases, IP-only access, certs without proper SAN)
+        switch (err) {
+            case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
+                preverify_ok = 1;
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Self Signed Certificate Accepted as the connection was "
+                       "requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+                break;
+            case X509_V_ERR_HOSTNAME_MISMATCH:
+                preverify_ok = 1;
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Certificate hostname mismatch accepted as the connection "
+                       "was requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+                break;
+            case X509_V_ERR_IP_ADDRESS_MISMATCH:
+                preverify_ok = 1;
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Certificate IP address mismatch accepted as the connection "
+                       "was requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+                break;
+            default:
+                break;
+        }
     }
 
     return preverify_ok;
@@ -412,6 +435,21 @@ int mqtt_wss_connect(
     if (!SSL_set_tlsext_host_name(client->ssl, client->target_host)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting TLS SNI host");
         return -7;
+    }
+
+    if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
+        // target_host may be either a DNS hostname or an IP literal.
+        // X509_VERIFY_PARAM_set1_ip_asc() parses the string as an IP and
+        // matches against the cert's iPAddress SAN; it returns 0 if the
+        // string is not a valid IP. X509_VERIFY_PARAM_set1_host() matches
+        // against the dNSName SAN. Try the IP path first; if the input is
+        // not an IP literal, fall back to hostname matching.
+        X509_VERIFY_PARAM *param = SSL_get0_param(client->ssl);
+        if (!X509_VERIFY_PARAM_set1_ip_asc(param, client->target_host) &&
+            !X509_VERIFY_PARAM_set1_host(param, client->target_host, 0)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting TLS hostname verification host");
+            return -7;
+        }
     }
 
     result = SSL_connect(client->ssl);
