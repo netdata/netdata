@@ -173,8 +173,11 @@ void ml_config_load(ml_config_t *cfg) {
     diff_n = clamp(diff_n, 0u, 1u);
     max_samples_to_smooth = clamp<size_t>(max_samples_to_smooth, 0, 5);
     lag_n = clamp(lag_n, 1u, 5u);
-    // k-means needs at least 2 vectors; sampling caps the output at this value,
-    // so values < 2 would force the undersampled early-return every cycle.
+    // max_training_vectors drives the lag-extraction sampling ratio (not a
+    // hard cap on output). A floor of 2 keeps the sampler from being starved
+    // by a misconfigured value. The runtime guard in ml_dimension_train_model
+    // is still required because sampling is probabilistic and can drop the
+    // emitted vector count below 2.
     max_training_vectors = clamp<size_t>(max_training_vectors, 2, 86400);
 
     max_kmeans_iters = clamp(max_kmeans_iters, 500u, 1000u);
