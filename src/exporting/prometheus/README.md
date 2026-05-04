@@ -30,6 +30,27 @@ Each Netdata chart contains metrics called `dimensions`. All dimensions in a cha
 - Share the same units of measurement
 - Belong to the same contextual category (e.g., disk bandwidth contains `read` and `write` dimensions)
 
+#### Negative Values in Exported Metrics
+
+Some Netdata dimensions use a `-1` multiplier by design so that read and write appear as opposing values on the dashboard. This multiplier is applied in the RRD layer during collection and is reflected in all Prometheus data sources (`as-collected`, `average`, and `sum`), causing those dimensions to export as negative values.
+
+Affected chart contexts include:
+
+- `cgroup.io`, `k8s.cgroup.io`, `systemd.service.disk.io`
+- `cgroup.serviced_ops`, `k8s.cgroup.serviced_ops`, `systemd.service.disk.iops`
+- `cgroup.throttle_io`, `k8s.cgroup.throttle_io`, `systemd.service.disk.throttle.io`
+- `cgroup.throttle_serviced_ops`, `k8s.cgroup.throttle_serviced_ops`, `systemd.service.disk.throttle.iops`
+- `cgroup.queued_ops`, `k8s.cgroup.queued_ops`, `systemd.service.disk.queued_iops`
+- `cgroup.merged_ops`, `k8s.cgroup.merged_ops`, `systemd.service.disk.merged_iops`
+- `disk.mops`
+- `disk.bcache_rates`
+
+:::note
+
+To get absolute values in PromQL, use `abs()`. For example: `abs(netdata_cgroup_io_KiB_persec_average{dimension="write"})`.
+
+:::
+
 ### Netdata Data Source
 
 Netdata sends metrics to Prometheus from 3 data sources:
@@ -47,12 +68,6 @@ Sends metrics exactly as collected without conversion. Prometheus prefers this m
 :::info
 
 Unlike Prometheus, Netdata allows each dimension to have different algorithms and conversion constants (`multiplier` and `divisor`). When dimensions are heterogeneous, Netdata uses the `CONTEXT_DIMENSION` format.
-
-:::
-
-:::note
-
-Some Netdata dimensions use a **negative multiplier** by design. For example, cgroup I/O charts apply a `-1` multiplier to the `write` dimension so that read and write appear as opposing areas on the dashboard. When using the **as-collected** data source, these dimensions export as negative values. Use the **average** or **sum** data source to get dashboard-consistent (positive) values.
 
 :::
 
