@@ -27,6 +27,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -47,6 +48,7 @@ type Config struct {
 	AuditDataDir       string
 	FunctionJSONWriter func(payload []byte, code int)
 	RuntimeService     runtimecomp.Service
+	VnodeRegistry      *vnoderegistry.Registry
 }
 
 const (
@@ -82,6 +84,10 @@ func New(cfg Config) *Manager {
 		storeCreators := backends.Creators()
 		secretStoreSvc = secretstore.NewService(storeCreators...)
 	}
+	vnodeRegistry := cfg.VnodeRegistry
+	if vnodeRegistry == nil {
+		vnodeRegistry = vnoderegistry.New()
+	}
 
 	mgr := &Manager{
 		Logger: logger.New().With(
@@ -116,6 +122,7 @@ func New(cfg Config) *Manager {
 
 		dyncfgResponder: api,
 		runtimeService:  cfg.RuntimeService,
+		vnodeRegistry:   vnodeRegistry,
 		secretResolver:  secretresolver.New(),
 	}
 	mgr.funcCtl = funcctl.New(funcctl.Options{
@@ -233,6 +240,7 @@ type Manager struct {
 	// RuntimeService is an optional runtime/internal metrics registration seam.
 	// When set, V2 jobs may register per-job runtime components.
 	runtimeService runtimecomp.Service
+	vnodeRegistry  *vnoderegistry.Registry
 
 	secretResolver *secretresolver.Resolver
 }

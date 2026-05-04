@@ -112,7 +112,7 @@ func (ts *unixTestServer) stop() {
 
 func connectReadyUnix(t *testing.T, client *Client) {
 	t.Helper()
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		client.Refresh()
 		if client.Ready() {
 			return
@@ -162,7 +162,7 @@ func TestCacheRoundTripUnix(t *testing.T) {
 	defer cache.Close()
 
 	var updated bool
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		if cache.Refresh() {
 			updated = true
 			break

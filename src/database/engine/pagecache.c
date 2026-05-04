@@ -1079,6 +1079,14 @@ void pgc_open_add_hot_page(
     uint64_t extent_offset,
     unsigned extent_size)
 {
+    if (unlikely(!rrdeng_valid_extent_disk_size(extent_size))) {
+        nd_log_limit_static_thread_var(erl, 10, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                     "DBENGINE: skipped adding open-cache page for datafile %u of tier %u, "
+                     "extent at offset %" PRIu64 " has invalid size %u",
+                     datafile->fileno, datafile->tier, extent_offset, extent_size);
+        return;
+    }
 
     if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) { // for open cache item
         nd_log_limit_static_thread_var(erl, 10, 0);

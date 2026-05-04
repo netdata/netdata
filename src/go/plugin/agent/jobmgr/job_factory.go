@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -46,6 +47,7 @@ type jobFactory struct {
 	auditDataDir  string
 
 	runtimeService runtimecomp.Service
+	vnodeRegistry  *vnoderegistry.Registry
 
 	secretResolver *secretresolver.Resolver
 	secretStoreSvc secretstore.Service
@@ -66,6 +68,7 @@ func newJobFactory(m *Manager) *jobFactory {
 		auditDataDir:  m.auditDataDir,
 
 		runtimeService: m.runtimeService,
+		vnodeRegistry:  m.vnodeRegistry,
 		secretResolver: m.secretResolver,
 		secretStoreSvc: m.secretsCtl.Service(),
 		ctx:            m.baseContext(),
@@ -143,6 +146,7 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 		Module:          mod,
 		FunctionOnly:    functionOnly,
 		RuntimeService:  f.runtimeService,
+		VnodeRegistry:   f.vnodeRegistry,
 	}
 	if vnode != nil {
 		jobCfg.Vnode = *vnode.Copy()

@@ -702,7 +702,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
     count = jf_metric_data->number_of_pages;
     descr_size = sizeof(*jf_metric_data->descr) * count;
     payload_length = sizeof(*jf_metric_data) + descr_size;
-    if (payload_length > max_size) {
+    if (payload_length > max_size || !rrdeng_valid_extent_disk_size(jf_metric_data->extent_size)) {
         netdata_log_error("DBENGINE: corrupted transaction payload.");
         return;
     }

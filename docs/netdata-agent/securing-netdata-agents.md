@@ -4,6 +4,8 @@ By default, your Netdata Agent exposes its local dashboard on port `19999`. If y
 
 You can protect your Agents by implementing any of these security measures:
 
+If you need to align Netdata with enterprise cybersecurity platforms such as Sophos, secure-access gateways, or corporate reverse proxies, see [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md).
+
 ## Security Approaches
 
 ### Recommended Methods

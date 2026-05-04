@@ -12,14 +12,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func buildCollectorRuntimeFromConfig(profileNames []string, profileEntries map[string]ProfileEntryConfig, catalog azureprofiles.Catalog) (*collectorRuntime, error) {
+func buildCollectorRuntimeFromConfig(profileNames []string, profileEntries map[string]ProfileEntryConfig, catalog azureprofiles.Catalog, workloadResourceTagKey string) (*collectorRuntime, error) {
 	profiles, err := catalog.Resolve(profileNames)
 	if err != nil {
 		return nil, err
 	}
 
 	runtime := &collectorRuntime{
-		Profiles: make([]*profileRuntime, 0, len(profiles)),
+		Profiles:               make([]*profileRuntime, 0, len(profiles)),
+		WorkloadResourceTagKey: stringsLowerTrim(workloadResourceTagKey),
 	}
 
 	seenProfileNames := make(map[string]struct{}, len(profiles))
