@@ -53,6 +53,22 @@ At higher ingestion rates the per-tier size limit is reached before the time lim
 
 :::
 
+### Calculating Disk Requirements
+
+Use the following formula to estimate the disk space needed for a given retention period:
+
+`Disk (bytes) = metrics_per_second × seconds_in_retention_period × bytes_per_sample`
+
+For example, to estimate tier0 disk usage for 4,000 metrics per second over 14 days:
+
+4,000 × 86,400 × 14 = 4,838,400,000 samples × 0.6 bytes ≈ **2.7 GiB**
+
+:::note
+
+Real-world compression varies depending on data patterns. Use these estimates for planning, but monitor actual disk usage to fine-tune your configuration.
+
+:::
+
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
 **Configuring dbengine mode and retention**:
