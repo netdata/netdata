@@ -861,12 +861,16 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         // Apply sampling during lag feature extraction
         ml_features_preprocess(&features, worker->training_samples, sampling_ratio);
 
-        // Preprocessing can still leave fewer than 2 vectors after smoothing, lag extraction,
-        // or sampling, and k-means cannot build 2 cluster centers from that input.
+        // Preprocessing can still leave fewer than 2 vectors after smoothing, lag
+        // extraction, or sampling, and k-means cannot build 2 cluster centers from
+        // that input. Match the post-training state ml_dimension_update_models would
+        // have set (mt, ts, suppression counters) so prediction is what re-arms
+        // training, the same self-correcting loop already used after every cycle.
         if (worker->training_samples.size() < 2) {
             spinlock_lock(&dim->slock);
 
             dim->mt = METRIC_TYPE_CONSTANT;
+            dim->ts = TRAINING_STATUS_TRAINED;
             dim->suppression_anomaly_counter = 0;
             dim->suppression_window_counter = 0;
             dim->training_in_progress = false;
