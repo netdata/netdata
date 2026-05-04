@@ -408,6 +408,36 @@ static void test_kmeans_inlined_empty_source_is_zero_initialized()
     }
 }
 
+// Test: at the smallest legal input (src_n == diff_n + smooth_n + lag_n),
+// ml_features_preprocess yields exactly one feature vector. ml_dimension_train_model
+// short-circuits in this case because dlib cannot seed 2 cluster centers from a
+// single sample. This guards the boundary so a later refactor cannot silently
+// re-enable training on insufficient input.
+static void test_features_preprocess_below_min_for_kmeans()
+{
+    fprintf(stderr, "  test_features_preprocess_below_min_for_kmeans...\n");
+
+    const size_t diff_n = 1;
+    const size_t smooth_n = 1;
+    const size_t lag_n = 1;
+    const size_t src_n = diff_n + smooth_n + lag_n; // 3, the minimum allowed by ml_validate_features_input
+
+    calculated_number_t src[16] = {1.0, 2.0, 3.0};
+    calculated_number_t dst[16] = {0};
+
+    std::vector<DSample> pf;
+    ml_features_t features = {
+        diff_n, smooth_n, lag_n,
+        dst, src_n, src, src_n
+    };
+
+    ml_features_preprocess(&features, pf, 1.0);
+
+    // n_vectors = src_n - diff_n - smooth_n + 1 - lag_n = 3 - 1 - 1 + 1 - 1 = 1
+    ML_TEST_ASSERT(pf.size() == 1, "boundary input should yield exactly 1 feature vector");
+    ML_TEST_ASSERT(pf.size() < 2, "<2 vectors must trigger the kmeans-skip early-return in ml_dimension_train_model");
+}
+
 // Test: circular buffer linearization produces the same result as std::rotate
 static void test_circular_buffer_equivalence()
 {
@@ -1004,6 +1034,7 @@ extern "C" int ml_unittest()
     test_kmeans_scoring();
     test_full_pipeline();
     test_kmeans_inlined_empty_source_is_zero_initialized();
+    test_features_preprocess_below_min_for_kmeans();
     test_circular_buffer_equivalence();
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
