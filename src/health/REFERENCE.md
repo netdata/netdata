@@ -244,6 +244,14 @@ You can use the [health management API](/src/web/api/health/README.md) to tempor
 
 **Step-by-Step Process:**
 
+:::tip
+
+You can put custom alerts in any `.conf` file under `health.d/` — the filename is your choice. The recommended pattern is one file per area (for example, `my-cpu-alerts.conf`, `my-disk-alerts.conf`), matching how stock alerts are organized. You can also consolidate everything into a single file like `custom-alerts.conf`.
+
+Keep all definitions that share the same alert name in the same file, because file loading order within `health.d/` is non-deterministic — splitting same-name definitions across files can lead to unpredictable behavior. See the [Alert Configuration Ordering FAQ](/src/health/alert-configuration-ordering.md#what-happens-if-i-define-the-same-alert-name-twice-in-my-user-config) for details.
+
+:::
+
 **Step 1: Create the Configuration File**
 
 Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md), then use `touch` to create a new file in the `health.d/` directory. Use `edit-config` to start editing the file.
