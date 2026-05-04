@@ -1155,26 +1155,30 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         if (num_active_dimensions)
             host_anomaly_rate = static_cast<double>(host_mls.num_anomalous_dimensions) / num_active_dimensions;
 
-        bool publish_stats = false;
-
         // Publish the final host snapshot after chart traversal so chart
         // deletion cannot block other host->mutex users for the full walk.
+        // If ml_running flipped to false during the walk, ml_host_stop may
+        // have raced our unlocked chart->mls reads; zero the snapshot so
+        // we don't surface partially-clobbered host stats. The chart
+        // updates below run unconditionally: ml_update_dimensions_chart
+        // reads host->ml_running directly (so the ml_running chart records
+        // the stop) and ml_update_host_and_detection_rate_charts resets
+        // the context_anomaly_rate counts.
         netdata_mutex_lock(&host->mutex);
-        if (host->ml_running) {
-            host->mls = host_mls;
-            host->host_anomaly_rate = host_anomaly_rate;
-            mls_copy = host->mls;
-            publish_stats = true;
+        if (!host->ml_running) {
+            host_mls = {};
+            host_anomaly_rate = 0.0;
         }
+        host->mls = host_mls;
+        host->host_anomaly_rate = host_anomaly_rate;
+        mls_copy = host_mls;
         netdata_mutex_unlock(&host->mutex);
 
-        if (publish_stats) {
-            worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
-            ml_update_dimensions_chart(host, mls_copy);
+        worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
+        ml_update_dimensions_chart(host, mls_copy);
 
-            worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-            ml_update_host_and_detection_rate_charts(host, host_anomaly_rate * 10000.0, owa);
-        }
+        worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
+        ml_update_host_and_detection_rate_charts(host, host_anomaly_rate * 10000.0, owa);
     } else {
         host->host_anomaly_rate = 0.0;
     }
