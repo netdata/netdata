@@ -13,7 +13,9 @@ You can create a new Agent container with `docker run` or `docker-compose`, then
 
 :::note
 
-Netdata Cloud connectivity is entirely optional. The local dashboard at `http://NODE:19999` is fully functional without any Cloud connection. You can claim the node later if you want Cloud features such as centralized Dashboards and user management.
+Netdata Cloud connectivity is optional. The local dashboard at `http://NODE:19999` provides core monitoring — real-time and historical metrics, charts, anomaly detection, and alert notifications — without any Cloud connection.
+
+Some features require a free Netdata Cloud account (signing in), including viewing processes, network connections, system logs, and AI-powered insights. Multi-node views are limited to 5 nodes on the free tier. You can claim the node later to unlock additional capabilities. For the full feature breakdown by access level, see [Access Control and Feature Availability](/docs/netdata-oss-limitations.md).
 
 :::
 
