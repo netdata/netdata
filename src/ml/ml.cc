@@ -730,8 +730,7 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
 void ml_dimension_finalize_constant_state(ml_dimension_t *dim)
 {
     dim->mt = METRIC_TYPE_CONSTANT;
-    if (!dim->km_contexts.empty())
-        dim->ts = TRAINING_STATUS_TRAINED;
+    dim->ts = TRAINING_STATUS_TRAINED;
     dim->suppression_anomaly_counter = 0;
     dim->suppression_window_counter = 0;
 }

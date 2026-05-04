@@ -446,45 +446,24 @@ static void test_features_preprocess_below_min_for_kmeans()
 
 // Test: ml_dimension_finalize_constant_state is the shared post-cycle state
 // transition used by both the successful-training path and the undersampled
-// early-return. mt is always set to CONSTANT and suppression counters are
-// reset; ts is promoted to TRAINED only when km_contexts already holds a
-// model, so a model-less dimension is not falsely counted as trained.
+// early-return. It sets mt = CONSTANT, ts = TRAINED, and resets suppression
+// counters. Matches the existing master behavior in ml_dimension_update_models.
 static void test_dimension_finalize_constant_state()
 {
     fprintf(stderr, "  test_dimension_finalize_constant_state...\n");
 
-    // Case 1: a prior model exists -> ts is promoted to TRAINED.
-    {
-        ml_dimension_t dim = {};
-        dim.mt = METRIC_TYPE_VARIABLE;
-        dim.ts = TRAINING_STATUS_UNTRAINED;
-        dim.suppression_anomaly_counter = 7;
-        dim.suppression_window_counter = 13;
-        dim.km_contexts.emplace_back();
+    ml_dimension_t dim = {};
+    dim.mt = METRIC_TYPE_VARIABLE;
+    dim.ts = TRAINING_STATUS_UNTRAINED;
+    dim.suppression_anomaly_counter = 7;
+    dim.suppression_window_counter = 13;
 
-        ml_dimension_finalize_constant_state(&dim);
+    ml_dimension_finalize_constant_state(&dim);
 
-        ML_TEST_ASSERT(dim.mt == METRIC_TYPE_CONSTANT, "mt must become CONSTANT");
-        ML_TEST_ASSERT(dim.ts == TRAINING_STATUS_TRAINED, "ts must promote to TRAINED with prior model");
-        ML_TEST_ASSERT(dim.suppression_anomaly_counter == 0, "anomaly counter must reset");
-        ML_TEST_ASSERT(dim.suppression_window_counter == 0, "window counter must reset");
-    }
-
-    // Case 2: no prior models -> ts stays where it was (do not lie in stats).
-    {
-        ml_dimension_t dim = {};
-        dim.mt = METRIC_TYPE_VARIABLE;
-        dim.ts = TRAINING_STATUS_UNTRAINED;
-        dim.suppression_anomaly_counter = 7;
-        dim.suppression_window_counter = 13;
-
-        ml_dimension_finalize_constant_state(&dim);
-
-        ML_TEST_ASSERT(dim.mt == METRIC_TYPE_CONSTANT, "mt must become CONSTANT");
-        ML_TEST_ASSERT(dim.ts == TRAINING_STATUS_UNTRAINED, "ts must stay UNTRAINED with no model");
-        ML_TEST_ASSERT(dim.suppression_anomaly_counter == 0, "anomaly counter must reset");
-        ML_TEST_ASSERT(dim.suppression_window_counter == 0, "window counter must reset");
-    }
+    ML_TEST_ASSERT(dim.mt == METRIC_TYPE_CONSTANT, "mt must become CONSTANT");
+    ML_TEST_ASSERT(dim.ts == TRAINING_STATUS_TRAINED, "ts must become TRAINED");
+    ML_TEST_ASSERT(dim.suppression_anomaly_counter == 0, "anomaly counter must reset");
+    ML_TEST_ASSERT(dim.suppression_window_counter == 0, "window counter must reset");
 }
 
 // Test: circular buffer linearization produces the same result as std::rotate
