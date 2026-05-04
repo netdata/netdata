@@ -453,12 +453,16 @@ static void test_dimension_finalize_constant_state()
     fprintf(stderr, "  test_dimension_finalize_constant_state...\n");
 
     ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
     dim.mt = METRIC_TYPE_VARIABLE;
     dim.ts = TRAINING_STATUS_UNTRAINED;
     dim.suppression_anomaly_counter = 7;
     dim.suppression_window_counter = 13;
 
+    // Match the helper's documented contract (caller holds dim->slock).
+    spinlock_lock(&dim.slock);
     ml_dimension_finalize_constant_state(&dim);
+    spinlock_unlock(&dim.slock);
 
     ML_TEST_ASSERT(dim.mt == METRIC_TYPE_CONSTANT, "mt must become CONSTANT");
     ML_TEST_ASSERT(dim.ts == TRAINING_STATUS_TRAINED, "ts must become TRAINED");

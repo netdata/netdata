@@ -1100,7 +1100,7 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         // Snapshot the stop generation before the unlocked walk. If it changes
         // by the time we publish, a stop ran while we were reading chart->mls
         // and the accumulated snapshot must be discarded.
-        uint64_t stop_gen_before = host->ml_stop_generation.load(std::memory_order_acquire);
+        uint64_t stop_gen_before = host->ml_stop_generation.load();
 
         /*
          * prediction/detection stats
@@ -1173,15 +1173,15 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         // host->ml_running directly (so the ml_running chart records the
         // stop), and the chart-update path resets and republishes the rest.
         netdata_mutex_lock(&host->mutex);
-        uint64_t stop_gen_after = host->ml_stop_generation.load(std::memory_order_acquire);
+        uint64_t stop_gen_after = host->ml_stop_generation.load();
         if (!host->ml_running || stop_gen_before != stop_gen_after) {
             host_mls = {};
             host_anomaly_rate = 0.0;
 
             spinlock_lock(&host->context_anomaly_rate_spinlock);
-            for (auto &entry : host->context_anomaly_rate) {
-                entry.second.anomalous_dimensions = 0;
-                entry.second.normal_dimensions = 0;
+            for (auto &[key, entry] : host->context_anomaly_rate) {
+                entry.anomalous_dimensions = 0;
+                entry.normal_dimensions = 0;
             }
             spinlock_unlock(&host->context_anomaly_rate_spinlock);
         }

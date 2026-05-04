@@ -165,11 +165,11 @@ void ml_host_stop(RRDHOST *rh) {
         return;
 
     // Prevent new ML activity from publishing while we reset host/dimension
-    // state. Bump the stop generation so a concurrent ml_host_detect_once can
-    // see a stop happened even if a subsequent ml_host_start flips ml_running
-    // back to true before detect's re-check.
+    // state. The ml_running flag gates collectors and the detect loop; the
+    // stop generation is bumped at the end of the function so a concurrent
+    // ml_host_detect_once that observes the new generation is guaranteed to
+    // also see all of our chart->mls / dim resets via seq_cst ordering.
     host->ml_running = false;
-    host->ml_stop_generation.fetch_add(1, std::memory_order_release);
 
     netdata_mutex_lock(&host->mutex);
 
@@ -226,6 +226,13 @@ void ml_host_stop(RRDHOST *rh) {
         rrddim_foreach_done(rdp);
     }
     rrdset_foreach_done(rsp);
+
+    // Publish the stop only after every chart->mls / dim reset is committed.
+    // ml_host_detect_once treats a generation change as "discard the snapshot",
+    // so bumping here guarantees that if detect saw stale chart->mls it will
+    // either also observe the new generation or have already published before
+    // any of our resets started.
+    host->ml_stop_generation.fetch_add(1);
 }
 
 void ml_host_get_info(RRDHOST *rh, BUFFER *wb)

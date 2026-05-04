@@ -175,9 +175,10 @@ void ml_config_load(ml_config_t *cfg) {
     lag_n = clamp(lag_n, 1u, 5u);
     // max_training_vectors drives the lag-extraction sampling ratio (not a
     // hard cap on output). A floor of 2 keeps the sampler from being starved
-    // by a misconfigured value. The runtime guard in ml_dimension_train_model
-    // is still required because sampling is probabilistic and can drop the
-    // emitted vector count below 2.
+    // by a misconfigured value; the ceiling of 86400 (24 hours of 1-second
+    // samples) is well past anything training_window can supply. The runtime
+    // guard in ml_dimension_train_model is still required because sampling is
+    // probabilistic and can drop the emitted vector count below 2.
     max_training_vectors = clamp<size_t>(max_training_vectors, 2, 86400);
 
     max_kmeans_iters = clamp(max_kmeans_iters, 500u, 1000u);
