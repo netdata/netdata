@@ -419,7 +419,10 @@ static inline int discovery_find_walkdir(const char *base, const char *dirpath) 
 
     DIR *dir = opendir(dirpath);
     if(!dir) {
-        collector_error("CGROUP: cannot open directory '%s'", base);
+        if(errno == EACCES && strcmp(dirpath, base) != 0)
+            nd_log_collector(NDLP_DEBUG, "CGROUP: cannot open directory '%s': %s", dirpath, strerror(errno));
+        else
+            collector_error("CGROUP: cannot open directory '%s': %s", dirpath, strerror(errno));
         return ret;
     }
     ret = 1;
