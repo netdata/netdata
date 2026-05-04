@@ -104,6 +104,7 @@ void ml_host_new(RRDHOST *rh)
     // fields, producing SIGSEGV faults inside ml_dimension_is_anomalous and
     // similar readers.
     __atomic_store_n(&rh->ml_host, (rrd_ml_host_t *)host, __ATOMIC_RELEASE);
+    host->ml_stop_generation = 0;
 }
 
 void ml_host_delete(RRDHOST *rh)
@@ -163,8 +164,12 @@ void ml_host_stop(RRDHOST *rh) {
     if (!host || !host->ml_running)
         return;
 
-    // Prevent new ML activity from publishing while we reset host/dimension state.
+    // Prevent new ML activity from publishing while we reset host/dimension
+    // state. Bump the stop generation so a concurrent ml_host_detect_once can
+    // see a stop happened even if a subsequent ml_host_start flips ml_running
+    // back to true before detect's re-check.
     host->ml_running = false;
+    host->ml_stop_generation.fetch_add(1, std::memory_order_release);
 
     netdata_mutex_lock(&host->mutex);
 

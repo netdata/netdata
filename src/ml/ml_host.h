@@ -40,6 +40,12 @@ typedef struct {
 
     std::atomic<bool> ml_running;
 
+    // Incremented on every ml_host_stop. ml_host_detect_once samples this before
+    // and after its unlocked chart walk; a change means a stop ran during the
+    // walk, so the accumulated snapshot must be discarded even if a subsequent
+    // ml_host_start has flipped ml_running back to true.
+    std::atomic<uint64_t> ml_stop_generation;
+
     ml_machine_learning_stats_t mls;
 
     calculated_number_t host_anomaly_rate;

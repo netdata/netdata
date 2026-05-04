@@ -1098,6 +1098,11 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
     calculated_number_t host_anomaly_rate = 0.0;
 
     if (host->ml_running) {
+        // Snapshot the stop generation before the unlocked walk. If it changes
+        // by the time we publish, a stop ran while we were reading chart->mls
+        // and the accumulated snapshot must be discarded.
+        uint64_t stop_gen_before = host->ml_stop_generation.load(std::memory_order_acquire);
+
         /*
          * prediction/detection stats
         */
@@ -1159,15 +1164,18 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 
         // Publish the final host snapshot after chart traversal so chart
         // deletion cannot block other host->mutex users for the full walk.
-        // If ml_running flipped to false during the walk, ml_host_stop may
-        // have raced our unlocked chart->mls reads — zero the snapshot
-        // and the per-context counts so we don't surface partially-
-        // clobbered stats. The chart updates below run unconditionally:
-        // ml_update_dimensions_chart reads host->ml_running directly (so
-        // the ml_running chart records the stop), and the chart-update
-        // path resets and republishes the rest.
+        // Discard the snapshot if either (a) ml_running is now false, or
+        // (b) the stop generation changed since the walk started — the
+        // latter catches a stop+start that completed during the walk and
+        // would otherwise pass the boolean check. In either case our
+        // unlocked chart->mls reads may have raced ml_host_stop, so zero
+        // the snapshot and the per-context counts. The chart updates below
+        // run unconditionally: ml_update_dimensions_chart reads
+        // host->ml_running directly (so the ml_running chart records the
+        // stop), and the chart-update path resets and republishes the rest.
         netdata_mutex_lock(&host->mutex);
-        if (!host->ml_running) {
+        uint64_t stop_gen_after = host->ml_stop_generation.load(std::memory_order_acquire);
+        if (!host->ml_running || stop_gen_before != stop_gen_after) {
             host_mls = {};
             host_anomaly_rate = 0.0;
 
