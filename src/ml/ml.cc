@@ -864,13 +864,16 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         // Preprocessing can still leave fewer than 2 vectors after smoothing, lag
         // extraction, or sampling, and k-means cannot build 2 cluster centers from
         // that input. Match the post-training state ml_dimension_update_models would
-        // have set (mt, ts, suppression counters) so prediction is what re-arms
-        // training, the same self-correcting loop already used after every cycle.
+        // have set (mt, ts, suppression counters) so prediction re-arms training via
+        // the same self-correcting loop used after every cycle. ts is only promoted
+        // to TRAINED when prior models exist, mirroring the loadtime path above so
+        // stats don't count a model-less dimension as trained.
         if (worker->training_samples.size() < 2) {
             spinlock_lock(&dim->slock);
 
             dim->mt = METRIC_TYPE_CONSTANT;
-            dim->ts = TRAINING_STATUS_TRAINED;
+            if (!dim->km_contexts.empty())
+                dim->ts = TRAINING_STATUS_TRAINED;
             dim->suppression_anomaly_counter = 0;
             dim->suppression_window_counter = 0;
             dim->training_in_progress = false;

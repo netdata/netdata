@@ -398,6 +398,10 @@ static void test_kmeans_inlined_empty_source_is_zero_initialized()
     }
     assigned = empty_km;
 
+    ML_TEST_ASSERT(assigned.after == empty_km.after, "assigned empty model should preserve 'after'");
+    ML_TEST_ASSERT(assigned.before == empty_km.before, "assigned empty model should preserve 'before'");
+    ML_TEST_ASSERT_DOUBLE_EQ(assigned.min_dist, empty_km.min_dist, 0.0, "assigned empty model should preserve min_dist");
+    ML_TEST_ASSERT_DOUBLE_EQ(assigned.max_dist, empty_km.max_dist, 0.0, "assigned empty model should preserve max_dist");
     for (size_t center = 0; center < assigned.cluster_centers.size(); center++) {
         ML_TEST_ASSERT(assigned.cluster_centers[center].size() == 6, "empty-source centers must keep fixed-size geometry");
         for (long i = 0; i < assigned.cluster_centers[center].size(); i++) {
@@ -409,10 +413,11 @@ static void test_kmeans_inlined_empty_source_is_zero_initialized()
 }
 
 // Test: at the smallest legal input (src_n == diff_n + smooth_n + lag_n),
-// ml_features_preprocess yields exactly one feature vector. ml_dimension_train_model
-// short-circuits in this case because dlib cannot seed 2 cluster centers from a
-// single sample. This guards the boundary so a later refactor cannot silently
-// re-enable training on insufficient input.
+// ml_features_preprocess yields exactly one feature vector. This guards the
+// preprocess boundary that triggers the <2-vectors early-return in
+// ml_dimension_train_model. Scope is intentionally limited to preprocess output:
+// ml_dimension_train_model itself depends on a live ml_dimension_t (worker, rd,
+// rrdset, host, sqlite) and is not unit-testable without significant plumbing.
 static void test_features_preprocess_below_min_for_kmeans()
 {
     fprintf(stderr, "  test_features_preprocess_below_min_for_kmeans...\n");
