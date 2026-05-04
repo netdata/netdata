@@ -79,7 +79,6 @@ Use these Docker Compose examples to deploy a Parent-Child streaming setup using
 **Parent `docker-compose.yml`:**
 
 ```yaml
-version: '3'
 services:
   netdata:
     image: netdata/netdata
@@ -115,14 +114,13 @@ volumes:
 
 :::tip
 
-After starting the container, edit `stream.conf` inside it to add your `[API_KEY]` section with `enabled = yes`, following the [Parent stream.conf example](#parent-with-tiered-storage) above. Access the container with `docker exec -it netdata-parent bash`, then run `./etc/netdata/edit-config stream.conf`.
+After starting the container, edit `stream.conf` inside it to add your `[API_KEY]` section with `enabled = yes`, following the [Parent stream.conf example](#parent-with-tiered-storage) above. Access the container with `docker exec -it netdata-parent bash`, then run `/etc/netdata/edit-config stream.conf`.
 
 :::
 
 **Child `docker-compose.yml`:**
 
 ```yaml
-version: '3'
 services:
   netdata:
     image: netdata/netdata
@@ -156,7 +154,7 @@ volumes:
 
 :::tip
 
-After starting the container, edit `stream.conf` inside it to set `destination = PARENT_IP_ADDRESS:19999` and `api key = API_KEY`, following the [Child stream.conf example](#lightweight-child-configuration) above. For a lightweight setup, also apply the [lightweight Child `netdata.conf`](#lightweight-child-configuration) settings. Access the container with `docker exec -it netdata-child bash`, then run `./etc/netdata/edit-config stream.conf` and `./etc/netdata/edit-config netdata.conf`.
+After starting the container, edit `stream.conf` inside it to set `destination = PARENT_IP_ADDRESS:19999` and `api key = API_KEY`, following the [Child stream.conf example](#lightweight-child-configuration) above. For a lightweight setup, also apply the [lightweight Child `netdata.conf`](#lightweight-child-configuration) settings. Access the container with `docker exec -it netdata-child bash`, then run `/etc/netdata/edit-config stream.conf` and `/etc/netdata/edit-config netdata.conf`.
 
 :::
 
