@@ -52,7 +52,11 @@ With appropriate API tokens, you can access endpoints including:
 
 :::warning
 
-You may encounter `404` responses on v2 and v3 Cloud API endpoints at `app.netdata.cloud`. The stable Cloud API is not currently publicly exposed, so the example endpoints listed on this page may not be directly accessible at this time. For assistance, visit [Netdata Support](https://www.netdata.cloud/support/).
+Not all Cloud API endpoints are currently available. If you receive **404** responses from `https://app.netdata.cloud/api/v2/` or `https://app.netdata.cloud/api/v3/` endpoints, this is because Netdata Cloud is not yet exposing the full stable API.
+
+For accessing metric data, you can use your local Netdata Agent API at `http://<agent-ip>:19999/api/v2/data` or `http://<agent-ip>:19999/api/v1/data` instead.
+
+If you need help with Cloud API access, visit [Netdata Support](https://www.netdata.cloud/support/).
 
 :::
 
