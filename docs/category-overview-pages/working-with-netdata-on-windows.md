@@ -121,7 +121,7 @@ You can collect custom metrics from PowerShell scripts using the [Nagios Plugins
 
 :::tip
 
-In a parent-child streaming setup, the collector runs on the Agent where the script is installed. To collect custom metrics from a child Node, install and configure the script directly on that child Node.
+In a Parent-Child streaming setup, the collector runs on the Agent where the script is installed. To collect custom metrics from a child Node, install and configure the script directly on that child Node.
 
 :::
 
