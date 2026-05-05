@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0520
+# Next unused error code: F052A
 
 # ======================================================================
 # Constants
@@ -95,6 +95,8 @@ else
 fi
 
 CURL="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
+WGET="$(command -v wget 2>/dev/null && true)"
+[ -z "${WGET}" ] && WGET="$(command -v wget2 2>/dev/null && true)"
 
 # ======================================================================
 # Shared messages used in multiple places throughout the script.
@@ -103,6 +105,7 @@ BADCACHE_MSG="Usually this is a result of an older copy of the file being cached
 BADNET_MSG="This is usually a result of a networking issue"
 ERROR_F0003="Could not find a usable HTTP client. Either curl or wget is required to proceed with installation."
 BADOPT_MSG="If you are following a third-party guide online, please see ${INSTALL_DOC_URL} for current instructions for using this script. If you are using a local copy of this script instead of fetching it from our servers, consider updating it. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
+GITHUB_BADNET_MSG="This usually means there is some networking issue preventing access to https://github.com/ from this system."
 
 # ======================================================================
 # Core program logic
@@ -332,16 +335,16 @@ EOF
   fi
 
   if [ "${succeeded}" -eq 0 ]; then
-    if command -v wget > /dev/null 2>&1; then
-      if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
+    if [ -n "${WGET}" ]; then
+      if "${WGET}" --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
         # BusyBox-compatible version of wget, there is no --no-check-certificate option
-        wget -q -O - \
+        "${WGET}" -q -O - \
         -T 1 \
         --header 'Content-Type: application/json' \
         --post-data "${REQ_BODY}" \
         "${TELEMETRY_URL}" > /dev/null
       else
-        wget -q -O - --no-check-certificate \
+        "${WGET}" -q -O - --no-check-certificate \
         --method POST \
         --timeout=1 \
         --header 'Content-Type: application/json' \
@@ -627,8 +630,6 @@ set_tmpdir() {
 
 check_for_remote_file() {
   url="${1}"
-  succeeded=0
-  checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
     [ -e "${url#file://}" ] || return 1
@@ -638,71 +639,114 @@ check_for_remote_file() {
   fi
 
   if [ -n "${CURL}" ]; then
-    checked=1
+    "${CURL}" --output /dev/null --silent --head --fail "${url}"
 
-    if "${CURL}" --output /dev/null --silent --head --fail "${url}"; then
-      succeeded=1
-    fi
+    case "$?" in
+        0) return 0 ;;
+        22|78) return 1 ;;
+        5|6|7)
+            error "Failed to connect to remote host when checking for remote file at ${url}"
+            return 2
+            ;;
+        35|60|83)
+            error "TLS error while connecting to remote host when checking for remote file at ${url}"
+            return 3
+            ;;
+        *) fatal "Unknown error when checking for remote file at ${url}" F0520 ;;
+    esac
   fi
 
-  if [ "${succeeded}" -eq 0 ]; then
-    if command -v wget > /dev/null 2>&1; then
-      checked=1
+  if [ -n "${WGET}" ]; then
+    output="$(mktemp)"
+    "${WGET}" -S --spider "${url}" > "${output}" 2>&1
 
-      if wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK'; then
-        succeeded=1
-      fi
-    fi
+    case "$?" in
+      0)
+        if grep -q 'HTTP/1.1 200 OK' "${output}"; then
+          rm "${output}"
+          return 0
+        else
+          rm "${output}"
+          return 1
+        fi
+        ;;
+      8)
+        rm "${output}"
+        return 1
+        ;;
+      4)
+        rm "${output}"
+        return 2
+        ;;
+      5)
+        rm "${output}"
+        return 3
+        ;;
+      *) fatal "Unknown error when checking for remote file at ${url}" F0520 ;;
+    esac
   fi
 
-  if [ "${succeeded}" -eq 1 ]; then
-    return 0
-  elif [ "${checked}" -eq 1 ]; then
-    return 1
-  else
-    fatal "${ERROR_F0003}" F0003
-  fi
+  fatal "${ERROR_F0003}" F0003
 }
 
 download() {
   url="${1}"
   dest="${2}"
-  succeeded=0
-  checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
     run cp "${url#file://}" "${dest}" || return 1
     return 0
   fi
 
-
   if [ -n "${CURL}" ]; then
-    checked=1
+    run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
 
-    if run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"; then
-      succeeded=1
-    else
-      rm -f "${dest}"
-    fi
+    case "$?" in
+      0) return 0 ;;
+      22|78)
+        error "Remote server reported error when downloading ${url}" F0522
+        rm -f "${dest}"
+        return 1
+        ;;
+      5|6|7)
+        error "Failed to connect to remote server to download ${url}" F0523
+        rm -f "${dest}"
+        return 2
+        ;;
+      35|60|83)
+        error "TLS error while connecting to remote server to download ${url}" F0524
+        rm -f "${dest}"
+        return 3
+        ;;
+      *) fatal "Unknown error when downloading ${url}" F0521 ;;
+    esac
   fi
 
-  if [ "${succeeded}" -eq 0 ]; then
-    if command -v wget > /dev/null 2>&1; then
-      checked=1
+  if [ -n "${WGET}" ]; then
+    run "${WGET}" -T 15 -O "${dest}" "${url}"
 
-      if run wget -T 15 -O "${dest}" "${url}"; then
-        succeeded=1
-      fi
-    fi
+    case "$?" in
+      0) return 0 ;;
+      8)
+        error "Remote server reported error when downloading ${url}" F0522
+        rm -f "${dest}"
+        return 1
+        ;;
+      4)
+        error "Failed to connect to remote server to download ${url}" F0523
+        rm -f "${dest}"
+        return 2
+        ;;
+      5)
+        error "TLS error while connecting to remote server to download ${url}" F0524
+        rm -f "${dest}"
+        return 3
+        ;;
+      *) fatal "Unknown error when downloading ${url}" F0521 ;;
+    esac
   fi
 
-  if [ "${succeeded}" -eq 1 ]; then
-    return 0
-  elif [ "${checked}" -eq 1 ]; then
-    return 1
-  else
-    fatal "${ERROR_F0003}" F0003
-  fi
+  fatal "${ERROR_F0003}" F0003
 }
 
 get_actual_version() {
@@ -723,34 +767,66 @@ get_actual_version() {
 
 get_redirect() {
   url="${1}"
-  succeeded=0
-  checked=0
 
   if [ -n "${CURL}" ]; then
-    checked=1
+    output="$(mktemp)"
+    run "${CURL}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' > "${output}"
 
-    if run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+/?$' | grep -Eo '^[^/]+'"; then
-      succeeded=1
-    fi
+    case "$?" in
+      0)
+        grep -Eo '[^/]+/?$' "${output}" | grep -Eo '^[^/]+'
+        rm -f "${output}"
+        return 0
+        ;;
+      22|78)
+        error "Remote server reported error when checking redirects for ${url}" F0525
+        rm -f "${output}"
+        return 1
+        ;;
+      5|6|7)
+        error "Failed to connect to remote server to check redirects for ${url}" F0526
+        rm -f "${output}"
+        return 2
+        ;;
+      35|60|83)
+        error "TLS error while connecting to remote server to check redirects for ${url}" F0527
+        rm -f "${output}"
+        return 3
+        ;;
+      *) fatal "Unknown error when checking redirect for ${url}" F0528 ;;
+    esac
   fi
 
-  if [ "${succeeded}" -eq 0 ]; then
-    if command -v wget > /dev/null 2>&1; then
-      checked=1
+  if [ -n "${WGET}" ]; then
+    output="$(mktemp)"
+    run sh -c "${WGET}" -S -O /dev/null "${url}" > "${output}" 2>&1
 
-      if run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+/?$' | grep -Eo '^[^/]+'"; then
-        succeeded=1
-      fi
-    fi
+    case "$?" in
+      0)
+        grep -m 1 Location "${output}" | grep -Eo '[^/]+/?$' | grep -Eo '[^/]+$'
+        rm -f "${output}"
+        return 0
+        ;;
+      8)
+        error "Remote server reported error when checking redirects for ${url}" F0525
+        rm -f "${output}"
+        return 1
+        ;;
+      4)
+        error "Failed to connect to remote server to check redirects for ${url}" F0526
+        rm -f "${output}"
+        return 2
+        ;;
+      5)
+        error "TLS error while connecting to remote server to check redirects for ${url}" F0527
+        rm -f "${output}"
+        return 3
+        ;;
+      *) fatal "Unknown error when checking redirect for ${url}" F0528 ;;
+    esac
   fi
 
-  if [ "${succeeded}" -eq 1 ]; then
-    return 0
-  elif [ "${checked}" -eq 1 ]; then
-    return 1
-  else
-    fatal "${ERROR_F0003}" F0003
-  fi
+  fatal "${ERROR_F0003}" F0003
 }
 
 safe_sha256sum() {
@@ -973,16 +1049,19 @@ uninstall() {
     fi
   else
     if [ "${DRY_RUN}" -eq 1 ]; then
-      progress "Would download installer script from: ${uninstaller_url}"
+      progress "Would download uninstaller script from: ${uninstaller_url}"
       progress "Would attempt to uninstall existing install with downloaded uninstaller script."
       return 0
     else
       progress "Downloading netdata-uninstaller ..."
-      download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
-      chmod +x "${tmpdir}/netdata-uninstaller.sh"
-      # shellcheck disable=SC2086
-      if ! run_script "${tmpdir}/netdata-uninstaller.sh" ${FLAGS}; then
-        warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
+      if download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
+        chmod +x "${tmpdir}/netdata-uninstaller.sh"
+        # shellcheck disable=SC2086
+        if ! run_script "${tmpdir}/netdata-uninstaller.sh" ${FLAGS}; then
+            warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
+        fi
+      else
+        fatal "Failed to fetch uninstaller script" F0529
       fi
     fi
   fi
@@ -1747,15 +1826,31 @@ try_package_install() {
       ;;
   esac
 
-  if ! check_for_remote_file "${ref_check_url}"; then
-    NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
-  fi
+  check_for_remote_file "${ref_check_url}"
+
+  case "$?" in
+    0) ;;
+    1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+    *)
+      error "Unable to communicate with Netdata package repositories"
+      return 1
+      ;;
+  esac
 
   progress "Checking if native packages are being published for this platform."
-  if ! check_for_remote_file "${pub_check_url}"; then
-    warning "Native packages are not being published for this system."
-    return 3
-  fi
+  check_for_remote_file "${pub_check_url}"
+
+  case "$?" in
+    0) ;;
+    1)
+      warning "Native packages are not being published for this system."
+      return 3
+      ;;
+    2|3)
+      error "Unable to determine if native packages are being published for this system."
+      return 1
+      ;;
+  esac
 
   if ! check_for_remote_file "${pkg_meta_url}"; then
     warning "Native packages have not yet been published for this system."
@@ -1900,6 +1995,17 @@ try_static_install() {
     progress "Attempting to install using static build..."
   fi
 
+  check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
+
+  case "$?" in
+    0) ;;
+    1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+    *)
+      error "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+      return 1
+      ;;
+  esac
+
   if ! check_for_remote_file "${NETDATA_TARBALL_BASEURL}"; then
     NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
   fi
@@ -1911,7 +2017,7 @@ try_static_install() {
     netdata_agent="${NETDATA_STATIC_ARCHIVE_OLD_NAME}"
     export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_OLD_URL}"
   else
-    warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs. This usually means there is some networking issue preventing access to https://github.com/ from this system."
+    warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs. ${GITHUB_BADNET_MSG}"
     return 2
   fi
 
@@ -2148,9 +2254,16 @@ prepare_offline_install_source() {
     static|auto|any)
       set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
 
-      if ! check_for_remote_file "${NETDATA_TARBALL_BASEURL}"; then
-        NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
-      fi
+      check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
+
+      case "$?" in
+        0) ;;
+        1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+        *)
+          error "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+          return 1
+          ;;
+      esac
 
       if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
         for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
