@@ -523,6 +523,12 @@ In Docker Swarm, bind-mounted host paths refer to the filesystem of the node whe
 
 :::
 
+:::note
+
+In Swarm mode, the `restart` key at the service level is ignored. Use `deploy.restart_policy` instead, as shown in the stack above.
+
+:::
+
 :::tip
 
 - When using `netdata/netdata` without a tag, Docker pulls the latest image by default. To run the stable version, replace it with `netdata/netdata:stable`.
@@ -531,7 +537,7 @@ In Docker Swarm, bind-mounted host paths refer to the filesystem of the node whe
 
 :::note
 
-All Swarm nodes must have the required host paths and devices available for bind mounts (`/proc`, `/sys`, `/var/run/docker.sock`, and so on). For GPU monitoring, add the `deploy.resources.reservations.devices` configuration shown in the [NVIDIA GPUs section](#with-nvidia-gpus-monitorning) to the stack's `deploy` block.
+All Swarm nodes must have the required host paths and devices available for bind mounts (`/proc`, `/sys`, `/var/run/docker.sock`, and so on). For GPU monitoring, add the `deploy.resources.reservations.devices` configuration shown in the [NVIDIA GPUs section](#with-nvidia-gpus-monitoring) to the stack's `deploy` block.
 
 :::
 
