@@ -1895,6 +1895,11 @@ static void restore_host_context(void *arg)
     if (!host)
         return;
 
+    if (unlikely(exit_initiated_get())) {
+        __atomic_store_n(&hclt->finished, true, __ATOMIC_RELEASE);
+        return;
+    }
+
     if (!db_meta_thread) {
         if (hclt->db_meta_thread) {
             db_meta_thread = hclt->db_meta_thread;
@@ -1903,17 +1908,13 @@ static void restore_host_context(void *arg)
             char sqlite_database[FILENAME_MAX + 1];
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
             int rc = sqlite3_open_v2(sqlite_database, &db_meta_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
-            if (rc != SQLITE_OK) {
-                sqlite3_close_v2(db_meta_thread);
-                db_meta_thread = NULL;
-            }
+            if (rc != SQLITE_OK)
+                sql_close_thread_db_safe(&db_meta_thread);
 
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
             rc = sqlite3_open_v2(sqlite_database, &db_context_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
-            if (rc != SQLITE_OK) {
-                sqlite3_close_v2(db_context_thread);
-                db_context_thread = NULL;
-            }
+            if (rc != SQLITE_OK)
+                sql_close_thread_db_safe(&db_context_thread);
 
             hclt->db_meta_thread = db_meta_thread;
             hclt->db_context_thread = db_context_thread;
@@ -2069,11 +2070,8 @@ static void ctx_hosts_load(uv_work_t *req)
 
     if (should_clean_threads) {
         for (size_t index = 0; index < max_threads; index++) {
-            if (hclt[index].db_meta_thread)
-                sqlite3_close_v2(hclt[index].db_meta_thread);
-
-            if (hclt[index].db_context_thread)
-                sqlite3_close_v2(hclt[index].db_context_thread);
+            sql_close_thread_db_safe(&hclt[index].db_meta_thread);
+            sql_close_thread_db_safe(&hclt[index].db_context_thread);
         }
     }
 
@@ -2090,12 +2088,9 @@ static void ctx_hosts_load(uv_work_t *req)
         sync_exec,
         load_duration);
 
-    if (db_meta_thread) {
-        sqlite3_close_v2(db_meta_thread);
-        sqlite3_close_v2(db_context_thread);
-        db_meta_thread = NULL;
-        db_context_thread = NULL;
-    }
+    sql_close_thread_db_safe(&db_meta_thread);
+    sql_close_thread_db_safe(&db_context_thread);
+
     freez(hclt);
     worker_is_idle();
 }
