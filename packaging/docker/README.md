@@ -471,7 +471,7 @@ Create a file named `docker-stack.yml` with the following content, then deploy i
 The stack uses the same privileges, capabilities, and volume mounts described in the [Recommended way](#recommended-way) section. Review the [Privileges](#create-a-new-netdata-agent-container) and [Mounts](#create-a-new-netdata-agent-container) tables for details on what each mount provides.
 
 ```yaml
-version: '3.8'
+version: '3'
 services:
   netdata:
     image: netdata/netdata
@@ -493,9 +493,14 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
+      - /etc/hostname:/etc/hostname:ro
       - /var/log:/host/var/log:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /run/dbus:/run/dbus:ro
+    environment:
+      - NETDATA_CLAIM_TOKEN=<claim-token>
+      - NETDATA_CLAIM_URL=https://app.netdata.cloud
+      - NETDATA_CLAIM_ROOMS=<room-id>
     deploy:
       mode: global
       restart_policy:
@@ -508,6 +513,12 @@ volumes:
 
 :::note
 
+The `NETDATA_CLAIM_*` environment variables are optional. To connect your nodes to Netdata Cloud, replace the placeholder values with those from the "Add Nodes" dialog in your Space's "Nodes" view. If you don't need Cloud claiming, remove the `environment` block entirely.
+
+:::
+
+:::note
+
 In Docker Swarm, bind-mounted host paths refer to the filesystem of the node where each container instance lands. With `mode: global`, every node runs its own Netdata Agent, so each container reads from its local host — which is the intended behavior.
 
 :::
@@ -515,7 +526,6 @@ In Docker Swarm, bind-mounted host paths refer to the filesystem of the node whe
 :::tip
 
 - When using `netdata/netdata` without a tag, Docker pulls the latest image by default. To run the stable version, replace it with `netdata/netdata:stable`.
-- If you plan to connect the nodes to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
 
 :::
 
