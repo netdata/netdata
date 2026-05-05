@@ -221,7 +221,7 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 
 :::tip
 
-**Role-Based Access Control (RBAC):** Business plan subscribers get fine-grained control over who can access what data, execute functions, and modify configurations - perfect for teams with different responsibilities.
+**Role-Based Access Control (RBAC):** Paid plan subscribers get fine-grained control over who can access what data, execute functions, and modify configurations - perfect for teams with different responsibilities.
 
 :::
 
@@ -236,18 +236,18 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 
 ## What's the Value for You
 
-### Experience the Difference with Business Plan
+### Experience the Difference with a Paid Plan
 
-**[Start Your Free Business Trial](https://netdata.cloud/pricing):** Experience the full power of Netdata Business with our free trial:
+**[Start Your Free Trial](https://netdata.cloud/pricing):** Experience the full power of Netdata with our free trial:
 
 - **No credit card required** - Start immediately
 - **Full access to all features** - Nothing held back
 - **Cancel anytime** - No commitments
 - **[Expert support](https://www.netdata.cloud/support/)** - Get help when you need it
 
-### Traditional Monitoring vs Netdata Business
+### Traditional Monitoring vs Netdata
 
-| **Traditional Monitoring**                       |        | **Netdata Business**                               |
+| **Traditional Monitoring**                       |        | **Netdata**                                        |
 | ------------------------------------------------ | :----: | -------------------------------------------------- |
 | **Navigate complex interfaces** during incidents |        | **Get instant analysis** with natural language     |
 | **Build dashboards** during incidents            | **VS** | **Automatic dashboards** with zero configuration   |
@@ -265,7 +265,7 @@ Experience the future of infrastructure monitoring with AI that actually works. 
 | ------------------------ | ----------------------------------- | ------------------------------------ |
 | **AI Chat with Netdata** | Ask questions in natural language   | Available now for all deployments    |
 | **AI DevOps Copilot**    | CLI-based AI automation             | Available now with MCP tools         |
-| **AI Insights**          | Professional reports in 2-3 minutes | Business plans get unlimited reports |
+| **AI Insights**          | Professional reports in 2-3 minutes | Paid plans get unlimited reports |
 | **Anomaly Advisor**      | Find root causes in minutes         | Available to all users               |
 | **ML Anomaly Detection** | Continuous anomaly detection        | Free for everyone                    |
 
@@ -322,7 +322,7 @@ Generate comprehensive reports in 2-3 minutes that explain what happened, why it
 - **Performance Optimization** - Bottleneck identification and tuning suggestions
 - **Anomaly Analysis** - Deep dive into unusual patterns and their impacts
 
-**Access:** Business subscriptions get unlimited reports, free trial users get full access during trial, Community users get 10 free reports.
+**Access:** Paid subscriptions get unlimited reports, free trial users get full access during trial, Community users get 10 free reports.
 
 </details>
 
@@ -365,6 +365,6 @@ The foundation of Netdata's AI capabilities. Machine learning models run locally
 
 **Transform your infrastructure monitoring today. Your future self and your team will thank you.**
 
-**[Start Free Business Trial](https://netdata.cloud/pricing)**
+**[Start Free Trial](https://netdata.cloud/pricing)**
 
 :::

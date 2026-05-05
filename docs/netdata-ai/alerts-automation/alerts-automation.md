@@ -61,7 +61,7 @@ Click **"New Alert"** from the Alerts tab to access the AI-powered alert creatio
 
 ## AI credits consumption
 
-Usage is based on AI credits. You get 10 monthly complementary credits with a Business subscription, and you can top up credits based on your needs. You also get 10 free credits on the free trial.
+Usage is based on AI credits. You get 10 monthly complementary credits with a paid subscription, and you can top up credits based on your needs. You also get 10 free credits on the free trial.
 
 - **Alert creation**: 0.2 credits per run (create up to 5 alerts per AI credit)
 - **Alert suggestion**: 0.2 credits per run (up to 5 suggestions per AI credit)
@@ -73,9 +73,9 @@ Track your AI credit usage from `Settings → Usage & Billing → AI Credits`.
 
 ## Availability
 
-Available for all users on a Business plan or free trial.
+Available for all users on a paid plan or free trial.
 
-- **Subscription:** Business plan or Free Trial
+- **Subscription:** Paid plan or Free Trial
 - **Access:** Netdata Cloud account with appropriate permissions
 
 ## FAQ
