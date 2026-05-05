@@ -63,6 +63,7 @@ static const char *inicfg_windows_path_list_for_display(const char *value, char 
     size_t len = 0;
     size_t value_len = strnlen(value, CONFIG_MAX_VALUE);
     const char *value_end = value + value_len;
+    bool first = true;
 
     const char *segment_start = value;
     while (segment_start <= value_end) {
@@ -79,9 +80,10 @@ static const char *inicfg_windows_path_list_for_display(const char *value, char 
         segment[segment_len] = '\0';
 
         CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(segment);
-        if (len)
+        if (!first)
             len = strcatz(dst, len, ";", dst_size);
         len = strcatz(dst, len, translated, dst_size);
+        first = false;
 
         if (!separator)
             break;
