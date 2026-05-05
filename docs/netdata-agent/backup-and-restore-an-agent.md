@@ -35,7 +35,7 @@ For Docker containers, the paths inside the container are the same as those list
 ## Backup and Restore Scenarios
 
 <details>
-<summary><strong>Backing up to restore data in case of a node failure</strong></summary><br/>
+<summary><strong>Backing up to restore data in case of a node failure</strong></summary>
 
 In this standard scenario, you're backing up your Netdata Agent in case of a node failure or data corruption so that the metrics and the configuration can be recovered. The purpose is not to back up/restore the application itself.
 
@@ -90,7 +90,7 @@ graph TB
     Using a backup tool such as `tar` you will need to run the backup as _root_ or as the _netdata_ user to access all the files in the directories.
 
     <details>
-    <summary><strong>For Native Packages and Local Builds</strong></summary><br/>
+    <summary><strong>For Native Packages and Local Builds</strong></summary>
 
     ```bash
     sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
@@ -98,10 +98,8 @@ graph TB
 
     </details>
 
-    <br/>
-
     <details>
-    <summary><strong>For Static Builds</strong></summary><br/>
+    <summary><strong>For Static Builds</strong></summary>
 
     ```bash
     sudo tar -cvpzf netdata_backup.tar.gz /opt/netdata/etc/netdata/ /opt/netdata/var/cache/netdata /opt/netdata/var/lib/netdata
@@ -126,11 +124,10 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
 - Back up the database files
 - Restart the Netdata Agent.
 
-<br/>
 </details>
 
 <details>
-<summary><strong>Restoring Netdata</strong></summary><br/>
+<summary><strong>Restoring Netdata</strong></summary>
 
 ### Restoration Process
 
@@ -165,5 +162,4 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
 
    [Start the Netdata Agent](/docs/netdata-agent/start-stop-restart.md)
 
-<br/>
 </details>
