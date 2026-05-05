@@ -468,7 +468,7 @@ You can deploy the Netdata Agent across all nodes in a Docker Swarm cluster usin
 
 Create a file named `docker-stack.yml` with the following content, then deploy it with `docker stack deploy -c docker-stack.yml netdata`.
 
-The stack uses the same privileges, capabilities, and volume mounts described in the [Recommended way](#recommended-way) section. Review the [Privileges](#create-a-new-netdata-agent-container) and [Mounts](#create-a-new-netdata-agent-container) tables for details on what each mount provides.
+The stack uses the same baseline privileges, capabilities, and volume mounts described in the [Recommended way](#recommended-way) section, with one additional bind mount: `/etc/hostname:/etc/hostname:ro`. This extra mount helps Netdata report the node hostname consistently in Swarm deployments. Review the [Privileges](#create-a-new-netdata-agent-container) and [Mounts](#create-a-new-netdata-agent-container) tables for details on what each mount provides.
 
 ```yaml
 version: '3'
@@ -493,7 +493,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
-      - /etc/hostname:/etc/hostname:ro
+      - /etc/hostname:/host/etc/hostname:ro
       - /var/log:/host/var/log:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /run/dbus:/run/dbus:ro
