@@ -32,18 +32,7 @@ Each Netdata chart contains metrics called `dimensions`. All dimensions in a cha
 
 #### Negative Values in Exported Metrics
 
-Some Netdata dimensions use a `-1` multiplier by design so that read and write appear as opposing values on the dashboard. This multiplier is applied in the RRD layer during collection and is reflected in all Prometheus data sources (`as-collected`, `average`, and `sum`), causing those dimensions to export as negative values.
-
-Affected chart contexts include:
-
-- `cgroup.io`, `k8s.cgroup.io`, `systemd.service.disk.io`
-- `cgroup.serviced_ops`, `k8s.cgroup.serviced_ops`, `systemd.service.disk.iops`
-- `cgroup.throttle_io`, `k8s.cgroup.throttle_io`, `systemd.service.disk.throttle.io`
-- `cgroup.throttle_serviced_ops`, `k8s.cgroup.throttle_serviced_ops`, `systemd.service.disk.throttle.iops`
-- `cgroup.queued_ops`, `k8s.cgroup.queued_ops`, `systemd.service.disk.queued_iops`
-- `cgroup.merged_ops`, `k8s.cgroup.merged_ops`, `systemd.service.disk.merged_iops`
-- `disk.mops`
-- `disk.bcache_rates`
+Some Netdata dimensions use a `-1` multiplier by design so that read and write appear as opposing values on the dashboard. This multiplier is applied in the RRD layer during collection and is reflected in all Prometheus data sources (`as-collected`, `average`, and `sum`), causing those dimensions to export as negative values. You can identify affected charts from the dashboard — they display read and write as stacked opposing areas.
 
 :::note
 
