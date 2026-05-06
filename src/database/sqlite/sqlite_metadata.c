@@ -1454,7 +1454,7 @@ static bool run_cleanup_cycle(struct cleanup_cycle *c, struct meta_config_s *wc)
         c->next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
         c->max_row_id = get_rowid_from_statement(c->max_rowid_sql);
         nd_log(NDLS_DAEMON, NDLP_INFO,
-               "%s metadata check has been scheduled to run (max id = %lu)",
+               "%s metadata check has been scheduled to run (max id = %" PRIu64 ")",
                c->label_singular, c->max_row_id);
     }
 
@@ -1463,8 +1463,14 @@ static bool run_cleanup_cycle(struct cleanup_cycle *c, struct meta_config_s *wc)
 
     if (c->max_row_id && c->last_row_id >= c->max_row_id) {
         nd_log(NDLS_DAEMON, NDLP_INFO, "%s metadata check completed", c->label_singular);
-        if (c->complete_repeat_after)
+        if (c->complete_repeat_after) {
+            // Re-arm for another full pass: reset the cursor and re-snapshot the
+            // table's current MAX(rowid) so the next firing actually scans rows
+            // added since the previous pass, instead of immediately re-completing.
             c->next_execution_t = now + c->complete_repeat_after;
+            c->last_row_id = 0;
+            c->max_row_id = get_rowid_from_statement(c->max_rowid_sql);
+        }
         else
             c->completed = true;
         return true;
@@ -1551,7 +1557,7 @@ static struct cleanup_cycle label_cleanup_cycle = {
     .worker_event         = UV_EVENT_CHART_LABEL_CLEANUP,
     .label_singular       = "Chart label",
     .label_plural         = "Chart labels",
-    .label_lower          = "charts labels",                   // preserves the original DEBUG-line typo verbatim
+    .label_lower          = "chart labels",
 };
 
 static void cleanup_health_log(struct meta_config_s *config)
