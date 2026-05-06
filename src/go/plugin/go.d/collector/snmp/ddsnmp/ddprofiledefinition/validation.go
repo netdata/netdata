@@ -62,19 +62,23 @@ const (
 	ColumnSymbol
 	MetricTagSymbol
 	MetadataSymbol
+	TopologyScalarSymbol
+	TopologyColumnSymbol
 )
 
 // ValidateEnrichProfile validates a profile and normalizes it.
 func ValidateEnrichProfile(p *ProfileDefinition) error {
 	normalizeMetrics(p.Metrics)
+	normalizeTopology(p.Topology)
 
 	errs := []error{
 		validateEnrichLegacySelector(p),
 		validateEnrichMetadata(p.Metadata),
 		validateEnrichSysobjectIDMetadata(p.SysobjectIDMetadata),
 		validateEnrichMetrics(p.Metrics),
-		validateEnrichMetricTags(p.MetricTags),
-		validateEnrichVirtualMetrics(p.Metrics, p.VirtualMetrics),
+		validateEnrichTopology(p.Topology),
+		validateEnrichGlobalMetricTags(p.MetricTags),
+		validateEnrichVirtualMetrics(p.Metrics, p.Topology, p.VirtualMetrics),
 	}
 
 	return errors.Join(errs...)
@@ -85,15 +89,31 @@ func ValidateEnrichProfile(p *ProfileDefinition) error {
 // metric.Name and metric.OID info are moved to metric.Symbol.Name and metric.Symbol.OID
 func normalizeMetrics(metrics []MetricsConfig) {
 	for i := range metrics {
-		metric := &metrics[i]
+		normalizeMetric(&metrics[i])
+	}
+}
 
-		// converts old symbol syntax to new symbol syntax
-		if metric.Symbol.Name == "" && metric.Symbol.OID == "" && metric.Name != "" && metric.OID != "" {
-			metric.Symbol.Name = metric.Name
-			metric.Symbol.OID = metric.OID
-			metric.Name = ""
-			metric.OID = ""
-		}
+func normalizeTopology(topology []TopologyConfig) {
+	for i := range topology {
+		normalizeMetric(&topology[i].MetricsConfig)
+	}
+}
+
+func normalizeMetric(metric *MetricsConfig) {
+	if metric == nil {
+		return
+	}
+
+	// converts old symbol syntax to new symbol syntax
+	if metric.Symbol.Name == "" && metric.Symbol.OID == "" && metric.Name != "" && metric.OID != "" {
+		metric.Symbol.Name = metric.Name
+		metric.Symbol.OID = metric.OID
+		metric.Name = ""
+		metric.OID = ""
+	}
+	if metric.Symbol.MetricType == "" {
+		metric.Symbol.MetricType = metric.MetricType
+		metric.MetricType = ""
 	}
 }
 
@@ -146,6 +166,7 @@ func validateEnrichMetadata(metadata MetadataConfig) error {
 					continue
 				}
 				field := res.Fields[fieldName]
+				errs = append(errs, validateConsumers(fmt.Sprintf("metadata.%s.fields.%s.consumers", resName, fieldName), field.Consumers))
 				for i := range field.Symbols {
 					errs = append(errs, validateEnrichSymbol(&field.Symbols[i], MetadataSymbol))
 				}
@@ -200,6 +221,7 @@ func validateEnrichSysobjectIDMetadata(entries []SysobjectIDMetadataEntryConfig)
 			if field.Value == "" && field.Symbol.OID == "" && len(field.Symbols) == 0 {
 				errs = append(errs, fmt.Errorf("sysobjectid_metadata[%d].%s: must have either value or symbol(s)", i, fieldName))
 			}
+			errs = append(errs, validateConsumers(fmt.Sprintf("sysobjectid_metadata[%d].%s.consumers", i, fieldName), field.Consumers))
 
 			// Can't have both value and symbols
 			if field.Value != "" && (field.Symbol.OID != "" || len(field.Symbols) > 0) {
@@ -283,6 +305,119 @@ func validateEnrichMetrics(metrics []MetricsConfig) error {
 		}
 	}
 
+	return errors.Join(errs...)
+}
+
+func validateEnrichTopology(topology []TopologyConfig) error {
+	var errs []error
+
+	for i := range topology {
+		topo := &topology[i]
+		metricConfig := &topo.MetricsConfig
+
+		if topo.Kind == "" {
+			errs = append(errs, fmt.Errorf("topology[%d]: missing kind", i))
+		} else if !IsValidTopologyKind(topo.Kind) {
+			errs = append(errs, fmt.Errorf("topology[%d]: invalid kind %q", i, topo.Kind))
+		}
+		if !metricConfig.IsScalar() && !metricConfig.IsColumn() {
+			errs = append(errs, fmt.Errorf("topology[%d]: either a table symbol or a scalar symbol must be provided: %#v", i, metricConfig))
+		}
+		if metricConfig.IsScalar() && metricConfig.IsColumn() {
+			errs = append(errs, fmt.Errorf("topology[%d]: table symbol and scalar symbol cannot be both provided: %#v", i, metricConfig))
+		}
+		if metricConfig.Options != (MetricsConfigOption{}) {
+			errs = append(errs, fmt.Errorf("topology[%d]: options cannot be used in topology rows", i))
+		}
+		if metricConfig.IsScalar() {
+			errs = append(errs, validateEnrichTopologySymbol(i, &metricConfig.Symbol, TopologyScalarSymbol))
+			for j := range metricConfig.MetricTags {
+				metricTag := &metricConfig.MetricTags[j]
+				errs = append(errs, validateEnrichMetricTag(metricTag))
+				if metricTag.Table != "" {
+					errs = append(errs, fmt.Errorf("topology[%d].metric_tags[%d]: scalar metric_tags do not support `table` lookups (tag=%q, table=%q)", i, j, metricTag.Tag, metricTag.Table))
+				}
+				if metricTag.Index != 0 {
+					errs = append(errs, fmt.Errorf("topology[%d].metric_tags[%d]: scalar metric_tags do not support `index` lookups (tag=%q, index=%d)", i, j, metricTag.Tag, metricTag.Index))
+				}
+				if len(metricTag.IndexTransform) > 0 {
+					errs = append(errs, fmt.Errorf("topology[%d].metric_tags[%d]: scalar metric_tags do not support `index_transform` (tag=%q)", i, j, metricTag.Tag))
+				}
+				if metricTag.Symbol.OID == "" {
+					errs = append(errs, fmt.Errorf("topology[%d].metric_tags[%d]: scalar metric_tags require `symbol.OID` (tag=%q)", i, j, metricTag.Tag))
+				}
+			}
+		}
+		if metricConfig.IsColumn() {
+			for j := range metricConfig.Symbols {
+				errs = append(errs, validateEnrichTopologySymbol(i, &metricConfig.Symbols[j], TopologyColumnSymbol))
+			}
+			for j := range metricConfig.MetricTags {
+				errs = append(errs, validateEnrichMetricTag(&metricConfig.MetricTags[j]))
+			}
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func validateEnrichTopologySymbol(topologyIdx int, symbol *SymbolConfig, symbolContext SymbolContext) error {
+	var errs []error
+
+	errs = append(errs, validateEnrichSymbol(symbol, symbolContext))
+	if strings.HasPrefix(symbol.Name, "_") {
+		errs = append(errs, fmt.Errorf("topology[%d]: symbol name %q cannot be underscore-prefixed", topologyIdx, symbol.Name))
+	}
+	if symbol.ChartMeta != (ChartMeta{}) {
+		errs = append(errs, fmt.Errorf("topology[%d]: chart_meta cannot be used in topology rows", topologyIdx))
+	}
+	if symbol.MetricType != "" {
+		errs = append(errs, fmt.Errorf("topology[%d]: metric_type cannot be used in topology rows", topologyIdx))
+	}
+	if symbol.Mapping.HasItems() || symbol.Mapping.Mode != "" {
+		errs = append(errs, fmt.Errorf("topology[%d]: mapping cannot be used in topology rows", topologyIdx))
+	}
+	if symbol.Transform != "" {
+		errs = append(errs, fmt.Errorf("topology[%d]: transform cannot be used in topology rows", topologyIdx))
+	}
+	if symbol.ScaleFactor != 0 {
+		errs = append(errs, fmt.Errorf("topology[%d]: scale_factor cannot be used in topology rows", topologyIdx))
+	}
+	if symbol.Format != "" {
+		errs = append(errs, fmt.Errorf("topology[%d]: format cannot be used in topology rows", topologyIdx))
+	}
+	if symbol.ConstantValueOne {
+		errs = append(errs, fmt.Errorf("topology[%d]: constant_value_one cannot be used in topology rows", topologyIdx))
+	}
+
+	return errors.Join(errs...)
+}
+
+func validateEnrichGlobalMetricTags(metricTags []GlobalMetricTagConfig) error {
+	var errs []error
+	for i := range metricTags {
+		errs = append(errs, validateEnrichMetricTag(&metricTags[i].MetricTagConfig))
+		errs = append(errs, validateConsumers(fmt.Sprintf("metric_tags[%d].consumers", i), metricTags[i].Consumers))
+	}
+	return errors.Join(errs...)
+}
+
+func validateConsumers(path string, consumers ConsumerSet) error {
+	var errs []error
+	seen := make(map[ProfileConsumer]int)
+	for i, consumer := range consumers {
+		switch consumer {
+		case ConsumerMetrics, ConsumerTopology:
+		default:
+			errs = append(errs, fmt.Errorf("%s[%d]: invalid consumer %q", path, i, consumer))
+			continue
+		}
+		if firstIdx, ok := seen[consumer]; ok {
+			errs = append(errs, fmt.Errorf("%s[%d]: duplicate consumer %q (first occurrence at index %d)", path, i, consumer, firstIdx))
+			continue
+		}
+		seen[consumer] = i
+	}
 	return errors.Join(errs...)
 }
 
@@ -477,10 +612,11 @@ func validateMapping(mapping MappingConfig, symbolContext SymbolContext) error {
 	return errors.Join(errs...)
 }
 
-func validateEnrichVirtualMetrics(metrics []MetricsConfig, vmetrics []VirtualMetricConfig) error {
+func validateEnrichVirtualMetrics(metrics []MetricsConfig, topology []TopologyConfig, vmetrics []VirtualMetricConfig) error {
 	var errs []error
 
 	metricSources := collectVirtualMetricSourceSpecs(metrics)
+	topologySources := collectTopologyMetricSourceNames(topology)
 
 	seenNames := make(map[string]int)
 
@@ -521,6 +657,7 @@ func validateEnrichVirtualMetrics(metrics []MetricsConfig, vmetrics []VirtualMet
 		case len(vm.Sources) == 0 && len(vm.Alternatives) == 0:
 			errs = append(errs, fmt.Errorf("virtual_metrics[%d]: must define sources or alternatives", i))
 		case len(vm.Alternatives) == 0:
+			errs = append(errs, validateVirtualMetricSourcesNotTopology(fmt.Sprintf("virtual_metrics[%d].sources", i), vm.Sources, topologySources))
 			errs = append(errs, validateVirtualMetricSources(fmt.Sprintf("virtual_metrics[%d].sources", i), vm.Sources, metricSources, grouped))
 		default:
 			for j, alt := range vm.Alternatives {
@@ -528,11 +665,38 @@ func validateEnrichVirtualMetrics(metrics []MetricsConfig, vmetrics []VirtualMet
 					errs = append(errs, fmt.Errorf("virtual_metrics[%d].alternatives[%d]: must define sources", i, j))
 					continue
 				}
+				errs = append(errs, validateVirtualMetricSourcesNotTopology(fmt.Sprintf("virtual_metrics[%d].alternatives[%d].sources", i, j), alt.Sources, topologySources))
 				errs = append(errs, validateVirtualMetricSources(fmt.Sprintf("virtual_metrics[%d].alternatives[%d].sources", i, j), alt.Sources, metricSources, grouped))
 			}
 		}
 	}
 
+	return errors.Join(errs...)
+}
+
+func collectTopologyMetricSourceNames(topology []TopologyConfig) map[string]struct{} {
+	names := make(map[string]struct{})
+	for _, topo := range topology {
+		metric := &topo.MetricsConfig
+		switch {
+		case metric.IsScalar():
+			names[metric.Symbol.Name] = struct{}{}
+		case metric.IsColumn():
+			for _, sym := range metric.Symbols {
+				names[sym.Name] = struct{}{}
+			}
+		}
+	}
+	return names
+}
+
+func validateVirtualMetricSourcesNotTopology(path string, sources []VirtualMetricSourceConfig, topologySources map[string]struct{}) error {
+	var errs []error
+	for i, src := range sources {
+		if _, ok := topologySources[src.Metric]; ok {
+			errs = append(errs, fmt.Errorf("%s[%d]: topology metric source %q cannot be used by virtual_metrics", path, i, src.Metric))
+		}
+	}
 	return errors.Join(errs...)
 }
 

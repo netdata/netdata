@@ -167,12 +167,18 @@ func (c *Collector) refreshDeviceTopology(key string, dev ddsnmp.DeviceConnectio
 		return
 	}
 
+	sysUptime, err := snmputils.GetSysUptime(snmpClient)
+	if err != nil {
+		c.Debugf("device '%s': failed to query system uptime: %v", dev.Hostname, err)
+	}
+
 	// Build the next snapshot off-registry. Function readers keep seeing the
 	// previous complete snapshot until this collection is fully ingested.
 	next := c.newDeviceCollectionCache(dev)
 	c.topologyCache = next
 	defer func() { c.topologyCache = nil }()
 
+	c.updateTopologySysUptime(sysUptime)
 	c.updateTopologyProfileTags(pms)
 	c.ingestTopologyProfileMetrics(pms)
 	c.collectTopologyVTPVLANContexts(dev)
@@ -214,24 +220,23 @@ func (c *Collector) pruneStaleDeviceCaches(seen map[string]bool) {
 }
 
 func (c *Collector) findTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
-	return selectTopologyRefreshProfiles(ddsnmp.FindProfiles(dev.SysObjectID, dev.SysDescr, dev.ManualProfiles))
+	return ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
+		SysObjectID:    dev.SysObjectID,
+		SysDescr:       dev.SysDescr,
+		ManualProfiles: dev.ManualProfiles,
+		ManualPolicy:   ddsnmp.ManualProfileAugment,
+	}).Project(ddsnmp.ConsumerTopology).Profiles()
 }
 
 func (c *Collector) ingestTopologyProfileMetrics(pms []*ddsnmp.ProfileMetrics) {
 	for _, pm := range pms {
-		c.ingestTopologyMetricSet(pm.HiddenMetrics)
-		c.ingestTopologyMetricSet(pm.Metrics)
+		c.ingestTopologyMetricSet(pm.TopologyMetrics)
 	}
 }
 
 func (c *Collector) ingestTopologyMetricSet(metrics []ddsnmp.Metric) {
 	for _, metric := range metrics {
-		switch {
-		case ddsnmp.IsTopologyMetric(metric.Name):
-			c.updateTopologyCacheEntry(metric)
-		case ddsnmp.IsTopologySysUptimeMetric(metric.Name):
-			c.updateTopologyScalarMetric(metric)
-		}
+		c.updateTopologyCacheEntry(metric)
 	}
 }
 

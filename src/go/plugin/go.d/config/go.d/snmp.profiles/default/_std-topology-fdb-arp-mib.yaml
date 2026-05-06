@@ -1,16 +1,17 @@
 # Supplemental topology discovery profile for endpoint correlation.
 # Sources: BRIDGE-MIB FDB and IP-MIB neighbor tables.
 
-metrics:
+topology:
   # Interface index -> interface name map used to annotate topology links.
-  - MIB: IF-MIB
+  - kind: if_name
+    MIB: IF-MIB
     table:
       OID: 1.3.6.1.2.1.31.1.1
       name: ifXTable
     symbols:
       # Use a numeric column to ensure row emission.
       - OID: 1.3.6.1.2.1.31.1.1.1.15
-        name: _topology_if_name_entry
+        name: if_name
     metric_tags:
       - tag: topo_if_index
         index: 1
@@ -29,14 +30,15 @@ metrics:
 
   # IF-MIB ifTable: explicit interface status collection for topology port states.
   # Some vendors do not support stable cross-table joins from ifXTable to ifTable.
-  - MIB: IF-MIB
+  - kind: if_status
+    MIB: IF-MIB
     table:
       OID: 1.3.6.1.2.1.2.2
       name: ifTable
     symbols:
       # Use oper status symbol to guarantee row emission for interfaces.
       - OID: 1.3.6.1.2.1.2.2.1.8
-        name: _topology_if_status_entry
+        name: if_status
     metric_tags:
       - tag: topo_if_index
         index: 1
@@ -83,13 +85,14 @@ metrics:
           name: ifLastChange
 
   # EtherLike-MIB: interface duplex mode.
-  - MIB: EtherLike-MIB
+  - kind: if_duplex
+    MIB: EtherLike-MIB
     table:
       OID: 1.3.6.1.2.1.10.7.2
       name: dot3StatsTable
     symbols:
       - OID: 1.3.6.1.2.1.10.7.2.1.19
-        name: _topology_if_duplex_entry
+        name: if_duplex
     metric_tags:
       - tag: topo_if_index
         index: 1
@@ -103,13 +106,14 @@ metrics:
             3: full
 
   # IP-MIB: interface address map used for management IP -> ifIndex correlation.
-  - MIB: IP-MIB
+  - kind: ip_if_index
+    MIB: IP-MIB
     table:
       OID: 1.3.6.1.2.1.4.20
       name: ipAddrTable
     symbols:
       - OID: 1.3.6.1.2.1.4.20.1.2
-        name: _topology_ip_if_index_entry
+        name: ip_if_index
     metric_tags:
       - tag: topo_ip_addr
         symbol:
@@ -125,13 +129,14 @@ metrics:
           name: ipAdEntNetMask
 
   # BRIDGE-MIB: maps bridge port number to ifIndex.
-  - MIB: BRIDGE-MIB
+  - kind: bridge_port_if_index
+    MIB: BRIDGE-MIB
     table:
       OID: 1.3.6.1.2.1.17.1.4
       name: dot1dBasePortTable
     symbols:
       - OID: 1.3.6.1.2.1.17.1.4.1.2
-        name: _topology_bridge_port_if_index_entry
+        name: bridge_port_if_index
     metric_tags:
       - tag: bridge_base_address
         symbol:
@@ -146,14 +151,15 @@ metrics:
           name: dot1dBasePortIfIndex
 
   # BRIDGE-MIB: forwarding database (MAC -> bridge port).
-  - MIB: BRIDGE-MIB
+  - kind: fdb_entry
+    MIB: BRIDGE-MIB
     table:
       OID: 1.3.6.1.2.1.17.4.3
       name: dot1dTpFdbTable
     symbols:
       # Use the port column so rows are emitted only for learned entries.
       - OID: 1.3.6.1.2.1.17.4.3.1.2
-        name: _topology_fdb_entry
+        name: fdb_entry
     metric_tags:
       - tag: bridge_base_address
         symbol:
@@ -181,14 +187,15 @@ metrics:
             5: mgmt
 
   # IP-MIB: modern ARP/ND cache (IPv4 + IPv6).
-  - MIB: IP-MIB
+  - kind: arp_entry
+    MIB: IP-MIB
     table:
       OID: 1.3.6.1.2.1.4.35.1
       name: ipNetToPhysicalTable
     symbols:
       # Use state column to emit rows only when neighbors exist.
       - OID: 1.3.6.1.2.1.4.35.1.6
-        name: _topology_arp_entry
+        name: arp_entry
     metric_tags:
       - tag: arp_if_index
         index: 1
@@ -234,13 +241,14 @@ metrics:
             7: incomplete
 
   # IP-MIB: legacy IPv4 ARP cache fallback.
-  - MIB: IP-MIB
+  - kind: arp_legacy_entry
+    MIB: IP-MIB
     table:
       OID: 1.3.6.1.2.1.4.22
       name: ipNetToMediaTable
     symbols:
       - OID: 1.3.6.1.2.1.4.22.1.4
-        name: _topology_arp_legacy_entry
+        name: arp_legacy_entry
     metric_tags:
       - tag: arp_if_index
         symbol:

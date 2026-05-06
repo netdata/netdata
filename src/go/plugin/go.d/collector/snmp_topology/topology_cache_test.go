@@ -26,6 +26,31 @@ func newTestCollector(dev ddsnmp.DeviceConnectionInfo) *Collector {
 	}
 }
 
+func TestTopologyMetricHandlersRegisteredForRowKinds(t *testing.T) {
+	for _, kind := range []ddsnmp.TopologyKind{
+		ddsnmp.KindLldpLocPort,
+		ddsnmp.KindLldpLocManAddr,
+		ddsnmp.KindLldpRem,
+		ddsnmp.KindLldpRemManAddr,
+		ddsnmp.KindLldpRemManAddrCompat,
+		ddsnmp.KindCdpCache,
+		ddsnmp.KindIfName,
+		ddsnmp.KindIfStatus,
+		ddsnmp.KindIfDuplex,
+		ddsnmp.KindIpIfIndex,
+		ddsnmp.KindBridgePortIfIndex,
+		ddsnmp.KindFdbEntry,
+		ddsnmp.KindQbridgeFdbEntry,
+		ddsnmp.KindQbridgeVlanEntry,
+		ddsnmp.KindStpPort,
+		ddsnmp.KindVtpVlan,
+		ddsnmp.KindArpEntry,
+		ddsnmp.KindArpLegacyEntry,
+	} {
+		require.NotNil(t, topologyMetricHandlers[kind], "missing topology handler for %s", kind)
+	}
+}
+
 func TestTopologyCache_LldpSnapshot(t *testing.T) {
 	coll := newTestCollector(ddsnmp.DeviceConnectionInfo{
 		Hostname: "10.0.0.1", SysObjectID: "1.3.6.1.4.1.9.1.1", SysName: "sw1", SysDescr: "Switch 1", SysLocation: "dc1",
@@ -40,7 +65,7 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 	coll.updateTopologyProfileTags(pms)
 
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
-		Name: metricLldpLocPortEntry,
+		TopologyKind: ddsnmp.KindLldpLocPort,
 		Tags: map[string]string{
 			tagLldpLocPortNum:       "1",
 			tagLldpLocPortID:        "Gi0/1",
@@ -49,7 +74,7 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 		},
 	})
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
-		Name: metricLldpRemEntry,
+		TopologyKind: ddsnmp.KindLldpRem,
 		Tags: map[string]string{
 			tagLldpLocPortNum:          "1",
 			tagLldpRemIndex:            "1",
@@ -433,7 +458,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 	}})
 
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
-		Name: metricLldpLocManAddrEntry,
+		TopologyKind: ddsnmp.KindLldpLocManAddr,
 		Tags: map[string]string{
 			tagLldpLocMgmtAddrSubtype: "2",
 			tagLldpLocMgmtAddr:        "0a000001",
@@ -441,7 +466,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
-		Name: metricLldpRemManAddrEntry,
+		TopologyKind: ddsnmp.KindLldpRemManAddr,
 		Tags: map[string]string{
 			tagLldpLocPortNum:         "1",
 			tagLldpRemIndex:           "1",
@@ -450,7 +475,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
-		Name: metricLldpRemManAddrEntry,
+		TopologyKind: ddsnmp.KindLldpRemManAddr,
 		Tags: map[string]string{
 			tagLldpLocPortNum:         "1",
 			tagLldpRemIndex:           "1",
@@ -459,7 +484,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
-		Name: metricLldpRemManAddrEntry,
+		TopologyKind: ddsnmp.KindLldpRemManAddr,
 		Tags: map[string]string{
 			tagLldpLocPortNum:         "1",
 			tagLldpRemIndex:           "1",
@@ -468,7 +493,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
-		Name: metricLldpRemManAddrEntry,
+		TopologyKind: ddsnmp.KindLldpRemManAddr,
 		Tags: map[string]string{
 			tagLldpLocPortNum:                 "1",
 			tagLldpRemIndex:                   "1",
@@ -481,7 +506,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
-		Name: metricLldpRemEntry,
+		TopologyKind: ddsnmp.KindLldpRem,
 		Tags: map[string]string{
 			tagLldpLocPortNum:          "1",
 			tagLldpRemIndex:            "1",
@@ -1305,35 +1330,29 @@ func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T)
 	require.Equal(t, topologyProfileChartContextPrefix, device.ChartContextPrefix)
 }
 
-func TestCollector_UpdateTopologyScalarMetric_StoresSysUptime(t *testing.T) {
-	for _, metricName := range []string{"sysUpTime", "systemUptime"} {
-		t.Run(metricName, func(t *testing.T) {
-			coll := &Collector{
-				topologyCache: newTopologyCache(),
-			}
-			coll.topologyCache.localDevice = topologyDevice{}
-
-			coll.updateTopologyScalarMetric(ddsnmp.Metric{
-				Name:  metricName,
-				Value: 4321,
-			})
-
-			require.EqualValues(t, 4321, coll.topologyCache.localDevice.SysUptime)
-			require.Equal(t, "4321", coll.topologyCache.localDevice.Labels["sys_uptime"])
-		})
+func TestCollector_UpdateTopologySysUptime_StoresSysUptime(t *testing.T) {
+	coll := &Collector{
+		topologyCache: newTopologyCache(),
 	}
+	coll.topologyCache.localDevice = topologyDevice{}
+
+	coll.updateTopologySysUptime(4321)
+
+	require.EqualValues(t, 4321, coll.topologyCache.localDevice.SysUptime)
+	require.Equal(t, "4321", coll.topologyCache.localDevice.Labels["sys_uptime"])
 }
 
-func TestCollector_IngestTopologyProfileMetrics_IncludesHiddenMetrics(t *testing.T) {
+func TestCollector_IngestTopologyProfileMetrics_IncludesTopologyMetrics(t *testing.T) {
 	coll := &Collector{
 		topologyCache: newTopologyCache(),
 	}
 
 	coll.ingestTopologyProfileMetrics([]*ddsnmp.ProfileMetrics{
 		{
-			HiddenMetrics: []ddsnmp.Metric{
+			TopologyMetrics: []ddsnmp.Metric{
 				{
-					Name: metricLldpLocPortEntry,
+					Name:         "lldp_loc_port",
+					TopologyKind: ddsnmp.KindLldpLocPort,
 					Tags: map[string]string{
 						tagLldpLocPortNum:       "7",
 						tagLldpLocPortID:        "Gi1/0/7",
@@ -1342,7 +1361,8 @@ func TestCollector_IngestTopologyProfileMetrics_IncludesHiddenMetrics(t *testing
 					},
 				},
 				{
-					Name: metricLldpRemEntry,
+					Name:         "lldp_rem",
+					TopologyKind: ddsnmp.KindLldpRem,
 					Tags: map[string]string{
 						tagLldpLocPortNum:          "7",
 						tagLldpRemIndex:            "1",
@@ -1355,19 +1375,13 @@ func TestCollector_IngestTopologyProfileMetrics_IncludesHiddenMetrics(t *testing
 					},
 				},
 			},
-			Metrics: []ddsnmp.Metric{
-				{
-					Name:  "systemUptime",
-					Value: 1234,
-				},
-			},
 		},
 	})
 
 	require.Contains(t, coll.topologyCache.lldpLocPorts, "7")
 	require.Contains(t, coll.topologyCache.lldpRemotes, "7:1")
-	require.EqualValues(t, 1234, coll.topologyCache.localDevice.SysUptime)
-	require.Equal(t, "1234", coll.topologyCache.localDevice.Labels["sys_uptime"])
+	require.Zero(t, coll.topologyCache.localDevice.SysUptime)
+	require.Empty(t, coll.topologyCache.localDevice.Labels["sys_uptime"])
 }
 
 func TestBuildLocalTopologyDevice_MapsVersionToSoftwareOnly(t *testing.T) {

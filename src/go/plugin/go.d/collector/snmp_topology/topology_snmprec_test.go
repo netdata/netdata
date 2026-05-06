@@ -51,19 +51,19 @@ func TestTopologyCache_RealSnmprecFixtures(t *testing.T) {
 				coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{DeviceMetadata: data.lldpLocalMeta}})
 			}
 			for _, tags := range data.lldpLocPorts {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricLldpLocPortEntry, Tags: tags})
+				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocPort, Tags: tags})
 			}
 			for _, tags := range data.lldpLocManAddrs {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricLldpLocManAddrEntry, Tags: tags})
+				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocManAddr, Tags: tags})
 			}
 			for _, tags := range data.lldpRemotes {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricLldpRemEntry, Tags: tags})
+				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRem, Tags: tags})
 			}
 			for _, tags := range data.lldpRemManAddrs {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricLldpRemManAddrEntry, Tags: tags})
+				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRemManAddr, Tags: tags})
 			}
 			for _, tags := range data.cdpRemotes {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricCdpCacheEntry, Tags: tags})
+				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindCdpCache, Tags: tags})
 			}
 			coll.finalizeTopologyCache()
 

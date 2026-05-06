@@ -2,54 +2,27 @@
 
 package snmptopology
 
-import "strings"
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
-func (c *topologyCache) ingestMetric(metricName string, tags map[string]string) {
-	switch metricName {
-	case metricLldpLocPortEntry:
-		c.updateLldpLocPort(tags)
-	case metricLldpLocManAddrEntry:
-		c.updateLldpLocManAddr(tags)
-	case metricLldpRemEntry:
-		c.updateLldpRemote(tags)
-	case metricLldpRemManAddrEntry, metricLldpRemManAddrCompat:
-		c.updateLldpRemManAddr(tags)
-	case metricCdpCacheEntry:
-		c.updateCdpRemote(tags)
-	case metricTopologyIfNameEntry, metricTopologyIfStatusEntry, metricTopologyIfDuplexEntry:
-		c.updateIfNameByIndex(tags)
-	case metricTopologyIPIfEntry:
-		c.updateIfIndexByIP(tags)
-	case metricBridgePortMapEntry:
-		c.updateBridgePortMap(tags)
-	case metricFdbEntry, metricDot1qFdbEntry:
-		c.updateFdbEntry(tags)
-	case metricDot1qVlanEntry:
-		c.updateDot1qVlanMap(tags)
-	case metricStpPortEntry:
-		c.updateStpPortEntry(tags)
-	case metricVtpVlanEntry:
-		c.updateVtpVlanEntry(tags)
-	case metricArpEntry, metricArpLegacyEntry:
-		c.updateArpEntry(tags)
+type topologyMetricHandler func(*topologyCache, map[string]string)
+
+var topologyMetricHandlers = make(map[ddsnmp.TopologyKind]topologyMetricHandler)
+
+func registerTopologyMetricHandler(kind ddsnmp.TopologyKind, handler topologyMetricHandler) {
+	if kind == "" {
+		panic("empty topology metric kind")
 	}
+	if handler == nil {
+		panic("nil topology metric handler")
+	}
+	if _, ok := topologyMetricHandlers[kind]; ok {
+		panic("duplicate topology metric handler for kind " + string(kind))
+	}
+	topologyMetricHandlers[kind] = handler
 }
 
-func isTopologySysUptimeMetric(name string) bool {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "sysuptime", "systemuptime":
-		return true
-	default:
-		return false
-	}
-}
-
-func isTopologyMetric(name string) bool {
-	switch name {
-	case metricLldpLocPortEntry, metricLldpLocManAddrEntry, metricLldpRemEntry, metricLldpRemManAddrEntry, metricLldpRemManAddrCompat, metricCdpCacheEntry,
-		metricTopologyIfNameEntry, metricTopologyIfStatusEntry, metricTopologyIfDuplexEntry, metricTopologyIPIfEntry, metricBridgePortMapEntry, metricFdbEntry, metricDot1qFdbEntry, metricDot1qVlanEntry, metricStpPortEntry, metricVtpVlanEntry, metricArpEntry, metricArpLegacyEntry:
-		return true
-	default:
-		return false
+func (c *topologyCache) ingestMetric(kind ddsnmp.TopologyKind, tags map[string]string) {
+	if handler := topologyMetricHandlers[kind]; handler != nil {
+		handler(c, tags)
 	}
 }

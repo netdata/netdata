@@ -7,12 +7,13 @@ import (
 )
 
 type ProfileMetrics struct {
-	Source         string
-	DeviceMetadata map[string]MetaTag
-	Tags           map[string]string
-	Metrics        []Metric
-	HiddenMetrics  []Metric
-	Stats          CollectionStats
+	Source          string
+	DeviceMetadata  map[string]MetaTag
+	Tags            map[string]string
+	Metrics         []Metric
+	TopologyMetrics []Metric
+	HiddenMetrics   []Metric
+	Stats           CollectionStats
 }
 
 type Metric struct {
@@ -29,7 +30,8 @@ type Metric struct {
 	Value       int64
 	MultiValue  map[string]int64
 
-	IsTable bool
+	TopologyKind ddprofiledefinition.TopologyKind
+	IsTable      bool
 }
 
 type MetaTag struct {

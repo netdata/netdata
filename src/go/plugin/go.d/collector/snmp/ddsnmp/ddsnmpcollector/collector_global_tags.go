@@ -54,7 +54,7 @@ func (gc *globalTagsCollector) processStaticTags(staticTags []ddprofiledefinitio
 }
 
 // processDynamicTags processes tags that require SNMP fetching
-func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefinition.MetricTagConfig, globalTags map[string]string) error {
+func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefinition.GlobalMetricTagConfig, globalTags map[string]string) error {
 	// Identify OIDs to collect
 	oids, missingOIDs := gc.identifyTagOIDs(metricTags)
 
@@ -74,15 +74,16 @@ func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 	// Collect each tag configuration
 	var errs []error
 	for _, tagCfg := range metricTags {
-		if tagCfg.Symbol.OID == "" {
+		cfg := tagCfg.MetricTagConfig
+		if cfg.Symbol.OID == "" {
 			continue
 		}
 
 		ta := tagAdder{tags: globalTags}
 
-		if err := gc.tagProc.processTag(tagCfg, pdus, ta); err != nil {
+		if err := gc.tagProc.processTag(cfg, pdus, ta); err != nil {
 			errs = append(errs, fmt.Errorf("failed to process tag value for %q: %w",
-				metricTagDisplayName(tagCfg), err))
+				metricTagDisplayName(cfg), err))
 			continue
 		}
 	}
@@ -94,22 +95,23 @@ func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 	return nil
 }
 
-func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.MetricTagConfig) ([]string, []string) {
+func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.GlobalMetricTagConfig) ([]string, []string) {
 	var oids []string
 	var missingOIDs []string
 
 	for _, tagCfg := range metricTags {
-		if tagCfg.Symbol.OID == "" {
+		cfg := tagCfg.MetricTagConfig
+		if cfg.Symbol.OID == "" {
 			continue
 		}
 
-		oid := trimOID(tagCfg.Symbol.OID)
+		oid := trimOID(cfg.Symbol.OID)
 		if gc.missingOIDs[oid] {
-			missingOIDs = append(missingOIDs, tagCfg.Symbol.OID)
+			missingOIDs = append(missingOIDs, cfg.Symbol.OID)
 			continue
 		}
 
-		oids = append(oids, tagCfg.Symbol.OID)
+		oids = append(oids, cfg.Symbol.OID)
 	}
 
 	// Sort and deduplicate

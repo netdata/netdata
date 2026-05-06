@@ -5,16 +5,17 @@
 # - dot1qTpFdbTable provides per-FDB-domain MAC learning entries.
 # - dot1qVlanCurrentTable maps FDB domain IDs to VLAN IDs where available.
 
-metrics:
+topology:
   # Q-BRIDGE-MIB: VLAN/FDB-domain forwarding table (MAC -> bridge port).
-  - MIB: Q-BRIDGE-MIB
+  - kind: qbridge_fdb_entry
+    MIB: Q-BRIDGE-MIB
     table:
       OID: 1.3.6.1.2.1.17.7.1.2.2.1
       name: dot1qTpFdbTable
     symbols:
       # Use port column as numeric row anchor.
       - OID: 1.3.6.1.2.1.17.7.1.2.2.1.2
-        name: _topology_qbridge_fdb_entry
+        name: qbridge_fdb_entry
     metric_tags:
       - tag: dot1q_fdb_id
         index: 1
@@ -40,13 +41,14 @@ metrics:
             5: mgmt
 
   # Q-BRIDGE-MIB: maps FDB domain ID to VLAN ID.
-  - MIB: Q-BRIDGE-MIB
+  - kind: qbridge_vlan_entry
+    MIB: Q-BRIDGE-MIB
     table:
       OID: 1.3.6.1.2.1.17.7.1.4.2.1
       name: dot1qVlanCurrentTable
     symbols:
       - OID: 1.3.6.1.2.1.17.7.1.4.2.1.3
-        name: _topology_qbridge_vlan_entry
+        name: qbridge_vlan_entry
     metric_tags:
       # Some devices expose timemark+vlan index, others only vlan.
       # Keep both and resolve in code.

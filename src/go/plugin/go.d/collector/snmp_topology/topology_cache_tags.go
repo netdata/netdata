@@ -3,27 +3,6 @@
 package snmptopology
 
 const (
-	metricLldpLocPortEntry      = "_topology_lldp_loc_port_entry"
-	metricLldpLocManAddrEntry   = "_topology_lldp_loc_man_addr_entry"
-	metricLldpRemEntry          = "_topology_lldp_rem_entry"
-	metricLldpRemManAddrEntry   = "_topology_lldp_rem_man_addr_entry"
-	metricLldpRemManAddrCompat  = "_topology_lldp_rem_man_addr_compat_entry"
-	metricCdpCacheEntry         = "_topology_cdp_cache_entry"
-	metricTopologyIfNameEntry   = "_topology_if_name_entry"
-	metricTopologyIfStatusEntry = "_topology_if_status_entry"
-	metricTopologyIfDuplexEntry = "_topology_if_duplex_entry"
-	metricTopologyIPIfEntry     = "_topology_ip_if_index_entry"
-	metricBridgePortMapEntry    = "_topology_bridge_port_if_index_entry"
-	metricFdbEntry              = "_topology_fdb_entry"
-	metricDot1qFdbEntry         = "_topology_qbridge_fdb_entry"
-	metricDot1qVlanEntry        = "_topology_qbridge_vlan_entry"
-	metricStpPortEntry          = "_topology_stp_port_entry"
-	metricVtpVlanEntry          = "_topology_vtp_vlan_entry"
-	metricArpEntry              = "_topology_arp_entry"
-	metricArpLegacyEntry        = "_topology_arp_legacy_entry"
-)
-
-const (
 	tagLldpLocChassisID        = "lldp_loc_chassis_id"
 	tagLldpLocChassisIDSubtype = "lldp_loc_chassis_id_subtype"
 	tagLldpLocSysName          = "lldp_loc_sys_name"

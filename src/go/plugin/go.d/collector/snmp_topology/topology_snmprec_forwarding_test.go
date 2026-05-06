@@ -112,34 +112,34 @@ func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecFo
 		coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{DeviceMetadata: data.bridgeMetadata}})
 	}
 	for _, tags := range data.ifNameEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricTopologyIfNameEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindIfName, Tags: tags})
 	}
 	for _, tags := range data.ifStatusEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricTopologyIfStatusEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindIfStatus, Tags: tags})
 	}
 	for _, tags := range data.ipIfEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricTopologyIPIfEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindIpIfIndex, Tags: tags})
 	}
 	for _, tags := range data.bridgePorts {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricBridgePortMapEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindBridgePortIfIndex, Tags: tags})
 	}
 	for _, tags := range data.qBridgeVLANs {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricDot1qVlanEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindQbridgeVlanEntry, Tags: tags})
 	}
 	for _, tags := range data.vtpVLANs {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricVtpVlanEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindVtpVlan, Tags: tags})
 	}
 	for _, tags := range data.fdbEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricFdbEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindFdbEntry, Tags: tags})
 	}
 	for _, tags := range data.qBridgeFdb {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricDot1qFdbEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindQbridgeFdbEntry, Tags: tags})
 	}
 	for _, tags := range data.stpPorts {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricStpPortEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindStpPort, Tags: tags})
 	}
 	for _, tags := range data.arpEntries {
-		coll.updateTopologyCacheEntry(ddsnmp.Metric{Name: metricArpEntry, Tags: tags})
+		coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindArpEntry, Tags: tags})
 	}
 
 	return coll

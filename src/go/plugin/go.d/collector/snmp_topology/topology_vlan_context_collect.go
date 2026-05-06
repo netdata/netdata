@@ -13,18 +13,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
-func loadTopologyVLANContextProfiles() ([]*ddsnmp.Profile, error) {
-	names := []string{fdbArpProfileName, stpProfileName}
-	profiles := make([]*ddsnmp.Profile, 0, len(names))
-	for _, name := range names {
-		profile, err := ddsnmp.LoadProfileByName(name)
-		if err != nil {
-			return nil, err
-		}
-		profiles = append(profiles, profile)
-	}
-
-	return ddsnmp.FinalizeProfiles(profiles), nil
+func loadTopologyVLANContextProfiles(dev ddsnmp.DeviceConnectionInfo) ([]*ddsnmp.Profile, error) {
+	return ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
+		SysObjectID:    dev.SysObjectID,
+		SysDescr:       dev.SysDescr,
+		ManualProfiles: dev.ManualProfiles,
+		ManualPolicy:   ddsnmp.ManualProfileAugment,
+	}).Project(ddsnmp.ConsumerTopology).FilterByKind(vlanScopableKinds).Profiles(), nil
 }
 
 func collectTopologyVLANContext(c *Collector, dev ddsnmp.DeviceConnectionInfo, vlanID string, profiles []*ddsnmp.Profile) ([]*ddsnmp.ProfileMetrics, error) {
