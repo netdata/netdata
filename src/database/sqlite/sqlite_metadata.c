@@ -275,7 +275,7 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         return;
     }
 
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
     uuid_copy(host->node_id.uuid, *node_id);
 

@@ -26,7 +26,7 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
 
 static void build_node_collectors(RRDHOST *host)
 {
-    struct aclk_sync_cfg_t *aclk_host_config = host->aclk_host_config;
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
     struct update_node_collectors upd_node_collectors;
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
@@ -49,7 +49,7 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
 {
     struct update_node_info node_info;
 
-    struct aclk_sync_cfg_t *aclk_host_config = host->aclk_host_config;
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
     CLAIM_ID claim_id = claim_id_get();
 
@@ -105,7 +105,7 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
 
 void send_node_info_with_wait(RRDHOST *host)
 {
-    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
+    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE)))
         return;
 
     // No node_id means cloud doesn't know about this node - nothing to update
@@ -130,7 +130,7 @@ void send_node_info_with_wait(RRDHOST *host)
 
 void send_node_update_with_wait(RRDHOST *host, int live, int queryable)
 {
-    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
+    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE)))
         return;
 
     // No node_id means cloud doesn't know about this node - nothing to update
@@ -177,7 +177,7 @@ void aclk_check_node_info_and_collectors(void)
     time_t now = now_realtime_sec();
     dfe_start_reentrant(rrdhost_root_index, host)
     {
-        struct aclk_sync_cfg_t *aclk_host_config = host->aclk_host_config;
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (unlikely(!aclk_host_config))
             continue;
 

@@ -246,7 +246,7 @@ static bool rrdcontext_checkpoint_generation_is_current(RRDHOST *host, const cha
 // Save a pending checkpoint to be replayed when context processing completes.
 // Returns true if saved successfully, false if save failed (caller should execute immediately).
 static bool rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkpoint *cmd) {
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if(!aclk_host_config)
         return false;
 
@@ -439,7 +439,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
 #define PENDING_CTX_CHECKPOINT_MAX_AGE_S 300
 
 void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if(!aclk_host_config || !__atomic_load_n(&aclk_host_config->pending_ctx_checkpoint, __ATOMIC_ACQUIRE))
         return;
 
