@@ -27,6 +27,12 @@ members = [
     # Netdata OTEL workspace members
     "netdata-otel/otel-plugin",
     "netdata-otel/flatten_otel",
+
+    # Netdata NetFlow workspace members
+    "netflow-plugin",
+
+    # Plugin IPC library
+    "netipc",
 ]
 
 [workspace.package]
@@ -43,6 +49,7 @@ thiserror = "2"
 zerocopy = { version = "0.9.0-alpha.0" }
 libc = "0.2"
 memmap2 = "0.9"
+memchr = "2.7"
 uuid = { version = "1.0"}
 nix = { version = "0.30" }
 
@@ -56,9 +63,10 @@ lzma-rust2 = { version = "0.15", default-features = false, features = ["std", "x
 md5 = "0.7"
 
 roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocative" }
+hashbrown = "0.17.0"
 serde = { version = "1.0" }
 rustc-hash = "2.1"
-bincode = { version = "1.3" }
+rmp-serde = "1.3.1"
 notify = "8.2"
 
 walkdir = "2.4"
@@ -77,6 +85,8 @@ async-trait = "0.1.89"
 serde_yaml = "0.9.34"
 serde_regex = "1.1.0"
 tokio = { version = "1.45", features = ["full"] }
+ipnet = "2.11.0"
+ipnet-trie = "0.3.0"
 
 # Tracing
 tracing = { version = "0.1" }
@@ -112,10 +122,28 @@ itoa = "1.0"
 
 base64 = "0.22"
 
+# NetFlow-specific dependencies
+jaq-core = "3.0.0"
+jaq-json = "2.0.0"
+jaq-std = "3.0.0"
+maxminddb = "0.27.3"
+netflow_parser = "0.9.0"
+netgauze-bgp-pkt = "0.11.0"
+netgauze-bmp-pkt = "0.11.0"
+sflow-parser = "0.6.0"
+reqwest = { version = "0.13.2", default-features = false }
+socket2 = "0.6.3"
+tonic-prost = "0.14"
+prost = "0.14"
+fst = "0.4.7"
+tonic-prost-build = "0.14"
+protoc-bin-vendored = "3"
+etherparse = "0.20.1"
+pcap-file = "2.0.0"
+
 # OTEL-specific dependencies
 atty = "0.2"
-bytesize = "1.3"
-bytesize-serde = "0.2"
+bytesize = { version = "2.3.1", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 duct = "0.13"
 humantime = "2.2"
@@ -134,7 +162,6 @@ journal-index = { path = "journal-index" }
 journal-log-writer = { path = "journal-log-writer" }
 journal-engine = { path = "journal-engine" }
 journal-registry = { path = "journal-registry" }
-journalctl = { path = "journalctl" }
 rdp = { path = "rdp" }
 
 # Netdata plugin crates
@@ -165,9 +192,10 @@ debug = true
 debug-assertions = true
 
 [profile.release]
+# Keep debuginfo in packaged release builds so production crashes remain symbolizable.
 debug = true
-lto = "fat"
 opt-level = 3
+lto = "fat"
 codegen-units = 1
 
 [profile.release-min]

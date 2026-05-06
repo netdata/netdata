@@ -12,12 +12,13 @@ import (
 )
 
 type jobV2CleanupSnapshot struct {
+	scopeKey             string
 	charts               map[string]chartengine.ChartMeta
 	host                 jobV2HostRef
 	staleVnodeSuppressed bool
 }
 
-func (s *jobV2HostState) captureCleanupSnapshot(vnode vnodes.VirtualNode) jobV2CleanupSnapshot {
+func (s *jobV2HostState) captureCleanupSnapshot(vnode vnodes.VirtualNode, allowStaleVnodeSuppression bool) jobV2CleanupSnapshot {
 	if s == nil {
 		return jobV2CleanupSnapshot{}
 	}
@@ -25,8 +26,51 @@ func (s *jobV2HostState) captureCleanupSnapshot(vnode vnodes.VirtualNode) jobV2C
 	return jobV2CleanupSnapshot{
 		charts:               maps.Clone(s.cleanupCharts),
 		host:                 host,
-		staleVnodeSuppressed: shouldSuppressCleanupForStaleVnode(host, vnode),
+		staleVnodeSuppressed: allowStaleVnodeSuppression && shouldSuppressCleanupForStaleVnode(host, vnode),
 	}
+}
+
+func (j *JobV2) captureScopeCleanupSnapshots() []jobV2CleanupSnapshot {
+	if j == nil || len(j.scopeStates) == 0 {
+		return nil
+	}
+	vnode := j.currentVnode()
+	keys := sortedScopeStateKeys(j.scopeStates)
+
+	snapshots := make([]jobV2CleanupSnapshot, 0, len(keys))
+	for _, key := range keys {
+		state := j.scopeStates[key]
+		if state == nil {
+			continue
+		}
+		snapshot := state.host.captureCleanupSnapshot(vnode, key == defaultHostScopeKey)
+		snapshot.scopeKey = key
+		snapshots = append(snapshots, snapshot)
+	}
+	return snapshots
+}
+
+func (j *JobV2) releaseAllScopeRegistryOwners() {
+	if j == nil {
+		return
+	}
+	for _, state := range j.scopeStates {
+		if state != nil {
+			state.host.releaseRegistryOwners(j.vnodeRegistry)
+		}
+	}
+}
+
+func (j *JobV2) clearAllScopeStateAfterCleanup() {
+	if j == nil {
+		return
+	}
+	for _, state := range j.scopeStates {
+		if state != nil {
+			state.host.clearAfterCleanup()
+		}
+	}
+	clear(j.scopeStates)
 }
 
 func (s *jobV2HostState) clearAfterCleanup() {

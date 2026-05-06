@@ -27,6 +27,17 @@ func (c *Collector) validateConfig() error {
 }
 
 func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
+	client, err := c.newConfiguredSNMPClient()
+	if err != nil {
+		return nil, err
+	}
+
+	c.Info(snmputils.SnmpClientConnInfo(client))
+
+	return client, nil
+}
+
+func (c *Collector) newConfiguredSNMPClient() (gosnmp.Handler, error) {
 	client := c.newSnmpClient()
 
 	client.SetTarget(c.Hostname)
@@ -67,8 +78,6 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 	default:
 		return nil, fmt.Errorf("invalid SNMP version: %s", c.Options.Version)
 	}
-
-	c.Info(snmputils.SnmpClientConnInfo(client))
 
 	return client, nil
 }

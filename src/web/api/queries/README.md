@@ -20,7 +20,7 @@ Every data query accepts the following parameters:
 |`points`|no|The number of points to be returned. Netdata can reduce number of points by applying query grouping methods. If not given, the result will have the same granularity as the database (although this relates to `gtime`).|
 |`before`|no|The absolute timestamp or the relative (to now) time the query should finish evaluating data. If not given, it defaults to the timestamp of the latest point in the database.|
 |`after`|no|The absolute timestamp or the relative (to `before`) time the query should start evaluating data. if not given, it defaults to the timestamp of the oldest point in the database.|
-|`group`|no|The grouping method to use when reducing the points the database has. If not given, it defaults to `average`.|
+|`group`|no|The grouping method to use when reducing the points the database has. If not given, it defaults to `average`. See [Grouping methods](#grouping-methods) for the full list, including `trimmed-mean`, `trimmed-median`, `percentile`, `countif`, and `extremes` variants.|
 |`gtime`|no|A resampling period to change the units of the metrics (i.e. setting this to `60` will convert `per second` metrics to `per minute`. If not given it defaults to granularity of the database.|
 |`options`|no|A bitmap of options that can affect the operation of the query. Only 2 options are used by the query engine: `unaligned` and `percentage`. All the other options are used by the output formatters. The default is to return aligned data.|
 |`dimensions`|no|A simple pattern to filter the dimensions to be queried. The default is to return all the dimensions of the chart.|
@@ -119,6 +119,31 @@ and they group the values every `group points`.
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=ses&after=-60&label=ses&value_color=brown) finds the exponential weighted moving average of the values
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=des&after=-60&label=des&value_color=blue) applies Holt-Winters double exponential smoothing
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=incremental_sum&after=-60&label=incremental_sum&value_color=red) finds the difference of the last vs the first value
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=countif&after=-60&label=countif&value_color=purple) returns the percentage (0 to 100) of values matching a condition set via `group_options` (e.g., `&group=countif&group_options=>10`)
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=ema&after=-60&label=ema&value_color=teal) alias for `ses`; finds the exponential weighted moving average of the values
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=extremes&after=-60&label=extremes&value_color=grey) returns the maximum of positive values and the minimum of negative values; when both are present, returns the one with the greater absolute magnitude
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=percentile&after=-60&label=percentile&value_color=olive) finds the value at a specific percentile (defaults to the 95th percentile; accepts `group_options` to specify a different percentile; `percentile50` is equivalent to median)
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=percentile95&after=-60&label=percentile95&value_color=olive) finds the value at the 95th percentile
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=percentile99&after=-60&label=percentile99&value_color=olive) finds the value at the 99th percentile
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=trimmed-mean&after=-60&label=trimmed-mean&value_color=maroon) finds the average after trimming outliers (defaults to trimming 5%; accepts `group_options` to specify a different percentage)
+-   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=trimmed-median&after=-60&label=trimmed-median&value_color=navy) finds the median after trimming outliers (defaults to trimming 5%; accepts `group_options` to specify a different percentage)
+
+#### Percentile variants
+
+The following percentile methods are also available: `percentile25`, `percentile50` (equivalent to median), `percentile75`, `percentile80`, `percentile90`, `percentile95`, `percentile97`, `percentile98`, `percentile99`. The generic `percentile` method defaults to the 95th percentile and accepts `group_options` to specify a different percentile number.
+
+#### Trimmed variants
+
+The following trimmed-mean methods are available: `trimmed-mean1`, `trimmed-mean2`, `trimmed-mean3`, `trimmed-mean5`, `trimmed-mean10`, `trimmed-mean15`, `trimmed-mean20`, `trimmed-mean25`. The number indicates the percentage of values trimmed from each end. The generic `trimmed-mean` method defaults to trimming 5%.
+
+The following trimmed-median methods are available: `trimmed-median1`, `trimmed-median2`, `trimmed-median3`, `trimmed-median5`, `trimmed-median10`, `trimmed-median15`, `trimmed-median20`, `trimmed-median25`.
+
+#### group_options parameter
+
+Some grouping methods accept additional parameters via `group_options`:
+- `countif`: A comparison operator followed by a value (e.g., `>100`, `<=50`, `!=0`, `<:5`, `>:10`)
+- `percentile`: A number from 1-99 specifying the percentile
+- `trimmed-mean` / `trimmed-median`: A number specifying the percentage of values to trim from each end
 
 The examples shown above show live information from the `received` traffic on the `eth0` interface of the global Netdata Registry.
 Inspect any of the badges to see the parameters provided. You can directly issue the request to the Registry server's API yourself, e.g. by passing the following to get the value shown on the badge for the sum of the values within the period:

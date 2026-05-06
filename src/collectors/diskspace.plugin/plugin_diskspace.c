@@ -46,6 +46,10 @@ static DICTIONARY *zfs_cache = NULL;
 static SIMPLE_PATTERN *excluded_zfs_datasets_pattern = NULL;
 static int zfs_datasets_heuristic = CONFIG_BOOLEAN_YES;
 
+static SIMPLE_PATTERN *excluded_mountpoints = NULL;
+static SIMPLE_PATTERN *excluded_filesystems = NULL;
+static SIMPLE_PATTERN *excluded_filesystems_inodes = NULL;
+
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
     time_t now = now_realtime_sec();
@@ -93,6 +97,49 @@ static DICTIONARY *dict_mountpoints = NULL;
 
 #define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete___safe_from_collector_thread(st); (st) = NULL; } } while(st)
 
+static void mountpoint_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused);
+
+static void diskspace_mountpoints_init(void) {
+    if(dict_mountpoints)
+        return;
+
+    SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
+
+    if(inicfg_move(&netdata_config, "plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
+        // old configuration, enable backwards compatibility
+        mode = SIMPLE_PATTERN_PREFIX;
+    }
+
+    excluded_mountpoints = simple_pattern_create(
+        inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS),
+        NULL,
+        mode,
+        true);
+
+    excluded_filesystems = simple_pattern_create(
+        inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS),
+        NULL,
+        SIMPLE_PATTERN_EXACT,
+        true);
+
+    excluded_filesystems_inodes = simple_pattern_create(
+        inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude inode metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS_INODES),
+        NULL,
+        SIMPLE_PATTERN_EXACT,
+        true);
+
+    // ZFS dataset exclusion pattern (used when heuristic is disabled)
+    // Always create so the option appears in config for users to customize.
+    excluded_zfs_datasets_pattern = simple_pattern_create(
+        inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude zfs datasets on paths", "!*"),
+        NULL,
+        SIMPLE_PATTERN_EXACT,
+        true);
+
+    dict_mountpoints = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(struct mount_point_metadata));
+    dictionary_register_delete_callback(dict_mountpoints, mountpoint_delete_cb, NULL);
+}
+
 static void mount_points_cleanup(bool slow) {
     struct mount_point_metadata *mp;
     dfe_start_write(dict_mountpoints, mp) {
@@ -108,7 +155,7 @@ static void mount_points_cleanup(bool slow) {
     dictionary_garbage_collect(dict_mountpoints);
 }
 
-void mountpoint_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {
+static void mountpoint_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {
     struct mount_point_metadata *mp = (struct mount_point_metadata *)entry;
 
     mp->collected = 0;
@@ -504,51 +551,12 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     const char *disk = mi->persistent_id;
 
-    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
-    static SIMPLE_PATTERN *excluded_filesystems = NULL;
-    static SIMPLE_PATTERN *excluded_filesystems_inodes = NULL;
-
     usec_t slow_timeout = MAX_STAT_USEC * update_every;
 
     int do_space, do_inodes;
 
-    if(unlikely(!dict_mountpoints)) {
-        SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
-
-        if(inicfg_move(&netdata_config, "plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
-            // old configuration, enable backwards compatibility
-            mode = SIMPLE_PATTERN_PREFIX;
-        }
-
-        excluded_mountpoints = simple_pattern_create(
-            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS),
-            NULL,
-            mode,
-            true);
-
-        excluded_filesystems = simple_pattern_create(
-            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS),
-            NULL,
-            SIMPLE_PATTERN_EXACT,
-            true);
-
-        excluded_filesystems_inodes = simple_pattern_create(
-            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude inode metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS_INODES),
-            NULL,
-            SIMPLE_PATTERN_EXACT,
-            true);
-
-        // ZFS dataset exclusion pattern (used when heuristic is disabled)
-        // Always create so the option appears in config for users to customize
-        excluded_zfs_datasets_pattern = simple_pattern_create(
-            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude zfs datasets on paths", "!*"),
-            NULL,
-            SIMPLE_PATTERN_EXACT,
-            true);
-
-        dict_mountpoints = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(struct mount_point_metadata));
-        dictionary_register_delete_callback(dict_mountpoints, mountpoint_delete_cb, NULL);
-    }
+    if(unlikely(!dict_mountpoints))
+        diskspace_mountpoints_init();
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dict_mountpoints, mi->mount_point);
     if(unlikely(!item)) {
@@ -844,6 +852,15 @@ static void diskspace_main_cleanup(void *ptr) {
     dictionary_destroy(dict_mountpoints);
     dict_mountpoints = NULL;
 
+    simple_pattern_free(excluded_mountpoints);
+    excluded_mountpoints = NULL;
+
+    simple_pattern_free(excluded_filesystems);
+    excluded_filesystems = NULL;
+
+    simple_pattern_free(excluded_filesystems_inodes);
+    excluded_filesystems_inodes = NULL;
+
     // Free ZFS deduplication resources
     dictionary_destroy(zfs_cache);
     zfs_cache = NULL;
@@ -1082,6 +1099,12 @@ void diskspace_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
 
+    // Initialize shared state before publishing the function endpoint, so that
+    // diskspace_function_mount_points cannot fire against an uninitialized
+    // mutex or a NULL dict_mountpoints.
+    netdata_mutex_init(&slow_mountinfo_mutex);
+    diskspace_mountpoints_init();
+
     rrd_function_add_inline(localhost, NULL, "mount-points", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
                             RRDFUNCTIONS_DISKSPACE_HELP,
@@ -1114,8 +1137,6 @@ void diskspace_main(void *ptr) {
             &dictionary_stats_category_collectors,
             sizeof(struct zfs_cache_entry));
     }
-
-    netdata_mutex_init(&slow_mountinfo_mutex);
 
     struct slow_worker_data slow_worker_data = { .update_every = update_every };
 

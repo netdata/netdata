@@ -3,9 +3,6 @@
 #ifndef NETDATA_EBPF_CGROUP_H
 #define NETDATA_EBPF_CGROUP_H 1
 
-#define NETDATA_EBPF_CGROUP_MAX_TRIES 3
-#define NETDATA_EBPF_CGROUP_NEXT_TRY_SEC 30
-
 #include "ebpf.h"
 #include "ebpf_apps.h"
 
@@ -83,11 +80,9 @@ typedef struct ebpf_systemd_args {
     char *dimension;
 } ebpf_systemd_args_t;
 
-void ebpf_map_cgroup_shared_memory();
-void ebpf_parse_cgroup_shm_data();
 void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart);
 void ebpf_cgroup_integration(void *ptr);
-void ebpf_unmap_cgroup_shared_memory();
-extern int send_cgroup_chart;
+void ebpf_cgroup_cache_cleanup(void);
+extern _Atomic int send_cgroup_chart;
 
 #endif /* NETDATA_EBPF_CGROUP_H */

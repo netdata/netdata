@@ -1,5 +1,7 @@
 # Collector Authoring Checklist
 
+CRITICAL: Never write raw sensitive data to durable artifacts. This includes passwords, API keys, bearer tokens, SNMP communities, private keys, connection strings with embedded credentials, session cookies, community member names, customer names, customer identifiers, personal data, non-private IP addresses that can identify customers, private endpoints, account IDs, and proprietary incident details.
+
 This file is a quick landing page for humans and AI assistants contributing to the IBM.d plugin. For the full documentation follow these links:
 
 - [Plugin overview & build instructions](README.md)

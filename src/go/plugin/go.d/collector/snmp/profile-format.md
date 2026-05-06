@@ -1230,6 +1230,62 @@ If the current row index is `1.192.0.2.1.1.128`, the collector:
 - formats it as an IP address
 - emits `neighbor="192.0.2.1"`
 
+### Field Accessibility
+
+SNMP profile symbols must only read objects that the source MIB exposes as
+readable columns. Before adding or changing a `symbol.OID`, check the source
+MIB object's `MAX-ACCESS` (SMIv2) or `ACCESS` (SMIv1).
+
+Rules:
+
+- `read-only`, `read-write`, and `read-create` objects can be read as
+  `symbol.OID` values.
+- `not-accessible` objects must not be read as `symbol.OID` values.
+- A `not-accessible` object that is part of a table `INDEX` can be derived from
+  the row OID index using `index` or `index_transform`.
+- Keep SNMP index slicing in the profile YAML; keep format conversion in
+  `symbol.format`.
+
+The two index extraction mechanisms use different counting bases:
+
+- `index: N` is **1-based**: `index: 1` selects the first index component,
+  `index: 2` the second, and so on. Use this to pick a single component.
+- `index_transform: [{start: M, end: K}]` is **0-based** over the row index
+  parts. `start: 0` is the first component. `end` is inclusive. Setting
+  `end: 0` together with `start: N > 0` slices to the tail (`start: N` to the
+  last index part) - useful for length-prefixed `OCTET STRING` index columns
+  whose width depends on a sibling index component (e.g.
+  `LLDP-MIB::lldpLocManAddr`, `IP-MIB::ipNetToPhysicalNetAddress`).
+
+So `index: 1` and `index_transform: [{start: 0, end: 0}]` both extract the
+first index component.
+
+Examples:
+
+- `Q-BRIDGE-MIB::dot1qTpFdbAddress` is `not-accessible` and is part of the
+  `dot1qTpFdbEntry` index. Derive it from the row index and use
+  `format: mac_address`.
+- `IP-MIB::ipNetToPhysicalIfIndex`,
+  `IP-MIB::ipNetToPhysicalNetAddressType`, and
+  `IP-MIB::ipNetToPhysicalNetAddress` are `not-accessible` index components.
+  Derive them from the row index. The physical MAC value,
+  `ipNetToPhysicalPhysAddress`, is readable and can stay as a column symbol.
+- `LLDP-MIB::lldpLocManAddrSubtype` and `LLDP-MIB::lldpLocManAddr` are
+  `not-accessible` index components. Anchor the row on a readable column such as
+  `lldpLocManAddrLen`, then derive subtype and address from the row index. Use
+  `format: hex` for the address bytes so non-IP management-address subtypes are
+  preserved; topology normalization converts IP-compatible bytes later.
+
+Audit recipe:
+
+```bash
+rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+not-accessible' path/to/MIB
+rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
+```
+
+Any profile hit for a `not-accessible` object is valid only when the tag is
+index-derived and does not declare a `symbol.OID` for that object.
+
 ## Tag Transformation
 
 Tag transformations let you **modify or extract parts of SNMP values** to produce clear, human-readable tags.
@@ -1243,6 +1299,7 @@ They work the same in **both** places:
 
 | Transformation                   | Purpose                                         | Example Input → Output                                           |
 |----------------------------------|-------------------------------------------------|------------------------------------------------------------------|
+| `format`                         | Convert the raw SNMP value before tag parsing.  | `0x18fd74331a9c → "18fd74331a9c"`                                |
 | `mapping`                        | Replace numeric/string codes with names.        | `1 → "ethernet"`, `161 → "lag"`                                  |
 | `extract_value`                  | Extract a substring via regex (first group).    | `"RouterOS CCR2004-16G-2S+" → "CCR2004-16G-2S+"`                 |
 | `match_pattern` + `match_value`  | Replace the value using regex groups or static. | `"Palo Alto Networks VM-Series firewall" → "VM-Series firewall"` |
@@ -1288,6 +1345,50 @@ They work the same in **both** places:
       pic: $3
       port: $4
     ```
+
+- `format`
+    ```yaml
+    symbol:
+      OID: 1.3.6.1.2.1.17.1.1
+      name: dot1dBaseBridgeAddress
+      format: hex
+    ```
+
+### Format
+
+Use `format` when the raw SNMP value must be converted before tag or metadata processing.
+
+**The collector**:
+
+- Applies `format` when converting the raw SNMP value to a string.
+- Then applies the configured tag or metadata transformations to that formatted string.
+- Supports the same `format` values accepted by `symbol` definitions elsewhere in the profile.
+
+**Where it can be used**:
+
+- `metadata.device.fields.<field>.symbol`
+- `metadata.device.fields.<field>.symbols[]`
+- `metric_tags[].symbol`
+
+**Currently used by this profile set**:
+
+- `format: hex` for octet-string values such as:
+  - MAC addresses
+  - binary management-address values
+  - capability bitmaps
+
+**Example**:
+
+```yaml
+metadata:
+  device:
+    fields:
+      bridge_base_address:
+        symbol:
+          OID: 1.3.6.1.2.1.17.1.1
+          name: dot1dBaseBridgeAddress
+          format: hex
+```
 
 ### Mapping
 

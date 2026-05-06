@@ -129,6 +129,11 @@ Note that this will test _all_ alert mechanisms for the selected role.
 ## Troubleshooting
 
 [% endif %]
+[% elif entry.integration_type == 'service_discovery' %]
+[% if entry.troubleshooting.problems.list %]
+## Troubleshooting
+
+[% endif %]
 [% endif %]
 [% for item in entry.troubleshooting.problems.list %]
 ### [[ item.name ]]

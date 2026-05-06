@@ -187,17 +187,30 @@ modules:
               dimensions:
                 - name: read
                 - name: write
-            - name: mem.swap_pages_io
-              description: Swap Pages
-              unit: "pages/s"
-              chart_type: stacked
+            - name: mem.swapio
+              description: Swap I/O
+              unit: "KiB/s"
+              chart_type: area
               dimensions:
-                - name: read
-                - name: write
+                - name: in
+                - name: out
             - name: mem.system_pool_size
               description: System Memory Pool
               unit: "bytes"
               chart_type: stacked
+              dimensions:
+                - name: paged
+                - name: non-paged
+            - name: mem.system_pool_paged
+              description: Paged System Memory Pool
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: resident
+            - name: mem.system_pool_allocs
+              description: System Pool Allocations
+              unit: "allocations/s"
+              chart_type: line
               dimensions:
                 - name: paged
                 - name: non-paged
@@ -207,6 +220,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: free
+            - name: mem.committed
+              description: Committed Memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: committed
+                - name: limit
+            - name: mem.system_cache
+              description: System Cache Memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: cache
+                - name: peak
+                - name: resident
+            - name: mem.page_lists
+              description: Memory Page Lists
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: modified
+                - name: standby_core
+                - name: standby_normal
+                - name: standby_reserve
+            - name: mem.system_code
+              description: System Code Memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: resident
+                - name: total
+            - name: mem.system_drivers
+              description: System Driver Memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: resident
+                - name: total
+            - name: mem.page_faults_breakdown
+              description: Memory Page Fault Breakdown
+              unit: "faults/s"
+              chart_type: line
+              dimensions:
+                - name: cache
+                - name: demand_zero
+                - name: transition
+                - name: write_copies
+            - name: mem.transition_repurposed
+              description: Transition Pages Repurposed
+              unit: "pages/s"
+              chart_type: line
+              dimensions:
+                - name: repurposed
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibProcesses
@@ -812,6 +879,134 @@ modules:
               chart_type: line
               dimensions:
                 - name: connections
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibSMB
+      monitored_instance:
+        name: SMB Server Shares
+        link: "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/"
+        categories:
+          - data-collection.storage
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - smb
+        - share
+        - file sharing
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor SMB server share activity and throughput counters on Windows systems.
+        method_description: |
+          It queries the 'SMB Server Shares' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector is disabled by default. When enabled, it automatically detects all available SMB share instances and metrics.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibSMB]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: SMB Share
+          description: "These metrics refer to SMB shares."
+          labels:
+            - name: share
+              description: SMB share name as exposed by the Windows SMB Server Shares performance object.
+          metrics:
+            - name: smb.server_shares_current_open_file_count
+              description: Current total count of open files on the SMB share.
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: smb.server_shares_tree_connect_count
+              description: Count of user connections to the SMB share.
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: smb.server_shares_received_bytes
+              description: Received bytes on the SMB share.
+              unit: "bytes/s"
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: smb.server_shares_write_requests
+              description: Write requests on the SMB share.
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: writes
+            - name: smb.server_shares_read_requests
+              description: Read requests on the SMB share.
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+            - name: smb.server_shares_metadata_requests
+              description: Metadata requests on the SMB share.
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: metadata
+            - name: smb.server_shares_sent_bytes
+              description: Sent bytes on the SMB share.
+              unit: "bytes/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: smb.server_shares_files_opened
+              description: Files opened on the SMB share.
+              unit: "files/s"
+              chart_type: line
+              dimensions:
+                - name: opened
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibObjects
@@ -2352,7 +2547,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Active Directory IO and queries.
+          This collector monitors Active Directory directory operations, replication, LDAP activity, binds, queueing, database, cleanup, security descriptor propagation, and SAM metrics.
         method_description: |
           It queries DirectoryServices object from Perflib in order to gather the metrics.
       supported_platforms:
@@ -2407,6 +2602,54 @@ modules:
           description: "These metrics refer to Active Directory."
           labels: []
           metrics:
+            - name: ad.address_book_ambiguous_name_resolution
+              description: Address book ambiguous name resolution
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: ambiguous_name_resolution
+            - name: ad.address_book_browse
+              description: Address book browse operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: browse
+            - name: ad.address_book_find
+              description: Address book matches
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: find
+            - name: ad.address_book_property_read
+              description: Address book property reads
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: property_read
+            - name: ad.address_book_search
+              description: Address book searches
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: search
+            - name: ad.address_book_proxy_search
+              description: Address book proxy searches
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: proxy_search
+            - name: ad.address_book_client_sessions
+              description: Address book client sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: sessions
+            - name: ad.approximate_highest_dnt
+              description: Approximate highest distinguished name tag
+              unit: dnt
+              chart_type: line
+              dimensions:
+                - name: dnt
             - name: ad.directory_operations
               description: AD directory operations
               unit: operations/s
@@ -2415,12 +2658,42 @@ modules:
                 - name: read
                 - name: write
                 - name: search
+            - name: ad.searches_base
+              description: Directory base searches
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: base
+            - name: ad.searches_subtree
+              description: Directory subtree searches
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: subtree
+            - name: ad.searches_one_level
+              description: Directory one-level searches
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: one_level
             - name: ad.name_cache_lookups
               description: Name cache lookups
               unit: lookups/s
               chart_type: line
               dimensions:
                 - name: lookups
+            - name: ad.name_cache_hits
+              description: Name cache hits
+              unit: hits/s
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: ad.ldap_searches
+              description: LDAP client search operations
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: searches
             - name: ad.dra_replication_properties_updated
               description: DRA replication properties updated
               unit: properties/s
@@ -2434,25 +2707,55 @@ modules:
               dimensions:
                 - name: inbound
             - name: ad.dra_replication_intersite_compressed_traffic
-              description: DRA replication compressed traffic withing site
-              unit: bytes/s
-              chart_type: area
-              dimensions:
-                - name: inbound
-                - name: outbound
-            - name: ad.dra_replication_intrasite_compressed_traffic
               description: DRA replication compressed traffic between sites
               unit: bytes/s
               chart_type: area
               dimensions:
                 - name: inbound
                 - name: outbound
-            - name: ad.dra_replication_pending_syncs
-              description: DRA replication pending syncs
-              unit: syncs
+            - name: ad.dra_replication_intrasite_uncompressed_traffic
+              description: DRA replication uncompressed traffic within site
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: ad.replication_highest_usn_committed
+              description: Highest replication committed update sequence number
+              unit: usn/s
               chart_type: line
               dimensions:
-                - name: pending
+                - name: committed
+            - name: ad.replication_highest_usn_issued
+              description: Highest replication issued update sequence number
+              unit: usn/s
+              chart_type: line
+              dimensions:
+                - name: issued
+            - name: ad.replication_inbound_sync_objects_remaining
+              description: Replication inbound sync objects remaining
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: remaining
+            - name: ad.replication_inbound_link_value_updates_remaining
+              description: Replication inbound link value updates remaining
+              unit: updates
+              chart_type: line
+              dimensions:
+                - name: remaining
+            - name: ad.replication_inbound_objects_updated
+              description: Replication inbound objects updated
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: updated
+            - name: ad.replication_inbound_objects_filtered
+              description: Replication inbound objects filtered
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: filtered
             - name: ad.dra_replication_pending_syncs
               description: DRA replication pending syncs
               unit: syncs
@@ -2465,12 +2768,78 @@ modules:
               chart_type: line
               dimensions:
                 - name: request
-            - name: ad.name_cache_hits
-              description: Name cache hits
-              unit: hits/s
+            - name: ad.replication_pending_operations
+              description: Replication pending operations
+              unit: operations
               chart_type: line
               dimensions:
-                - name: hits
+                - name: pending
+            - name: ad.replication_sync_requests_success
+              description: Replication sync requests successful
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: ad.replication_sync_requests_schema_mismatch_failure
+              description: Replication sync requests failed due to schema mismatch
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: failure
+            - name: ad.name_translations_client
+              description: Client name translations
+              unit: translations/s
+              chart_type: line
+              dimensions:
+                - name: client
+            - name: ad.name_translations_server
+              description: Server name translations
+              unit: translations/s
+              chart_type: line
+              dimensions:
+                - name: server
+            - name: ad.change_monitors_registered
+              description: Registered change monitors
+              unit: monitors
+              chart_type: line
+              dimensions:
+                - name: registered
+            - name: ad.change_monitor_updates_pending
+              description: Pending change monitor updates
+              unit: updates
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: ad.directory_search_suboperations
+              description: Directory search suboperations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: suboperations
+            - name: ad.security_descriptor_propagation_events
+              description: Security descriptor propagation events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: events
+            - name: ad.security_descriptor_propagation_events_queued
+              description: Security descriptor propagation events queued
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: ad.security_descriptor_propagation_access_wait
+              description: Security descriptor propagation access wait
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: wait
+            - name: ad.security_descriptor_propagation_items_queued
+              description: Security descriptor propagation items queued
+              unit: items
+              chart_type: line
+              dimensions:
+                - name: queued
             - name: ad.ds_threads
               description: Directory Service threads
               unit: threads
@@ -2483,18 +2852,360 @@ modules:
               chart_type: line
               dimensions:
                 - name: last_bind
-            - name: ad.ldap_searches
-              description: LDAP client search operations
-              unit: searches/s
+            - name: ad.binds_digest
+              description: Digest binds
+              unit: binds/s
               chart_type: line
               dimensions:
-                - name: searches
+                - name: digest
+            - name: ad.binds_ds_client
+              description: DS client binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: ds_client
+            - name: ad.binds_ds_server
+              description: DS server binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: ds_server
+            - name: ad.binds_external
+              description: External binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: external
+            - name: ad.binds_fast
+              description: Fast binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: fast
+            - name: ad.binds_negotiate
+              description: Negotiated binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: negotiate
+            - name: ad.binds_ntlm
+              description: NTLM binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: ntlm
+            - name: ad.binds_simple
+              description: Simple binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: simple
+            - name: ad.binds_ldap
+              description: LDAP successful binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: ldap
+            - name: ad.ldap_closed_connections
+              description: LDAP closed connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: closed
+            - name: ad.ldap_opened_connections_ldap
+              description: LDAP opened connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: ldap
+            - name: ad.ldap_opened_connections_ldaps
+              description: LDAPS opened connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: ldaps
+            - name: ad.ldap_active_threads
+              description: LDAP active threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: ad.ldap_udp_operations
+              description: LDAP UDP operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: udp
+            - name: ad.ldap_writes
+              description: LDAP writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: writes
+            - name: ad.ldap_client_sessions
+              description: LDAP client sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: sessions
+            - name: ad.atq_outstanding_requests
+              description: Outstanding requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: outstanding
+            - name: ad.atq_estimated_delay
+              description: Estimated queue delay
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: delay
             - name: ad.atq_average_request_latency
               description: Average request processing time
               unit: seconds
               chart_type: line
               dimensions:
                 - name: time
+            - name: ad.atq_current_threads_ldap
+              description: Current ATQ LDAP threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: ldap
+            - name: ad.atq_current_threads_other
+              description: Current ATQ other threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: other
+            - name: ad.atq_current_threads_total
+              description: Current ATQ total threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: ad.database_operations
+              description: AD database operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: add
+                - name: delete
+                - name: modify
+                - name: recycle
+            - name: ad.directory_reads
+              description: Directory reads
+              unit: reads/s
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: ad.directory_searches
+              description: Directory searches
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: search
+            - name: ad.directory_writes
+              description: Directory writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: ad.replication_inbound_object_updates_remaining
+              description: Replication inbound object updates remaining
+              unit: updates
+              chart_type: line
+              dimensions:
+                - name: remaining
+            - name: ad.replication_inbound_values_dns_only
+              description: DRA replication inbound values DNs only
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: dns_only
+            - name: ad.replication_inbound_values_total
+              description: DRA replication inbound values total
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: ad.replication_outbound_objects_filtered
+              description: Replication outbound objects filtered
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: filtered
+            - name: ad.replication_outbound_objects
+              description: Replication outbound objects
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: objects
+            - name: ad.replication_outbound_properties
+              description: Replication outbound properties
+              unit: properties/s
+              chart_type: line
+              dimensions:
+                - name: properties
+            - name: ad.replication_outbound_values_dns_only
+              description: DRA replication outbound values DNs only
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: dns_only
+            - name: ad.replication_outbound_values_total
+              description: DRA replication outbound values total
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: ad.replication_threads_getting_nc_changes
+              description: DRA threads getting NC changes
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: ad.replication_threads_getting_nc_changes_holding_semaphore
+              description: DRA threads getting NC changes holding semaphore
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: ad.transitive_operations
+              description: Transitive operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: ad.transitive_suboperations
+              description: Transitive suboperations
+              unit: suboperations/s
+              chart_type: line
+              dimensions:
+                - name: suboperations
+            - name: ad.replication_inbound_bytes_total
+              description: DRA replication inbound bytes total
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: inbound
+            - name: ad.replication_outbound_bytes_total
+              description: DRA replication outbound bytes total
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: outbound
+            - name: ad.link_values_cleaned
+              description: Link values cleaned
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: cleaned
+            - name: ad.phantom_objects_cleaned
+              description: Phantom objects cleaned
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: cleaned
+            - name: ad.phantom_objects_visited
+              description: Phantom objects visited
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: visited
+            - name: ad.tombstoned_objects_collected
+              description: Tombstoned objects collected
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: collected
+            - name: ad.tombstoned_objects_visited
+              description: Tombstoned objects visited
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: visited
+            - name: ad.sam_group_membership_evaluations
+              description: SAM group membership evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: global
+                - name: domain_local
+                - name: universal
+            - name: ad.sam_group_membership_global_catalog_evaluations
+              description: SAM group membership global catalog evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: global_catalog
+            - name: ad.sam_group_membership_evaluations_nontransitive
+              description: SAM non-transitive membership evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: nontransitive
+            - name: ad.sam_group_membership_evaluations_transitive
+              description: SAM transitive membership evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: transitive
+            - name: ad.sam_group_evaluation_latency
+              description: SAM group evaluation latency
+              unit: latency
+              chart_type: line
+              dimensions:
+                - name: account_group
+                - name: resource_group
+            - name: ad.sam_computer_creation_requests
+              description: SAM computer creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: request
+            - name: ad.sam_computer_creation_successful_requests
+              description: SAM successful computer creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: ad.sam_user_creation_requests
+              description: SAM user creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: request
+            - name: ad.sam_user_creation_successful_requests
+              description: SAM successful user creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: ad.sam_query_display_requests
+              description: SAM query display requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: query
+            - name: ad.sam_enumerations
+              description: SAM enumerations
+              unit: enumerations/s
+              chart_type: line
+              dimensions:
+                - name: enumeration
+            - name: ad.sam_membership_changes
+              description: SAM membership changes
+              unit: changes/s
+              chart_type: line
+              dimensions:
+                - name: change
+            - name: ad.sam_password_changes
+              description: SAM password changes
+              unit: changes/s
+              chart_type: line
+              dimensions:
+                - name: change
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibADCS

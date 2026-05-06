@@ -342,12 +342,14 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
 
         size_t source_len = string_strlen(expression->source);
 
-        char find1[string_strlen(variable) + 1 + 1];
-        snprintfz(find1, sizeof(find1), "$%s", string2str(variable));
+        size_t find1_size = string_strlen(variable) + 1 + 1;
+        CLEAN_CHAR_P *find1 = mallocz(find1_size);
+        snprintfz(find1, find1_size, "$%s", string2str(variable));
         size_t find1_len = strlen(find1);
 
-        char find2[string_strlen(variable) + 1 + 3];
-        snprintfz(find2, sizeof(find2), "${%s}", string2str(variable));
+        size_t find2_size = string_strlen(variable) + 1 + 3;
+        CLEAN_CHAR_P *find2 = mallocz(find2_size);
+        snprintfz(find2, find2_size, "${%s}", string2str(variable));
         size_t find2_len = strlen(find2);
 
         // Calculate the maximum possible buffer size needed
@@ -355,8 +357,8 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
         size_t min_var_len = MIN(find1_len, find2_len);
         size_t max_buf_size = source_len + 1 + (matches * (replace_len > min_var_len ? replace_len - min_var_len : 0));
 
-        char buf1[max_buf_size];
-        char buf2[max_buf_size];
+        CLEAN_CHAR_P *buf1 = mallocz(max_buf_size);
+        CLEAN_CHAR_P *buf2 = mallocz(max_buf_size);
 
         char *dst[2] = {buf1, buf2};
 

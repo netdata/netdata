@@ -935,7 +935,7 @@ func TestTableCollector_Collect(t *testing.T) {
 				{
 					Name:       "devClientCount",
 					Value:      10,
-					Tags:       map[string]string{"mac_address": "00:50:56:AB:CD:EF"},
+					Tags:       map[string]string{"mac_address": "00:50:56:ab:cd:ef"},
 					MetricType: "rate",
 					IsTable:    true,
 					Table:      "devTable",

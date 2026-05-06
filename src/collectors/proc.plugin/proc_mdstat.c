@@ -70,8 +70,8 @@ static inline void make_chart_obsolete(char *name, const char *id_modifier)
     RRDSET *st = NULL;
 
     if (likely(name && id_modifier)) {
-        snprintfz(id, sizeof(id) - 1, "mdstat.%s_%s", name, id_modifier);
-        st = rrdset_find_active_byname_localhost(id);
+        snprintfz(id, sizeof(id) - 1, "%s_%s", name, id_modifier);
+        st = rrdset_find_active_bytype_localhost("mdstat", id);
         if (likely(st))
             rrdset_is_obsolete___safe_from_collector_thread(st);
     }

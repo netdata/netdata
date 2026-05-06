@@ -122,7 +122,8 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
             freez(temp);
             temp = buf;
         }
-        else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
+        else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN) &&
+                 i > (int)RRDCALC_VAR_LABEL_LEN && var[i - 1] == '}') {
             char label_val[RRDCALC_VAR_MAX + RRDCALC_VAR_LABEL_LEN + 1] = { 0 };
             strcpy(label_val, var+RRDCALC_VAR_LABEL_LEN);
             label_val[i - RRDCALC_VAR_LABEL_LEN - 1] = '\0';
@@ -440,8 +441,17 @@ void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock
 // RRDCALC cleanup API functions
 
 void rrdcalc_unlink_and_delete_all_rrdset_alerts(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
     RRDCALC *rc, *last = NULL;
+
+    // Acquire the host alert dictionary write lock to exclude the health
+    // thread (which mutates rc fields under foreach_rrdcalc_in_rrdhost_read),
+    // then walk only this chart's alert list to keep the work O(chart-alerts).
+    // The lock is recursive, so dictionary_del_advanced() inside the loop
+    // re-enters safely.
+    dictionary_write_lock(host->rrdcalc_root_index);
     rw_spinlock_write_lock(&st->alerts.spinlock);
+
     while((rc = st->alerts.base)) {
         if(last == rc) {
             netdata_log_error("RRDCALC: malformed list of alerts linked to chart - cannot cleanup - giving up.");
@@ -449,9 +459,11 @@ void rrdcalc_unlink_and_delete_all_rrdset_alerts(RRDSET *st) {
         }
         last = rc;
 
-        rrdcalc_unlink_and_delete(st->rrdhost, rc, true);
+        rrdcalc_unlink_and_delete(host, rc, true);
     }
+
     rw_spinlock_write_unlock(&st->alerts.spinlock);
+    dictionary_write_unlock(host->rrdcalc_root_index);
 }
 
 void rrdcalc_delete_all(RRDHOST *host) {

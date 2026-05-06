@@ -6,18 +6,21 @@ const MeasureSetFieldLabel = "measure_field"
 
 // stagedMeasureSet holds one in-cycle MeasureSet sample for a single series identity.
 type stagedMeasureSet struct {
-	key       string
-	name      string
-	labels    []Label
-	labelsKey string
-	desc      *instrumentDescriptor
-	values    []SampleValue
+	key          string
+	name         string
+	hostScopeKey string
+	hostScope    HostScope
+	labels       []Label
+	labelsKey    string
+	desc         *instrumentDescriptor
+	values       []SampleValue
 }
 
 // snapshotMeasureSetGaugeInstrument writes sampled MeasureSet gauge points.
 type snapshotMeasureSetGaugeInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
@@ -25,6 +28,7 @@ type snapshotMeasureSetGaugeInstrument struct {
 type snapshotMeasureSetCounterInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
@@ -32,6 +36,7 @@ type snapshotMeasureSetCounterInstrument struct {
 type statefulMeasureSetGaugeInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
@@ -39,6 +44,7 @@ type statefulMeasureSetGaugeInstrument struct {
 type statefulMeasureSetCounterInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
@@ -58,6 +64,7 @@ func (m *snapshotMeter) MeasureSetGauge(name string, opts ...InstrumentOption) S
 	return &snapshotMeasureSetGaugeInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
@@ -71,6 +78,7 @@ func (m *snapshotMeter) MeasureSetCounter(name string, opts ...InstrumentOption)
 	return &snapshotMeasureSetCounterInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
@@ -84,6 +92,7 @@ func (m *statefulMeter) MeasureSetGauge(name string, opts ...InstrumentOption) S
 	return &statefulMeasureSetGaugeInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
@@ -97,12 +106,13 @@ func (m *statefulMeter) MeasureSetCounter(name string, opts ...InstrumentOption)
 	return &statefulMeasureSetCounterInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
 
 func (m *snapshotMeasureSetGaugeInstrument) ObservePoint(p MeasureSetPoint, labels ...LabelSet) {
-	m.backend.recordMeasureSetGaugeObservePoint(m.desc, p, appendLabelSets(m.base, labels))
+	m.backend.recordMeasureSetGaugeObservePoint(m.desc, m.scope, p, appendLabelSets(m.base, labels))
 }
 
 func (m *snapshotMeasureSetGaugeInstrument) ObserveFields(fields map[string]SampleValue, labels ...LabelSet) {
@@ -110,7 +120,7 @@ func (m *snapshotMeasureSetGaugeInstrument) ObserveFields(fields map[string]Samp
 }
 
 func (m *snapshotMeasureSetCounterInstrument) ObserveTotalPoint(p MeasureSetPoint, labels ...LabelSet) {
-	m.backend.recordMeasureSetCounterObserveTotalPoint(m.desc, p, appendLabelSets(m.base, labels))
+	m.backend.recordMeasureSetCounterObserveTotalPoint(m.desc, m.scope, p, appendLabelSets(m.base, labels))
 }
 
 func (m *snapshotMeasureSetCounterInstrument) ObserveTotalFields(fields map[string]SampleValue, labels ...LabelSet) {
@@ -118,7 +128,7 @@ func (m *snapshotMeasureSetCounterInstrument) ObserveTotalFields(fields map[stri
 }
 
 func (m *statefulMeasureSetGaugeInstrument) SetPoint(p MeasureSetPoint, labels ...LabelSet) {
-	m.backend.recordMeasureSetGaugeSetPoint(m.desc, p, appendLabelSets(m.base, labels))
+	m.backend.recordMeasureSetGaugeSetPoint(m.desc, m.scope, p, appendLabelSets(m.base, labels))
 }
 
 func (m *statefulMeasureSetGaugeInstrument) SetFields(fields map[string]SampleValue, labels ...LabelSet) {
@@ -126,11 +136,11 @@ func (m *statefulMeasureSetGaugeInstrument) SetFields(fields map[string]SampleVa
 }
 
 func (m *statefulMeasureSetGaugeInstrument) SetField(field string, value SampleValue, labels ...LabelSet) {
-	m.backend.recordMeasureSetGaugeSetField(m.desc, field, value, appendLabelSets(m.base, labels))
+	m.backend.recordMeasureSetGaugeSetField(m.desc, m.scope, field, value, appendLabelSets(m.base, labels))
 }
 
 func (m *statefulMeasureSetGaugeInstrument) AddPoint(delta MeasureSetPoint, labels ...LabelSet) {
-	m.backend.recordMeasureSetGaugeAddPoint(m.desc, delta, appendLabelSets(m.base, labels))
+	m.backend.recordMeasureSetGaugeAddPoint(m.desc, m.scope, delta, appendLabelSets(m.base, labels))
 }
 
 func (m *statefulMeasureSetGaugeInstrument) AddFields(delta map[string]SampleValue, labels ...LabelSet) {
@@ -142,7 +152,7 @@ func (m *statefulMeasureSetGaugeInstrument) AddField(field string, delta SampleV
 }
 
 func (m *statefulMeasureSetCounterInstrument) AddPoint(delta MeasureSetPoint, labels ...LabelSet) {
-	m.backend.recordMeasureSetCounterAddPoint(m.desc, delta, appendLabelSets(m.base, labels))
+	m.backend.recordMeasureSetCounterAddPoint(m.desc, m.scope, delta, appendLabelSets(m.base, labels))
 }
 
 func (m *statefulMeasureSetCounterInstrument) AddFields(delta map[string]SampleValue, labels ...LabelSet) {
@@ -222,11 +232,11 @@ func normalizeMeasureSetCounterDelta(delta MeasureSetPoint, schema *measureSetSc
 	return values
 }
 
-func (c *storeCore) recordMeasureSetGaugeObservePoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet) {
-	c.recordMeasureSetGaugeSetPoint(desc, point, sets)
+func (c *storeCore) recordMeasureSetGaugeObservePoint(desc *instrumentDescriptor, scope HostScope, point MeasureSetPoint, sets []LabelSet) {
+	c.recordMeasureSetGaugeSetPoint(desc, scope, point, sets)
 }
 
-func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet) {
+func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, scope HostScope, point MeasureSetPoint, sets []LabelSet) {
 	schema := desc.measureSet
 	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
 		panic(errMeasureSetSchema)
@@ -248,23 +258,29 @@ func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, po
 	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetGauges[key]
 	if !ok {
 		entry = &stagedMeasureSet{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
 		}
 		c.active.measureSetGauges[key] = entry
 	}
 	entry.values = append(entry.values[:0], values...)
 }
 
-func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet) {
+func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, scope HostScope, delta MeasureSetPoint, sets []LabelSet) {
 	schema := desc.measureSet
 	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
 		panic(errMeasureSetSchema)
@@ -286,8 +302,12 @@ func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, de
 	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetGauges[key]
 	if !ok {
 		baseline := make([]SampleValue, len(schema.fields))
@@ -298,12 +318,14 @@ func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, de
 			}
 		}
 		entry = &stagedMeasureSet{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
-			values:    baseline,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
+			values:       baseline,
 		}
 		c.active.measureSetGauges[key] = entry
 	}
@@ -312,7 +334,7 @@ func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, de
 	}
 }
 
-func (c *storeCore) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, field string, value SampleValue, sets []LabelSet) {
+func (c *storeCore) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, scope HostScope, field string, value SampleValue, sets []LabelSet) {
 	schema := desc.measureSet
 	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
 		panic(errMeasureSetSchema)
@@ -335,8 +357,12 @@ func (c *storeCore) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, fi
 	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetGauges[key]
 	if !ok {
 		baseline := make([]SampleValue, len(schema.fields))
@@ -347,12 +373,14 @@ func (c *storeCore) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, fi
 			}
 		}
 		entry = &stagedMeasureSet{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
-			values:    baseline,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
+			values:       baseline,
 		}
 		c.active.measureSetGauges[key] = entry
 	} else if len(entry.values) == 0 {
@@ -361,7 +389,7 @@ func (c *storeCore) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, fi
 	entry.values[fieldIndex] = value
 }
 
-func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet) {
+func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDescriptor, scope HostScope, point MeasureSetPoint, sets []LabelSet) {
 	schema := desc.measureSet
 	if schema == nil || schema.semantics != MeasureSetSemanticsCounter {
 		panic(errMeasureSetSchema)
@@ -383,23 +411,29 @@ func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDes
 	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetCounters[key]
 	if !ok {
 		entry = &stagedMeasureSet{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
 		}
 		c.active.measureSetCounters[key] = entry
 	}
 	entry.values = append(entry.values[:0], values...)
 }
 
-func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet) {
+func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, scope HostScope, delta MeasureSetPoint, sets []LabelSet) {
 	schema := desc.measureSet
 	if schema == nil || schema.semantics != MeasureSetSemanticsCounter {
 		panic(errMeasureSetSchema)
@@ -421,8 +455,12 @@ func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, 
 	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetCounters[key]
 	if !ok {
 		baseline := make([]SampleValue, len(schema.fields))
@@ -433,12 +471,14 @@ func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, 
 			}
 		}
 		entry = &stagedMeasureSet{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
-			values:    baseline,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
+			values:       baseline,
 		}
 		c.active.measureSetCounters[key] = entry
 	}

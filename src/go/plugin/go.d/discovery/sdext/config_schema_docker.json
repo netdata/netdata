@@ -103,6 +103,7 @@
       }
     },
     "services": {
+      "ui:descriptionPosition": "top",
       "ui:listFlavour": "list",
       "items": {
         "id": {

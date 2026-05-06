@@ -5,18 +5,20 @@ package metrix
 import (
 	"maps"
 	"math"
+	"slices"
 	"sort"
 	"sync"
 )
 
 type storeReader struct {
-	snap       *readSnapshot
-	raw        bool // true => ReadRaw semantics (no freshness filtering)
-	flattened  bool
-	seriesOnce sync.Once
-	series     map[string]*committedSeries
-	indexOnce  sync.Once
-	index      map[string][]*committedSeries
+	snap         *readSnapshot
+	raw          bool // true => ReadRaw semantics (no freshness filtering)
+	flattened    bool
+	hostScopeKey string
+	seriesOnce   sync.Once
+	series       map[string]*committedSeries
+	indexOnce    sync.Once
+	index        map[string][]*committedSeries
 }
 
 type familyView struct {
@@ -188,6 +190,16 @@ func (r *storeReader) CollectMeta() CollectMeta {
 	return r.snap.collectMeta
 }
 
+func (r *storeReader) HostScopes() []HostScope {
+	// Scope discovery intentionally ignores this reader's active scope filter so
+	// jobruntime can enumerate all host partitions from one snapshot.
+	scopes := make(map[string]HostScope)
+	for _, s := range r.seriesView() {
+		scopes[s.hostScopeKey] = cloneHostScope(s.hostScope)
+	}
+	return sortedHostScopes(scopes)
+}
+
 func flattenSnapshot(src *readSnapshot) *readSnapshot {
 	series := snapshotSeriesView(src)
 	dst := &readSnapshot{
@@ -242,14 +254,16 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		}
 
 		name := src.name + "_bucket"
-		key := makeSeriesKey(name, labelsKey)
+		key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
 		dst.series[key] = &committedSeries{
-			id:        SeriesID(key),
-			hash64:    seriesIDHash(SeriesID(key)),
-			key:       key,
-			name:      name,
-			labels:    labels,
-			labelsKey: labelsKey,
+			id:           SeriesID(key),
+			hash64:       seriesIDHash(SeriesID(key)),
+			key:          key,
+			name:         name,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       labels,
+			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
 				name:      name,
 				kind:      kindCounter,
@@ -276,14 +290,16 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	infLabels, infLabelsKey, err := canonicalizeLabels(infMap)
 	if err == nil {
 		infName := src.name + "_bucket"
-		infKey := makeSeriesKey(infName, infLabelsKey)
+		infKey := makeSeriesKey(src.hostScopeKey, infName, infLabelsKey)
 		dst.series[infKey] = &committedSeries{
-			id:        SeriesID(infKey),
-			hash64:    seriesIDHash(SeriesID(infKey)),
-			key:       infKey,
-			name:      infName,
-			labels:    infLabels,
-			labelsKey: infLabelsKey,
+			id:           SeriesID(infKey),
+			hash64:       seriesIDHash(SeriesID(infKey)),
+			key:          infKey,
+			name:         infName,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       infLabels,
+			labelsKey:    infLabelsKey,
 			desc: &instrumentDescriptor{
 				name:      infName,
 				kind:      kindCounter,
@@ -304,6 +320,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 
 	appendFlattenedHistogramScalar(
 		dst,
+		src,
 		src.name+"_count",
 		src.labels,
 		src.histogramCount,
@@ -312,6 +329,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	)
 	appendFlattenedHistogramScalar(
 		dst,
+		src,
 		src.name+"_sum",
 		src.labels,
 		src.histogramSum,
@@ -320,7 +338,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	)
 }
 
-func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Label, value SampleValue, meta SeriesMeta, desc *instrumentDescriptor) {
+func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, name string, labels []Label, value SampleValue, meta SeriesMeta, desc *instrumentDescriptor) {
 	labelsMap := make(map[string]string, len(labels))
 	for _, lbl := range labels {
 		labelsMap[lbl.Key] = lbl.Value
@@ -329,14 +347,16 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 	if err != nil {
 		return
 	}
-	key := makeSeriesKey(name, labelsKey)
+	key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
 	dst.series[key] = &committedSeries{
-		id:        SeriesID(key),
-		hash64:    seriesIDHash(SeriesID(key)),
-		key:       key,
-		name:      name,
-		labels:    items,
-		labelsKey: labelsKey,
+		id:           SeriesID(key),
+		hash64:       seriesIDHash(SeriesID(key)),
+		key:          key,
+		name:         name,
+		hostScopeKey: src.hostScopeKey,
+		hostScope:    cloneHostScope(src.hostScope),
+		labels:       items,
+		labelsKey:    labelsKey,
 		desc: &instrumentDescriptor{
 			name:      name,
 			kind:      kindCounter,
@@ -353,6 +373,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 	appendFlattenedHistogramScalar(
 		dst,
+		src,
 		src.name+"_count",
 		src.labels,
 		src.summaryCount,
@@ -361,6 +382,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 	)
 	appendFlattenedHistogramScalar(
 		dst,
+		src,
 		src.name+"_sum",
 		src.labels,
 		src.summarySum,
@@ -387,14 +409,16 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 		if err != nil {
 			continue
 		}
-		key := makeSeriesKey(src.name, labelsKey)
+		key := makeSeriesKey(src.hostScopeKey, src.name, labelsKey)
 		dst.series[key] = &committedSeries{
-			id:        SeriesID(key),
-			hash64:    seriesIDHash(SeriesID(key)),
-			key:       key,
-			name:      src.name,
-			labels:    labels,
-			labelsKey: labelsKey,
+			id:           SeriesID(key),
+			hash64:       seriesIDHash(SeriesID(key)),
+			key:          key,
+			name:         src.name,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       labels,
+			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
 				name:      src.name,
 				kind:      kindGauge,
@@ -437,14 +461,16 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 			continue
 		}
 
-		key := makeSeriesKey(src.name, labelsKey)
+		key := makeSeriesKey(src.hostScopeKey, src.name, labelsKey)
 		dst.series[key] = &committedSeries{
-			id:        SeriesID(key),
-			hash64:    seriesIDHash(SeriesID(key)),
-			key:       key,
-			name:      src.name,
-			labels:    labels,
-			labelsKey: labelsKey,
+			id:           SeriesID(key),
+			hash64:       seriesIDHash(SeriesID(key)),
+			key:          key,
+			name:         src.name,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       labels,
+			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
 				name:      src.name,
 				kind:      kindGauge,
@@ -490,17 +516,19 @@ func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
 		}
 
 		name := src.name + "_" + field.Name
-		key := makeSeriesKey(name, labelsKey)
+		key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
 		meta := src.desc.meta
 		meta.Float = field.Float
 
 		series := &committedSeries{
-			id:        SeriesID(key),
-			hash64:    seriesIDHash(SeriesID(key)),
-			key:       key,
-			name:      name,
-			labels:    labels,
-			labelsKey: labelsKey,
+			id:           SeriesID(key),
+			hash64:       seriesIDHash(SeriesID(key)),
+			key:          key,
+			name:         name,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       labels,
+			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
 				name:      name,
 				kind:      descKind,
@@ -532,10 +560,10 @@ func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
 
 func (r *storeReader) Family(name string) (FamilyView, bool) {
 	index := r.byNameIndex()
-	if len(index[name]) == 0 {
-		return nil, false
+	if slices.ContainsFunc(index[name], r.visible) {
+		return familyView{name: name, reader: r}, true
 	}
-	return familyView{name: name, reader: r}, true
+	return nil, false
 }
 
 func (r *storeReader) ForEachByName(name string, fn func(labels LabelView, v SampleValue)) {
@@ -609,7 +637,7 @@ func (r *storeReader) lookup(name string, labels Labels) (*committedSeries, bool
 		_ = items
 		return nil, false
 	}
-	key := makeSeriesKey(name, labelsKey)
+	key := makeSeriesKey(r.hostScopeKey, name, labelsKey)
 	return lookupSnapshotSeries(r.snap, key)
 }
 
@@ -667,6 +695,9 @@ func materializeRuntimeSeries(snap *readSnapshot) map[string]*committedSeries {
 
 // visible applies freshness policy for Read(); Read(ReadRaw()) bypasses it.
 func (r *storeReader) visible(s *committedSeries) bool {
+	if s.hostScopeKey != r.hostScopeKey {
+		return false
+	}
 	if r.raw {
 		return true
 	}

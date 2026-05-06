@@ -1,0 +1,40 @@
+# Supplemental topology profile for Cisco VTP VLAN metadata enrichment.
+# Source: CISCO-VTP-MIB.
+
+metadata:
+  device:
+    fields:
+      vtp_version:
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.46.1.1.1
+          name: vtpVersion
+
+metrics:
+  - MIB: CISCO-VTP-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.46.1.3.1.1
+      name: vtpVlanTable
+    symbols:
+      # Numeric anchor to force row emission.
+      - OID: 1.3.6.1.4.1.9.9.46.1.3.1.1.2
+        name: _topology_vtp_vlan_entry
+    metric_tags:
+      - tag: vtp_vlan_index
+        index: 1
+      - tag: vtp_vlan_state
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.46.1.3.1.1.2
+          name: vtpVlanState
+          mapping:
+            1: operational
+            2: suspended
+            3: mtuTooBigForDevice
+            4: mtuTooBigForTrunk
+      - tag: vtp_vlan_type
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.46.1.3.1.1.3
+          name: vtpVlanType
+      - tag: vtp_vlan_name
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.46.1.3.1.1.4
+          name: vtpVlanName

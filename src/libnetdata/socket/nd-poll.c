@@ -182,7 +182,9 @@ static int compare_last_served(const void *a, const void *b) {
 static void sort_events(nd_poll_t *ndpl) {
     if(ndpl->used <= 1) return;
 
-    sortable_event_t sortable_array[ndpl->used];
+    internal_fatal(ndpl->used > MAX_EVENTS_PER_CALL, "ndpl->used exceeds MAX_EVENTS_PER_CALL");
+
+    sortable_event_t sortable_array[MAX_EVENTS_PER_CALL];
     for (size_t i = 0; i < ndpl->used; ++i) {
         struct fd_info *fdi = POINTERS_GET(&ndpl->pointers, ndpl->ev[i].data.fd);
         sortable_array[i] = (sortable_event_t){

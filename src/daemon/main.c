@@ -221,6 +221,7 @@ int progress_unittest(void);
 int dyncfg_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
+int statistical_unittest(void);
 int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
@@ -444,6 +445,7 @@ int netdata_main(int argc, char **argv) {
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
+                            if (statistical_unittest()) return 1;
                             if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;
                             if (yaml_unittest()) return 1;
@@ -476,6 +478,15 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "araltest") == 0) {
                             unittest_running = true;
                             return aral_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "aralconcurrency") == 0) {
+                            unittest_running = true;
+#ifdef NETDATA_INTERNAL_CHECKS
+                            return aral_unittest_concurrency();
+#else
+                            fprintf(stderr, "aralconcurrency requires NETDATA_INTERNAL_CHECKS\n");
+                            return 1;
+#endif
                         }
                         else if(strcmp(optarg, "waitqtest") == 0) {
                             unittest_running = true;

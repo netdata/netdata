@@ -364,7 +364,7 @@ done:
 
 #define SQL_SCHEDULE_HOST_CTX_CLEANUP                                                                                  \
     "INSERT INTO ctx_metadata_cleanup (host_id, context, date_created) "                                               \
-    "VALUES (@host_id, @context, UNIXEPOCH()) ON CONFLICT DO UPDATE SET date_created = excluded.date_created; END"
+    "VALUES (@host_id, @context, UNIXEPOCH()) ON CONFLICT DO UPDATE SET date_created = excluded.date_created"
 
 // Schedule context cleanup for host
 static void sql_schedule_host_ctx_cleanup(sqlite3_stmt **res, nd_uuid_t *host_id, const char *context)
@@ -499,8 +499,9 @@ void sql_load_node_id(RRDHOST *host)
     param = 0;
     int rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW)) {
-        if (likely(sqlite3_column_bytes(res, 0) == sizeof(nd_uuid_t)))
-            set_host_node_id(host, (nd_uuid_t *)sqlite3_column_blob(res, 0));
+        nd_uuid_t node_id;
+        if (likely(sqlite3_column_uuid_copy(res, 0, node_id)))
+            set_host_node_id(host, &node_id);
         else
             set_host_node_id(host, NULL);
     }
@@ -615,7 +616,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
 
         rc = sqlite3_recover_finish(recover);
 
-        (void) sqlite3_close(database);
+        (void) sqlite3_close_v2(database);
 
         if (rc == SQLITE_OK) {
             rc = rename(new_sqlite_database, sqlite_database);
@@ -628,7 +629,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
             netdata_log_error("Recover failed to free resources");
     }
     else
-        (void) sqlite3_close(database);
+        (void) sqlite3_close_v2(database);
 }
 
 
@@ -757,7 +758,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         }
         else {
             (void)db_execute(db_meta, "select count(*) from sqlite_master limit 0", NULL);
-            (void) sqlite3_close(db_meta);
+            (void) sqlite3_close_v2(db_meta);
         }
         return 1;
     }
@@ -772,7 +773,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         }
         else {
             (void)db_execute(db_meta, "select count(*) from sqlite_master limit 0", NULL);
-            (void) sqlite3_close(db_meta);
+            (void) sqlite3_close_v2(db_meta);
         }
         return 1;
     }
@@ -813,7 +814,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     return 0;
 
 close_database:
-    sqlite3_close(db_meta);
+    sqlite3_close_v2(db_meta);
     db_meta = NULL;
     return 1;
 }
@@ -1162,7 +1163,7 @@ static bool store_host_systeminfo(RRDHOST *host)
     if (unlikely(!system_info))
         return false;
 
-    return (27 != rrdhost_system_info_foreach(system_info, add_host_sysinfo_key_value, &host->host_id.uuid));
+    return (RRDHOST_SYSTEM_INFO_KEY_COUNT != rrdhost_system_info_foreach(system_info, add_host_sysinfo_key_value, &host->host_id.uuid));
 }
 
 
@@ -1298,17 +1299,20 @@ static bool run_cleanup_loop(
     uint32_t l_checked = 0;
     uint32_t l_deleted = 0;
     while (!time_expired && sqlite3_step_monitored(res) == SQLITE_ROW) {
+        nd_uuid_t uuid = {0};
+
         if (unlikely(SHUTDOWN_REQUESTED(config)))
             break;
 
         *row_id = sqlite3_column_int64(res, 1);
-        rc = check_cb((nd_uuid_t *)sqlite3_column_blob(res, 0), check_stmt, check_flag);
+        if (unlikely(!sqlite3_column_uuid_copy(res, 0, uuid)))
+            continue;
+
+        rc = check_cb(&uuid, check_stmt, check_flag);
 
         if (rc == true) {
-            action_cb((nd_uuid_t *)sqlite3_column_blob(res, 0), action_stmt, action_flag);
+            action_cb(&uuid, action_stmt, action_flag);
             l_deleted++;
-//            if (false == sql_metadata_wal_size_acceptable())
-//                (void) sqlite3_wal_checkpoint(db_meta, NULL);
         }
 
         l_checked++;
@@ -1747,14 +1751,15 @@ static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
 
     can_continue = true;
     while (can_continue && sqlite3_step_monitored(*res) == SQLITE_ROW) {
-        if (sqlite3_column_bytes(*res, 0) != sizeof(nd_uuid_t))
+        nd_uuid_t dim_uuid;
+
+        if (!sqlite3_column_uuid_copy(*res, 0, dim_uuid))
             continue;
 
-        nd_uuid_t *dim_uuid = (nd_uuid_t *)sqlite3_column_blob(*res, 0);
         int64_t dimension_id = sqlite3_column_int64(*res, 1);
 
-        if (dimension_can_be_deleted(dim_uuid, NULL, false)) {
-            delete_dimension_by_rowid(&dim_del_stmt, dimension_id, dim_uuid);
+        if (dimension_can_be_deleted(&dim_uuid, NULL, false)) {
+            delete_dimension_by_rowid(&dim_del_stmt, dimension_id, &dim_uuid);
             (*deleted)++;
         }
         (*checked)++;
@@ -1899,14 +1904,14 @@ static void restore_host_context(void *arg)
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
             int rc = sqlite3_open_v2(sqlite_database, &db_meta_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK) {
-                sqlite3_close(db_meta_thread);
+                sqlite3_close_v2(db_meta_thread);
                 db_meta_thread = NULL;
             }
 
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
             rc = sqlite3_open_v2(sqlite_database, &db_context_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK) {
-                sqlite3_close(db_context_thread);
+                sqlite3_close_v2(db_context_thread);
                 db_context_thread = NULL;
             }
 
@@ -2129,7 +2134,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
     int rc = sqlite3_open_v2(sqlite_database, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
     if (rc != SQLITE_OK) {
-        sqlite3_close(local_meta_db);
+        sqlite3_close_v2(local_meta_db);
         local_meta_db = NULL;
     }
 
@@ -2137,7 +2142,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
         (void)db_execute(local_meta_db, "PRAGMA cache_size=10000", NULL);
 
     if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
-        sqlite3_close(local_meta_db);
+        sqlite3_close_v2(local_meta_db);
         return 0;
     }
 
@@ -2145,21 +2150,21 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 
     usec_t started_ut = now_monotonic_usec();
     while (sqlite3_step(res) == SQLITE_ROW) {
-        nd_uuid_t *uuid = (nd_uuid_t *)sqlite3_column_blob(res, 0);
-        if (!uuid || sqlite3_column_bytes(res, 0) != sizeof(nd_uuid_t))
+        nd_uuid_t uuid;
+        if (!sqlite3_column_uuid_copy(res, 0, uuid))
             continue;
 
         for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++) {
             if (unlikely(!multidb_ctx[tier]))
                 continue;
 
-            populate_cb(mrg, (Word_t)multidb_ctx[tier], uuid);
+            populate_cb(mrg, (Word_t)multidb_ctx[tier], &uuid);
         }
         count++;
     }
 
     SQLITE_FINALIZE(res);
-    sqlite3_close(local_meta_db);
+    sqlite3_close_v2(local_meta_db);
     COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_INFO, "MRG: Loaded %zu metrics from database in %s", count, report_duration);
     return count;
@@ -2595,8 +2600,9 @@ static void start_metadata_hosts(uv_work_t *req)
 
     store_alert_transitions((struct judy_list_t *)worker->pending_alert_list, true, false);
 
-    if (!SHUTDOWN_REQUESTED(config))
-        store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
+    // This helper already skips database scheduling once shutdown starts, but it
+    // still has to release the worker-owned Judy list on that path.
+    store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
 
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
@@ -2605,8 +2611,11 @@ static void start_metadata_hosts(uv_work_t *req)
     COMPUTE_DURATION(report_duration, "us", all_started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_DEBUG, "Checking all hosts completed in %s", report_duration);
 
+    // This helper already skips dimension deletion once shutdown starts, but it
+    // still has to release the worker-owned Judy list on that path.
+    do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
+
     if (!SHUTDOWN_REQUESTED(config)) {
-        do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
         run_metadata_cleanup(config);
     }
 

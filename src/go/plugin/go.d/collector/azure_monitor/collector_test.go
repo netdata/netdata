@@ -6,8 +6,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -17,6 +20,7 @@ import (
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
+	"github.com/google/uuid"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -29,14 +33,18 @@ import (
 )
 
 var (
-	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
-	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+	dataConfigJSON, _         = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _         = os.ReadFile("testdata/config.yaml")
+	dataConfigWorkloadJSON, _ = os.ReadFile("testdata/config_workload.json")
+	dataConfigWorkloadYAML, _ = os.ReadFile("testdata/config_workload.yaml")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON": dataConfigJSON,
-		"dataConfigYAML": dataConfigYAML,
+		"dataConfigJSON":         dataConfigJSON,
+		"dataConfigYAML":         dataConfigYAML,
+		"dataConfigWorkloadJSON": dataConfigWorkloadJSON,
+		"dataConfigWorkloadYAML": dataConfigWorkloadYAML,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -69,6 +77,12 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	assert.NotContains(t, profileProps, "mode_exact")
 	assert.NotContains(t, profileProps, "mode_combined")
 
+	virtualNodes := requireMapField(t, properties, "virtual_nodes")
+	assert.NotContains(t, virtualNodes, "required")
+	virtualNodeProps := requireMapField(t, virtualNodes, "properties")
+	byResourceTag := requireMapField(t, virtualNodeProps, "by_resource_tag")
+	assert.Equal(t, "string", byResourceTag["type"])
+
 	uiSchema := requireMapField(t, doc, "uiSchema")
 	uiProfiles := requireMapField(t, uiSchema, "profiles")
 	_, hasIDs := uiProfiles["ids"]
@@ -81,6 +95,22 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	assert.True(t, hasModeExact)
 	_, hasModeCombined := uiProfiles["mode_combined"]
 	assert.True(t, hasModeCombined)
+
+	tabs := requireArrayField(t, requireMapField(t, uiSchema, "ui:options"), "tabs")
+	var baseFields, vnodeFields []string
+	for _, item := range tabs {
+		tab, ok := item.(map[string]any)
+		require.True(t, ok)
+		switch tab["title"] {
+		case "Base":
+			baseFields = requireStringSliceField(t, tab, "fields")
+		case "Virtual Node":
+			vnodeFields = requireStringSliceField(t, tab, "fields")
+		}
+	}
+	assert.NotContains(t, baseFields, "vnode")
+	assert.NotContains(t, baseFields, "virtual_nodes")
+	assert.ElementsMatch(t, []string{"vnode", "virtual_nodes"}, vnodeFields)
 }
 
 func TestConfigSchema_ProfileTagHelpText(t *testing.T) {
@@ -94,6 +124,13 @@ func TestConfigSchema_ProfileTagHelpText(t *testing.T) {
 	assert.NotContains(t, schema, "allOf")
 
 	uiSchema := requireMapField(t, doc, "uiSchema")
+	discovery := requireMapField(t, uiSchema, "discovery")
+	modeQuery := requireMapField(t, discovery, "mode_query")
+	kql := requireMapField(t, modeQuery, "kql")
+	help, ok := kql["ui:help"].(string)
+	require.True(t, ok)
+	assert.Contains(t, help, "project `tags`")
+
 	uiProfiles := requireMapField(t, uiSchema, "profiles")
 	for _, mode := range []string{"mode_auto", "mode_exact", "mode_combined"} {
 		modeUI := requireMapField(t, uiProfiles, mode)
@@ -104,6 +141,252 @@ func TestConfigSchema_ProfileTagHelpText(t *testing.T) {
 		help, ok := tags["ui:help"].(string)
 		require.True(t, ok)
 		assert.Contains(t, help, "Only supported when `discovery.mode` is `filters`")
+	}
+}
+
+func TestAzureMonitorStaticArtifacts_WorkloadVirtualNodes(t *testing.T) {
+	tests := map[string]struct {
+		path       string
+		contains   []string
+		notContain []string
+	}{
+		"metadata": {
+			path: "metadata.yaml",
+			contains: []string{
+				"virtual_nodes.by_resource_tag",
+				"_vnode_type=azure_workload",
+				"azure_monitor:",
+				"More alerts appear after enabling workload virtual nodes",
+			},
+		},
+		"stock config": {
+			path: "../../config/go.d/azure_monitor.conf",
+			contains: []string{
+				"subscription_ids:",
+				"virtual_nodes:",
+				"by_resource_tag: workload",
+				"mode_exact:",
+				"mode_combined:",
+			},
+			notContain: []string{
+				"subscription_id:",
+				"profile_selection_mode",
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			raw, err := os.ReadFile(tc.path)
+			require.NoError(t, err)
+			text := string(raw)
+			for _, want := range tc.contains {
+				assert.Contains(t, text, want)
+			}
+			for _, unwanted := range tc.notContain {
+				assert.NotContains(t, text, unwanted)
+			}
+		})
+	}
+
+	docs, err := filepath.Glob("integrations/*.md")
+	require.NoError(t, err)
+	require.Greater(t, len(docs), 1)
+	for _, path := range docs {
+		raw, err := os.ReadFile(path)
+		require.NoError(t, err, path)
+		text := string(raw)
+		assert.Contains(t, text, "virtual_nodes.by_resource_tag", path)
+		assert.Contains(t, text, "_vnode_type=azure_workload", path)
+	}
+}
+
+func TestWorkloadScopeScenarios(t *testing.T) {
+	tests := map[string]struct {
+		tags         []resourceTag
+		tagKey       string
+		wantDefault  bool
+		wantUnsafe   string
+		wantHostname string
+	}{
+		"matching tag creates namespaced scope": {
+			tags:         []resourceTag{{Key: "workload", Value: " Api "}},
+			tagKey:       "WORKLOAD",
+			wantHostname: "Api",
+		},
+		"missing tag uses default": {
+			tags:        []resourceTag{{Key: "env", Value: "prod"}},
+			tagKey:      "workload",
+			wantDefault: true,
+		},
+		"empty tag value uses default": {
+			tags:        []resourceTag{{Key: "workload", Value: "   "}},
+			tagKey:      "workload",
+			wantDefault: true,
+		},
+		"unsafe hostname uses default and reports value": {
+			tags:        []resourceTag{{Key: "workload", Value: "api\nprod"}},
+			tagKey:      "workload",
+			wantDefault: true,
+			wantUnsafe:  "api\nprod",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			scope, unsafeValue := workloadHostScope(resourceInfo{Tags: tc.tags}, tc.tagKey)
+
+			assert.Equal(t, tc.wantUnsafe, unsafeValue)
+			if tc.wantDefault {
+				assert.True(t, scope.IsDefault())
+				return
+			}
+
+			wantGUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(azureWorkloadGUIDPrefix+tc.wantHostname)).String()
+			assert.Equal(t, wantGUID, scope.GUID)
+			assert.Equal(t, wantGUID, scope.ScopeKey)
+			assert.Equal(t, tc.wantHostname, scope.Hostname)
+			assert.Equal(t, map[string]string{azureWorkloadScopeLabelKey: azureWorkloadScopeLabelValue}, scope.Labels)
+			assert.NotEqual(t, uuid.NewSHA1(uuid.NameSpaceDNS, []byte(tc.wantHostname)).String(), scope.GUID)
+		})
+	}
+}
+
+func TestConfig_WorkloadResourceTagKey(t *testing.T) {
+	tests := map[string]struct {
+		virtualNodes *VirtualNodesConfig
+		wantKey      string
+		wantNil      bool
+	}{
+		"unset disables workload scoping": {
+			wantNil: true,
+		},
+		"whitespace disables workload scoping": {
+			virtualNodes: &VirtualNodesConfig{ByResourceTag: " \t "},
+			wantNil:      true,
+		},
+		"normalizes configured tag key": {
+			virtualNodes: &VirtualNodesConfig{ByResourceTag: " Workload "},
+			wantKey:      "workload",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := testConfig()
+			cfg.VirtualNodes = tc.virtualNodes
+			cfg.applyDefaults()
+
+			assert.Equal(t, tc.wantKey, cfg.workloadResourceTagKey())
+			if tc.wantNil {
+				assert.Nil(t, cfg.VirtualNodes)
+				return
+			}
+			require.NotNil(t, cfg.VirtualNodes)
+			assert.Equal(t, tc.wantKey, cfg.VirtualNodes.ByResourceTag)
+		})
+	}
+}
+
+func TestDiscoveryState_WorkloadScopes(t *testing.T) {
+	runtime := &collectorRuntime{
+		WorkloadResourceTagKey: "workload",
+		Profiles: []*profileRuntime{{
+			Name:         "sql_database",
+			ResourceType: "Microsoft.Sql/servers/databases",
+		}},
+	}
+	resources := []resourceInfo{
+		{
+			SubscriptionID: "sub-1",
+			ID:             "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Sql/servers/sql-a/databases/db-a",
+			UID:            "uid-a",
+			Name:           "db-a",
+			Type:           "Microsoft.Sql/servers/databases",
+			ResourceGroup:  "rg-a",
+			Region:         "eastus",
+			Tags:           []resourceTag{{Key: "workload", Value: "api"}},
+		},
+	}
+
+	state := buildDiscoveryState(resources, runtime, time.Unix(0, 0), 300, 7, discoveryFetchResult{})
+	require.Len(t, state.Resources, 1)
+	scope := state.Resources[0].HostScope
+	require.False(t, scope.IsDefault())
+	assert.Equal(t, "api", scope.Hostname)
+	assert.Equal(t, scope.GUID, scope.ScopeKey)
+	assert.Equal(t, state.Resources, state.ByProfile["sql_database"])
+
+	changed := state.Resources[0]
+	changed.HostScope = metrix.HostScope{}
+	assert.False(t, equalResourceInfo(state.Resources[0], changed))
+}
+
+func TestParseStrictQueryDiscoveryRow_OptionalTags(t *testing.T) {
+	base := map[string]any{
+		"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Sql/servers/sql-a/databases/db-a",
+		"name":          "db-a",
+		"type":          "Microsoft.Sql/servers/databases",
+		"resourceGroup": "rg-a",
+		"location":      "eastus",
+	}
+
+	tests := map[string]struct {
+		mutate        func(map[string]any)
+		wantShape     queryTagsShape
+		wantTags      []resourceTag
+		wantErrSubstr string
+	}{
+		"absent tags": {
+			wantShape: queryTagsShapeAbsent,
+		},
+		"map tags": {
+			mutate: func(row map[string]any) {
+				row["tags"] = map[string]any{"Workload": "api"}
+			},
+			wantShape: queryTagsShapePresentMap,
+			wantTags:  []resourceTag{{Key: "workload", Value: "api"}},
+		},
+		"null tags are projected empty tags": {
+			mutate: func(row map[string]any) {
+				row["tags"] = nil
+			},
+			wantShape: queryTagsShapePresentMap,
+		},
+		"wrong shaped tags do not fail required parsing": {
+			mutate: func(row map[string]any) {
+				row["tags"] = []any{"not", "a", "map"}
+			},
+			wantShape: queryTagsShapeWrong,
+		},
+		"missing required column still fails": {
+			mutate: func(row map[string]any) {
+				delete(row, "location")
+			},
+			wantShape:     queryTagsShapeAbsent,
+			wantErrSubstr: `missing required column "location"`,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			row := make(map[string]any, len(base)+1)
+			maps.Copy(row, base)
+			if tc.mutate != nil {
+				tc.mutate(row)
+			}
+
+			resource, shape, err := parseStrictQueryDiscoveryRow(row)
+			assert.Equal(t, tc.wantShape, shape)
+			if tc.wantErrSubstr != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErrSubstr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantTags, resource.Tags)
+		})
 	}
 }
 
@@ -146,6 +429,10 @@ func requireArrayField(t *testing.T, m map[string]any, key string) []any {
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+}
+
+func TestCollector_ConfigurationSerialize_WorkloadVirtualNodes(t *testing.T) {
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigWorkloadJSON, dataConfigWorkloadYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -709,6 +996,71 @@ func TestCollector_CollectScenarios(t *testing.T) {
 	}
 }
 
+func TestCollector_WorkloadMode_MixedTaggedAndUntaggedResources_RouteToCorrectScopes(t *testing.T) {
+	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
+	taggedID := "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a"
+	untaggedID := "/subscriptions/sub-1/resourceGroups/rg-b/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-b"
+
+	rg := &mockResourceGraph{
+		resources: []map[string]any{
+			{
+				"id":            taggedID,
+				"name":          "pg-a",
+				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+				"tags":          map[string]any{"workload": "api"},
+			},
+			{
+				"id":            untaggedID,
+				"name":          "pg-b",
+				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+				"resourceGroup": "rg-b",
+				"location":      "eastus",
+				"tags":          map[string]any{"env": "prod"},
+			},
+		},
+	}
+	mx := &mockMetricsClient{
+		queryResponse: azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
+			{
+				ResourceID: ptrString(strings.ToLower(taggedID)),
+				Values: []azmetrics.Metric{
+					metricWithAvg("cpu_percent", now, 21.5),
+				},
+			},
+			{
+				ResourceID: ptrString(strings.ToLower(untaggedID)),
+				Values: []azmetrics.Metric{
+					metricWithAvg("cpu_percent", now, 33.1),
+				},
+			},
+		}}},
+	}
+	c := newTestCollectorWithMocks(rg, mx)
+	c.Config = testConfig()
+	c.Config.VirtualNodes = &VirtualNodesConfig{ByResourceTag: "workload"}
+	c.now = func() time.Time { return now }
+
+	require.NoError(t, c.Init(context.Background()))
+	defaultSeries, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(keysFromSeries(defaultSeries), "\n"), `resource_name="pg-b"`)
+	assert.NotContains(t, strings.Join(keysFromSeries(defaultSeries), "\n"), `resource_name="pg-a"`)
+
+	var workloadScope metrix.HostScope
+	for _, resource := range c.discovery.Resources {
+		if resource.Name == "pg-a" {
+			workloadScope = resource.HostScope
+		}
+	}
+	require.False(t, workloadScope.IsDefault())
+
+	scopedSeries := scalarSeriesFromReader(c.store.Read(metrix.ReadRaw(), metrix.ReadHostScope(workloadScope.ScopeKey)))
+	assert.Contains(t, strings.Join(keysFromSeries(scopedSeries), "\n"), `resource_name="pg-a"`)
+	assert.NotContains(t, strings.Join(keysFromSeries(scopedSeries), "\n"), `resource_name="pg-b"`)
+}
+
 func TestCollector_RefreshDiscovery_PushesModeFiltersIntoQuery(t *testing.T) {
 	tests := map[string]struct {
 		resources  []map[string]any
@@ -985,6 +1337,63 @@ template:
 	assert.Equal(t, []string{"UsedCapacity"}, byInterval["PT5M"].MetricNames)
 }
 
+func TestSamplesFromQueryResponse_UsesResourceHostScope(t *testing.T) {
+	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
+	scope, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "api"}}}, "workload")
+	require.Empty(t, unsafeValue)
+
+	tests := map[string]struct {
+		scope metrix.HostScope
+	}{
+		"default scope": {},
+		"workload scope": {
+			scope: scope,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			resourceID := "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a"
+			samples := samplesFromQueryResponse(
+				[]azmetrics.MetricData{{
+					ResourceID: ptrString(strings.ToLower(resourceID)),
+					Values: []azmetrics.Metric{
+						metricWithAvg("cpu_percent", now, 10),
+					},
+				}},
+				"postgres_flexible",
+				map[string]*metricRuntime{
+					"cpu_percent": {
+						Series: []*seriesRuntime{{
+							Aggregation: "average",
+							Kind:        azureprofiles.SeriesKindGauge,
+							Instrument:  "postgres_flexible.cpu_percent.average",
+						}},
+					},
+				},
+				map[string]resourceInfo{
+					strings.ToLower(resourceID): {
+						SubscriptionID: "sub-1",
+						ID:             resourceID,
+						UID:            "uid-a",
+						Name:           "pg-a",
+						Type:           "Microsoft.DBforPostgreSQL/flexibleServers",
+						ResourceGroup:  "rg-a",
+						Region:         "eastus",
+						HostScope:      tc.scope,
+					},
+				},
+			)
+
+			require.Len(t, samples, 1)
+			assert.Equal(t, tc.scope, samples[0].Scope)
+			if tc.scope.IsDefault() {
+				assert.True(t, samples[0].Scope.IsDefault())
+			}
+		})
+	}
+}
+
 func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 	tests := map[string]struct {
 		resources       []map[string]any
@@ -1179,6 +1588,281 @@ func TestCollector_CheckBootstrapQueryModeScenarios(t *testing.T) {
 			require.NoError(t, c.Init(context.Background()))
 			require.NoError(t, c.Check(context.Background()))
 			tc.check(t, c, rg)
+		})
+	}
+}
+
+func TestCollector_WorkloadMode_QueryModeTagFallbackState(t *testing.T) {
+	const kql = "resources | project id, name, type, resourceGroup, location"
+
+	tests := map[string]struct {
+		tags                      any
+		tagsPresent               bool
+		wantMissingWarning        bool
+		wantWrongShapeWarning     bool
+		wantDefaultScope          bool
+		wantWorkloadScopeHostname string
+	}{
+		"tags column missing falls back and records warning": {
+			wantMissingWarning: true,
+			wantDefaultScope:   true,
+		},
+		"tags wrong shape falls back and records warning": {
+			tagsPresent:           true,
+			tags:                  "not-a-map",
+			wantWrongShapeWarning: true,
+			wantDefaultScope:      true,
+		},
+		"configured tag missing in tags map falls back silently": {
+			tagsPresent:      true,
+			tags:             map[string]any{"env": "prod"},
+			wantDefaultScope: true,
+		},
+		"tags map derives workload scope": {
+			tagsPresent:               true,
+			tags:                      map[string]any{"Workload": "api"},
+			wantWorkloadScopeHostname: "api",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			row := map[string]any{
+				"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+				"name":          "pg-a",
+				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+			}
+			if tc.tagsPresent {
+				row["tags"] = tc.tags
+			}
+
+			rg := &mockResourceGraph{resources: []map[string]any{row}}
+			c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
+			c.Config = testConfig()
+			c.Config.VirtualNodes = &VirtualNodesConfig{ByResourceTag: "workload"}
+			c.Config.Profiles.Mode = profilesModeAuto
+			c.Config.Profiles.ModeExact = nil
+			c.Config.Profiles.ModeCombined = nil
+			c.Config.Discovery.Mode = discoveryModeQuery
+			c.Config.Discovery.ModeFilters = nil
+			c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
+
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+
+			require.Len(t, c.discovery.Resources, 1)
+			assert.Equal(t, tc.wantMissingWarning, c.tagsColumnMissingWarned)
+			assert.Equal(t, tc.wantWrongShapeWarning, c.tagsWrongShapeWarned)
+			if tc.wantDefaultScope {
+				assert.True(t, c.discovery.Resources[0].HostScope.IsDefault())
+				return
+			}
+			require.False(t, c.discovery.Resources[0].HostScope.IsDefault())
+			assert.Equal(t, tc.wantWorkloadScopeHostname, c.discovery.Resources[0].HostScope.Hostname)
+		})
+	}
+}
+
+func TestCollector_WorkloadMode_QueryModeWarningWatermarks(t *testing.T) {
+	c := New()
+	runtime := &collectorRuntime{WorkloadResourceTagKey: "workload"}
+
+	state := discoveryState{
+		FetchCounter:           1,
+		QueryTagsColumnMissing: true,
+		QueryTagsWrongShape:    true,
+		UnsafeWorkloadValues: map[string]int{
+			"bad\nvalue": 2,
+		},
+	}
+
+	c.warnDiscoveryScopeFallbacks(state, runtime)
+	c.warnDiscoveryScopeFallbacks(state, runtime)
+	assert.True(t, c.tagsColumnMissingWarned)
+	assert.True(t, c.tagsWrongShapeWarned)
+	assert.Equal(t, uint64(1), c.tagsColumnMissingWarnedAt)
+	assert.Equal(t, uint64(1), c.tagsWrongShapeWarnedAt)
+
+	state.FetchCounter = 2
+	c.warnDiscoveryScopeFallbacks(state, runtime)
+	assert.Equal(t, uint64(2), c.tagsColumnMissingWarnedAt)
+	assert.Equal(t, uint64(2), c.tagsWrongShapeWarnedAt)
+}
+
+func TestCollector_WorkloadMode_QueryModeWarningDedupAcrossRefreshes(t *testing.T) {
+	const kql = "resources | project id, name, type, resourceGroup, location"
+
+	tests := map[string]struct {
+		tagsPresent   bool
+		tags          any
+		wantMissingAt func(*Collector) uint64
+		wantWrongAt   func(*Collector) uint64
+	}{
+		"missing tags column": {
+			wantMissingAt: func(c *Collector) uint64 { return c.tagsColumnMissingWarnedAt },
+		},
+		"wrong shaped tags column": {
+			tagsPresent: true,
+			tags:        "not-a-map",
+			wantWrongAt: func(c *Collector) uint64 { return c.tagsWrongShapeWarnedAt },
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			row := map[string]any{
+				"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+				"name":          "pg-a",
+				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+			}
+			if tc.tagsPresent {
+				row["tags"] = tc.tags
+			}
+
+			rg := &mockResourceGraph{resources: []map[string]any{row}}
+			c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
+			c.Config = testConfig()
+			c.Config.VirtualNodes = &VirtualNodesConfig{ByResourceTag: "workload"}
+			c.Config.Profiles.Mode = profilesModeAuto
+			c.Config.Profiles.ModeExact = nil
+			c.Config.Profiles.ModeCombined = nil
+			c.Config.Discovery.Mode = discoveryModeQuery
+			c.Config.Discovery.ModeFilters = nil
+			c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
+
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+			require.Equal(t, uint64(1), c.discovery.FetchCounter)
+			if tc.wantMissingAt != nil {
+				assert.Equal(t, uint64(1), tc.wantMissingAt(c))
+			}
+			if tc.wantWrongAt != nil {
+				assert.Equal(t, uint64(1), tc.wantWrongAt(c))
+			}
+
+			c.warnDiscoveryScopeFallbacks(c.discovery, c.runtime)
+			if tc.wantMissingAt != nil {
+				assert.Equal(t, uint64(1), tc.wantMissingAt(c))
+			}
+			if tc.wantWrongAt != nil {
+				assert.Equal(t, uint64(1), tc.wantWrongAt(c))
+			}
+
+			_, err := c.refreshDiscovery(context.Background(), true)
+			require.NoError(t, err)
+			require.Equal(t, uint64(2), c.discovery.FetchCounter)
+			if tc.wantMissingAt != nil {
+				assert.Equal(t, uint64(2), tc.wantMissingAt(c))
+			}
+			if tc.wantWrongAt != nil {
+				assert.Equal(t, uint64(2), tc.wantWrongAt(c))
+			}
+		})
+	}
+}
+
+func TestCollector_WorkloadMode_UnsafeValueReportResetsPerRefresh(t *testing.T) {
+	runtime := &collectorRuntime{
+		WorkloadResourceTagKey: "workload",
+		Profiles: []*profileRuntime{{
+			Name:         "postgres_flexible",
+			ResourceType: "Microsoft.DBforPostgreSQL/flexibleServers",
+		}},
+	}
+	base := resourceInfo{
+		SubscriptionID: "sub-1",
+		ID:             "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+		UID:            "uid-a",
+		Name:           "pg-a",
+		Type:           "Microsoft.DBforPostgreSQL/flexibleServers",
+		ResourceGroup:  "rg-a",
+		Region:         "eastus",
+	}
+	tests := map[string]struct {
+		refreshes []struct {
+			tags       []resourceTag
+			wantUnsafe map[string]int
+		}
+	}{
+		"unsafe report is scoped to the current refresh": {
+			refreshes: []struct {
+				tags       []resourceTag
+				wantUnsafe map[string]int
+			}{
+				{
+					tags:       []resourceTag{{Key: "workload", Value: "bad\none"}},
+					wantUnsafe: map[string]int{"bad\none": 1},
+				},
+				{
+					tags:       []resourceTag{{Key: "workload", Value: "bad\ntwo"}},
+					wantUnsafe: map[string]int{"bad\ntwo": 1},
+				},
+				{
+					tags: []resourceTag{{Key: "workload", Value: "api"}},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			for i, refresh := range tc.refreshes {
+				resource := base
+				resource.Tags = refresh.tags
+				fetchCounter := uint64(i + 1)
+
+				state := buildDiscoveryState([]resourceInfo{resource}, runtime, time.Unix(int64(fetchCounter), 0), 300, fetchCounter, discoveryFetchResult{})
+
+				assert.Equal(t, refresh.wantUnsafe, state.UnsafeWorkloadValues)
+			}
+		})
+	}
+}
+
+func TestCollector_WorkloadMode_DisabledLeavesQueryAndScopesDefault(t *testing.T) {
+	const kql = "resources | project id, name, type, resourceGroup, location"
+
+	tests := map[string]struct {
+		virtualNodes *VirtualNodesConfig
+	}{
+		"unset": {},
+		"whitespace": {
+			virtualNodes: &VirtualNodesConfig{ByResourceTag: " \t "},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rg := &mockResourceGraph{resources: []map[string]any{{
+				"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+				"name":          "pg-a",
+				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+			}}}
+			c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
+			c.Config = testConfig()
+			c.Config.VirtualNodes = tc.virtualNodes
+			c.Config.Profiles.Mode = profilesModeAuto
+			c.Config.Profiles.ModeExact = nil
+			c.Config.Profiles.ModeCombined = nil
+			c.Config.Discovery.Mode = discoveryModeQuery
+			c.Config.Discovery.ModeFilters = nil
+			c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
+
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+
+			assert.Equal(t, kql, rg.lastQuery())
+			assert.Empty(t, c.runtime.WorkloadResourceTagKey)
+			require.Len(t, c.discovery.Resources, 1)
+			assert.True(t, c.discovery.Resources[0].HostScope.IsDefault())
+			assert.False(t, c.tagsColumnMissingWarned)
+			assert.False(t, c.tagsWrongShapeWarned)
 		})
 	}
 }
@@ -1454,13 +2138,13 @@ func TestObservationState_PruneStaleResources_RemovesOldProfileMembership(t *tes
 		Type:           "Microsoft.Sql/servers/databases",
 	}
 	labels := labelValues(resourceLabels(resource, "sql_database"))
-	key := sampleObservationKey("sql.cpu", labels)
+	key := sampleObservationKey("sql.cpu", metrix.HostScope{}, labels)
 
 	state := &observationState{
-		accumulators: map[string]float64{
+		accumulators: map[observationKey]float64{
 			key: 10,
 		},
-		lastObserved: map[string]lastObservation{
+		lastObserved: map[observationKey]lastObservation{
 			key: {
 				instrument:  "sql.cpu",
 				labelValues: append([]string(nil), labels...),
@@ -1490,13 +2174,13 @@ func TestObservationState_PruneStaleResources_RemovesLabelChurnForSameResource(t
 	newResource.Name = "db-a-renamed"
 
 	labels := labelValues(resourceLabels(oldResource, "sql_database"))
-	key := sampleObservationKey("sql.cpu", labels)
+	key := sampleObservationKey("sql.cpu", metrix.HostScope{}, labels)
 
 	state := &observationState{
-		accumulators: map[string]float64{
+		accumulators: map[observationKey]float64{
 			key: 10,
 		},
-		lastObserved: map[string]lastObservation{
+		lastObserved: map[observationKey]lastObservation{
 			key: {
 				instrument:  "sql.cpu",
 				labelValues: append([]string(nil), labels...),
@@ -1511,6 +2195,192 @@ func TestObservationState_PruneStaleResources_RemovesLabelChurnForSameResource(t
 
 	assert.Empty(t, state.lastObserved)
 	assert.Empty(t, state.accumulators)
+}
+
+func TestObservationState_PruneStaleResources_RespectsScopeBoundary(t *testing.T) {
+	scopeA, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "api"}}}, "workload")
+	require.Empty(t, unsafeValue)
+	scopeB, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "worker"}}}, "workload")
+	require.Empty(t, unsafeValue)
+
+	resource := resourceInfo{
+		SubscriptionID: "sub-1",
+		UID:            "uid-a",
+		Name:           "db-a",
+		ResourceGroup:  "rg-a",
+		Region:         "eastus",
+		Type:           "Microsoft.Sql/servers/databases",
+		HostScope:      scopeA,
+	}
+	labels := labelValues(resourceLabels(resource, "sql_database"))
+	keyA := sampleObservationKey("sql.cpu", scopeA, labels)
+	keyB := sampleObservationKey("sql.cpu", scopeB, labels)
+
+	state := &observationState{
+		accumulators: map[observationKey]float64{
+			keyA: 10,
+			keyB: 20,
+		},
+		lastObserved: map[observationKey]lastObservation{
+			keyA: {
+				instrument:  "sql.cpu",
+				scope:       scopeA,
+				labelValues: append([]string(nil), labels...),
+				value:       10,
+			},
+			keyB: {
+				instrument:  "sql.cpu",
+				scope:       scopeB,
+				labelValues: append([]string(nil), labels...),
+				value:       20,
+			},
+		},
+	}
+
+	state.pruneStaleResources(map[string][]resourceInfo{
+		"sql_database": {resource},
+	})
+
+	assert.Contains(t, state.lastObserved, keyA)
+	assert.NotContains(t, state.lastObserved, keyB)
+	assert.Contains(t, state.accumulators, keyA)
+	assert.NotContains(t, state.accumulators, keyB)
+}
+
+func TestObservationState_CounterAccumulatorFollowsScopeMobility(t *testing.T) {
+	scopes := map[string]metrix.HostScope{}
+	for _, workload := range []string{"api", "worker", "batch"} {
+		scope, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: workload}}}, "workload")
+		require.Empty(t, unsafeValue)
+		scopes[workload] = scope
+	}
+
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+	cycle := managed.CycleController()
+	vec := store.Write().SnapshotMeter("").Vec("resource_uid", "subscription_id", "resource_name", "resource_group", "region", "resource_type", "profile")
+	state := &observationState{
+		instruments: map[string]*instrumentRuntime{
+			"sql.transactions": {
+				Kind:    azureprofiles.SeriesKindCounter,
+				Counter: vec.Counter("sql.transactions"),
+			},
+		},
+		accumulators: make(map[observationKey]float64),
+		lastObserved: make(map[observationKey]lastObservation),
+	}
+
+	baseResource := resourceInfo{
+		SubscriptionID: "sub-1",
+		UID:            "uid-a",
+		Name:           "db-a",
+		ResourceGroup:  "rg-a",
+		Region:         "eastus",
+		Type:           "Microsoft.Sql/servers/databases",
+	}
+	steps := map[string]struct {
+		path []struct {
+			workload string
+			value    float64
+		}
+	}{
+		"a to b to c to a": {
+			path: []struct {
+				workload string
+				value    float64
+			}{
+				{workload: "api", value: 5},
+				{workload: "worker", value: 7},
+				{workload: "batch", value: 11},
+				{workload: "api", value: 13},
+			},
+		},
+	}
+
+	for name, tc := range steps {
+		t.Run(name, func(t *testing.T) {
+			for _, step := range tc.path {
+				scope := scopes[step.workload]
+				resource := baseResource
+				resource.HostScope = scope
+				labels := labelValues(resourceLabels(resource, "sql_database"))
+
+				state.pruneStaleResources(map[string][]resourceInfo{"sql_database": {resource}})
+				cycle.BeginCycle()
+				observed := state.observeSamples([]metricSample{{
+					Instrument: "sql.transactions",
+					Kind:       azureprofiles.SeriesKindCounter,
+					Scope:      scope,
+					Labels:     resourceLabels(resource, "sql_database"),
+					Value:      step.value,
+				}})
+				state.reobserveCachedObservations(map[string]bool{}, observed)
+				require.NoError(t, cycle.CommitCycleSuccess())
+
+				key := sampleObservationKey("sql.transactions", scope, labels)
+				require.Len(t, state.accumulators, 1)
+				assert.Equal(t, step.value, state.accumulators[key])
+				assert.Contains(t, state.lastObserved, key)
+			}
+		})
+	}
+}
+
+func TestObservationState_ReobserveUsesStoredScope(t *testing.T) {
+	scope, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "api"}}}, "workload")
+	require.Empty(t, unsafeValue)
+
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+	cycle := managed.CycleController()
+	vec := store.Write().SnapshotMeter("").Vec("resource_uid", "subscription_id", "resource_name", "resource_group", "region", "resource_type", "profile")
+	labels := []string{"uid-a", "sub-1", "db-a", "rg-a", "eastus", "Microsoft.Sql/servers/databases", "sql_database"}
+
+	state := &observationState{
+		instruments: map[string]*instrumentRuntime{
+			"sql.cpu": {
+				Kind:  azureprofiles.SeriesKindGauge,
+				Gauge: vec.Gauge("sql.cpu"),
+			},
+		},
+		accumulators: make(map[observationKey]float64),
+		lastObserved: map[observationKey]lastObservation{
+			sampleObservationKey("sql.cpu", scope, labels): {
+				instrument:  "sql.cpu",
+				scope:       scope,
+				labelValues: append([]string(nil), labels...),
+				value:       42,
+			},
+		},
+	}
+
+	cycle.BeginCycle()
+	state.reobserveCachedObservations(map[string]bool{}, map[observationKey]bool{})
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	_, ok = store.Read(metrix.ReadRaw()).Value("sql.cpu", metrix.Labels{
+		"resource_uid":    "uid-a",
+		"subscription_id": "sub-1",
+		"resource_name":   "db-a",
+		"resource_group":  "rg-a",
+		"region":          "eastus",
+		"resource_type":   "Microsoft.Sql/servers/databases",
+		"profile":         "sql_database",
+	})
+	assert.False(t, ok)
+
+	_, ok = store.Read(metrix.ReadRaw(), metrix.ReadHostScope(scope.ScopeKey)).Value("sql.cpu", metrix.Labels{
+		"resource_uid":    "uid-a",
+		"subscription_id": "sub-1",
+		"resource_name":   "db-a",
+		"resource_group":  "rg-a",
+		"region":          "eastus",
+		"resource_type":   "Microsoft.Sql/servers/databases",
+		"profile":         "sql_database",
+	})
+	assert.True(t, ok)
 }
 
 func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
@@ -1774,7 +2644,7 @@ template:
 `,
 	})
 
-	_, err := buildCollectorRuntimeFromConfig(profileNames, nil, catalog)
+	_, err := buildCollectorRuntimeFromConfig(profileNames, nil, catalog, "")
 	require.Error(t, err)
 }
 
@@ -2042,4 +2912,39 @@ func keysFromSeries(series map[string]metrix.SampleValue) []string {
 		out = append(out, key)
 	}
 	return out
+}
+
+func scalarSeriesFromReader(reader metrix.Reader) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue)
+	reader.ForEachSeries(func(name string, labels metrix.LabelView, value metrix.SampleValue) {
+		out[scalarKeyFromLabelView(name, labels)] = value
+	})
+	return out
+}
+
+func scalarKeyFromLabelView(name string, labels metrix.LabelView) string {
+	if labels == nil || labels.Len() == 0 {
+		return strings.TrimSpace(name)
+	}
+
+	labelsMap := labels.CloneMap()
+	keys := make([]string, 0, len(labelsMap))
+	for key := range labelsMap {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	b.WriteString(strings.TrimSpace(name))
+	b.WriteByte('{')
+	for i, key := range keys {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(key)
+		b.WriteByte('=')
+		b.WriteString(strconv.Quote(labelsMap[key]))
+	}
+	b.WriteByte('}')
+	return b.String()
 }

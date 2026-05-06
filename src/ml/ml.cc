@@ -1006,7 +1006,7 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
 #define WORKER_JOB_DETECTION_STATS 3
 
 static void
-ml_host_detect_once(ml_host_t *host)
+ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 {
     worker_is_busy(WORKER_JOB_DETECTION_COLLECT_STATS);
 
@@ -1081,7 +1081,7 @@ ml_host_detect_once(ml_host_t *host)
         ml_update_dimensions_chart(host, mls_copy);
 
         worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0);
+        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0, owa);
     } else {
         host->host_anomaly_rate = 0.0;
 
@@ -1109,6 +1109,13 @@ void ml_detect_main(void *arg)
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
 
+    // Single onewayalloc arena reused across every host and loop iteration
+    // for the whole detect thread lifetime — one mmap/munmap pair instead
+    // of one per host per second. The arena is reset between hosts inside
+    // ml_update_host_and_detection_rate_charts, so peak memory stays bounded
+    // by a single host's anomaly-rate query scratch.
+    ONEWAYALLOC *detect_owa = onewayalloc_create(0);
+
     while (!Cfg.detection_stop && service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb);
@@ -1122,7 +1129,7 @@ void ml_detect_main(void *arg)
             if (!service_running(SERVICE_COLLECTORS))
                 break;
 
-            ml_host_detect_once((ml_host_t *) rh->ml_host);
+            ml_host_detect_once((ml_host_t *) rh->ml_host, detect_owa);
         }
         rrd_rdunlock();
 
@@ -1139,6 +1146,9 @@ void ml_detect_main(void *arg)
             }
         }
     }
+
+    onewayalloc_destroy(detect_owa);
+
     Cfg.training_stop = true;
     finalize_self_prepared_sql_statements();
 }

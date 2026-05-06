@@ -351,8 +351,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         return -ND_SOCK_ERR_NO_HOST_IN_DEFINITION;
     }
 
-    char buffer[strlen(definition) + 1];
-    strcpy(buffer, definition);
+    CLEAN_CHAR_P *buffer = strdupz(definition);
 
     char default_service[10 + 1];
     snprintfz(default_service, 10, "%d", default_port);
@@ -403,8 +402,8 @@ void foreach_entry_in_connection_string(const char *destination, bool (*callback
         // is there anything?
         if(!*s || s == e) break;
 
-        char buf[e - s + 1];
-        strncpyz(buf, s, e - s);
+        CLEAN_CHAR_P *buf = mallocz((size_t)(e - s) + 1);
+        strncpyz(buf, s, (size_t)(e - s));
 
         if(callback(buf, data)) break;
 

@@ -702,7 +702,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
     count = jf_metric_data->number_of_pages;
     descr_size = sizeof(*jf_metric_data->descr) * count;
     payload_length = sizeof(*jf_metric_data) + descr_size;
-    if (payload_length > max_size) {
+    if (payload_length > max_size || !rrdeng_valid_extent_disk_size(jf_metric_data->extent_size)) {
         netdata_log_error("DBENGINE: corrupted transaction payload.");
         return;
     }
@@ -1423,9 +1423,11 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     uint32_t trailer_offset = total_file_size;
     total_file_size  += sizeof(struct journal_v2_block_trailer);
 
-    int fd_v2;
+    int fd_v2 = -1;
     uint8_t *data_start = nd_mmap_advanced(path, total_file_size, MAP_SHARED, 0, false, true, &fd_v2);
     if(!data_start) {
+        if(fd_v2 != -1)
+            close(fd_v2);
         nd_log_daemon(NDLP_WARNING, "DBENGINE: Failed to allocate %"PRIu64" bytes of memory for journal file \"%s\". Will retry later", total_file_size, path);
         return false;
     }
@@ -1603,6 +1605,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     netdata_log_info("DBENGINE: failed to build index \"%s\", file will be skipped", path);
 
     nd_munmap(data_start, total_file_size);
+    if(fd_v2 != -1)
+        close(fd_v2);
     unlink(path);
     return false;
 }

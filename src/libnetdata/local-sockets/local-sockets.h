@@ -23,6 +23,9 @@
 
 #define UID_UNSET (uid_t)(UINT32_MAX)
 
+// max cmdline bytes read from /proc/<pid>/cmdline — reader-side guard must match
+#define LOCAL_SOCKETS_CMDLINE_MAX 8192
+
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for keeping the namespaces
 // key and value is the namespace inode
@@ -583,7 +586,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
     struct dirent *proc_entry;
     char filename[FILENAME_MAX + 1];
     char comm[TASK_COMM_LEN];
-    char cmdline[8192];
+    char cmdline[LOCAL_SOCKETS_CMDLINE_MAX];
     const char *cmdline_trimmed;
     uint64_t net_ns_inode;
 
@@ -1579,8 +1582,14 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         if(read(spawn_server_instance_read_fd(si), &len, sizeof(len)) != sizeof(len))
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
+        if(len > LOCAL_SOCKETS_CMDLINE_MAX) {
+            // broken pipe protocol: writer caps at LOCAL_SOCKETS_CMDLINE_MAX bytes
+            local_sockets_log(ls, "cmdline length %zu from child exceeds limit (%d), aborting namespace socket collection", len, LOCAL_SOCKETS_CMDLINE_MAX);
+            break;
+        }
+
         if(len) {
-            char cmdline[len + 1];
+            CLEAN_CHAR_P *cmdline = mallocz(len + 1);
             if(read(spawn_server_instance_read_fd(si), cmdline, len) != (ssize_t)len)
                 local_sockets_log(ls, "failed to read cmdline from pipe");
             else {
@@ -1663,10 +1672,8 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
     if(threads > 100) threads = 100;
 
     size_t last_thread = 0;
-    ND_THREAD *workers[threads];
-    struct local_sockets_namespace_worker workers_data[threads];
-    memset(workers, 0, sizeof(workers));
-    memset(workers_data, 0, sizeof(workers_data));
+    ND_THREAD **workers = callocz(threads, sizeof(*workers));
+    struct local_sockets_namespace_worker *workers_data = callocz(threads, sizeof(*workers_data));
 
     spinlock_lock(&ls->spinlock);
 
@@ -1711,6 +1718,9 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
         if(workers[i])
             nd_thread_join(workers[i]);
     }
+
+    freez(workers_data);
+    freez(workers);
 }
 
 #endif // LOCAL_SOCKETS_USE_SETNS

@@ -338,8 +338,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     struct addrinfo hints;
     struct addrinfo *result = NULL, *rp = NULL;
 
-    char buffer[strlen(definition) + 1];
-    strcpy(buffer, definition);
+    CLEAN_CHAR_P *buffer = strdupz(definition);
 
     char buffer2[10 + 1];
     snprintfz(buffer2, 10, "%d", default_port);
@@ -549,8 +548,8 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
         // is there anything?
         if(!*s || s == e) break;
 
-        char buf[e - s + 1];
-        strncpyz(buf, s, e - s);
+        CLEAN_CHAR_P *buf = mallocz((size_t)(e - s) + 1);
+        strncpyz(buf, s, (size_t)(e - s));
         bind_to_this(sockets, buf, sockets->default_port, sockets->backlog);
 
         s = e;
