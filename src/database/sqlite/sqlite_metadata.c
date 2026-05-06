@@ -364,7 +364,7 @@ done:
 
 #define SQL_SCHEDULE_HOST_CTX_CLEANUP                                                                                  \
     "INSERT INTO ctx_metadata_cleanup (host_id, context, date_created) "                                               \
-    "VALUES (@host_id, @context, UNIXEPOCH()) ON CONFLICT DO UPDATE SET date_created = excluded.date_created; END"
+    "VALUES (@host_id, @context, UNIXEPOCH()) ON CONFLICT DO UPDATE SET date_created = excluded.date_created"
 
 // Schedule context cleanup for host
 static void sql_schedule_host_ctx_cleanup(sqlite3_stmt **res, nd_uuid_t *host_id, const char *context)
@@ -616,7 +616,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
 
         rc = sqlite3_recover_finish(recover);
 
-        (void) sqlite3_close(database);
+        (void) sqlite3_close_v2(database);
 
         if (rc == SQLITE_OK) {
             rc = rename(new_sqlite_database, sqlite_database);
@@ -629,7 +629,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
             netdata_log_error("Recover failed to free resources");
     }
     else
-        (void) sqlite3_close(database);
+        (void) sqlite3_close_v2(database);
 }
 
 
@@ -758,7 +758,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         }
         else {
             (void)db_execute(db_meta, "select count(*) from sqlite_master limit 0", NULL);
-            (void) sqlite3_close(db_meta);
+            (void) sqlite3_close_v2(db_meta);
         }
         return 1;
     }
@@ -773,7 +773,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         }
         else {
             (void)db_execute(db_meta, "select count(*) from sqlite_master limit 0", NULL);
-            (void) sqlite3_close(db_meta);
+            (void) sqlite3_close_v2(db_meta);
         }
         return 1;
     }
@@ -814,7 +814,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     return 0;
 
 close_database:
-    sqlite3_close(db_meta);
+    sqlite3_close_v2(db_meta);
     db_meta = NULL;
     return 1;
 }
@@ -1163,7 +1163,7 @@ static bool store_host_systeminfo(RRDHOST *host)
     if (unlikely(!system_info))
         return false;
 
-    return (27 != rrdhost_system_info_foreach(system_info, add_host_sysinfo_key_value, &host->host_id.uuid));
+    return (RRDHOST_SYSTEM_INFO_KEY_COUNT != rrdhost_system_info_foreach(system_info, add_host_sysinfo_key_value, &host->host_id.uuid));
 }
 
 
@@ -1313,8 +1313,6 @@ static bool run_cleanup_loop(
         if (rc == true) {
             action_cb(&uuid, action_stmt, action_flag);
             l_deleted++;
-//            if (false == sql_metadata_wal_size_acceptable())
-//                (void) sqlite3_wal_checkpoint(db_meta, NULL);
         }
 
         l_checked++;
@@ -1906,14 +1904,14 @@ static void restore_host_context(void *arg)
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
             int rc = sqlite3_open_v2(sqlite_database, &db_meta_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK) {
-                sqlite3_close(db_meta_thread);
+                sqlite3_close_v2(db_meta_thread);
                 db_meta_thread = NULL;
             }
 
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
             rc = sqlite3_open_v2(sqlite_database, &db_context_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK) {
-                sqlite3_close(db_context_thread);
+                sqlite3_close_v2(db_context_thread);
                 db_context_thread = NULL;
             }
 
@@ -2136,7 +2134,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
     int rc = sqlite3_open_v2(sqlite_database, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
     if (rc != SQLITE_OK) {
-        sqlite3_close(local_meta_db);
+        sqlite3_close_v2(local_meta_db);
         local_meta_db = NULL;
     }
 
@@ -2144,7 +2142,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
         (void)db_execute(local_meta_db, "PRAGMA cache_size=10000", NULL);
 
     if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
-        sqlite3_close(local_meta_db);
+        sqlite3_close_v2(local_meta_db);
         return 0;
     }
 
@@ -2166,7 +2164,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     }
 
     SQLITE_FINALIZE(res);
-    sqlite3_close(local_meta_db);
+    sqlite3_close_v2(local_meta_db);
     COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_INFO, "MRG: Loaded %zu metrics from database in %s", count, report_duration);
     return count;
