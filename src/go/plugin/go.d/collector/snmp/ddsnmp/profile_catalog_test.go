@@ -60,31 +60,56 @@ func TestCatalogResolve_ManualProfilePolicies(t *testing.T) {
 }
 
 func TestResolvedProfileSetProject_SeparatesMetricsAndTopology(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+	tests := map[string]struct {
+		consumer      ProfileConsumer
+		metrics       int
+		topology      int
+		virtual       int
+		metadataField string
+		metricTag     string
+		sysobjectID   string
+		firstKind     ddprofiledefinition.TopologyKind
+	}{
+		"metrics_projection": {
+			consumer:      ConsumerMetrics,
+			metrics:       2,
+			virtual:       1,
+			metadataField: "vendor",
+			metricTag:     "model",
+			sysobjectID:   "sysobjectid_vendor",
+		},
+		"topology_projection": {
+			consumer:      ConsumerTopology,
+			topology:      2,
+			metadataField: "lldp_loc_sys_name",
+			metricTag:     "lldp_loc_chassis_id",
+			sysobjectID:   "sysobjectid_topology_vendor",
+			firstKind:     ddprofiledefinition.KindLldpRem,
+		},
+	}
 
-	metricsProfiles := resolved.Project(ConsumerMetrics).Profiles()
-	topologyProfiles := resolved.Project(ConsumerTopology).Profiles()
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
 
-	require.Len(t, metricsProfiles, 1)
-	metricsDef := metricsProfiles[0].Definition
-	require.Len(t, metricsDef.Metrics, 2)
-	assert.Empty(t, metricsDef.Topology)
-	require.Len(t, metricsDef.VirtualMetrics, 1)
-	require.Len(t, metricsDef.Metadata["device"].Fields, 1)
-	assert.Contains(t, metricsDef.Metadata["device"].Fields, "vendor")
-	require.Len(t, metricsDef.MetricTags, 1)
-	assert.Equal(t, "model", metricsDef.MetricTags[0].Tag)
+			profiles := resolved.Project(tc.consumer).Profiles()
 
-	require.Len(t, topologyProfiles, 1)
-	topologyDef := topologyProfiles[0].Definition
-	require.Len(t, topologyDef.Topology, 2)
-	assert.Equal(t, ddprofiledefinition.KindLldpRem, topologyDef.Topology[0].Kind)
-	assert.Empty(t, topologyDef.Metrics)
-	assert.Empty(t, topologyDef.VirtualMetrics)
-	require.Len(t, topologyDef.Metadata["device"].Fields, 1)
-	assert.Contains(t, topologyDef.Metadata["device"].Fields, "lldp_loc_sys_name")
-	require.Len(t, topologyDef.MetricTags, 1)
-	assert.Equal(t, "lldp_loc_chassis_id", topologyDef.MetricTags[0].Tag)
+			require.Len(t, profiles, 1)
+			def := profiles[0].Definition
+			require.Len(t, def.Metrics, tc.metrics)
+			require.Len(t, def.Topology, tc.topology)
+			require.Len(t, def.VirtualMetrics, tc.virtual)
+			require.Len(t, def.Metadata["device"].Fields, 1)
+			assert.Contains(t, def.Metadata["device"].Fields, tc.metadataField)
+			require.Len(t, def.MetricTags, 1)
+			assert.Equal(t, tc.metricTag, def.MetricTags[0].Tag)
+			require.Len(t, def.SysobjectIDMetadata, 1)
+			assert.Contains(t, def.SysobjectIDMetadata[0].Metadata, tc.sysobjectID)
+			if tc.firstKind != "" {
+				assert.Equal(t, tc.firstKind, def.Topology[0].Kind)
+			}
+		})
+	}
 }
 
 func TestResolvedProfileSetProject_DoesNotShareMutableProjectionState(t *testing.T) {
@@ -137,6 +162,21 @@ func projectionTestProfile() *Profile {
 						},
 						"lldp_loc_sys_name": {
 							Symbol:    ddprofiledefinition.SymbolConfig{Name: "lldpLocSysName"},
+							Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerTopology},
+						},
+					},
+				},
+			},
+			SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+				{
+					SysobjectID: "1.3.6.1.4.1.9",
+					Metadata: map[string]ddprofiledefinition.MetadataField{
+						"sysobjectid_vendor": {
+							Value:     "Cisco",
+							Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerMetrics},
+						},
+						"sysobjectid_topology_vendor": {
+							Value:     "Cisco topology",
 							Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerTopology},
 						},
 					},

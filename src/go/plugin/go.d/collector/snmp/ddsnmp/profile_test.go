@@ -174,6 +174,77 @@ func Test_FindProfiles(t *testing.T) {
 	}
 }
 
+func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *testing.T) {
+	tests := map[string]struct {
+		consumer          ProfileConsumer
+		wantMetrics       []string
+		wantTopologyKinds []ddprofiledefinition.TopologyKind
+		wantNoMetrics     bool
+		wantNoTopology    bool
+	}{
+		"metrics_projection": {
+			consumer:       ConsumerMetrics,
+			wantMetrics:    []string{"systemUptime", "tcpCurrEstab", "cpmCPUTotal5minRev"},
+			wantNoTopology: true,
+		},
+		"topology_projection": {
+			consumer: ConsumerTopology,
+			wantTopologyKinds: []ddprofiledefinition.TopologyKind{
+				ddprofiledefinition.KindLldpRem,
+				ddprofiledefinition.KindCdpCache,
+				ddprofiledefinition.KindFdbEntry,
+				ddprofiledefinition.KindQbridgeFdbEntry,
+				ddprofiledefinition.KindStpPort,
+				ddprofiledefinition.KindVtpVlan,
+			},
+			wantNoMetrics: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profiles := DefaultCatalog().Resolve(ResolveRequest{
+				SysObjectID:  "1.3.6.1.4.1.9.1.1",
+				ManualPolicy: ManualProfileFallback,
+			}).Project(tc.consumer).Profiles()
+			require.NotEmpty(t, profiles)
+
+			metricNames := make(map[string]bool)
+			topologyKinds := make(map[ddprofiledefinition.TopologyKind]bool)
+
+			for _, prof := range profiles {
+				require.NotNil(t, prof.Definition)
+				if tc.wantNoMetrics {
+					assert.Empty(t, prof.Definition.Metrics, prof.SourceFile)
+					assert.Empty(t, prof.Definition.VirtualMetrics, prof.SourceFile)
+				}
+				if tc.wantNoTopology {
+					assert.Empty(t, prof.Definition.Topology, prof.SourceFile)
+				}
+
+				for _, metric := range prof.Definition.Metrics {
+					if metric.Symbol.Name != "" {
+						metricNames[metric.Symbol.Name] = true
+					}
+					for _, sym := range metric.Symbols {
+						metricNames[sym.Name] = true
+					}
+				}
+				for _, topo := range prof.Definition.Topology {
+					topologyKinds[topo.Kind] = true
+				}
+			}
+
+			for _, metricName := range tc.wantMetrics {
+				assert.True(t, metricNames[metricName], "missing metric %q", metricName)
+			}
+			for _, kind := range tc.wantTopologyKinds {
+				assert.True(t, topologyKinds[kind], "missing topology kind %q", kind)
+			}
+		})
+	}
+}
+
 func Test_Profile_merge(t *testing.T) {
 	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216", "", nil) // cisco-nexus
 
