@@ -13,14 +13,15 @@ import (
 )
 
 func TestTopologyProfile_QBridgeFDBUsesMACFromIndex(t *testing.T) {
-	for _, tc := range []struct {
-		name        string
+	tests := map[string]struct {
 		indexSuffix string
 	}{
-		{name: "normal_mac_index", indexSuffix: "7.0.80.86.171.205.239"},
-		{name: "length_prefixed_mac_index", indexSuffix: "7.6.0.80.86.171.205.239"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+		"normal_mac_index":          {indexSuffix: "7.0.80.86.171.205.239"},
+		"length_prefixed_mac_index": {indexSuffix: "7.6.0.80.86.171.205.239"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			ctrl, mockHandler := setupMockHandler(t)
 			defer ctrl.Finish()
 

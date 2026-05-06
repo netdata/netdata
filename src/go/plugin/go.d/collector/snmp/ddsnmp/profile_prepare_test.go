@@ -12,15 +12,31 @@ import (
 )
 
 func TestLongestCommonPrefix(t *testing.T) {
-	assert.Equal(t, "1.3.6.1.2.1.31.1.1.1", longestCommonPrefix([]string{
-		"1.3.6.1.2.1.31.1.1.1.1",
-		"1.3.6.1.2.1.31.1.1.1.18",
-	}))
+	tests := map[string]struct {
+		oids     []string
+		expected string
+	}{
+		"if_x_table": {
+			oids: []string{
+				"1.3.6.1.2.1.31.1.1.1.1",
+				"1.3.6.1.2.1.31.1.1.1.18",
+			},
+			expected: "1.3.6.1.2.1.31.1.1.1",
+		},
+		"juniper_table": {
+			oids: []string{
+				"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11",
+				"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14",
+			},
+			expected: "1.3.6.1.4.1.2636.5.1.1.2.1.1.1",
+		},
+	}
 
-	assert.Equal(t, "1.3.6.1.4.1.2636.5.1.1.2.1.1.1", longestCommonPrefix([]string{
-		"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11",
-		"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14",
-	}))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, longestCommonPrefix(tc.oids))
+		})
+	}
 }
 
 func TestHandleCrossTableTagsWithoutMetrics(t *testing.T) {

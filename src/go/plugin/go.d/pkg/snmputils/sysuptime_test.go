@@ -16,7 +16,9 @@ import (
 func TestGetSysUptime(t *testing.T) {
 	tests := map[string]struct {
 		pdus     []gosnmp.SnmpPDU
+		getErr   error
 		expected int64
+		wantErr  bool
 	}{
 		"prefers_snmp_engine_time_seconds": {
 			pdus: []gosnmp.SnmpPDU{
@@ -50,6 +52,18 @@ func TestGetSysUptime(t *testing.T) {
 			},
 			expected: 0,
 		},
+		"returns_get_error": {
+			getErr:  errors.New("timeout"),
+			wantErr: true,
+		},
+		"returns_conversion_error_when_only_available_source_is_invalid": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: OidSnmpEngineTime, Type: gosnmp.OctetString, Value: []byte("bad")},
+				{Name: OidHrSystemUptime, Type: gosnmp.NoSuchObject, Value: nil},
+				{Name: OidSysUpTime, Type: gosnmp.NoSuchObject, Value: nil},
+			},
+			wantErr: true,
+		},
 	}
 
 	for name, tc := range tests {
@@ -58,41 +72,15 @@ func TestGetSysUptime(t *testing.T) {
 			defer ctrl.Finish()
 
 			client := snmpmock.NewMockHandler(ctrl)
-			client.EXPECT().Get(gomock.InAnyOrder(sysUptimeOIDs())).Return(&gosnmp.SnmpPacket{Variables: tc.pdus}, nil)
+			client.EXPECT().Get(gomock.InAnyOrder(sysUptimeOIDs())).Return(&gosnmp.SnmpPacket{Variables: tc.pdus}, tc.getErr)
 
 			actual, err := GetSysUptime(client)
-			require.NoError(t, err)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
-}
-
-func TestGetSysUptime_ReturnsGetError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().Get(gomock.InAnyOrder(sysUptimeOIDs())).Return(nil, errors.New("timeout"))
-
-	actual, err := GetSysUptime(client)
-	require.Error(t, err)
-	assert.Zero(t, actual)
-}
-
-func TestGetSysUptime_ReturnsConversionErrorWhenOnlyAvailableSourceIsInvalid(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().Get(gomock.InAnyOrder(sysUptimeOIDs())).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Name: OidSnmpEngineTime, Type: gosnmp.OctetString, Value: []byte("bad")},
-			{Name: OidHrSystemUptime, Type: gosnmp.NoSuchObject, Value: nil},
-			{Name: OidSysUpTime, Type: gosnmp.NoSuchObject, Value: nil},
-		},
-	}, nil)
-
-	actual, err := GetSysUptime(client)
-	require.Error(t, err)
-	assert.Zero(t, actual)
 }

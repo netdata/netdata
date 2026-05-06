@@ -103,6 +103,11 @@ When adding a new topology kind, update all three parts together:
 Verify that topology rows are delivered through `ProfileMetrics.TopologyMetrics`,
 not through underscore-prefixed `HiddenMetrics`.
 
+When adding or refactoring SNMP profile, parser, or topology tests, prefer
+table-driven cases using `map[string]struct{}` keyed by test-case name when
+the cases share setup and assertion shape. Use separate test functions only for
+materially different setup or assertions.
+
 ## Validation
 
 Run the narrow suites for the changed area:

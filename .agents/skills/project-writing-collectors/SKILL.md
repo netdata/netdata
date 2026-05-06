@@ -101,6 +101,12 @@ Source test data based on what you're collecting:
 
 Don't fabricate test data the parser passes by accident. Don't skip tests "because this protocol can't be tested locally" — that's exactly when fixtures matter most. Standard go.d test-function names: `Test_testDataIsValid`, `TestCollector_ConfigurationSerialize`, `TestCollector_Init`, `TestCollector_Check`, `TestCollector_Collect` — match the convention in adjacent collectors. Functions get a dedicated validator at `src/go/tools/functions-validation/` (E2E plus schema checks).
 
+For Go tests, prefer table-driven tests using `map[string]struct{}` keyed by
+test-case name when cases share setup and assertion shape. Use separate test
+functions only when setup or assertions are materially different. Prefer map
+keys over a `name` field in `[]struct{}` so case names stay prominent and
+order-independent.
+
 ### 2.2 Hot-path discipline
 
 `Collect()` runs every `update_every` seconds. It must:

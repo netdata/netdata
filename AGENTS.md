@@ -347,6 +347,15 @@ Output/reference skills:
 - Do not claim full-project validation from a narrow subsystem command.
 - Existing local helper scripts such as `install.sh` may exist in this working copy; inspect before use and do not assume they are tracked project interfaces.
 
+### Go test style
+
+- Prefer table-driven tests using `map[string]struct{}` keyed by test-case name
+  when cases share setup and assertion shape.
+- Use separate test functions only when setup or assertions are materially
+  different.
+- Prefer map keys over a `name` field in `[]struct{}` so case names are
+  prominent and order-independent.
+
 ### Project-specific overrides
 
 All existing project-specific instructions in this file remain active. The SOW framework adds durable work tracking; it does not weaken the root-cause, collector consistency, C code, naming, local-output, or secret-handling rules below.

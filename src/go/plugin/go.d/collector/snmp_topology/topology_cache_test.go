@@ -27,27 +27,33 @@ func newTestCollector(dev ddsnmp.DeviceConnectionInfo) *Collector {
 }
 
 func TestTopologyMetricHandlersRegisteredForRowKinds(t *testing.T) {
-	for _, kind := range []ddsnmp.TopologyKind{
-		ddsnmp.KindLldpLocPort,
-		ddsnmp.KindLldpLocManAddr,
-		ddsnmp.KindLldpRem,
-		ddsnmp.KindLldpRemManAddr,
-		ddsnmp.KindLldpRemManAddrCompat,
-		ddsnmp.KindCdpCache,
-		ddsnmp.KindIfName,
-		ddsnmp.KindIfStatus,
-		ddsnmp.KindIfDuplex,
-		ddsnmp.KindIpIfIndex,
-		ddsnmp.KindBridgePortIfIndex,
-		ddsnmp.KindFdbEntry,
-		ddsnmp.KindQbridgeFdbEntry,
-		ddsnmp.KindQbridgeVlanEntry,
-		ddsnmp.KindStpPort,
-		ddsnmp.KindVtpVlan,
-		ddsnmp.KindArpEntry,
-		ddsnmp.KindArpLegacyEntry,
-	} {
-		require.NotNil(t, topologyMetricHandlers[kind], "missing topology handler for %s", kind)
+	tests := map[string]struct {
+		kind ddsnmp.TopologyKind
+	}{
+		"lldp_loc_port":            {kind: ddsnmp.KindLldpLocPort},
+		"lldp_loc_man_addr":        {kind: ddsnmp.KindLldpLocManAddr},
+		"lldp_rem":                 {kind: ddsnmp.KindLldpRem},
+		"lldp_rem_man_addr":        {kind: ddsnmp.KindLldpRemManAddr},
+		"lldp_rem_man_addr_compat": {kind: ddsnmp.KindLldpRemManAddrCompat},
+		"cdp_cache":                {kind: ddsnmp.KindCdpCache},
+		"if_name":                  {kind: ddsnmp.KindIfName},
+		"if_status":                {kind: ddsnmp.KindIfStatus},
+		"if_duplex":                {kind: ddsnmp.KindIfDuplex},
+		"ip_if_index":              {kind: ddsnmp.KindIpIfIndex},
+		"bridge_port_if_index":     {kind: ddsnmp.KindBridgePortIfIndex},
+		"fdb_entry":                {kind: ddsnmp.KindFdbEntry},
+		"qbridge_fdb_entry":        {kind: ddsnmp.KindQbridgeFdbEntry},
+		"qbridge_vlan_entry":       {kind: ddsnmp.KindQbridgeVlanEntry},
+		"stp_port":                 {kind: ddsnmp.KindStpPort},
+		"vtp_vlan":                 {kind: ddsnmp.KindVtpVlan},
+		"arp_entry":                {kind: ddsnmp.KindArpEntry},
+		"arp_legacy_entry":         {kind: ddsnmp.KindArpLegacyEntry},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NotNil(t, topologyMetricHandlers[tc.kind], "missing topology handler for %s", tc.kind)
+		})
 	}
 }
 

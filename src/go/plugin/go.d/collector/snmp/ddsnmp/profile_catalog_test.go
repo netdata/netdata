@@ -34,30 +34,29 @@ func TestCatalogResolve_ManualProfilePolicies(t *testing.T) {
 		},
 	}}
 
-	fallback := catalog.Resolve(ResolveRequest{
-		SysObjectID:    "1.3.6.1.4",
-		ManualProfiles: []string{"manual"},
-		ManualPolicy:   ManualProfileFallback,
-	}).Profiles()
-	require.Len(t, fallback, 1)
-	assert.Equal(t, "auto.yaml", fallback[0].SourceFile)
+	tests := map[string]struct {
+		policy   ManualProfilePolicy
+		expected []string
+	}{
+		"fallback_keeps_auto_match": {policy: ManualProfileFallback, expected: []string{"auto.yaml"}},
+		"augment_appends_manual":    {policy: ManualProfileAugment, expected: []string{"auto.yaml", "manual.yaml"}},
+		"override_uses_manual_only": {policy: ManualProfileOverride, expected: []string{"manual.yaml"}},
+	}
 
-	augment := catalog.Resolve(ResolveRequest{
-		SysObjectID:    "1.3.6.1.4",
-		ManualProfiles: []string{"manual"},
-		ManualPolicy:   ManualProfileAugment,
-	}).Profiles()
-	require.Len(t, augment, 2)
-	assert.Equal(t, "auto.yaml", augment[0].SourceFile)
-	assert.Equal(t, "manual.yaml", augment[1].SourceFile)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profiles := catalog.Resolve(ResolveRequest{
+				SysObjectID:    "1.3.6.1.4",
+				ManualProfiles: []string{"manual"},
+				ManualPolicy:   tc.policy,
+			}).Profiles()
 
-	override := catalog.Resolve(ResolveRequest{
-		SysObjectID:    "1.3.6.1.4",
-		ManualProfiles: []string{"manual"},
-		ManualPolicy:   ManualProfileOverride,
-	}).Profiles()
-	require.Len(t, override, 1)
-	assert.Equal(t, "manual.yaml", override[0].SourceFile)
+			require.Len(t, profiles, len(tc.expected))
+			for i, expected := range tc.expected {
+				assert.Equal(t, expected, profiles[i].SourceFile)
+			}
+		})
+	}
 }
 
 func TestResolvedProfileSetProject_SeparatesMetricsAndTopology(t *testing.T) {
