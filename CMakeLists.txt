@@ -1429,8 +1429,10 @@ set(API_PLUGIN_FILES
         src/web/api/functions/functions.h
         src/web/api/functions/function-progress.c
         src/web/api/functions/function-progress.h
-        src/web/api/functions/function-streaming.c
-        src/web/api/functions/function-streaming.h
+        src/web/api/functions/function-netdata-streaming.c
+        src/web/api/functions/function-netdata-streaming.h
+        src/web/api/functions/function-topology-streaming.c
+        src/web/api/functions/function-topology-streaming.h
         src/web/api/queries/rrdr.c
         src/web/api/queries/rrdr.h
         src/web/api/queries/query.c

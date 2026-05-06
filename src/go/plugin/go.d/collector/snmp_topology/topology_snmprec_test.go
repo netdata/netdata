@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build topology_fixtures
+//go:build snmp_topology_fixtures
 
 package snmptopology
 
