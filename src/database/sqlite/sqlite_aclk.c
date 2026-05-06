@@ -988,7 +988,7 @@ static void aclk_initialize_event_loop(void)
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_uuid_t *node_id __maybe_unused)
 {
 
-    if (!host || host->aclk_host_config)
+    if (!host || __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE))
         return;
 
     struct aclk_sync_cfg_t *aclk_host_config = callocz(1, sizeof(struct aclk_sync_cfg_t));
