@@ -1052,6 +1052,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/windows-wmi/windows-wmi.h
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.c
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.h
+        src/libnetdata/os/windows-wmi/windows-wmi-GetOsInfo.c
+        src/libnetdata/os/windows-wmi/windows-wmi-GetOsInfo.h
         src/libnetdata/os/windows-perflib/perflib.c
         src/libnetdata/os/windows-perflib/perflib.h
         src/libnetdata/os/windows-perflib/perflib-names.c

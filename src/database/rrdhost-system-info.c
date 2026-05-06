@@ -150,6 +150,14 @@ int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, cha
         freez(system_info->network_default_iface_detection);
         system_info->network_default_iface_detection = strdupz(value);
     }
+    else if(!strcmp(name, "NETDATA_WINDOWS_OS_CAPTION")){
+        freez(system_info->windows_os_caption);
+        system_info->windows_os_caption = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_WINDOWS_PRODUCT_TYPE")){
+        freez(system_info->windows_product_type);
+        system_info->windows_product_type = strdupz(value);
+    }
     else if (!strcmp(name, "NETDATA_SYSTEM_CPU_VENDOR"))
         return res;
     else if (!strcmp(name, "NETDATA_SYSTEM_CPU_DETECTION"))
@@ -197,6 +205,8 @@ struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labe
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_name, "_hw_product_name");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_sys_vendor, "_hw_sys_vendor");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_type, "_hw_product_type");
+    rrdlabels_get_value_strdup_or_null(labels, &info->windows_os_caption, "_windows_os_caption");
+    rrdlabels_get_value_strdup_or_null(labels, &info->windows_product_type, "_windows_product_type");
     return info;
 }
 
@@ -278,6 +288,12 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
 
     if (system_info->hw_product_type)
         rrdlabels_add(labels, "_hw_product_type", system_info->hw_product_type, RRDLABEL_SRC_AUTO);
+
+    if (system_info->windows_os_caption)
+        rrdlabels_add(labels, "_windows_os_caption", system_info->windows_os_caption, RRDLABEL_SRC_AUTO);
+
+    if (system_info->windows_product_type)
+        rrdlabels_add(labels, "_windows_product_type", system_info->windows_product_type, RRDLABEL_SRC_AUTO);
 }
 
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
@@ -441,6 +457,8 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->hw_product_name);
         freez(system_info->hw_sys_vendor);
         freez(system_info->hw_product_type);
+        freez(system_info->windows_os_caption);
+        freez(system_info->windows_product_type);
         freez(system_info);
     }
 }
@@ -573,6 +591,8 @@ int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_hos
     ret += cb("NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", system_info->network_default_iface, uuid);
     ret += cb("NETDATA_SYSTEM_DEFAULT_INTERFACE_IP", system_info->network_default_iface_ip, uuid);
     ret += cb("NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION", system_info->network_default_iface_detection, uuid);
+    ret += cb("NETDATA_WINDOWS_OS_CAPTION", system_info->windows_os_caption, uuid);
+    ret += cb("NETDATA_WINDOWS_PRODUCT_TYPE", system_info->windows_product_type, uuid);
     return ret;
 }
 
@@ -607,6 +627,8 @@ void rrdhost_system_info_to_url_encode_stream(BUFFER *wb, struct rrdhost_system_
     buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_CPU_FREQ", system_info->host_cpu_freq);
     buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_TOTAL_RAM", system_info->host_ram_total);
     buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_TOTAL_DISK_SIZE", system_info->host_disk_space);
+    buffer_key_value_urlencode(wb, "&NETDATA_WINDOWS_OS_CAPTION", system_info->windows_os_caption);
+    buffer_key_value_urlencode(wb, "&NETDATA_WINDOWS_PRODUCT_TYPE", system_info->windows_product_type);
 }
 
 void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, struct update_node_info *node_info) {

@@ -51,6 +51,8 @@ struct rrdhost_system_info {
     char *hw_product_name;
     char *hw_sys_vendor;
     char *hw_product_type;
+    char *windows_os_caption;
+    char *windows_product_type;
 };
 #else
 struct rrdhost_system_info;
@@ -102,7 +104,7 @@ typedef int (*add_host_sysinfo_key_value_t)(const char *name, const char *value,
 // Number of NETDATA_* keys emitted by rrdhost_system_info_foreach(); callers
 // compare against the cb-success count to detect partial-store failures.
 // Keep in sync with the body of rrdhost_system_info_foreach().
-#define RRDHOST_SYSTEM_INFO_KEY_COUNT 27
+#define RRDHOST_SYSTEM_INFO_KEY_COUNT 29
 
 int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_host_sysinfo_key_value_t cb, nd_uuid_t *uuid);
 

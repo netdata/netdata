@@ -3,6 +3,7 @@
 #include "win_system-info.h"
 #include "database/rrdhost-system-info.h"
 #include "libnetdata/os/windows-api/windows_api.h"
+#include "libnetdata/os/windows-wmi/windows-wmi.h"
 
 #ifdef OS_WINDOWS
 
@@ -329,12 +330,38 @@ static char *netdata_windows_get_os_id_like(DWORD build)
     return id_like;
 }
 
+static const char *netdata_windows_product_type_str(DWORD productType)
+{
+    switch (productType) {
+        case 1:  return "Desktop";
+        case 2:  return "Domain Controller";
+        case 3:  return "Server";
+        default: return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+    }
+}
+
 static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
 {
     char osVersion[4096];
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_NAME", "Microsoft Windows");
 
     DWORD build = netdata_windows_get_current_build();
+
+    OsInfoWMI osInfo;
+    bool wmi_ok = GetOsInfo(&osInfo);
+
+    // Use WMI Caption as the human-friendly OS name if available
+    if (wmi_ok && osInfo.Caption[0] != '\0') {
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_NAME", osInfo.Caption);
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_WINDOWS_OS_CAPTION", osInfo.Caption);
+    } else {
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_NAME", "Microsoft Windows");
+    }
+
+    if (wmi_ok && osInfo.ProductType > 0) {
+        (void)rrdhost_system_info_set_by_name(
+            systemInfo, "NETDATA_WINDOWS_PRODUCT_TYPE",
+            (char *)netdata_windows_product_type_str(osInfo.ProductType));
+    }
 
     netdata_windows_discover_os_version(osVersion, 4095, build);
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_ID", osVersion);
