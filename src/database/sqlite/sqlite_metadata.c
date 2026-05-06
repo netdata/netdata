@@ -1413,219 +1413,146 @@ static uint64_t get_rowid_from_statement(const char *sql)
 }
 
 
-#define SQL_GET_MAX_DIM_ROW_ID "SELECT MAX(rowid) FROM dimension"
+// Descriptor + state for one cleanup cycle (dimension / chart / chart_label).
+// Preserves the three former check_*_metadata() functions' control flow exactly:
+//   first call -> arm timer, snapshot max(rowid)
+//   timer not yet expired -> return true (yield)
+//   already past max(rowid) -> log completion; either re-arm (dim) or mark
+//                              one-shot completed (chart, label)
+//   else -> run one cleanup_loop slice and re-arm
+struct cleanup_cycle {
+    // descriptor (immutable)
+    const char *select_sql;        // SELECT id, rowid FROM <table> WHERE rowid > ?
+    const char *max_rowid_sql;     // SELECT MAX(rowid) FROM <table>
+    bool (*check_cb)(nd_uuid_t *, sqlite3_stmt **, bool);
+    void (*action_cb)(nd_uuid_t *, sqlite3_stmt **, bool);
+    bool check_flag;
+    bool action_flag;
+    int repeat_after;              // seconds to next slice after a partial pass
+    int complete_repeat_after;     // seconds to next pass after full completion;
+                                   // 0 means one-shot (don't re-run after first done)
+    size_t worker_event;           // worker_is_busy id
+    const char *label_singular;    // "Dimension" / "Chart" / "Chart label"     (INFO logs)
+    const char *label_plural;      // "Dimensions" / "Charts" / "Chart labels"  (DEBUG summary)
+    const char *label_lower;       // "dimensions" / "charts" / "chart labels"  (DEBUG checking)
 
-static bool check_dimension_metadata(struct meta_config_s *wc)
+    // mutable state (per-cycle)
+    time_t next_execution_t;
+    uint64_t last_row_id;
+    uint64_t max_row_id;
+    bool completed;                // for one-shot cycles only
+};
+
+static bool run_cleanup_cycle(struct cleanup_cycle *c, struct meta_config_s *wc)
 {
-    static time_t next_execution_t = 0;
-    static uint64_t last_row_id = 0;
-    static uint64_t max_row_id = 0;
+    if (c->complete_repeat_after == 0 && c->completed)
+        return true;
 
     time_t now = now_realtime_sec();
 
-    if (!next_execution_t) {
-        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
-        max_row_id = get_rowid_from_statement(SQL_GET_MAX_DIM_ROW_ID);
-        nd_log(NDLS_DAEMON, NDLP_INFO, "Dimension metadata check has been scheduled to run (max id = %lu)", max_row_id);
+    if (!c->next_execution_t) {
+        c->next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
+        c->max_row_id = get_rowid_from_statement(c->max_rowid_sql);
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "%s metadata check has been scheduled to run (max id = %lu)",
+               c->label_singular, c->max_row_id);
     }
 
-    if (next_execution_t && next_execution_t > now)
+    if (c->next_execution_t > now)
         return true;
 
-    if (max_row_id && last_row_id >= max_row_id) {
-        nd_log_daemon(NDLP_INFO, "Dimension metadata check completed");
-        // For long running agents, check in a week
-        next_execution_t = now + 604800;
+    if (c->max_row_id && c->last_row_id >= c->max_row_id) {
+        nd_log(NDLS_DAEMON, NDLP_INFO, "%s metadata check completed", c->label_singular);
+        if (c->complete_repeat_after)
+            c->next_execution_t = now + c->complete_repeat_after;
+        else
+            c->completed = true;
         return true;
     }
 
     sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SELECT_DIMENSION_LIST, &res))
+    if (!PREPARE_STATEMENT(db_meta, c->select_sql, &res))
         return true;
 
     uint32_t total_checked = 0;
     uint32_t total_deleted = 0;
 
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Checking dimensions starting after row %" PRIu64, last_row_id);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "Checking %s starting after row %" PRIu64, c->label_lower, c->last_row_id);
 
-    worker_is_busy(UV_EVENT_DIMENSION_CLEANUP);
+    worker_is_busy(c->worker_event);
+
+    sqlite3_stmt *check_res = NULL;
+    sqlite3_stmt *action_res = NULL;
 
     (void) run_cleanup_loop(
-        res,
-        wc,
-        dimension_can_be_deleted,
-        delete_dimension_uuid,
-        &total_checked,
-        &total_deleted,
-        &last_row_id,
-        NULL,
-        NULL,
-        false,
-        false);
-
-    now = now_realtime_sec();
-    next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
-    nd_log_daemon(
-        NDLP_DEBUG,
-        "Dimensions checked %u, deleted %u. Checks will resume in %d seconds",
-        total_checked,
-        total_deleted,
-        METADATA_MAINTENANCE_REPEAT);
-
-    SQLITE_FINALIZE(res);
-
-    worker_is_idle();
-    return false;
-}
-
-#define SQL_GET_MAX_CHART_ROW_ID "SELECT MAX(rowid) FROM chart"
-
-static bool check_chart_metadata(struct meta_config_s *wc)
-{
-    static time_t next_execution_t = 0;
-    static uint64_t last_row_id = 0;
-    static uint64_t max_row_id = 0;
-    static bool check_completed = false;
-
-    if (check_completed)
-        return true;
-
-    time_t now = now_realtime_sec();
-
-    if (!next_execution_t) {
-        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
-        max_row_id = get_rowid_from_statement(SQL_GET_MAX_CHART_ROW_ID);
-        nd_log(NDLS_DAEMON, NDLP_INFO, "Chart metadata check has been scheduled to run (max id = %lu)", max_row_id);
-    }
-
-    if (next_execution_t && next_execution_t > now)
-        return true;
-
-    if (max_row_id && last_row_id >= max_row_id) {
-        nd_log(NDLS_DAEMON, NDLP_INFO, "Chart metadata check completed");
-        check_completed = true;
-        return true;
-    }
-
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SELECT_CHART_LIST, &res))
-        return true;
-
-    uint32_t total_checked = 0;
-    uint32_t total_deleted = 0;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Checking charts starting after row %" PRIu64, last_row_id);
-
-    worker_is_busy(UV_EVENT_CHART_CLEANUP);
-    sqlite3_stmt *check_res = NULL;
-    sqlite3_stmt *action_res = NULL;
-    (void)run_cleanup_loop(
-        res,
-        wc,
-        chart_can_be_deleted,
-        delete_chart_uuid,
-        &total_checked,
-        &total_deleted,
-        &last_row_id,
-        &check_res,
-        &action_res,
-        true,
-        false);
+        res, wc,
+        c->check_cb, c->action_cb,
+        &total_checked, &total_deleted,
+        &c->last_row_id,
+        &check_res, &action_res,
+        c->check_flag, c->action_flag);
 
     SQLITE_FINALIZE(check_res);
     SQLITE_FINALIZE(action_res);
 
     now = now_realtime_sec();
-    next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
-    nd_log_daemon(
-        NDLP_DEBUG,
-        "Charts checked %u, deleted %u. Checks will resume in %d seconds",
-        total_checked,
-        total_deleted,
-        METADATA_MAINTENANCE_REPEAT);
+    c->next_execution_t = now + c->repeat_after;
 
-    SQLITE_FINALIZE(res);
-    worker_is_idle();
-    return false;
-}
-
-#define SQL_GET_MAX_CHART_LABEL_ROW_ID "SELECT MAX(rowid) FROM chart_label"
-
-static bool check_label_metadata(struct meta_config_s *wc)
-{
-    static time_t next_execution_t = 0;
-    static uint64_t last_row_id = 0;
-    static uint64_t max_row_id = 0;
-    static bool check_completed = false;
-
-    if (check_completed)
-        return true;
-
-    time_t now = now_realtime_sec();
-
-    if (!next_execution_t) {
-        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
-        max_row_id = get_rowid_from_statement(SQL_GET_MAX_CHART_LABEL_ROW_ID);
-        nd_log(NDLS_DAEMON, NDLP_INFO, "Chart label metadata check has been scheduled to run (max id = %lu)", max_row_id);
-    }
-
-    if (next_execution_t && next_execution_t > now)
-        return true;
-
-    if (max_row_id && last_row_id >= max_row_id) {
-        nd_log(NDLS_DAEMON, NDLP_INFO, "Chart label metadata check completed");
-        check_completed = true;
-        return true;
-    }
-
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SELECT_CHART_LABEL_LIST, &res))
-        return true;
-
-    uint32_t total_checked = 0;
-    uint32_t total_deleted = 0;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Checking charts labels starting after row %" PRIu64, last_row_id);
-
-    sqlite3_stmt *check_res = NULL;
-    sqlite3_stmt *action_res = NULL;
-
-    worker_is_busy(UV_EVENT_CHART_LABEL_CLEANUP);
-
-    (void )run_cleanup_loop(
-        res,
-        wc,
-        chart_can_be_deleted,
-        delete_chart_uuid,
-        &total_checked,
-        &total_deleted,
-        &last_row_id,
-        &check_res,
-        &action_res,
-        false,
-        true);
-
-    SQLITE_FINALIZE(check_res);
-    SQLITE_FINALIZE(action_res);
-
-    now = now_realtime_sec();
-    next_execution_t = now + METADATA_LABEL_CHECK_INTERVAL;
-
-    nd_log_daemon(
-        NDLP_DEBUG,
-        "Chart labels checked %u, deleted %u. Checks will resume in %d seconds",
-        total_checked,
-        total_deleted,
-        METADATA_LABEL_CHECK_INTERVAL);
+    nd_log_daemon(NDLP_DEBUG,
+                  "%s checked %u, deleted %u. Checks will resume in %d seconds",
+                  c->label_plural, total_checked, total_deleted, c->repeat_after);
 
     SQLITE_FINALIZE(res);
 
     worker_is_idle();
     return false;
 }
+
+static struct cleanup_cycle dim_cleanup_cycle = {
+    .select_sql           = SELECT_DIMENSION_LIST,
+    .max_rowid_sql        = "SELECT MAX(rowid) FROM dimension",
+    .check_cb             = dimension_can_be_deleted,
+    .action_cb            = delete_dimension_uuid,
+    .check_flag           = false,
+    .action_flag          = false,
+    .repeat_after         = METADATA_MAINTENANCE_REPEAT,
+    .complete_repeat_after = 604800,                          // re-fire weekly (no-op rearm; preserved as-is)
+    .worker_event         = UV_EVENT_DIMENSION_CLEANUP,
+    .label_singular       = "Dimension",
+    .label_plural         = "Dimensions",
+    .label_lower          = "dimensions",
+};
+
+static struct cleanup_cycle chart_cleanup_cycle = {
+    .select_sql           = SELECT_CHART_LIST,
+    .max_rowid_sql        = "SELECT MAX(rowid) FROM chart",
+    .check_cb             = chart_can_be_deleted,
+    .action_cb            = delete_chart_uuid,
+    .check_flag           = true,
+    .action_flag          = false,
+    .repeat_after         = METADATA_MAINTENANCE_REPEAT,
+    .complete_repeat_after = 0,                                // one-shot
+    .worker_event         = UV_EVENT_CHART_CLEANUP,
+    .label_singular       = "Chart",
+    .label_plural         = "Charts",
+    .label_lower          = "charts",
+};
+
+static struct cleanup_cycle label_cleanup_cycle = {
+    .select_sql           = SELECT_CHART_LABEL_LIST,
+    .max_rowid_sql        = "SELECT MAX(rowid) FROM chart_label",
+    .check_cb             = chart_can_be_deleted,
+    .action_cb            = delete_chart_uuid,
+    .check_flag           = false,
+    .action_flag          = true,
+    .repeat_after         = METADATA_LABEL_CHECK_INTERVAL,
+    .complete_repeat_after = 0,                                // one-shot
+    .worker_event         = UV_EVENT_CHART_LABEL_CLEANUP,
+    .label_singular       = "Chart label",
+    .label_plural         = "Chart labels",
+    .label_lower          = "charts labels",                   // preserves the original DEBUG-line typo verbatim
+};
 
 static void cleanup_health_log(struct meta_config_s *config)
 {
@@ -1859,9 +1786,9 @@ void run_metadata_cleanup(struct meta_config_s *config)
     if (unlikely(SHUTDOWN_REQUESTED(config)))
         return;
 
-    if (check_dimension_metadata(config))
-        if (check_chart_metadata(config))
-            check_label_metadata(config);
+    if (run_cleanup_cycle(&dim_cleanup_cycle, config))
+        if (run_cleanup_cycle(&chart_cleanup_cycle, config))
+            run_cleanup_cycle(&label_cleanup_cycle, config);
 
     cleanup_health_log(config);
 
