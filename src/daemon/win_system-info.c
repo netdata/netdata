@@ -332,6 +332,10 @@ static char *netdata_windows_get_os_id_like(DWORD build)
 
 static const char *netdata_windows_product_type_str(DWORD productType)
 {
+    // Win32_OperatingSystem ProductType values:
+    // 1 = VER_NT_WORKSTATION (Desktop/Workstation)
+    // 2 = VER_NT_DOMAIN_CONTROLLER (Active Directory Domain Controller)
+    // 3 = VER_NT_SERVER (Server)
     switch (productType) {
         case 1:  return "Desktop";
         case 2:  return "Domain Controller";
@@ -360,7 +364,7 @@ static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
     if (wmi_ok && osInfo.ProductType > 0) {
         (void)rrdhost_system_info_set_by_name(
             systemInfo, "NETDATA_WINDOWS_PRODUCT_TYPE",
-            (char *)netdata_windows_product_type_str(osInfo.ProductType));
+            netdata_windows_product_type_str(osInfo.ProductType));
     }
 
     netdata_windows_discover_os_version(osVersion, 4095, build);
