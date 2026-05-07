@@ -60,7 +60,7 @@ static char *transform_log_path_setting(const char *setting, bool for_display) {
         return strdupz("");
 
     CLEAN_CHAR_P *copy = strdupz(setting);
-    char *output = strrchr(copy, '@');
+    char *output = strchr(copy, '@');
     size_t prefix_len = 0;
 
     if(output) {
