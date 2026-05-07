@@ -125,6 +125,29 @@ modules:
                   - name: name2
                     pattern: pattern2
                 ```
+
+                Examples:
+
+                ```yaml
+                url_patterns:
+                  - name: api
+                    pattern: '* /api/*'
+                  - name: api_versioned
+                    pattern: '~ ^/api/v[0-9]+/.*'
+                  - name: health_endpoint
+                    pattern: '= /health'
+                  - name: not_static_css
+                    pattern: '!* *.css'
+                ```
+
+                Pattern values use the [matcher library](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) syntax:
+
+                - `=` — string (exact match)
+                - `*` — glob patterns
+                - `~` — regular expressions
+                - `simple_patterns` — simple patterns (long syntax only)
+
+                Patterns are matched against the full original request URI (`$request_uri`).
             - name: url_patterns.name
               description: Used as a dimension name.
               default_value: ""
