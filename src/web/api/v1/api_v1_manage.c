@@ -14,18 +14,27 @@ static char *get_mgmt_api_key(void) {
         return guid;
 
     // read it from disk
+#ifdef O_NOFOLLOW
+    int fd = open(api_key_filename, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+#else
     int fd = open(api_key_filename, O_RDONLY | O_CLOEXEC);
+#endif
     if(fd != -1) {
-        char buf[GUID_LEN + 1];
-        if(read(fd, buf, GUID_LEN) != GUID_LEN)
-            netdata_log_error("Failed to read management API key from '%s'", api_key_filename);
+        struct stat st;
+        if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode))
+            netdata_log_error("Management API key file '%s' is not a regular file, regenerating.", api_key_filename);
         else {
-            buf[GUID_LEN] = '\0';
-            if(regenerate_guid(buf, guid) == -1) {
-                netdata_log_error("Failed to validate management API key '%s' from '%s'.",
-                                  buf, api_key_filename);
+            char buf[GUID_LEN + 1];
+            if(read(fd, buf, GUID_LEN) != GUID_LEN)
+                netdata_log_error("Failed to read management API key from '%s'", api_key_filename);
+            else {
+                buf[GUID_LEN] = '\0';
+                if(regenerate_guid(buf, guid) == -1) {
+                    netdata_log_error("Failed to validate management API key '%s' from '%s'.",
+                                      buf, api_key_filename);
 
-                guid[0] = '\0';
+                    guid[0] = '\0';
+                }
             }
         }
         close(fd);
@@ -34,15 +43,26 @@ static char *get_mgmt_api_key(void) {
     // generate a new one?
     if(!guid[0]) {
         nd_uuid_t uuid;
+        struct stat st;
 
         uuid_generate(uuid);
         uuid_unparse_lower(uuid, guid);
         guid[GUID_LEN] = '\0';
 
         // save it
-        fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC | O_CLOEXEC, 0600);
+#ifdef O_NOFOLLOW
+        fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC|O_NOFOLLOW, 0600);
+#else
+        fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0600);
+#endif
         if(fd == -1) {
             netdata_log_error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
+            goto temp_key;
+        }
+
+        if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+            netdata_log_error("Management API key file '%s' is not a regular file.", api_key_filename);
+            close(fd);
             goto temp_key;
         }
 
