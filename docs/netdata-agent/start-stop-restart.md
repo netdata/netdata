@@ -62,6 +62,54 @@ No need to restart the Netdata Agent after modifying health configuration files 
 sudo netdatacli reload-health
 ```
 
+## macOS
+
+Netdata on macOS is managed through `launchd`. The service is registered with the label `com.github.netdata` and its plist file is installed at `/Library/LaunchDaemons/com.github.netdata.plist`.
+
+### Start and Stop
+
+| Action | Command                                      |
+|--------|----------------------------------------------|
+| start  | `sudo launchctl start com.github.netdata`    |
+| stop   | `sudo launchctl stop com.github.netdata`     |
+
+### Enable and Disable at Boot
+
+| Action  | Command                                                            |
+|---------|--------------------------------------------------------------------|
+| enable  | `sudo launchctl load /Library/LaunchDaemons/com.github.netdata.plist`  |
+| disable | `sudo launchctl unload /Library/LaunchDaemons/com.github.netdata.plist` |
+
+:::note
+
+`launchctl load` starts the daemon immediately because `RunAtLoad` is set to `true` in the plist. After a `launchctl unload`, the daemon will not restart until you load the plist again.
+
+:::
+
+## FreeBSD
+
+Netdata on FreeBSD is managed through the `rc.d` system.
+
+### Start, Stop, and Restart
+
+| Action  | Command                           |
+|---------|-----------------------------------|
+| start   | `sudo service netdata start`      |
+| stop    | `sudo service netdata stop`       |
+| restart | `sudo service netdata restart`    |
+
+### Enable at Boot
+
+```bash
+sudo sysrc netdata_enable=YES
+```
+
+To disable the service at boot:
+
+```bash
+sudo sysrc netdata_enable=NO
+```
+
 ## Windows
 
 :::note
@@ -99,6 +147,25 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 | **Restart**       | `sudo systemctl restart netdata` | `sudo service netdata restart`   | Stop + Start                     |
 | **Reload Health** | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  |
 | **Shutdown**      | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` |
+
+### macOS Commands Summary
+
+| Task        | Command                                        |
+|-------------|------------------------------------------------|
+| **Start**   | `sudo launchctl start com.github.netdata`      |
+| **Stop**    | `sudo launchctl stop com.github.netdata`       |
+| **Enable**  | `sudo launchctl load /Library/LaunchDaemons/com.github.netdata.plist`  |
+| **Disable** | `sudo launchctl unload /Library/LaunchDaemons/com.github.netdata.plist` |
+
+### FreeBSD Commands Summary
+
+| Task        | Command                           |
+|-------------|-----------------------------------|
+| **Start**   | `sudo service netdata start`      |
+| **Stop**    | `sudo service netdata stop`       |
+| **Restart** | `sudo service netdata restart`    |
+| **Enable**  | `sudo sysrc netdata_enable=YES`   |
+| **Disable** | `sudo sysrc netdata_enable=NO`    |
 
 ### Windows Commands Summary
 
