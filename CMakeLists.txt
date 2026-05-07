@@ -108,7 +108,7 @@ function(netdata_windows_path_to_runtime_path output_var input_path)
       ERROR_QUIET)
   endif()
 
-  if(NOT _converted_path)
+  if(NOT _converted_path OR NOT _cygpath_result EQUAL 0)
     string(REPLACE "\\" "/" _converted_path "${input_path}")
 
     if(_converted_path MATCHES "^([A-Za-z]):(.*)$")
