@@ -752,6 +752,7 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 
 	tests := map[string]struct {
 		metrics         []MetricsConfig
+		topology        []TopologyConfig
 		virtualMetrics  []VirtualMetricConfig
 		wantErrContains []string
 	}{
@@ -967,6 +968,37 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 				"virtual_metrics[0]: must define sources or alternatives",
 			},
 		},
+		"reject topology source": {
+			metrics: baseMetrics,
+			topology: []TopologyConfig{
+				{
+					Kind: KindLldpRem,
+					MetricsConfig: MetricsConfig{
+						Table: SymbolConfig{
+							OID:  "1.0.8802.1.1.2.1.4.1",
+							Name: "lldpRemTable",
+						},
+						Symbols: []SymbolConfig{
+							{OID: "1.0.8802.1.1.2.1.4.1.1.6", Name: "lldpRemPortIdSubtype"},
+						},
+						MetricTags: MetricTagConfigList{
+							{Tag: "lldp_rem_index", Index: 1},
+						},
+					},
+				},
+			},
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name: "invalidTopologyDerivedMetric",
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "lldpRemPortIdSubtype", Table: "lldpRemTable"},
+					},
+				},
+			},
+			wantErrContains: []string{
+				`virtual_metrics[0].sources[0]: topology metric source "lldpRemPortIdSubtype" cannot be used by virtual_metrics`,
+			},
+		},
 		"duplicate name conflicting with metric": {
 			metrics: baseMetrics,
 			virtualMetrics: []VirtualMetricConfig{
@@ -1026,7 +1058,7 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := validateEnrichVirtualMetrics(tt.metrics, tt.virtualMetrics)
+			err := validateEnrichVirtualMetrics(tt.metrics, tt.topology, tt.virtualMetrics)
 			if len(tt.wantErrContains) == 0 {
 				assert.NoError(t, err)
 				return

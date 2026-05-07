@@ -22,61 +22,49 @@ type columnMetricKey struct {
 	symbolName string
 }
 
+type topologyScalarMetricKey struct {
+	kind ddprofiledefinition.TopologyKind
+	name string
+	oid  string
+}
+
+type topologyColumnMetricKey struct {
+	kind       ddprofiledefinition.TopologyKind
+	table      string
+	symbolName string
+}
+
+type topologyScalarConflictKey struct {
+	name string
+	oid  string
+}
+
+type topologyColumnConflictKey struct {
+	table      string
+	symbolName string
+}
+
 // FindProfiles returns profiles matching the given sysObjectID.
 // Profiles are sorted by match specificity: most specific first.
 func FindProfiles(sysObjID, sysDescr string, manualProfiles []string) []*Profile {
-	loadProfiles()
-
-	finalize := func(profiles []*Profile) []*Profile {
-		if len(profiles) == 0 {
-			return nil
-		}
-		enrichProfiles(profiles)
-		deduplicateMetricsAcrossProfiles(profiles)
-		return profiles
-	}
-
-	// Fallback/manual path (no sysObjectID)
-	if sysObjID == "" {
-		if len(manualProfiles) == 0 {
-			log.Warning("No sysObjectID found and no manual_profiles configured. Either ensure the device provides sysObjectID or configure manual_profiles option.")
-			return nil
-		}
-
-		var selected []*Profile
-		for _, prof := range ddProfiles {
-			name := stripFileNameExt(prof.SourceFile)
-			if slices.ContainsFunc(manualProfiles, func(p string) bool { return stripFileNameExt(p) == name }) {
-				selected = append(selected, prof.clone())
-			}
-		}
-
-		return finalize(selected)
-	}
-
-	// Auto-detect path
-	matchedOIDs := make(map[*Profile]string)
-	var selected []*Profile
-
-	for _, prof := range ddProfiles {
-		if ok, matchedOid := prof.Definition.Selector.Matches(sysObjID, sysDescr); ok {
-			cloned := prof.clone()
-			selected = append(selected, cloned)
-			matchedOIDs[cloned] = matchedOid
-		}
-	}
-
-	sortProfilesBySpecificity(selected, matchedOIDs)
-	return finalize(selected)
+	return DefaultCatalog().Resolve(ResolveRequest{
+		SysObjectID:    sysObjID,
+		SysDescr:       sysDescr,
+		ManualProfiles: manualProfiles,
+		ManualPolicy:   ManualProfileFallback,
+	}).Profiles()
 }
 
-// FinalizeProfiles enriches and deduplicates metrics for a given profile list.
-// This mirrors the post-processing performed by FindProfiles.
+// FinalizeProfiles applies load-time profile preparation and deduplicates metrics for a
+// given profile list. This mirrors the post-processing performed by FindProfiles.
 func FinalizeProfiles(profiles []*Profile) []*Profile {
 	if len(profiles) == 0 {
 		return nil
 	}
-	enrichProfiles(profiles)
+	for _, prof := range profiles {
+		enrichProfile(prof)
+		handleCrossTableTagsWithoutMetrics(prof)
+	}
 	deduplicateMetricsAcrossProfiles(profiles)
 	return profiles
 }
@@ -183,12 +171,16 @@ func cloneExtensionHierarchy(extensions []*extensionInfo) []*extensionInfo {
 	return cloned
 }
 
-func (p *Profile) merge(base *Profile) {
+func (p *Profile) merge(base *Profile) error {
 	p.mergeMetadata(base)
 	p.mergeMetrics(base)
+	if err := p.mergeTopology(base); err != nil {
+		return err
+	}
 	// Append other fields as before (these likely don't need deduplication)
 	p.Definition.MetricTags = append(p.Definition.MetricTags, base.Definition.MetricTags...)
 	p.Definition.StaticTags = append(slices.Clone(base.Definition.StaticTags), p.Definition.StaticTags...)
+	return nil
 }
 
 func (p *Profile) mergeMetrics(base *Profile) {
@@ -263,6 +255,109 @@ func columnMetricTableIdentity(table ddprofiledefinition.SymbolConfig) string {
 		return table.Name
 	}
 	return table.OID
+}
+
+func (p *Profile) mergeTopology(base *Profile) error {
+	seenScalars := make(map[topologyScalarMetricKey]bool)
+	seenColumns := make(map[topologyColumnMetricKey]bool)
+	seenTableOIDs := make(map[string]string)
+	scalarKinds := make(map[topologyScalarConflictKey]ddprofiledefinition.TopologyKind)
+	columnKinds := make(map[topologyColumnConflictKey]ddprofiledefinition.TopologyKind)
+
+	for _, topo := range p.Definition.Topology {
+		if err := indexTopologyMergeConflicts(topo, scalarKinds, columnKinds); err != nil {
+			return err
+		}
+		switch {
+		case topo.IsScalar():
+			seenScalars[topologyScalarMetricKey{kind: topo.Kind, name: topo.Symbol.Name, oid: topo.Symbol.OID}] = true
+		case topo.IsColumn():
+			seenTableOIDs[topologyColumnTableIdentity(topo.Kind, topo.Table)] = topo.Table.OID
+			for _, sym := range topo.Symbols {
+				seenColumns[topologyColumnSymbolKey(topo.Kind, topo.Table, sym)] = true
+			}
+		}
+	}
+
+	for _, baseTopo := range base.Definition.Topology {
+		if err := indexTopologyMergeConflicts(baseTopo, scalarKinds, columnKinds); err != nil {
+			return err
+		}
+		switch {
+		case baseTopo.IsScalar():
+			key := topologyScalarMetricKey{kind: baseTopo.Kind, name: baseTopo.Symbol.Name, oid: baseTopo.Symbol.OID}
+			if !seenScalars[key] {
+				p.Definition.Topology = append(p.Definition.Topology, baseTopo)
+				seenScalars[key] = true
+			}
+		case baseTopo.IsColumn():
+			tableID := topologyColumnTableIdentity(baseTopo.Kind, baseTopo.Table)
+			if tableOID, ok := seenTableOIDs[tableID]; ok && tableOID != baseTopo.Table.OID {
+				continue
+			}
+
+			symbols := make([]ddprofiledefinition.SymbolConfig, 0, len(baseTopo.Symbols))
+			for _, sym := range baseTopo.Symbols {
+				key := topologyColumnSymbolKey(baseTopo.Kind, baseTopo.Table, sym)
+				if seenColumns[key] {
+					continue
+				}
+				symbols = append(symbols, sym)
+			}
+			baseTopo.Symbols = symbols
+			if len(baseTopo.Symbols) > 0 {
+				p.Definition.Topology = append(p.Definition.Topology, baseTopo)
+				seenTableOIDs[tableID] = baseTopo.Table.OID
+			}
+		}
+	}
+
+	return nil
+}
+
+func indexTopologyMergeConflicts(
+	topo ddprofiledefinition.TopologyConfig,
+	scalarKinds map[topologyScalarConflictKey]ddprofiledefinition.TopologyKind,
+	columnKinds map[topologyColumnConflictKey]ddprofiledefinition.TopologyKind,
+) error {
+	switch {
+	case topo.IsScalar():
+		key := topologyScalarConflictKey{name: topo.Symbol.Name, oid: topo.Symbol.OID}
+		return indexTopologyKindConflict(fmt.Sprintf("scalar %q/%q", topo.Symbol.Name, topo.Symbol.OID), key, topo.Kind, scalarKinds)
+	case topo.IsColumn():
+		for _, sym := range topo.Symbols {
+			key := topologyColumnConflictKey{table: columnMetricTableIdentity(topo.Table), symbolName: sym.Name}
+			if err := indexTopologyKindConflict(fmt.Sprintf("table %q symbol %q", columnMetricTableIdentity(topo.Table), sym.Name), key, topo.Kind, columnKinds); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func indexTopologyKindConflict[K comparable](
+	label string,
+	key K,
+	kind ddprofiledefinition.TopologyKind,
+	seen map[K]ddprofiledefinition.TopologyKind,
+) error {
+	if existingKind, ok := seen[key]; ok && existingKind != kind {
+		return fmt.Errorf("conflicting topology kinds for %s: %q and %q", label, existingKind, kind)
+	}
+	seen[key] = kind
+	return nil
+}
+
+func topologyColumnSymbolKey(kind ddprofiledefinition.TopologyKind, table ddprofiledefinition.SymbolConfig, sym ddprofiledefinition.SymbolConfig) topologyColumnMetricKey {
+	return topologyColumnMetricKey{
+		kind:       kind,
+		table:      columnMetricTableIdentity(table),
+		symbolName: sym.Name,
+	}
+}
+
+func topologyColumnTableIdentity(kind ddprofiledefinition.TopologyKind, table ddprofiledefinition.SymbolConfig) string {
+	return string(kind) + "|" + columnMetricTableIdentity(table)
 }
 
 func (p *Profile) mergeMetadata(base *Profile) {
@@ -372,29 +467,32 @@ func sortProfilesBySpecificity(profiles []*Profile, matchedOIDs map[*Profile]str
 	})
 }
 
-func enrichProfiles(profiles []*Profile) {
-	for _, prof := range profiles {
-		if prof.Definition == nil {
+func enrichProfile(prof *Profile) {
+	if prof.Definition == nil {
+		return
+	}
+
+	for i := range prof.Definition.Metrics {
+		enrichMetricTagMappingRefs(prof.Definition.Metrics[i].MetricTags)
+	}
+	for i := range prof.Definition.Topology {
+		enrichMetricTagMappingRefs(prof.Definition.Topology[i].MetricTags)
+	}
+}
+
+func enrichMetricTagMappingRefs(tags ddprofiledefinition.MetricTagConfigList) {
+	for j := range tags {
+		tagCfg := &tags[j]
+
+		if tagCfg.Mapping.HasItems() {
 			continue
 		}
 
-		for i := range prof.Definition.Metrics {
-			metric := &prof.Definition.Metrics[i]
-
-			for j := range metric.MetricTags {
-				tagCfg := &metric.MetricTags[j]
-
-				if tagCfg.Mapping.HasItems() {
-					continue
-				}
-
-				switch tagCfg.MappingRef {
-				case "ifType":
-					tagCfg.Mapping = ddprofiledefinition.NewExactMapping(sharedMappings.ifType)
-				case "ifTypeGroup":
-					tagCfg.Mapping = ddprofiledefinition.NewExactMapping(sharedMappings.ifTypeGroup)
-				}
-			}
+		switch tagCfg.MappingRef {
+		case "ifType":
+			tagCfg.Mapping = ddprofiledefinition.NewExactMapping(sharedMappings.ifType)
+		case "ifTypeGroup":
+			tagCfg.Mapping = ddprofiledefinition.NewExactMapping(sharedMappings.ifTypeGroup)
 		}
 	}
 }
@@ -436,7 +534,66 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 				return false
 			},
 		)
+
+		deduplicateTopologyInProfile(prof, seenMetrics)
 	}
+}
+
+func deduplicateTopologyInProfile(prof *Profile, seenMetrics map[string]bool) {
+	filtered := prof.Definition.Topology[:0]
+	for _, topo := range prof.Definition.Topology {
+		if topo.IsScalar() {
+			key := generateTopologyScalarMetricKey(topo)
+			if seenMetrics[key] {
+				continue
+			}
+			seenMetrics[key] = true
+			filtered = append(filtered, topo)
+			continue
+		}
+
+		if topo.IsColumn() {
+			symbols := topo.Symbols[:0]
+			for _, sym := range topo.Symbols {
+				key := generateTopologyColumnMetricKey(topo, sym)
+				if seenMetrics[key] {
+					continue
+				}
+				seenMetrics[key] = true
+				symbols = append(symbols, sym)
+			}
+			topo.Symbols = symbols
+			if len(topo.Symbols) == 0 {
+				continue
+			}
+		}
+
+		filtered = append(filtered, topo)
+	}
+	if len(filtered) == 0 {
+		prof.Definition.Topology = nil
+		return
+	}
+	prof.Definition.Topology = filtered
+}
+
+func generateTopologyScalarMetricKey(topo ddprofiledefinition.TopologyConfig) string {
+	return strings.Join([]string{
+		"topology-scalar",
+		string(topo.Kind),
+		topo.Symbol.OID,
+		topo.Symbol.Name,
+	}, "|")
+}
+
+func generateTopologyColumnMetricKey(topo ddprofiledefinition.TopologyConfig, sym ddprofiledefinition.SymbolConfig) string {
+	return strings.Join([]string{
+		"topology-table",
+		string(topo.Kind),
+		topo.Table.OID,
+		columnMetricTableIdentity(topo.Table),
+		sym.Name,
+	}, "|")
 }
 
 func generateMetricKey(metric ddprofiledefinition.MetricsConfig) string {

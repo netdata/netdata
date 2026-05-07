@@ -13,27 +13,30 @@ func (c *Collector) ingestTopologyVLANContextMetrics(vlanID, vlanName string, pm
 	c.updateTopologyProfileTags(pms)
 
 	for _, pm := range pms {
-		for _, metric := range pm.Metrics {
-			if !isTopologyVLANContextMetric(metric.Name) {
+		for _, metric := range pm.TopologyMetrics {
+			if !isTopologyVLANContextMetric(metric.TopologyKind) {
 				continue
 			}
 
 			tags := withTopologyVLANContextTags(metric.Tags, vlanID, vlanName)
 			c.updateTopologyCacheEntry(ddsnmp.Metric{
-				Name: metric.Name,
-				Tags: tags,
+				Name:         metric.Name,
+				TopologyKind: metric.TopologyKind,
+				Tags:         tags,
 			})
 		}
 	}
 }
 
-func isTopologyVLANContextMetric(name string) bool {
-	switch name {
-	case metricTopologyIfNameEntry, metricBridgePortMapEntry, metricFdbEntry, metricStpPortEntry:
-		return true
-	default:
-		return false
-	}
+func isTopologyVLANContextMetric(kind ddsnmp.TopologyKind) bool {
+	return vlanScopableKinds[kind]
+}
+
+var vlanScopableKinds = map[ddsnmp.TopologyKind]bool{
+	ddsnmp.KindIfName:            true,
+	ddsnmp.KindBridgePortIfIndex: true,
+	ddsnmp.KindFdbEntry:          true,
+	ddsnmp.KindStpPort:           true,
 }
 
 func withTopologyVLANContextTags(tags map[string]string, vlanID, vlanName string) map[string]string {

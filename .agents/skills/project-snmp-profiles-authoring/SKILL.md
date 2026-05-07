@@ -22,6 +22,14 @@ Use this skill before editing files under:
    - use `index` for one index component;
    - use `index_transform` for multiple components;
    - use `symbol.format` only for final formatting such as `ip_address`, `mac_address`, or `hex`.
+6. Put SNMP topology rows under top-level `topology:` with a required closed
+   `kind`. Do not mark topology rows by naming metrics `_topology_*`.
+7. Do not use chart/export-only value fields on topology row anchor symbols:
+   `chart_meta`, `metric_type`, `mapping`, `transform`, `scale_factor`,
+   `format`, or `constant_value_one`.
+8. Keep regular `systemUptime` rows under `metrics:`. Do not model uptime as a
+   topology row kind; topology-specific uptime acquisition belongs in collector
+   code, not profile topology schema.
 
 ## Index Rules
 
@@ -85,6 +93,20 @@ rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysica
 ```
 
 Any hit must be reviewed. It is valid only when the tag is index-derived and does not declare `symbol.OID` for a `not-accessible` object.
+
+When adding a new topology kind, update all three parts together:
+
+- profile YAML using `topology: - kind: <kind>`;
+- the Go `TopologyKind` enum and validation;
+- the topology cache handler registry and tests.
+
+Verify that topology rows are delivered through `ProfileMetrics.TopologyMetrics`,
+not through underscore-prefixed `HiddenMetrics`.
+
+When adding or refactoring SNMP profile, parser, or topology tests, prefer
+table-driven cases using `map[string]struct{}` keyed by test-case name when
+the cases share setup and assertion shape. Use separate test functions only for
+materially different setup or assertions.
 
 ## Validation
 

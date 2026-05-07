@@ -284,26 +284,14 @@ static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
     char *s = buffer;
 
     // skip to the last slash
-    size_t len = strlen(s);
-    while (len--) {
-        if (unlikely(s[len] == '/')) {
-            break;
-        }
-    }
-    if (len) {
-        s = &s[len + 1];
-    }
+    char *slash = strrchr(s, '/');
+    if (unlikely(slash && slash != s))
+        s = slash + 1;
 
     // remove extension
-    len = strlen(s);
-    while (len--) {
-        if (unlikely(s[len] == '.')) {
-            break;
-        }
-    }
-    if (len) {
-        s[len] = '\0';
-    }
+    char *dot = strrchr(s, '.');
+    if (unlikely(dot && dot != s))
+        *dot = '\0';
 
     freez(cg->name);
     cg->name = strdupz(s);

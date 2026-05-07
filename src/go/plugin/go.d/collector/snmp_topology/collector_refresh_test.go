@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T) {
@@ -91,6 +92,15 @@ func expectTopologyRefreshSNMPClient(mockHandler *snmpmock.MockHandler, dev ddsn
 	mockHandler.EXPECT().SetCommunity(dev.Community)
 	mockHandler.EXPECT().SetVersion(gosnmp.Version2c)
 	mockHandler.EXPECT().Connect().Return(nil)
+	mockHandler.EXPECT().Get(gomock.InAnyOrder([]string{
+		snmputils.OidSnmpEngineTime,
+		snmputils.OidHrSystemUptime,
+		snmputils.OidSysUpTime,
+	})).Return(&gosnmp.SnmpPacket{
+		Variables: []gosnmp.SnmpPDU{
+			{Name: snmputils.OidSnmpEngineTime, Type: gosnmp.Integer, Value: 1234},
+		},
+	}, nil)
 	mockHandler.EXPECT().Close().Return(nil)
 }
 
@@ -122,16 +132,16 @@ func seedPublishedEndpointSnapshot(cache *topologyCache) {
 
 func replacementEndpointProfileMetrics() []*ddsnmp.ProfileMetrics {
 	return []*ddsnmp.ProfileMetrics{{
-		HiddenMetrics: []ddsnmp.Metric{
+		TopologyMetrics: []ddsnmp.Metric{
 			{
-				Name: metricBridgePortMapEntry,
+				TopologyKind: ddsnmp.KindBridgePortIfIndex,
 				Tags: map[string]string{
 					tagBridgeBasePort: "5",
 					tagBridgeIfIndex:  "5",
 				},
 			},
 			{
-				Name: metricDot1qFdbEntry,
+				TopologyKind: ddsnmp.KindQbridgeFdbEntry,
 				Tags: map[string]string{
 					tagDot1qFdbID:   "7",
 					tagDot1qFdbMac:  "00:50:56:ab:cd:ef",
@@ -139,7 +149,7 @@ func replacementEndpointProfileMetrics() []*ddsnmp.ProfileMetrics {
 				},
 			},
 			{
-				Name: metricArpEntry,
+				TopologyKind: ddsnmp.KindArpEntry,
 				Tags: map[string]string{
 					tagArpIfIndex:  "5",
 					tagArpIP:       "10.0.0.20",

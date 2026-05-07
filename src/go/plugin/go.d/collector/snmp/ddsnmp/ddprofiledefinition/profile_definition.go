@@ -14,7 +14,8 @@ type ProfileDefinition struct {
 	Metadata            MetadataConfig                   `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 	SysobjectIDMetadata []SysobjectIDMetadataEntryConfig `yaml:"sysobjectid_metadata,omitempty"`
 	Metrics             []MetricsConfig                  `yaml:"metrics,omitempty" json:"metrics,omitempty"`
-	MetricTags          []MetricTagConfig                `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
+	Topology            []TopologyConfig                 `yaml:"topology,omitempty" json:"topology,omitempty"`
+	MetricTags          []GlobalMetricTagConfig          `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 	StaticTags          []StaticMetricTagConfig          `yaml:"static_tags,omitempty" json:"static_tags,omitempty"`
 
 	VirtualMetrics []VirtualMetricConfig `yaml:"virtual_metrics,omitempty" json:"virtual_metrics,omitempty"`
@@ -37,6 +38,7 @@ func (p *ProfileDefinition) Clone() *ProfileDefinition {
 		MetricTags:          cloneSlice(p.MetricTags),
 		StaticTags:          slices.Clone(p.StaticTags),
 		Metrics:             cloneSlice(p.Metrics),
+		Topology:            cloneSlice(p.Topology),
 		VirtualMetrics:      cloneSlice(p.VirtualMetrics),
 	}
 }

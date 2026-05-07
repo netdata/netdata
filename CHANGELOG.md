@@ -139,6 +139,15 @@
 - Docs: add anomaly rate alerting guidance and cross-references ([#22283](https://github.com/netdata/netdata/issues/22283))
 - Bump repositroy config package version used by kickstart script to the latest. ([#22420](https://github.com/netdata/netdata/issues/22420))
 - Add AI-assistant skills (query-netdata, integrations, learn, agent-events, mirror) ([#22423](https://github.com/netdata/netdata/issues/22423))
+- Ci: rework SNMP fixture workflow to cover topology engine tests ([#22426](https://github.com/netdata/netdata/issues/22426))
+- Assorted CI updates and fixes ([#22427](https://github.com/netdata/netdata/issues/22427))
+- Fix streaming topology graph output ([#22432](https://github.com/netdata/netdata/issues/22432))
+- Fix vnode take over crash ([#22417](https://github.com/netdata/netdata/issues/22417))
+- Code cleanup ([#22431](https://github.com/netdata/netdata/issues/22431))
+- Fix based on Coverity and Sonar audits (part 1) ([#22329](https://github.com/netdata/netdata/issues/22329))
+- Fix sender replication counter leak on obsolete charts ([#22428](https://github.com/netdata/netdata/issues/22428))
+- Refactor(snmp): clean up profile projection and topology tests ([#22433](https://github.com/netdata/netdata/issues/22433))
+- Fix based on Coverity and Sonar audits (part 3) ([#22331](https://github.com/netdata/netdata/issues/22331))
 
 ## [2.10.0] - 2026-04-09
 

@@ -15,6 +15,7 @@ It tells the Netdata SNMP collector:
 - which **OIDs** to query
 - how to **interpret** the returned values
 - how to **transform** them into **metrics**, **dimensions**, **tags**, and **metadata**
+- which rows are **regular metrics** and which rows are **SNMP topology** observations
 
 Profiles make it possible to describe _entire device families_ (switches, routers, UPSes, firewalls, printers, etc.) declaratively — so you don’t need to hard-code logic in Go or manually define metrics for each device.
 
@@ -48,6 +49,8 @@ When Netdata connects to an SNMP device, the collector:
 │ metadata             │ → device info (vendor, model, etc.)
 ├──────────────────────┤
 │ metrics              │ → OIDs to collect
+├──────────────────────┤
+│ topology             │ → OIDs to collect for SNMP topology
 ├──────────────────────┤
 │ metric_tags          │ → dynamic tags for all metrics
 ├──────────────────────┤
@@ -146,6 +149,7 @@ selector: <device matching pattern>
 extends: <base profiles to include>
 metadata: <device information>
 metrics: <what to collect>
+topology: <what to collect for topology>
 metric_tags: <global tags>
 static_tags: <static tags>
 virtual_metrics: <calculated metrics>
@@ -157,6 +161,7 @@ virtual_metrics: <calculated metrics>
 | [**extends**](#2-extends)                 | Inherits and merges other base profiles.                                           |
 | [**metadata**](#3-metadata)               | Collects device-level information (host labels).                                   |
 | [**metrics**](#4-metrics)                 | Defines which OIDs to collect and how to chart them.                               |
+| [**topology**](#41-topology)              | Defines SNMP topology rows and their topology kind.                                |
 | [**metric_tags**](#5-metric_tags)         | Defines global dynamic tags collected once per device and attached to all metrics. |
 | [**static_tags**](#6-static_tags)         | Defines fixed tags applied to all metrics.                                         |
 | [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others.                          |
@@ -270,6 +275,9 @@ metadata:
 - `model` is collected dynamically. The collector tries the listed OIDs **in order** and uses the **first** one that returns a non-empty value.
 - These values appear as **device (virtual node) host labels** in the Netdata UI.
 - They are **not per-metric tags** and are applied to the device itself, not individual charts.
+- Metadata fields are available to both regular metrics and topology by default.
+  Use `consumers: [metrics]` or `consumers: [topology]` only when a field is
+  intentionally limited to one view.
 
 :::tip
 
@@ -371,6 +379,76 @@ virtual_metrics:
       - { metric: _ifHCOutOctets, table: ifXTable, as: out }
 ```
 
+### 4.1 topology
+
+The `topology` section defines SNMP rows consumed by the SNMP topology collector.
+Topology rows are collected through the same scalar and table mechanics as
+regular metrics, but they are not exported as charts. Instead, each row is routed
+to a topology handler through its closed `kind` value.
+
+Use top-level `topology:` when the row describes a topology actor, link, VLAN,
+bridge, FDB, ARP, LLDP, CDP, STP, VTP, or interface-mapping observation.
+
+```yaml
+topology:
+  - kind: lldp_rem
+    MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.4.1
+      name: lldpRemTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.4.1.1.6
+        name: lldp_rem
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 2
+      - tag: lldp_rem_index
+        index: 3
+      - tag: lldp_rem_sys_name
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.9
+          name: lldpRemSysName
+```
+
+**Rules**:
+
+- `kind` is required and must be one of the closed topology kinds below.
+- Topology row symbol names must not start with `_`.
+- Topology rows do not use chart/export-only fields such as `chart_meta`,
+  `metric_type`, `mapping`, `transform`, `scale_factor`, `format`, or
+  `constant_value_one` on the row value symbol.
+- `metric_tags` inside a topology row work like table metric tags and identify
+  or enrich the topology row.
+- `systemUptime` stays under `metrics:` for regular SNMP collection. It is not a
+  topology kind and should not be declared under `topology:`.
+
+Valid topology kinds:
+
+```text
+lldp_loc_port
+lldp_loc_man_addr
+lldp_rem
+lldp_rem_man_addr
+lldp_rem_man_addr_compat
+cdp_cache
+if_name
+if_status
+if_duplex
+ip_if_index
+bridge_port_if_index
+fdb_entry
+qbridge_fdb_entry
+qbridge_vlan_entry
+stp_port
+vtp_vlan
+arp_entry
+arp_legacy_entry
+```
+
+Topology mixins can be inherited through `extends` just like metric mixins. When
+two inherited topology rows collide, the identity is `kind + table identity +
+symbol name`, matching regular table metric merge behavior.
+
 #### Scalar symbol fallbacks
 
 You can express “try this OID, otherwise try that OID” by declaring **multiple scalar metrics with the same** `symbol.name`, each pointing to a different OID. At runtime the collector **GETs** all declared scalar OIDs, marks missing ones, and **emits** the metric from whichever OID returns data. Missing OIDs are skipped cleanly.
@@ -427,6 +505,10 @@ metric_tags:
 - Each tag is collected once per device, not per metric or per table row.
 - The resulting tag values are attached to **all metrics** collected by the profile.
 - Tags can be transformed (for example, reformatted or mapped) using the same rules as per-metric tags.
+- Top-level `metric_tags` are available to both regular metrics and topology by
+  default. In topology they become device/profile labels, not per-row dispatch
+  keys. Use `consumers: [metrics]` or `consumers: [topology]` only when a tag is
+  intentionally limited to one view.
 
 :::tip
 
@@ -1854,6 +1936,8 @@ metrics:
 - Virtual metrics are **calculated metrics** built from other metrics in your profile (or inherited ones).
 - They don’t query SNMP; they **reuse existing metric values** to create totals, fallbacks, or per-row aggregations.
 - Once computed, they behave like normal metrics: charted, tagged, and alertable.
+- Virtual metrics are part of the regular metrics view. A virtual metric cannot
+  depend on both regular metric rows and topology rows.
 
 Common use cases:
 

@@ -13,14 +13,15 @@ import (
 )
 
 func TestTopologyProfile_QBridgeFDBUsesMACFromIndex(t *testing.T) {
-	for _, tc := range []struct {
-		name        string
+	tests := map[string]struct {
 		indexSuffix string
 	}{
-		{name: "normal_mac_index", indexSuffix: "7.0.80.86.171.205.239"},
-		{name: "length_prefixed_mac_index", indexSuffix: "7.6.0.80.86.171.205.239"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+		"normal_mac_index":          {indexSuffix: "7.0.80.86.171.205.239"},
+		"length_prefixed_mac_index": {indexSuffix: "7.6.0.80.86.171.205.239"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			ctrl, mockHandler := setupMockHandler(t)
 			defer ctrl.Finish()
 
@@ -59,20 +60,22 @@ func TestTopologyProfile_IPNetToPhysicalUsesIndexFields(t *testing.T) {
 
 	assertTableMetricsEqual(t, []ddsnmp.Metric{
 		{
-			Name:       "_topology_arp_entry",
-			Value:      1,
-			Tags:       map[string]string{"arp_if_index": "2", "arp_addr_type": "ipv4", "arp_ip": "10.0.2.10", "arp_mac": "005056abcdef", "arp_state": "1"},
-			MetricType: "gauge",
-			IsTable:    true,
-			Table:      "ipNetToPhysicalTable",
+			Name:         "arp_entry",
+			Value:        1,
+			Tags:         map[string]string{"arp_if_index": "2", "arp_addr_type": "ipv4", "arp_ip": "10.0.2.10", "arp_mac": "005056abcdef", "arp_state": "1"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "ipNetToPhysicalTable",
+			TopologyKind: ddsnmp.KindArpEntry,
 		},
 		{
-			Name:       "_topology_arp_entry",
-			Value:      2,
-			Tags:       map[string]string{"arp_if_index": "3", "arp_addr_type": "ipv6", "arp_ip": "fe80::1", "arp_mac": "005056abcdf0", "arp_state": "2"},
-			MetricType: "gauge",
-			IsTable:    true,
-			Table:      "ipNetToPhysicalTable",
+			Name:         "arp_entry",
+			Value:        2,
+			Tags:         map[string]string{"arp_if_index": "3", "arp_addr_type": "ipv6", "arp_ip": "fe80::1", "arp_mac": "005056abcdf0", "arp_state": "2"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "ipNetToPhysicalTable",
+			TopologyKind: ddsnmp.KindArpEntry,
 		},
 	}, actual)
 }
@@ -99,20 +102,22 @@ func TestTopologyProfile_LLDPManagementAddressUsesIndexFields(t *testing.T) {
 
 	assertTableMetricsEqual(t, []ddsnmp.Metric{
 		{
-			Name:       "_topology_lldp_loc_man_addr_entry",
-			Value:      4,
-			Tags:       map[string]string{"lldp_loc_mgmt_addr_subtype": "1", "lldp_loc_mgmt_addr": "0a000001", "lldp_loc_mgmt_addr_if_subtype": "2", "lldp_loc_mgmt_addr_if_id": "12", "lldp_loc_mgmt_addr_oid": "0.0"},
-			MetricType: "gauge",
-			IsTable:    true,
-			Table:      "lldpLocManAddrTable",
+			Name:         "lldp_loc_man_addr",
+			Value:        4,
+			Tags:         map[string]string{"lldp_loc_mgmt_addr_subtype": "1", "lldp_loc_mgmt_addr": "0a000001", "lldp_loc_mgmt_addr_if_subtype": "2", "lldp_loc_mgmt_addr_if_id": "12", "lldp_loc_mgmt_addr_oid": "0.0"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpLocManAddrTable",
+			TopologyKind: ddsnmp.KindLldpLocManAddr,
 		},
 		{
-			Name:       "_topology_lldp_loc_man_addr_entry",
-			Value:      6,
-			Tags:       map[string]string{"lldp_loc_mgmt_addr_subtype": "6", "lldp_loc_mgmt_addr": "005056abcdef", "lldp_loc_mgmt_addr_if_subtype": "2", "lldp_loc_mgmt_addr_if_id": "12", "lldp_loc_mgmt_addr_oid": "0.0"},
-			MetricType: "gauge",
-			IsTable:    true,
-			Table:      "lldpLocManAddrTable",
+			Name:         "lldp_loc_man_addr",
+			Value:        6,
+			Tags:         map[string]string{"lldp_loc_mgmt_addr_subtype": "6", "lldp_loc_mgmt_addr": "005056abcdef", "lldp_loc_mgmt_addr_if_subtype": "2", "lldp_loc_mgmt_addr_if_id": "12", "lldp_loc_mgmt_addr_oid": "0.0"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpLocManAddrTable",
+			TopologyKind: ddsnmp.KindLldpLocManAddr,
 		},
 	}, actual)
 }
@@ -125,10 +130,13 @@ func collectTopologyProfileTables(t *testing.T, mockHandler gosnmp.Handler, prof
 
 	missingOIDs := make(map[string]bool)
 	tcache := newTableCache(0, 0)
-	collector := newTableCollector(mockHandler, missingOIDs, tcache, logger.New(), false)
+	collector := &Collector{
+		scalarCollector: newScalarCollector(mockHandler, missingOIDs, logger.New()),
+		tableCollector:  newTableCollector(mockHandler, missingOIDs, tcache, logger.New(), false),
+	}
 
 	var stats ddsnmp.CollectionStats
-	actual, err := collector.collect(profile, &stats)
+	actual, err := collector.collectTopologyMetrics(profile, &stats)
 	require.NoError(t, err)
 
 	return actual
@@ -136,11 +144,12 @@ func collectTopologyProfileTables(t *testing.T, mockHandler gosnmp.Handler, prof
 
 func qBridgeFDBMetric() ddsnmp.Metric {
 	return ddsnmp.Metric{
-		Name:       "_topology_qbridge_fdb_entry",
-		Value:      5,
-		Tags:       map[string]string{"dot1q_fdb_id": "7", "dot1q_fdb_mac": "00:50:56:ab:cd:ef", "dot1q_fdb_bridge_port": "5", "dot1q_fdb_status": "3"},
-		MetricType: "gauge",
-		IsTable:    true,
-		Table:      "dot1qTpFdbTable",
+		Name:         "qbridge_fdb_entry",
+		Value:        5,
+		Tags:         map[string]string{"dot1q_fdb_id": "7", "dot1q_fdb_mac": "00:50:56:ab:cd:ef", "dot1q_fdb_bridge_port": "5", "dot1q_fdb_status": "3"},
+		MetricType:   "gauge",
+		IsTable:      true,
+		Table:        "dot1qTpFdbTable",
+		TopologyKind: ddsnmp.KindQbridgeFdbEntry,
 	}
 }

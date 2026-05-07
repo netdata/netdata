@@ -98,9 +98,8 @@ static int create_listen_socket_unix(const char *path, int listen_backlog) {
         return -1;
     }
 
-    // we have to chmod this to 0777 so that the client will be able
-    // to read from and write to this socket.
-    if(chmod(path, 0777) == -1)
+    // Clients need read and write permissions to connect to this socket.
+    if(chmod(path, 0666) == -1)
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: failed to chmod() socket file '%s'.",
                path);
