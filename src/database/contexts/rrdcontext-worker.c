@@ -133,7 +133,12 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 }
 
 static void rrdcontext_recalculate_retention_all_hosts(void) {
-    __atomic_store_n(&rrdcontext_next_db_rotation_ut, 0, __ATOMIC_RELAXED);
+    // Don't pre-clear rrdcontext_next_db_rotation_ut here -- the caller in
+    // rrdcontext_main clears it via CAS at the end of the pass, expecting
+    // the same deadline value it observed. Pre-clearing would let a
+    // concurrent rrdcontext_request_full_gc() arm a new deadline that the
+    // caller's unconditional store-to-zero would then silently overwrite,
+    // dropping the request.
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host) {
         worker_is_busy(WORKER_JOB_RETENTION);
@@ -1063,7 +1068,15 @@ void rrdcontext_main(void *ptr) {
             extreme_cardinality.db_rotations++;
             rrdcontext_recalculate_retention_all_hosts();
             rrdcontext_garbage_collect_for_all_hosts();
-            __atomic_store_n(&rrdcontext_next_db_rotation_ut, 0, __ATOMIC_RELAXED);
+            // Clear the slot only if it still holds the deadline we
+            // processed. If a concurrent rrdcontext_request_full_gc() has
+            // armed a NEW deadline during this pass (it CAS'd 0 -> Y while
+            // we ran), leave it in place so the next iteration fires for
+            // the archives we may have missed.
+            __atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
+                                        &deadline, 0,
+                                        false,
+                                        __ATOMIC_RELAXED, __ATOMIC_RELAXED);
         }
 
         size_t hub_queued_contexts_for_all_hosts = 0;
