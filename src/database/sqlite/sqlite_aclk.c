@@ -117,10 +117,12 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
     int hops          = sqlite3_column_int(res, COL_FETCH_HOPS);
     int utc_offset    = sqlite3_column_int(res, COL_FETCH_UTC_OFFSET);
     int entries       = sqlite3_column_int(res, COL_FETCH_ENTRIES);
-    // update_every defaults to 1 when the row stored 0/NULL (preserves the
-    // pre-refactor `argv[i] ? ... : 1` fallback).
-    int update_every  = sqlite3_column_int(res, COL_FETCH_UPDATE_EVERY);
-    if (!update_every) update_every = 1;
+    // update_every defaults to 1 only when the column is SQL NULL — preserves
+    // the pre-refactor `argv[i] ? str2i(argv[i]) : 1` fallback exactly. A
+    // stored 0 stays 0 (matches the original str2i path).
+    int update_every = (sqlite3_column_type(res, COL_FETCH_UPDATE_EVERY) == SQLITE_NULL)
+        ? 1
+        : sqlite3_column_int(res, COL_FETCH_UPDATE_EVERY);
     int64_t last_connected_db = sqlite3_column_int64(res, COL_FETCH_LAST_CONNECTED);
     int is_ephemeral  = sqlite3_column_int(res, COL_FETCH_IS_EPHEMERAL);
     int is_registered = sqlite3_column_int(res, COL_FETCH_IS_REGISTERED);
@@ -1053,7 +1055,9 @@ void aclk_synchronization_init(void)
         SQLITE_FINALIZE(res);
     }
     else
-        nd_log_daemon(NDLP_ERR, "SQLite error when loading archived hosts");
+        nd_log_daemon(NDLP_ERR,
+                      "SQLite error when preparing statement to load archived hosts: %s",
+                      sqlite3_errmsg(db_meta));
 
     nd_log_daemon(
         NDLP_INFO,
@@ -1099,7 +1103,9 @@ void aclk_synchronization_init(void)
         SQLITE_FINALIZE(res_inst);
     }
     else
-        nd_log_daemon(NDLP_ERR, "SQLite error when configuring host ACLK synchronization parameters");
+        nd_log_daemon(NDLP_ERR,
+                      "SQLite error when preparing statement to configure host ACLK synchronization parameters: %s",
+                      sqlite3_errmsg(db_meta));
 
     aclk_initialize_event_loop();
 
