@@ -245,12 +245,6 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
             send_SET("handles", w->values[PDF_HANDLES]);
 #endif
             send_END();
-
-#if (PROCESSES_HAVE_FDS == 1)
-            send_BEGIN(type, string2str(w->clean_name), "fds_total", dt);
-            send_SET("total", pid_openfds_sum(w));
-            send_END();
-#endif
         }
     }
 }
@@ -294,17 +288,6 @@ static void send_file_charts_to_netdata(struct target *w, const char *type, cons
 #endif // PROCESSES_HAVE_HANDLES
     }
 #endif // PROCESSES_HAVE_FDS || PROCESSES_HAVE_HANDLES
-
-#if (PROCESSES_HAVE_FDS == 1)
-    fprintf(stdout, "CHART %s.%s_fds_total '' '%s total open files descriptors' 'fds' fds %s.fds_total line 20205 %d %s\n",
-            type, string2str(w->clean_name), title, type, update_every, obsolete ? "obsolete" : "");
-
-    if(!obsolete) {
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION total '' absolute 1 1\n");
-    }
-#endif
 }
 
 void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title) {
