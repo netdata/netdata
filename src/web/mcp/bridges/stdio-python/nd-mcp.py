@@ -165,7 +165,13 @@ async def connect_with_backoff(uri, bearer_token):
                     retry_event.clear()
                     
                 except asyncio.CancelledError:
-                    pass
+                    # Cancel the in-flight wait/retry tasks so they don't
+                    # outlive this coroutine, then propagate the cancellation
+                    # so the parent reconnect loop can exit cleanly.
+                    wait_task.cancel()
+                    retry_task.cancel()
+                    retry_event.clear()
+                    raise
                     
             print(f"{PROGRAM_NAME}: Connecting to {uri}...", file=sys.stderr)
 
@@ -304,13 +310,16 @@ async def connect_with_backoff(uri, bearer_token):
                 return_when=asyncio.FIRST_COMPLETED
             )
             
-            # Cancel the pending task
-            for task in pending:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+            if pending:
+                # Drain cancelled children without suppressing cancellation of this coroutine.
+                for task in pending:
+                    task.cancel()
+                results = await asyncio.gather(*pending, return_exceptions=True)
+                for result in results:
+                    if isinstance(result, asyncio.CancelledError):
+                        continue
+                    if isinstance(result, BaseException):
+                        raise result
             
             # Ensure WebSocket is closed
             try:

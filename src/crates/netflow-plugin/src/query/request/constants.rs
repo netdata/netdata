@@ -8,6 +8,10 @@ pub(crate) const MAX_GROUP_BY_FIELDS: usize = 10;
 #[cfg(test)]
 pub(crate) const DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS: usize = 50_000;
 pub(crate) const FACET_VALUE_LIMIT: usize = 100;
+/// Hard cap on the autocomplete `term` to prevent runaway substring scans
+/// on large vocabularies. AS names, MAC addresses, IPv6 strings, CIDRs all
+/// fit comfortably under this; longer terms get rejected at deserialize.
+pub(crate) const MAX_AUTOCOMPLETE_TERM_LEN: usize = 256;
 pub(crate) const FACET_CACHE_JOURNAL_WINDOW_SIZE: u64 = 8 * 1024 * 1024;
 #[cfg(test)]
 pub(crate) const DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD: usize = 5_000;

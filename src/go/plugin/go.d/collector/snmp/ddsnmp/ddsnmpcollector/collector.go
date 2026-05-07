@@ -15,7 +15,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 type Config struct {
@@ -35,7 +34,6 @@ func New(cfg Config) *Collector {
 	}
 
 	for _, prof := range cfg.Profiles {
-		handleCrossTableTagsWithoutMetrics(prof)
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
 
@@ -200,8 +198,17 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 	pm.Stats.Timing.Table = time.Since(now)
 	pm.Stats.Metrics.Table += int64(len(tableMetrics))
 
+	topologyMetrics, err := c.collectTopologyMetrics(ps.profile, &pm.Stats)
+	if err != nil {
+		return nil, err
+	}
+	pm.TopologyMetrics = append(pm.TopologyMetrics, topologyMetrics...)
+
 	for i := range pm.Metrics {
 		pm.Metrics[i].Profile = pm
+	}
+	for i := range pm.TopologyMetrics {
+		pm.TopologyMetrics[i].Profile = pm
 	}
 
 	return pm, nil
@@ -209,19 +216,25 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 
 func (c *Collector) updateProfileMetrics(pm *ddsnmp.ProfileMetrics) {
 	for i := range pm.Metrics {
-		m := &pm.Metrics[i]
-		m.Description = metricMetaReplacer.Replace(m.Description)
-		m.Family = metricMetaReplacer.Replace(m.Family)
-		m.Unit = metricMetaReplacer.Replace(m.Unit)
-		for k, v := range m.Tags {
-			// Remove tags prefixed with "rm:", which are intended for temporary use during transforms
-			// and should not appear in the final exported metric.
-			if strings.HasPrefix(k, "rm:") {
-				delete(m.Tags, k)
-				continue
-			}
-			m.Tags[k] = metricMetaReplacer.Replace(v)
+		sanitizeMetricMetadata(&pm.Metrics[i])
+	}
+	for i := range pm.TopologyMetrics {
+		sanitizeMetricMetadata(&pm.TopologyMetrics[i])
+	}
+}
+
+func sanitizeMetricMetadata(m *ddsnmp.Metric) {
+	m.Description = metricMetaReplacer.Replace(m.Description)
+	m.Family = metricMetaReplacer.Replace(m.Family)
+	m.Unit = metricMetaReplacer.Replace(m.Unit)
+	for k, v := range m.Tags {
+		// Remove tags prefixed with "rm:", which are intended for temporary use during transforms
+		// and should not appear in the final exported metric.
+		if strings.HasPrefix(k, "rm:") {
+			delete(m.Tags, k)
+			continue
 		}
+		m.Tags[k] = metricMetaReplacer.Replace(v)
 	}
 }
 
@@ -231,84 +244,3 @@ var metricMetaReplacer = strings.NewReplacer(
 	"\r", " ",
 	"\x00", "",
 )
-
-// handleCrossTableTagsWithoutMetrics ensures tables referenced only by cross-table tags
-// are still walked during collection. Without this, if a table like ifXTable is used
-// only for cross-table tags (e.g., getting interface names) but has no metrics defined,
-// it won't be walked and the tags will be missing. This creates synthetic metric entries
-// for such tables using the longest common OID prefix of the referenced columns, including
-// lookup columns used by value-based joins.
-func handleCrossTableTagsWithoutMetrics(prof *ddsnmp.Profile) {
-	if prof.Definition == nil {
-		return
-	}
-
-	seenTableNames := make(map[string]bool)
-
-	for _, m := range prof.Definition.Metrics {
-		seenTableNames[m.Table.Name] = true
-	}
-
-	tagCrossTableOnlyOIDs := make(map[string][]string)
-
-	for _, m := range prof.Definition.Metrics {
-		if m.IsScalar() {
-			continue
-		}
-		for _, tag := range m.MetricTags {
-			if tag.Table == "" || seenTableNames[tag.Table] {
-				continue
-			}
-			if tag.Symbol.OID != "" {
-				tagCrossTableOnlyOIDs[tag.Table] = append(tagCrossTableOnlyOIDs[tag.Table], tag.Symbol.OID)
-			}
-			if tag.LookupSymbol.OID != "" {
-				tagCrossTableOnlyOIDs[tag.Table] = append(tagCrossTableOnlyOIDs[tag.Table], tag.LookupSymbol.OID)
-			}
-		}
-	}
-
-	for tableName, oids := range tagCrossTableOnlyOIDs {
-		slices.Sort(oids)
-		oids = slices.Compact(oids)
-
-		prof.Definition.Metrics = append(prof.Definition.Metrics, ddprofiledefinition.MetricsConfig{
-			MIB: fmt.Sprintf("synthetic-%s-MIB", tableName),
-			Table: ddprofiledefinition.SymbolConfig{
-				OID:  longestCommonPrefix(oids),
-				Name: tableName,
-			},
-		})
-	}
-}
-
-func longestCommonPrefix(oids []string) string {
-	if len(oids) == 0 {
-		return ""
-	}
-
-	prefixParts := splitOIDParts(oids[0])
-	for i := 1; i < len(oids); i++ {
-		parts := splitOIDParts(oids[i])
-		n := min(len(parts), len(prefixParts))
-
-		j := 0
-		for j < n && prefixParts[j] == parts[j] {
-			j++
-		}
-		prefixParts = prefixParts[:j]
-		if len(prefixParts) == 0 {
-			return ""
-		}
-	}
-
-	return strings.Join(prefixParts, ".")
-}
-
-func splitOIDParts(oid string) []string {
-	parts := strings.Split(strings.Trim(oid, "."), ".")
-	if len(parts) == 1 && parts[0] == "" {
-		return nil
-	}
-	return parts
-}

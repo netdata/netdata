@@ -1,4 +1,4 @@
-use crate::facet_catalog::FacetValueKind;
+use crate::facet_catalog::{AutocompleteMatchKind, FacetValueKind};
 use allocative::{Allocative, Key, Visitor};
 use bitvec::prelude::*;
 use hashbrown::HashTable;
@@ -270,14 +270,22 @@ impl FacetStore {
         }
     }
 
-    pub(super) fn prefix_matches(&self, prefix: &str, limit: usize) -> Vec<String> {
+    /// Autocomplete (dropdown) matching, parameterised by the per-field
+    /// policy in `FacetFieldSpec::autocomplete_match`. Regular facet
+    /// matching (selections) is exact equality and never reaches this path.
+    pub(super) fn autocomplete_matches(
+        &self,
+        term: &str,
+        limit: usize,
+        match_kind: AutocompleteMatchKind,
+    ) -> Vec<String> {
         match self {
-            Self::Text(store) => store.prefix_matches(prefix, limit),
-            Self::DenseU8(store) => store.prefix_matches(prefix, limit),
-            Self::DenseU16(store) => store.prefix_matches(prefix, limit),
-            Self::SparseU32(store) => prefix_match_roaring(store, prefix, limit),
-            Self::SparseU64(store) => prefix_match_roaring(store, prefix, limit),
-            Self::IpAddr(store) => store.prefix_matches(prefix, limit),
+            Self::Text(store) => store.autocomplete_matches(term, limit, match_kind),
+            Self::DenseU8(store) => store.autocomplete_matches(term, limit, match_kind),
+            Self::DenseU16(store) => store.autocomplete_matches(term, limit, match_kind),
+            Self::SparseU32(store) => autocomplete_match_roaring(store, term, limit, match_kind),
+            Self::SparseU64(store) => autocomplete_match_roaring(store, term, limit, match_kind),
+            Self::IpAddr(store) => store.autocomplete_matches(term, limit, match_kind),
         }
     }
 
@@ -387,11 +395,20 @@ impl<const N: usize> DenseBitSet<N> {
         values
     }
 
-    fn prefix_matches(&self, prefix: &str, limit: usize) -> Vec<String> {
+    fn autocomplete_matches(
+        &self,
+        term: &str,
+        limit: usize,
+        match_kind: AutocompleteMatchKind,
+    ) -> Vec<String> {
         let mut values = Vec::new();
         for value in self.iter_indices() {
             let rendered = value.to_string();
-            if rendered.starts_with(prefix) {
+            let hit = match match_kind {
+                AutocompleteMatchKind::Prefix => rendered.starts_with(term),
+                AutocompleteMatchKind::Substring => rendered.contains(term),
+            };
+            if hit {
                 values.push(rendered);
                 if values.len() >= limit {
                     break;
@@ -500,14 +517,34 @@ impl TextValueStore {
         }
     }
 
-    fn prefix_matches(&self, prefix: &str, limit: usize) -> Vec<String> {
+    fn autocomplete_matches(
+        &self,
+        term: &str,
+        limit: usize,
+        match_kind: AutocompleteMatchKind,
+    ) -> Vec<String> {
         let mut values = Vec::new();
-        for field_id in 0..self.entries.len() {
-            let Some(value) = self.value_str(field_id as u32) else {
-                continue;
-            };
-            if value.starts_with(prefix) {
-                values.push(value.to_string());
+        match match_kind {
+            AutocompleteMatchKind::Prefix => {
+                for field_id in 0..self.entries.len() {
+                    let Some(value) = self.value_str(field_id as u32) else {
+                        continue;
+                    };
+                    if value.starts_with(term) {
+                        values.push(value.to_string());
+                    }
+                }
+            }
+            AutocompleteMatchKind::Substring => {
+                let finder = memchr::memmem::Finder::new(term.as_bytes());
+                for field_id in 0..self.entries.len() {
+                    let Some(value) = self.value_str(field_id as u32) else {
+                        continue;
+                    };
+                    if finder.find(value.as_bytes()).is_some() {
+                        values.push(value.to_string());
+                    }
+                }
             }
         }
         values.sort_unstable();
@@ -645,17 +682,26 @@ impl IpValueStore {
         values
     }
 
-    fn prefix_matches(&self, prefix: &str, limit: usize) -> Vec<String> {
+    fn autocomplete_matches(
+        &self,
+        term: &str,
+        limit: usize,
+        match_kind: AutocompleteMatchKind,
+    ) -> Vec<String> {
         let mut values = Vec::new();
+        let predicate = |rendered: &str| match match_kind {
+            AutocompleteMatchKind::Prefix => rendered.starts_with(term),
+            AutocompleteMatchKind::Substring => rendered.contains(term),
+        };
         for value in self.v4_values.iter() {
             let rendered = IpAddr::V4(Ipv4Addr::from((value as u32).to_be_bytes())).to_string();
-            if rendered.starts_with(prefix) {
+            if predicate(&rendered) {
                 values.push(rendered);
             }
         }
         for value in &self.v6_values {
             let rendered = IpAddr::V6(Ipv6Addr::from(*value)).to_string();
-            if rendered.starts_with(prefix) {
+            if predicate(&rendered) {
                 values.push(rendered);
             }
         }
@@ -745,11 +791,20 @@ fn collect_roaring_strings(bitmap: &RoaringTreemap, limit: Option<usize>) -> Vec
     values
 }
 
-fn prefix_match_roaring(bitmap: &RoaringTreemap, prefix: &str, limit: usize) -> Vec<String> {
+fn autocomplete_match_roaring(
+    bitmap: &RoaringTreemap,
+    term: &str,
+    limit: usize,
+    match_kind: AutocompleteMatchKind,
+) -> Vec<String> {
     let mut values = Vec::new();
     for value in bitmap.iter() {
         let rendered = value.to_string();
-        if rendered.starts_with(prefix) {
+        let hit = match match_kind {
+            AutocompleteMatchKind::Prefix => rendered.starts_with(term),
+            AutocompleteMatchKind::Substring => rendered.contains(term),
+        };
+        if hit {
             values.push(rendered);
             if values.len() >= limit {
                 break;

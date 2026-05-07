@@ -2,13 +2,25 @@
 
 package snmptopology
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+)
+
+func init() {
+	registerTopologyMetricHandler(ddsnmp.KindFdbEntry, (*topologyCache).updateFdbEntry)
+	registerTopologyMetricHandler(ddsnmp.KindQbridgeFdbEntry, (*topologyCache).updateFdbEntry)
+	registerTopologyMetricHandler(ddsnmp.KindQbridgeVlanEntry, (*topologyCache).updateDot1qVlanMap)
+	registerTopologyMetricHandler(ddsnmp.KindVtpVlan, (*topologyCache).updateVtpVlanEntry)
+}
 
 func (c *topologyCache) updateFdbEntry(tags map[string]string) {
 	c.updateLocalBridgeIdentityFromTags(tags)
 
 	mac := normalizeMAC(firstNonEmpty(tags[tagFdbMac], tags[tagDot1qFdbMac]))
 	if mac == "" {
+		c.fdbRowsDroppedNoMAC++
 		return
 	}
 

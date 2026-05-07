@@ -28,6 +28,8 @@ type topologyCache struct {
 	fdbEntries           map[string]*fdbEntry
 	fdbIDToVlanID        map[string]string
 	vlanIDToName         map[string]string
+	fdbRowsDroppedNoMAC  int
+	fdbRowsUnmappedPort  int
 	vtpVersion           string
 	stpBaseBridgeAddress string
 	stpDesignatedRoot    string

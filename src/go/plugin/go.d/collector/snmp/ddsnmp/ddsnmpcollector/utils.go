@@ -51,7 +51,7 @@ func convPhysAddressToString(pdu gosnmp.SnmpPDU) (string, error) {
 
 	parts := make([]string, 0, len(address))
 	for _, v := range address {
-		parts = append(parts, fmt.Sprintf("%02X", v))
+		parts = append(parts, fmt.Sprintf("%02x", v))
 	}
 	return strings.Join(parts, ":"), nil
 }

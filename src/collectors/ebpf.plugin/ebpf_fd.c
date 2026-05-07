@@ -778,6 +778,8 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
         if (ebpf_plugin_stop())
             break;
 
+        key = next_key;
+
         if (bpf_map_lookup_elem(fd, &key, fv)) {
             netdata_log_error("Failed to lookup PID %u in FD map", key);
             goto end_fd_loop;
@@ -804,7 +806,6 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
     end_fd_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(fv, 0, length);
-        key = next_key;
     }
 }
 

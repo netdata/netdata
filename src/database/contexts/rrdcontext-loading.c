@@ -156,8 +156,16 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     th_ignored_metrics = th_ignored_instances = th_zero_retention_metrics = 0;
 
     ctx_get_context_list(&host->host_id.uuid, rrdcontext_load_context_callback, host);
+    if (unlikely(exit_initiated_get()))
+        return;
+
     ctx_get_chart_list(&host->host_id.uuid, rrdinstance_load_instance_callback, host);
+    if (unlikely(exit_initiated_get()))
+        return;
+
     ctx_get_dimension_list(&host->host_id.uuid, rrdinstance_load_dimension_callback, host);
+    if (unlikely(exit_initiated_get()))
+        return;
 
     size_t ignored_metrics = th_ignored_metrics, ignored_instances = th_ignored_instances, zero_retention_metrics = th_zero_retention_metrics;
     size_t loaded_metrics = 0, loaded_instances = 0, loaded_contexts = 0;
@@ -165,6 +173,9 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 
     RRDCONTEXT *rc;
     dfe_start_read(host->rrdctx.contexts, rc) {
+        if (unlikely(exit_initiated_get()))
+            break;
+
         size_t instances = 0;
 
         RRDINSTANCE *ri;

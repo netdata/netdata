@@ -15,7 +15,7 @@ void global_functions_add(void) {
         RRDFUNCTIONS_STREAMING_HELP,
         "top",
         HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-        function_streaming);
+        function_netdata_streaming);
 
     rrd_function_add_inline(
         localhost,

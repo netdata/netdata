@@ -3,8 +3,8 @@ mod sidecar;
 mod store;
 
 use crate::facet_catalog::{
-    FACET_ALLOWED_OPTIONS, FACET_FIELD_SPECS, FacetFieldSpec, facet_field_spec,
-    facet_field_spec_static,
+    AutocompleteMatchKind, FACET_ALLOWED_OPTIONS, FACET_FIELD_SPECS, FacetFieldSpec,
+    facet_field_spec, facet_field_spec_static,
 };
 use crate::flow::FlowRecord;
 use crate::query::{
@@ -362,6 +362,7 @@ impl FacetRuntime {
         let Some(spec) = facet_field_spec(&normalized) else {
             return Ok(Vec::new());
         };
+        let match_kind = spec.autocomplete_match;
 
         let (promoted, mut matches, archived_paths) = {
             let state = self
@@ -371,13 +372,19 @@ impl FacetRuntime {
             let Some(published) = state.published.fields.get(normalized.as_str()) else {
                 return Ok(Vec::new());
             };
-            let active_matches =
-                active_autocomplete_matches(&state.active_contributions, normalized.as_str(), term);
+            let active_matches = active_autocomplete_matches(
+                &state.active_contributions,
+                normalized.as_str(),
+                term,
+                match_kind,
+            );
             let archived_matches = if !spec.uses_sidecar || !published.autocomplete {
                 state
                     .archived_fields
                     .get(normalized.as_str())
-                    .map(|store| store.prefix_matches(term, FACET_AUTOCOMPLETE_LIMIT))
+                    .map(|store| {
+                        store.autocomplete_matches(term, FACET_AUTOCOMPLETE_LIMIT, match_kind)
+                    })
                     .unwrap_or_default()
             } else {
                 Vec::new()
@@ -400,8 +407,13 @@ impl FacetRuntime {
                 if needed == 0 {
                     break;
                 }
-                let sidecar_matches =
-                    search_sidecar(Path::new(&path), normalized.as_str(), term, needed)?;
+                let sidecar_matches = search_sidecar(
+                    Path::new(&path),
+                    normalized.as_str(),
+                    term,
+                    needed,
+                    match_kind,
+                )?;
                 matches = merge_autocomplete_values(matches, sidecar_matches);
                 if matches.len() >= FACET_AUTOCOMPLETE_LIMIT {
                     break;
@@ -885,6 +897,7 @@ fn active_autocomplete_matches(
     active_contributions: &BTreeMap<String, FacetFileContribution>,
     field: &str,
     term: &str,
+    match_kind: AutocompleteMatchKind,
 ) -> Vec<String> {
     let mut matches = Vec::new();
     for contribution in active_contributions.values() {
@@ -893,7 +906,7 @@ fn active_autocomplete_matches(
         };
         matches = merge_autocomplete_values(
             matches,
-            store.prefix_matches(term, FACET_AUTOCOMPLETE_LIMIT),
+            store.autocomplete_matches(term, FACET_AUTOCOMPLETE_LIMIT, match_kind),
         );
         if matches.len() >= FACET_AUTOCOMPLETE_LIMIT {
             break;
@@ -1201,6 +1214,253 @@ mod tests {
         assert!(
             results.iter().any(|value| value == "AS110 EXAMPLE"),
             "expected promoted sidecar autocomplete to return archived values"
+        );
+    }
+
+    #[test]
+    fn runtime_autocomplete_text_field_uses_substring_matching() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+
+        let mut fields = FlowFields::new();
+        fields.insert("SRC_AS_NAME", "AS20940 Akamai International".to_string());
+        runtime
+            .observe_active_contribution(
+                Path::new("/tmp/flows-substring-active.journal"),
+                &facet_contribution_from_flow_fields(&fields),
+            )
+            .expect("observe substring contribution");
+
+        let mid_token = runtime
+            .autocomplete("SRC_AS_NAME", "Akamai")
+            .expect("autocomplete by org name");
+        assert!(
+            mid_token.iter().any(|v| v == "AS20940 Akamai International"),
+            "substring search on AS_NAME must match the organisation token; got {mid_token:?}"
+        );
+
+        let inner_token = runtime
+            .autocomplete("SRC_AS_NAME", "kamai")
+            .expect("autocomplete by inner substring");
+        assert!(
+            inner_token
+                .iter()
+                .any(|v| v == "AS20940 Akamai International"),
+            "substring search must match a non-prefix substring; got {inner_token:?}"
+        );
+
+        let prefix_still_works = runtime
+            .autocomplete("SRC_AS_NAME", "AS20940")
+            .expect("autocomplete by AS prefix");
+        assert!(
+            prefix_still_works
+                .iter()
+                .any(|v| v == "AS20940 Akamai International"),
+            "AS-number prefix must still match; got {prefix_still_works:?}"
+        );
+    }
+
+    #[test]
+    fn runtime_autocomplete_text_substring_survives_archive_promotion() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let archived_path = Path::new("/tmp/flows-substring-archived.journal");
+
+        for asn in 0..120u32 {
+            let mut fields = FlowFields::new();
+            fields.insert("SRC_AS_NAME", format!("AS{asn:05} Akamai-{asn:03}"));
+            runtime
+                .observe_active_contribution(
+                    archived_path,
+                    &facet_contribution_from_flow_fields(&fields),
+                )
+                .expect("observe contribution");
+        }
+
+        runtime
+            .observe_rotation(
+                archived_path,
+                Path::new("/tmp/flows-substring-archived-next.journal"),
+            )
+            .expect("rotate file");
+
+        let results = runtime
+            .autocomplete("SRC_AS_NAME", "Akamai")
+            .expect("autocomplete via promoted sidecar");
+
+        assert!(
+            !results.is_empty(),
+            "promoted sidecar must return substring matches"
+        );
+        assert!(
+            results.iter().all(|v| v.contains("Akamai")),
+            "every result must contain the search term; got {results:?}"
+        );
+    }
+
+    #[test]
+    fn runtime_autocomplete_text_substring_matches_across_multiple_sidecars() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+
+        // Two journals, each promoted to sidecar by inserting >FACET_VALUE_LIMIT
+        // distinct values. Each sidecar has only 30 entries that match the
+        // search term, so neither alone can fill FACET_AUTOCOMPLETE_LIMIT (100)
+        // and the loop must reach both sidecars.
+        let paths = [
+            Path::new("/tmp/flows-multi-a.journal"),
+            Path::new("/tmp/flows-multi-b.journal"),
+        ];
+        for (idx, journal_path) in paths.iter().enumerate() {
+            for asn in 0..120u32 {
+                let mut fields = FlowFields::new();
+                let unique_asn = asn + (idx as u32) * 1000;
+                let label = if asn < 30 {
+                    format!("AS{unique_asn:05} Provider-{idx}-{asn:03}")
+                } else {
+                    format!("AS{unique_asn:05} Filler-{idx}-{asn:03}")
+                };
+                fields.insert("SRC_AS_NAME", label);
+                runtime
+                    .observe_active_contribution(
+                        journal_path,
+                        &facet_contribution_from_flow_fields(&fields),
+                    )
+                    .expect("observe contribution");
+            }
+            runtime
+                .observe_rotation(
+                    journal_path,
+                    Path::new(&format!("/tmp/flows-multi-{idx}-rot.journal")),
+                )
+                .expect("rotate file");
+        }
+
+        let results = runtime
+            .autocomplete("SRC_AS_NAME", "Provider-")
+            .expect("autocomplete across sidecars");
+
+        let from_a = results.iter().any(|v| v.contains("Provider-0-"));
+        let from_b = results.iter().any(|v| v.contains("Provider-1-"));
+        assert!(
+            from_a && from_b,
+            "expected hits from both sidecars; got {results:?}"
+        );
+        assert!(
+            results.iter().all(|v| v.contains("Provider-")),
+            "every result must match the search term; got {results:?}"
+        );
+    }
+
+    #[test]
+    fn runtime_autocomplete_text_empty_term_returns_some_values() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+
+        for asn in 0..5u32 {
+            let mut fields = FlowFields::new();
+            fields.insert("SRC_AS_NAME", format!("AS{asn:05} EXAMPLE-{asn}"));
+            runtime
+                .observe_active_contribution(
+                    Path::new("/tmp/flows-empty-term.journal"),
+                    &facet_contribution_from_flow_fields(&fields),
+                )
+                .expect("observe contribution");
+        }
+
+        let results = runtime
+            .autocomplete("SRC_AS_NAME", "")
+            .expect("autocomplete with empty term");
+        assert_eq!(
+            results.len(),
+            5,
+            "empty term must surface every value (limited by FACET_AUTOCOMPLETE_LIMIT); got {results:?}"
+        );
+    }
+
+    #[test]
+    fn runtime_autocomplete_text_long_term_returns_no_match_without_panicking() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+
+        let mut fields = FlowFields::new();
+        fields.insert("SRC_AS_NAME", "AS20940 Akamai International".to_string());
+        runtime
+            .observe_active_contribution(
+                Path::new("/tmp/flows-long-term.journal"),
+                &facet_contribution_from_flow_fields(&fields),
+            )
+            .expect("observe contribution");
+
+        let term = "x".repeat(200);
+        let results = runtime
+            .autocomplete("SRC_AS_NAME", &term)
+            .expect("autocomplete with long term");
+        assert!(results.is_empty(), "got {results:?}");
+    }
+
+    #[test]
+    fn runtime_autocomplete_promotion_threshold_at_exact_limit() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let archived_path = Path::new("/tmp/flows-threshold.journal");
+
+        // FACET_VALUE_LIMIT == 100; promotion fires only when total_values > 100.
+        // Insert exactly 100 values: should NOT promote, archived in-memory store wins.
+        for asn in 0..100u32 {
+            let mut fields = FlowFields::new();
+            fields.insert("SRC_AS_NAME", format!("AS{asn:05} Provider-{asn:03}"));
+            runtime
+                .observe_active_contribution(
+                    archived_path,
+                    &facet_contribution_from_flow_fields(&fields),
+                )
+                .expect("observe contribution");
+        }
+        runtime
+            .observe_rotation(archived_path, Path::new("/tmp/flows-threshold-rot.journal"))
+            .expect("rotate file");
+
+        let results = runtime
+            .autocomplete("SRC_AS_NAME", "Provider-")
+            .expect("autocomplete at threshold");
+        assert!(
+            !results.is_empty(),
+            "exact-threshold archived-in-memory path must still match"
+        );
+        assert!(
+            results.iter().all(|v| v.contains("Provider-")),
+            "got {results:?}"
+        );
+    }
+
+    #[test]
+    fn runtime_autocomplete_ip_field_keeps_prefix_matching() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+
+        for last in 0..3u32 {
+            let mut fields = FlowFields::new();
+            fields.insert("SRC_ADDR", format!("10.0.0.{last}"));
+            runtime
+                .observe_active_contribution(
+                    Path::new("/tmp/flows-ip-prefix.journal"),
+                    &facet_contribution_from_flow_fields(&fields),
+                )
+                .expect("observe ip contribution");
+        }
+
+        let prefix_hit = runtime
+            .autocomplete("SRC_ADDR", "10.0.")
+            .expect("autocomplete by ip prefix");
+        assert_eq!(prefix_hit.len(), 3, "got {prefix_hit:?}");
+
+        let middle_octet_miss = runtime
+            .autocomplete("SRC_ADDR", "0.0.0")
+            .expect("autocomplete by middle substring");
+        assert!(
+            middle_octet_miss.is_empty(),
+            "IP autocomplete must remain prefix-only; got {middle_octet_miss:?}"
         );
     }
 

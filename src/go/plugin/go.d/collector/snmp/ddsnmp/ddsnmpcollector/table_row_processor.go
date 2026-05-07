@@ -319,8 +319,12 @@ func (r *crossTableResolver) lookupValue(tagCfg ddprofiledefinition.MetricTagCon
 	return pdu, nil
 }
 
-// applyTransform applies index transformation rules to extract a subset of the index
-// Example: index "1.6.0.36.155.53.3.246", transform [{start: 1, end: 7}] → "6.0.36.155.53.3.246"
+// applyTransform applies index transformation rules to extract a subset of the index.
+// Indices are 0-based; end is inclusive.
+// Examples:
+//   - index "1.6.0.36.155.53.3.246", transform [{start: 1, end: 7}]    → "6.0.36.155.53.3.246"
+//   - index "7.0.80.86.171.205.239", transform [{start: 1}]            → "0.80.86.171.205.239"  (start>0, end==0 ⇒ to tail)
+//   - index "1.4.10.0.0.1.99",       transform [{start: 0, drop_right: 1}] → "1.4.10.0.0.1"
 func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddprofiledefinition.MetricIndexTransform) string {
 	if len(transforms) == 0 {
 		return index
@@ -336,6 +340,8 @@ func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddpr
 				return ""
 			}
 			end = uint(len(parts) - int(transform.DropRight) - 1)
+		} else if transform.Start > 0 && transform.End == 0 {
+			end = uint(len(parts) - 1)
 		}
 
 		if int(start) >= len(parts) || end < start || int(end) >= len(parts) {

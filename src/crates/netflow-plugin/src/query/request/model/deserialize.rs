@@ -1,6 +1,7 @@
 use super::super::*;
 use super::{FlowsRequest, RawFlowsRequest};
 use crate::facet_catalog::facet_field_enabled;
+use crate::query::request::constants::MAX_AUTOCOMPLETE_TERM_LEN;
 
 impl<'de> Deserialize<'de> for FlowsRequest {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
@@ -54,6 +55,7 @@ impl<'de> Deserialize<'de> for FlowsRequest {
             (!normalized.is_empty()).then_some(normalized)
         });
 
+        let trimmed_term = raw.term.trim();
         if matches!(mode, super::RequestMode::Autocomplete) {
             let Some(field) = field.as_deref() else {
                 return Err(D::Error::custom(
@@ -65,7 +67,13 @@ impl<'de> Deserialize<'de> for FlowsRequest {
                     "unsupported autocomplete field `{field}`"
                 )));
             }
+            if trimmed_term.len() > MAX_AUTOCOMPLETE_TERM_LEN {
+                return Err(D::Error::custom(format!(
+                    "autocomplete `term` exceeds {MAX_AUTOCOMPLETE_TERM_LEN}-byte limit"
+                )));
+            }
         }
+        let term = trimmed_term.to_string();
 
         validate_selection_fields(&raw.selections).map_err(D::Error::custom)?;
 
@@ -81,7 +89,7 @@ impl<'de> Deserialize<'de> for FlowsRequest {
             sort_by,
             top_n,
             field,
-            term: raw.term.trim().to_string(),
+            term,
         })
     }
 }

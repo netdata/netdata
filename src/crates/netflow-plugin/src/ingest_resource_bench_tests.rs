@@ -1,9 +1,10 @@
 use super::bench_support::{
-    CARDINALITY_SOURCE_SCENARIO, CardinalityMode, build_cardinality_record_batches,
-    collect_decoded_record_batches,
+    CARDINALITY_SOURCE_SCENARIO, CardinalityMode, PROTOCOL_SCENARIOS, ProtocolScenario,
+    build_cardinality_record_batches, collect_decoded_record_batches,
 };
 use super::resource_bench_support::{
-    ResourceEnvelopeReport, cpu_percent_of_one_core, parse_child_report, print_resource_report,
+    ResourceEnvelopeReport, StorageFootprintReport, StorageFootprintSample,
+    cpu_percent_of_one_core, journal_dir_size_bytes, parse_child_report, print_resource_report,
     take_proc_snapshot,
 };
 use super::test_support::{new_disk_benchmark_ingest_service, new_disk_benchmark_raw_log};
@@ -15,11 +16,17 @@ use std::time::{Duration, Instant};
 const CHILD_ENV: &str = "NETFLOW_RESOURCE_BENCH_CHILD";
 const LAYER_ENV: &str = "NETFLOW_RESOURCE_BENCH_LAYER";
 const PROFILE_ENV: &str = "NETFLOW_RESOURCE_BENCH_PROFILE";
+const PROTOCOL_ENV: &str = "NETFLOW_RESOURCE_BENCH_PROTOCOL";
 const RATE_ENV: &str = "NETFLOW_RESOURCE_BENCH_FLOWS_PER_SEC";
 const WARMUP_ENV: &str = "NETFLOW_RESOURCE_BENCH_WARMUP_SECS";
 const MEASURE_ENV: &str = "NETFLOW_RESOURCE_BENCH_MEASURE_SECS";
 const HIGH_POOL_ENV: &str = "NETFLOW_RESOURCE_BENCH_HIGH_POOL_FLOWS";
 const LOW_POOL_ENV: &str = "NETFLOW_RESOURCE_BENCH_LOW_POOL_FLOWS";
+const STORAGE_DURATION_ENV: &str = "NETFLOW_STORAGE_BENCH_DURATION_SECS";
+const STORAGE_SAMPLE_ENV: &str = "NETFLOW_STORAGE_BENCH_SAMPLE_INTERVAL_SECS";
+const DEFAULT_STORAGE_DURATION_SECS: u64 = 900;
+const DEFAULT_STORAGE_SAMPLE_INTERVAL_SECS: u64 = 30;
+const DEFAULT_STORAGE_FLOWS_PER_SEC: u64 = 10_000;
 
 const DEFAULT_WARMUP_SECS: u64 = 5;
 const DEFAULT_MEASURE_SECS: u64 = 15;
@@ -147,6 +154,103 @@ fn bench_resource_envelope_child() {
     );
 }
 
+#[test]
+#[ignore = "manual storage footprint benchmark child helper"]
+fn bench_storage_footprint_child() {
+    if std::env::var_os(CHILD_ENV).is_none() {
+        return;
+    }
+
+    let report = run_storage_footprint_child();
+    println!(
+        "STORAGE_BENCH_RESULT:{}",
+        serde_json::to_string(&report).expect("serialize storage benchmark result")
+    );
+}
+
+fn run_storage_footprint_child() -> StorageFootprintReport {
+    let profile = ResourceProfile::from_env();
+    let flows_per_sec = env_u64(RATE_ENV, DEFAULT_STORAGE_FLOWS_PER_SEC);
+    let duration_secs = env_u64(STORAGE_DURATION_ENV, DEFAULT_STORAGE_DURATION_SECS);
+    let sample_interval_secs = env_u64(
+        STORAGE_SAMPLE_ENV,
+        DEFAULT_STORAGE_SAMPLE_INTERVAL_SECS,
+    )
+    .max(1);
+
+    let (record_batches, protocol_name) = build_record_batches(profile);
+    let (_tmp, mut service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
+    let layer = ResourceLayer::AllTiersBatched;
+    configure_service_for_layer(&mut service, layer);
+
+    let raw_dir = service.cfg.journal.raw_tier_dir();
+    let m1_dir = service.cfg.journal.minute_1_tier_dir();
+    let m5_dir = service.cfg.journal.minute_5_tier_dir();
+    let h1_dir = service.cfg.journal.hour_1_tier_dir();
+
+    let proc_initial = take_proc_snapshot();
+    let metrics_initial = service.metrics.snapshot();
+    let started = Instant::now();
+
+    let mut samples = Vec::new();
+    let mut entries_since_sync = 0_usize;
+    let mut total_flows_ingested = 0_u64;
+    let total_intervals = duration_secs.div_ceil(sample_interval_secs);
+
+    for _ in 0..total_intervals {
+        let segment = run_paced_plugin_loop(
+            &mut service,
+            &record_batches,
+            flows_per_sec,
+            Duration::from_secs(sample_interval_secs),
+            entries_since_sync,
+            false,
+        );
+        entries_since_sync = segment.entries_since_sync;
+        total_flows_ingested =
+            total_flows_ingested.saturating_add(segment.ingested_flows as u64);
+
+        let elapsed = started.elapsed().as_secs();
+        let proc_now = take_proc_snapshot();
+        let metrics_now = service.metrics.snapshot();
+        let raw_bytes = journal_dir_size_bytes(&raw_dir);
+        let m1_bytes = journal_dir_size_bytes(&m1_dir);
+        let m5_bytes = journal_dir_size_bytes(&m5_dir);
+        let h1_bytes = journal_dir_size_bytes(&h1_dir);
+
+        samples.push(StorageFootprintSample {
+            elapsed_secs: elapsed,
+            raw_dir_bytes: raw_bytes,
+            minute_1_dir_bytes: m1_bytes,
+            minute_5_dir_bytes: m5_bytes,
+            hour_1_dir_bytes: h1_bytes,
+            total_disk_bytes: raw_bytes + m1_bytes + m5_bytes + h1_bytes,
+            cumulative_io_write_bytes: proc_now
+                .write_bytes
+                .saturating_sub(proc_initial.write_bytes),
+            cumulative_logical_bytes: total_logical_bytes_delta(&metrics_initial, &metrics_now),
+            cumulative_flows_ingested: total_flows_ingested,
+            rss_bytes: proc_now.rss_bytes,
+        });
+    }
+
+    service.finish_shutdown_for_test(entries_since_sync);
+
+    let last = samples.last().expect("at least one storage sample");
+    StorageFootprintReport {
+        protocol: protocol_name.to_string(),
+        profile: profile.label().to_string(),
+        flows_per_sec,
+        duration_secs,
+        sample_interval_secs,
+        final_total_flows: last.cumulative_flows_ingested,
+        final_disk_bytes: last.total_disk_bytes,
+        final_logical_bytes: last.cumulative_logical_bytes,
+        final_io_write_bytes: last.cumulative_io_write_bytes,
+        samples: samples.clone(),
+    }
+}
+
 fn run_resource_envelope_case(
     layer: ResourceLayer,
     profile: ResourceProfile,
@@ -177,6 +281,10 @@ fn run_resource_envelope_case(
             },
         )
         .env(RATE_ENV, flows_per_sec.to_string())
+        .env(
+            PROTOCOL_ENV,
+            std::env::var(PROTOCOL_ENV).unwrap_or_else(|_| "mixed".to_string()),
+        )
         .env(
             WARMUP_ENV,
             env_u64(WARMUP_ENV, DEFAULT_WARMUP_SECS).to_string(),
@@ -229,13 +337,32 @@ fn run_resource_envelope_child() -> ResourceEnvelopeReport {
     }
 }
 
-fn build_record_batches(profile: ResourceProfile) -> Vec<Vec<crate::flow::FlowRecord>> {
-    let source_batches = collect_decoded_record_batches(&CARDINALITY_SOURCE_SCENARIO);
-    build_cardinality_record_batches(
+fn build_record_batches(
+    profile: ResourceProfile,
+) -> (Vec<Vec<crate::flow::FlowRecord>>, &'static str) {
+    let scenario = resolve_source_scenario();
+    let source_batches = collect_decoded_record_batches(scenario);
+    let batches = build_cardinality_record_batches(
         &source_batches,
         profile.record_pool_size(),
         profile.cardinality_mode(),
-    )
+    );
+    (batches, scenario.name)
+}
+
+fn resolve_source_scenario() -> &'static ProtocolScenario {
+    match std::env::var(PROTOCOL_ENV) {
+        Err(_) => &CARDINALITY_SOURCE_SCENARIO,
+        Ok(value) if value.is_empty() || value == "mixed" => &CARDINALITY_SOURCE_SCENARIO,
+        Ok(value) => PROTOCOL_SCENARIOS
+            .iter()
+            .find(|scenario| scenario.name == value)
+            .unwrap_or_else(|| {
+                panic!(
+                    "unsupported {PROTOCOL_ENV}={value} (expected: mixed, netflow-v5, netflow-v9, ipfix, sflow)"
+                )
+            }),
+    }
 }
 
 fn run_writer_only_resource_envelope(
@@ -244,7 +371,7 @@ fn run_writer_only_resource_envelope(
     warmup_secs: u64,
     measurement_secs: u64,
 ) -> ResourceEnvelopeReport {
-    let record_batches = build_record_batches(profile);
+    let (record_batches, protocol_name) = build_record_batches(profile);
     let (_tmp, mut log) = new_disk_benchmark_raw_log();
     let mut encode_buf = JournalEncodeBuffer::new();
 
@@ -274,6 +401,7 @@ fn run_writer_only_resource_envelope(
             .to_string(),
         layer: ResourceLayer::WriterOnly.label().to_string(),
         profile: profile.label().to_string(),
+        protocol: protocol_name.to_string(),
         requested_flows_per_sec: flows_per_sec,
         achieved_flows_per_sec: measurement_result.ingested_flows as f64 / elapsed.as_secs_f64(),
         cpu_percent_of_one_core: cpu_percent_of_one_core(proc_before, proc_after, elapsed),
@@ -308,7 +436,7 @@ fn run_plugin_resource_envelope(
     warmup_secs: u64,
     measurement_secs: u64,
 ) -> ResourceEnvelopeReport {
-    let record_batches = build_record_batches(profile);
+    let (record_batches, protocol_name) = build_record_batches(profile);
     let (_tmp, mut service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
     configure_service_for_layer(&mut service, layer);
 
@@ -369,6 +497,7 @@ fn run_plugin_resource_envelope(
             .to_string(),
         layer: layer.label().to_string(),
         profile: profile.label().to_string(),
+        protocol: protocol_name.to_string(),
         requested_flows_per_sec: flows_per_sec,
         achieved_flows_per_sec: measurement_result.ingested_flows as f64 / elapsed.as_secs_f64(),
         cpu_percent_of_one_core: cpu_percent_of_one_core(proc_before, proc_after, elapsed),

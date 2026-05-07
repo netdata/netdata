@@ -43,9 +43,7 @@ fn json_from_any_value(any_value: &AnyValue) -> JsonValue {
     match &any_value.value {
         Some(Value::StringValue(s)) => JsonValue::String(s.clone()),
         Some(Value::BoolValue(b)) => JsonValue::Bool(*b),
-        Some(Value::IntValue(i)) => JsonValue::Number(
-            serde_json::Number::from_f64(*i as f64).unwrap_or_else(|| serde_json::Number::from(0)),
-        ),
+        Some(Value::IntValue(i)) => JsonValue::Number(serde_json::Number::from(*i)),
         Some(Value::DoubleValue(d)) => JsonValue::Number(
             serde_json::Number::from_f64(*d).unwrap_or_else(|| serde_json::Number::from(0)),
         ),

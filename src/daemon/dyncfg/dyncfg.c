@@ -467,7 +467,7 @@ void dyncfg_add_streaming(BUFFER *wb) {
 }
 
 bool dyncfg_available_for_rrdhost(RRDHOST *host) {
-    if(host == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+    if(host == localhost)
         return true;
 
     return rrd_function_available(host, PLUGINSD_FUNCTION_CONFIG);

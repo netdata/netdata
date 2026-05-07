@@ -935,7 +935,7 @@ func TestTableCollector_Collect(t *testing.T) {
 				{
 					Name:       "devClientCount",
 					Value:      10,
-					Tags:       map[string]string{"mac_address": "00:50:56:AB:CD:EF"},
+					Tags:       map[string]string{"mac_address": "00:50:56:ab:cd:ef"},
 					MetricType: "rate",
 					IsTable:    true,
 					Table:      "devTable",
@@ -4125,7 +4125,7 @@ func TestTableCollector_Collect(t *testing.T) {
 
 			tc.setupMock(mockHandler)
 
-			handleCrossTableTagsWithoutMetrics(tc.profile)
+			ddsnmp.FinalizeProfiles([]*ddsnmp.Profile{tc.profile})
 			if err := ddsnmp.CompileTransforms(tc.profile); err != nil {
 				if tc.expectedError && tc.errorContains != "" && strings.Contains(err.Error(), tc.errorContains) {
 					return // Expected error during compilation
@@ -4927,6 +4927,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			mockHandler := snmpmock.NewMockHandler(ctrl)
 			tc.setupMock(mockHandler)
 
+			ddsnmp.FinalizeProfiles(tc.profiles)
 			collector := New(Config{
 				SnmpClient:  mockHandler,
 				Profiles:    tc.profiles,
