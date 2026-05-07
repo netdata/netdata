@@ -114,6 +114,13 @@ ALWAYS_INLINE void rrdcontext_host_child_connected(RRDHOST *host) {
 // rather than a TOCTOU race.
 usec_t rrdcontext_next_db_rotation_ut = 0;
 
+// Companion flag for rrdcontext_request_full_gc(): set when its CAS
+// failed because the worker was already mid-pass with the deadline in
+// the past. The worker reads-and-clears this after each pass and arms
+// a follow-up if set, so an archive that landed mid-pass (after the
+// worker had already walked its host) doesn't get stranded.
+size_t rrdcontext_full_gc_rerun_requested = 0;
+
 ALWAYS_INLINE void rrdcontext_db_rotation(void) {
     // called when the db rotates its database
     __atomic_store_n(&rrdcontext_next_db_rotation_ut,
@@ -139,12 +146,22 @@ ALWAYS_INLINE void rrdcontext_request_full_gc(void) {
     // no pass is already scheduled; the worker resets the slot to 0 after
     // it runs, at which point the next chart-free arms a fresh window.
     // Multiple requests within that window coalesce into a single GC pass.
+    usec_t now = now_realtime_usec();
     usec_t expected = 0;
-    usec_t deadline = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
-    __atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
-                                &expected, deadline,
-                                false,
-                                __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+    usec_t deadline = now + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+    if(!__atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
+                                    &expected, deadline,
+                                    false,
+                                    __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+        // CAS failed -- expected now holds the slot's actual value.
+        // If that deadline is in the past, the worker is mid-pass and
+        // may already have walked the host whose archive triggered this
+        // request. Mark for a follow-up so the worker schedules another
+        // pass after the current one. Future-armed deadlines need no
+        // follow-up: their upcoming pass will see the archive.
+        if(expected && expected <= now)
+            __atomic_store_n(&rrdcontext_full_gc_rerun_requested, 1, __ATOMIC_RELAXED);
+    }
 }
 
 int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, nd_uuid_t *store_uuid) {

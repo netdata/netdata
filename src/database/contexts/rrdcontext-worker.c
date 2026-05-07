@@ -23,6 +23,7 @@ static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 static void rrdcontext_garbage_collect_for_all_hosts(void);
 
 extern usec_t rrdcontext_next_db_rotation_ut;
+extern size_t rrdcontext_full_gc_rerun_requested;
 
 // ----------------------------------------------------------------------------
 // version hash calculation
@@ -699,7 +700,7 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
         dfe_done(ri);
 
         if(extreme_cardinality.enabled &&
-            extreme_cardinality.db_rotations &&
+            __atomic_load_n(&extreme_cardinality.db_rotations, __ATOMIC_RELAXED) &&
             instances_active &&
             instances_no_tier0 >= extreme_cardinality.instances_count) {
             size_t percent = (100 * instances_no_tier0 / instances_active);
@@ -1090,6 +1091,22 @@ void rrdcontext_main(void *ptr) {
                                         &deadline, 0,
                                         false,
                                         __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+
+            // If a rrdcontext_request_full_gc() landed mid-pass (its CAS
+            // failed because the slot was non-zero with an expired
+            // deadline), the host whose archive motivated it may have
+            // already been walked in this pass. Schedule a follow-up:
+            // arm a fresh deadline iff the slot is currently zero. If
+            // another path (e.g. dbengine rotation) just armed a new
+            // deadline, the CAS leaves it alone.
+            if(__atomic_exchange_n(&rrdcontext_full_gc_rerun_requested, 0, __ATOMIC_RELAXED)) {
+                usec_t expected = 0;
+                usec_t fresh = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+                __atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
+                                            &expected, fresh,
+                                            false,
+                                            __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+            }
         }
 
         size_t hub_queued_contexts_for_all_hosts = 0;
