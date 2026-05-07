@@ -49,6 +49,103 @@ modules:
         list: []
       configuration:
         file:
+          name: "netdata.conf"
+          section_name: "[plugin:network-viewer:PerflibTCP]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes: []
+      functions:
+        description: |
+          This plugin exposes a real-time function for viewing active network connections.
+        list:
+          - id: network-connections
+            name: Network Connections
+            description: |
+              Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
+
+              Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
+              including connection direction (listen, inbound, outbound, local), process information,
+              and TCP performance metrics (RTT, retransmissions).
+
+              Connections are classified as system or container based on network namespace.
+            parameters: []
+            returns:
+              description: ""
+              columns: []
+            performance: ""
+            security: ""
+            availability: ""
+  - meta:
+      plugin_name: network-viewer.plugin
+      module_name: PerflibTCP
+      monitored_instance:
+        name: TCP Stack
+        link: "https://learn.microsoft.com/en-us/windows/win32/networking"
+        categories:
+          - data-collection.networking
+        icon_filename: windows.svg
+      alternative_monitored_instances: []
+      keywords:
+        - network
+        - tcp
+        - stack
+        - connections
+        - segments
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors TCP stack counters and TCP connection states on Windows systems.
+        method_description: |
+          It queries the TCPv4 and TCPv6 objects from Perflib and uses the Windows IP Helper API for TCP connection-state counts.
+      supported_platforms:
+        include:
+          - windows
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
           name: ""
         options:
           description: ""
@@ -71,25 +168,47 @@ modules:
         enabled: false
       description: ""
       availability: []
-      scopes: []
-    functions:
-      description: |
-        This plugin exposes a real-time function for viewing active network connections.
-      list:
-        - id: network-connections
-          name: Network Connections
+      scopes:
+        - name: Per TCP Stack
           description: |
-            Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
-
-            Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
-            including connection direction (listen, inbound, outbound, local), process information,
-            and TCP performance metrics (RTT, retransmissions).
-
-            Connections are classified as system or container based on network namespace.
-          parameters: []
-          returns:
-            description: ""
-            columns: []
-          performance: ""
-          security: ""
-          availability: ""
+            These metrics refer to the TCP stack for each address family.
+          labels:
+            - name: af
+              description: The address family. On Windows systems, this collector exposes `ipv4` and `ipv6`.
+          metrics:
+            - name: tcp.connections
+              description: TCP connection counters.
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: failures
+                - name: active
+                - name: established
+                - name: passive
+                - name: reset
+            - name: tcp.segments
+              description: TCP segment counters.
+              unit: segments/s
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: received
+                - name: retransmitted
+                - name: sent
+            - name: tcp.connections_state_count
+              description: TCP connection state counts.
+              unit: connections
+              chart_type: stacked
+              dimensions:
+                - name: closed
+                - name: listening
+                - name: syn_sent
+                - name: syn_received
+                - name: established
+                - name: fin_wait1
+                - name: fin_wait2
+                - name: close_wait
+                - name: closing
+                - name: last_ack
+                - name: time_wait
+                - name: delete_tcb

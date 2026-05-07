@@ -280,6 +280,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Network interfaces](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/network_interfaces.md) | Monitor network interface metrics about bandwidth, state, errors and more. |
 | [Network statistics](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/network_statistics.md) | This integration provides metrics from the `netstat`, `snmp` and `snmp6` modules. |
 | [Network Subsystem](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/network_subsystem.md) | Monitor network interface metrics about bandwidth, state, errors and more. |
+| [TCP Stack](https://github.com/netdata/netdata/blob/master/src/collectors/network-viewer.plugin/integrations/tcp_stack.md) | Monitor TCP stack counters and connection states on Windows systems. |
 | [NextDNS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/nextdns.md) | Track NextDNS DNS resolver and security platform metrics for efficient DNS management and security. |
 | [NSD](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/nsd/integrations/nsd.md) | This collector monitors NSD statistics like queries, zones, protocols, query types and more. |
 | [NTPd](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/ntpd/integrations/ntpd.md) | This collector monitors the system variables of the local `ntpd` daemon (optional incl. |
