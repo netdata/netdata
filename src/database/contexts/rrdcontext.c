@@ -118,10 +118,16 @@ ALWAYS_INLINE void rrdcontext_request_full_gc(void) {
     // hosts also drop archived rrdinstance / rrdmetric entries -- otherwise
     // those grow unbounded with chart churn (k8s cgroups, etc.) because the
     // dbengine rotation trigger never fires on them.
-    // Reuses rrdcontext_next_db_rotation_ut as the schedule slot; multiple
-    // requests within FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS
-    // coalesce into a single deep GC pass.
-    rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+    //
+    // The maintenance loop runs every 10 s; under continuous churn it would
+    // free charts on every pass. Unconditionally rewriting the deadline
+    // would push it out by another 120 s on every call, so under sustained
+    // churn the deep GC would never actually fire. Only arm the deadline if
+    // no pass is already scheduled; the worker resets the slot to 0 after
+    // it runs, at which point the next chart-free arms a fresh window.
+    // Multiple requests within that window coalesce into a single GC pass.
+    if(rrdcontext_next_db_rotation_ut == 0)
+        rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
 }
 
 int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, nd_uuid_t *store_uuid) {

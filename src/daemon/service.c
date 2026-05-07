@@ -135,7 +135,11 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     if(full_archives != full_candidates)
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 
-    return full_archives;
+    // Both partial dim-archive (svc_rrdset_archive_obsolete_dimensions)
+    // and full chart-free (rrdset_free) produce archived RRDMETRIC and/or
+    // RRDINSTANCE entries in rrdcontext. Either kind of archival warrants
+    // a deep rrdcontext GC pass on non-dbengine hosts.
+    return partial_archives + full_archives;
 }
 
 void svc_rrdhost_obsolete_all_charts(RRDHOST *host) {
@@ -153,14 +157,14 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
     rrd_rdlock();
 
-    size_t charts_freed = 0;
+    size_t archived = 0;
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
         if(rrdhost_receiver_replicating_charts(host) || rrdhost_sender_replicating_charts(host))
             continue;
 
-        charts_freed += svc_rrdhost_cleanup_charts_marked_obsolete(host);
+        archived += svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
         if (rrdhost_is_local(host) || IS_VIRTUAL_HOST_OS(host))
             continue;
@@ -180,11 +184,12 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
     rrd_rdunlock();
 
-    // If we actually freed any chart, schedule a deep rrdcontext GC pass.
-    // On non-dbengine hosts, dbengine rotation never triggers it, so archived
+    // If anything was archived (a chart freed, or just dimensions archived
+    // on a still-live chart), schedule a deep rrdcontext GC pass. On
+    // non-dbengine hosts, dbengine rotation never triggers it, so archived
     // RRDINSTANCE / RRDMETRIC entries would otherwise accumulate forever in
     // host->rrdctx.contexts -> rc->rrdinstances / ri->rrdmetrics.
-    if(charts_freed)
+    if(archived)
         rrdcontext_request_full_gc();
 }
 
