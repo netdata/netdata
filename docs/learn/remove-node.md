@@ -72,13 +72,19 @@ The **Remove** option is only available in the **Space Settings** view. It will 
 4. Copy the UUID from the JSON data (it will be copied to your clipboard)
 
 **Step 2: Remove the Stale Node**
-Run this command on any node with Netdata Agent installed:
+Run this command on the **Parent node** that holds the stale child's data:
 
 ```bash
 netdatacli remove-stale-node <UUID>
 ```
 
 Replace `<UUID>` with the node's actual identifier from Step 1.
+
+:::note
+
+In a high-availability setup with multiple Parent Agents, this command must be executed on **each** Parent Agent.
+
+:::
 
 **What happens next**: The command unregisters and removes the node from the cloud. The node status should change from **Stale → Offline** in Netdata Cloud, then you can remove it via the UI method if needed.
 
