@@ -97,6 +97,7 @@ set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
 function(netdata_windows_path_to_runtime_path output_var input_path)
   set(_converted_path "")
+  set(_cygpath_result 1)
 
   find_program(_cygpath_executable NAMES cygpath)
   if(_cygpath_executable)
