@@ -1011,6 +1011,12 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
 // so the planner does the lookup once per row instead of 2N extra index probes.
 // memory_mode and health_enabled are intentionally omitted — they were SELECTed
 // in the previous shape but never read by the consumer.
+//
+// Both LEFT JOINs are guaranteed to match at most one row per host by the
+// schema (sqlite_metadata.c database_config[]): host_label has
+// PRIMARY KEY (host_id, label_key), and node_instance has host_id PRIMARY KEY.
+// Row multiplication is therefore impossible here without a SQLite invariant
+// violation; no DISTINCT / GROUP BY / EXISTS wrapper needed.
 #define SQL_FETCH_ALL_HOSTS                                                                                            \
     "SELECT h.host_id, h.hostname, h.registry_hostname, h.update_every, h.os, "                                        \
     "h.timezone, h.hops, h.abbrev_timezone, h.utc_offset, h.program_name, "                                            \
