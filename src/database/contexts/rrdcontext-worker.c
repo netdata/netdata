@@ -4,7 +4,7 @@
 
 static struct {
     bool enabled;
-    size_t db_rotations;
+    size_t db_rotations;            // count of actual dbengine rotations only
     size_t instances_count;
     size_t active_vs_archived_percentage;
 } extreme_cardinality = {
@@ -13,6 +13,10 @@ static struct {
     .instances_count = 1000,
     .active_vs_archived_percentage = 50,
 };
+
+void rrdcontext_count_db_rotation(void) {
+    __atomic_add_fetch(&extreme_cardinality.db_rotations, 1, __ATOMIC_RELAXED);
+}
 
 static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 
@@ -1065,7 +1069,11 @@ void rrdcontext_main(void *ptr) {
 
         usec_t deadline = __atomic_load_n(&rrdcontext_next_db_rotation_ut, __ATOMIC_RELAXED);
         if(deadline && now_ut > deadline) {
-            extreme_cardinality.db_rotations++;
+            // db_rotations is bumped by rrdcontext_count_db_rotation() from
+            // rrdcontext_db_rotation() only -- the chart-cleanup trigger
+            // (rrdcontext_request_full_gc) does NOT bump it, so the
+            // extreme-cardinality guard at line ~700 still activates only
+            // after a real dbengine rotation.
             rrdcontext_recalculate_retention_all_hosts();
             rrdcontext_garbage_collect_for_all_hosts();
             // Clear the slot only if it still holds the deadline we

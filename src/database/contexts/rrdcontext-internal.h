@@ -529,6 +529,12 @@ void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc);
 
 RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri);
 
+// Bump the dbengine-rotations counter that gates extreme-cardinality
+// protection. Called from rrdcontext_db_rotation(); the chart-cleanup
+// trigger (rrdcontext_request_full_gc) deliberately does NOT bump it,
+// so the guard activates only on real dbengine rotations as before.
+void rrdcontext_count_db_rotation(void);
+
 bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
 void rrdcontext_post_process_queued_contexts(RRDHOST *host);
 void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut);

@@ -119,6 +119,10 @@ ALWAYS_INLINE void rrdcontext_db_rotation(void) {
     __atomic_store_n(&rrdcontext_next_db_rotation_ut,
                      now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC,
                      __ATOMIC_RELAXED);
+    // Count only real dbengine rotations (not chart-cleanup-driven scans),
+    // so the extreme-cardinality guard in the rrdcontext worker preserves
+    // its original "wait for first rotation" semantics.
+    rrdcontext_count_db_rotation();
 }
 
 ALWAYS_INLINE void rrdcontext_request_full_gc(void) {
