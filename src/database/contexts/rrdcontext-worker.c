@@ -1069,10 +1069,12 @@ void rrdcontext_main(void *ptr) {
             rrdcontext_recalculate_retention_all_hosts();
             rrdcontext_garbage_collect_for_all_hosts();
             // Clear the slot only if it still holds the deadline we
-            // processed. If a concurrent rrdcontext_request_full_gc() has
-            // armed a NEW deadline during this pass (it CAS'd 0 -> Y while
-            // we ran), leave it in place so the next iteration fires for
-            // the archives we may have missed.
+            // processed. rrdcontext_request_full_gc() cannot land mid-pass
+            // (the slot is non-zero, so its CAS 0 -> Y fails -- requests
+            // during a pass coalesce silently). rrdcontext_db_rotation(),
+            // however, does an unconditional store of a fresh deadline; if
+            // it fires during this pass, the CAS here fails and the new
+            // deadline survives to drive the next iteration.
             __atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
                                         &deadline, 0,
                                         false,

@@ -28,10 +28,13 @@ static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     return true;
 }
 
-// Returns the number of dimensions actually archived this call. The
-// caller can detect "all candidates archived" by checking
-// RRDSET_FLAG_OBSOLETE_DIMENSIONS afterwards: it is cleared on entry and
-// re-set only when some candidate could not be archived this pass.
+// Returns the number of dimensions actually archived this call. When the
+// function does any work (i.e. the early return below didn't fire), it
+// clears RRDSET_FLAG_OBSOLETE_DIMENSIONS on entry and only re-sets it
+// when some candidate could not be archived this pass. Callers can
+// therefore detect "all candidates archived" by checking the flag after
+// the call -- but only on the path that actually scanned (all_dimensions
+// is true, or the flag was set on entry).
 static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
     if(!all_dimensions && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
         return 0;
