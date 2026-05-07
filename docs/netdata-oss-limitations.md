@@ -37,6 +37,12 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Multi-node views | 5 nodes | 5 nodes | Unlimited |
 | Custom dashboards | 1 per agent | 1 per room | Unlimited |
 
+:::note
+
+The 5-node limit on multi-node views applies to Netdata Cloud dashboards only. When self-hosting without Netdata Cloud, a Netdata Parent can receive streaming data from unlimited Children. Access the Parent's local dashboard to view metrics from all connected nodes without any node count restriction.
+
+:::
+
 ### Functions (Live Tab)
 
 Functions provide on-demand, detailed information beyond standard metrics.
@@ -122,6 +128,7 @@ The 5-node limit on multi-node dashboards applies to Community plans:
 
 1. **Upgrade to Business** for unlimited nodes
 2. **Or select preferred nodes** in Space settings to choose which 5 nodes appear in multi-node views
+3. **Or self-host without Netdata Cloud** — set up a [Parent to centralize data](/docs/deployment-guides/deployment-with-centralization-points.md) from all connected Children. Self-hosted Parents consolidate metrics and logs locally with no node count limit, and provide a unified dashboard accessible from the Parent's local web interface.
 
 ## Summary
 
