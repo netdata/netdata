@@ -1414,12 +1414,18 @@ static uint64_t get_rowid_from_statement(const char *sql)
 
 
 // Descriptor + state for one cleanup cycle (dimension / chart / chart_label).
-// Preserves the three former check_*_metadata() functions' control flow exactly:
-//   first call -> arm timer, snapshot max(rowid)
-//   timer not yet expired -> return true (yield)
-//   already past max(rowid) -> log completion; either re-arm (dim) or mark
-//                              one-shot completed (chart, label)
-//   else -> run one cleanup_loop slice and re-arm
+// Replaces the three former check_*_metadata() functions with one driver:
+//   first call         -> arm timer, snapshot max(rowid), log "scheduled to run"
+//   timer not expired  -> return true (yield)
+//   max_row_id == 0    -> snapshot deferred from a previous re-arm (see below);
+//                         re-snapshot now so the new pass uses fresh state
+//   past max(rowid)    -> log completion; one-shot cycles (chart, label) mark
+//                         completed and never re-run; cycles with
+//                         complete_repeat_after > 0 (dim) reset last_row_id and
+//                         clear max_row_id so the snapshot is taken fresh when
+//                         the timer next fires (NOT at completion time, which
+//                         would let the snapshot go stale during the gap)
+//   else               -> run one cleanup_loop slice and re-arm short timer
 struct cleanup_cycle {
     // descriptor (immutable)
     const char *select_sql;        // SELECT id, rowid FROM <table> WHERE rowid > ?
@@ -1461,15 +1467,26 @@ static bool run_cleanup_cycle(struct cleanup_cycle *c, struct meta_config_s *wc)
     if (c->next_execution_t > now)
         return true;
 
+    // Lazy snapshot: a prior pass completed and re-armed by clearing max_row_id;
+    // take the snapshot now (timer just expired) so the upcoming pass scans
+    // every row inserted since the previous completion, not just up to a
+    // (possibly week-old) value snapped at completion time.
+    if (!c->max_row_id) {
+        c->max_row_id = get_rowid_from_statement(c->max_rowid_sql);
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "%s metadata check has been scheduled to run (max id = %" PRIu64 ")",
+               c->label_singular, c->max_row_id);
+    }
+
     if (c->max_row_id && c->last_row_id >= c->max_row_id) {
         nd_log(NDLS_DAEMON, NDLP_INFO, "%s metadata check completed", c->label_singular);
         if (c->complete_repeat_after) {
-            // Re-arm for another full pass: reset the cursor and re-snapshot the
-            // table's current MAX(rowid) so the next firing actually scans rows
-            // added since the previous pass, instead of immediately re-completing.
+            // Re-arm for another full pass; defer the MAX(rowid) snapshot to the
+            // next entry (see "Lazy snapshot" above) so it isn't stale by the
+            // time the timer actually fires.
             c->next_execution_t = now + c->complete_repeat_after;
             c->last_row_id = 0;
-            c->max_row_id = get_rowid_from_statement(c->max_rowid_sql);
+            c->max_row_id = 0;
         }
         else
             c->completed = true;
@@ -1523,7 +1540,7 @@ static struct cleanup_cycle dim_cleanup_cycle = {
     .check_flag           = false,
     .action_flag          = false,
     .repeat_after         = METADATA_MAINTENANCE_REPEAT,
-    .complete_repeat_after = 604800,                          // re-fire weekly (no-op rearm; preserved as-is)
+    .complete_repeat_after = 604800,                          // re-fire weekly: re-snapshots max(rowid) and rescans dimensions added since the previous pass
     .worker_event         = UV_EVENT_DIMENSION_CLEANUP,
     .label_singular       = "Dimension",
     .label_plural         = "Dimensions",
