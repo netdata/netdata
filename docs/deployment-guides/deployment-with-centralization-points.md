@@ -40,7 +40,7 @@ This **distributed yet centralized** approach gives you the benefits of both dec
 |-------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
 | **Ephemeral Systems**                           | Ideal for your Kubernetes nodes or temporary VMs that frequently go offline                    | You retain metrics and logs for analysis and troubleshooting even after node termination      |
 | **Limited Resources**                           | Offloads observability tasks from your systems with low disk space, CPU, RAM, or I/O bandwidth | Your production systems run efficiently without performance trade-offs                        |
-| **Multi-Node Dashboards Without Netdata Cloud** | Aggregates data from all your nodes for centralized dashboards                                 | You get Cloud-like functionality in environments that prefer or require on-premises solutions |
+| **Multi-Node Dashboards Without Netdata Cloud** | Aggregates data from all your nodes for centralized dashboards with no node count limit        | You get Cloud-like functionality in environments that prefer or require on-premises solutions |
 | **Restricted Netdata Cloud Access**             | Acts as a bridge when your monitored systems can't connect to Netdata Cloud                    | You can still use Cloud features despite firewall restrictions or security policies           |
 
 ## How Multiple Parents Work
