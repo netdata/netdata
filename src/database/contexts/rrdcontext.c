@@ -106,10 +106,19 @@ ALWAYS_INLINE void rrdcontext_host_child_connected(RRDHOST *host) {
     rrdset_foreach_done(st);
 }
 
+// Cross-thread schedule slot for the deep rrdcontext GC pass. Written by
+// rrdcontext_db_rotation() (dbengine rotation), rrdcontext_request_full_gc()
+// (chart-cleanup), and the rrdcontext worker (reset to 0 after a pass).
+// All accesses go through __atomic_* so 32-bit platforms cannot tear the
+// 64-bit value, and the request_full_gc() check-then-set is a real CAS
+// rather than a TOCTOU race.
 usec_t rrdcontext_next_db_rotation_ut = 0;
+
 ALWAYS_INLINE void rrdcontext_db_rotation(void) {
     // called when the db rotates its database
-    rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+    __atomic_store_n(&rrdcontext_next_db_rotation_ut,
+                     now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC,
+                     __ATOMIC_RELAXED);
 }
 
 ALWAYS_INLINE void rrdcontext_request_full_gc(void) {
@@ -126,8 +135,12 @@ ALWAYS_INLINE void rrdcontext_request_full_gc(void) {
     // no pass is already scheduled; the worker resets the slot to 0 after
     // it runs, at which point the next chart-free arms a fresh window.
     // Multiple requests within that window coalesce into a single GC pass.
-    if(rrdcontext_next_db_rotation_ut == 0)
-        rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+    usec_t expected = 0;
+    usec_t deadline = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+    __atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
+                                &expected, deadline,
+                                false,
+                                __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 }
 
 int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, nd_uuid_t *store_uuid) {

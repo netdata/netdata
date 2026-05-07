@@ -133,7 +133,7 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 }
 
 static void rrdcontext_recalculate_retention_all_hosts(void) {
-    rrdcontext_next_db_rotation_ut = 0;
+    __atomic_store_n(&rrdcontext_next_db_rotation_ut, 0, __ATOMIC_RELAXED);
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host) {
         worker_is_busy(WORKER_JOB_RETENTION);
@@ -1058,11 +1058,12 @@ void rrdcontext_main(void *ptr) {
 
         usec_t now_ut = now_realtime_usec();
 
-        if(rrdcontext_next_db_rotation_ut && now_ut > rrdcontext_next_db_rotation_ut) {
+        usec_t deadline = __atomic_load_n(&rrdcontext_next_db_rotation_ut, __ATOMIC_RELAXED);
+        if(deadline && now_ut > deadline) {
             extreme_cardinality.db_rotations++;
             rrdcontext_recalculate_retention_all_hosts();
             rrdcontext_garbage_collect_for_all_hosts();
-            rrdcontext_next_db_rotation_ut = 0;
+            __atomic_store_n(&rrdcontext_next_db_rotation_ut, 0, __ATOMIC_RELAXED);
         }
 
         size_t hub_queued_contexts_for_all_hosts = 0;
