@@ -82,9 +82,9 @@ static bool svc_rrdset_lock_for_deletion(RRDSET *st, time_t now) {
     return false;
 }
 
-static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
+static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS|RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS))
-        return;
+        return 0;
 
     worker_is_busy(UV_EVENT_CLEANUP_OBSOLETE_CHARTS);
 
@@ -134,6 +134,8 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
 
     if(full_archives != full_candidates)
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
+
+    return full_archives;
 }
 
 void svc_rrdhost_obsolete_all_charts(RRDHOST *host) {
@@ -151,12 +153,14 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
     rrd_rdlock();
 
+    size_t charts_freed = 0;
+
     RRDHOST *host;
     rrdhost_foreach_read(host) {
         if(rrdhost_receiver_replicating_charts(host) || rrdhost_sender_replicating_charts(host))
             continue;
 
-        svc_rrdhost_cleanup_charts_marked_obsolete(host);
+        charts_freed += svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
         if (rrdhost_is_local(host) || IS_VIRTUAL_HOST_OS(host))
             continue;
@@ -175,6 +179,13 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
     }
 
     rrd_rdunlock();
+
+    // If we actually freed any chart, schedule a deep rrdcontext GC pass.
+    // On non-dbengine hosts, dbengine rotation never triggers it, so archived
+    // RRDINSTANCE / RRDMETRIC entries would otherwise accumulate forever in
+    // host->rrdctx.contexts -> rc->rrdinstances / ri->rrdmetrics.
+    if(charts_freed)
+        rrdcontext_request_full_gc();
 }
 
 static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {

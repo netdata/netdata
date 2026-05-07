@@ -112,6 +112,18 @@ ALWAYS_INLINE void rrdcontext_db_rotation(void) {
     rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
 }
 
+ALWAYS_INLINE void rrdcontext_request_full_gc(void) {
+    // Schedule a deep rrdcontext GC pass. Called from chart-cleanup paths
+    // (e.g. svc_rrd_cleanup_obsolete_charts_from_all_hosts) so non-dbengine
+    // hosts also drop archived rrdinstance / rrdmetric entries -- otherwise
+    // those grow unbounded with chart churn (k8s cgroups, etc.) because the
+    // dbengine rotation trigger never fires on them.
+    // Reuses rrdcontext_next_db_rotation_ut as the schedule slot; multiple
+    // requests within FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS
+    // coalesce into a single deep GC pass.
+    rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+}
+
 int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, nd_uuid_t *store_uuid) {
     if(!st->rrdhost) return 1;
     if(!st->context) return 2;
