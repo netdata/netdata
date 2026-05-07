@@ -2,9 +2,7 @@
 
 ## Status
 
-Status: in-progress
-
-Sub-state: Researching implementation details and repository state.
+Status: completed
 
 ## Requirements
 
