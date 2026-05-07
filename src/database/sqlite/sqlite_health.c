@@ -676,7 +676,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
     param = 0;
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+    while (service_running(SERVICE_HEALTH) && sqlite3_step_monitored(res) == SQLITE_ROW) {
         ALARM_ENTRY *ae = NULL;
 
         // check that we have valid ids
