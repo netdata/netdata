@@ -833,10 +833,7 @@ fn read_limited_to_end_with_cap<R: std::io::Read>(
                         .max(MIN_DECOMPRESSION_RESERVE_SIZE)
                         .min(max_size);
 
-                    if buf
-                        .try_reserve_exact(target_capacity - buf.capacity())
-                        .is_err()
-                    {
+                    if buf.try_reserve_exact(target_capacity - buf.len()).is_err() {
                         *buf = Vec::new();
                         return Err(JournalError::DecompressorError);
                     }

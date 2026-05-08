@@ -424,6 +424,25 @@ Validation:
 - `cargo test -q -p journal-core` in `src/crates`: passed; 23 tests passed plus the existing ignored tests.
 - `git diff --check`: passed.
 
+## PR Review Iteration 9 - 2026-05-08
+
+Findings:
+
+- `PRRT_kwDOAKPxd86AuPUu`, `src/crates/journal-core/src/file/object.rs:947`: valid. The amortized `try_reserve_exact()` call still used a capacity delta, but the API takes additional capacity relative to `buf.len()`.
+- `PRRT_kwDOAKPxd86AuPVH`, `src/crates/jf/journal_file/src/object.rs:842`: valid. Same reservation argument bug in the legacy reader.
+
+Actions:
+
+- Changed both amortized reservation paths to pass `target_capacity - buf.len()` to `try_reserve_exact()`.
+
+Validation:
+
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q` in `src/crates/jf`: passed; 10 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 23 tests passed plus the existing ignored tests.
+- `git diff --check`: passed.
+
 ## Outcome
 
 Implemented, validated, and prepared for commit in `~/src/PRs/netdata-static-journal-facets`.
