@@ -132,6 +132,7 @@ void watcher_main(void *arg)
         WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_REPLICATION_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS, shutdown_start_time);
@@ -145,7 +146,6 @@ void watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_METASYNC_THREADS, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_JOIN_STATIC_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE, shutdown_start_time);
