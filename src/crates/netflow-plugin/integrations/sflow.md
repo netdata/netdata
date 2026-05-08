@@ -137,7 +137,7 @@ the full diagnostic recipe. sFlow-specific gotchas: counter samples are not surf
 (only flow samples), bytes/packets are statistical estimates that won't match SNMP
 byte-for-byte, and VLAN information comes from `ExtendedSwitch` records only -- not
 from 802.1Q tags inside the sampled header. See also
-[Validation and Data Quality](https://learn.netdata.cloud/docs/network-flows/validation)
+[Validation and Data Quality](https://learn.netdata.cloud/docs/network-flows/validation-and-data-quality)
 and the sFlow section of [Anti-patterns](https://learn.netdata.cloud/docs/network-flows/anti-patterns).
 
 

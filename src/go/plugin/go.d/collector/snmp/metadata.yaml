@@ -240,7 +240,7 @@ modules:
 
             The configuration file name is [go.d/sd/snmp.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/sd/snmp.conf).
 
-            You can edit the configuration file using the edit-config script from the Netdata [config directory](https://learn.netdata.cloud/docs/netdata-agent/configuration#the-netdata-config-directory).
+            You can edit the configuration file using the edit-config script from the Netdata [config directory](https://learn.netdata.cloud/docs/netdata-agent/configuration#locate-your-config-directory).
 
             ```bash
             cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata

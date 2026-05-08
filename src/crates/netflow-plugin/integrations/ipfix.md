@@ -135,7 +135,7 @@ See [Troubleshooting](https://learn.netdata.cloud/docs/network-flows/troubleshoo
 the full diagnostic recipe. For IPFIX specifically, watch the `template_errors` dimension
 on `netflow.input_packets` -- IPFIX is template-driven and data records arriving before
 their templates are dropped. See also
-[Validation and Data Quality](https://learn.netdata.cloud/docs/network-flows/validation).
+[Validation and Data Quality](https://learn.netdata.cloud/docs/network-flows/validation-and-data-quality).
 
 
 

@@ -157,7 +157,7 @@ journal:
 See [Troubleshooting](https://learn.netdata.cloud/docs/network-flows/troubleshooting) for
 the full diagnostic recipe -- including UDP path checks, template-error analysis,
 and the "looks like a bug but isn't" section (doubling, mirroring, internal-IP geolocation).
-See also [Validation and Data Quality](https://learn.netdata.cloud/docs/network-flows/validation)
+See also [Validation and Data Quality](https://learn.netdata.cloud/docs/network-flows/validation-and-data-quality)
 and [Anti-patterns](https://learn.netdata.cloud/docs/network-flows/anti-patterns).
 
 
