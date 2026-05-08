@@ -1,6 +1,5 @@
 use crate::offset_array::{Cursor, InlinedCursor, List};
 use error::{JournalError, Result};
-use std::io::Read;
 use std::num::{NonZeroU32, NonZeroU64, NonZeroUsize};
 use zerocopy::{
     ByteSlice, ByteSliceMut, FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice,
@@ -788,26 +787,48 @@ fn read_limited_to_end<R: std::io::Read>(reader: R, buf: &mut Vec<u8>) -> Result
 }
 
 fn read_limited_to_end_with_cap<R: std::io::Read>(
-    reader: R,
+    mut reader: R,
     buf: &mut Vec<u8>,
     max_size: usize,
 ) -> Result<usize> {
-    let limit = u64::try_from(max_size)
-        .ok()
-        .and_then(|value| value.checked_add(1))
-        .ok_or(JournalError::DecompressorError)?;
-    let mut limited = reader.take(limit);
-
     buf.clear();
-    let len = match limited.read_to_end(buf) {
-        Ok(len) if len <= max_size => len,
-        Ok(_) | Err(_) => {
-            *buf = Vec::new();
-            return Err(JournalError::DecompressorError);
-        }
-    };
+    let mut chunk = [0u8; 8192];
 
-    Ok(len)
+    loop {
+        if buf.len() == max_size {
+            let mut extra = [0u8; 1];
+            match reader.read(&mut extra) {
+                Ok(0) => return Ok(buf.len()),
+                Ok(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+            }
+        }
+
+        let remaining = max_size - buf.len();
+        let read_len = remaining.min(chunk.len());
+        match reader.read(&mut chunk[..read_len]) {
+            Ok(0) => return Ok(buf.len()),
+            Ok(len) => {
+                if buf.try_reserve_exact(len).is_err() {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+                buf.extend_from_slice(&chunk[..len]);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => {
+                *buf = Vec::new();
+                return Err(JournalError::DecompressorError);
+            }
+        }
+    }
 }
 
 impl<B: ByteSlice> std::fmt::Debug for DataObject<B> {

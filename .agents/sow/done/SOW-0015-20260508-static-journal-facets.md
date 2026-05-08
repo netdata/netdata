@@ -384,6 +384,26 @@ Validation:
 - `cargo test -q -p journal-core` in `src/crates`: passed; 23 tests passed plus the existing ignored tests.
 - `git diff --check`: passed.
 
+## PR Review Iteration 7 - 2026-05-08
+
+Findings:
+
+- `PRRT_kwDOAKPxd86At82Y`, `src/crates/journal-core/src/file/object.rs:915`: valid. `read_to_end()` with `take(max + 1)` bounded decompressed bytes but still allowed `Vec` growth strategy to over-allocate beyond the intended cap.
+- `PRRT_kwDOAKPxd86At821`, `src/crates/jf/journal_file/src/file.rs:583`: valid. Existing tests covered `DataPayloadMatcher::payload_matches()` directly but not the `find_data_offset()` hash-bucket traversal path that uses the matcher.
+
+Actions:
+
+- Replaced bounded streaming `read_to_end()` calls in both readers with a manual fixed-size stack-buffer loop that uses `try_reserve_exact()` for each chunk and fails as soon as the decompressed stream exceeds the configured cap.
+- Added a temporary-journal test that writes a compressed DATA object into the data hash table and verifies `find_data_offset()` locates it by logical uncompressed payload.
+
+Validation:
+
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q` in `src/crates/jf`: passed; 10 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 23 tests passed plus the existing ignored tests.
+- `git diff --check`: passed.
+
 ## Outcome
 
 Implemented, validated, and prepared for commit in `~/src/PRs/netdata-static-journal-facets`.

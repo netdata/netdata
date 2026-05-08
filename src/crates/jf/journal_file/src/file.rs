@@ -1175,6 +1175,7 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::JournalWriter;
     use zerocopy::IntoBytes;
 
     fn data_object_bytes(payload: &[u8], flags: u8) -> Vec<u8> {
@@ -1212,6 +1213,45 @@ mod tests {
 
         let mut matcher = DataPayloadMatcher::new(payload, 0);
         assert!(matcher.payload_matches(&object).unwrap());
+    }
+
+    #[test]
+    fn find_data_offset_matches_lz4_compressed_payload_in_hash_bucket() -> Result<()> {
+        let payload = b"_SYSTEMD_UNIT=netdata.service";
+        let temp_file = tempfile::NamedTempFile::new().map_err(JournalError::Io)?;
+        let options = JournalFileOptions::new([1; 16], [2; 16], [3; 16], [4; 16]);
+        let mut journal_file = JournalFile::<memmap2::MmapMut>::create(temp_file.path(), options)?;
+        let data_offset = {
+            let writer = JournalWriter::new(&mut journal_file)?;
+            NonZeroU64::new(writer.current_file_size()).unwrap()
+        };
+        let hash = journal_file.hash(payload);
+
+        let compressed = lz4_flex::block::compress(payload);
+        let mut stored_payload = Vec::with_capacity(std::mem::size_of::<u64>() + compressed.len());
+        stored_payload.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+        stored_payload.extend_from_slice(&compressed);
+
+        {
+            let mut data_guard =
+                journal_file.data_mut(data_offset, Some(stored_payload.len() as u64))?;
+            data_guard.header.hash = hash;
+            data_guard.header.object_header.flags = ObjectFlags::CompressedLz4 as u8;
+            data_guard.set_payload(&stored_payload);
+        }
+
+        journal_file.data_hash_table_set_tail_offset(hash, data_offset)?;
+
+        assert_eq!(
+            journal_file.find_data_offset(hash, payload)?,
+            Some(data_offset)
+        );
+        assert_eq!(
+            journal_file.find_data_offset(hash, b"_SYSTEMD_UNIT=sshd.service")?,
+            None
+        );
+
+        Ok(())
     }
 
     #[test]
