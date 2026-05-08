@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#if defined(OS_WINDOWS)
-
 #include "../windows.plugin/windows_plugin.h"
 #include "../windows.plugin/windows-internals.h"
 
@@ -327,7 +325,6 @@ int do_PerflibTCP(int update_every, usec_t dt __maybe_unused)
     return have_any ? 0 : -1;
 }
 
-#if defined(OS_WINDOWS)
 int main(int argc __maybe_unused, char **argv __maybe_unused)
 {
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
@@ -344,6 +341,3 @@ int main(int argc __maybe_unused, char **argv __maybe_unused)
 
     return 0;
 }
-#endif
-
-#endif // OS_WINDOWS
