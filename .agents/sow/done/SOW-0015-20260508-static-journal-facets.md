@@ -404,6 +404,26 @@ Validation:
 - `cargo test -q -p journal-core` in `src/crates`: passed; 23 tests passed plus the existing ignored tests.
 - `git diff --check`: passed.
 
+## PR Review Iteration 8 - 2026-05-08
+
+Findings:
+
+- `PRRT_kwDOAKPxd86AuG7E`, `src/crates/journal-core/src/file/object.rs:926`: valid. Per-read `try_reserve_exact()` avoided unbounded growth but could cause one allocation per read chunk for large decompressed payloads.
+- `PRRT_kwDOAKPxd86AuG7c`, `src/crates/jf/journal_file/src/file.rs:1190`: reviewed and not changed. The direct matcher fixture's `ObjectHeader::size = header + payload.len()` matches the writer contract; object placement alignment is handled by `ObjectHeader::aligned_size()` and is covered by the new temporary-journal `find_data_offset()` test.
+
+Actions:
+
+- Changed both bounded stream helpers to reserve capacity in amortized chunks, growing up to the configured decompressed-size cap without using `read_to_end()`'s geometric growth.
+- Kept the direct matcher helper unpadded because padding those raw bytes would become part of the payload passed to `DataObject::from_data()` and would diverge from the writer's unpadded `size` field.
+
+Validation:
+
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q` in `src/crates/jf`: passed; 10 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 23 tests passed plus the existing ignored tests.
+- `git diff --check`: passed.
+
 ## Outcome
 
 Implemented, validated, and prepared for commit in `~/src/PRs/netdata-static-journal-facets`.

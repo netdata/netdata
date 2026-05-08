@@ -886,6 +886,8 @@ pub struct DataObject<B: ByteSlice> {
 
 // systemd limits journal DATA field payloads to 768 MiB; reject corrupt size prefixes before allocating.
 const MAX_UNCOMPRESSED_DATA_OBJECT_SIZE: usize = 768 * 1024 * 1024;
+const DECOMPRESSION_READ_CHUNK_SIZE: usize = 8 * 1024;
+const MIN_DECOMPRESSION_RESERVE_SIZE: usize = 64 * 1024;
 
 fn read_limited_to_end<R: std::io::Read>(reader: R, buf: &mut Vec<u8>) -> Result<usize> {
     read_limited_to_end_with_cap(reader, buf, MAX_UNCOMPRESSED_DATA_OBJECT_SIZE)
@@ -897,7 +899,7 @@ fn read_limited_to_end_with_cap<R: std::io::Read>(
     max_size: usize,
 ) -> Result<usize> {
     buf.clear();
-    let mut chunk = [0u8; 8192];
+    let mut chunk = [0u8; DECOMPRESSION_READ_CHUNK_SIZE];
 
     loop {
         if buf.len() == max_size {
@@ -921,10 +923,30 @@ fn read_limited_to_end_with_cap<R: std::io::Read>(
         match reader.read(&mut chunk[..read_len]) {
             Ok(0) => return Ok(buf.len()),
             Ok(len) => {
-                if buf.try_reserve_exact(len).is_err() {
+                let Some(required) = buf
+                    .len()
+                    .checked_add(len)
+                    .filter(|required| *required <= max_size)
+                else {
                     *buf = Vec::new();
                     return Err(JournalError::DecompressorError);
+                };
+
+                if required > buf.capacity() {
+                    let target_capacity = required
+                        .max(buf.capacity().saturating_mul(2))
+                        .max(MIN_DECOMPRESSION_RESERVE_SIZE)
+                        .min(max_size);
+
+                    if buf
+                        .try_reserve_exact(target_capacity - buf.capacity())
+                        .is_err()
+                    {
+                        *buf = Vec::new();
+                        return Err(JournalError::DecompressorError);
+                    }
                 }
+
                 buf.extend_from_slice(&chunk[..len]);
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
