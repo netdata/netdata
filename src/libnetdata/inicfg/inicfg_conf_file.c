@@ -66,7 +66,7 @@ static const char *inicfg_windows_path_list_for_display(const char *value, char 
     bool first = true;
 
     const char *segment_start = value;
-    while (segment_start < value_end) {
+    while (segment_start <= value_end) {
         const char *separator = memchr(segment_start, ':', (size_t)(value_end - segment_start));
         size_t segment_len = separator
             ? (size_t)(separator - segment_start)
