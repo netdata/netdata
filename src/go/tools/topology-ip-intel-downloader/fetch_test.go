@@ -132,6 +132,21 @@ func TestDecodeMaxMindASNPayloadAcceptsGzippedMMDB(t *testing.T) {
 	require.Equal(t, payload, decoded)
 }
 
+func TestDecodeMaxMindASNPayloadRejectsCorruptTarPayload(t *testing.T) {
+	tarLikeCorruptPayload := make([]byte, 512)
+	copy(tarLikeCorruptPayload[257:], []byte("ustar"))
+
+	var compressed bytes.Buffer
+	zw := gzip.NewWriter(&compressed)
+	_, err := zw.Write(tarLikeCorruptPayload)
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+
+	_, err = decodeMaxMindASNPayload(compressed.Bytes())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to extract MaxMind ASN MMDB from tar payload")
+}
+
 func TestExpandEnvPlaceholdersRequiresMissingVariable(t *testing.T) {
 	t.Setenv("TOPOLOGY_TEST_PRESENT", "value")
 	_, err := expandEnvPlaceholders("https://example.test/${TOPOLOGY_TEST_MISSING}/${TOPOLOGY_TEST_PRESENT}")

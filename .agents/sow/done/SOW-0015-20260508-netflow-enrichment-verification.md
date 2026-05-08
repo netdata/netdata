@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: regression repaired; user-facing metadata modules now cover all supported topology IP intelligence downloader Geo/ASN providers.
+Sub-state: Copilot PR review finding repaired; direct-agent skill output-variable assignment no longer uses eval for external command output.
 
 ## Requirements
 
@@ -682,3 +682,43 @@ Artifact maintenance:
 - End-user/operator docs: updated `src/crates/netflow-plugin/metadata.yaml` and generated four new provider integration pages.
 - End-user/operator skills: no update needed; no public skill workflow changed.
 - SOW lifecycle: regression recorded here, then SOW returned to `completed` and moved back to `.agents/sow/done/` with the metadata/doc commit.
+
+### PR Review Follow-up - 2026-05-08 - Copilot Findings
+
+Trigger:
+
+- Copilot opened PR review threads on:
+  - `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh:171`
+  - `src/go/tools/topology-ip-intel-downloader/fetch.go:295`
+
+Findings:
+
+- `_agents_set_outvar` used `eval "${name}=\${value}"` to write external command output into a caller-provided variable.
+- The variable name was validated, and the previous assignment form avoided common word-splitting behavior, but the pattern was still fragile and hard to audit because token and claim values originate from `curl` / `jq` output.
+- `decodeMaxMindASNPayload` accepted every `extractMMDBFromTar` error as "not a tarred MMDB" and returned the ungzipped content. That preserved plain gzipped MMDB support, but it also hid corrupt tar-like payloads behind a later, less-specific MMDB parse error.
+
+Implementation:
+
+- Replaced the eval assignment with `printf -v "${_agents_out_name}" '%s' "${_agents_out_value}"`.
+- Kept variable-name validation before assignment.
+- Added a self-test payload containing whitespace, glob characters, shell metacharacters, command-substitution text, backticks, quotes, and a newline, verifying the helper preserves it as data and does not interpret it.
+- Updated the public `query-netdata-agents` skill text from "bash nameref" to "validated caller-local output variable", matching the zsh-compatible implementation.
+- Updated MaxMind ASN payload decoding so plain gzipped MMDB payloads still pass through, while tar-like payloads with invalid tar structure now return a clear extraction error.
+- Added downloader test coverage for corrupt tar-like MaxMind ASN payloads.
+
+Validation:
+
+- `bash -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
+- `zsh -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
+- `shellcheck --external-sources docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh` passed.
+- `go test ./tools/topology-ip-intel-downloader` passed from `src/go`.
+- Same-pattern search found no remaining eval-based `_agents_set_outvar` assignment in the public skill path.
+
+Artifact maintenance:
+
+- AGENTS.md: no update needed; existing sensitive-data and public-skill rules were sufficient.
+- Runtime project skills: no update needed.
+- Specs: no update needed; this repaired implementation safety/error handling for existing helper/provider contracts.
+- End-user/operator docs: updated `docs/netdata-ai/skills/query-netdata-agents/SKILL.md` to describe the actual output-variable contract.
+- End-user/operator skills: updated `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`.
+- SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` and moved back to `.agents/sow/done/` with the fix commit.

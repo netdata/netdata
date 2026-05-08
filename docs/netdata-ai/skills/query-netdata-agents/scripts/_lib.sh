@@ -161,14 +161,18 @@ _agents_log_masked() {
 # ---------------------------------------------------------------------------
 
 _agents_set_outvar() {
-    local name="${1:?output variable name required}"
-    # shellcheck disable=SC2034 # Read by the eval assignment below in bash and zsh.
-    local value="${2-}"
-    if [[ ! "${name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Invalid output variable name: ${name}" >&2
+    local _agents_out_name="${1:?output variable name required}"
+    local _agents_out_value="${2-}"
+    if [[ ! "${_agents_out_name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Invalid output variable name: ${_agents_out_name}" >&2
         return 1
     fi
-    eval "${name}=\${value}"
+    # Bash and zsh both support printf -v and preserve caller-local
+    # dynamic scope. Avoid eval here because values come from curl/jq output.
+    if ! printf -v "${_agents_out_name}" '%s' "${_agents_out_value}"; then
+        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Failed to set output variable: ${_agents_out_name}" >&2
+        return 1
+    fi
 }
 
 # Resolve claim_id from a node's /api/v3/info. The /info endpoint
@@ -505,7 +509,25 @@ EOF
         return 1
     fi
 
-    # 4. The unit test passes if all checks above passed.
+    # 4. _agents_set_outvar must preserve shell metacharacters as data.
+    # This protects bearer/claim assignment from accidental eval-style
+    # interpretation of external command output.
+    local assigned marker weird_value
+    marker="unchanged"
+    weird_value=$'space * ? ; marker=changed $(echo bad) `bad`\nline2 "quote"'
+    assigned=""
+    if ! _agents_set_outvar assigned "${weird_value}"; then
+        echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_set_outvar failed on metacharacter payload" >&2
+        NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
+        return 1
+    fi
+    if [[ "${assigned}" != "${weird_value}" || "${marker}" != "unchanged" ]]; then
+        echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_set_outvar interpreted metacharacters instead of assigning data" >&2
+        NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
+        return 1
+    fi
+
+    # 5. The unit test passes if all checks above passed.
     NETDATA_CLOUD_TOKEN="${real_token}"
     unset AGENTS_DRY_RUN
     echo -e "${AGENTS_GREEN}[PASS]${AGENTS_NC} no-token-leak self-test" >&2

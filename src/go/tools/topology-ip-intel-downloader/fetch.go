@@ -291,6 +291,9 @@ func decodeMaxMindASNPayload(raw []byte) ([]byte, error) {
 	if err == nil {
 		return mmdb, nil
 	}
+	if !errors.Is(err, errTarMMDBNotFound) {
+		return nil, fmt.Errorf("failed to extract MaxMind ASN MMDB from tar payload: %w", err)
+	}
 	return content, nil
 }
 
@@ -342,6 +345,9 @@ func decodeZip(raw []byte) ([]byte, error) {
 }
 
 func extractMMDBFromTar(raw []byte) ([]byte, error) {
+	if !looksLikeTarPayload(raw) {
+		return nil, errTarMMDBNotFound
+	}
 	tr := tar.NewReader(bytes.NewReader(raw))
 	for {
 		header, err := tr.Next()
@@ -360,4 +366,8 @@ func extractMMDBFromTar(raw []byte) ([]byte, error) {
 		}
 		return content, nil
 	}
+}
+
+func looksLikeTarPayload(raw []byte) bool {
+	return len(raw) >= 512 && bytes.Equal(raw[257:262], []byte("ustar"))
 }
