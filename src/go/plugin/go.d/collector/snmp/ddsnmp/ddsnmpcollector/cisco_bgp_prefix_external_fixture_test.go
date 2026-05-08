@@ -14,138 +14,58 @@ import (
 )
 
 func TestCollector_Collect_CiscoBgpPeer2Prefixes_FromLibreNMSFixture(t *testing.T) {
-	metrics := collectCiscoPeer2PrefixMetricsFromFixture(t,
+	rows := collectCiscoPeer2PrefixRowsFromFixture(t,
 		"1.3.6.1.4.1.9.1.1639",
 		"cisco-asr.yaml",
 		"librenms/cisco_iosxr_asr9001_bgp_peer2_prefix_table.snmprec",
 	)
 
-	accepted := requireMetricWithTags(t, metrics, "bgpPeerPrefixesAccepted", map[string]string{
-		"neighbor":                  "10.246.0.3",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "vpn",
-	})
-	assert.EqualValues(t, 5, accepted.Value)
-	assert.Equal(t, "VPNv4 Unicast", accepted.Tags["address_family_name"])
-	assert.Equal(t, "10.246.0.1", accepted.Tags["local_address"])
-	assert.Equal(t, "65056", accepted.Tags["remote_as"])
+	row := requireCiscoPeerFamilyRow(t, rows, "10.246.0.3", "ipv4", "vpn")
+	assert.Equal(t, "10.246.0.1", row.Descriptors.LocalAddress)
+	assert.Equal(t, "65056", row.Identity.RemoteAS)
+	assert.EqualValues(t, 5, row.Routes.Current.Accepted.Value)
+	assert.EqualValues(t, 2097152, row.RouteLimits.Limit.Value)
+	assert.EqualValues(t, 75, row.RouteLimits.Threshold.Value)
+	assert.EqualValues(t, 25, row.Routes.Current.Advertised.Value)
+	assert.EqualValues(t, 7, row.Routes.Current.Withdrawn.Value)
 
-	adminLimit := requireMetricWithTags(t, metrics, "bgpPeerPrefixAdminLimit", map[string]string{
-		"neighbor":                  "10.246.0.3",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "vpn",
-	})
-	assert.EqualValues(t, 2097152, adminLimit.Value)
-
-	threshold := requireMetricWithTags(t, metrics, "bgpPeerPrefixThreshold", map[string]string{
-		"neighbor":                  "10.246.0.3",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "vpn",
-	})
-	assert.EqualValues(t, 75, threshold.Value)
-
-	advertised := requireMetricWithTags(t, metrics, "bgpPeerPrefixesAdvertised", map[string]string{
-		"neighbor":                  "10.246.0.3",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "vpn",
-	})
-	assert.EqualValues(t, 25, advertised.Value)
-
-	withdrawn := requireMetricWithTags(t, metrics, "bgpPeerPrefixesWithdrawn", map[string]string{
-		"neighbor":                  "10.246.0.3",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "vpn",
-	})
-	assert.EqualValues(t, 7, withdrawn.Value)
-
-	idleAccepted := requireMetricWithTags(t, metrics, "bgpPeerPrefixesAccepted", map[string]string{
-		"neighbor":                  "10.246.0.4",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "vpn",
-	})
-	assert.EqualValues(t, 0, idleAccepted.Value)
-	assert.Equal(t, "0.0.0.0", idleAccepted.Tags["local_address"])
-	assert.Equal(t, "65056", idleAccepted.Tags["remote_as"])
+	idleRow := requireCiscoPeerFamilyRow(t, rows, "10.246.0.4", "ipv4", "vpn")
+	assert.Equal(t, "0.0.0.0", idleRow.Descriptors.LocalAddress)
+	assert.Equal(t, "65056", idleRow.Identity.RemoteAS)
+	assert.EqualValues(t, 0, idleRow.Routes.Current.Accepted.Value)
 }
 
 func TestCollector_Collect_CiscoBgpPeer2Prefixes_FromNCS540LibreNMSFixture(t *testing.T) {
-	metrics := collectCiscoPeer2PrefixMetricsFromFixture(t,
+	rows := collectCiscoPeer2PrefixRowsFromFixture(t,
 		"1.3.6.1.4.1.9.1.2984",
-		"cisco.yaml",
+		"cisco-ncs.yaml",
 		"librenms/cisco_iosxr_ncs540_bgp_peer2_prefix_table.snmprec",
 	)
 
-	accepted := requireMetricWithTags(t, metrics, "bgpPeerPrefixesAccepted", map[string]string{
-		"neighbor":                  "10.255.9.1",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "unicast",
-	})
-	assert.EqualValues(t, 30, accepted.Value)
-	assert.Equal(t, "IPv4 Unicast", accepted.Tags["address_family_name"])
-	assert.Equal(t, "10.255.9.31", accepted.Tags["local_address"])
-	assert.Equal(t, "65011", accepted.Tags["remote_as"])
-
-	adminLimit := requireMetricWithTags(t, metrics, "bgpPeerPrefixAdminLimit", map[string]string{
-		"neighbor":                  "10.255.9.1",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "unicast",
-	})
-	assert.EqualValues(t, 4294967295, adminLimit.Value)
-
-	threshold := requireMetricWithTags(t, metrics, "bgpPeerPrefixThreshold", map[string]string{
-		"neighbor":                  "10.255.9.1",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "unicast",
-	})
-	assert.EqualValues(t, 75, threshold.Value)
-
-	clearThreshold := requireMetricWithTags(t, metrics, "bgpPeerPrefixClearThreshold", map[string]string{
-		"neighbor":                  "10.255.9.1",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "unicast",
-	})
-	assert.EqualValues(t, 75, clearThreshold.Value)
-
-	advertised := requireMetricWithTags(t, metrics, "bgpPeerPrefixesAdvertised", map[string]string{
-		"neighbor":                  "10.255.9.1",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "unicast",
-	})
-	assert.EqualValues(t, 8, advertised.Value)
-
-	withdrawn := requireMetricWithTags(t, metrics, "bgpPeerPrefixesWithdrawn", map[string]string{
-		"neighbor":                  "10.255.9.1",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "unicast",
-	})
-	assert.EqualValues(t, 0, withdrawn.Value)
+	row := requireCiscoPeerFamilyRow(t, rows, "10.255.9.1", "ipv4", "unicast")
+	assert.Equal(t, "10.255.9.31", row.Descriptors.LocalAddress)
+	assert.Equal(t, "65011", row.Identity.RemoteAS)
+	assert.EqualValues(t, 30, row.Routes.Current.Accepted.Value)
+	assert.EqualValues(t, 4294967295, row.RouteLimits.Limit.Value)
+	assert.EqualValues(t, 75, row.RouteLimits.Threshold.Value)
+	assert.EqualValues(t, 75, row.RouteLimits.ClearThreshold.Value)
+	assert.EqualValues(t, 8, row.Routes.Current.Advertised.Value)
+	assert.EqualValues(t, 0, row.Routes.Current.Withdrawn.Value)
 }
 
-func collectCiscoPeer2PrefixMetricsFromFixture(t *testing.T, sysObjectID, profileFile, fixturePath string) []ddsnmp.Metric {
+func collectCiscoPeer2PrefixRowsFromFixture(t *testing.T, sysObjectID, profileFile, fixturePath string) []ddsnmp.BGPRow {
 	t.Helper()
 
 	profile := matchedProfileByFile(t, sysObjectID, profileFile)
-	filterProfileForAlertSurface(profile, map[string][]string{
-		"cbgpPeer2AddrFamilyPrefixTable": {
-			"bgpPeerPrefixesAccepted",
-			"bgpPeerPrefixAdminLimit",
-			"bgpPeerPrefixThreshold",
-			"bgpPeerPrefixClearThreshold",
-			"bgpPeerPrefixesAdvertised",
-			"bgpPeerPrefixesWithdrawn",
-		},
-	}, nil)
+	filterProfileForTypedBGPByID(t, profile, "cisco-bgp-peer-family")
 
 	pdus := loadSnmprecPDUs(t, fixturePath)
 
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
-	setProfileWalkExpectations(t, mockHandler, profile, map[string][]gosnmp.SnmpPDU{
-		"cbgpPeer2AddrFamilyPrefixTable": snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.9.9.187.1.2.8."),
-		"cbgpPeer2Table":                 snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.9.9.187.1.2.5."),
-		"cbgpPeer2AddrFamilyTable":       snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.9.9.187.1.2.7."),
-	})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.8", snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.9.9.187.1.2.8."))
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.5.1", snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.9.9.187.1.2.5.1."))
 
 	collector := New(Config{
 		SnmpClient:  mockHandler,
@@ -157,6 +77,23 @@ func collectCiscoPeer2PrefixMetricsFromFixture(t *testing.T, sysObjectID, profil
 	results, err := collector.Collect()
 	require.NoError(t, err)
 	require.Len(t, results, 1)
+	require.Empty(t, results[0].Metrics)
+	require.NotEmpty(t, results[0].BGPRows)
 
-	return stripProfilePointers(results[0].Metrics)
+	return results[0].BGPRows
+}
+
+func requireCiscoPeerFamilyRow(t *testing.T, rows []ddsnmp.BGPRow, neighbor, afi, safi string) ddsnmp.BGPRow {
+	t.Helper()
+
+	for _, row := range rows {
+		if row.Identity.Neighbor == neighbor &&
+			string(row.Identity.AddressFamily) == afi &&
+			string(row.Identity.SubsequentAddressFamily) == safi {
+			return row
+		}
+	}
+
+	require.FailNowf(t, "missing BGP row", "missing Cisco BGP peer-family row for %s %s/%s", neighbor, afi, safi)
+	return ddsnmp.BGPRow{}
 }

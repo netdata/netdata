@@ -6,6 +6,7 @@ import (
 	"context"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 )
@@ -80,30 +81,32 @@ func (f *funcBGPPeers) Handle(_ context.Context, method string, params funcapi.R
 		view = bgpPeersDefaultView
 	}
 
-	f.cache.mu.RLock()
-	defer f.cache.mu.RUnlock()
-
-	if len(f.cache.entries) == 0 {
-		return funcapi.UnavailableResponse("no BGP peer data is available for this device")
+	snapshot := f.cache.snapshot(time.Now())
+	if snapshot.expired || len(snapshot.entries) == 0 {
+		if snapshot.message == "" {
+			snapshot.message = "no BGP peer data is available for this device"
+		}
+		return funcapi.UnavailableResponse(snapshot.message)
 	}
 
-	rows := make([][]any, 0, len(f.cache.entries))
-	for _, entry := range f.cache.entries {
+	rows := make([][]any, 0, len(snapshot.entries))
+	for _, entry := range snapshot.entries {
 		if !matchesBGPPeerView(entry.scope, view) {
 			continue
 		}
 		rows = append(rows, buildBGPPeerRow(entry))
 	}
-	if len(rows) == 0 {
-		return funcapi.UnavailableResponse("no BGP rows match the selected view")
-	}
 
 	sortBGPPeerRows(rows)
 
 	cs := bgpPeerColumnSet(bgpPeerColumns)
+	help := "Detailed current BGP peer and peer-family state from cached SNMP data"
+	if snapshot.stale && snapshot.message != "" {
+		help += ". " + snapshot.message
+	}
 	return &funcapi.FunctionResponse{
 		Status:            200,
-		Help:              "Detailed current BGP peer and peer-family state from cached SNMP data",
+		Help:              help,
 		Columns:           cs.BuildColumns(),
 		Data:              rows,
 		DefaultSortColumn: "Neighbor",
@@ -211,6 +214,7 @@ func int64Value(v *int64) any {
 
 var bgpPeerColumns = []bgpPeerColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "rowId", Tooltip: "Row ID", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true, Summary: funcapi.FieldSummaryCount}, Value: func(e *bgpPeerEntry) any { return e.key }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Stale", Tooltip: "Whether this row is from a previous successful collection after a newer BGP collection failure", Type: funcapi.FieldTypeBoolean, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Summary: funcapi.FieldSummaryCount}, Value: func(e *bgpPeerEntry) any { return e.stale }},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Scope", Tooltip: "Scope", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Summary: funcapi.FieldSummaryCount}, Value: func(e *bgpPeerEntry) any { return bgpScopeLabel(e.scope) }},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Routing Instance", Tooltip: "Routing Instance", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Summary: funcapi.FieldSummaryCount}, Value: func(e *bgpPeerEntry) any { return e.tags["routing_instance"] }},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Neighbor", Tooltip: "Neighbor", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Sticky: true, Summary: funcapi.FieldSummaryCount}, Value: func(e *bgpPeerEntry) any { return e.tags["neighbor"] }},

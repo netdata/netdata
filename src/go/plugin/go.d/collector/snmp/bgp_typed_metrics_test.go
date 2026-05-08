@@ -1,0 +1,442 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package snmp
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestTypedBGPMetricsFromProfileMetrics(t *testing.T) {
+	tests := map[string]struct {
+		pm       *ddsnmp.ProfileMetrics
+		validate func(t *testing.T, metrics []ddsnmp.Metric)
+	}{
+		"peer and peer-family rows become public BGP chart metrics": {
+			pm: &ddsnmp.ProfileMetrics{
+				BGPRows: []ddsnmp.BGPRow{
+					typedBGPPeerRow(),
+					typedBGPPeerFamilyRow(),
+				},
+			},
+			validate: func(t *testing.T, metrics []ddsnmp.Metric) {
+				availability := requireMetric(t, metrics, "bgp.peers.availability", map[string]string{
+					"routing_instance": "blue",
+					"neighbor":         "192.0.2.1",
+					"remote_as":        "65001",
+				})
+				assert.Equal(t, map[string]int64{"admin_enabled": 1, "established": 1}, availability.MultiValue)
+				assert.NotContains(t, availability.Tags, "local_address")
+				assert.NotContains(t, availability.Tags, "peer_description")
+
+				updates := requireMetric(t, metrics, "bgp.peers.update_traffic", map[string]string{
+					"routing_instance": "blue",
+					"neighbor":         "192.0.2.1",
+					"remote_as":        "65001",
+				})
+				assert.Equal(t, map[string]int64{"received": 10, "sent": 20}, updates.MultiValue)
+
+				routes := requireMetric(t, metrics, "bgp.peer_families.route_counts.current", map[string]string{
+					"routing_instance":          "blue",
+					"neighbor":                  "192.0.2.1",
+					"remote_as":                 "65001",
+					"address_family":            "ipv4",
+					"subsequent_address_family": "unicast",
+				})
+				assert.Equal(t, map[string]int64{"accepted": 540336, "advertised": 540339}, routes.MultiValue)
+
+				counts := requireMetric(t, metrics, "bgp.devices.peer_counts", nil)
+				assert.Equal(t, map[string]int64{"configured": 1, "admin_enabled": 1, "established": 1}, counts.MultiValue)
+
+				states := requireMetric(t, metrics, "bgp.devices.peer_states", nil)
+				assert.Equal(t, map[string]int64{"established": 1}, states.MultiValue)
+			},
+		},
+		"empty routing instance is normalized to default": {
+			pm: &ddsnmp.ProfileMetrics{
+				BGPRows: []ddsnmp.BGPRow{
+					typedBGPPeerRowWithIdentity("typed-peer-default-vrf", "192.0.2.3", "65003", "", ddprofiledefinition.BGPPeerStateEstablished),
+				},
+			},
+			validate: func(t *testing.T, metrics []ddsnmp.Metric) {
+				availability := requireMetric(t, metrics, "bgp.peers.availability", map[string]string{
+					"routing_instance": "default",
+					"neighbor":         "192.0.2.3",
+					"remote_as":        "65003",
+				})
+				assert.Equal(t, map[string]int64{"admin_enabled": 1, "established": 1}, availability.MultiValue)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			metrics := typedBGPMetricsFromProfileMetrics([]*ddsnmp.ProfileMetrics{tc.pm})
+			tc.validate(t, metrics)
+		})
+	}
+}
+
+func TestBGPPeerCache_UpdateRow(t *testing.T) {
+	tests := map[string]struct {
+		rows     []ddsnmp.BGPRow
+		params   funcapi.ResolvedParams
+		validate func(t *testing.T, resp *funcapi.FunctionResponse)
+	}{
+		"typed rows populate function cache without underscore tags": {
+			rows: []ddsnmp.BGPRow{
+				typedBGPPeerRow(),
+				typedBGPPeerFamilyRow(),
+			},
+			params: resolveBGPPeerParams(map[string][]string{bgpPeersParamView: {bgpPeersViewAll}}),
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
+				assert.Equal(t, 200, resp.Status)
+				rows := responseRows(t, resp)
+				require.Len(t, rows, 2)
+
+				assert.Equal(t, "peer", rows[0][findBGPPeerColIdx("Scope")])
+				assert.Equal(t, "192.0.2.1", rows[0][findBGPPeerColIdx("Neighbor")])
+				assert.Equal(t, "198.51.100.1", rows[0][findBGPPeerColIdx("Local Address")])
+				assert.Equal(t, "Transit Peer", rows[0][findBGPPeerColIdx("Peer Description")])
+				assert.Equal(t, "enabled", rows[0][findBGPPeerColIdx("Admin Status")])
+				assert.Equal(t, "established", rows[0][findBGPPeerColIdx("Connection State")])
+				assert.Equal(t, "Cease (subcode 0)", rows[0][findBGPPeerColIdx("Last Error")])
+
+				assert.Equal(t, "peer family", rows[1][findBGPPeerColIdx("Scope")])
+				assert.Equal(t, "ipv4 unicast", rows[1][findBGPPeerColIdx("Family")])
+				assert.Equal(t, "restart time wait", rows[1][findBGPPeerColIdx("GR State")])
+				assert.Equal(t, "peer not ready", rows[1][findBGPPeerColIdx("Unavailability Reason")])
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newBGPPeerCache()
+			cache.reset()
+			for _, row := range tc.rows {
+				cache.updateRow("_vendor-bgp.yaml", row)
+			}
+			cache.finalize()
+
+			resp := newTestFuncBGPPeers(cache).Handle(context.Background(), bgpPeersMethodID, tc.params)
+			tc.validate(t, resp)
+		})
+	}
+}
+
+func TestBGPIntegration_PreservesFunctionCacheOnProfileBGPError(t *testing.T) {
+	tests := map[string]struct {
+		initial []*ddsnmp.ProfileMetrics
+		failed  []*ddsnmp.ProfileMetrics
+	}{
+		"profile BGP failure marks existing function rows stale instead of deleting them": {
+			initial: []*ddsnmp.ProfileMetrics{{
+				Source:  "typed-bgp-profile.yaml",
+				BGPRows: []ddsnmp.BGPRow{typedBGPPeerRow()},
+			}},
+			failed: []*ddsnmp.ProfileMetrics{{
+				Source:          "typed-bgp-profile.yaml",
+				BGPCollectError: errors.New("BGP table walk failed"),
+			}},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.sysInfo = &snmputils.SysInfo{}
+			collr.enableBGPIntegration()
+			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
+
+			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+
+			resp := newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
+			assert.Equal(t, 200, resp.Status)
+			require.Len(t, responseRows(t, resp), 1)
+
+			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.failed}
+			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+
+			resp = newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
+			assert.Equal(t, 200, resp.Status)
+			assert.Contains(t, resp.Help, "showing stale BGP rows")
+			rows := responseRows(t, resp)
+			require.Len(t, rows, 1)
+			assert.Equal(t, true, rows[0][findBGPPeerColIdx("Stale")])
+		})
+	}
+}
+
+func TestBGPIntegration_MixedProfileBGPErrorRefreshesSuccessfulProfiles(t *testing.T) {
+	tests := map[string]struct {
+		initial []*ddsnmp.ProfileMetrics
+		next    []*ddsnmp.ProfileMetrics
+	}{
+		"failed profile keeps stale rows while successful profile refreshes": {
+			initial: []*ddsnmp.ProfileMetrics{
+				{
+					Source:  "profile-a.yaml",
+					BGPRows: []ddsnmp.BGPRow{typedBGPPeerRowWithIdentity("peer-a", "192.0.2.1", "65001", "blue", ddprofiledefinition.BGPPeerStateEstablished)},
+				},
+				{
+					Source:  "profile-b.yaml",
+					BGPRows: []ddsnmp.BGPRow{typedBGPPeerRowWithIdentity("peer-b", "192.0.2.2", "65002", "blue", ddprofiledefinition.BGPPeerStateEstablished)},
+				},
+			},
+			next: []*ddsnmp.ProfileMetrics{
+				{
+					Source:          "profile-a.yaml",
+					BGPCollectError: errors.New("BGP table walk failed"),
+				},
+				{
+					Source:  "profile-b.yaml",
+					BGPRows: []ddsnmp.BGPRow{typedBGPPeerRowWithIdentity("peer-b", "192.0.2.2", "65002", "blue", ddprofiledefinition.BGPPeerStateActive)},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.sysInfo = &snmputils.SysInfo{}
+			collr.enableBGPIntegration()
+			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
+
+			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+
+			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.next}
+			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+
+			resp := newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
+			assert.Equal(t, 200, resp.Status)
+			assert.Contains(t, resp.Help, "showing stale BGP rows")
+
+			byNeighbor := bgpPeerRowsByNeighbor(t, responseRows(t, resp))
+			require.Len(t, byNeighbor, 2)
+
+			assert.Equal(t, true, byNeighbor["192.0.2.1"][findBGPPeerColIdx("Stale")])
+			assert.Equal(t, "established", byNeighbor["192.0.2.1"][findBGPPeerColIdx("Connection State")])
+			assert.Equal(t, false, byNeighbor["192.0.2.2"][findBGPPeerColIdx("Stale")])
+			assert.Equal(t, "active", byNeighbor["192.0.2.2"][findBGPPeerColIdx("Connection State")])
+		})
+	}
+}
+
+func TestBGPIntegration_ExpiredFailedProfileDoesNotKeepStaleRowsWithFreshProfiles(t *testing.T) {
+	tests := map[string]struct {
+		initial []*ddsnmp.ProfileMetrics
+		next    []*ddsnmp.ProfileMetrics
+	}{
+		"expired failed profile row is omitted while successful profile refreshes": {
+			initial: []*ddsnmp.ProfileMetrics{
+				{
+					Source:  "profile-a.yaml",
+					BGPRows: []ddsnmp.BGPRow{typedBGPPeerRowWithIdentity("peer-a", "192.0.2.1", "65001", "blue", ddprofiledefinition.BGPPeerStateEstablished)},
+				},
+				{
+					Source:  "profile-b.yaml",
+					BGPRows: []ddsnmp.BGPRow{typedBGPPeerRowWithIdentity("peer-b", "192.0.2.2", "65002", "blue", ddprofiledefinition.BGPPeerStateEstablished)},
+				},
+			},
+			next: []*ddsnmp.ProfileMetrics{
+				{
+					Source:          "profile-a.yaml",
+					BGPCollectError: errors.New("BGP table walk failed"),
+				},
+				{
+					Source:  "profile-b.yaml",
+					BGPRows: []ddsnmp.BGPRow{typedBGPPeerRowWithIdentity("peer-b", "192.0.2.2", "65002", "blue", ddprofiledefinition.BGPPeerStateActive)},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.sysInfo = &snmputils.SysInfo{}
+			collr.enableBGPIntegration()
+			collr.bgp.setStaleAfter(time.Minute)
+			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
+
+			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			markBGPCacheSourceLastUpdate(t, collr.bgp.peerCache, "profile-a.yaml", time.Now().Add(-2*time.Minute))
+
+			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.next}
+			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+
+			resp := newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
+			assert.Equal(t, 200, resp.Status)
+
+			byNeighbor := bgpPeerRowsByNeighbor(t, responseRows(t, resp))
+			require.Len(t, byNeighbor, 1)
+			require.NotContains(t, byNeighbor, "192.0.2.1")
+			require.Contains(t, byNeighbor, "192.0.2.2")
+			assert.Equal(t, false, byNeighbor["192.0.2.2"][findBGPPeerColIdx("Stale")])
+			assert.Equal(t, "active", byNeighbor["192.0.2.2"][findBGPPeerColIdx("Connection State")])
+		})
+	}
+}
+
+func TestProfilesHaveBGP(t *testing.T) {
+	tests := map[string]struct {
+		profiles []*ddsnmp.Profile
+		want     bool
+	}{
+		"typed BGP row enables integration": {
+			profiles: []*ddsnmp.Profile{{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					BGP: []ddprofiledefinition.BGPConfig{{ID: "peer"}},
+				},
+			}},
+			want: true,
+		},
+		"legacy BGP virtual metric enables integration during migration": {
+			profiles: []*ddsnmp.Profile{{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{{Name: "bgpPeerAvailability"}},
+				},
+			}},
+			want: true,
+		},
+		"legacy BGP raw metric enables integration during migration": {
+			profiles: []*ddsnmp.Profile{{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{{
+						Symbols: []ddprofiledefinition.SymbolConfig{{Name: "bgpPeerState"}},
+					}},
+				},
+			}},
+			want: true,
+		},
+		"ordinary metrics do not enable integration": {
+			profiles: []*ddsnmp.Profile{{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{{
+						Symbol: ddprofiledefinition.SymbolConfig{Name: "sysUpTime"},
+					}},
+				},
+			}},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, profilesHaveBGP(tc.profiles))
+		})
+	}
+}
+
+func typedBGPPeerRow() ddsnmp.BGPRow {
+	return ddsnmp.BGPRow{
+		OriginProfileID: "_vendor-bgp.yaml",
+		Kind:            ddprofiledefinition.BGPRowKindPeer,
+		StructuralID:    "typed-peer-key",
+		Identity: ddsnmp.BGPIdentity{
+			RoutingInstance: "blue",
+			Neighbor:        "192.0.2.1",
+			RemoteAS:        "65001",
+		},
+		Descriptors: ddsnmp.BGPDescriptors{
+			LocalAddress: "198.51.100.1",
+			Description:  "Transit Peer",
+		},
+		Admin: ddsnmp.BGPAdmin{
+			Enabled: ddsnmp.BGPBool{Has: true, Value: true},
+		},
+		State: ddsnmp.BGPState{
+			Has:   true,
+			State: ddprofiledefinition.BGPPeerStateEstablished,
+		},
+		Previous: ddsnmp.BGPState{
+			Has:   true,
+			State: ddprofiledefinition.BGPPeerStateIdle,
+		},
+		Connection: ddsnmp.BGPConnection{
+			EstablishedUptime: ddsnmp.BGPInt64{Has: true, Value: 1234},
+		},
+		Traffic: ddsnmp.BGPTraffic{
+			Updates: ddsnmp.BGPDirectional{
+				Received: ddsnmp.BGPInt64{Has: true, Value: 10},
+				Sent:     ddsnmp.BGPInt64{Has: true, Value: 20},
+			},
+		},
+		LastError: ddsnmp.BGPLastError{
+			Code:    ddsnmp.BGPInt64{Has: true, Value: 6},
+			Subcode: ddsnmp.BGPInt64{Has: true, Value: 0},
+		},
+	}
+}
+
+func typedBGPPeerRowWithIdentity(structuralID, neighbor, remoteAS, routingInstance string, state ddprofiledefinition.BGPPeerState) ddsnmp.BGPRow {
+	row := typedBGPPeerRow()
+	row.StructuralID = structuralID
+	row.Identity.Neighbor = neighbor
+	row.Identity.RemoteAS = remoteAS
+	row.Identity.RoutingInstance = routingInstance
+	row.State.State = state
+	row.Tags = nil
+	return row
+}
+
+func bgpPeerRowsByNeighbor(t *testing.T, rows [][]any) map[string][]any {
+	t.Helper()
+	result := make(map[string][]any, len(rows))
+	for _, row := range rows {
+		neighbor, ok := row[findBGPPeerColIdx("Neighbor")].(string)
+		require.True(t, ok)
+		result[neighbor] = row
+	}
+	return result
+}
+
+func markBGPCacheSourceLastUpdate(t *testing.T, cache *bgpPeerCache, source string, lastUpdate time.Time) {
+	t.Helper()
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	for _, entry := range cache.entries {
+		if entry.source == source {
+			entry.lastUpdate = lastUpdate
+			return
+		}
+	}
+	t.Fatalf("BGP cache source %q not found", source)
+}
+
+func typedBGPPeerFamilyRow() ddsnmp.BGPRow {
+	return ddsnmp.BGPRow{
+		OriginProfileID: "_vendor-bgp.yaml",
+		Kind:            ddprofiledefinition.BGPRowKindPeerFamily,
+		StructuralID:    "typed-peer-family-key",
+		Identity: ddsnmp.BGPIdentity{
+			RoutingInstance:         "blue",
+			Neighbor:                "192.0.2.1",
+			RemoteAS:                "65001",
+			AddressFamily:           ddprofiledefinition.BGPAddressFamilyIPv4,
+			SubsequentAddressFamily: ddprofiledefinition.BGPSubsequentAddressFamilyUnicast,
+		},
+		Routes: ddsnmp.BGPRoutes{
+			Current: ddsnmp.BGPRouteCounters{
+				Accepted:   ddsnmp.BGPInt64{Has: true, Value: 540336},
+				Advertised: ddsnmp.BGPInt64{Has: true, Value: 540339},
+			},
+		},
+		Restart: ddsnmp.BGPGracefulRestart{
+			State: ddsnmp.BGPText{Has: true, Value: "restart_time_wait"},
+		},
+		Reasons: ddsnmp.BGPReasons{
+			Unavailability: ddsnmp.BGPText{Has: true, Value: "peer_not_ready"},
+		},
+	}
+}

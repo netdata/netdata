@@ -22,29 +22,12 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, profiles)
 
-	tests := []struct {
-		name        string
+	tests := map[string]struct {
 		sysObjectID string
 		profileFile string
 		virtuals    map[string][]ddprofiledefinition.VirtualMetricSourceConfig
 	}{
-		{
-			name:        "Cisco ASR uses VRF-aware peer3 tables for common contract",
-			sysObjectID: "1.3.6.1.4.1.9.1.923",
-			profileFile: "cisco-asr.yaml",
-			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
-				"bgpPeerAvailability": {
-					{Metric: "bgpPeerAdminStatus", Table: "cbgpPeer3Table", As: "admin_enabled", Dim: "start"},
-					{Metric: "bgpPeerState", Table: "cbgpPeer3Table", As: "established", Dim: "established"},
-				},
-				"bgpPeerUpdates": {
-					{Metric: "bgpPeerInUpdates", Table: "cbgpPeer3Table", As: "received"},
-					{Metric: "bgpPeerOutUpdates", Table: "cbgpPeer3Table", As: "sent"},
-				},
-			},
-		},
-		{
-			name:        "Juniper MX overrides generic contract with Juniper peer tables",
+		"Juniper MX overrides generic contract with Juniper peer tables": {
 			sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.21",
 			profileFile: "juniper-mx.yaml",
 			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
@@ -58,8 +41,7 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:        "Nokia SR OS overrides generic contract with TiMOS peer tables",
+		"Nokia SR OS overrides generic contract with TiMOS peer tables": {
 			sysObjectID: "1.3.6.1.4.1.6527.1.3.17",
 			profileFile: "nokia-service-router-os.yaml",
 			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
@@ -73,8 +55,7 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:        "Arista switch overrides generic contract with Arista peer tables",
+		"Arista switch overrides generic contract with Arista peer tables": {
 			sysObjectID: "1.3.6.1.4.1.30065.1.3011.7010.427.48",
 			profileFile: "arista-switch.yaml",
 			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
@@ -88,8 +69,7 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:        "Dell OS10 exposes common contract from Dell peer tables",
+		"Dell OS10 exposes common contract from Dell peer tables": {
 			sysObjectID: "1.3.6.1.4.1.674.11000.5000.100.2.1.1",
 			profileFile: "dell-os10.yaml",
 			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
@@ -103,8 +83,7 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:        "Huawei routers expose common alert surface through virtual aliases",
+		"Huawei routers expose common alert surface through virtual aliases": {
 			sysObjectID: "1.3.6.1.4.1.2011.2.224.279",
 			profileFile: "huawei-routers.yaml",
 			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
@@ -121,34 +100,10 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:        "Cumulus switches inherit the generic BGP4-MIB contract",
-			sysObjectID: "1.3.6.1.4.1.40310",
-			profileFile: "nvidia-cumulus-linux-switch.yaml",
-			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
-				"bgpPeerAvailability": {
-					{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
-					{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
-				},
-				"bgpPeerUpdates": {
-					{Metric: "bgpPeerInUpdates", Table: "bgpPeerTable", As: "received"},
-					{Metric: "bgpPeerOutUpdates", Table: "bgpPeerTable", As: "sent"},
-				},
-			},
-		},
-		{
-			name:        "Alcatel dual-stack keeps IPv4 generic and adds IPv6 aliases",
+		"Alcatel dual-stack keeps IPv6 virtual aliases after standard BGP migration": {
 			sysObjectID: "1.3.6.1.4.1.6486.801.1.1.2.1.1",
 			profileFile: "alcatel-lucent-ent.yaml",
 			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
-				"bgpPeerAvailability": {
-					{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
-					{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
-				},
-				"bgpPeerUpdates": {
-					{Metric: "bgpPeerInUpdates", Table: "bgpPeerTable", As: "received"},
-					{Metric: "bgpPeerOutUpdates", Table: "bgpPeerTable", As: "sent"},
-				},
 				"alcatel.bgpPeerAvailability": {
 					{Metric: "bgpPeerAdminStatus", Table: "alaBgpPeer6Table", As: "admin_enabled", Dim: "start"},
 					{Metric: "bgpPeerState", Table: "alaBgpPeer6Table", As: "established", Dim: "established"},
@@ -161,8 +116,8 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			matched := FindProfiles(tc.sysObjectID, "", nil)
 			index := slices.IndexFunc(matched, func(p *Profile) bool {
 				return strings.HasSuffix(p.SourceFile, tc.profileFile)

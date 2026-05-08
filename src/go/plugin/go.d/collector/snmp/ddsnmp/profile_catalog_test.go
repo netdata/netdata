@@ -65,6 +65,7 @@ func TestResolvedProfileSetProject_SeparatesMetricsAndTopology(t *testing.T) {
 		metrics       int
 		topology      int
 		licensing     int
+		bgp           int
 		virtual       int
 		metadataField string
 		metricTag     string
@@ -94,6 +95,13 @@ func TestResolvedProfileSetProject_SeparatesMetricsAndTopology(t *testing.T) {
 			metricTag:     "license_model",
 			sysobjectID:   "sysobjectid_license_vendor",
 		},
+		"bgp_projection": {
+			consumer:      ConsumerBGP,
+			bgp:           1,
+			metadataField: "bgp_vendor",
+			metricTag:     "bgp_model",
+			sysobjectID:   "sysobjectid_bgp_vendor",
+		},
 	}
 
 	for name, tc := range tests {
@@ -107,6 +115,7 @@ func TestResolvedProfileSetProject_SeparatesMetricsAndTopology(t *testing.T) {
 			require.Len(t, def.Metrics, tc.metrics)
 			require.Len(t, def.Topology, tc.topology)
 			require.Len(t, def.Licensing, tc.licensing)
+			require.Len(t, def.BGP, tc.bgp)
 			require.Len(t, def.VirtualMetrics, tc.virtual)
 			require.Len(t, def.Metadata["device"].Fields, 1)
 			assert.Contains(t, def.Metadata["device"].Fields, tc.metadataField)
@@ -144,6 +153,30 @@ func TestResolvedProfileSetProject_MetricsAndLicensing(t *testing.T) {
 	assert.NotContains(t, def.SysobjectIDMetadata[0].Metadata, "sysobjectid_topology_vendor")
 }
 
+func TestResolvedProfileSetProject_MetricsAndBGP(t *testing.T) {
+	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+
+	profiles := resolved.Project(ConsumerMetrics, ConsumerBGP).Profiles()
+
+	require.Len(t, profiles, 1)
+	def := profiles[0].Definition
+	require.Len(t, def.Metrics, 2)
+	require.Len(t, def.BGP, 1)
+	require.Len(t, def.VirtualMetrics, 1)
+	require.Empty(t, def.Topology)
+	require.Empty(t, def.Licensing)
+	assert.Contains(t, def.Metadata["device"].Fields, "vendor")
+	assert.Contains(t, def.Metadata["device"].Fields, "bgp_vendor")
+	assert.NotContains(t, def.Metadata["device"].Fields, "lldp_loc_sys_name")
+	require.Len(t, def.MetricTags, 2)
+	assert.Equal(t, "model", def.MetricTags[0].Tag)
+	assert.Equal(t, "bgp_model", def.MetricTags[1].Tag)
+	require.Len(t, def.SysobjectIDMetadata, 1)
+	assert.Contains(t, def.SysobjectIDMetadata[0].Metadata, "sysobjectid_vendor")
+	assert.Contains(t, def.SysobjectIDMetadata[0].Metadata, "sysobjectid_bgp_vendor")
+	assert.NotContains(t, def.SysobjectIDMetadata[0].Metadata, "sysobjectid_topology_vendor")
+}
+
 func TestResolvedProfileSetProject_UnscopedMetricTagsPropagateToLicensing(t *testing.T) {
 	resolved := &ResolvedProfileSet{profiles: []*Profile{
 		{
@@ -166,6 +199,38 @@ func TestResolvedProfileSetProject_UnscopedMetricTagsPropagateToLicensing(t *tes
 	}}
 
 	profiles := resolved.Project(ConsumerLicensing).Profiles()
+
+	require.Len(t, profiles, 1)
+	require.Len(t, profiles[0].Definition.MetricTags, 1)
+	assert.Equal(t, "device_model", profiles[0].Definition.MetricTags[0].Tag)
+}
+
+func TestResolvedProfileSetProject_UnscopedMetricTagsPropagateToBGP(t *testing.T) {
+	resolved := &ResolvedProfileSet{profiles: []*Profile{
+		{
+			SourceFile: "bgp.yaml",
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{
+					{MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "device_model"}},
+				},
+				BGP: []ddprofiledefinition.BGPConfig{
+					{
+						ID:   "peer",
+						Kind: ddprofiledefinition.BGPRowKindPeer,
+						Identity: ddprofiledefinition.BGPIdentityConfig{
+							Neighbor: ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
+							RemoteAS: ddprofiledefinition.BGPValueConfig{Value: "65001"},
+						},
+						State: ddprofiledefinition.BGPStateConfig{
+							BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "established"},
+						},
+					},
+				},
+			},
+		},
+	}}
+
+	profiles := resolved.Project(ConsumerBGP).Profiles()
 
 	require.Len(t, profiles, 1)
 	require.Len(t, profiles[0].Definition.MetricTags, 1)
@@ -228,6 +293,10 @@ func projectionTestProfile() *Profile {
 							Value:     "Cisco licensing",
 							Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerLicensing},
 						},
+						"bgp_vendor": {
+							Value:     "Cisco BGP",
+							Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerBGP},
+						},
 					},
 				},
 			},
@@ -247,6 +316,10 @@ func projectionTestProfile() *Profile {
 							Value:     "Cisco licensing",
 							Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerLicensing},
 						},
+						"sysobjectid_bgp_vendor": {
+							Value:     "Cisco BGP",
+							Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerBGP},
+						},
 					},
 				},
 			},
@@ -262,6 +335,10 @@ func projectionTestProfile() *Profile {
 				{
 					MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "license_model"},
 					Consumers:       ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerLicensing},
+				},
+				{
+					MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "bgp_model"},
+					Consumers:       ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerBGP},
 				},
 			},
 			Metrics: []ddprofiledefinition.MetricsConfig{
@@ -304,6 +381,16 @@ func projectionTestProfile() *Profile {
 					OriginProfileID: "_cisco-licensing-smart.yaml",
 					Identity: ddprofiledefinition.LicenseIdentityConfig{
 						ID: ddprofiledefinition.LicenseValueConfig{Value: "smart"},
+					},
+				},
+			},
+			BGP: []ddprofiledefinition.BGPConfig{
+				{
+					ID:   "peer",
+					Kind: ddprofiledefinition.BGPRowKindPeer,
+					Identity: ddprofiledefinition.BGPIdentityConfig{
+						Neighbor: ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
+						RemoteAS: ddprofiledefinition.BGPValueConfig{Value: "65001"},
 					},
 				},
 			},

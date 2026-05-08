@@ -27,17 +27,18 @@ type externalDeviceFixture struct {
 	} `json:"os"`
 }
 
-func Test_LibreNMSCumulusFixture_MatchesCumulusBGPProfile(t *testing.T) {
+func Test_LibreNMSCumulusIdentity_MatchesStandardBGPProjection(t *testing.T) {
 	profile := matchedProfileFromIdentityFixture(t, "cumulus_bgp_identity.json", "nvidia-cumulus-linux-switch.yaml")
 
-	assertVirtualSources(t, profile, "bgpPeerAvailability", []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
-		{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
-	})
-	assertVirtualSources(t, profile, "bgpPeerUpdates", []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerInUpdates", Table: "bgpPeerTable", As: "received"},
-		{Metric: "bgpPeerOutUpdates", Table: "bgpPeerTable", As: "sent"},
-	})
+	require.NotEmpty(t, profile.Definition.BGP)
+	assert.True(t, profile.HasExtension("_std-bgp4-mib.yaml"))
+
+	row := profile.Definition.BGP[0]
+	assert.Equal(t, "_std-bgp4-mib.yaml", row.OriginProfileID)
+	assert.Equal(t, "bgp4-peer", row.ID)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeer, row.Kind)
+	assert.Equal(t, "bgpPeerTable", row.Table.Name)
+	assert.Equal(t, "1.3.6.1.2.1.15.3", row.Table.OID)
 }
 
 func Test_LibreNMSJuniperVMXFixture_MatchesJuniperMXBGPProfile(t *testing.T) {
@@ -56,35 +57,32 @@ func Test_LibreNMSJuniperVMXFixture_MatchesJuniperMXBGPProfile(t *testing.T) {
 func Test_LibreNMSTiMOSIXRSFixture_MatchesNokiaSROSBGPProfile(t *testing.T) {
 	profile := matchedProfileFromIdentityFixture(t, "timos_ixr_s_identity.json", "nokia-service-router-os.yaml")
 
-	assertVirtualAlternativeSources(t, profile, "bgpPeerAvailability", 0, []ddprofiledefinition.VirtualMetricSourceConfig{
+	assertVirtualSources(t, profile, "bgpPeerAvailability", []ddprofiledefinition.VirtualMetricSourceConfig{
 		{Metric: "bgpPeerAdminStatus", Table: "tBgpPeerNgTable", As: "admin_enabled", Dim: "start"},
 		{Metric: "bgpPeerState", Table: "tBgpPeerNgTable", As: "established", Dim: "established"},
 	})
-	assertVirtualAlternativeSources(t, profile, "bgpPeerAvailability", 1, []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
-		{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
-	})
-	assertVirtualAlternativeSources(t, profile, "bgpPeerUpdates", 0, []ddprofiledefinition.VirtualMetricSourceConfig{
+	assertVirtualSources(t, profile, "bgpPeerUpdates", []ddprofiledefinition.VirtualMetricSourceConfig{
 		{Metric: "bgpPeerInUpdates", Table: "tBgpPeerNgOperTable", As: "received"},
 		{Metric: "bgpPeerOutUpdates", Table: "tBgpPeerNgOperTable", As: "sent"},
 	})
-	assertVirtualAlternativeSources(t, profile, "bgpPeerUpdates", 1, []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerInUpdates", Table: "bgpPeerTable", As: "received"},
-		{Metric: "bgpPeerOutUpdates", Table: "bgpPeerTable", As: "sent"},
-	})
 }
 
-func Test_LibreNMSCiscoIOSXRNCS540Fixture_MatchesGenericCiscoBGPProfile(t *testing.T) {
-	profile := matchedProfileFromIdentityFixture(t, "iosxr_ncs540_identity.json", "cisco.yaml")
+func Test_LibreNMSCiscoIOSXRNCS540Fixture_MatchesCiscoNCSBGPProfile(t *testing.T) {
+	profile := matchedProfileFromIdentityFixture(t, "iosxr_ncs540_identity.json", "cisco-ncs.yaml")
 
-	assertVirtualSources(t, profile, "bgpPeerAvailability", []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerAdminStatus", Table: "cbgpPeer3Table", As: "admin_enabled", Dim: "start"},
-		{Metric: "bgpPeerState", Table: "cbgpPeer3Table", As: "established", Dim: "established"},
+	require.Len(t, profile.Definition.BGP, 2)
+	assert.True(t, profile.HasExtension("_cisco-bgp4-mib.yaml"))
+
+	rowIndex := slices.IndexFunc(profile.Definition.BGP, func(row ddprofiledefinition.BGPConfig) bool {
+		return row.ID == "cisco-bgp-peer-family"
 	})
-	assertVirtualSources(t, profile, "bgpPeerUpdates", []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerInUpdates", Table: "cbgpPeer3Table", As: "received"},
-		{Metric: "bgpPeerOutUpdates", Table: "cbgpPeer3Table", As: "sent"},
-	})
+	require.NotEqual(t, -1, rowIndex, "expected Cisco NCS profile to include typed Cisco peer-family row")
+
+	row := profile.Definition.BGP[rowIndex]
+	assert.Equal(t, "_cisco-bgp4-mib.yaml", row.OriginProfileID)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeerFamily, row.Kind)
+	assert.Equal(t, "cbgpPeer2AddrFamilyPrefixTable", row.Table.Name)
+	assert.Equal(t, "cbgpPeer2Table", row.Identity.RemoteAS.Table)
 }
 
 func matchedProfileFromIdentityFixture(t *testing.T, fixtureFile, profileFile string) *Profile {

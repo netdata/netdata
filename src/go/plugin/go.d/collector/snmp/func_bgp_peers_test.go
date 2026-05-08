@@ -4,7 +4,9 @@ package snmp
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
@@ -374,6 +376,117 @@ func TestFuncBGPPeersHandle(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			resp := newTestFuncBGPPeers(cache).Handle(context.Background(), bgpPeersMethodID, tc.params)
 			tc.validate(t, resp)
+		})
+	}
+}
+
+func TestFuncBGPPeers_HandleStaleAndFilteredRows(t *testing.T) {
+	tests := map[string]struct {
+		prepare  func(cache *bgpPeerCache)
+		params   funcapi.ResolvedParams
+		validate func(t *testing.T, resp *funcapi.FunctionResponse)
+	}{
+		"recent failure keeps stale rows visible": {
+			prepare: func(cache *bgpPeerCache) {
+				cache.setStaleAfter(time.Hour)
+				cache.updateEntry(ddsnmp.Metric{
+					Name:       "bgp.peers.availability",
+					IsTable:    true,
+					Tags:       map[string]string{"neighbor": "192.0.2.1", "remote_as": "65001"},
+					MultiValue: map[string]int64{"admin_enabled": 1, "established": 1},
+				})
+				cache.finalize()
+				cache.markCollectFailed(errors.New("walk failed"))
+			},
+			params: resolveBGPPeerParams(nil),
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
+				assert.Equal(t, 200, resp.Status)
+				assert.Contains(t, resp.Help, "showing stale BGP rows")
+				rows := responseRows(t, resp)
+				require.Len(t, rows, 1)
+				assert.Equal(t, true, rows[0][findBGPPeerColIdx("Stale")])
+			},
+		},
+		"expired failure returns unavailable": {
+			prepare: func(cache *bgpPeerCache) {
+				cache.setStaleAfter(time.Minute)
+				cache.updateEntry(ddsnmp.Metric{
+					Name:       "bgp.peers.availability",
+					IsTable:    true,
+					Tags:       map[string]string{"neighbor": "192.0.2.1", "remote_as": "65001"},
+					MultiValue: map[string]int64{"admin_enabled": 1, "established": 1},
+				})
+				cache.finalize()
+				cache.mu.Lock()
+				cache.lastUpdate = time.Now().Add(-2 * time.Minute)
+				cache.lastFailure = time.Now()
+				cache.lastError = "walk failed"
+				cache.mu.Unlock()
+			},
+			params: resolveBGPPeerParams(nil),
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
+				assert.Equal(t, 503, resp.Status)
+				assert.Contains(t, resp.Message, "last successful BGP collection")
+			},
+		},
+		"filtered empty view returns an empty table": {
+			prepare: func(cache *bgpPeerCache) {
+				cache.updateEntry(ddsnmp.Metric{
+					Name:       "bgp.peers.availability",
+					IsTable:    true,
+					Tags:       map[string]string{"neighbor": "192.0.2.1", "remote_as": "65001"},
+					MultiValue: map[string]int64{"admin_enabled": 1, "established": 1},
+				})
+				cache.finalize()
+			},
+			params: resolveBGPPeerParams(map[string][]string{bgpPeersParamView: {bgpPeersViewFamilies}}),
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
+				assert.Equal(t, 200, resp.Status)
+				assert.Empty(t, responseRows(t, resp))
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newBGPPeerCache()
+			tc.prepare(cache)
+
+			resp := newTestFuncBGPPeers(cache).Handle(context.Background(), bgpPeersMethodID, tc.params)
+			tc.validate(t, resp)
+		})
+	}
+}
+
+func TestCollector_BGPFunctionHandlerIsRegisteredOnlyWhenEnabled(t *testing.T) {
+	tests := map[string]struct {
+		prepare    func(c *Collector)
+		wantStatus int
+		wantBGP    bool
+	}{
+		"new collector has no BGP handler": {
+			wantStatus: 404,
+		},
+		"enabled BGP integration registers handler": {
+			prepare: func(c *Collector) {
+				c.enableBGPIntegration()
+			},
+			wantStatus: 503,
+			wantBGP:    true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			if tc.prepare != nil {
+				tc.prepare(collr)
+			}
+
+			assert.Equal(t, tc.wantBGP, collr.bgp != nil)
+
+			resp := collr.funcRouter.Handle(context.Background(), bgpPeersMethodID, nil)
+			assert.Equal(t, tc.wantStatus, resp.Status)
 		})
 	}
 }

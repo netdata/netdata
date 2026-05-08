@@ -168,6 +168,18 @@ func (p *tableRowProcessor) extractIndexPosition(index string, position uint) (s
 	return index, n == position && index != ""
 }
 
+func (p *tableRowProcessor) extractIndexPositionFromEnd(index string, position uint) (string, bool) {
+	if position == 0 || index == "" {
+		return "", false
+	}
+
+	parts := strings.Split(index, ".")
+	if int(position) > len(parts) {
+		return "", false
+	}
+	return parts[len(parts)-int(position)], true
+}
+
 func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
 	symbolCount := 0
 	for _, syms := range ctx.columnOIDs {

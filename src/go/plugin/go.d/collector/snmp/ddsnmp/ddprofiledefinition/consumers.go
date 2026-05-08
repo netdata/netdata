@@ -12,6 +12,7 @@ const (
 	ConsumerMetrics   ProfileConsumer = "metrics"
 	ConsumerTopology  ProfileConsumer = "topology"
 	ConsumerLicensing ProfileConsumer = "licensing"
+	ConsumerBGP       ProfileConsumer = "bgp"
 )
 
 type ConsumerSet []ProfileConsumer

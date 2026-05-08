@@ -18,7 +18,11 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 
 	pms, err := c.ddSnmpColl.Collect()
 	if err != nil {
+		c.markBGPCollectFailed(err)
 		return err
+	}
+	if c.bgp == nil && profileMetricsHaveBGP(pms) {
+		c.enableBGPIntegration()
 	}
 
 	c.resetIfaceCache()
@@ -111,6 +115,7 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 		mx[px+"timings_scalar"] = pm.Stats.Timing.Scalar.Milliseconds()
 		mx[px+"timings_table"] = pm.Stats.Timing.Table.Milliseconds()
 		mx[px+"timings_licensing"] = pm.Stats.Timing.Licensing.Milliseconds()
+		mx[px+"timings_bgp"] = pm.Stats.Timing.BGP.Milliseconds()
 		mx[px+"timings_virtual"] = pm.Stats.Timing.VirtualMetrics.Milliseconds()
 		mx[px+"snmp_get_requests"] = pm.Stats.SNMP.GetRequests
 		mx[px+"snmp_get_oids"] = pm.Stats.SNMP.GetOIDs
@@ -122,6 +127,7 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 		mx[px+"metrics_table"] = pm.Stats.Metrics.Table
 		mx[px+"metrics_virtual"] = pm.Stats.Metrics.Virtual
 		mx[px+"metrics_licensing"] = pm.Stats.Metrics.Licensing
+		mx[px+"metrics_bgp"] = pm.Stats.Metrics.BGP
 		mx[px+"metrics_tables"] = pm.Stats.Metrics.Tables
 		mx[px+"metrics_rows"] = pm.Stats.Metrics.Rows
 		mx[px+"table_cache_hits"] = pm.Stats.TableCache.Hits
@@ -130,6 +136,7 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 		mx[px+"errors_processing_scalar"] = pm.Stats.Errors.Processing.Scalar
 		mx[px+"errors_processing_table"] = pm.Stats.Errors.Processing.Table
 		mx[px+"errors_processing_licensing"] = pm.Stats.Errors.Processing.Licensing
+		mx[px+"errors_processing_bgp"] = pm.Stats.Errors.Processing.BGP
 	}
 }
 

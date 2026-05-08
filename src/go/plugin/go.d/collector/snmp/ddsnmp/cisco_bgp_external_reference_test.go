@@ -30,44 +30,32 @@ func Test_CiscoBgpPeer3Profile_AlignedWithOfficialMIBAndCheckmk(t *testing.T) {
 	require.NotEqual(t, -1, index, "expected cisco-asr profile to match")
 
 	profile := matched[index]
-	metricIndex := slices.IndexFunc(profile.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
-		return m.Table.Name == "cbgpPeer3Table" && m.Table.OID == "1.3.6.1.4.1.9.9.187.1.2.9"
+	rowIndex := slices.IndexFunc(profile.Definition.BGP, func(row ddprofiledefinition.BGPConfig) bool {
+		return row.Table.Name == "cbgpPeer3Table" && row.Table.OID == "1.3.6.1.4.1.9.9.187.1.2.9"
 	})
-	require.NotEqual(t, -1, metricIndex, "expected merged Cisco profile to include cbgpPeer3Table")
-
-	metric := profile.Definition.Metrics[metricIndex]
-
-	var symbolNames []string
-	for _, sym := range metric.Symbols {
-		symbolNames = append(symbolNames, sym.Name)
-	}
-
-	var tagNames []string
-	for _, tag := range metric.MetricTags {
-		tagNames = append(tagNames, tag.Tag)
-	}
+	require.NotEqual(t, -1, rowIndex, "expected merged Cisco profile to include typed cbgpPeer3Table row")
 
 	// Official CISCO-BGP4-MIB defines cbgpPeer3Entry indexed by:
 	// cbgpPeer3VrfId, cbgpPeer3Type, cbgpPeer3RemoteAddr.
-	assert.Contains(t, tagNames, "routing_instance_id")
-	assert.Contains(t, tagNames, "neighbor_address_type")
-	assert.Contains(t, tagNames, "neighbor")
+	row := profile.Definition.BGP[rowIndex]
+	assert.Equal(t, "cbgpPeer3VrfName", row.Identity.RoutingInstance.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3RemoteAddr", row.Identity.Neighbor.Symbol.Name)
+	assert.EqualValues(t, 2, row.Descriptors.PeerType.Index)
 
 	// Checkmk's cisco_bgp_peerv3 section independently uses cbgpPeer3Table for:
 	// localAddr, localIdentifier, remoteAs, remoteIdentifier, adminStatus,
 	// state, establishedTime, vrfName, and OID-end remoteAddr extraction.
-	assert.Contains(t, tagNames, "routing_instance")
-	assert.Contains(t, tagNames, "local_address")
-	assert.Contains(t, tagNames, "remote_as")
-	assert.Contains(t, tagNames, "local_identifier")
-	assert.Contains(t, tagNames, "peer_identifier")
-	assert.Contains(t, symbolNames, "bgpPeerAdminStatus")
-	assert.Contains(t, symbolNames, "bgpPeerState")
-	assert.Contains(t, symbolNames, "bgpPeerFsmEstablishedTime")
+	assert.Equal(t, "cbgpPeer3LocalAddr", row.Descriptors.LocalAddress.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3RemoteAs", row.Identity.RemoteAS.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3LocalIdentifier", row.Descriptors.LocalIdentifier.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3RemoteIdentifier", row.Descriptors.PeerIdentifier.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3AdminStatus", row.Admin.Enabled.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3State", row.State.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3FsmEstablishedTime", row.Connection.EstablishedUptime.Symbol.Name)
 
 	// Netdata intentionally prefers numeric last-error code/subcode over the
 	// vendor-specific text field, so operators get stable alertable metrics.
-	assert.Contains(t, symbolNames, "bgpPeerLastErrorCode")
-	assert.Contains(t, symbolNames, "bgpPeerLastErrorSubcode")
-	assert.Contains(t, symbolNames, "bgpPeerPreviousState")
+	assert.Equal(t, "cbgpPeer3LastErrorCode", row.LastError.Code.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3LastErrorSubcode", row.LastError.Subcode.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3PrevState", row.Previous.Symbol.Name)
 }

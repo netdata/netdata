@@ -1342,6 +1342,11 @@ The two index extraction mechanisms use different counting bases:
 So `index: 1` and `index_transform: [{start: 0, end: 0}]` both extract the
 first index component.
 
+Typed BGP value fields also support `index_from_end: N`, where `N` is
+1-based from the right side of the row index. Use it only when the target
+INDEX component is a trailing component after a variable-length field, such as
+AFI/SAFI after an `InetAddress` peer address.
+
 Examples:
 
 - `Q-BRIDGE-MIB::dot1qTpFdbAddress` is `not-accessible` and is part of the

@@ -4,26 +4,18 @@ extends:
 virtual_metrics:
   - name: bgpPeerAvailability
     per_row: true
-    alternatives:
-      - sources:
-          - {metric: bgpPeerAdminStatus, table: tBgpPeerNgTable, as: admin_enabled, dim: start}
-          - {metric: bgpPeerState, table: tBgpPeerNgTable, as: established, dim: established}
-      - sources:
-          - {metric: bgpPeerAdminStatus, table: bgpPeerTable, as: admin_enabled, dim: start}
-          - {metric: bgpPeerState, table: bgpPeerTable, as: established, dim: established}
+    sources:
+      - {metric: bgpPeerAdminStatus, table: tBgpPeerNgTable, as: admin_enabled, dim: start}
+      - {metric: bgpPeerState, table: tBgpPeerNgTable, as: established, dim: established}
     chart_meta:
       description: BGP peer administrative and established availability
       family: 'Network/Routing/BGP/Peer/Availability'
       unit: "{status}"
   - name: bgpPeerUpdates
     per_row: true
-    alternatives:
-      - sources:
-          - {metric: bgpPeerInUpdates, table: tBgpPeerNgOperTable, as: received}
-          - {metric: bgpPeerOutUpdates, table: tBgpPeerNgOperTable, as: sent}
-      - sources:
-          - {metric: bgpPeerInUpdates, table: bgpPeerTable, as: received}
-          - {metric: bgpPeerOutUpdates, table: bgpPeerTable, as: sent}
+    sources:
+      - {metric: bgpPeerInUpdates, table: tBgpPeerNgOperTable, as: received}
+      - {metric: bgpPeerOutUpdates, table: tBgpPeerNgOperTable, as: sent}
     chart_meta:
       description: BGP peer update traffic by direction
       family: 'Network/Routing/BGP/Peer/Message/Update'

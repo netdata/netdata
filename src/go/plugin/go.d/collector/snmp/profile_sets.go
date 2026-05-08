@@ -23,7 +23,12 @@ func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
 	matchedProfiles := resolved.Profiles()
 	c.logMatchedProfiles(matchedProfiles, si.SysObjectID)
 
-	return resolved.Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing).Profiles()
+	profiles := resolved.Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing, ddsnmp.ConsumerBGP).Profiles()
+	if profilesHaveBGP(profiles) {
+		c.enableBGPIntegration()
+	}
+
+	return profiles
 }
 
 func (c *Collector) logMatchedProfiles(profiles []*ddsnmp.Profile, sysObjectID string) {

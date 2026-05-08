@@ -31,44 +31,27 @@ func Test_CiscoBGPProfileMergedIntoCiscoASR(t *testing.T) {
 
 	profile := matched[index]
 
-	metricIndex := slices.IndexFunc(profile.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
-		return m.Table.Name == "cbgpPeer3Table" && m.Table.OID == "1.3.6.1.4.1.9.9.187.1.2.9"
+	rowIndex := slices.IndexFunc(profile.Definition.BGP, func(row ddprofiledefinition.BGPConfig) bool {
+		return row.Table.Name == "cbgpPeer3Table" && row.Table.OID == "1.3.6.1.4.1.9.9.187.1.2.9"
 	})
-	require.NotEqual(t, -1, metricIndex, "expected merged Cisco profile to include cbgpPeer3Table")
+	require.NotEqual(t, -1, rowIndex, "expected merged Cisco profile to include typed cbgpPeer3Table row")
 
-	metric := profile.Definition.Metrics[metricIndex]
-
-	var symbolNames []string
-	for _, sym := range metric.Symbols {
-		symbolNames = append(symbolNames, sym.Name)
-	}
-
-	var tagNames []string
-	for _, tag := range metric.MetricTags {
-		tagNames = append(tagNames, tag.Tag)
-	}
-
-	assert.Contains(t, symbolNames, "bgpPeerAdminStatus")
-	assert.Contains(t, symbolNames, "bgpPeerState")
-	assert.Contains(t, symbolNames, "bgpPeerInUpdates")
-	assert.Contains(t, symbolNames, "bgpPeerOutTotalMessages")
-	assert.Contains(t, symbolNames, "bgpPeerLastErrorCode")
-	assert.Contains(t, symbolNames, "bgpPeerLastErrorSubcode")
-	assert.Contains(t, symbolNames, "bgpPeerFsmEstablishedTransitions")
-	assert.Contains(t, symbolNames, "bgpPeerFsmEstablishedTime")
-	assert.Contains(t, symbolNames, "bgpPeerInUpdateElapsedTime")
-	assert.Contains(t, symbolNames, "bgpPeerPreviousState")
-
-	assert.Contains(t, tagNames, "routing_instance")
-	assert.Contains(t, tagNames, "routing_instance_id")
-	assert.Contains(t, tagNames, "neighbor_address_type")
-	assert.Contains(t, tagNames, "neighbor")
-	assert.Contains(t, tagNames, "local_address")
-	assert.Contains(t, tagNames, "local_as")
-	assert.Contains(t, tagNames, "remote_as")
-	assert.Contains(t, tagNames, "local_identifier")
-	assert.Contains(t, tagNames, "peer_identifier")
-	assert.Contains(t, tagNames, "bgp_version")
+	row := profile.Definition.BGP[rowIndex]
+	assert.Equal(t, "_cisco-bgp4-mib.yaml", row.OriginProfileID)
+	assert.Equal(t, "cisco-bgp-peer", row.ID)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeer, row.Kind)
+	assert.Equal(t, "cbgpPeer3RemoteAddr", row.Identity.Neighbor.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3RemoteAs", row.Identity.RemoteAS.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3AdminStatus", row.Admin.Enabled.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3State", row.State.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3InUpdates", row.Traffic.Updates.Received.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3OutTotalMessages", row.Traffic.Messages.Sent.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3LastErrorCode", row.LastError.Code.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3LastErrorSubcode", row.LastError.Subcode.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3FsmEstablishedTransitions", row.Transitions.Established.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3FsmEstablishedTime", row.Connection.EstablishedUptime.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3InUpdateElapsedTime", row.Connection.LastReceivedUpdateAge.Symbol.Name)
+	assert.Equal(t, "cbgpPeer3PrevState", row.Previous.Symbol.Name)
 }
 
 func Test_CiscoBgpPrefixProfileMergedIntoCiscoASR(t *testing.T) {
@@ -87,41 +70,80 @@ func Test_CiscoBgpPrefixProfileMergedIntoCiscoASR(t *testing.T) {
 
 	profile := matched[index]
 
-	metricIndex := slices.IndexFunc(profile.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
-		return m.Table.Name == "cbgpPeer2AddrFamilyPrefixTable" && m.Table.OID == "1.3.6.1.4.1.9.9.187.1.2.8"
+	rowIndex := slices.IndexFunc(profile.Definition.BGP, func(row ddprofiledefinition.BGPConfig) bool {
+		return row.Table.Name == "cbgpPeer2AddrFamilyPrefixTable" && row.Table.OID == "1.3.6.1.4.1.9.9.187.1.2.8"
 	})
-	require.NotEqual(t, -1, metricIndex, "expected merged Cisco profile to include cbgpPeer2AddrFamilyPrefixTable")
+	require.NotEqual(t, -1, rowIndex, "expected merged Cisco profile to include typed cbgpPeer2AddrFamilyPrefixTable row")
 
-	metric := profile.Definition.Metrics[metricIndex]
+	row := profile.Definition.BGP[rowIndex]
+	assert.Equal(t, "_cisco-bgp4-mib.yaml", row.OriginProfileID)
+	assert.Equal(t, "cisco-bgp-peer-family", row.ID)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeerFamily, row.Kind)
+	assert.Equal(t, "cbgpPeer2RemoteAs", row.Identity.RemoteAS.Symbol.Name)
+	assert.Equal(t, "cbgpPeer2Table", row.Identity.RemoteAS.Table)
+	assert.Equal(t, "cbgpPeer2AcceptedPrefixes", row.Routes.Current.Accepted.Symbol.Name)
+	assert.Equal(t, "cbgpPeer2DeniedPrefixes", row.Routes.Current.Rejected.Symbol.Name)
+	assert.Equal(t, "cbgpPeer2PrefixAdminLimit", row.RouteLimits.Limit.Symbol.Name)
+	assert.Equal(t, "cbgpPeer2PrefixThreshold", row.RouteLimits.Threshold.Symbol.Name)
+	assert.Equal(t, "cbgpPeer2PrefixClearThreshold", row.RouteLimits.ClearThreshold.Symbol.Name)
+	assert.Equal(t, "cbgpPeer2AdvertisedPrefixes", row.Routes.Current.Advertised.Symbol.Name)
+	assert.Equal(t, "cbgpPeer2SuppressedPrefixes", row.Routes.Current.Suppressed.Symbol.Name)
+	assert.Equal(t, "cbgpPeer2WithdrawnPrefixes", row.Routes.Current.Withdrawn.Symbol.Name)
+	assert.Equal(t, uint(2), row.Identity.AddressFamily.IndexFromEnd)
+	assert.Equal(t, uint(1), row.Identity.SubsequentAddressFamily.IndexFromEnd)
+}
 
-	var symbolNames []string
-	for _, sym := range metric.Symbols {
-		symbolNames = append(symbolNames, sym.Name)
+func Test_CiscoBGPProfileMergedIntoCiscoCatalyst(t *testing.T) {
+	dir, err := filepath.Abs("../../../config/go.d/snmp.profiles/default")
+	require.NoError(t, err)
+
+	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
+	require.NoError(t, err)
+	require.NotEmpty(t, profiles)
+
+	matched := FindProfiles("1.3.6.1.4.1.9.1.2435", "", nil) // catC930024T
+	index := slices.IndexFunc(matched, func(p *Profile) bool {
+		return strings.HasSuffix(p.SourceFile, "cisco-catalyst.yaml")
+	})
+	require.NotEqual(t, -1, index, "expected cisco-catalyst profile to match")
+
+	profile := matched[index]
+	assert.True(t, profile.HasExtension("_cisco-bgp4-mib.yaml"))
+
+	rowIndex := slices.IndexFunc(profile.Definition.BGP, func(row ddprofiledefinition.BGPConfig) bool {
+		return row.Table.Name == "cbgpPeer3Table" && row.Table.OID == "1.3.6.1.4.1.9.9.187.1.2.9"
+	})
+	require.NotEqual(t, -1, rowIndex, "expected merged Cisco Catalyst profile to include typed cbgpPeer3Table row")
+	assert.Equal(t, "_cisco-bgp4-mib.yaml", profile.Definition.BGP[rowIndex].OriginProfileID)
+}
+
+func Test_CiscoGenericProfilesDoNotInheritBGP(t *testing.T) {
+	tests := map[string]struct {
+		sysObjectID string
+		profileFile string
+	}{
+		"generic Cisco profile has no BGP rows": {
+			sysObjectID: "1.3.6.1.4.1.9.1",
+			profileFile: "cisco.yaml",
+		},
+		"Cisco base mixin has no BGP rows": {
+			sysObjectID: "1.3.6.1.4.1.9.1",
+			profileFile: "_cisco-base.yaml",
+		},
 	}
 
-	var tagNames []string
-	for _, tag := range metric.MetricTags {
-		tagNames = append(tagNames, tag.Tag)
+	dir, err := filepath.Abs("../../../config/go.d/snmp.profiles/default")
+	require.NoError(t, err)
+
+	_, err = loadProfilesFromDir(dir, multipath.New(dir))
+	require.NoError(t, err)
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profile, err := loadProfile(filepath.Join(dir, tc.profileFile), multipath.New(dir))
+			require.NoError(t, err)
+			require.True(t, strings.HasSuffix(profile.SourceFile, tc.profileFile))
+			assert.Empty(t, profile.Definition.BGP)
+		})
 	}
-
-	assert.Contains(t, symbolNames, "bgpPeerPrefixesAccepted")
-	assert.Contains(t, symbolNames, "bgpPeerPrefixesRejected")
-	assert.Contains(t, symbolNames, "bgpPeerPrefixAdminLimit")
-	assert.Contains(t, symbolNames, "bgpPeerPrefixThreshold")
-	assert.Contains(t, symbolNames, "bgpPeerPrefixClearThreshold")
-	assert.Contains(t, symbolNames, "bgpPeerPrefixesAdvertised")
-	assert.Contains(t, symbolNames, "bgpPeerPrefixesSuppressed")
-	assert.Contains(t, symbolNames, "bgpPeerPrefixesWithdrawn")
-
-	assert.Contains(t, tagNames, "neighbor_address_type")
-	assert.Contains(t, tagNames, "neighbor")
-	assert.Contains(t, tagNames, "local_address")
-	assert.Contains(t, tagNames, "local_as")
-	assert.Contains(t, tagNames, "remote_as")
-	assert.Contains(t, tagNames, "local_identifier")
-	assert.Contains(t, tagNames, "peer_identifier")
-	assert.Contains(t, tagNames, "bgp_version")
-	assert.Contains(t, tagNames, "address_family_name")
-	assert.Contains(t, tagNames, "address_family")
-	assert.Contains(t, tagNames, "subsequent_address_family")
 }
