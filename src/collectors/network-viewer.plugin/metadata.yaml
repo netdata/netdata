@@ -212,3 +212,88 @@ modules:
                 - name: last_ack
                 - name: time_wait
                 - name: delete_tcb
+  - meta:
+      plugin_name: network-viewer.plugin
+      module_name: PerflibUDP
+      monitored_instance:
+        name: UDP Stack
+        link: "https://learn.microsoft.com/en-us/windows/win32/networking"
+        categories:
+          - data-collection.networking
+        icon_filename: windows.svg
+      alternative_monitored_instances: []
+      keywords:
+        - network
+        - udp
+        - stack
+        - datagrams
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors UDP datagram counters on Windows systems.
+        method_description: |
+          It queries the UDPv4 and UDPv6 objects from Perflib.
+      supported_platforms:
+        include:
+          - windows
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: false
+          list: []
+        examples:
+          folding:
+            title: ""
+            enabled: false
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Per UDP Stack
+          description: |
+            These metrics refer to the UDP stack for each address family.
+          labels:
+            - name: af
+              description: The address family. On Windows systems, this collector exposes `ipv4` and `ipv6`.
+          metrics:
+            - name: udp.datagrams
+              description: UDP datagram counters.
+              unit: datagrams/s
+              chart_type: line
+              dimensions:
+                - name: no_port
+                - name: received_errors
+                - name: received
+                - name: sent

@@ -17,6 +17,8 @@
 #define PRIO_TCP_IPV6_SEGMENTS                21073
 #define PRIO_TCP_IPV6_CONNECTIONS_STATE_COUNT 21074
 
+int do_PerflibUDP(int update_every, usec_t dt);
+
 static volatile sig_atomic_t plugin_should_exit = 0;
 static void signal_handler(int sig __maybe_unused) { plugin_should_exit = 1; }
 
@@ -262,6 +264,7 @@ int main(int argc, char **argv)
     while (!plugin_should_exit) {
         usec_t dt = heartbeat_next(&hb);
         do_PerflibTCP(update_every, dt);
+        do_PerflibUDP(update_every, dt);
         fflush(stdout);
     }
 
