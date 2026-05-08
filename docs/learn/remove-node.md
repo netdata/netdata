@@ -45,7 +45,7 @@ You need **Admin** role in your Space to remove nodes. The CLI method requires a
 
 :::
 
-## Section A: Removing Singular (Standalone) Nodes
+## Singular or Standalone Nodes
 
 These are nodes that connect directly to Netdata Cloud without streaming through a Parent Agent.
 
@@ -74,7 +74,7 @@ The **Remove** option is only available in the **Space Settings** view. It will 
 
 </details>
 
-## Section B: Removing Child Nodes
+## Child Nodes
 
 These are nodes that stream metrics through a Parent Agent. When a child node stops streaming to its parent, it becomes **Stale**.
 
