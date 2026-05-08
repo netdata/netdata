@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Copilot PR review finding repaired; direct-agent skill output-variable assignment no longer uses eval for external command output.
+Sub-state: Additional external application validation completed; BioRIS documentation corrected to describe the actual bio-rd-compatible gRPC requirement and the non-direct RIPE RIS limitation.
 
 ## Requirements
 
@@ -722,3 +722,89 @@ Artifact maintenance:
 - End-user/operator docs: updated `docs/netdata-ai/skills/query-netdata-agents/SKILL.md` to describe the actual output-variable contract.
 - End-user/operator skills: updated `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`.
 - SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` and moved back to `.agents/sow/done/` with the fix commit.
+
+### External App Validation Follow-up - 2026-05-08
+
+Trigger:
+
+- User asked to proceed with the remaining external application validation after PR review cleanup.
+
+Scope exercised:
+
+- Generic JSON-over-HTTP IPAM.
+- NetBox.
+- FRR BMP.
+- GoBGP BMP.
+- bio-rd RIS / BioRIS.
+
+Evidence and results:
+
+- Generic JSON-over-HTTP IPAM:
+  - Started a temporary localhost HTTP server serving sanitized RFC documentation prefixes.
+  - Fetched `networks.json` over HTTP and applied the documented transform `.[] | {prefix: .cidr, name: .label, tenant: .tenant}`.
+  - Result: `{"prefix":"203.0.113.0/24","name":"corp edge","tenant":"prod"}`.
+  - Temporary HTTP process was verified stopped.
+- NetBox:
+  - Started local `netbox-docker` under a dedicated Compose project.
+  - Initial health check exceeded the Docker health timeout while migrations were still finishing, but the NetBox login endpoint returned HTTP 200 and the API was usable after startup.
+  - Bootstrapped a local prefix and queried `/api/ipam/prefixes/?limit=1000` with a generated local token.
+  - Applied the documented transform and verified the expected result:
+    `{"prefix":"198.51.100.0/24","tenant":"","role":"","site":"","name":"netdata edge subnet"}`.
+  - Compose project was shut down with volumes removed.
+- FRR BMP:
+  - Used `quay.io/frrouting/frr:10.6.0`.
+  - `bgpd -M bmp -C -f /etc/frr/bgpd.conf` accepted the BMP config. FRR logged warnings about missing synthetic OPEN messages for the static announcement, but did not reject the config.
+  - A running FRR container connected to a local BMP listener and emitted 297 bytes. The captured stream began with BMP v3 and an FRRouting initiation payload.
+  - Temporary listener process and container were verified stopped.
+- GoBGP BMP:
+  - `NETDATA_GOBGPD=.local/audits/netflow-live/bin/gobgpd NETDATA_GOBGP=.local/audits/netflow-live/bin/gobgp cargo test -p netflow-plugin routing::bmp --manifest-path src/crates/Cargo.toml`
+  - Result: 13 passed, 0 failed, including `bmp_listener_accepts_gobgp_route_when_binaries_are_set`.
+- BioRIS / bio-rd:
+  - Upstream source evidence shows `bio-rd` `cmd/ris` is BMP-backed:
+    - `bio-routing/bio-rd @ 14a8de966e8b3f488a207aa0d02454a447ed5c99`, `cmd/ris/main.go:52-83` creates a BMP receiver, listens for BMP, adds configured BMP servers, then exposes the RIS gRPC server.
+    - `bio-routing/bio-rd @ 14a8de966e8b3f488a207aa0d02454a447ed5c99`, `cmd/ris/config/config.go:10-20` defines `bmp_servers`.
+  - Official RIPE RIS documentation checked:
+    - `https://ris-live.ripe.net/` describes RIS Live as WebSocket JSON.
+    - `https://ris.ripe.net/docs/` lists route collectors, raw MRT files, RIS Live, RISwhois, and routing beacons.
+  - No official public RIPE RIS endpoint implementing `bio.ris.RoutingInformationService` gRPC was found.
+  - GoBGP-to-upstream-bio-rd reached BMP Peer Up, then upstream bio-rd crashed in its BGP/BMP handling. This is an upstream/runtime issue, not a Netdata BioRIS client failure.
+  - FRR-to-upstream-bio-rd did not crash; `riscli routers` saw a router from `[LOCAL_HOST]`, but the local loopback lab did not produce a stable non-empty RIB. The logs showed peer up/down behavior and duplicate-neighbor handling.
+  - Netdata's BioRIS client path remains covered by the in-process gRPC test that exercises `GetRouters`, `DumpRIB`, and `ObserveRIB`.
+
+Documentation correction:
+
+- Corrected `src/crates/netflow-plugin/metadata.yaml` so the BioRIS module says Netdata consumes only a bio-rd-compatible `RoutingInformationService` gRPC endpoint.
+- Corrected the generated `src/crates/netflow-plugin/integrations/bio-rd_-_ripe_ris.md` from metadata.
+- Corrected `docs/network-flows/enrichment.md` and `docs/network-flows/configuration.md` link text / routing-overlay language.
+- Removed misleading instructions that implied users can point `grpc_addr` at RIPE RIS Live, RIPEstat, MRT dumps, route collector sessions, or looking-glass sources directly.
+
+Validation after documentation correction:
+
+- `python3 integrations/gen_integrations.py` passed.
+- `python3 integrations/gen_docs_integrations.py` passed.
+- `python3 -c` YAML parse of `src/crates/netflow-plugin/metadata.yaml` passed.
+- `cargo test -p netflow-plugin network_sources --manifest-path src/crates/Cargo.toml`
+  - Result: 17 passed, 0 failed.
+- `cargo test -p netflow-plugin routing::bioris --manifest-path src/crates/Cargo.toml`
+  - Result: 7 passed, 0 failed.
+- `NETDATA_GOBGPD="$(pwd)/.local/audits/netflow-live/bin/gobgpd" NETDATA_GOBGP="$(pwd)/.local/audits/netflow-live/bin/gobgp" cargo test -p netflow-plugin routing::bmp --manifest-path src/crates/Cargo.toml`
+  - Result: 13 passed, 0 failed.
+- `git diff --check` passed.
+- Generated-doc noise from unrelated SNMP and trailing blank-line changes was removed from the changeset.
+- A process/container cleanup check found no remaining temporary live-validation processes or containers.
+
+Artifact maintenance:
+
+- AGENTS.md: no update needed; existing SOW, sensitive-data, and generated-doc rules were sufficient.
+- Runtime project skills: no update needed; `project-writing-collectors`, `integrations-lifecycle`, and `mirrored-repos` already cover the workflow.
+- Specs: no update needed; this corrected public/operator documentation to match existing implementation and upstream protocol reality.
+- End-user/operator docs: updated BioRIS metadata, generated integration docs, and hand-authored network-flow docs.
+- End-user/operator skills: no update needed; no public skill workflow changed.
+- SOW lifecycle: reopened from `done`, recorded external validation, then returned to `completed` and moved back to `.agents/sow/done/` with the validation/doc commit.
+
+Remaining items requiring user involvement or explicit approval:
+
+- A real stable bio-rd-compatible `RoutingInformationService` endpoint with a non-empty RIB if final end-to-end live BioRIS route proof is required.
+- A real router/BMP source if proof against a production router vendor is required beyond the GoBGP and FRR protocol-level validation already completed.
+- Approval to spend time debugging, reporting, or fixing upstream bio-rd behavior if the local GoBGP/FRR-to-bio-rd failures should be turned into an upstream bugfix.
+- User-owned NetBox or custom IPAM endpoints if validation against production/user systems is desired. Local NetBox and local generic IPAM are validated.

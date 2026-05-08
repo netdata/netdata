@@ -23,20 +23,21 @@ Module: bioris
 
 ## Overview
 
-Enrich network flows with BGP routing context received from bio-rd / RIPE RIS
-over gRPC. [bio-rd](https://github.com/bio-routing/bio-rd)
-is a Go-based BGP/BMP daemon that you run yourself. You point it at one or more
-BGP / BMP sources -- your own routers, a [RIPE RIS](https://www.ripe.net/analyse/internet-measurements/routing-information-service-ris)
-Route Collector you peer with, or any other reachable BGP source -- and it
-exposes the resulting RIB through a gRPC interface (`RoutingInformationService`).
-Netdata is a **client** of that interface, not of RIPE NCC directly.
+Enrich network flows with BGP routing context received from a bio-rd-compatible
+`RoutingInformationService` gRPC endpoint. [bio-rd](https://github.com/bio-routing/bio-rd)
+is a Go-based BGP/BMP daemon that you run yourself. Its `ris` daemon receives BMP
+sessions from routers or collectors and exposes the resulting RIB through gRPC.
+Netdata is a **client** of that gRPC interface only.
 
-Pick this when you want a third-party / external BGP view (e.g. RIPE RIS's view of the
-public DFZ) without exposing a BMP listener on your agent or running BMP across your
-network. If your routers can speak BMP straight to Netdata, the `bmp` integration is
-simpler -- BioRIS makes sense when bio-rd is already part of your routing toolbox or
-when you want to peer with an external party (RIPE RIS, looking-glass) and re-export
-to Netdata.
+Netdata does **not** connect directly to RIPE NCC RIS Live, RIPEstat, RIS MRT dumps,
+or RIPE route collector sessions. RIPE RIS public access is WebSocket JSON, HTTP API,
+and MRT dump based. To use a RIPE-derived external view, run a bridge or service that
+imports that data into a bio-rd-compatible `RoutingInformationService`, then point
+Netdata at that service.
+
+Pick this when bio-rd is already part of your routing toolbox, or when you want Netdata
+to consume a routing view that is already exposed through the bio-rd RIS gRPC API. If
+your routers can speak BMP straight to Netdata, the `bmp` integration is simpler.
 
 BioRIS populates the same flow-record fields as BMP -- both feed a single shared
 in-memory routing trie. See the BMP integration card for the side-by-side comparison
@@ -128,10 +129,13 @@ cd bio-rd/cmd/ris
 go build -o /usr/local/bin/ris .
 ```
 
-Configure `ris` to peer with one or more BGP / BMP sources (your own routers,
-RIPE RIS Route Collectors, looking-glass servers, etc.). Refer to the bio-rd
-documentation for the peering setup -- this is bio-rd's configuration, not
-Netdata's.
+Configure `ris` with one or more BMP sources using bio-rd's `bmp_addr` /
+`bmp_servers` configuration. Refer to the bio-rd documentation for the BMP setup
+-- this is bio-rd's configuration, not Netdata's.
+
+Do not set Netdata's `grpc_addr` to a RIPE RIS Live URL, RIPEstat API URL, MRT dump
+URL, or route collector session address. Those endpoints are not the
+`RoutingInformationService` gRPC API that Netdata consumes.
 
 Run the daemon with a gRPC port:
 `/usr/local/bin/ris --grpc_port 50051 --config.file /etc/bio-rd.yml`
@@ -248,9 +252,10 @@ enrichment:
 
 ###### Combined with BMP into a single trie
 
-Run BMP from internal routers and BioRIS for an external (RIPE RIS) view.
-Both populate the same shared trie -- lookups pick the best-matching route
-across both sources at query time.
+Run BMP from internal routers and BioRIS from a separate bio-rd-compatible RIS
+service, for example one populated from an external routing view. Both populate
+the same shared trie -- lookups pick the best-matching route across both sources
+at query time.
 
 
 <details open><summary>Config</summary>
@@ -282,18 +287,27 @@ message stream reads (default 10s).
 
 ### Initial dump takes minutes for full feeds
 
-A full IPv4+IPv6 RIB from a route collector is millions of prefixes. The
-first `DumpRIB` after enabling (or after a plugin restart) takes time -- BGP
-attribution is incomplete until it finishes. Subsequent `ObserveRIB` streams
-are incremental.
+A full IPv4+IPv6 RIB from a full-table bio-rd source can contain millions of
+prefixes. The first `DumpRIB` after enabling (or after a plugin restart) takes
+time -- BGP attribution is incomplete until it finishes. Subsequent
+`ObserveRIB` streams are incremental.
 
 
 ### Plugin restart wipes the trie
 
 The trie is in-memory only -- restarting the netflow plugin loses every
 learned BGP route. Convergence over BioRIS depends on the upstream feed; a
-full DumpRIB from a RIPE RIS Route Collector can take minutes. Schedule
+full DumpRIB from a full-table bio-rd source can take minutes. Schedule
 restarts off-peak if BGP attribution matters for your workflow.
+
+
+### Pointing grpc_addr at RIPE RIS does not work
+
+`grpc_addr` must point to a bio-rd-compatible `RoutingInformationService`
+endpoint. RIPE RIS Live, RIPEstat, RIS MRT dumps, and route collector BGP
+sessions use different protocols, so they cannot be used directly as
+`ris_instances[].grpc_addr`. Put a converter or bio-rd-compatible service in
+front of RIPE-derived data if you need that external view.
 
 
 ### Memory growth without bound

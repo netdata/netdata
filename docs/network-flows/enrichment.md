@@ -283,7 +283,9 @@ See the [Decapsulation integration card](/src/crates/netflow-plugin/integrations
 
 ## Routing overlay (BMP and BioRIS share the trie)
 
-BMP and BioRIS are separate transports that feed the **same** in-memory routing trie. A deployment running BMP from internal routers and BioRIS for an external view (RIPE RIS) gets unified enrichment without duplicate trie entries.
+BMP and BioRIS are separate transports that feed the **same** in-memory routing trie. A deployment running BMP from internal routers and BioRIS from a separate bio-rd-compatible RIS endpoint gets unified enrichment without duplicate trie entries.
+
+BioRIS means Netdata consumes the `bio.ris.RoutingInformationService` gRPC API. Netdata does not connect directly to RIPE RIS Live, RIPEstat, RIS MRT dumps, or RIPE route collector sessions. If you need a RIPE-derived external view, put a converter or bio-rd-compatible service in front of that data and point Netdata at the resulting gRPC endpoint.
 
 Each prefix entry holds a list of routes keyed by `(peer, route_key)` so multipath BGP and multiple peers contributing the same prefix coexist. Lookups walk the trie longest-prefix-first, then refine within candidates by:
 
@@ -312,7 +314,7 @@ AS *names* still come from the ASN MMDB, not from BGP. BGP gives accurate AS num
 ### Restart behaviour
 
 - **GeoIP databases** are reloaded automatically — no special handling needed.
-- **The routing trie is not persisted.** A restart wipes BGP-derived data; it is re-learned as routers re-send Initiation + Update messages (BMP) or as bio-rd's next refresh cycle dumps the RIB (BioRIS). Convergence ranges from seconds (FRR) to minutes (Cisco IOS-XR, RIPE RIS full feed). Schedule restarts off-peak when BGP attribution matters.
+- **The routing trie is not persisted.** A restart wipes BGP-derived data; it is re-learned as routers re-send Initiation + Update messages (BMP) or as bio-rd's next refresh cycle dumps the RIB (BioRIS). Convergence ranges from seconds (FRR) to minutes for full-table BioRIS feeds. Schedule restarts off-peak when BGP attribution matters.
 - **Network-source records** are re-fetched on the next interval tick. There is no persistence between restarts.
 - **Classifier caches** are wiped — they refill on first hit per target.
 
@@ -392,7 +394,7 @@ These cards carry the per-method specifics — installation steps, refresh caden
 
 **BGP routing**
 - [BMP (BGP Monitoring Protocol)](/src/crates/netflow-plugin/integrations/bmp_bgp_monitoring_protocol.md) — routers push BGP updates over TCP
-- [bio-rd / RIPE RIS](/src/crates/netflow-plugin/integrations/bio-rd_-_ripe_ris.md) — pull BGP data from a bio-rd RIS gRPC daemon
+- [bio-rd RIS](/src/crates/netflow-plugin/integrations/bio-rd_-_ripe_ris.md) — pull BGP data from a bio-rd-compatible RIS gRPC daemon
 
 **Network identity (cloud IP ranges, IPAM)**
 - [AWS IP Ranges](/src/crates/netflow-plugin/integrations/aws_ip_ranges.md) — public AWS prefix list
