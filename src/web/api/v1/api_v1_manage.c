@@ -43,7 +43,6 @@ static char *get_mgmt_api_key(void) {
     // generate a new one?
     if(!guid[0]) {
         nd_uuid_t uuid;
-        struct stat st;
 
         uuid_generate(uuid);
         uuid_unparse_lower(uuid, guid);
@@ -51,10 +50,8 @@ static char *get_mgmt_api_key(void) {
 
         // save it
 #ifdef O_NOFOLLOW
+        struct stat st;
         fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC|O_NOFOLLOW, 0600);
-#else
-        fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0600);
-#endif
         if(fd == -1) {
             netdata_log_error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
             goto temp_key;
@@ -73,6 +70,34 @@ static char *get_mgmt_api_key(void) {
         }
 
         close(fd);
+#else
+        // Without O_NOFOLLOW: write to a uniquely named temp file then rename atomically.
+        // O_EXCL guarantees we create a fresh file (fails if a symlink exists at tmp path).
+        // rename() replaces the destination entry without following symlinks there,
+        // so a symlink planted at api_key_filename cannot redirect truncation to another file.
+        char tmp_filename[FILENAME_MAX + 1];
+        snprintfz(tmp_filename, FILENAME_MAX, "%s.%u.tmp", api_key_filename, (unsigned)getpid());
+
+        fd = open(tmp_filename, O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC, 0600);
+        if(fd == -1) {
+            netdata_log_error("Cannot create temporary management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", tmp_filename);
+            goto temp_key;
+        }
+
+        if(write(fd, guid, GUID_LEN) != GUID_LEN) {
+            netdata_log_error("Cannot write the unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file with enough space left.", tmp_filename);
+            close(fd);
+            unlink(tmp_filename);
+            goto temp_key;
+        }
+        close(fd);
+
+        if(rename(tmp_filename, api_key_filename) != 0) {
+            netdata_log_error("Cannot rename temporary API key file '%s' to '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", tmp_filename, api_key_filename);
+            unlink(tmp_filename);
+            goto temp_key;
+        }
+#endif
     }
 
     return guid;
