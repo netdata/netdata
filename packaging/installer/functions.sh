@@ -281,11 +281,14 @@ prepare_cmake_options() {
   NETDATA_CMAKE_INSTALL_PREFIX_OPTION="-DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX-}"
   NETDATA_WINDOWS_PATH_PREFIX_OPTION=
 
-  NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} ${NETDATA_CMAKE_INSTALL_PREFIX_OPTION}"
+  #
+  # Do not append either prefix-related option to NETDATA_CMAKE_OPTIONS,
+  # because that variable is later expanded as a space-delimited string and
+  # path values may contain spaces. Keep them as dedicated variables so
+  # callers can pass them as separately quoted arguments.
 
   if [ -n "${NETDATA_WINDOWS_PATH_PREFIX:-}" ]; then
     NETDATA_WINDOWS_PATH_PREFIX_OPTION="-DNETDATA_WINDOWS_PATH_PREFIX=${NETDATA_WINDOWS_PATH_PREFIX}"
-    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} ${NETDATA_WINDOWS_PATH_PREFIX_OPTION}"
   fi
 
   NEED_OLD_CXX=0
