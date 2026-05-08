@@ -206,7 +206,8 @@ Real-use evidence:
 
 Reviewer findings:
 
-- No external reviewers were run; the user asked to distrust the prior session and verify locally from code.
+- Initial implementation had no external reviewer pass before opening the PR; the user asked to distrust the prior session and verify locally from code.
+- PR review iteration found two Copilot comments on `netdata/netdata#22456`; both were verified as valid and addressed in the same SOW.
 
 Same-failure scan:
 
@@ -248,6 +249,30 @@ Lessons:
 Follow-up mapping:
 
 - No follow-up needed at this stage.
+
+## PR Review Iteration - 2026-05-08
+
+Findings:
+
+- `PRRT_kwDOAKPxd86Asq8i`, `src/crates/jf/journal_reader_ffi/src/lib.rs:396`: valid. The decompression error path returned generic `-1` and printed to stderr instead of returning `JournalError::to_error_code()`. Same-class sweep found the same pattern in `rsd_journal_enumerate_available_data()`.
+- `PRRT_kwDOAKPxd86Asq9F`, `src/crates/jf/journal_file/src/object.rs:899`: valid. The LZ4 branch trusted the on-disk uncompressed size prefix before `Vec::resize()`. Same-class sweep found the same LZ4 reader pattern in `src/crates/journal-core/src/file/object.rs`.
+- CI signal before this iteration: one Docker armv7 job failed in its `Build Image` step while the workflow run was still in progress. GitHub did not expose logs yet because the overall run had not completed; all other available failure sources were either pending or passing.
+
+Actions:
+
+- Changed compressed DATA enumeration FFI paths to return `e.to_error_code()` for decompression errors.
+- Added checked `u64` to `usize` conversion for the LZ4 uncompressed-size prefix.
+- Added a DATA payload upper bound matching systemd's `DATA_SIZE_MAX` journal importer limit: 768 MiB.
+- Used `try_reserve_exact()` before `Vec::resize()` so allocation failure returns `JournalError::DecompressorError` instead of panicking.
+- Applied the same LZ4 bounds hardening to both `src/crates/jf/journal_file` and `src/crates/journal-core`.
+- Added oversized LZ4 prefix regression tests in both readers.
+
+Validation:
+
+- `cargo fmt` in `src/crates/jf`: passed.
+- `cargo fmt` in `src/crates`: passed; unrelated formatting churn in `src/crates/netdata-plugin/rt/src/lib.rs` was removed before staging.
+- `cargo test -q` in `src/crates/jf`: passed; 5 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 19 tests passed plus the existing ignored tests.
 
 ## Outcome
 

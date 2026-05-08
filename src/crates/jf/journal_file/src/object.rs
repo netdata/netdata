@@ -779,6 +779,9 @@ pub struct DataObject<B: ByteSlice> {
     pub payload: DataPayloadType<B>,
 }
 
+// systemd limits journal DATA field payloads to 768 MiB; reject corrupt size prefixes before allocating.
+const MAX_UNCOMPRESSED_DATA_OBJECT_SIZE: usize = 768 * 1024 * 1024;
+
 impl<B: ByteSlice> std::fmt::Debug for DataObject<B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataObject")
@@ -892,10 +895,22 @@ impl<B: ByteSlice> DataObject<B> {
                 return Err(JournalError::DecompressorError);
             }
 
-            let uncompressed_size = u64::from_le_bytes(payload[..8].try_into().unwrap()) as usize;
+            let uncompressed_size = usize::try_from(u64::from_le_bytes(
+                payload[..8]
+                    .try_into()
+                    .map_err(|_| JournalError::DecompressorError)?,
+            ))
+            .map_err(|_| JournalError::DecompressorError)?;
+            if uncompressed_size > MAX_UNCOMPRESSED_DATA_OBJECT_SIZE {
+                return Err(JournalError::DecompressorError);
+            }
             let compressed_data = &payload[8..];
 
             buf.clear();
+            if uncompressed_size > buf.capacity() {
+                buf.try_reserve_exact(uncompressed_size - buf.capacity())
+                    .map_err(|_| JournalError::DecompressorError)?;
+            }
             buf.resize(uncompressed_size, 0);
 
             lz4_flex::block::decompress_into(compressed_data, buf)
@@ -914,6 +929,51 @@ impl<B: ByteSlice> DataObject<B> {
         } else {
             Err(JournalError::UnknownCompressionMethod)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn data_object_bytes(payload: &[u8], flags: u8) -> Vec<u8> {
+        let header = DataObjectHeader {
+            object_header: ObjectHeader {
+                type_: ObjectType::Data as u8,
+                flags,
+                reserved: [0; 6],
+                size: (std::mem::size_of::<DataObjectHeader>() + payload.len()) as u64,
+            },
+            hash: 0,
+            next_hash_offset: None,
+            next_field_offset: None,
+            entry_offset: None,
+            entry_array_offset: None,
+            n_entries: None,
+        };
+
+        let mut bytes = Vec::with_capacity(header.object_header.size as usize);
+        bytes.extend_from_slice(header.as_bytes());
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    #[test]
+    fn lz4_decompress_rejects_oversized_payload_prefix() {
+        let mut stored_payload = Vec::new();
+        stored_payload
+            .extend_from_slice(&((MAX_UNCOMPRESSED_DATA_OBJECT_SIZE as u64) + 1).to_le_bytes());
+        stored_payload.extend_from_slice(b"invalid");
+
+        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = Vec::new();
+
+        assert!(matches!(
+            object.decompress(&mut buf),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
     }
 }
 
