@@ -66,7 +66,7 @@ func (c *Collector) prepareProfileMetrics(pms []*ddsnmp.ProfileMetrics) []ddsnmp
 func (b *bgpIntegration) prepareProfileMetrics(pms []*ddsnmp.ProfileMetrics) []ddsnmp.Metric {
 	b.collectError, b.collectFailedSources = bgpCollectErrorsBySource(pms)
 
-	metrics := normalizeCollectorMetrics(pms)
+	metrics := flattenProfileMetrics(pms)
 	b.peerCache.resetExceptSources(b.collectFailedSources)
 	for _, pm := range pms {
 		if pm == nil || pm.BGPCollectError != nil {
@@ -77,12 +77,6 @@ func (b *bgpIntegration) prepareProfileMetrics(pms []*ddsnmp.ProfileMetrics) []d
 		}
 	}
 
-	for _, metric := range metrics {
-		if bgpMetricSourceFailed(metric, b.collectFailedSources) {
-			continue
-		}
-		b.peerCache.updateEntry(metric)
-	}
 	metrics = append(metrics, typedBGPMetricsFromProfileMetrics(successfulBGPProfileMetrics(pms))...)
 
 	return filterChartMetrics(metrics)
@@ -133,13 +127,6 @@ func successfulBGPProfileMetrics(pms []*ddsnmp.ProfileMetrics) []*ddsnmp.Profile
 		result = append(result, pm)
 	}
 	return result
-}
-
-func bgpMetricSourceFailed(metric ddsnmp.Metric, failedSources map[string]bool) bool {
-	if len(failedSources) == 0 || metric.Profile == nil {
-		return false
-	}
-	return failedSources[metric.Profile.Source]
 }
 
 func flattenProfileMetrics(pms []*ddsnmp.ProfileMetrics) []ddsnmp.Metric {
@@ -195,33 +182,6 @@ func profileHasBGP(prof *ddsnmp.Profile) bool {
 	if len(def.BGP) > 0 {
 		return true
 	}
-	for _, vm := range def.VirtualMetrics {
-		if isBGPMetricName(vm.Name) {
-			return true
-		}
-		for _, src := range vm.Sources {
-			if isBGPMetricName(src.Metric) {
-				return true
-			}
-		}
-		for _, alt := range vm.Alternatives {
-			for _, src := range alt.Sources {
-				if isBGPMetricName(src.Metric) {
-					return true
-				}
-			}
-		}
-	}
-	for _, metric := range def.Metrics {
-		if isBGPMetricName(metric.Symbol.Name) || isBGPMetricName(metric.Name) {
-			return true
-		}
-		for _, sym := range metric.Symbols {
-			if isBGPMetricName(sym.Name) {
-				return true
-			}
-		}
-	}
 	return false
 }
 
@@ -230,23 +190,8 @@ func profileMetricsHaveBGP(pms []*ddsnmp.ProfileMetrics) bool {
 		if pm.BGPCollectError != nil || len(pm.BGPRows) > 0 {
 			return true
 		}
-		for _, metric := range pm.Metrics {
-			if isBGPMetricName(metric.Name) {
-				return true
-			}
-		}
 	}
 	return false
-}
-
-func isBGPMetricName(name string) bool {
-	if name == "" {
-		return false
-	}
-	if _, ok := routeBGPPublicMetric(name); ok {
-		return true
-	}
-	return shouldSuppressBGPRawMetric(name)
 }
 
 func (c *Collector) bgpStaleAfter() time.Duration {

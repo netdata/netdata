@@ -264,6 +264,41 @@ func TestDefaultCatalogResolveProject_LoadedProfilesSeparateConsumers(t *testing
 			wantNoTopology:  true,
 			wantNoLicensing: true,
 		},
+		"bgp_projection_arista": {
+			sysObjectID: "1.3.6.1.4.1.30065.1.3011.7010.427.48",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"arista-bgp-peer",
+				"arista-bgp-peer-family",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_dell_os10": {
+			sysObjectID: "1.3.6.1.4.1.674.11000.5000.100.2.1.1",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"dell-os10-bgp-peer",
+				"dell-os10-bgp-peer-family",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_alcatel": {
+			sysObjectID: "1.3.6.1.4.1.6486.801.1.1.2.1.1",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"alcatel-bgp4-peer",
+				"alcatel-bgp4-peer-family",
+				"alcatel-bgp6-peer",
+				"alcatel-bgp6-peer-family",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
 		"metrics_and_licensing_projection": {
 			sysObjectID: "1.3.6.1.4.1.9.1.1",
 			consumer:    ConsumerMetrics,

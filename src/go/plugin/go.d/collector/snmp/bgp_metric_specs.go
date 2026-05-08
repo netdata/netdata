@@ -2,23 +2,47 @@
 
 package snmp
 
-import (
-	"sort"
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+type bgpScope string
+
+const (
+	bgpScopePeers        bgpScope = "peers"
+	bgpScopePeerFamilies bgpScope = "peer_families"
+	bgpScopeDevices      bgpScope = "devices"
 )
 
-func bgpPublicSpec(name string) (bgpPublicMetricSpec, bool) {
+type bgpMetricSpecDef struct {
+	description string
+	family      string
+	unit        string
+	chartType   string
+	metricType  ddprofiledefinition.ProfileMetricType
+	isTable     bool
+}
+
+func buildBGPMetricName(scope bgpScope, leaf string) string {
+	switch scope {
+	case bgpScopePeerFamilies:
+		return "bgp.peer_families." + leaf
+	case bgpScopeDevices:
+		return "bgp.devices." + leaf
+	default:
+		return "bgp.peers." + leaf
+	}
+}
+
+func bgpMetricSpec(name string) (bgpMetricSpecDef, bool) {
 	switch name {
 	case "bgp.devices.peer_counts":
-		return bgpPublicMetricSpec{
+		return bgpMetricSpecDef{
 			description: "BGP device peer counts",
 			family:      "BGP/Devices",
 			unit:        "peers",
 			metricType:  ddprofiledefinition.ProfileMetricTypeGauge,
 		}, true
 	case "bgp.devices.peer_states":
-		return bgpPublicMetricSpec{
+		return bgpMetricSpecDef{
 			description: "BGP device peer states",
 			family:      "BGP/Devices",
 			unit:        "peers",
@@ -109,34 +133,16 @@ func bgpPublicSpec(name string) (bgpPublicMetricSpec, bool) {
 	case "bgp.peer_families.route_limit_thresholds":
 		return tableSpec("BGP peer-family route limit thresholds", "BGP/Peer Families/Routes", "%", ddprofiledefinition.ProfileMetricTypeGauge), true
 	default:
-		return bgpPublicMetricSpec{}, false
+		return bgpMetricSpecDef{}, false
 	}
 }
 
-func tableSpec(description, family, unit string, metricType ddprofiledefinition.ProfileMetricType) bgpPublicMetricSpec {
-	return bgpPublicMetricSpec{
+func tableSpec(description, family, unit string, metricType ddprofiledefinition.ProfileMetricType) bgpMetricSpecDef {
+	return bgpMetricSpecDef{
 		description: description,
 		family:      family,
 		unit:        unit,
 		metricType:  metricType,
 		isTable:     true,
 	}
-}
-
-func mergeMultiValue(dst, src map[string]int64) {
-	if len(src) == 0 || dst == nil {
-		return
-	}
-	for key, value := range src {
-		dst[key] = value
-	}
-}
-
-func sortedKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }

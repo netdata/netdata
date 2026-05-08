@@ -74,7 +74,7 @@ func (b *bgpTypedMetricBuilder) addPeerDeviceSummary(row ddsnmp.BGPRow) {
 }
 
 func (b *bgpTypedMetricBuilder) addPeerLikeRow(pm *ddsnmp.ProfileMetrics, row ddsnmp.BGPRow, scope bgpScope) {
-	prefix := buildBGPPublicMetricName(scope, "")
+	prefix := buildBGPMetricName(scope, "")
 	tags := bgpTypedMetricTags(row, scope)
 
 	availability := make(map[string]int64)
@@ -133,7 +133,7 @@ func (b *bgpTypedMetricBuilder) addMetric(pm *ddsnmp.ProfileMetrics, name string
 	if len(mv) == 0 {
 		return
 	}
-	spec, ok := bgpPublicSpec(name)
+	spec, ok := bgpMetricSpec(name)
 	if !ok {
 		return
 	}
@@ -303,6 +303,13 @@ func bgpTypedMetricTags(row ddsnmp.BGPRow, scope bgpScope) map[string]string {
 		add("address_family", string(row.Identity.AddressFamily))
 		add("subsequent_address_family", string(row.Identity.SubsequentAddressFamily))
 	}
+	add("_local_address", row.Descriptors.LocalAddress)
+	add("_local_as", row.Descriptors.LocalAS)
+	add("_local_identifier", row.Descriptors.LocalIdentifier)
+	add("_peer_identifier", row.Descriptors.PeerIdentifier)
+	add("_peer_type", row.Descriptors.PeerType)
+	add("_bgp_version", row.Descriptors.BGPVersion)
+	add("_peer_description", row.Descriptors.Description)
 	return tags
 }
 

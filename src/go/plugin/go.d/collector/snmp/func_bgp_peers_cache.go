@@ -5,7 +5,6 @@ package snmp
 import (
 	"fmt"
 	"maps"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -187,94 +186,6 @@ func (c *bgpPeerCache) markSourcesCollectFailed(sources map[string]bool, err err
 	}
 }
 
-func (c *bgpPeerCache) updateEntry(metric ddsnmp.Metric) {
-	if c == nil || !metric.IsTable || !isBGPPeerFunctionMetric(metric.Name) || len(metric.Tags) == 0 {
-		return
-	}
-
-	scope := bgpPeerEntryScope(metric.Name)
-	if scope == "" {
-		return
-	}
-
-	key := bgpPeerEntryKey(scope, metric.Tags)
-	if key == "" {
-		return
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	entry := c.entries[key]
-	if entry == nil {
-		entry = &bgpPeerEntry{
-			key:    key,
-			scope:  scope,
-			source: bgpMetricProfileSource(metric),
-			tags:   make(map[string]string, len(metric.Tags)),
-		}
-		c.entries[key] = entry
-	}
-	entry.source = firstNonEmpty(bgpMetricProfileSource(metric), entry.source)
-	mergeBGPPeerEntryTags(entry, metric.Tags)
-
-	switch bgpPeerMetricLeaf(metric.Name) {
-	case "availability":
-		entry.adminStatus = bgpAdminStatus(metric.MultiValue)
-	case "connection_state":
-		entry.state = activeMultiValueDimension(metric.MultiValue)
-	case "previous_connection_state":
-		entry.previousState = activeMultiValueDimension(metric.MultiValue)
-	case "established_uptime":
-		entry.establishedUptime = metricDimValuePtr(metric.MultiValue, "uptime")
-	case "update_traffic":
-		entry.updateCounts = maps.Clone(metric.MultiValue)
-	case "message_traffic":
-		entry.messageCounts = maps.Clone(metric.MultiValue)
-	case "notification_traffic":
-		entry.notificationCounts = maps.Clone(metric.MultiValue)
-	case "route_refresh_traffic":
-		entry.routeRefreshCounts = maps.Clone(metric.MultiValue)
-	case "open_traffic":
-		entry.openCounts = maps.Clone(metric.MultiValue)
-	case "keepalive_traffic":
-		entry.keepaliveCounts = maps.Clone(metric.MultiValue)
-	case "established_transitions":
-		entry.establishedCount = metricDimValuePtr(metric.MultiValue, "transitions")
-	case "down_transitions":
-		entry.downTransitions = metricDimValuePtr(metric.MultiValue, "transitions")
-	case "up_transitions":
-		entry.upTransitions = metricDimValuePtr(metric.MultiValue, "transitions")
-	case "flaps":
-		entry.flaps = metricDimValuePtr(metric.MultiValue, "flaps")
-	case "last_received_update_age":
-		entry.lastReceivedUpdate = metricDimValuePtr(metric.MultiValue, "age")
-	case "last_error":
-		setBGPPeerLastError(entry, metric.MultiValue)
-	case "last_down_reason":
-		entry.lastDownReason = humanizeBGPLabel(activeMultiValueDimension(metric.MultiValue))
-	case "last_received_notification_reason":
-		entry.lastRecvNotify = humanizeBGPLabel(activeMultiValueDimension(metric.MultiValue))
-	case "last_sent_notification_reason":
-		entry.lastSentNotify = humanizeBGPLabel(activeMultiValueDimension(metric.MultiValue))
-	case "graceful_restart_state":
-		entry.gracefulRestart = humanizeBGPLabel(activeMultiValueDimension(metric.MultiValue))
-	case "unavailability_reason":
-		entry.unavailabilityReason = humanizeBGPLabel(activeMultiValueDimension(metric.MultiValue))
-	case "route_counts.current":
-		entry.routeCounts = maps.Clone(metric.MultiValue)
-	case "route_totals":
-		entry.routeTotals = maps.Clone(metric.MultiValue)
-	case "route_limits":
-		entry.routeLimits = maps.Clone(metric.MultiValue)
-	case "route_limit_thresholds":
-		entry.routeLimitThresholds = maps.Clone(metric.MultiValue)
-	}
-
-	entry.updated = true
-	entry.stale = false
-}
-
 func (c *bgpPeerCache) updateRow(source string, row ddsnmp.BGPRow) {
 	if c == nil {
 		return
@@ -347,13 +258,6 @@ func (c *bgpPeerCache) updateRow(source string, row ddsnmp.BGPRow) {
 	entry.routeLimitThresholds = bgpRouteLimitThresholdsMap(row.RouteLimits)
 	entry.updated = true
 	entry.stale = false
-}
-
-func bgpMetricProfileSource(metric ddsnmp.Metric) string {
-	if metric.Profile == nil {
-		return ""
-	}
-	return metric.Profile.Source
 }
 
 func bgpPeerEntryScopeFromRow(row ddsnmp.BGPRow) string {
@@ -466,29 +370,6 @@ func bgpRouteLimitThresholdsMap(value ddsnmp.BGPRouteLimits) map[string]int64 {
 		return nil
 	}
 	return result
-}
-
-func mergeBGPPeerEntryTags(entry *bgpPeerEntry, tags map[string]string) {
-	for key, value := range tags {
-		if value == "" || strings.HasPrefix(key, "_") {
-			continue
-		}
-		entry.tags[key] = value
-	}
-
-	for key, value := range tags {
-		if value == "" || !strings.HasPrefix(key, "_") {
-			continue
-		}
-		normalizedKey := strings.TrimPrefix(key, "_")
-		if normalizedKey == "" {
-			continue
-		}
-		if tags[normalizedKey] != "" {
-			continue
-		}
-		entry.tags[normalizedKey] = value
-	}
 }
 
 func (c *bgpPeerCache) finalize() {
@@ -633,28 +514,6 @@ func (entry *bgpPeerEntry) clone() *bgpPeerEntry {
 	return &clone
 }
 
-func bgpPeerEntryScope(name string) string {
-	switch {
-	case strings.HasPrefix(name, "bgp.peers."):
-		return "peers"
-	case strings.HasPrefix(name, "bgp.peer_families."):
-		return "peer_families"
-	default:
-		return ""
-	}
-}
-
-func bgpPeerMetricLeaf(name string) string {
-	switch {
-	case strings.HasPrefix(name, "bgp.peers."):
-		return strings.TrimPrefix(name, "bgp.peers.")
-	case strings.HasPrefix(name, "bgp.peer_families."):
-		return strings.TrimPrefix(name, "bgp.peer_families.")
-	default:
-		return name
-	}
-}
-
 func bgpPeerEntryKey(scope string, tags map[string]string) string {
 	identityTags, requiredTags := bgpPeerIdentityKeyTags(scope)
 	if len(identityTags) == 0 {
@@ -662,7 +521,7 @@ func bgpPeerEntryKey(scope string, tags map[string]string) string {
 	}
 
 	for _, key := range requiredTags {
-		if bgpTagValue(tags, key) == "" {
+		if tags[key] == "" {
 			return ""
 		}
 	}
@@ -671,7 +530,7 @@ func bgpPeerEntryKey(scope string, tags map[string]string) string {
 	bgpWritePeerKeyPart(&sb, scope)
 	for _, key := range identityTags {
 		bgpWritePeerKeyPart(&sb, key)
-		bgpWritePeerKeyPart(&sb, bgpTagValue(tags, key))
+		bgpWritePeerKeyPart(&sb, tags[key])
 	}
 	return sb.String()
 }
@@ -685,69 +544,6 @@ func bgpPeerIdentityKeyTags(scope string) ([]string, []string) {
 	default:
 		return nil, nil
 	}
-}
-
-func bgpAdminStatus(mv map[string]int64) string {
-	if len(mv) == 0 {
-		return ""
-	}
-	if v, ok := mv["admin_enabled"]; ok {
-		if v == 1 {
-			return "enabled"
-		}
-		if v == 0 {
-			return "disabled"
-		}
-	}
-	if mv["admin_disabled"] == 1 {
-		return "disabled"
-	}
-	return ""
-}
-
-func activeMultiValueDimension(mv map[string]int64) string {
-	if len(mv) == 0 {
-		return ""
-	}
-
-	keys := make([]string, 0, len(mv))
-	for key := range mv {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-
-	for _, key := range keys {
-		if mv[key] == 1 {
-			return key
-		}
-	}
-	return ""
-}
-
-func metricDimValuePtr(mv map[string]int64, key string) *int64 {
-	if len(mv) == 0 {
-		return nil
-	}
-	v, ok := mv[key]
-	if !ok {
-		return nil
-	}
-	return int64Ptr(v)
-}
-
-func setBGPPeerLastError(entry *bgpPeerEntry, mv map[string]int64) {
-	code := metricDimValuePtr(mv, "code")
-	subcode := metricDimValuePtr(mv, "subcode")
-	if isNoBGPLastError(code, subcode) {
-		entry.lastErrorCode = nil
-		entry.lastErrorSubcode = nil
-		entry.lastErrorText = ""
-		return
-	}
-
-	entry.lastErrorCode = code
-	entry.lastErrorSubcode = subcode
-	entry.lastErrorText = bgpLastErrorText(code, subcode)
 }
 
 func isNoBGPLastError(code, subcode *int64) bool {

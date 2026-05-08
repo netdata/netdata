@@ -2,11 +2,7 @@
 
 package snmp
 
-import (
-	"strings"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-)
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
 func filterChartMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
 	if len(metrics) == 0 {
@@ -37,8 +33,4 @@ func shouldHideBGPDiagnosticMetric(name string) bool {
 	default:
 		return false
 	}
-}
-
-func isBGPPeerFunctionMetric(name string) bool {
-	return strings.HasPrefix(name, "bgp.peers.") || strings.HasPrefix(name, "bgp.peer_families.")
 }

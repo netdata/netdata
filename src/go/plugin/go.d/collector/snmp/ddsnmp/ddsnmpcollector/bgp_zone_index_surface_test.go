@@ -11,15 +11,11 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 func TestCollector_Collect_AristaBGP_IPv6ZoneIndexTags(t *testing.T) {
-	profile := matchedProfileByFile(t, "1.3.6.1.4.1.30065.1.3011.7010.427.48", "arista-switch.yaml")
-	filterProfileForAlertSurface(profile, map[string][]string{
-		"aristaBgp4V2PeerTable":         {"aristaBgp4V2PeerAdminStatus", "aristaBgp4V2PeerState"},
-		"aristaBgp4V2PeerCountersTable": {"bgpPeerInUpdates", "bgpPeerOutUpdates", "bgpPeerFsmEstablishedTransitions"},
-		"aristaBgp4V2PrefixGaugesTable": {"bgpPeerPrefixesAccepted"},
-	}, []string{"bgpPeerAvailability", "bgpPeerUpdates"})
+	profile := matchedBGPProjectionByFile(t, "1.3.6.1.4.1.30065.1.3011.7010.427.48", "arista-switch.yaml")
 
 	idx := "7.4.20.254.128.1.2.0.0.0.0.194.213.130.253.254.123.34.167.0.0.14.132"
 	prefixIdx := idx + ".2.1"
@@ -31,26 +27,22 @@ func TestCollector_Collect_AristaBGP_IPv6ZoneIndexTags(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
-	setProfileWalkExpectations(t, mockHandler, profile, map[string][]gosnmp.SnmpPDU{
-		"aristaBgp4V2PeerTable": {
-			createIntegerPDU(oidWithIndex(requireSymbolOID(t, profile, "aristaBgp4V2PeerTable", "aristaBgp4V2PeerAdminStatus"), idx), 2),
-			createIntegerPDU(oidWithIndex(requireSymbolOID(t, profile, "aristaBgp4V2PeerTable", "aristaBgp4V2PeerState"), idx), 6),
-			createGauge32PDU(oidWithIndex(requireMetricTagOID(t, profile, "aristaBgp4V2PeerTable", "local_as"), idx), 65000),
-			createGauge32PDU(oidWithIndex(requireMetricTagOID(t, profile, "aristaBgp4V2PeerTable", "remote_as"), idx), 65001),
-			createPDU(oidWithIndex(requireMetricTagOID(t, profile, "aristaBgp4V2PeerTable", "local_identifier"), idx), gosnmp.IPAddress, "198.51.100.12"),
-			createPDU(oidWithIndex(requireMetricTagOID(t, profile, "aristaBgp4V2PeerTable", "peer_identifier"), idx), gosnmp.IPAddress, "203.0.113.12"),
-			createStringPDU(oidWithIndex(requireMetricTagOID(t, profile, "aristaBgp4V2PeerTable", "peer_description"), idx), "link-local-upstream"),
-			createPDU(oidWithIndex(requireMetricTagOID(t, profile, "aristaBgp4V2PeerTable", "local_address"), idx), gosnmp.OctetString, localAddr),
-		},
-		"aristaBgp4V2PeerCountersTable": {
-			createCounter32PDU(oidWithIndex(requireSymbolOID(t, profile, "aristaBgp4V2PeerCountersTable", "bgpPeerInUpdates"), idx), 16),
-			createCounter32PDU(oidWithIndex(requireSymbolOID(t, profile, "aristaBgp4V2PeerCountersTable", "bgpPeerOutUpdates"), idx), 17),
-			createCounter32PDU(oidWithIndex(requireSymbolOID(t, profile, "aristaBgp4V2PeerCountersTable", "bgpPeerFsmEstablishedTransitions"), idx), 2),
-		},
-		"aristaBgp4V2PrefixGaugesTable": {
-			createGauge32PDU(oidWithIndex(requireSymbolOID(t, profile, "aristaBgp4V2PrefixGaugesTable", "bgpPeerPrefixesAccepted"), prefixIdx), 1301),
-		},
-	})
+	expectSystemMetadataGets(mockHandler, "1.3.6.1.4.1.30065.1.3011.7010.427.48", "arista")
+	pdus := []gosnmp.SnmpPDU{
+		createPDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.3", idx), gosnmp.OctetString, localAddr),
+		createGauge32PDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.7", idx), 65000),
+		createPDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.8", idx), gosnmp.IPAddress, "198.51.100.12"),
+		createGauge32PDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.10", idx), 65001),
+		createPDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.11", idx), gosnmp.IPAddress, "203.0.113.12"),
+		createIntegerPDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.12", idx), 2),
+		createIntegerPDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.13", idx), 6),
+		createStringPDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.14", idx), "link-local-upstream"),
+		createCounter32PDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.7.1.1", idx), 16),
+		createCounter32PDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.7.1.2", idx), 17),
+		createCounter32PDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.7.1.5", idx), 2),
+		createGauge32PDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.8.1.4", prefixIdx), 1301),
+	}
+	expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 	collector := New(Config{
 		SnmpClient:  mockHandler,
@@ -62,32 +54,35 @@ func TestCollector_Collect_AristaBGP_IPv6ZoneIndexTags(t *testing.T) {
 	results, err := collector.Collect()
 	require.NoError(t, err)
 	require.Len(t, results, 1)
+	require.Empty(t, results[0].Metrics)
+	require.Len(t, results[0].BGPRows, 2)
 
-	metrics := stripProfilePointers(results[0].Metrics)
-
-	availability := requireMetricWithTags(t, metrics, "bgpPeerAvailability", map[string]string{
-		"routing_instance":      "7",
-		"neighbor_address_type": "ipv6z",
-		"neighbor":              "fe80:102::c2d5:82fd:fe7b:22a7%0.0.14.132",
-		"remote_as":             "65001",
+	peer := requireBGPRowMatching(t, results[0].BGPRows, func(row ddsnmp.BGPRow) bool {
+		return row.Kind == ddprofiledefinition.BGPRowKindPeer &&
+			row.Identity.Neighbor == "fe80:102::c2d5:82fd:fe7b:22a7%0.0.14.132"
 	})
-	assert.Equal(t, map[string]int64{"admin_enabled": 1, "established": 1}, availability.MultiValue)
-	assert.Equal(t, "fe80:102::c2d5:82fd:fe7b:22a8%0.0.14.133", availability.Tags["local_address"])
+	assert.Equal(t, "7", peer.Identity.RoutingInstance)
+	assert.Equal(t, "65001", peer.Identity.RemoteAS)
+	assert.Equal(t, "ipv6z", peer.Descriptors.PeerType)
+	assert.Equal(t, "fe80:102::c2d5:82fd:fe7b:22a8%0.0.14.133", peer.Descriptors.LocalAddress)
+	require.True(t, peer.Admin.Enabled.Has)
+	assert.True(t, peer.Admin.Enabled.Value)
+	require.True(t, peer.State.Has)
+	assert.Equal(t, ddprofiledefinition.BGPPeerStateEstablished, peer.State.State)
+	assert.EqualValues(t, 16, peer.Traffic.Updates.Received.Value)
+	assert.EqualValues(t, 17, peer.Traffic.Updates.Sent.Value)
 
-	updates := requireMetricWithTags(t, metrics, "bgpPeerUpdates", map[string]string{
-		"neighbor_address_type": "ipv6z",
-		"neighbor":              "fe80:102::c2d5:82fd:fe7b:22a7%0.0.14.132",
+	family := requireBGPRowMatching(t, results[0].BGPRows, func(row ddsnmp.BGPRow) bool {
+		return row.Kind == ddprofiledefinition.BGPRowKindPeerFamily &&
+			row.Identity.Neighbor == "fe80:102::c2d5:82fd:fe7b:22a7%0.0.14.132" &&
+			row.Identity.AddressFamily == ddprofiledefinition.BGPAddressFamilyIPv6 &&
+			row.Identity.SubsequentAddressFamily == ddprofiledefinition.BGPSubsequentAddressFamilyUnicast
 	})
-	assert.Equal(t, map[string]int64{"received": 16, "sent": 17}, updates.MultiValue)
-
-	accepted := requireMetricWithTags(t, metrics, "bgpPeerPrefixesAccepted", map[string]string{
-		"neighbor_address_type":     "ipv6z",
-		"neighbor":                  "fe80:102::c2d5:82fd:fe7b:22a7%0.0.14.132",
-		"address_family":            "ipv6",
-		"subsequent_address_family": "unicast",
-	})
-	assert.EqualValues(t, 1301, accepted.Value)
-	assert.Equal(t, "fe80:102::c2d5:82fd:fe7b:22a8%0.0.14.133", accepted.Tags["local_address"])
+	assert.Equal(t, "7", family.Identity.RoutingInstance)
+	assert.Equal(t, "65001", family.Identity.RemoteAS)
+	assert.Equal(t, "ipv6z", family.Descriptors.PeerType)
+	assert.Equal(t, "fe80:102::c2d5:82fd:fe7b:22a8%0.0.14.133", family.Descriptors.LocalAddress)
+	assert.EqualValues(t, 1301, family.Routes.Current.Accepted.Value)
 }
 
 func TestCollector_Collect_CiscoBgpPeer3_IPv6ZoneIndexTags(t *testing.T) {

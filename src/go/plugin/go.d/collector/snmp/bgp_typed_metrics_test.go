@@ -21,7 +21,7 @@ func TestTypedBGPMetricsFromProfileMetrics(t *testing.T) {
 		pm       *ddsnmp.ProfileMetrics
 		validate func(t *testing.T, metrics []ddsnmp.Metric)
 	}{
-		"peer and peer-family rows become public BGP chart metrics": {
+		"peer and peer-family rows become BGP chart metrics": {
 			pm: &ddsnmp.ProfileMetrics{
 				BGPRows: []ddsnmp.BGPRow{
 					typedBGPPeerRow(),
@@ -37,6 +37,8 @@ func TestTypedBGPMetricsFromProfileMetrics(t *testing.T) {
 				assert.Equal(t, map[string]int64{"admin_enabled": 1, "established": 1}, availability.MultiValue)
 				assert.NotContains(t, availability.Tags, "local_address")
 				assert.NotContains(t, availability.Tags, "peer_description")
+				assert.Equal(t, "198.51.100.1", availability.Tags["_local_address"])
+				assert.Equal(t, "Transit Peer", availability.Tags["_peer_description"])
 
 				updates := requireMetric(t, metrics, "bgp.peers.update_traffic", map[string]string{
 					"routing_instance": "blue",
@@ -111,6 +113,30 @@ func TestTypedBGPMetricsFromProfileMetrics(t *testing.T) {
 			tc.validate(t, metrics)
 		})
 	}
+}
+
+func requireMetric(t *testing.T, metrics []ddsnmp.Metric, name string, subset map[string]string) ddsnmp.Metric {
+	t.Helper()
+	for _, metric := range metrics {
+		if metric.Name != name {
+			continue
+		}
+		if len(subset) == 0 {
+			return metric
+		}
+		matches := true
+		for key, want := range subset {
+			if metric.Tags[key] != want {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return metric
+		}
+	}
+	require.Failf(t, "metric not found", "name=%q tags=%v metrics=%v", name, subset, metrics)
+	return ddsnmp.Metric{}
 }
 
 func TestBGPPeerCache_UpdateRow(t *testing.T) {
@@ -329,15 +355,15 @@ func TestProfilesHaveBGP(t *testing.T) {
 			}},
 			want: true,
 		},
-		"legacy BGP virtual metric enables integration during migration": {
+		"legacy BGP virtual metric does not enable integration": {
 			profiles: []*ddsnmp.Profile{{
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{{Name: "bgpPeerAvailability"}},
 				},
 			}},
-			want: true,
+			want: false,
 		},
-		"legacy BGP raw metric enables integration during migration": {
+		"legacy BGP raw metric does not enable integration": {
 			profiles: []*ddsnmp.Profile{{
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metrics: []ddprofiledefinition.MetricsConfig{{
@@ -345,7 +371,7 @@ func TestProfilesHaveBGP(t *testing.T) {
 					}},
 				},
 			}},
-			want: true,
+			want: false,
 		},
 		"ordinary metrics do not enable integration": {
 			profiles: []*ddsnmp.Profile{{
@@ -355,6 +381,7 @@ func TestProfilesHaveBGP(t *testing.T) {
 					}},
 				},
 			}},
+			want: false,
 		},
 	}
 
