@@ -59,6 +59,58 @@ fn validate_accepts_enabled_bioris_with_instance() {
 }
 
 #[test]
+fn validate_rejects_bioris_instance_without_port_or_scheme() {
+    let mut cfg = PluginConfig::default();
+    cfg.enrichment.routing_dynamic.bioris.enabled = true;
+    cfg.enrichment.routing_dynamic.bioris.ris_instances.push(
+        RoutingDynamicBiorisRisInstanceConfig {
+            grpc_addr: "ris.example.internal".to_string(),
+            grpc_secure: false,
+            vrf_id: 0,
+            vrf: String::new(),
+        },
+    );
+
+    let err = cfg.validate().expect_err("expected validation error");
+    assert!(
+        err.to_string()
+            .contains("grpc_addr must include host:port or an explicit URI scheme")
+    );
+}
+
+#[test]
+fn validate_rejects_zero_bioris_timeouts_when_enabled() {
+    for field in ["timeout", "refresh", "refresh_timeout"] {
+        let mut cfg = PluginConfig::default();
+        cfg.enrichment.routing_dynamic.bioris.enabled = true;
+        cfg.enrichment.routing_dynamic.bioris.ris_instances.push(
+            RoutingDynamicBiorisRisInstanceConfig {
+                grpc_addr: "127.0.0.1:50051".to_string(),
+                grpc_secure: false,
+                vrf_id: 0,
+                vrf: String::new(),
+            },
+        );
+        match field {
+            "timeout" => cfg.enrichment.routing_dynamic.bioris.timeout = Duration::ZERO,
+            "refresh" => cfg.enrichment.routing_dynamic.bioris.refresh = Duration::ZERO,
+            "refresh_timeout" => {
+                cfg.enrichment.routing_dynamic.bioris.refresh_timeout = Duration::ZERO;
+            }
+            _ => unreachable!(),
+        }
+
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(
+            err.to_string().contains(&format!(
+                "enrichment.routing_dynamic.bioris.{field} must be greater than 0"
+            )),
+            "unexpected error for {field}: {err:#}"
+        );
+    }
+}
+
+#[test]
 fn validate_rejects_network_source_verify_false() {
     let mut cfg = PluginConfig::default();
     cfg.enrichment.network_sources.insert(

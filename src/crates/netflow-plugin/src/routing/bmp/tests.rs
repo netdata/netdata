@@ -1,17 +1,21 @@
 use super::rd::{parse_configured_rds, parse_rd_text};
 use super::routes::{
-    flatten_as_path, flatten_as4_path, ipv4_mpls_label_routes, ipv4_mpls_vpn_routes,
+    apply_update, flatten_as_path, flatten_as4_path, ipv4_mpls_label_routes, ipv4_mpls_vpn_routes,
     l2_evpn_routes, mp_reach_to_routes, mp_unreach_to_routes, path_id_component,
     route_distinguisher_to_u64,
 };
 use super::session::{BmpSessionDecision, bmp_session_decision};
 use super::*;
 use ipnet::{Ipv4Net, Ipv6Net};
+use netgauze_bgp_pkt::community::{Community, LargeCommunity};
 use netgauze_bgp_pkt::nlri::{
     EthernetSegmentIdentifier, EthernetTag, Ipv4MplsVpnUnicastAddress, Ipv4NlriMplsLabelsAddress,
-    Ipv4Unicast, L2EvpnIpv4PrefixRoute, L2EvpnIpv6PrefixRoute, MplsLabel,
+    Ipv4Unicast, Ipv4UnicastAddress, L2EvpnIpv4PrefixRoute, L2EvpnIpv6PrefixRoute, MplsLabel,
 };
-use netgauze_bgp_pkt::path_attribute::{As2PathSegment, As4PathSegment};
+use netgauze_bgp_pkt::path_attribute::{
+    As2PathSegment, As4PathSegment, Communities, LargeCommunities, NextHop, PathAttribute,
+};
+use std::collections::HashSet;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
@@ -237,6 +241,113 @@ fn flatten_as4_path_keeps_first_from_set_segments() {
 }
 
 #[test]
+fn bmp_apply_update_respects_collection_flags() {
+    let runtime = DynamicRoutingRuntime::default();
+    let peer = DynamicRoutingPeerKey {
+        exporter: "192.0.2.10:10179".parse().expect("parse exporter"),
+        session_id: 7,
+        peer_id: "peer".to_string(),
+    };
+    let config = RoutingDynamicBmpConfig {
+        collect_asns: false,
+        collect_as_paths: false,
+        collect_communities: false,
+        ..Default::default()
+    };
+
+    apply_update(
+        &peer,
+        64_512,
+        BmpPeerType::GlobalInstancePeer {
+            ipv6: false,
+            post_policy: false,
+            asn2: false,
+            adj_rib_out: false,
+        },
+        0,
+        &test_bmp_update(),
+        &config,
+        &HashSet::new(),
+        &runtime,
+    );
+
+    let route = runtime
+        .lookup(
+            "203.0.113.42".parse().expect("parse lookup address"),
+            Some("198.51.100.1".parse().expect("parse next-hop")),
+            Some("192.0.2.10".parse().expect("parse exporter")),
+        )
+        .expect("BMP route should be published");
+    assert_eq!(route.asn, 0);
+    assert!(route.as_path.is_empty());
+    assert!(route.communities.is_empty());
+    assert!(route.large_communities.is_empty());
+    assert_eq!(
+        route.next_hop,
+        Some(IpAddr::V4(Ipv4Addr::new(198, 51, 100, 1)))
+    );
+}
+
+#[test]
+fn bmp_apply_update_maps_as_path_communities_and_withdraws() {
+    let runtime = DynamicRoutingRuntime::default();
+    let peer = DynamicRoutingPeerKey {
+        exporter: "192.0.2.10:10179".parse().expect("parse exporter"),
+        session_id: 7,
+        peer_id: "peer".to_string(),
+    };
+    let config = RoutingDynamicBmpConfig::default();
+
+    apply_update(
+        &peer,
+        64_512,
+        BmpPeerType::GlobalInstancePeer {
+            ipv6: false,
+            post_policy: false,
+            asn2: false,
+            adj_rib_out: false,
+        },
+        0,
+        &test_bmp_update(),
+        &config,
+        &HashSet::new(),
+        &runtime,
+    );
+
+    let route = runtime
+        .lookup(
+            "203.0.113.42".parse().expect("parse lookup address"),
+            None,
+            None,
+        )
+        .expect("BMP route should be published");
+    assert_eq!(route.asn, 64_501);
+    assert_eq!(route.as_path, vec![64_500, 64_501]);
+    assert_eq!(route.communities, vec![100, 200]);
+    assert_eq!(route.large_communities.len(), 1);
+    assert_eq!(route.large_communities[0].asn, 64_500);
+    assert_eq!(route.large_communities[0].local_data1, 10);
+    assert_eq!(route.large_communities[0].local_data2, 20);
+
+    apply_update(
+        &peer,
+        64_512,
+        BmpPeerType::GlobalInstancePeer {
+            ipv6: false,
+            post_policy: false,
+            asn2: false,
+            adj_rib_out: false,
+        },
+        0,
+        &test_bmp_withdraw_update(),
+        &config,
+        &HashSet::new(),
+        &runtime,
+    );
+    assert_eq!(runtime.route_count(), 0);
+}
+
+#[test]
 fn bmp_session_requires_initiation_first() {
     let mut initialized = false;
     let decision = bmp_session_decision(
@@ -434,6 +545,73 @@ fn encode_bmp(message: BmpMessage) -> Vec<u8> {
     let mut out = bytes::BytesMut::new();
     codec.encode(message, &mut out).expect("encode BMP message");
     out.to_vec()
+}
+
+fn test_bmp_update() -> BgpUpdateMessage {
+    BgpUpdateMessage::new(
+        vec![],
+        vec![
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                true,
+                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
+                    AsPathSegmentType::AsSequence,
+                    vec![64_500, 64_501],
+                )])),
+            )
+            .expect("build AS path attribute"),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::NextHop(NextHop::new(Ipv4Addr::new(198, 51, 100, 1))),
+            )
+            .expect("build next-hop attribute"),
+            PathAttribute::from(
+                true,
+                true,
+                false,
+                false,
+                PathAttributeValue::Communities(Communities::new(vec![
+                    Community::new(100),
+                    Community::new(200),
+                ])),
+            )
+            .expect("build communities attribute"),
+            PathAttribute::from(
+                true,
+                true,
+                false,
+                false,
+                PathAttributeValue::LargeCommunities(LargeCommunities::new(vec![
+                    LargeCommunity::new(64_500, 10, 20),
+                ])),
+            )
+            .expect("build large communities attribute"),
+        ],
+        vec![Ipv4UnicastAddress::new_no_path_id(
+            Ipv4Unicast::from_net(
+                Ipv4Net::new(Ipv4Addr::new(203, 0, 113, 0), 24).expect("v4 prefix"),
+            )
+            .expect("build IPv4 unicast NLRI"),
+        )],
+    )
+}
+
+fn test_bmp_withdraw_update() -> BgpUpdateMessage {
+    BgpUpdateMessage::new(
+        vec![Ipv4UnicastAddress::new_no_path_id(
+            Ipv4Unicast::from_net(
+                Ipv4Net::new(Ipv4Addr::new(203, 0, 113, 0), 24).expect("v4 prefix"),
+            )
+            .expect("build IPv4 unicast withdrawal"),
+        )],
+        vec![],
+        vec![],
+    )
 }
 
 async fn run_gobgp_route_fixture(

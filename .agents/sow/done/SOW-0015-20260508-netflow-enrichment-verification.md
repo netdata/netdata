@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Additional external application validation completed; BioRIS documentation corrected to describe the actual bio-rd-compatible gRPC requirement and the non-direct RIPE RIS limitation.
+Sub-state: Netdata-side BioRIS/BMP contract hardening completed under the clarified beta validation bar. Production-router and production-bio-rd interoperability proof remains optional expanded validation, not a blocker for this beta pass.
 
 ## Requirements
 
@@ -42,6 +42,27 @@ Scope:
 18. bio-rd / RIPE RIS.
 19. BMP.
 
+### Clarified Beta Validation Target
+
+The target is **not** proving that every external routing stack is production-stable. The target is proving Netdata's side is sane:
+
+- It connects when given valid config.
+- It rejects or reports bad config clearly.
+- It consumes the expected payload/schema.
+- It maps fields correctly into enrichment state.
+- It respects configured options.
+- It does not panic, hang, leak tasks, or silently ignore data.
+- The docs describe commands/configs that actually work.
+- The beta can ship without obvious "this was never exercised" failures.
+
+This SOW must not block on the user having a router that supports BMP or a production bio-rd/RIS deployment.
+
+For BMP, GoBGP/FRR plus deterministic BMP frames are sufficient to validate Netdata's listener and route ingestion contract.
+
+For BioRIS, a deterministic bio-rd-compatible gRPC service is sufficient to validate Netdata's client behavior. Running upstream bio-rd is useful as a smoke test, but it is not a hard shipping blocker if upstream itself is unstable in a local lab.
+
+End-user documentation remains product documentation. It must describe supported commands, configuration, payload/schema expectations, limitations, and troubleshooting. It must not discuss internal test gaps, untested status, or why a test could not be performed.
+
 ### Assistant Understanding
 
 Facts:
@@ -56,7 +77,7 @@ Facts:
 Inferences:
 
 - The core gap is not absence of all tests; it is missing proof across the real boundaries for methods not already covered: documented config, MMDB files, HTTP fetchers, gRPC streams, BMP TCP sessions, runtime state publication, flow enrichment, journal-backed query output, and generated integration documentation.
-- BMP and bio-rd validation can progress without the user by using local synthetic speakers or public/open-source fixtures, but proof against the user's own network cannot happen unless the user later supplies or enables a real BGP/BMP source.
+- BMP and bio-rd validation can progress without the user by using local deterministic speakers, public/open-source fixtures, FRR/GoBGP, and a bio-rd-compatible gRPC test service. Production-router proof is not an acceptance criterion for this beta validation pass.
 
 Unknowns:
 
@@ -239,6 +260,12 @@ Open decisions:
    - Rationale: these are installable or emulatable local systems on this workstation and are better proof than only mocked unit tests.
    - Implication: use temporary/local runtime services, store raw outputs under `.local/`, and only record sanitized evidence in durable artifacts.
    - Risk: full router-equivalent proof may still require a real router or production routing topology; local GoBGP/FRR/BMP proof is protocol-level, not proof against a vendor router.
+
+6. Decision: beta external-routing validation bar.
+   - Selected: prove Netdata's BMP and BioRIS contracts with deterministic payloads, local protocol speakers, and bio-rd-compatible gRPC services; do not block on production-router or production-bio-rd stability.
+   - Rationale: the user does not have a router supporting these protocols, and the purpose is to catch Netdata-side issues before beta: connection/config failures, wrong fields, wrong payload schemas, ignored options, panics, hangs, leaked tasks, silent drops, and incorrect docs.
+   - Implication: FRR/GoBGP plus deterministic BMP frames are sufficient for BMP. A deterministic bio-rd-compatible gRPC service is sufficient for BioRIS client validation. Upstream bio-rd remains useful as a smoke test, but upstream instability does not by itself block the beta.
+   - Risk: this does not prove behavior against every vendor router or every production bio-rd deployment. That broader interoperability proof is expected from beta user feedback and later targeted fixes, while this SOW removes the obvious Netdata-side failures before shipping.
 
 ## Plan
 
@@ -802,9 +829,69 @@ Artifact maintenance:
 - End-user/operator skills: no update needed; no public skill workflow changed.
 - SOW lifecycle: reopened from `done`, recorded external validation, then returned to `completed` and moved back to `.agents/sow/done/` with the validation/doc commit.
 
-Remaining items requiring user involvement or explicit approval:
+Additional proof outside the clarified beta validation bar:
 
-- A real stable bio-rd-compatible `RoutingInformationService` endpoint with a non-empty RIB if final end-to-end live BioRIS route proof is required.
-- A real router/BMP source if proof against a production router vendor is required beyond the GoBGP and FRR protocol-level validation already completed.
-- Approval to spend time debugging, reporting, or fixing upstream bio-rd behavior if the local GoBGP/FRR-to-bio-rd failures should be turned into an upstream bugfix.
-- User-owned NetBox or custom IPAM endpoints if validation against production/user systems is desired. Local NetBox and local generic IPAM are validated.
+- A real stable bio-rd-compatible `RoutingInformationService` endpoint with a non-empty RIB would expand proof beyond Netdata's client contract into production-style BioRIS interoperability.
+- A real router/BMP source would expand proof beyond deterministic BMP frames, GoBGP route publication, and FRR config/connection validation into vendor-router interoperability.
+- Debugging, reporting, or fixing upstream bio-rd behavior would be useful only if this beta work is expanded into upstream bio-rd stabilization.
+- User-owned NetBox or custom IPAM endpoints would expand proof beyond local NetBox and local generic IPAM validation into user-specific environment validation.
+
+These are not blockers under the clarified beta validation target. The final autonomous work in this pass strengthened Netdata-side automated coverage for configuration, payload/schema consumption, field mapping, option handling, and stability.
+
+### Netdata-side Contract Hardening - 2026-05-08
+
+Trigger:
+
+- The user clarified that this beta validation does not need to prove every external routing stack is production-stable.
+- The required bar is to prove Netdata's side is sane: valid configs connect, bad configs are rejected or reported clearly, expected payloads are consumed, fields map correctly into enrichment state, options are respected, no obvious panic/hang/task leak/silent ignore exists, and user docs describe working commands/configs.
+
+Implementation:
+
+- BioRIS:
+  - Added endpoint URI contract coverage for explicit schemes and `grpc_secure`.
+  - Added invalid-endpoint coverage proving malformed gRPC URIs produce a clear `invalid BioRIS endpoint URI` error before network dialing.
+  - Added router IP parsing coverage for plain IPs and socket-address forms.
+  - Extended the in-process `RoutingInformationService` fixture so tests record `DumpRIB` and `ObserveRIB` requests.
+  - Added coverage proving configured `vrf_id` and `vrf` are sent to `DumpRIB` and `ObserveRIB`.
+  - Added coverage proving `DumpRIB` and `ObserveRIB` advertisements publish AS path, communities, and large communities into the runtime trie.
+  - Added coverage proving `ObserveRIB` withdrawals remove the more-specific route and fall back to the broader route.
+- BMP:
+  - Added deterministic `apply_update` tests proving `collect_asns`, `collect_as_paths`, and `collect_communities` are respected.
+  - Added deterministic update/withdrawal tests proving AS number, AS path, communities, large communities, next hop, and route deletion map correctly into the runtime trie.
+- Config validation:
+  - Added coverage rejecting enabled BioRIS instances with `grpc_addr` that has neither `host:port` nor an explicit URI scheme.
+  - Added coverage rejecting zero `timeout`, `refresh`, and `refresh_timeout` values for enabled BioRIS.
+
+Validation:
+
+- `cargo test -p netflow-plugin routing::bioris --manifest-path src/crates/Cargo.toml`
+  - Result: 11 passed, 0 failed.
+- `cargo test -p netflow-plugin routing::bmp --manifest-path src/crates/Cargo.toml`
+  - Result: 15 passed, 0 failed, including the opt-in GoBGP route publication test because local GoBGP binaries are present.
+- `cargo test -p netflow-plugin plugin_config --manifest-path src/crates/Cargo.toml`
+  - Result: 30 passed, 0 failed.
+- `cargo test -p netflow-plugin --manifest-path src/crates/Cargo.toml`
+  - Result: 456 passed, 18 ignored, 0 failed.
+  - `tests/grpc_build.rs`: 1 passed, 0 failed.
+- `git diff --check` passed.
+- `bash .agents/sow/audit.sh` verified SOW status/directory consistency. It exited nonzero on the existing unmodified `.agents/skills/mirror-netdata-repos/SKILL.md:112` Git SSH URL pattern that the audit classifies as email-like sensitive data.
+
+End-user documentation check:
+
+- No end-user docs were changed in this hardening pass.
+- Previous BioRIS product docs already describe BioRIS as a bio-rd-compatible `RoutingInformationService` gRPC endpoint and do not describe internal test gaps.
+- A docs search was run for internal test-gap phrases across `docs/network-flows`, `src/crates/netflow-plugin/metadata.yaml`, and generated NetFlow integration pages. No product-doc statement was found saying BioRIS or BMP are untested or explaining why internal testing could not be performed.
+
+Artifact maintenance:
+
+- AGENTS.md: no update needed; existing SOW, sensitive-data, and validation rules were sufficient.
+- Runtime project skills: no update needed; `project-writing-collectors` and `integrations-lifecycle` already cover this workflow.
+- Specs: no update needed; this hardening adds tests for existing intended contracts, not a new public contract.
+- End-user/operator docs: no update needed in this pass; previous product-doc correction remains valid.
+- End-user/operator skills: no update needed; no public skill workflow changed.
+- SOW lifecycle: reopened from `done`, clarified the beta validation bar, recorded the contract-hardening work, then returned to `completed` and moved back to `.agents/sow/done/` with the hardening commit.
+
+Outcome:
+
+- Under the clarified beta validation target, no autonomous Netdata-side blocker remains for BMP or BioRIS contract proof.
+- Broader production-router or production-bio-rd interoperability is explicitly outside this beta blocker and can be handled later as expanded validation or beta feedback.
