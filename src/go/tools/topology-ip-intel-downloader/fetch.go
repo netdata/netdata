@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"regexp"
 	"sort"
 	"strconv"
@@ -210,8 +211,20 @@ func (d *downloader) resolveCAIDAPrefix2ASURL(logURL string) (string, error) {
 	})
 	latest := candidates[len(candidates)-1].path
 
-	base := strings.TrimSuffix(logURL, "pfx2as-creation.log")
-	return base + latest, nil
+	base, err := url.Parse(logURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse CAIDA prefix2as creation log URL %s: %w", redactURLForDisplay(logURL), err)
+	}
+	base.RawQuery = ""
+	base.Fragment = ""
+	if !strings.HasSuffix(base.Path, "/") {
+		base.Path = path.Dir(base.Path) + "/"
+	}
+	ref, err := url.Parse(latest)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse CAIDA prefix2as candidate %q: %w", latest, err)
+	}
+	return base.ResolveReference(ref).String(), nil
 }
 
 func expandEnvPlaceholders(raw string) (string, error) {
@@ -369,9 +382,6 @@ func decodeZip(raw []byte) ([]byte, error) {
 }
 
 func extractMMDBFromTar(raw []byte) ([]byte, error) {
-	if !looksLikeTarPayload(raw) {
-		return nil, errTarMMDBNotFound
-	}
 	tr := tar.NewReader(bytes.NewReader(raw))
 	for {
 		header, err := tr.Next()
@@ -379,6 +389,9 @@ func extractMMDBFromTar(raw []byte) ([]byte, error) {
 			return nil, errTarMMDBNotFound
 		}
 		if err != nil {
+			if !looksLikeTarPayload(raw) {
+				return nil, errTarMMDBNotFound
+			}
 			return nil, err
 		}
 		if header.Typeflag != tar.TypeReg || !strings.HasSuffix(strings.ToLower(header.Name), ".mmdb") {

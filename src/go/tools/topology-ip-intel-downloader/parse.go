@@ -14,7 +14,7 @@ import (
 	"math/big"
 	"net"
 	"net/netip"
-	"path/filepath"
+	"path"
 	"strconv"
 	"strings"
 
@@ -780,7 +780,7 @@ func parseIPDenyCountryTarGZ(payload []byte) ([]geoRange, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to read ipdeny tar: %w", err)
 		}
-		name := filepath.Base(header.Name)
+		name := path.Base(header.Name)
 		zoneName, ok := strings.CutSuffix(strings.ToLower(name), ".zone")
 		if header.Typeflag != tar.TypeReg || !ok {
 			continue
@@ -977,7 +977,7 @@ func csvHeaderIndex(header []string) map[string]int {
 
 func openZipEntryBase(archive *zip.Reader, name string) (*zip.File, error) {
 	for _, file := range archive.File {
-		if filepath.Base(file.Name) == name {
+		if path.Base(file.Name) == name {
 			return file, nil
 		}
 	}

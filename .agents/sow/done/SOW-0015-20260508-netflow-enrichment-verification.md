@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Copilot review on direct-agent helper wording and parser preallocation review signals addressed.
+Sub-state: Copilot low-confidence downloader and BMP live-test review signals addressed.
 
 ## Requirements
 
@@ -740,6 +740,8 @@ Validation:
 - `shellcheck --external-sources docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh` passed.
 - `git diff --check` passed.
 - `bash .agents/sow/audit.sh` verified SOW status/directory consistency. It exited nonzero on the existing unmodified `.agents/skills/mirror-netdata-repos/SKILL.md:112` Git SSH URL pattern that the audit classifies as email-like sensitive data.
+- `git diff --check` passed.
+- `bash .agents/sow/audit.sh` verified SOW status/directory consistency. It exited nonzero on the existing unmodified `.agents/skills/mirror-netdata-repos/SKILL.md:112` Git SSH URL pattern that the audit classifies as email-like sensitive data.
 - `go test ./tools/topology-ip-intel-downloader` passed from `src/go`.
 - Same-pattern search found no remaining eval-based `_agents_set_outvar` assignment in the public skill path.
 
@@ -1007,3 +1009,47 @@ Artifact maintenance:
 - End-user/operator docs: no update needed; no user-facing command, option, or provider contract changed.
 - End-user/operator skills: updated `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`.
 - SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` for the helper-comment and parser-preallocation commit.
+
+### PR Review Follow-up - 2026-05-08 - Downloader URL, Archive, ZIP, And GoBGP Live-Test Hardening
+
+Trigger:
+
+- Copilot's refreshed review generated no new inline comments, but its review body listed low-confidence notes about:
+  - MaxMind ASN tar detection relying on the fixed `ustar` marker.
+  - CAIDA prefix2as URL construction using fixed suffix trimming and string concatenation.
+  - ZIP entry lookup using OS-specific `filepath.Base`.
+  - The optional GoBGP BMP live test reserving and then releasing an API port before starting `gobgpd`.
+
+Findings:
+
+- The downloader notes were valid hardening opportunities:
+  - `extractMMDBFromTar` did reject tar payloads before attempting tar iteration unless the `ustar` marker was present.
+  - `resolveCAIDAPrefix2ASURL` did build the resolved URL by trimming `pfx2as-creation.log` from the full URL string.
+  - ZIP members use slash-separated paths, so `path.Base` is the correct package for archive member names.
+- The GoBGP note was a real race in theory. The test is opt-in and local-only, but a retry loop keeps the validation from becoming flaky on shared machines.
+
+Implementation:
+
+- Changed CAIDA prefix2as URL resolution to parse `logURL`, remove query/fragment, normalize the directory path, and resolve the selected candidate with `url.ResolveReference`.
+- Changed MaxMind ASN tar extraction to attempt tar iteration first, while still treating corrupt tar-like payloads with a `ustar` marker as extraction errors instead of silently accepting them as raw MMDB bytes.
+- Added test coverage for CAIDA log URLs with query strings and nested paths.
+- Added test coverage for gzipped legacy tar payloads without the `ustar` marker.
+- Switched archive member base-name handling from `filepath.Base` to `path.Base`.
+- Added retry behavior around the optional GoBGP API port reservation in the BMP live test.
+
+Validation:
+
+- `go test ./tools/topology-ip-intel-downloader` from `src/go` passed.
+- `NETDATA_GOBGPD="$(pwd)/.local/audits/netflow-live/bin/gobgpd" NETDATA_GOBGP="$(pwd)/.local/audits/netflow-live/bin/gobgp" cargo test -p netflow-plugin routing::bmp --manifest-path src/crates/Cargo.toml` passed with 15 tests.
+- `bash -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
+- `zsh -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
+- `shellcheck --external-sources docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh` passed.
+
+Artifact maintenance:
+
+- AGENTS.md: no update needed; existing PR review and SOW lifecycle rules were sufficient.
+- Runtime project skills: no update needed.
+- Specs: no update needed; this is implementation hardening for existing downloader and test behavior.
+- End-user/operator docs: no update needed; no user-facing command, option, or provider contract changed.
+- End-user/operator skills: no additional update needed beyond the direct-agent helper comment from the previous follow-up.
+- SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` for the downloader and BMP live-test hardening commit.

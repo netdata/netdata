@@ -185,9 +185,20 @@ func buildZip(t *testing.T, files map[string]string) []byte {
 func buildTarGZ(t *testing.T, files map[string]string) []byte {
 	t.Helper()
 
+	rawTar := buildTar(t, files)
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
-	tw := tar.NewWriter(gz)
+	_, err := gz.Write(rawTar)
+	require.NoError(t, err)
+	require.NoError(t, gz.Close())
+	return buf.Bytes()
+}
+
+func buildTar(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
 	for name, content := range files {
 		err := tw.WriteHeader(&tar.Header{
 			Name: name,
@@ -199,6 +210,5 @@ func buildTarGZ(t *testing.T, files map[string]string) []byte {
 		require.NoError(t, err)
 	}
 	require.NoError(t, tw.Close())
-	require.NoError(t, gz.Close())
 	return buf.Bytes()
 }
