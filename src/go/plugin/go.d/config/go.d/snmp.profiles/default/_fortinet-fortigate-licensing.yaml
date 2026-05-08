@@ -1,0 +1,80 @@
+# References:
+# https://docs.fortinet.com/document/fortigate/8.0.0/fortigate-mib-information-overview/293724/fortigate-system-mibs
+# https://mibbrowser.online/mibdb_search.php?mib=FORTINET-FORTIGATE-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/fortinet/FORTINET-FORTIGATE-MIB
+
+licensing:
+  - MIB: FORTINET-FORTIGATE-MIB
+    id: fortigate_contracts
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2
+      name: fgLicContractTable
+    identity:
+      id:
+        OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.1
+        name: fgLicContractDesc
+      name:
+        OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.1
+        name: fgLicContractDesc
+      component:
+        value: device
+    descriptors:
+      type:
+        value: contract
+    signals:
+      expiry:
+        timestamp:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.2
+          name: fgLicContractExpiry
+          format: text_date
+
+  - MIB: FORTINET-FORTIGATE-MIB
+    id: fortiguard_services
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2
+      name: fgLicVersionTable
+    identity:
+      id:
+        OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.1
+        name: fgLicVersionDesc
+      name:
+        OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.1
+        name: fgLicVersionDesc
+      feature:
+        OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.3
+        name: fgLicVersionNumber
+      component:
+        value: fortiguard
+    descriptors:
+      type:
+        value: service
+    signals:
+      expiry:
+        timestamp:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.2
+          name: fgLicVersionExpiry
+          format: text_date
+
+  - MIB: FORTINET-FORTIGATE-MIB
+    id: forticare_account_contracts
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2
+      name: fgLicAlContractTable
+    identity:
+      id:
+        OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.1
+        name: fgLicAlContractDesc
+      name:
+        OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.1
+        name: fgLicAlContractDesc
+      component:
+        value: account
+    descriptors:
+      type:
+        value: account_contract
+    signals:
+      expiry:
+        timestamp:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.2
+          name: fgLicAlContractExpiry
+          format: text_date

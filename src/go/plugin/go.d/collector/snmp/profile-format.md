@@ -1351,6 +1351,11 @@ Typed BGP value fields also support `index_from_end: N`, where `N` is
 INDEX component is a trailing component after a variable-length field, such as
 AFI/SAFI after an `InetAddress` peer address.
 
+Use exactly one row-index selector per typed BGP value: `index`,
+`index_from_end`, or `index_transform`. If more than one is set, the current
+collector reads `index_from_end` first, then `index`, then
+`index_transform`; profiles should not rely on that precedence.
+
 Typed BGP cross-table value fields can also use `lookup_symbol` with
 `table:` and `index_transform:`. This is needed when a BGP peer-family table is
 indexed by a compact peer ID, but peer identity fields such as neighbor and
@@ -2218,6 +2223,17 @@ BGP row `kind` values are closed:
 - `peer` — peer-level rows identified by `neighbor` and `remote_as`.
 - `peer_family` — address-family rows identified by `neighbor`, `remote_as`,
   `address_family`, and `subsequent_address_family`.
+
+Peer-state mappings must use the six RFC 4271 state names: `idle`, `connect`,
+`active`, `opensent`, `openconfirm`, and `established`. A complete source must
+map all six states. If a source MIB is intentionally partial, set
+`partial: true` and use `partial_states: [...]` to record which canonical
+states the source can represent.
+
+When a peer or peer-family row does not provide a routing instance, the public
+chart/function label defaults to `default`. Profiles may still set
+`identity.routing_instance` explicitly when a vendor MIB exposes VRF or routing
+instance identity.
 
 Device rows support `device_counts.peers`, `device_counts.ibgp_peers`,
 `device_counts.ebgp_peers`, and per-state counters under

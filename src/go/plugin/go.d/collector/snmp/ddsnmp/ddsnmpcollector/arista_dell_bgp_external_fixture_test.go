@@ -15,20 +15,22 @@ import (
 
 func TestCollector_Collect_AristaAndDellBGP_FromLibreNMSFixtures(t *testing.T) {
 	tests := map[string]struct {
-		sysObjectID string
-		profileFile string
-		fixture     string
-		validate    func(t *testing.T, rows []ddsnmp.BGPRow)
+		sysObjectID     string
+		profileFile     string
+		originProfileID string
+		fixture         string
+		validate        func(t *testing.T, rows []ddsnmp.BGPRow, originProfileID string)
 	}{
 		"Arista EOS emits typed peer and peer-family rows": {
-			sysObjectID: "1.3.6.1.4.1.30065.1.3011.7050.1958.128",
-			profileFile: "arista-switch.yaml",
-			fixture:     "librenms/arista_eos_bgp_peer_table.snmprec",
-			validate: func(t *testing.T, rows []ddsnmp.BGPRow) {
+			sysObjectID:     "1.3.6.1.4.1.30065.1.3011.7050.1958.128",
+			profileFile:     "arista-switch.yaml",
+			originProfileID: "_arista-bgp4-v2.yaml",
+			fixture:         "librenms/arista_eos_bgp_peer_table.snmprec",
+			validate: func(t *testing.T, rows []ddsnmp.BGPRow, originProfileID string) {
 				peer := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Kind == ddprofiledefinition.BGPRowKindPeer && row.Identity.Neighbor == "192.168.0.2"
 				})
-				assert.Equal(t, "arista-switch.yaml", peer.OriginProfileID)
+				assert.Equal(t, originProfileID, peer.OriginProfileID)
 				assert.Equal(t, "aristaBgp4V2PeerTable", peer.Table)
 				assert.Equal(t, "1", peer.Identity.RoutingInstance)
 				assert.Equal(t, "65000", peer.Identity.RemoteAS)
@@ -63,14 +65,15 @@ func TestCollector_Collect_AristaAndDellBGP_FromLibreNMSFixtures(t *testing.T) {
 			},
 		},
 		"Dell OS10 emits typed peer and peer-family rows": {
-			sysObjectID: "1.3.6.1.4.1.674.11000.5000.100.2.1.7",
-			profileFile: "dell-os10.yaml",
-			fixture:     "librenms/dell_os10_bgp_peer_table.snmprec",
-			validate: func(t *testing.T, rows []ddsnmp.BGPRow) {
+			sysObjectID:     "1.3.6.1.4.1.674.11000.5000.100.2.1.7",
+			profileFile:     "dell-os10.yaml",
+			originProfileID: "_dell-os10-bgp4-v2.yaml",
+			fixture:         "librenms/dell_os10_bgp_peer_table.snmprec",
+			validate: func(t *testing.T, rows []ddsnmp.BGPRow, originProfileID string) {
 				peer := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Kind == ddprofiledefinition.BGPRowKindPeer && row.Identity.Neighbor == "169.254.247.1"
 				})
-				assert.Equal(t, "dell-os10.yaml", peer.OriginProfileID)
+				assert.Equal(t, originProfileID, peer.OriginProfileID)
 				assert.Equal(t, "dell.os10bgp4V2PeerTable", peer.Table)
 				assert.Equal(t, "1", peer.Identity.RoutingInstance)
 				assert.Equal(t, "64513", peer.Identity.RemoteAS)
@@ -137,7 +140,7 @@ func TestCollector_Collect_AristaAndDellBGP_FromLibreNMSFixtures(t *testing.T) {
 			require.Empty(t, results[0].LicenseRows)
 			require.NotEmpty(t, results[0].BGPRows)
 
-			tc.validate(t, results[0].BGPRows)
+			tc.validate(t, results[0].BGPRows, tc.originProfileID)
 		})
 	}
 }

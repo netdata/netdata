@@ -4,13 +4,15 @@
 
 Status: in-progress
 
-Sub-state: user decisions 1-23 resolved; schema/API/projection and typed producer scaffold landed; typed BGP grouped-row refactor is landed; Cisco migration now includes typed cross-table BGP value sources.
+Sub-state: user decisions 1-23 resolved; all BGP-bearing stock profiles migrated to typed `bgp:` rows; legacy `bgp_public*` runtime deleted; metadata and generated SNMP integration docs regenerated; final external review and local `mibs/` cleanup remain before close.
 
 ## Requirements
 
 ### Purpose
 
 Replace the WIP SNMP BGP monitoring branch's metric-name/tag routing layer with a clean typed BGP profile section and projection. Preserve normal ddsnmp chart-per-row behavior, keep BGP per-peer/per-family health templates enabled by default, and remove unsupported public coverage claims until real fixture evidence exists.
+
+Scope expansion on 2026-05-09: normalize typed SNMP profile organization before SOW close by moving remaining inline `bgp:` and `licensing:` sections into dedicated underscore-prefixed typed-domain fragments where practical.
 
 ### User Request
 
@@ -70,6 +72,7 @@ Inferences:
 - Each migrated vendor has production-shaped full-profile tests through normal profile loading/resolution/finalization.
 - `.agents/sow/specs/snmp-profile-projection.md` documents the BGP projection contract.
 - Metadata/docs/generated integration artifacts are coherent after final migration.
+- Typed-domain SNMP profile sections are organized as dedicated fragments where practical; concrete device profiles extend those fragments instead of mixing typed-domain sections with regular metric sections.
 - Local raw MIB files under `mibs/` are not committed and are removed before SOW close-out.
 
 ## Analysis
@@ -320,6 +323,7 @@ Open decisions:
 15. Run same-failure and sensitive-data scans.
 16. Remove local untracked `mibs/` files before close-out.
 17. Complete validation gate, move SOW to `done/`, and commit lifecycle change with implementation.
+18. Normalize remaining inline typed-domain profile sections into dedicated fragments before close-out.
 
 ## Execution Log
 
@@ -426,20 +430,62 @@ Open decisions:
   - Added synthetic Huawei typed-collection coverage for state/admin mapping and peer-statistics remote-AS lookup by peer address.
   - Local raw MIB audit gap: `mibs/` contains `HUAWEI-MPLS-BGP-VPN-MIB.mib`, not the exact `HUAWEI-BGP-VPN-MIB`; profile OIDs are carried forward from the existing Huawei profile and the linked public Huawei BGP MIB references.
 
+### 2026-05-09
+
+- Migrated the remaining BGP-bearing vendor profiles and deleted the legacy BGP public router:
+  - Arista, Dell OS10, and Alcatel now declare typed `bgp:` rows.
+  - All stock BGP coverage is typed: standard `BGP4-MIB`, Cisco, Juniper, Nokia SR OS, Huawei, Arista, Dell OS10, and Alcatel.
+  - `bgp_public.go`, `bgp_public_routes.go`, and `bgp_public_test.go` were deleted.
+  - The retained chart-filter and chart-spec behavior now lives in `bgp_chart_filter.go` and `bgp_metric_specs.go`.
+  - The BGP function cache consumes typed `BGPRow` updates only.
+- Reconciled final migration review blockers:
+  - Corrected inherited Alcatel IPv6 BGP table OIDs from `.12` to `.14` according to `ALCATEL-IND1-BGP-MIB`.
+  - Restored end-to-end collection-level assertions for BGP metric IDs and chart context.
+  - Removed dead BGP alert-surface test helpers and moved the remaining shared profile helper.
+  - Reviewed and refactored applicable BGP tests to map-keyed table-driven cases.
+- Resolved AC#69:
+  - Updated `collector/snmp/metadata.yaml` to remove Cumulus and Alcatel from public BGP support claims until real fixture evidence exists.
+  - Regenerated integration artifacts with `integrations/gen_integrations.py`, `integrations/gen_docs_integrations.py -c go.d.plugin/snmp`, `integrations/gen_doc_collector_page.py`, and `integrations/gen_doc_secrets_page.py`.
+  - Committed generated output changed in `collector/snmp/integrations/snmp_devices.md`.
+  - Gitignored generated `integrations/integrations.js` and `integrations/integrations.json` were regenerated locally.
+  - `src/collectors/COLLECTORS.md` and `src/collectors/SECRETS.md` had no tracked diff after generation.
+- Updated durable authoring and behavior references:
+  - `collector/snmp/profile-format.md` now documents typed BGP `partial_states`, routing-instance default labeling, and `index_from_end` selector behavior.
+  - `.agents/sow/specs/snmp-profile-projection.md` now records typed BGP structural identity, default routing-instance normalization, per-source stale-cache semantics, and current row-index selector behavior.
+  - `.agents/skills/project-snmp-profiles-authoring/SKILL.md` now records the BGP authoring checks for typed `bgp:` rows, RFC 4271 state mappings, and index-derived BGP fields.
+- Created `.agents/sow/pending/SOW-0016-20260509-snmp-bgp-hardening-followups.md` for non-blocking validation/runtime/fixture hardening that should not be hidden as vague follow-up debt.
+- Applied the user's typed-domain profile organization decision:
+  - Extracted inline Arista, Dell OS10, and Huawei `bgp:` sections into `_arista-bgp4-v2.yaml`, `_dell-os10-bgp4-v2.yaml`, and `_huawei-bgp-vpn.yaml`.
+  - Extracted inline Blue Coat, Check Point, Fortinet FortiGate, MikroTik RouterOS, and Sophos XGS `licensing:` sections into `_bluecoat-proxysg-licensing.yaml`, `_checkpoint-licensing.yaml`, `_fortinet-fortigate-licensing.yaml`, `_mikrotik-routeros-licensing.yaml`, and `_sophos-xgs-firewall-licensing.yaml`.
+  - Concrete device profiles now extend the typed fragments and no longer mix inline typed-domain sections with regular metric sections.
+  - Updated Arista/Dell typed BGP fixture assertions to expect the new fragment origin profile IDs.
+
 ## Validation
 
 Acceptance criteria evidence:
 
-- Partial:
+- Met for the implemented migration:
   - Typed `bgp:` profile section exists in `ddprofiledefinition.ProfileDefinition`.
   - Typed BGP output exists in `ddsnmp.ProfileMetrics.BGPRows`.
   - `Project(bgp)` and `Project(metrics, bgp)` projection paths exist and are tested.
   - Closed row kind, peer state, AFI/SAFI, and typed-field validation exists.
-  - Spec now documents the BGP profile projection contract.
-  - ddsnmpcollector now emits typed BGP rows for scalar and table `bgp:` configs.
+  - `ddsnmpcollector` emits typed BGP rows for scalar and table `bgp:` configs.
   - BGP collection is wired into the regular SNMP profile collection path and keeps regular metrics on BGP row errors.
   - BGP profile stats are exposed alongside scalar/table/licensing/internal stats.
-  - Typed BGP rows now project into BGP chart metrics and the BGP peers function cache.
+  - Typed BGP rows project into BGP chart metrics and the BGP peers function cache.
+  - All BGP-bearing stock profile coverage is typed: standard `BGP4-MIB`, Cisco, Juniper, Nokia SR OS, Huawei, Arista, Dell OS10, and Alcatel.
+  - `bgp_public.go`, `bgp_public_routes.go`, and `bgp_public_test.go` are deleted.
+  - Production runtime scans found no remaining `bgp_public`, `BGPSignalKind`, `bgpScopeAuto`, `mergeBGPPeerEntryTags`, `bgpPeerMetricLeaf`, `normalizeCollectorMetrics`, or `routeBGPPublicMetric` references outside tests/docs.
+  - Inline typed-domain profile section scan now finds `bgp:` and `licensing:` only in underscore-prefixed typed fragments.
+  - Legacy BGP identity/router underscore protocol (`_routing_instance`, `_neighbor`, `_remote_as`, `_address_family`, `_subsequent_address_family`) has no production code or profile YAML use. Remaining hits are the generic virtual-metric example in `collector/snmp/profile-format.md`.
+  - Typed BGP descriptor labels still use the generic SNMP convention of underscore-prefixed chart labels (`_local_address`, `_local_as`, `_peer_identifier`, and related descriptors) in `bgp_typed_metrics.go`; this is not the deleted legacy BGP public-router protocol and is tracked in SOW-0016 for explicit verification.
+  - Cisco BGP was removed from `_cisco-base.yaml` and attached to audited router/L3/data-center Cisco profiles, including Catalyst by Decision 23A.
+  - Cumulus and Alcatel were removed from public BGP capability claims in `metadata.yaml` and regenerated `snmp_devices.md`.
+  - `.agents/sow/specs/snmp-profile-projection.md` documents the BGP projection contract, including the typed config ID in structural identity.
+  - Metadata and generated integration docs are coherent for the BGP support list and BGP alert/metric/function surface.
+- Still open before moving this SOW to `done/`:
+  - Final external review of the close-out diff.
+  - Local raw `mibs/` cleanup after final review.
 
 Tests or equivalent validation:
 
@@ -479,79 +525,165 @@ Tests or equivalent validation:
 - `go test -count=1 ./collector/snmp/ddsnmp ./collector/snmp/ddsnmp/ddprofiledefinition ./collector/snmp/ddsnmp/ddsnmpcollector` passed on 2026-05-08 after the Huawei typed-profile migration.
 - `go test -count=1 ./collector/snmp/...` passed on 2026-05-08 after the Huawei typed-profile migration.
 - `go test -race -count=1 ./collector/snmp` passed on 2026-05-08 after the Huawei typed-profile migration.
+- `go test -count=1 ./collector/snmp -run 'Test(BGPLastErrorText|BGPPeerEntryKey|BGPPeerCache|FuncBGPPeers|CollectSNMP_HidesBGP)'` passed on 2026-05-09 after the BGP table-driven test refactor.
+- `go test -count=1 ./collector/snmp/ddsnmp -run 'Test_(LibreNMSBGPIdentityFixtures|CiscoBGPProfiles|CiscoGeneric|AlcatelBGPProfile|HuaweiBGP|JuniperBGP|NokiaBGP)'` passed on 2026-05-09 after the BGP table-driven test refactor.
+- `go test -count=1 ./collector/snmp/ddsnmp/ddsnmpcollector -run 'TestCollector_Collect_(GenericBGP4Rows|HuaweiBGP|AlcatelBGP|AristaAndDellBGP|CiscoBgpPeer2|CiscoBgpPeer3|JuniperBGP|TiMOSBGP)'` passed on 2026-05-09 after the BGP table-driven test refactor.
+- `go test -count=1 ./collector/snmp/...` passed on 2026-05-09 after the BGP table-driven test refactor.
+- `git diff --check` passed on 2026-05-09 after the BGP table-driven test refactor.
+- `go test -count=1 ./collector/snmp/...` passed on 2026-05-09 after metadata/docs/spec/skill close-out updates and local integration docs regeneration.
+- `git diff --check` passed on 2026-05-09 after metadata/docs/spec/skill close-out updates and local integration docs regeneration.
+- `go test -count=1 ./collector/snmp/ddsnmp -run 'Test_(AristaAndDellBGPProfilesUseTypedRows|HuaweiBGPProfileUsesTypedRows|ProfilesProjectConsumers|NokiaBGPProfile|CiscoBGPProfiles|JuniperBGPProfiles)|TestProfile_Merge'` passed on 2026-05-09 after typed-domain profile fragment extraction.
+- `go test -count=1 ./collector/snmp/ddsnmp/ddsnmpcollector -run 'TestCollector_Collect_(LicensingProfiles|LicensingProfileFixtures|SophosLicensingProfile|FortiGate|BlueCoat|HuaweiBGP|AlcatelBGP|AristaAndDellBGP|TiMOSBGP|GenericBGP4Rows)'` passed on 2026-05-09 after typed-domain profile fragment extraction.
+- `go test -count=1 ./collector/snmp/...` passed on 2026-05-09 after typed-domain profile fragment extraction.
+- `git diff --check` passed on 2026-05-09 after typed-domain profile fragment extraction.
 
 Real-use evidence:
 
-- Pending implementation.
+- No live production device walk was run in this SOW.
+- Production-shaped profile fixture and synthetic-PDU evidence covers the migrated typed paths:
+  - Standard `BGP4-MIB` and Cumulus/FRR-style standard fixture paths now assert typed `BGPRows`.
+  - Cisco typed peer and peer-family rows cover IPv4 and IPv6 `InetAddress` row-index AFI/SAFI extraction.
+  - Juniper, Nokia/TiMOS, Huawei, Arista, Dell OS10, and Alcatel tests assert typed rows through normal profile loading/resolution/finalization or collector production paths.
+  - `snmp:bgp-peers` cache/function tests cover typed row updates, stale rows, mixed per-source failures, expiry, and recovery.
+- Integration docs were regenerated through the repository generator path, not hand-edited in the generated file.
 
 Reviewer findings:
 
-- Pending implementation.
+- External Claude review passes were run by the user during the SOW and reconciled before commits.
+- Commit blockers fixed during the SOW include:
+  - `funcRouter` handler map runtime race.
+  - Per-profile BGP failure wiping stale peer cache.
+  - Cisco IPv6 peer-family AFI/SAFI positional extraction.
+  - Mixed-profile BGP failure freezing successful profiles.
+  - Catalyst BGP attachment decision and test.
+  - Untracked `cisco-ncs.yaml` slice drift.
+  - Alcatel IPv6 BGP table OID `.12` vs authoritative `.14`.
+  - Lost end-to-end BGP metric ID/chart-context coverage.
+  - Dead BGP alert-surface test helper file.
+- Non-blocking findings were either implemented during close-out or tracked in pending SOWs:
+  - SOW-0014 owns typed licensing + typed BGP unsupported table-root caching.
+  - SOW-0016 owns typed BGP validation/runtime/fixture hardening.
 
 Same-failure scan:
 
-- Pending implementation.
+- Legacy router scan:
+  - Command: `rg -n "bgp_public|BGPSignalKind|bgpScopeAuto|mergeBGPPeerEntryTags|bgpPeerMetricLeaf|normalizeCollectorMetrics|routeBGPPublicMetric" src/go/plugin/go.d/collector/snmp src/go/plugin/go.d/config/go.d/snmp.profiles/default --glob '!**/*_test.go'`
+  - Result: no hits.
+- Legacy BGP underscore identity protocol scan:
+  - Command: `rg -n '"_(routing_instance|neighbor|remote_as|address_family|subsequent_address_family)"|\b_(routing_instance|neighbor|remote_as|address_family|subsequent_address_family)\b' src/go/plugin/go.d/collector/snmp src/go/plugin/go.d/config/go.d/snmp.profiles/default --glob '!**/*_test.go'`
+  - Result: only the generic virtual-metric example in `collector/snmp/profile-format.md`; no production code or profile YAML uses the deleted BGP identity-router protocol.
+- Cumulus/Alcatel BGP claim scan:
+  - Command: `rg -n "Cumulus|Alcatel" src/go/plugin/go.d/collector/snmp/metadata.yaml src/go/plugin/go.d/collector/snmp/integrations/snmp_devices.md integrations/integrations.js src/collectors/COLLECTORS.md`
+  - Result: remaining `Alcatel-Lucent` hits are in the generic Wireless vendor table, not the BGP capability/support list; regenerated `integrations.js` contains the updated BGP support sentence without Cumulus or Alcatel.
+- Raw MIB tracking scan:
+  - Command: `git ls-files mibs`
+  - Result: no tracked MIB files.
+  - Command: `git status --short --ignored=matching mibs`
+  - Result: `!! mibs/`, meaning local MIB reference files remain ignored and untracked until final cleanup.
+- Generated artifact status:
+  - `integrations/integrations.js` and `integrations/integrations.json` were regenerated and remain gitignored.
+  - `collector/snmp/integrations/snmp_devices.md` is the committed generated SNMP integration page diff for this SOW.
+- Typed-domain profile organization scan:
+  - Command: `rg -n "^bgp:|^licensing:" config/go.d/snmp.profiles/default -g "*.yaml"`
+  - Result: all hits are in underscore-prefixed typed fragments; no concrete device profile has an inline `bgp:` or `licensing:` section.
 
 Sensitive data gate:
 
-- Pending implementation. Local raw MIB files under `mibs/` are untracked and must remain uncommitted.
+- Sensitive string scan:
+  - Command: `rg -n "BEGIN (RSA|OPENSSH|PRIVATE)|Authorization:|Bearer |password|passphrase|community:|SNMP_V3|SNMP_V2C|customer|token|secret|private key" .agents/sow/current/SOW-0015-20260508-snmp-bgp-typed-projection.md .agents/sow/pending/SOW-0016-20260509-snmp-bgp-hardening-followups.md .agents/sow/specs/snmp-profile-projection.md .agents/skills/project-snmp-profiles-authoring/SKILL.md src/go/plugin/go.d/collector/snmp/metadata.yaml src/go/plugin/go.d/collector/snmp/integrations/snmp_devices.md src/go/plugin/go.d/collector/snmp/profile-format.md`
+  - Result: hits are documented placeholder SNMP examples (`community: public`, `auth_protocol_passphrase`, `priv_protocol_passphrase`) and the SOW's own sensitive-data policy text. No real credentials or customer data found.
+- Workstation path scan:
+  - Command: ran `rg` for home-directory paths, private scratch paths, mirrored-repo workstation paths, and user/workstation markers across the SOW, pending follow-up SOW, spec, project skill, metadata, generated SNMP integration docs, and profile-format docs.
+  - Result: no hits.
+- Local raw MIB files under `mibs/` are ignored and untracked; they must be removed before SOW close-out.
 
 Artifact maintenance gate:
 
-- AGENTS.md: pending final check.
-- Runtime project skills: pending final check.
-- Specs: pending `.agents/sow/specs/snmp-profile-projection.md` update.
-- End-user/operator docs: pending metadata/generated integration/doc checks.
-- End-user/operator skills: pending final check.
-- SOW lifecycle: pending move to current before code and done after completion.
+- AGENTS.md:
+  - No project-wide workflow change needed. The existing Go test style rule already captures the user's table-driven test preference.
+- Runtime project skills:
+  - Updated `.agents/skills/project-snmp-profiles-authoring/SKILL.md` with typed BGP profile authoring checks.
+  - No update needed to `project-writing-collectors`; this SOW refined SNMP profile-specific BGP rules rather than general collector authoring policy.
+  - `integrations-lifecycle` was used for generator workflow; no missing pipeline behavior was discovered that required a skill update.
+- Specs:
+  - Updated `.agents/sow/specs/snmp-profile-projection.md` with BGP typed projection, structural identity, routing-instance normalization, stale-cache semantics, `partial_states`, and current index selector behavior.
+- End-user/operator docs:
+  - Updated `collector/snmp/metadata.yaml`.
+  - Regenerated `collector/snmp/integrations/snmp_devices.md`.
+  - Updated `collector/snmp/profile-format.md` for typed BGP authoring details.
+  - `src/collectors/COLLECTORS.md` and `src/collectors/SECRETS.md` had no tracked diff after generation.
+- End-user/operator skills:
+  - No public Netdata AI skill or operator workflow skill was affected by the BGP SNMP profile schema/docs changes.
+- SOW lifecycle:
+  - SOW-0015 remains `current/in-progress` until final review and local `mibs/` cleanup.
+  - Created pending SOW-0016 for post-migration BGP hardening.
+  - SOW-0014 remains the owner for typed licensing + typed BGP unsupported table-root caching.
 
 Specs update:
 
-- Updated `.agents/sow/specs/snmp-profile-projection.md` with BGP consumer, row shape, projection, inheritance, delivery, and validation guarantees.
+- Updated `.agents/sow/specs/snmp-profile-projection.md` with BGP consumer, row shape, projection, inheritance, delivery, validation guarantees, structural identity, routing-instance normalization, stale-cache semantics, `partial_states`, and current row-index selector behavior.
 
 Project skills update:
 
-- Pending final determination after implementation.
+- Updated `.agents/skills/project-snmp-profiles-authoring/SKILL.md`.
 
 End-user/operator docs update:
 
-- Pending implementation.
+- Updated `collector/snmp/metadata.yaml`.
+- Regenerated `collector/snmp/integrations/snmp_devices.md`.
+- Updated `collector/snmp/profile-format.md`.
 
 End-user/operator skills update:
 
-- Pending final determination after implementation.
+- No public/end-user AI skills were affected.
 
 Lessons:
 
-- Pending implementation.
+- Typed projection work should migrate source profiles and runtime consumers before deleting string-router code; doing the deletion only after the final vendor migration made the old-protocol leak scan decisive.
+- Variable-length SNMP indexes require tail-based extraction for fields such as AFI/SAFI; fixed positional index assumptions work for IPv4 and fail for IPv6.
+- BGP function cache freshness must be source-aware. A single profile failure must not freeze successful profiles in the same collection cycle.
+- Integration docs should be regenerated locally after metadata changes. Waiting for CI would have hidden AC#69 drift until after merge.
 
 Follow-up mapping:
 
-- Pending implementation.
+- Implemented in SOW-0015:
+  - Remove Cumulus and Alcatel BGP public capability claims until real fixtures exist.
+  - Regenerate SNMP integration artifacts after metadata changes.
+  - Document `partial_states`, empty routing-instance normalization, per-source stale-cache semantics, and `index_from_end` current behavior.
+  - Delete the legacy `bgp_public*` runtime and BGP public-router underscore protocol.
+  - Normalize remaining inline typed-domain profile sections into dedicated `bgp:` and `licensing:` fragments.
+- Tracked in SOW-0014:
+  - Typed licensing + typed BGP unsupported table-root caching for broad Cisco/Catalyst unsupported table walks.
+- Tracked in SOW-0016:
+  - RT-4 typed BGP cross-profile chart-key collision risk.
+  - RT3-1 stale BGP cache entries from permanent per-source failure.
+  - SCH-2 typed BGP cross-table `table:` reference load-time resolution.
+  - SCH-3 `partial: true` empty mapping/spec-validator consistency.
+  - SCH2-4 `index`, `index_from_end`, and `index_transform` mutual-exclusivity validation.
+  - SCH2-6 `index_from_end` plus `format` propagation coverage.
+  - NOK-1 Nokia/TiMOS `tBgpPeerNgOperTable` high-numbered OID verification.
+  - Dell IPv6 typed BGP fixture coverage.
+  - Typed BGP descriptor underscore label behavior verification.
+- Rejected as a SOW-0015 follow-up:
+  - Generated function-name capitalization (`Snmp:*`, `Docker:*`, `Mysql:*`, etc.) is a pre-existing global integration template behavior in `integrations/templates/functions.md`, not specific to BGP typed projection. It should be handled only as a separate integrations-docs decision if the project wants to normalize all generated Function names.
+- Still pending before SOW close:
+  - Final external review of this close-out diff.
+  - Remove local ignored `mibs/` reference files.
 
 ## Outcome
 
-Pending.
+Pending final review and local `mibs/` cleanup.
 
 ## Lessons Extracted
 
-Pending.
+Recorded in the Validation gate.
 
 ## Followup
 
-Open items that must be implemented, rejected with evidence, or represented by a separate pending/current SOW before this SOW can close:
+All valid follow-up items from this SOW are implemented, rejected with evidence, or represented by SOW-0014 / SOW-0016, except the in-progress close actions:
 
-- Remove Cumulus and Alcatel BGP public capability claims until real fixtures exist, then regenerate integration artifacts.
-- Resolve or track RT-4: typed BGP chart-key collision risk when multiple profiles emit the same peer identity.
-- Resolve or track RT3-1: stale BGP cache entries from permanent per-source failure are filtered from output after TTL but not reaped from memory.
-- Resolve or track SCH-2: typed BGP cross-table `table:` references are not load-time resolved against actual table definitions.
-- Resolve or track SCH-3: `partial: true` with an empty state mapping disagrees between spec intent and validator behavior.
-- Resolve or track SCH2-4: `index`, `index_from_end`, and `index_transform` mutual-exclusivity is not validated or documented.
-- Document or test SCH2-6: `index_from_end` plus `format` propagation is correct through `bgpValueSymbol` but lacks focused coverage.
-- Document `partial_states`, empty routing-instance normalization, per-source stale-cache semantics, and `index_from_end` precedence in the projection spec and/or profile format docs.
-- Verify or correct NOK-1: inherited Nokia/TiMOS `tBgpPeerNgOperTable` high-numbered OIDs `.177-.188` are used by legacy and typed profiles but are absent from the downloaded TIMETRA MIB excerpt.
-- Complete SOW validation gate: reviewer findings, same-failure scans, sensitive-data gate, artifact gate, lessons, and final follow-up mapping.
-- Remove local raw `mibs/` files before closing the SOW; `/mibs/` is ignored as defense-in-depth.
+- Final external review of the close-out diff.
+- Remove local raw `mibs/` files before moving this SOW to `done/`; `/mibs/` is ignored as defense-in-depth.
 
 ## Regression Log
 

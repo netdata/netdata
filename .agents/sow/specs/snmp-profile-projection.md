@@ -220,7 +220,8 @@ state must map all six states by default:
 
 Partial state coverage is allowed only when the row explicitly declares
 `partial: true`. That escape hatch records that the profile author knowingly
-accepts a partial source MIB.
+accepts a partial source MIB. `partial_states: [...]` records the canonical
+states that the source can represent.
 
 AFI/SAFI values are normalized to closed canonical strings at profile load.
 Known address families include `ipv4`, `ipv6`, and `l2vpn`. Known subsequent
@@ -238,9 +239,13 @@ values, or from a related table in the same resolved profile. Row-index value
 sources can use `index: N`, `index_transform:`, or `index_from_end: N`.
 `index_from_end` selects one OID index component from the tail and is for MIBs
 where the wanted trailing INDEX component follows a variable-length component
-such as `InetAddress`. A cross-table
-typed value uses `table: <table_name>` with `index_transform:` to derive the
-referenced row index:
+such as `InetAddress`. Profiles should declare only one row-index selector per
+typed BGP value. If a profile declares more than one today, runtime precedence
+is `index_from_end`, then `index`, then `index_transform`; validation hardening
+for mutual exclusivity is tracked as a follow-up.
+
+A cross-table typed value uses `table: <table_name>` with `index_transform:`
+to derive the referenced row index:
 
 ```yaml
 identity:
@@ -266,6 +271,14 @@ address components.
 Cross-table typed values are internal BGP row sources. They do not require
 synthetic metric labels and must not reintroduce underscore-prefixed side
 protocols. Scalar BGP rows cannot use `table:` sources.
+
+When a peer or peer-family row does not expose a routing instance, public chart
+and function labels normalize the empty value to `default`.
+
+BGP function cache freshness is tracked per typed source profile. A failed BGP
+source preserves its stale rows during the bounded stale window without
+blocking other BGP sources from refreshing. After the stale window expires, the
+function omits expired stale rows and returns 503 when no usable rows remain.
 
 ## Resolve And Projection
 
@@ -462,8 +475,7 @@ Profile validation rejects:
 - BGP scalar values that use `table:` sources;
 - BGP scalar values that use row-index sources such as `index:`,
   `index_from_end:`, or `index_transform:`;
-- BGP cross-table value sources without a referenced table, source OID, or
-  valid index transform;
+- BGP cross-table value sources without a source OID;
 - BGP `lookup_symbol` value sources without a referenced table;
 - underscore-prefixed BGP value names;
 - regular metric chart/export-only fields, transforms, scale factors, and
