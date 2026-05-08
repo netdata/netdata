@@ -198,6 +198,12 @@ BGP row kinds are closed:
 - `peer`
 - `peer_family`
 
+Device rows are identity-free device summaries. Supported `device_counts`
+fields are `peers`, `ibgp_peers`, `ebgp_peers`, and per-state fields under
+`states`. `ibgp_peers` and `ebgp_peers` map to the public
+`bgp.devices.peer_counts` dimensions `ibgp` and `ebgp`; `peers` maps to
+`configured`.
+
 Peer rows must declare stable `neighbor` and `remote_as` identity fields.
 Peer-family rows must additionally declare canonical `address_family` and
 `subsequent_address_family` identity fields.

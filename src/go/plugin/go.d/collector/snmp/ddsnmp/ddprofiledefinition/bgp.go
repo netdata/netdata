@@ -427,14 +427,18 @@ func (c BGPRouteLimitsConfig) Clone() BGPRouteLimitsConfig {
 }
 
 type BGPDeviceCountsConfig struct {
-	Peers  BGPValueConfig      `yaml:"peers,omitempty" json:"peers"`
-	States BGPPeerStatesConfig `yaml:"states,omitempty" json:"states"`
+	Peers         BGPValueConfig      `yaml:"peers,omitempty" json:"peers"`
+	InternalPeers BGPValueConfig      `yaml:"ibgp_peers,omitempty" json:"ibgp_peers"`
+	ExternalPeers BGPValueConfig      `yaml:"ebgp_peers,omitempty" json:"ebgp_peers"`
+	States        BGPPeerStatesConfig `yaml:"states,omitempty" json:"states"`
 }
 
 func (c BGPDeviceCountsConfig) Clone() BGPDeviceCountsConfig {
 	return BGPDeviceCountsConfig{
-		Peers:  c.Peers.Clone(),
-		States: c.States.Clone(),
+		Peers:         c.Peers.Clone(),
+		InternalPeers: c.InternalPeers.Clone(),
+		ExternalPeers: c.ExternalPeers.Clone(),
+		States:        c.States.Clone(),
 	}
 }
 
@@ -603,6 +607,8 @@ func ForEachBGPSignalValue(row BGPConfig, add func(path string, value BGPValueCo
 	addValue("route_limits.threshold", row.RouteLimits.Threshold)
 	addValue("route_limits.clear_threshold", row.RouteLimits.ClearThreshold)
 	addValue("device_counts.peers", row.Device.Peers)
+	addValue("device_counts.ibgp_peers", row.Device.InternalPeers)
+	addValue("device_counts.ebgp_peers", row.Device.ExternalPeers)
 	addValue("device_counts.states.idle", row.Device.States.Idle)
 	addValue("device_counts.states.connect", row.Device.States.Connect)
 	addValue("device_counts.states.active", row.Device.States.Active)

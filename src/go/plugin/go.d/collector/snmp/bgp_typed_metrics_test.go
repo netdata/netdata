@@ -76,6 +76,33 @@ func TestTypedBGPMetricsFromProfileMetrics(t *testing.T) {
 				assert.Equal(t, map[string]int64{"admin_enabled": 1, "established": 1}, availability.MultiValue)
 			},
 		},
+		"explicit device peer counts override auto peer-row count dimensions": {
+			pm: &ddsnmp.ProfileMetrics{
+				BGPRows: []ddsnmp.BGPRow{
+					typedBGPPeerRow(),
+					{
+						OriginProfileID: "_vendor-bgp.yaml",
+						Kind:            ddprofiledefinition.BGPRowKindDevice,
+						StructuralID:    "typed-device-key",
+						Device: ddsnmp.BGPDeviceCounts{
+							Peers:         ddsnmp.BGPInt64{Has: true, Value: 12},
+							InternalPeers: ddsnmp.BGPInt64{Has: true, Value: 4},
+							ExternalPeers: ddsnmp.BGPInt64{Has: true, Value: 8},
+						},
+					},
+				},
+			},
+			validate: func(t *testing.T, metrics []ddsnmp.Metric) {
+				counts := requireMetric(t, metrics, "bgp.devices.peer_counts", nil)
+				assert.Equal(t, map[string]int64{
+					"configured":    12,
+					"ibgp":          4,
+					"ebgp":          8,
+					"admin_enabled": 1,
+					"established":   1,
+				}, counts.MultiValue)
+			},
+		},
 	}
 
 	for name, tc := range tests {

@@ -250,6 +250,20 @@ func TestDefaultCatalogResolveProject_LoadedProfilesSeparateConsumers(t *testing
 			wantNoTopology:  true,
 			wantNoLicensing: true,
 		},
+		"bgp_projection_huawei": {
+			sysObjectID: "1.3.6.1.4.1.2011.2.224.279",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"huawei-bgp-device-counts",
+				"huawei-bgp-peer-family",
+				"huawei-bgp-peer-family-routes",
+				"huawei-bgp-peer-family-messages",
+				"huawei-bgp-peer-statistics",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
 		"metrics_and_licensing_projection": {
 			sysObjectID: "1.3.6.1.4.1.9.1.1",
 			consumer:    ConsumerMetrics,

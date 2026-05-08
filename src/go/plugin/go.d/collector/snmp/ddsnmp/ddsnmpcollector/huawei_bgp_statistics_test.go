@@ -10,85 +10,92 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func TestHuaweiBGPStatisticsRowTags(t *testing.T) {
-	profile := matchedProfileByFile(t, "1.3.6.1.4.1.2011.2.224.279", "huawei-routers.yaml")
-
-	var statsCfg ddprofiledefinition.MetricsConfig
-	var peerTableOID string
-	found := false
-	for _, metric := range profile.Definition.Metrics {
-		switch metric.Table.Name {
-		case "hwBgpPeerStatisticTable":
-			statsCfg = metric
-			found = true
-		case "hwBgpPeerTable":
-			peerTableOID = metric.Table.OID
-		}
-	}
-	require.True(t, found)
-	require.NotEmpty(t, peerTableOID)
-
-	ordered := buildOrderedTags(statsCfg)
-	require.Len(t, ordered, 7)
-	assert.Equal(t, tagTypeIndex, ordered[0].tagType)
-	assert.Equal(t, tagTypeIndex, ordered[1].tagType)
-	assert.Equal(t, tagTypeCrossTable, ordered[2].tagType)
-	assert.Equal(t, tagTypeCrossTable, ordered[3].tagType)
-	assert.Equal(t, tagTypeIndex, ordered[4].tagType)
-	assert.Equal(t, tagTypeCrossTable, ordered[5].tagType)
-	assert.Equal(t, tagTypeCrossTable, ordered[6].tagType)
-
-	fixturePDUs := loadSnmprecPDUs(t, "librenms/huawei_vrp_ne8000_bgp_peer_table.snmprec")
-	statsPDUs := pduSliceToMap(snmprecPDUsWithPrefix(fixturePDUs, "1.3.6.1.4.1.2011.5.25.177.1.1.7."))
-	peerPDUs := pduSliceToMap(snmprecPDUsWithPrefix(fixturePDUs, "1.3.6.1.4.1.2011.5.25.177.1.1.2."))
-
-	rowIndex := "0.0.4.10.45.2.2"
-	rowPDUs := make(map[string]gosnmp.SnmpPDU)
-	for _, sym := range statsCfg.Symbols {
-		fullOID := trimOID(sym.OID) + "." + rowIndex
-		pdu, ok := statsPDUs[fullOID]
-		require.Truef(t, ok, "missing PDU for %s", fullOID)
-		rowPDUs[trimOID(sym.OID)] = pdu
-	}
-
-	row := &tableRowData{
-		index: rowIndex,
-		pdus:  rowPDUs,
-		tags:  make(map[string]string),
-	}
-
-	processor := newTableRowProcessor(logger.New())
-	err := processor.processRowTags(row, &tableRowProcessingContext{
-		config: statsCfg,
-		crossTableCtx: &crossTableContext{
-			walkedData: map[string]map[string]gosnmp.SnmpPDU{
-				trimOID(peerTableOID): peerPDUs,
+func TestCollector_Collect_HuaweiTypedBGPRows(t *testing.T) {
+	tests := map[string]struct {
+		rowID    string
+		pdus     []gosnmp.SnmpPDU
+		validate func(t *testing.T, rows []ddsnmp.BGPRow)
+	}{
+		"peer family maps state admin and routing instance": {
+			rowID: "huawei-bgp-peer-family",
+			pdus: []gosnmp.SnmpPDU{
+				createStringPDU("1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6.0.1.1.1.4.192.0.2.21", "blue"),
+				createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2.0.1.1.1.4.192.0.2.21", 65001),
+				createPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.1.1.1.4.192.0.2.21", gosnmp.OctetString, []byte{192, 0, 2, 21}),
+				createIntegerPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.5.0.1.1.1.4.192.0.2.21", 3),
+				createIntegerPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.11.0.1.1.1.4.192.0.2.21", 1),
+				createCounter32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.6.0.1.1.1.4.192.0.2.21", 4),
 			},
-			tableNameToOID: map[string]string{
-				"hwBgpPeerTable": trimOID(peerTableOID),
+			validate: func(t *testing.T, rows []ddsnmp.BGPRow) {
+				require.Len(t, rows, 1)
+				row := rows[0]
+				assert.Equal(t, ddprofiledefinition.BGPRowKindPeerFamily, row.Kind)
+				assert.Equal(t, "blue", row.Identity.RoutingInstance)
+				assert.Equal(t, "192.0.2.21", row.Identity.Neighbor)
+				assert.Equal(t, "65001", row.Identity.RemoteAS)
+				assert.Equal(t, ddprofiledefinition.BGPAddressFamilyIPv4, row.Identity.AddressFamily)
+				assert.Equal(t, ddprofiledefinition.BGPSubsequentAddressFamilyUnicast, row.Identity.SubsequentAddressFamily)
+				require.True(t, row.Admin.Enabled.Has)
+				assert.False(t, row.Admin.Enabled.Value)
+				require.True(t, row.State.Has)
+				assert.Equal(t, ddprofiledefinition.BGPPeerStateActive, row.State.State)
+				assert.EqualValues(t, 4, row.Transitions.Established.Value)
 			},
-			lookupIndexCache: make(map[crossTableLookupKey]string),
-			rowTags:          row.tags,
 		},
-		orderedTags: ordered,
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, "0", row.tags["_routing_instance"])
-	assert.Equal(t, "0", row.tags["huawei_hw_bgp_peer_vrf_instance_id"])
-	assert.Equal(t, "10.45.2.2", row.tags["_neighbor"])
-	assert.Equal(t, "10.45.2.2", row.tags["huawei_hw_bgp_peer_remote_addr"])
-	assert.Equal(t, "ipv4", row.tags["_neighbor_address_type"])
-	assert.Equal(t, "26479", row.tags["_remote_as"])
-}
-
-func pduSliceToMap(pdus []gosnmp.SnmpPDU) map[string]gosnmp.SnmpPDU {
-	out := make(map[string]gosnmp.SnmpPDU, len(pdus))
-	for _, pdu := range pdus {
-		out[trimOID(pdu.Name)] = pdu
+		"peer statistics resolves non-default VRF index and remote AS by peer address": {
+			rowID: "huawei-bgp-peer-statistics",
+			pdus: []gosnmp.SnmpPDU{
+				createPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.42.1.1.1.4.192.0.2.22", gosnmp.OctetString, []byte{192, 0, 2, 22}),
+				createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2.42.1.1.1.4.192.0.2.22", 65002),
+				createCounter32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4.0.42.4.192.0.2.22", 5),
+				createCounter32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.7.1.5.0.42.4.192.0.2.22", 2),
+				createCounter32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.7.1.6.0.42.4.192.0.2.22", 101),
+				createCounter32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.7.1.7.0.42.4.192.0.2.22", 202),
+			},
+			validate: func(t *testing.T, rows []ddsnmp.BGPRow) {
+				require.Len(t, rows, 1)
+				row := rows[0]
+				assert.Equal(t, ddprofiledefinition.BGPRowKindPeer, row.Kind)
+				assert.Equal(t, "42", row.Identity.RoutingInstance)
+				assert.Equal(t, "192.0.2.22", row.Identity.Neighbor)
+				assert.Equal(t, "65002", row.Identity.RemoteAS)
+				assert.Equal(t, "ipv4", row.Descriptors.PeerType)
+				assert.EqualValues(t, 5, row.Transitions.Established.Value)
+				assert.EqualValues(t, 2, row.Transitions.Down.Value)
+				assert.EqualValues(t, 101, row.Traffic.Updates.Received.Value)
+				assert.EqualValues(t, 202, row.Traffic.Updates.Sent.Value)
+			},
+		},
 	}
-	return out
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profile := matchedBGPProjectionByFile(t, "1.3.6.1.4.1.2011.2.224.279", "huawei-routers.yaml")
+			filterProfileForTypedBGPByID(t, profile, tc.rowID)
+
+			ctrl, mockHandler := setupMockHandler(t)
+			defer ctrl.Finish()
+
+			expectBGPTableWalksFromFixture(mockHandler, profile, tc.pdus)
+
+			collector := New(Config{
+				SnmpClient:  mockHandler,
+				Profiles:    []*ddsnmp.Profile{profile},
+				Log:         logger.New(),
+				SysObjectID: "1.3.6.1.4.1.2011.2.224.279",
+			})
+
+			results, err := collector.Collect()
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			require.Empty(t, results[0].Metrics)
+			require.Len(t, results[0].BGPRows, 1)
+
+			tc.validate(t, results[0].BGPRows)
+		})
+	}
 }

@@ -416,6 +416,15 @@ Open decisions:
   - Added broader Nokia profile assertions for descriptor, timer, traffic, notification, transition, and last-error fields.
   - Updated `.agents/sow/specs/snmp-profile-projection.md` so BGP table structural identity includes typed config ID.
   - Recorded the inherited TIMETRA high-numbered oper OID verification gap as a SOW follow-up.
+- Migrated Huawei BGP to typed rows:
+  - `huawei-routers.yaml` now declares typed BGP device, peer, and peer-family rows instead of raw BGP `metrics:`/`virtual_metrics:`.
+  - Removed `_huawei-bgp-statistics.yaml`; Huawei BGP session counts now flow through typed `device_counts`.
+  - Extended typed BGP device counts with `ibgp_peers` and `ebgp_peers` so Huawei preserves the public `configured`/`ibgp`/`ebgp` peer-count dimensions without the legacy public router.
+  - Removed Huawei-specific cases from the temporary `bgp_public*` metric-name router.
+  - Added Huawei BGP projection coverage to `collector/snmp/ddsnmp/profile_test.go`.
+  - Reworked Huawei LibreNMS fixture coverage to assert typed `BGPRows` directly, including IPv4/IPv6 peer-family rows, route totals, peer-level message/update counters, and device peer counts.
+  - Added synthetic Huawei typed-collection coverage for state/admin mapping and peer-statistics remote-AS lookup by peer address.
+  - Local raw MIB audit gap: `mibs/` contains `HUAWEI-MPLS-BGP-VPN-MIB.mib`, not the exact `HUAWEI-BGP-VPN-MIB`; profile OIDs are carried forward from the existing Huawei profile and the linked public Huawei BGP MIB references.
 
 ## Validation
 
@@ -467,6 +476,9 @@ Tests or equivalent validation:
 - `go test -count=1 ./collector/snmp/ddsnmp ./collector/snmp/ddsnmp/ddprofiledefinition ./collector/snmp/ddsnmp/ddsnmpcollector` passed on 2026-05-08 after the Claude Nokia/TiMOS review follow-ups.
 - `go test -count=1 ./collector/snmp/...` passed on 2026-05-08 after the Claude Nokia/TiMOS review follow-ups.
 - `go test -race -count=1 ./collector/snmp` passed on 2026-05-08 after the Claude Nokia/TiMOS review follow-ups.
+- `go test -count=1 ./collector/snmp/ddsnmp ./collector/snmp/ddsnmp/ddprofiledefinition ./collector/snmp/ddsnmp/ddsnmpcollector` passed on 2026-05-08 after the Huawei typed-profile migration.
+- `go test -count=1 ./collector/snmp/...` passed on 2026-05-08 after the Huawei typed-profile migration.
+- `go test -race -count=1 ./collector/snmp` passed on 2026-05-08 after the Huawei typed-profile migration.
 
 Real-use evidence:
 

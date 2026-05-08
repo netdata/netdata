@@ -324,6 +324,8 @@ func sanitizeBGPRow(row *ddsnmp.BGPRow) {
 	sanitizeBGPInt64(&row.RouteLimits.Threshold)
 	sanitizeBGPInt64(&row.RouteLimits.ClearThreshold)
 	sanitizeBGPInt64(&row.Device.Peers)
+	sanitizeBGPInt64(&row.Device.InternalPeers)
+	sanitizeBGPInt64(&row.Device.ExternalPeers)
 	for k, v := range row.Tags {
 		if strings.HasPrefix(k, "rm:") {
 			delete(row.Tags, k)

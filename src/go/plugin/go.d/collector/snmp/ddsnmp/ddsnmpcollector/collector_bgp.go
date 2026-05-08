@@ -750,6 +750,12 @@ func (c *Collector) populateBGPDeviceCounts(dst *ddsnmp.BGPDeviceCounts, cfg ddp
 	if err := c.populateBGPInt64(&dst.Peers, cfg.Peers, ctx); err != nil {
 		return fmt.Errorf("peers: %w", err)
 	}
+	if err := c.populateBGPInt64(&dst.InternalPeers, cfg.InternalPeers, ctx); err != nil {
+		return fmt.Errorf("ibgp_peers: %w", err)
+	}
+	if err := c.populateBGPInt64(&dst.ExternalPeers, cfg.ExternalPeers, ctx); err != nil {
+		return fmt.Errorf("ebgp_peers: %w", err)
+	}
 	counts, err := c.bgpPeerStateCounts(cfg.States, ctx)
 	if err != nil {
 		return fmt.Errorf("states: %w", err)
@@ -1236,6 +1242,8 @@ func bgpRowHasSignals(row ddsnmp.BGPRow) bool {
 		row.RouteLimits.Threshold.Has ||
 		row.RouteLimits.ClearThreshold.Has ||
 		row.Device.Peers.Has ||
+		row.Device.InternalPeers.Has ||
+		row.Device.ExternalPeers.Has ||
 		row.Device.ByStateHas
 }
 

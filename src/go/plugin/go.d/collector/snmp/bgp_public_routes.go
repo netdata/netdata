@@ -8,7 +8,7 @@ func routeBGPPublicMetric(name string) (bgpRoute, bool) {
 	switch name {
 	case "bgpPeerAvailability", "alcatel.bgpPeerAvailability":
 		return bgpRoute{leaf: "availability", copyMultiValue: true, scope: bgpScopeAuto}, true
-	case "bgpPeerState", "huawei.hwBgpPeerState", "aristaBgp4V2PeerState", "dell.os10bgp4V2PeerState":
+	case "bgpPeerState", "aristaBgp4V2PeerState", "dell.os10bgp4V2PeerState":
 		return bgpRoute{leaf: "connection_state", copyMultiValue: true, scope: bgpScopeAuto}, true
 	case "bgpPeerPreviousState":
 		return bgpRoute{leaf: "previous_connection_state", copyMultiValue: true, scope: bgpScopePeers}, true
@@ -16,29 +16,21 @@ func routeBGPPublicMetric(name string) (bgpRoute, bool) {
 		return bgpRoute{leaf: "established_uptime", dim: "uptime", scope: bgpScopeAuto}, true
 	case "bgpPeerUpdates", "alcatel.bgpPeerUpdates":
 		return bgpRoute{leaf: "update_traffic", copyMultiValue: true, scope: bgpScopeAuto}, true
-	case "bgpPeerInTotalMessages", "huawei.hwBgpPeerInTotalMsgCounter", "huawei.hwBgpPeerInTotalMsgs":
+	case "bgpPeerInTotalMessages":
 		return bgpRoute{leaf: "message_traffic", dim: "received", scope: bgpScopeAuto}, true
-	case "bgpPeerOutTotalMessages", "huawei.hwBgpPeerOutTotalMsgCounter", "huawei.hwBgpPeerOutTotalMsgs":
+	case "bgpPeerOutTotalMessages":
 		return bgpRoute{leaf: "message_traffic", dim: "sent", scope: bgpScopeAuto}, true
-	case "bgpPeerInNotifications", "alcatel.bgpPeerInNotifications", "huawei.hwBgpPeerInNotificationMsgCounter":
+	case "bgpPeerInNotifications", "alcatel.bgpPeerInNotifications":
 		return bgpRoute{leaf: "notification_traffic", dim: "received", scope: bgpScopeAuto}, true
-	case "bgpPeerOutNotifications", "alcatel.bgpPeerOutNotifications", "huawei.hwBgpPeerOutNotificationMsgCounter":
+	case "bgpPeerOutNotifications", "alcatel.bgpPeerOutNotifications":
 		return bgpRoute{leaf: "notification_traffic", dim: "sent", scope: bgpScopeAuto}, true
-	case "alcatel.bgpPeerInRouteRefreshMessages", "huawei.hwBgpPeerInRouteFreshMsgCounter":
+	case "alcatel.bgpPeerInRouteRefreshMessages":
 		return bgpRoute{leaf: "route_refresh_traffic", dim: "received", scope: bgpScopeAuto}, true
-	case "alcatel.bgpPeerOutRouteRefreshMessages", "huawei.hwBgpPeerOutRouteFreshMsgCounter":
+	case "alcatel.bgpPeerOutRouteRefreshMessages":
 		return bgpRoute{leaf: "route_refresh_traffic", dim: "sent", scope: bgpScopeAuto}, true
-	case "huawei.hwBgpPeerInOpenMsgCounter":
-		return bgpRoute{leaf: "open_traffic", dim: "received", scope: bgpScopeAuto}, true
-	case "huawei.hwBgpPeerOutOpenMsgCounter":
-		return bgpRoute{leaf: "open_traffic", dim: "sent", scope: bgpScopeAuto}, true
-	case "huawei.hwBgpPeerInKeepAliveMsgCounter":
-		return bgpRoute{leaf: "keepalive_traffic", dim: "received", scope: bgpScopeAuto}, true
-	case "huawei.hwBgpPeerOutKeepAliveMsgCounter":
-		return bgpRoute{leaf: "keepalive_traffic", dim: "sent", scope: bgpScopeAuto}, true
-	case "bgpPeerFsmEstablishedTransitions", "huawei.hwBgpPeerFsmEstablishedCounter", "huawei.hwBgpPeerFsmEstablishedTransitions":
+	case "bgpPeerFsmEstablishedTransitions":
 		return bgpRoute{leaf: "established_transitions", dim: "transitions", scope: bgpScopeAuto}, true
-	case "bgpPeerDownTransitions", "huawei.hwBgpPeerDownCounts":
+	case "bgpPeerDownTransitions":
 		return bgpRoute{leaf: "down_transitions", dim: "transitions", scope: bgpScopeAuto}, true
 	case "bgpPeerUpTransitions":
 		return bgpRoute{leaf: "up_transitions", dim: "transitions", scope: bgpScopePeers}, true
@@ -46,9 +38,9 @@ func routeBGPPublicMetric(name string) (bgpRoute, bool) {
 		return bgpRoute{leaf: "flaps", dim: "flaps", scope: bgpScopePeers}, true
 	case "bgpPeerInUpdateElapsedTime":
 		return bgpRoute{leaf: "last_received_update_age", dim: "age", scope: bgpScopeAuto}, true
-	case "bgpPeerLastErrorCode", "huawei.hwBgpPeerLastErrorCode":
+	case "bgpPeerLastErrorCode":
 		return bgpRoute{leaf: "last_error", dim: "code", scope: bgpScopeAuto}, true
-	case "bgpPeerLastErrorSubcode", "huawei.hwBgpPeerLastErrorSubcode":
+	case "bgpPeerLastErrorSubcode":
 		return bgpRoute{leaf: "last_error", dim: "subcode", scope: bgpScopeAuto}, true
 	case "alcatel.bgpPeerLastDownReason":
 		return bgpRoute{leaf: "last_down_reason", copyMultiValue: true, scope: bgpScopePeers}, true
@@ -56,10 +48,6 @@ func routeBGPPublicMetric(name string) (bgpRoute, bool) {
 		return bgpRoute{leaf: "last_received_notification_reason", copyMultiValue: true, scope: bgpScopePeers}, true
 	case "alcatel.bgpPeerLastSentNotifyReason":
 		return bgpRoute{leaf: "last_sent_notification_reason", copyMultiValue: true, scope: bgpScopePeers}, true
-	case "huawei.hwBgpPeerGRStatus":
-		return bgpRoute{leaf: "graceful_restart_state", copyMultiValue: true, scope: bgpScopePeerFamilies}, true
-	case "huawei.hwBgpPeerUnAvaiReason":
-		return bgpRoute{leaf: "unavailability_reason", copyMultiValue: true, scope: bgpScopePeerFamilies}, true
 	case "bgpPeerHoldTime":
 		return bgpRoute{leaf: "negotiated_timers", dim: "hold_time", scope: bgpScopeAuto}, true
 	case "bgpPeerKeepAlive":
@@ -88,26 +76,18 @@ func routeBGPPublicMetric(name string) (bgpRoute, bool) {
 		return bgpRoute{leaf: "route_counts.current", dim: "suppressed", scope: bgpScopePeerFamilies}, true
 	case "bgpPeerPrefixesWithdrawn":
 		return bgpRoute{leaf: "route_counts.current", dim: "withdrawn", scope: bgpScopePeerFamilies}, true
-	case "bgpPeerPrefixesReceivedTotal", "huawei.hwBgpPeerPrefixRcvCounter":
+	case "bgpPeerPrefixesReceivedTotal":
 		return bgpRoute{leaf: "route_totals", dim: "received", scope: bgpScopePeerFamilies}, true
-	case "bgpPeerPrefixesAdvertisedTotal", "huawei.hwBgpPeerPrefixAdvCounter":
+	case "bgpPeerPrefixesAdvertisedTotal":
 		return bgpRoute{leaf: "route_totals", dim: "advertised", scope: bgpScopePeerFamilies}, true
 	case "bgpPeerPrefixesRejectedTotal":
 		return bgpRoute{leaf: "route_totals", dim: "rejected", scope: bgpScopePeerFamilies}, true
-	case "huawei.hwBgpPeerPrefixActiveCounter":
-		return bgpRoute{leaf: "route_totals", dim: "active", scope: bgpScopePeerFamilies}, true
 	case "bgpPeerPrefixAdminLimit":
 		return bgpRoute{leaf: "route_limits", dim: "admin_limit", scope: bgpScopePeerFamilies}, true
 	case "bgpPeerPrefixThreshold":
 		return bgpRoute{leaf: "route_limit_thresholds", dim: "threshold", scope: bgpScopePeerFamilies}, true
 	case "bgpPeerPrefixClearThreshold":
 		return bgpRoute{leaf: "route_limit_thresholds", dim: "clear_threshold", scope: bgpScopePeerFamilies}, true
-	case "huawei.hwBgpPeerSessionNum":
-		return bgpRoute{leaf: "peer_counts", dim: "configured", scope: bgpScopeDevices}, true
-	case "huawei.hwIBgpPeerSessionNum":
-		return bgpRoute{leaf: "peer_counts", dim: "ibgp", scope: bgpScopeDevices}, true
-	case "huawei.hwEBgpPeerSessionNum":
-		return bgpRoute{leaf: "peer_counts", dim: "ebgp", scope: bgpScopeDevices}, true
 	default:
 		return bgpRoute{}, false
 	}
@@ -118,13 +98,8 @@ func shouldSuppressBGPRawMetric(name string) bool {
 	case "bgpPeerAdminStatus",
 		"aristaBgp4V2PeerAdminStatus",
 		"dell.os10bgp4V2PeerAdminStatus",
-		"huawei.hwBgpPeerAdminStatus",
 		"bgpPeerInUpdates",
-		"bgpPeerOutUpdates",
-		"huawei.hwBgpPeerInUpdateMsgCounter",
-		"huawei.hwBgpPeerOutUpdateMsgCounter",
-		"huawei.hwBgpPeerInUpdateMsgs",
-		"huawei.hwBgpPeerOutUpdateMsgs":
+		"bgpPeerOutUpdates":
 		return true
 	default:
 		return false

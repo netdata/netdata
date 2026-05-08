@@ -55,23 +55,6 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 				},
 			},
 		},
-		"Huawei routers expose common alert surface through virtual aliases": {
-			sysObjectID: "1.3.6.1.4.1.2011.2.224.279",
-			profileFile: "huawei-routers.yaml",
-			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
-				"bgpPeerAvailability": {
-					{Metric: "huawei.hwBgpPeerAdminStatus", Table: "hwBgpPeerTable", As: "admin_enabled", Dim: "start"},
-					{Metric: "huawei.hwBgpPeerState", Table: "hwBgpPeerTable", As: "established", Dim: "established"},
-				},
-				"bgpPeerFsmEstablishedTransitions": {
-					{Metric: "huawei.hwBgpPeerFsmEstablishedCounter", Table: "hwBgpPeerTable"},
-				},
-				"bgpPeerUpdates": {
-					{Metric: "huawei.hwBgpPeerInUpdateMsgCounter", Table: "hwBgpPeerMessageTable", As: "received"},
-					{Metric: "huawei.hwBgpPeerOutUpdateMsgCounter", Table: "hwBgpPeerMessageTable", As: "sent"},
-				},
-			},
-		},
 		"Alcatel dual-stack keeps IPv6 virtual aliases after standard BGP migration": {
 			sysObjectID: "1.3.6.1.4.1.6486.801.1.1.2.1.1",
 			profileFile: "alcatel-lucent-ent.yaml",
@@ -112,31 +95,4 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 			}
 		})
 	}
-}
-
-func Test_BGPVirtualMetricContracts_HuaweiUpdatesHasStatisticsFallback(t *testing.T) {
-	matched := FindProfiles("1.3.6.1.4.1.2011.2.224.279", "", nil)
-	index := slices.IndexFunc(matched, func(p *Profile) bool {
-		return strings.HasSuffix(p.SourceFile, "huawei-routers.yaml")
-	})
-	require.NotEqual(t, -1, index, "expected huawei-routers.yaml profile to match")
-
-	profile := matched[index]
-	vmIndex := slices.IndexFunc(profile.Definition.VirtualMetrics, func(vm ddprofiledefinition.VirtualMetricConfig) bool {
-		return vm.Name == "bgpPeerUpdates"
-	})
-	require.NotEqual(t, -1, vmIndex, "expected virtual metric bgpPeerUpdates")
-
-	vm := profile.Definition.VirtualMetrics[vmIndex]
-	require.Len(t, vm.Alternatives, 2)
-
-	assert.Equal(t, []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "huawei.hwBgpPeerInUpdateMsgCounter", Table: "hwBgpPeerMessageTable", As: "received"},
-		{Metric: "huawei.hwBgpPeerOutUpdateMsgCounter", Table: "hwBgpPeerMessageTable", As: "sent"},
-	}, vm.Alternatives[0].Sources)
-
-	assert.Equal(t, []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "huawei.hwBgpPeerInUpdateMsgs", Table: "hwBgpPeerStatisticTable", As: "received"},
-		{Metric: "huawei.hwBgpPeerOutUpdateMsgs", Table: "hwBgpPeerStatisticTable", As: "sent"},
-	}, vm.Alternatives[1].Sources)
 }

@@ -906,6 +906,8 @@ func forEachBGPSignalValueConfig(row *BGPConfig, add func(path string, value *BG
 	add("route_limits.threshold", &row.RouteLimits.Threshold)
 	add("route_limits.clear_threshold", &row.RouteLimits.ClearThreshold)
 	add("device_counts.peers", &row.Device.Peers)
+	add("device_counts.ibgp_peers", &row.Device.InternalPeers)
+	add("device_counts.ebgp_peers", &row.Device.ExternalPeers)
 	add("device_counts.states.idle", &row.Device.States.Idle)
 	add("device_counts.states.connect", &row.Device.States.Connect)
 	add("device_counts.states.active", &row.Device.States.Active)

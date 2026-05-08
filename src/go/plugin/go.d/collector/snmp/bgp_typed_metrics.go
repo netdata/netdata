@@ -10,10 +10,11 @@ import (
 )
 
 type bgpTypedMetricBuilder struct {
-	metrics          []ddsnmp.Metric
-	devicePeerCounts map[string]int64
-	devicePeerStates map[string]int64
-	deviceSample     *ddsnmp.ProfileMetrics
+	metrics                  []ddsnmp.Metric
+	explicitDevicePeerCounts map[string]int64
+	autoDevicePeerCounts     map[string]int64
+	devicePeerStates         map[string]int64
+	deviceSample             *ddsnmp.ProfileMetrics
 }
 
 func typedBGPMetricsFromProfileMetrics(pms []*ddsnmp.ProfileMetrics) []ddsnmp.Metric {
@@ -44,7 +45,13 @@ func (b *bgpTypedMetricBuilder) addRow(pm *ddsnmp.ProfileMetrics, row ddsnmp.BGP
 
 func (b *bgpTypedMetricBuilder) addDeviceRow(_ *ddsnmp.ProfileMetrics, row ddsnmp.BGPRow) {
 	if row.Device.Peers.Has {
-		b.addDevicePeerCount("configured", row.Device.Peers.Value)
+		b.addExplicitDevicePeerCount("configured", row.Device.Peers.Value)
+	}
+	if row.Device.InternalPeers.Has {
+		b.addExplicitDevicePeerCount("ibgp", row.Device.InternalPeers.Value)
+	}
+	if row.Device.ExternalPeers.Has {
+		b.addExplicitDevicePeerCount("ebgp", row.Device.ExternalPeers.Value)
 	}
 	if row.Device.ByStateHas {
 		for state, value := range row.Device.ByState {
@@ -54,14 +61,14 @@ func (b *bgpTypedMetricBuilder) addDeviceRow(_ *ddsnmp.ProfileMetrics, row ddsnm
 }
 
 func (b *bgpTypedMetricBuilder) addPeerDeviceSummary(row ddsnmp.BGPRow) {
-	b.addDevicePeerCount("configured", 1)
+	b.addAutoDevicePeerCount("configured", 1)
 	if row.Admin.Enabled.Has && row.Admin.Enabled.Value {
-		b.addDevicePeerCount("admin_enabled", 1)
+		b.addAutoDevicePeerCount("admin_enabled", 1)
 	}
 	if row.State.Has {
 		b.addDevicePeerState(string(row.State.State), 1)
 		if row.State.State == ddprofiledefinition.BGPPeerStateEstablished {
-			b.addDevicePeerCount("established", 1)
+			b.addAutoDevicePeerCount("established", 1)
 		}
 	}
 }
@@ -246,11 +253,18 @@ func (b *bgpTypedMetricBuilder) addRouteLimitThresholdsMetric(pm *ddsnmp.Profile
 	b.addMetric(pm, name, mv, tags)
 }
 
-func (b *bgpTypedMetricBuilder) addDevicePeerCount(dim string, value int64) {
-	if b.devicePeerCounts == nil {
-		b.devicePeerCounts = make(map[string]int64)
+func (b *bgpTypedMetricBuilder) addExplicitDevicePeerCount(dim string, value int64) {
+	if b.explicitDevicePeerCounts == nil {
+		b.explicitDevicePeerCounts = make(map[string]int64)
 	}
-	b.devicePeerCounts[dim] += value
+	b.explicitDevicePeerCounts[dim] += value
+}
+
+func (b *bgpTypedMetricBuilder) addAutoDevicePeerCount(dim string, value int64) {
+	if b.autoDevicePeerCounts == nil {
+		b.autoDevicePeerCounts = make(map[string]int64)
+	}
+	b.autoDevicePeerCounts[dim] += value
 }
 
 func (b *bgpTypedMetricBuilder) addDevicePeerState(dim string, value int64) {
@@ -262,7 +276,14 @@ func (b *bgpTypedMetricBuilder) addDevicePeerState(dim string, value int64) {
 
 func (b *bgpTypedMetricBuilder) metricsWithDeviceSummaries() []ddsnmp.Metric {
 	if b.deviceSample != nil {
-		b.addMetric(b.deviceSample, "bgp.devices.peer_counts", b.devicePeerCounts, nil)
+		peerCounts := maps.Clone(b.autoDevicePeerCounts)
+		if peerCounts == nil && len(b.explicitDevicePeerCounts) > 0 {
+			peerCounts = make(map[string]int64, len(b.explicitDevicePeerCounts))
+		}
+		for dim, value := range b.explicitDevicePeerCounts {
+			peerCounts[dim] = value
+		}
+		b.addMetric(b.deviceSample, "bgp.devices.peer_counts", peerCounts, nil)
 		b.addMetric(b.deviceSample, "bgp.devices.peer_states", b.devicePeerStates, nil)
 	}
 	return b.metrics

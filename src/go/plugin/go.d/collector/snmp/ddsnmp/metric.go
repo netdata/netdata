@@ -259,9 +259,11 @@ type BGPRouteLimits struct {
 }
 
 type BGPDeviceCounts struct {
-	Peers      BGPInt64
-	ByState    map[ddprofiledefinition.BGPPeerState]int64
-	ByStateHas bool
+	Peers         BGPInt64
+	InternalPeers BGPInt64
+	ExternalPeers BGPInt64
+	ByState       map[ddprofiledefinition.BGPPeerState]int64
+	ByStateHas    bool
 }
 
 // CollectionStats contains statistics for a single profile collection cycle.
