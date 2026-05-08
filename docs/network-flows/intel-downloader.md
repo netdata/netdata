@@ -45,14 +45,24 @@ The tool only knows how to talk to a fixed set of providers — anything else is
 | `dbip:country-lite` | Geo | `mmdb` (default) or `csv` | DB-IP free monthly download page |
 | `dbip:city-lite` | Geo | `mmdb` (default) or `csv` | DB-IP free monthly download page |
 | `iptoasn:combined` | ASN or Geo | `tsv` | `https://iptoasn.com/data/ip2asn-combined.tsv.gz` (direct URL) |
+| `caida:prefix2as` | ASN | `tsv` | CAIDA RouteViews prefix-to-AS creation log |
+| `maxmind:geolite2-asn` | ASN | `mmdb` | MaxMind authenticated GeoLite2 download |
+| `maxmind:geolite2-country` | Geo | `csv` | MaxMind authenticated GeoLite2 Country CSV ZIP download |
+| `ip2location:country-lite` | Geo | `csv` | IP2Location Lite country CSV ZIP download |
+| `ipdeny:country-zones` | Geo | `cidr` | IPDeny country zone archive |
+| `ipip:country` | Geo | `txt` | IPIP country text ZIP download |
 
 DB-IP artifacts are resolved from the current monthly URL on the DB-IP landing page (`https://db-ip.com/db/download/<artifact>`). The downloaded URL uses the DB-IP free database pattern `https://download.db-ip.com/free/dbip-<artifact>-YYYY-MM.<ext>.gz`.
 
 The IPtoASN TSV feed is converted into the same Netdata MMDB layout as the DB-IP feeds, so consumers don't care which source produced the file.
 
-> **MaxMind GeoIP / GeoLite2 is not supported by this tool.** The downloader has no `license_key` field, no `MAXMIND_LICENSE_KEY` env var, and no MaxMind URL builder. If you want to use MaxMind, run MaxMind's own [`geoipupdate`](/src/crates/netflow-plugin/integrations/maxmind_geoip_-_geolite2.md) and point `enrichment.geoip.asn_database` / `enrichment.geoip.geo_database` at the files it produces.
+CAIDA prefix2as is ASN-only and has no AS organization names. The downloader resolves the latest `.pfx2as.gz` entry from CAIDA's creation log before fetching it.
 
-You can still pull *any* MMDB build (including a custom one) into the resolver by configuring `enrichment.geoip.asn_database` / `geo_database` directly — the downloader is one of several producers; the plugin doesn't care who wrote the MMDB. See the [Custom MMDB Database](/src/crates/netflow-plugin/integrations/custom_mmdb_database.md) card.
+MaxMind built-in sources require `MAXMIND_LICENSE_KEY` in the downloader environment. `maxmind:geolite2-asn@mmdb` downloads the official GeoLite2 ASN tarball and extracts the MMDB member. `maxmind:geolite2-country@csv` downloads the official GeoLite2 Country CSV **ZIP bundle** and needs the locations file plus the IPv4/IPv6 block CSVs inside that bundle; `csv` here does not mean a single raw CSV file.
+
+IP2Location `country-lite@csv` is also the provider's official CSV ZIP bundle. IPDeny `country-zones@cidr` is the `all-zones.tar.gz` archive, and IPIP `country@txt` is the country text ZIP.
+
+You can still pull *any* MMDB build (including a custom one) into the resolver by configuring `enrichment.geoip.asn_database` / `geo_database` directly — the downloader is one of several producers; the plugin doesn't care who wrote the MMDB. See the [Custom MMDB Database](/src/crates/netflow-plugin/integrations/custom_mmdb_database.md) card. If you prefer MaxMind's own updater, run [`geoipupdate`](/src/crates/netflow-plugin/integrations/maxmind_geoip_-_geolite2.md) and point `enrichment.geoip.asn_database` / `enrichment.geoip.geo_database` at the MMDB files it produces.
 
 ## Configuration file
 
@@ -161,7 +171,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now netdata-topology-ip-intel.timer
 ```
 
-DB-IP refreshes its free Lite databases monthly; weekly is a safe over-poll that picks up every release within a few days while staying polite to the upstream. IPtoASN refreshes hourly, but downstream consumers rarely need that resolution — daily is plenty if you switch to it.
+Refresh cadence depends on the sources you enable. DB-IP refreshes its free Lite databases monthly; weekly is a safe over-poll that picks up every release within a few days while staying polite to the upstream. IPtoASN refreshes hourly, but downstream consumers rarely need that resolution — daily is plenty if you switch to it. CAIDA prefix2as, MaxMind, IP2Location, IPDeny, and IPIP have their own publication schedules and terms; choose a timer cadence that is polite to the upstream and fast enough for your environment.
 
 Run the packaged binary as the `netdata` user (or root) so it can write to `/var/cache/netdata/topology-ip-intel/`.
 
@@ -242,7 +252,11 @@ When the plugin auto-detects MMDBs this way it forces `optional: true` on the ge
 - Per-provider details (refresh cadence, license, schema, attribution requirements):
   - [DB-IP IP Intelligence](/src/crates/netflow-plugin/integrations/db-ip_ip_intelligence.md) — the default the downloader fetches.
   - [IPtoASN](/src/crates/netflow-plugin/integrations/iptoasn.md) — public-domain TSV feed; converted to MMDB by this tool.
-  - [MaxMind GeoIP / GeoLite2](/src/crates/netflow-plugin/integrations/maxmind_geoip_-_geolite2.md) — *not* fetched by this tool; use `geoipupdate`.
+  - [CAIDA RouteViews Prefix-to-AS](/src/crates/netflow-plugin/integrations/caida_routeviews_prefix-to-as.md) — prefix-to-AS TSV feed; ASN-only.
+  - [MaxMind GeoIP / GeoLite2](/src/crates/netflow-plugin/integrations/maxmind_geoip_-_geolite2.md) — authenticated MaxMind downloads or MMDB files managed by `geoipupdate`.
+  - [IP2Location LITE IP-Country](/src/crates/netflow-plugin/integrations/ip2location_lite_ip-country.md) — public country-only CSV ZIP feed.
+  - [IPDeny Country Zones](/src/crates/netflow-plugin/integrations/ipdeny_country_zones.md) — country CIDR archive.
+  - [IPIP Country Database](/src/crates/netflow-plugin/integrations/ipip_country_database.md) — country text ZIP feed.
   - [Custom MMDB Database](/src/crates/netflow-plugin/integrations/custom_mmdb_database.md) — your own MMDB build.
 - The enrichment mechanism that consumes these files: [Enrichment](/docs/network-flows/enrichment.md) (the MMDB shared mechanism section).
 - The plugin knobs that point at the files: [Configuration › `enrichment.geoip`](/docs/network-flows/configuration.md#enrichment).

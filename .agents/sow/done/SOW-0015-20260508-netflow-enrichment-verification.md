@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Copilot low-confidence downloader and BMP live-test review signals addressed.
+Sub-state: End-user downloader documentation mismatch on supported providers corrected.
 
 ## Requirements
 
@@ -1053,3 +1053,41 @@ Artifact maintenance:
 - End-user/operator docs: no update needed; no user-facing command, option, or provider contract changed.
 - End-user/operator skills: no additional update needed beyond the direct-agent helper comment from the previous follow-up.
 - SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` for the downloader and BMP live-test hardening commit.
+
+### PR Review Follow-up - 2026-05-08 - Intel Downloader Provider Documentation
+
+Trigger:
+
+- Copilot's refreshed review body listed a low-confidence note about `netipx` import status and a note about `maxmind:geolite2-country@csv` being a ZIP bundle rather than a single raw CSV file.
+- The user asked whether the PR was ready to merge and approved fixing the remaining documentation mismatch first.
+
+Findings:
+
+- The `netipx` import note was false. `src/go/tools/topology-ip-intel-downloader/parse.go` imports `go4.org/netipx`, and the downloader package test passes.
+- The MaxMind `format: csv` note exposed a real user-documentation issue. `docs/network-flows/intel-downloader.md` still listed only DB-IP and IPtoASN, and still said MaxMind was not supported by the downloader.
+- The current code supports DB-IP, IPtoASN, CAIDA prefix2as, MaxMind GeoLite2 ASN, MaxMind GeoLite2 Country, IP2Location, IPDeny, and IPIP through the downloader.
+- MaxMind GeoLite2 Country and IP2Location country-lite use provider CSV ZIP bundles. For MaxMind Country, `format: csv` means the official GeoLite2 Country CSV ZIP bundle with locations plus IPv4/IPv6 block CSVs; it does not mean a single raw CSV file.
+
+Implementation:
+
+- Updated `docs/network-flows/intel-downloader.md` to list all supported provider/artifact combinations.
+- Removed the stale statement saying MaxMind is unsupported by the downloader.
+- Added explicit MaxMind `MAXMIND_LICENSE_KEY` and CSV ZIP bundle wording.
+- Added notes for CAIDA, IP2Location, IPDeny, and IPIP payload shapes.
+- Updated the refresh-cadence wording and per-provider links.
+
+Validation:
+
+- `rg` confirmed the stale "MaxMind unsupported" wording was removed and the new provider entries / MaxMind CSV ZIP clarification are present.
+- `go test ./tools/topology-ip-intel-downloader` from `src/go` passed.
+- `git diff --check` passed.
+- `bash .agents/sow/audit.sh` verified SOW status/directory consistency. It exited nonzero on existing unrelated audit findings, including `.agents/skills/mirror-netdata-repos/SKILL.md:112` Git SSH URL pattern classified as email-like sensitive data.
+
+Artifact maintenance:
+
+- AGENTS.md: no update needed; this work followed the existing PR review and SOW lifecycle rules.
+- Runtime project skills: no update needed.
+- Specs: no update needed; source code and provider metadata already define the current downloader contract.
+- End-user/operator docs: updated `docs/network-flows/intel-downloader.md`.
+- End-user/operator skills: no update needed; no public skill workflow changed.
+- SOW lifecycle: reopened from `done`, recorded this end-user documentation correction, then returned to `completed` for the docs commit.
