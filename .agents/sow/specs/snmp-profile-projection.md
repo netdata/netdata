@@ -362,14 +362,21 @@ inside one resolved profile remain load errors.
 Runtime BGP row structural identity is:
 
 ```text
-origin profile id + row kind + table OID + row index
+origin profile id + row kind + typed config id + table OID + row index
 origin profile id + row kind + scalar signal OID
 origin profile id + row kind + explicit scalar group id
 ```
 
+The typed config id is part of table-row structural identity because a single
+SNMP table row can legitimately produce multiple typed BGP rows with different
+semantics, such as separate peer-family views over one operational table. The
+runtime key still length-prefixes every component, including an empty config id.
+
 Within that structural identity, display fields such as peer description,
-local address, and peer identifier never determine storage identity. Typed
-structural identity is the source for chart, function, and alert row identity.
+local address, and peer identifier never determine storage identity. During the
+legacy-to-typed BGP migration, typed structural identity owns typed row and
+function row identity; chart and alert identity remain bound to the existing
+public chart context and label contract until the legacy BGP path is removed.
 
 Profile inheritance merge identity is the pre-collection form of that identity:
 

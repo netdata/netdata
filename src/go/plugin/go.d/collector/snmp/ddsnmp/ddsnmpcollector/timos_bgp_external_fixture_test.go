@@ -127,6 +127,83 @@ func TestCollector_Collect_TiMOSBGP_FromLibreNMSFixtures(t *testing.T) {
 	}
 }
 
+func TestCollector_Collect_TiMOSBGP_StateAdminAndRoutingInstance(t *testing.T) {
+	tests := map[string]struct {
+		rowIndex        string
+		instanceID      string
+		routingInstance string
+		neighbor        string
+		shutdown        int
+		wantAdmin       bool
+		state           int
+		wantState       ddprofiledefinition.BGPPeerState
+	}{
+		"admin disabled active peer in non-default VRF": {
+			rowIndex:        "2.1.4.192.0.2.21",
+			instanceID:      "2",
+			routingInstance: "vprn111",
+			neighbor:        "192.0.2.21",
+			shutdown:        1,
+			wantAdmin:       false,
+			state:           3,
+			wantState:       ddprofiledefinition.BGPPeerStateActive,
+		},
+		"idle peer in second non-default VRF": {
+			rowIndex:        "3.1.4.192.0.2.22",
+			instanceID:      "3",
+			routingInstance: "vprn222",
+			neighbor:        "192.0.2.22",
+			shutdown:        2,
+			wantAdmin:       true,
+			state:           1,
+			wantState:       ddprofiledefinition.BGPPeerStateIdle,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profile := matchedBGPProjectionByFile(t, "1.3.6.1.4.1.6527.1.3.17", "nokia-service-router-os.yaml")
+			filterProfileForTypedBGPByID(t, profile, "nokia-timos-bgp-peer")
+
+			pdus := []gosnmp.SnmpPDU{
+				createStringPDU(oidWithIndex("1.3.6.1.4.1.6527.3.1.2.3.1.1.4", tc.instanceID), tc.routingInstance),
+				createIntegerPDU(oidWithIndex("1.3.6.1.4.1.6527.3.1.2.14.4.7.1.6", tc.rowIndex), tc.shutdown),
+				createIntegerPDU(oidWithIndex("1.3.6.1.4.1.6527.3.1.2.14.4.7.1.59", tc.rowIndex), tc.state),
+				createGauge32PDU(oidWithIndex("1.3.6.1.4.1.6527.3.1.2.14.4.7.1.66", tc.rowIndex), 65001),
+			}
+
+			ctrl, mockHandler := setupMockHandler(t)
+			defer ctrl.Finish()
+
+			expectTiMOSMetadataGets(mockHandler, "1.3.6.1.4.1.6527.1.3.17")
+			expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
+
+			collector := New(Config{
+				SnmpClient:  mockHandler,
+				Profiles:    []*ddsnmp.Profile{profile},
+				Log:         logger.New(),
+				SysObjectID: "1.3.6.1.4.1.6527.1.3.17",
+			})
+
+			results, err := collector.Collect()
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			require.Empty(t, results[0].Metrics)
+			require.Len(t, results[0].BGPRows, 1)
+
+			row := requireBGPRowMatching(t, results[0].BGPRows, func(row ddsnmp.BGPRow) bool {
+				return row.Identity.Neighbor == tc.neighbor
+			})
+			assert.Equal(t, tc.routingInstance, row.Identity.RoutingInstance)
+			assert.Equal(t, "65001", row.Identity.RemoteAS)
+			require.True(t, row.Admin.Enabled.Has)
+			assert.Equal(t, tc.wantAdmin, row.Admin.Enabled.Value)
+			require.True(t, row.State.Has)
+			assert.Equal(t, tc.wantState, row.State.State)
+		})
+	}
+}
+
 func expectTiMOSMetadataGets(mockHandler *snmpmock.MockHandler, sysObjectID string) {
 	mockHandler.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		createStringPDU("1.3.6.1.2.1.1.1.0", "Nokia SR OS"),

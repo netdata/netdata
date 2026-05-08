@@ -409,6 +409,13 @@ Open decisions:
   - Updated Nokia profile, LibreNMS identity, and TiMOS fixture coverage to assert typed `BGPRows`.
   - Added Nokia BGP projection coverage to `collector/snmp/ddsnmp/profile_test.go`.
   - Reviewed new BGP tests for the branch's table-driven style rule and refactored same-shape Cisco prefix, Arista/Dell fixture, and TiMOS fixture tests to `map[string]struct{}` or equivalent map-keyed tables.
+- Reconciled the Claude Nokia/TiMOS commit review:
+  - Accepted the review verdict as ready with follow-ups.
+  - Added Nokia profile assertions for admin and six-state peer-state mappings.
+  - Added synthetic Nokia typed-collection coverage for admin-disabled, non-established states, and non-default VRF routing-instance extraction.
+  - Added broader Nokia profile assertions for descriptor, timer, traffic, notification, transition, and last-error fields.
+  - Updated `.agents/sow/specs/snmp-profile-projection.md` so BGP table structural identity includes typed config ID.
+  - Recorded the inherited TIMETRA high-numbered oper OID verification gap as a SOW follow-up.
 
 ## Validation
 
@@ -457,6 +464,9 @@ Tests or equivalent validation:
 - `go test -count=1 ./collector/snmp` passed on 2026-05-08 after the Nokia/TiMOS typed-profile migration and test refactor.
 - `go test -count=1 ./collector/snmp/...` passed on 2026-05-08 after the Nokia/TiMOS typed-profile migration and test refactor.
 - `go test -race -count=1 ./collector/snmp` passed on 2026-05-08 after the Nokia/TiMOS typed-profile migration and test refactor.
+- `go test -count=1 ./collector/snmp/ddsnmp ./collector/snmp/ddsnmp/ddprofiledefinition ./collector/snmp/ddsnmp/ddsnmpcollector` passed on 2026-05-08 after the Claude Nokia/TiMOS review follow-ups.
+- `go test -count=1 ./collector/snmp/...` passed on 2026-05-08 after the Claude Nokia/TiMOS review follow-ups.
+- `go test -race -count=1 ./collector/snmp` passed on 2026-05-08 after the Claude Nokia/TiMOS review follow-ups.
 
 Real-use evidence:
 
@@ -527,6 +537,7 @@ Open items that must be implemented, rejected with evidence, or represented by a
 - Resolve or track SCH2-4: `index`, `index_from_end`, and `index_transform` mutual-exclusivity is not validated or documented.
 - Document or test SCH2-6: `index_from_end` plus `format` propagation is correct through `bgpValueSymbol` but lacks focused coverage.
 - Document `partial_states`, empty routing-instance normalization, per-source stale-cache semantics, and `index_from_end` precedence in the projection spec and/or profile format docs.
+- Verify or correct NOK-1: inherited Nokia/TiMOS `tBgpPeerNgOperTable` high-numbered OIDs `.177-.188` are used by legacy and typed profiles but are absent from the downloaded TIMETRA MIB excerpt.
 - Complete SOW validation gate: reviewer findings, same-failure scans, sensitive-data gate, artifact gate, lessons, and final follow-up mapping.
 - Remove local raw `mibs/` files before closing the SOW; `/mibs/` is ignored as defense-in-depth.
 

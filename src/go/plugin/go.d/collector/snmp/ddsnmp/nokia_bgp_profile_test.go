@@ -33,6 +33,85 @@ func Test_NokiaBGPProfileMergedIntoNokiaSROS(t *testing.T) {
 	assert.Equal(t, "tBgpPeerNgOperTable", peer.Connection.EstablishedUptime.Table)
 	assert.Equal(t, "tBgpPeerNgOperTable", peer.Traffic.Updates.Received.Table)
 	assert.Equal(t, "tBgpPeerNgOperTable", peer.LastError.Code.Table)
+	assert.Equal(t, map[string]string{"1": "stop", "2": "start"}, peer.Admin.Enabled.Symbol.Mapping.Items)
+	assert.Equal(t, map[string]string{
+		"1": "idle",
+		"2": "connect",
+		"3": "active",
+		"4": "opensent",
+		"5": "openconfirm",
+		"6": "established",
+	}, peer.State.Symbol.Mapping.Items)
+
+	values := map[string]struct {
+		value  ddprofiledefinition.BGPValueConfig
+		table  string
+		symbol string
+	}{
+		"peer_identifier": {
+			value:  peer.Descriptors.PeerIdentifier,
+			table:  "tBgpPeerNgOperTable",
+			symbol: "bgpPeerIdentifier",
+		},
+		"last_received_update_age": {
+			value:  peer.Connection.LastReceivedUpdateAge,
+			table:  "tBgpPeerNgOperTable",
+			symbol: "bgpPeerInUpdateElapsedTime",
+		},
+		"messages.received": {
+			value:  peer.Traffic.Messages.Received,
+			table:  "tBgpPeerNgOperTable",
+			symbol: "bgpPeerInTotalMessages",
+		},
+		"messages.sent": {
+			value:  peer.Traffic.Messages.Sent,
+			table:  "tBgpPeerNgOperTable",
+			symbol: "bgpPeerOutTotalMessages",
+		},
+		"notifications.received": {
+			value:  peer.Traffic.Notifications.Received,
+			table:  "tBgpPeerNgOperTable",
+			symbol: "bgpPeerInNotifications",
+		},
+		"notifications.sent": {
+			value:  peer.Traffic.Notifications.Sent,
+			table:  "tBgpPeerNgOperTable",
+			symbol: "bgpPeerOutNotifications",
+		},
+		"transitions.flaps": {
+			value:  peer.Transitions.Flaps,
+			table:  "tBgpPeerNgOperTable",
+			symbol: "tBgpPeerNgOperFlaps",
+		},
+		"timers.configured.connect_retry": {
+			value:  peer.Timers.Configured.ConnectRetry,
+			symbol: "tBgpPeerNgConnectRetry",
+		},
+		"timers.configured.hold_time": {
+			value:  peer.Timers.Configured.HoldTime,
+			symbol: "tBgpPeerNgHoldTime",
+		},
+		"timers.configured.keepalive_time": {
+			value:  peer.Timers.Configured.KeepaliveTime,
+			symbol: "tBgpPeerNgKeepAlive",
+		},
+		"timers.configured.min_route_advertisement_interval": {
+			value:  peer.Timers.Configured.MinRouteAdvertisementInterval,
+			symbol: "tBgpPeerNgMinRouteAdvertisement",
+		},
+		"last_error.subcode": {
+			value:  peer.LastError.Subcode,
+			table:  "tBgpPeerNgOperTable",
+			symbol: "bgpPeerLastErrorSubcode",
+		},
+	}
+
+	for name, tc := range values {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.table, tc.value.Table)
+			assert.Equal(t, tc.symbol, tc.value.Symbol.Name)
+		})
+	}
 
 	tests := map[string]struct {
 		id     string
