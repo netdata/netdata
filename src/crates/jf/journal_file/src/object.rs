@@ -937,8 +937,13 @@ impl<B: ByteSlice> DataObject<B> {
             }
             buf.resize(uncompressed_size, 0);
 
-            lz4_flex::block::decompress_into(compressed_data, buf)
-                .map_err(|_| JournalError::DecompressorError)
+            match lz4_flex::block::decompress_into(compressed_data, buf) {
+                Ok(len) => Ok(len),
+                Err(_) => {
+                    *buf = Vec::new();
+                    Err(JournalError::DecompressorError)
+                }
+            }
         } else if self.xz_compressed() {
             use lzma_rust2::XzReader;
 
@@ -1008,6 +1013,25 @@ mod tests {
             Err(JournalError::DecompressorError)
         ));
         assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn lz4_decompress_clears_buffer_on_decode_error() {
+        let uncompressed_size = 4usize;
+        let mut stored_payload = Vec::new();
+        stored_payload.extend_from_slice(&(uncompressed_size as u64).to_le_bytes());
+        stored_payload.extend_from_slice(&[0x10, b'a', 1, 0]);
+
+        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = b"stale".to_vec();
+
+        assert!(matches!(
+            object.decompress(&mut buf),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
     }
 
     #[test]

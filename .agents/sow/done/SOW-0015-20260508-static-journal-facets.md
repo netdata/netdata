@@ -207,7 +207,7 @@ Real-use evidence:
 Reviewer findings:
 
 - Initial implementation had no external reviewer pass before opening the PR; the user asked to distrust the prior session and verify locally from code.
-- PR review iteration found two Copilot comments on `netdata/netdata#22456`; both were verified as valid and addressed in the same SOW.
+- PR review iterations found Copilot comments on `netdata/netdata#22456`; each was verified before code changes, addressed in the same SOW, replied to in-thread, and resolved after commit/push.
 
 Same-failure scan:
 
@@ -340,6 +340,26 @@ Validation:
 - `cargo fmt -p journal-core` in `src/crates`: passed.
 - `cargo test -q` in `src/crates/jf`: passed; 7 tests passed.
 - `cargo test -q -p journal-core` in `src/crates`: passed; 21 tests passed plus the existing ignored tests.
+
+## PR Review Iteration 5 - 2026-05-08
+
+Findings:
+
+- `PRRT_kwDOAKPxd86Atn1r`, `src/crates/journal-core/src/file/object.rs:1047`: valid. The LZ4 decode-error path left the reusable buffer resized to the advertised uncompressed size.
+- `PRRT_kwDOAKPxd86Atn2C`, `src/crates/jf/journal_file/src/object.rs:941`: valid. Same LZ4 decode-error buffer state issue in the legacy static reader, including the FFI caller reuse path.
+
+Actions:
+
+- Changed both LZ4 decode-error branches to replace the reusable buffer with a new empty `Vec`, so callers cannot observe stale decompressed bytes or retain the failed allocation.
+- Added malformed LZ4 block regression tests for both readers.
+
+Validation:
+
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q` in `src/crates/jf`: passed; 8 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 22 tests passed plus the existing ignored tests.
+- `git diff --check`: passed.
 
 ## Outcome
 
