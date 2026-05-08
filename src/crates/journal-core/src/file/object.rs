@@ -889,16 +889,24 @@ pub struct DataObject<B: ByteSlice> {
 const MAX_UNCOMPRESSED_DATA_OBJECT_SIZE: usize = 768 * 1024 * 1024;
 
 fn read_limited_to_end<R: std::io::Read>(reader: R, buf: &mut Vec<u8>) -> Result<usize> {
-    let mut limited = reader.take((MAX_UNCOMPRESSED_DATA_OBJECT_SIZE as u64) + 1);
+    read_limited_to_end_with_cap(reader, buf, MAX_UNCOMPRESSED_DATA_OBJECT_SIZE)
+}
+
+fn read_limited_to_end_with_cap<R: std::io::Read>(
+    reader: R,
+    buf: &mut Vec<u8>,
+    max_size: usize,
+) -> Result<usize> {
+    let mut limited = reader.take((max_size as u64) + 1);
 
     buf.clear();
-    let len = limited
-        .read_to_end(buf)
-        .map_err(|_| JournalError::DecompressorError)?;
-    if len > MAX_UNCOMPRESSED_DATA_OBJECT_SIZE {
-        buf.clear();
-        return Err(JournalError::DecompressorError);
-    }
+    let len = match limited.read_to_end(buf) {
+        Ok(len) if len <= max_size => len,
+        Ok(_) | Err(_) => {
+            buf.clear();
+            return Err(JournalError::DecompressorError);
+        }
+    };
 
     Ok(len)
 }
@@ -1049,6 +1057,20 @@ impl<B: ByteSlice> DataObject<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{self, Read};
+
+    struct FixedSizeReader {
+        remaining: usize,
+    }
+
+    impl Read for FixedSizeReader {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            let len = self.remaining.min(buf.len());
+            buf[..len].fill(b'x');
+            self.remaining -= len;
+            Ok(len)
+        }
+    }
 
     fn data_object_bytes(payload: &[u8], flags: u8) -> Vec<u8> {
         let header = DataObjectHeader {
@@ -1085,6 +1107,17 @@ mod tests {
 
         assert!(matches!(
             object.decompress(&mut buf),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn read_limited_to_end_errors_and_clears_when_limit_is_exceeded() {
+        let mut buf = b"stale".to_vec();
+
+        assert!(matches!(
+            read_limited_to_end_with_cap(FixedSizeReader { remaining: 5 }, &mut buf, 4),
             Err(JournalError::DecompressorError)
         ));
         assert!(buf.is_empty());

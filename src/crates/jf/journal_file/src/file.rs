@@ -182,7 +182,7 @@ impl<'data> DataPayloadMatcher<'data> {
 
         if object.is_compressed() {
             let len = object.decompress(&mut self.decompressed_payload)?;
-            return Ok(self.decompressed_payload[..len] == *self.payload);
+            return Ok(&self.decompressed_payload[..len] == self.payload);
         }
 
         Ok(false)

@@ -297,6 +297,29 @@ Validation:
 - `cargo test -q` in `src/crates/jf`: passed; 6 tests passed.
 - `cargo test -q -p journal-core` in `src/crates`: passed; 20 tests passed plus the existing ignored tests.
 
+## PR Review Iteration 3 - 2026-05-08
+
+Findings:
+
+- `PRRT_kwDOAKPxd86AtR3f`, `src/crates/jf/journal_file/src/file.rs:185`: partially valid. The slice comparison compiled in focused tests, but comparing by reference is clearer and avoids relying on implicit unsized slice comparison behavior.
+- `PRRT_kwDOAKPxd86AtR33`, `src/crates/jf/journal_file/src/object.rs:787`: considered and not implemented as shared code. The duplicate helper exists in a legacy separate `src/crates/jf` workspace and the newer `src/crates/journal-core` workspace, with different error types. Centralizing via `journal-common` would add unrelated dependencies to the legacy static reader for a small private helper. Keeping the helpers local is lower risk for this bug-fix PR.
+- `PRRT_kwDOAKPxd86AtR4H`, `src/crates/jf/journal_file/src/object.rs:796`: valid. `read_to_end()` can leave partial bytes in the reusable buffer before returning an error.
+- `PRRT_kwDOAKPxd86AtR4a`, `src/crates/journal-core/src/file/object.rs:901`: valid. The stream-size cap needed a focused small-cap test that does not allocate hundreds of MiB.
+
+Actions:
+
+- Changed compressed payload comparison to compare slice references explicitly.
+- Changed bounded stream reads to clear the reusable buffer on both over-limit and read-error paths.
+- Added private small-cap helper entry points used by tests.
+- Added small custom `Read` tests for over-limit stream handling in both readers.
+
+Validation:
+
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q` in `src/crates/jf`: passed; 7 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 21 tests passed plus the existing ignored tests.
+
 ## Outcome
 
 Implemented, validated, and prepared for commit in `~/src/PRs/netdata-static-journal-facets`.
