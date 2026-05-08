@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
 #include "../windows.plugin/windows_plugin.h"
 #include "../windows.plugin/windows-internals.h"
 
