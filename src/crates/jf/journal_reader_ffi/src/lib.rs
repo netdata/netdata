@@ -382,9 +382,24 @@ unsafe extern "C" fn rsd_journal_enumerate_available_unique(
 
     match journal.reader.field_data_enumerate(&journal.journal_file) {
         Ok(Some(data_guard)) => {
-            let payload = data_guard.payload_bytes();
-            *data = payload.as_ptr() as *const c_void;
-            *l = payload.len();
+            if data_guard.is_compressed() {
+                return match data_guard.decompress(&mut journal.decompressed_payload) {
+                    Ok(n) => {
+                        *l = n;
+                        *data = journal.decompressed_payload.as_ptr() as *const c_void;
+                        1
+                    }
+                    Err(error::JournalError::UnknownCompressionMethod) => {
+                        eprintln!("unknown compression method");
+                        -1
+                    }
+                    Err(_) => -1,
+                };
+            } else {
+                let payload = data_guard.payload_bytes();
+                *data = payload.as_ptr() as *const c_void;
+                *l = payload.len();
+            }
 
             1
         }

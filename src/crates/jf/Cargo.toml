@@ -23,6 +23,8 @@ twox-hash = { version = "2.1", default-features = false, features = ["std"] }
 static_assertions = "1.1"
 serde_json = "1.0"
 ruzstd = "0.8"
+lz4_flex = { version = "0.12", default-features = false, features = ["std", "safe-decode", "checked-decode"] }
+lzma-rust2 = { version = "0.15", default-features = false, features = ["std", "xz"] }
 libc = "0.2"
 hex = "0.4"
 tempfile = "3"

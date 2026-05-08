@@ -633,8 +633,12 @@ mod tests {
                 filtered_entries += 1;
             }
 
-            // Should find 2 entries with _SYSTEMD_UNIT=test.service (entries 0 and 2)
-            assert_eq!(filtered_entries, 2, "Expected 2 filtered entries");
+            // Should find 2 entries with _SYSTEMD_UNIT=test.service per iteration (entries 0 and 2)
+            assert_eq!(
+                filtered_entries,
+                2 * iterations,
+                "Expected filtered entries"
+            );
         }
 
         println!("✅ All tests passed!");

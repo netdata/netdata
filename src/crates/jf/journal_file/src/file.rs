@@ -160,13 +160,32 @@ struct PayloadMatcher<'data, T> {
     _phantom: PhantomData<T>,
 }
 
-impl<'data, B: ByteSlice> PayloadMatcher<'data, DataObject<B>> {
-    fn data_matcher(payload: &'data [u8], hash: u64) -> Self {
+struct DataPayloadMatcher<'data> {
+    payload: &'data [u8],
+    hash: u64,
+    decompressed_payload: Vec<u8>,
+}
+
+impl<'data> DataPayloadMatcher<'data> {
+    fn new(payload: &'data [u8], hash: u64) -> Self {
         Self {
             payload,
             hash,
-            _phantom: PhantomData::<DataObject<B>>,
+            decompressed_payload: Vec::new(),
         }
+    }
+
+    fn payload_matches<B: ByteSlice>(&mut self, object: &DataObject<B>) -> Result<bool> {
+        if object.get_payload() == self.payload {
+            return Ok(true);
+        }
+
+        if object.is_compressed() {
+            let len = object.decompress(&mut self.decompressed_payload)?;
+            return Ok(self.decompressed_payload[..len] == *self.payload);
+        }
+
+        Ok(false)
     }
 }
 
@@ -176,6 +195,19 @@ impl<'data, B: ByteSlice> PayloadMatcher<'data, FieldObject<B>> {
             payload,
             hash,
             _phantom: PhantomData::<FieldObject<B>>,
+        }
+    }
+}
+
+impl<'a> BucketVisitor<'a> for DataPayloadMatcher<'_> {
+    type Object = DataObject<&'a [u8]>;
+    type Output = NonZeroU64;
+
+    fn visit(&mut self, object: &ValueGuard<'a, Self::Object>) -> Result<Option<Self::Output>> {
+        if object.hash() == self.hash && self.payload_matches(object)? {
+            Ok(Some(object.offset()))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -546,7 +578,7 @@ impl<M: MemoryMap> JournalFile<M> {
     }
 
     pub fn find_data_offset(&self, hash: u64, payload: &[u8]) -> Result<Option<NonZeroU64>> {
-        let visitor = PayloadMatcher::data_matcher(payload, hash);
+        let visitor = DataPayloadMatcher::new(payload, hash);
         self.visit_bucket(self.data_hash_table_ref(), hash, visitor)
     }
 
@@ -1137,5 +1169,63 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
                 Some(Err(e))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zerocopy::IntoBytes;
+
+    fn data_object_bytes(payload: &[u8], flags: u8) -> Vec<u8> {
+        let header = DataObjectHeader {
+            object_header: ObjectHeader {
+                type_: ObjectType::Data as u8,
+                flags,
+                reserved: [0; 6],
+                size: (std::mem::size_of::<DataObjectHeader>() + payload.len()) as u64,
+            },
+            hash: 0,
+            next_hash_offset: None,
+            next_field_offset: None,
+            entry_offset: None,
+            entry_array_offset: None,
+            n_entries: None,
+        };
+
+        let mut bytes = Vec::with_capacity(header.object_header.size as usize);
+        bytes.extend_from_slice(header.as_bytes());
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    #[test]
+    fn data_payload_matcher_matches_lz4_compressed_payload() {
+        let payload = b"_SYSTEMD_UNIT=netdata.service";
+        let compressed = lz4_flex::block::compress(payload);
+        let mut stored_payload = Vec::with_capacity(std::mem::size_of::<u64>() + compressed.len());
+        stored_payload.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+        stored_payload.extend_from_slice(&compressed);
+
+        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+
+        let mut matcher = DataPayloadMatcher::new(payload, 0);
+        assert!(matcher.payload_matches(&object).unwrap());
+    }
+
+    #[test]
+    fn data_payload_matcher_rejects_different_compressed_payload() {
+        let payload = b"_SYSTEMD_UNIT=netdata.service";
+        let compressed = lz4_flex::block::compress(payload);
+        let mut stored_payload = Vec::with_capacity(std::mem::size_of::<u64>() + compressed.len());
+        stored_payload.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+        stored_payload.extend_from_slice(&compressed);
+
+        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+
+        let mut matcher = DataPayloadMatcher::new(b"_SYSTEMD_UNIT=sshd.service", 0);
+        assert!(!matcher.payload_matches(&object).unwrap());
     }
 }

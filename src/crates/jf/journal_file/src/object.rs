@@ -885,6 +885,32 @@ impl<B: ByteSlice> DataObject<B> {
             decoder
                 .read_to_end(buf)
                 .map_err(|_| JournalError::DecompressorError)
+        } else if self.lz4_compressed() {
+            let payload = self.payload_bytes();
+
+            if payload.len() < 8 {
+                return Err(JournalError::DecompressorError);
+            }
+
+            let uncompressed_size = u64::from_le_bytes(payload[..8].try_into().unwrap()) as usize;
+            let compressed_data = &payload[8..];
+
+            buf.clear();
+            buf.resize(uncompressed_size, 0);
+
+            lz4_flex::block::decompress_into(compressed_data, buf)
+                .map_err(|_| JournalError::DecompressorError)
+        } else if self.xz_compressed() {
+            use lzma_rust2::XzReader;
+            use std::io::Read;
+
+            let payload = self.payload_bytes();
+            let mut decoder = XzReader::new(payload, false);
+
+            buf.clear();
+            decoder
+                .read_to_end(buf)
+                .map_err(|_| JournalError::DecompressorError)
         } else {
             Err(JournalError::UnknownCompressionMethod)
         }
