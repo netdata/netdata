@@ -2,6 +2,8 @@
 
 #include "../windows.plugin/windows_plugin.h"
 #include "../windows.plugin/windows-internals.h"
+#include "daemon/daemon-service.h"
+#include "libnetdata/required_dummies.h"
 #include "libnetdata/os/windows-api/windows_api.h"
 
 #define PLUGIN_NETWORK_VIEWER_NAME "network-viewer.plugin"
@@ -123,12 +125,11 @@ static void tcp_create_connection_chart(TCP_FAMILY *tcp, int update_every)
         update_every,
         RRDSET_TYPE_LINE);
 
-    tcp->rd_connection_failures = perflib_rrddim_add(tcp->connections_chart, "failures", NULL, 1, 1, &tcp->connection_failures);
-    tcp->rd_connections_active = perflib_rrddim_add(tcp->connections_chart, "active", NULL, 1, 1, &tcp->connections_active);
-    tcp->rd_connections_established =
-        perflib_rrddim_add(tcp->connections_chart, "established", NULL, 1, 1, &tcp->connections_established);
-    tcp->rd_connections_passive = perflib_rrddim_add(tcp->connections_chart, "passive", NULL, 1, 1, &tcp->connections_passive);
-    tcp->rd_connections_reset = perflib_rrddim_add(tcp->connections_chart, "reset", NULL, 1, 1, &tcp->connections_reset);
+    tcp->rd_connection_failures = rrddim_add(tcp->connections_chart, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    tcp->rd_connections_active = rrddim_add(tcp->connections_chart, "active", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    tcp->rd_connections_established = rrddim_add(tcp->connections_chart, "established", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    tcp->rd_connections_passive = rrddim_add(tcp->connections_chart, "passive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    tcp->rd_connections_reset = rrddim_add(tcp->connections_chart, "reset", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 }
 
 static void tcp_create_segments_chart(TCP_FAMILY *tcp, int update_every)
@@ -156,11 +157,11 @@ static void tcp_create_segments_chart(TCP_FAMILY *tcp, int update_every)
         update_every,
         RRDSET_TYPE_LINE);
 
-    tcp->rd_segments_total = perflib_rrddim_add(tcp->segments_chart, "total", NULL, 1, 1, &tcp->segments_total);
-    tcp->rd_segments_received = perflib_rrddim_add(tcp->segments_chart, "received", NULL, 1, 1, &tcp->segments_received);
+    tcp->rd_segments_total = rrddim_add(tcp->segments_chart, "total", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    tcp->rd_segments_received = rrddim_add(tcp->segments_chart, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     tcp->rd_segments_retransmitted =
-        perflib_rrddim_add(tcp->segments_chart, "retransmitted", NULL, 1, 1, &tcp->segments_retransmitted);
-    tcp->rd_segments_sent = perflib_rrddim_add(tcp->segments_chart, "sent", NULL, 1, 1, &tcp->segments_sent);
+        rrddim_add(tcp->segments_chart, "retransmitted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    tcp->rd_segments_sent = rrddim_add(tcp->segments_chart, "sent", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 }
 
 static void tcp_create_states_chart(TCP_FAMILY *tcp, int update_every)
@@ -248,17 +249,17 @@ static bool tcp_collect_family(TCP_FAMILY *tcp, int update_every)
     tcp_create_segments_chart(tcp, update_every);
     tcp_create_states_chart(tcp, update_every);
 
-    perflib_rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connection_failures, &tcp->connection_failures);
-    perflib_rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connections_active, &tcp->connections_active);
-    perflib_rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connections_established, &tcp->connections_established);
-    perflib_rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connections_passive, &tcp->connections_passive);
-    perflib_rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connections_reset, &tcp->connections_reset);
+    rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connection_failures, (collected_number)tcp->connection_failures.current.Data);
+    rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connections_active, (collected_number)tcp->connections_active.current.Data);
+    rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connections_established, (collected_number)tcp->connections_established.current.Data);
+    rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connections_passive, (collected_number)tcp->connections_passive.current.Data);
+    rrddim_set_by_pointer(tcp->connections_chart, tcp->rd_connections_reset, (collected_number)tcp->connections_reset.current.Data);
     rrdset_done(tcp->connections_chart);
 
-    perflib_rrddim_set_by_pointer(tcp->segments_chart, tcp->rd_segments_total, &tcp->segments_total);
-    perflib_rrddim_set_by_pointer(tcp->segments_chart, tcp->rd_segments_received, &tcp->segments_received);
-    perflib_rrddim_set_by_pointer(tcp->segments_chart, tcp->rd_segments_retransmitted, &tcp->segments_retransmitted);
-    perflib_rrddim_set_by_pointer(tcp->segments_chart, tcp->rd_segments_sent, &tcp->segments_sent);
+    rrddim_set_by_pointer(tcp->segments_chart, tcp->rd_segments_total, (collected_number)tcp->segments_total.current.Data);
+    rrddim_set_by_pointer(tcp->segments_chart, tcp->rd_segments_received, (collected_number)tcp->segments_received.current.Data);
+    rrddim_set_by_pointer(tcp->segments_chart, tcp->rd_segments_retransmitted, (collected_number)tcp->segments_retransmitted.current.Data);
+    rrddim_set_by_pointer(tcp->segments_chart, tcp->rd_segments_sent, (collected_number)tcp->segments_sent.current.Data);
     rrdset_done(tcp->segments_chart);
 
     uint32_t state_counts[NETDATA_WIN_TCP_STATE_COUNT] = {0};
