@@ -1,21 +1,38 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents (Claude Code, Codex CLI, Gemini CLI, Opencode, Qwen-code, Crush, and others) working with code in this repository. The repo-root `CLAUDE.md` and `GEMINI.md` are relative symlinks to this file so every tool reads the same instructions.
-
-THE MOST IMPORTANT RULES ARE:
-
-1. You MUST ALWAYS find the root cause of a problem, before giving a solution.
-2. Patching without understanding the problem IS NOT ALLOWED.
-3. Before patching code, we MUST understand the code base and the potential implications of our changes.
-4. We do not duplicate code. We first check if similar code already exists and to reuse it.
-
 ## Goals
 
 This repository is the Netdata Agent codebase. It is a large, multi-language, multi-platform monolith that serves production monitoring, troubleshooting, data collection, alerting, storage, streaming, cloud integration, packaging, and documentation workflows.
 
-Work in this repository must prioritize root-cause understanding, correctness, performance, maintainability, portability, security, and consistency with existing project conventions. Because the project is too broad for one bootstrap pass, SOW coverage grows incrementally by the area being worked.
+Work in this repository must prioritize root-cause understanding, correctness, performance, maintainability, portability, security, and consistency with existing project conventions.
+
+CRITICAL RULES:
+
+1. You MUST ALWAYS find the root cause of a problem, before offering/giving a solution.
+   Patching without understanding the problem IS NOT ALLOWED.
+
+2. Before patching code, you MUST understand the codebase and the potential implications of the changes.
+   What else is affected? What else is using this part of the code?
+
+3. Do not duplicate code.
+   First check if similar code already exists and reuse it.
+
+USER COMMUNICATION:
+
+1. ALWAYS DO YOUR HOMEWORK BEFORE ASKING QUESTIONS OR REQUESTING USER DECISIONS.
+   PROACTIVELY CHECK ALL RELATED ASPECTS AND ALL POSSIBILITIES SO THAT YOUR QUESTIONS AND REQUESTS ARE WELL INFORMED AND TO THE POINT.
+
+2. NEVER WRITE WALLS OF TEXT TO THE USER, UNLESS THEY ASKED FOR IT.
+   YOUR COMMUNICATION MUST BE SIMPLE, DIRECT, LEAN, ORDERED BY IMPORTANCE.
+   PROVIDE THE FULL PICTURE AT THE BEGINNING, START FROM THE HIGH LEVEL, AND LET THE USER ASK FOR DETAILS.
+
+3. NEVER AGREE TO THE USER WHEN THE FACTS CONTRADICT THEIR UNDERSTANDING.
+   YOU MUST ALWAYS PROVIDE CLEAR DESCRIPTIONS OF THE RISKS AND IMPLICATIONS OF THEIR DECISIONS.
+   YOU ARE HELPFUL WHEN YOU ACCURATELY REVEAL THE TRUTH, NOT WHEN YOU AGREE.
 
 ## SOW System
+
+Project SOW status: initialized
 
 This project uses a local Statement of Work system.
 
@@ -32,7 +49,7 @@ Before non-trivial work:
 
 1. Read pending/current SOWs for overlap, contradictions, and existing decisions.
 2. Read relevant specs under `.agents/sow/specs/`.
-3. Inspect `.agents/skills/project-*/SKILL.md` if any exist, and load every runtime project skill whose trigger matches the work.
+3. Inspect `.agents/skills/*/SKILL.md` if any exist, and load every runtime project skill whose trigger matches the work.
 4. Inspect legacy runtime skills listed below when the user request matches their frontmatter trigger.
 5. Inspect code, docs, tests, and existing project instructions as ground truth.
 6. Ask the user only for irreducible product/design/risk decisions.
@@ -58,7 +75,7 @@ If sensitive data is required to continue, stop and ask the user for a secure ha
 
 ### Open-Source Reference Evidence
 
-When SOW evidence comes from local mirrored open-source repositories under `/opt/baddisk/monitoring/repos/`, cite the upstream repository and checked commit instead of the workstation absolute path.
+When SOW evidence comes from other open-source repositories, cite the upstream repository and checked commit instead of the workstation absolute path.
 
 Use:
 
@@ -67,7 +84,7 @@ owner/repo @ commit
 relative/path/inside/repo:line
 ```
 
-Resolve `owner/repo` from the repository remote, record the checked commit, and keep paths relative to the upstream repository root. Never write `/opt/baddisk/monitoring/repos/...` paths into SOW evidence.
+Resolve `owner/repo` from the repository remote, record the checked commit, and keep paths relative to the upstream repository root. Never write absolute paths into SOW evidence.
 
 ### Pre-Implementation Gate
 
@@ -255,11 +272,7 @@ Specs describe current reality, not aspiration. If specs and code disagree, reco
 
 Project skills are memory of HOW to work here.
 
-Runtime input project skills should live under `.agents/skills/project-*/SKILL.md`. The `project-` prefix is the generic hook meaning "agents working in this repo must consider this skill." Before non-trivial work, inspect those skill descriptions and load every matching runtime skill.
-
-Do not create generic `project-*` skills only to make the framework look complete. The user requested that project skills for this repository grow incrementally.
-
-Existing non-`project-*` skills under `.agents/skills/` are preserved as legacy runtime skills. Use them when the request matches their frontmatter trigger. Do not rename them or add wrappers during this bootstrap pass.
+Runtime input project skills should live under `.agents/skills/*/SKILL.md`. Before non-trivial work, inspect those skill descriptions and load every matching runtime skill.
 
 Output/reference skills may also exist under product documentation or generated skill directories. Do not rename, shorten, or change their descriptions only to satisfy runtime discovery. Update them when their related public/operator workflow changes.
 
@@ -269,7 +282,7 @@ End-user-facing AI skills under `docs/netdata-ai/skills/` follow the directory s
 
 Each public skill is reachable from `.agents/skills/<skill-name>` via a relative symlink (`.agents/skills/<name>` → `../../docs/netdata-ai/skills/<name>`) so local AI assistants reading from `.agents/skills/` see the same skill as end-users. Create the symlink with `ln -srfn`. Verify with `readlink -f .agents/skills/<name>`.
 
-Public-skill scripts must follow the same `_lib.sh` shape as the legacy private skills (`set -euo pipefail`, ANSI colors with real ESC bytes via `$'\033[...]'`, `<prefix>_repo_root` via `git rev-parse --show-toplevel`, `<prefix>_load_env` that sources `<repo>/.env` with `: "${VAR:?}"` validation, `<prefix>_audit_dir` that creates `<repo>/.local/audits/<topic>/`, masked-token `<prefix>_run`/`<prefix>_run_read` wrappers).
+Public-skill scripts must follow the same `_lib.sh` shape as existing skills (`set -euo pipefail`, ANSI colors with real ESC bytes via `$'\033[...]'`, `<prefix>_repo_root` via `git rev-parse --show-toplevel`, `<prefix>_load_env` that sources `<repo>/.env` with `: "${VAR:?}"` validation, `<prefix>_audit_dir` that creates `<repo>/.local/audits/<topic>/`, masked-token `<prefix>_run`/`<prefix>_run_read` wrappers).
 
 Public-skill scripts that touch credentials (cloud tokens, per-agent bearers, claim ids, session cookies) MUST be **token-safe** -- helpers that handle credential bytes are named with a leading underscore (`_skill_*`, internal-only) and return them via bash namerefs into the caller's local variables, NEVER to stdout. Public wrappers (no leading underscore) read credentials from `.env` internally and emit ONLY the response body. Each token-handling lib must ship a `<prefix>_selftest_no_token_leak` function that drives every public wrapper with a sentinel token and asserts the sentinel never appears on captured stdout.
 
@@ -277,7 +290,7 @@ Public-skill scripts that touch credentials (cloud tokens, per-agent bearers, cl
 
 Each public skill ships a `how-tos/` subdirectory with `INDEX.md`. The catalog is **live**: every time an AI assistant is asked a concrete question that requires analysis (multiple wrapper calls, jq pipelines, or cross-referencing more than one per-domain guide) and the answer isn't already documented under `how-tos/`, the assistant MUST author a new how-to and add it to `INDEX.md` BEFORE completing the task. This rule is repeated in each skill's `SKILL.md` so future assistants honor it. Skipping it means the next assistant repeats the same analysis from scratch -- an explicit framework violation.
 
-The legacy private skills (`coverity-audit`, `sonarqube-audit`, `graphql-audit`, `pr-reviews`) keep their `.agents/skills/<name>/` location -- they are intentionally private and have no `docs/netdata-ai/skills/` counterpart.
+The existing private skills (`coverity-audit`, `sonarqube-audit`, `graphql-audit`, `pr-reviews`) keep their `.agents/skills/<name>/` location -- they are intentionally private and have no `docs/netdata-ai/skills/` counterpart.
 
 ### Project Skills Index
 
@@ -286,12 +299,19 @@ Runtime input skills:
 - `.agents/skills/project-snmp-profiles-authoring/`
   Trigger: editing SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, or SNMP profile-format documentation.
   Purpose: require MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects.
+
 - `.agents/skills/project-writing-collectors/`
   Trigger: authoring or modifying any Netdata data-collection plugin or module (Go go.d / ibm.d, Rust crates, internal C plugins, external plugins via PLUGINSD). Read before adding a new collector, modifying an existing one, working on NetFlow/sFlow/IPFIX, OTEL ingestion, topology, SNMP profiles, or interactive Functions.
   Status: live. Updates that close gaps or fix outdated pointers must ship in the same PR that exposed the issue.
+
+- `.agents/skills/project-writing-go-modules-framework-v2/`
+  Trigger: creating or migrating a Go go.d collector to framework V2; touching `CollectorV2`, `metrix.CollectorStore`, `ChartTemplateYAML` / `charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, or V2 collector tests.
+  Purpose: mirror maintainer-preferred framework V2 patterns from accepted collectors so new or migrated modules blend with repository style.
+
 - `.agents/skills/integrations-lifecycle/`
   Trigger: editing any `metadata.yaml`; modifying `integrations/` generators, schemas, or templates; working with `integrations.js` / `integrations.json` / per-integration `.md` files / `COLLECTORS.md` / `SECRETS.md` / `SERVICE-DISCOVERY.md`; ibm.d module generation (`contexts.yaml` -> `metadata.yaml`); CI workflows `generate-integrations.yml` and `check-markdown.yml`; the five-file collector-consistency rule.
   Status: live. SKILL.md plus per-domain guides (`pipeline.md`, `schema-reference.md`, `per-type-matrix.md`, `artifacts-and-banners.md`, `ibm-d.md`, `consistency.md`, `in-app-contract.md`, `gotchas.md`) and `recipes/`, `how-tos/` directories.
+
 - `.agents/skills/learn-site-structure/`
   Trigger: adding/moving/renaming/deleting any docs page that should appear on `learn.netdata.cloud`; editing `<repo>/docs/.map/map.yaml`; investigating why a Learn page looks the way it does; reading the live `ingest/ingest.py` orchestrator or the legacy `ingest.js` / `ingest.md` (which are stale); MDX escape rules; redirects; the Netlify deploy contract.
   Status: live. SKILL.md plus per-domain guides (`mapping.md`, `pipeline.md`, `sidebars.md`, `mdx-rules.md`, `redirects.md`, `pitfalls-and-gotchas.md`, `authoring-boundary.md`) and `recipes/`, `how-tos/` directories.
@@ -301,24 +321,27 @@ Runtime input skills:
 - `.agents/skills/query-agent-events/`
   Trigger: investigating crashes, panics, or fatals across the Netdata fleet; downloading events from the agent-events ingestion namespace; analyzing AE_* fields and their enums; understanding the 23h client-side dedup or the after-the-fact event timing; using the systemd-journal Function multi-value `selections` filter for index-friendly queries.
   Status: live. SKILL.md plus per-domain guides (`AE_FIELDS.md`, `transports.md`, `update-cadence.md`, `query-discipline.md`, `finding-crashes.md`, `finding-fatals.md`), scripts (`scripts/_lib.sh`, `get-events.sh`, `analyze-events.sh`, `redact-events.sh`) and `recipes/`, `how-tos/` directories. Bug-investigation tool, NOT a generic logs query skill -- consumes `query-netdata-{cloud,agents}` for transport.
+
 - `.agents/skills/mirror-netdata-repos/`
   Trigger: setting up or updating a local mirror of Netdata-org source repositories at `${NETDATA_REPOS_DIR}` for cross-repo grep / code review without GitHub API calls; running the vendored sync script; questions about the reset-to-default-branch safety mechanism or the `--repo NAME` scoping flag.
   Status: live. SKILL.md (single-file overview) plus the vendored `scripts/sync-netdata-repos.sh` (env-driven, sanitized, `--repo` scoping, `gh` optional for Phase 2) and `how-tos/` catalog. Independent from any other repo mirrors this workstation may have.
 
-Legacy runtime skills:
-
 - `.agents/skills/coverity-audit/`
   Trigger: Coverity Scan defect triage for this repository.
   Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+
 - `.agents/skills/sonarqube-audit/`
   Trigger: SonarCloud findings triage for this repository.
   Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+
 - `.agents/skills/graphql-audit/`
   Trigger: GitHub Code Scanning/CodeQL triage for this repository.
   Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+
 - `.agents/skills/pr-reviews/`
   Trigger: PR comment and review iteration work for this repository.
   Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+
 - `.agents/skills/codacy-audit/`
   Trigger: Codacy Cloud workflow for this repository -- pre-push local analysis (`codacy-analysis-cli` via docker or local binary) and read-only PR-issue fetching via the v3 API.
   Status: live. SKILL.md plus `scripts/_lib.sh` (token-safe wrappers + sentinel no-leak self-test), `scripts/analyze-local.sh`, `scripts/pr-issues.sh`, and a live `how-tos/INDEX.md` catalog. Read-only by design; write actions deferred to a future SOW.
@@ -329,6 +352,7 @@ Public skills (canonical under `docs/netdata-ai/skills/<name>/`; relative symlin
   Trigger: querying Netdata Cloud REST API -- metrics, logs (systemd-journal), alerts, generic Function calls on a node.
   Symlink: `.agents/skills/query-netdata-cloud` -> `../../docs/netdata-ai/skills/query-netdata-cloud`.
   Status: live. SKILL.md plus per-domain guides (`query-metrics.md`, `query-logs.md`, `query-alerts.md`, `query-functions.md`).
+
 - `docs/netdata-ai/skills/query-netdata-agents/`
   Trigger: querying Netdata Agents directly on port 19999, including auto-mint of per-agent bearer tokens from a Cloud token.
   Symlink: `.agents/skills/query-netdata-agents` -> `../../docs/netdata-ai/skills/query-netdata-agents`.
@@ -339,6 +363,7 @@ Output/reference skills:
 - `docs/netdata-ai/skills/`
   Consumer: downstream assistants and users of Netdata AI skill artifacts.
   Update when: public/operator AI skill docs, examples, commands, schemas, or workflows change.
+
 - `src/ai-skills/`
   Consumer: downstream assistants and users of generated or source AI skill artifacts when this tree is present in the working copy.
   Update when: generated/source AI skill behavior, tests, examples, commands, schemas, or workflows change.
@@ -402,38 +427,6 @@ These files MUST be consistent with each other. For example:
 - "`netdata`" (lowercase, code-formatted) when referring to the process
 - See DICTIONARY.md for precise terminology
 
-## AI agent skills
-
-Repo-scoped skills for AI agents live under `.agents/skills/<skill-name>/`.
-Each skill is self-contained: a `SKILL.md` with frontmatter (`name`,
-`description`) plus its own `scripts/` directory. Skills carry the operational
-knowledge for tasks that recur across sessions (Coverity triage, SonarCloud
-triage, GitHub Code Scanning triage, etc.).
-
-These existing skills are legacy runtime skills, not SOW-generated `project-*`
-skills. They are preserved under their original names during the incremental
-SOW bootstrap.
-
-When an agent learns something new while running a skill (a new gotcha, a
-working API call, a corrected workflow) it MUST update the skill's
-`SKILL.md` and commit it before proceeding. Knowledge that isn't committed
-is lost.
-
-Currently available skills:
-- `.agents/skills/coverity-audit/` - Coverity Scan defect triage
-- `.agents/skills/sonarqube-audit/` - SonarCloud findings triage
-- `.agents/skills/graphql-audit/` - GitHub Code Scanning (CodeQL) triage
-- `.agents/skills/pr-reviews/` - PR comment / review iteration loop
-- `.agents/skills/codacy-audit/` - Codacy Cloud pre-push analysis + PR-issue triage
-
-### Preservation Notes
-
-- The pre-SOW `AGENTS.md` was copied to `AGENTS.md.pre-sow.bak` before this merge.
-- Existing top-level rules, collector consistency requirements, C code notes, naming conventions, local-only directory rules, and `.env` secret rules were preserved.
-- Existing non-`project-*` operational skills were preserved under their current paths.
-- No `project-*` skills were created during bootstrap by user request.
-- Existing root `TODO*.md` files were preserved in place and are tracked by a pending SOW for future classification.
-
 ## Local-only working directory
 
 `/.local/` at the repo root is gitignored and reserved for per-user runtime
@@ -471,5 +464,3 @@ the keys you need.
 covering every key -- what it is, where to find the value, sample
 format, common mistakes, and which skills require it. When a script
 errors with `<KEY> is empty`, check `.agents/ENV.md` for that key.
-
-Project SOW status: initialized
