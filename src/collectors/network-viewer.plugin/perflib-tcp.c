@@ -327,4 +327,23 @@ int do_PerflibTCP(int update_every, usec_t dt __maybe_unused)
     return have_any ? 0 : -1;
 }
 
+#if defined(OS_WINDOWS)
+int main(int argc __maybe_unused, char **argv __maybe_unused)
+{
+    nd_log_initialize_for_external_plugins("network-viewer.plugin");
+    netdata_threads_init_for_external_plugins(0);
+
+    int update_every = localhost->rrd_update_every;
+    heartbeat_t hb;
+    heartbeat_init(&hb, update_every * USEC_PER_SEC);
+
+    while(service_running(SERVICE_COLLECTORS)) {
+        usec_t dt = heartbeat_next(&hb);
+        do_PerflibTCP(update_every, dt);
+    }
+
+    return 0;
+}
+#endif
+
 #endif // OS_WINDOWS
