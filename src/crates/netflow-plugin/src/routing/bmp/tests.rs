@@ -12,6 +12,7 @@ use netgauze_bgp_pkt::nlri::{
     Ipv4Unicast, L2EvpnIpv4PrefixRoute, L2EvpnIpv6PrefixRoute, MplsLabel,
 };
 use netgauze_bgp_pkt::path_attribute::{As2PathSegment, As4PathSegment};
+use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
@@ -305,6 +306,85 @@ async fn bmp_listener_accepts_encoded_initiation_and_termination_messages() {
         .expect("BMP listener should stop cleanly");
 }
 
+#[tokio::test]
+async fn bmp_listener_accepts_gobgp_route_when_binaries_are_set() {
+    let Some(gobgpd) = std::env::var_os("NETDATA_GOBGPD") else {
+        return;
+    };
+    let Some(gobgp) = std::env::var_os("NETDATA_GOBGP") else {
+        return;
+    };
+
+    let listen = reserve_loopback_addr();
+    let gobgp_api = reserve_loopback_addr();
+    let dir = tempfile::tempdir().expect("create GoBGP fixture dir");
+    let config = dir.path().join("gobgpd.toml");
+    std::fs::write(
+        &config,
+        format!(
+            r#"[global.config]
+  as = 64512
+  router-id = "192.0.2.1"
+  port = -1
+
+[[bmp-servers]]
+  [bmp-servers.config]
+    address = "{}"
+    port = {}
+    route-monitoring-policy = "all"
+"#,
+            listen.ip(),
+            listen.port()
+        ),
+    )
+    .expect("write GoBGP fixture config");
+
+    let shutdown = CancellationToken::new();
+    let runtime = DynamicRoutingRuntime::default();
+    let config_bmp = RoutingDynamicBmpConfig {
+        enabled: true,
+        listen: listen.to_string(),
+        keep: Duration::from_millis(10),
+        ..Default::default()
+    };
+    let listener_runtime = runtime.clone();
+    let listener_shutdown = shutdown.clone();
+    let listener = tokio::spawn(async move {
+        run_bmp_listener(config_bmp, listener_runtime, listener_shutdown).await
+    });
+
+    let mut daemon = ChildGuard {
+        child: Command::new(&gobgpd)
+            .arg("--api-hosts")
+            .arg(gobgp_api.to_string())
+            .arg("-f")
+            .arg(&config)
+            .arg("-l")
+            .arg("info")
+            .arg("-p")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("start gobgpd"),
+    };
+
+    run_gobgp_route_fixture(
+        &gobgp,
+        gobgp_api,
+        &runtime,
+        "203.0.113.0/24",
+        "203.0.113.42",
+    )
+    .await;
+
+    stop_child(&mut daemon.child);
+    shutdown.cancel();
+    listener
+        .await
+        .expect("join BMP listener")
+        .expect("BMP listener should stop cleanly");
+}
+
 fn reserve_loopback_addr() -> SocketAddr {
     let socket = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve BMP listen socket");
     let addr = socket.local_addr().expect("read BMP listen address");
@@ -330,4 +410,83 @@ fn encode_bmp(message: BmpMessage) -> Vec<u8> {
     let mut out = bytes::BytesMut::new();
     codec.encode(message, &mut out).expect("encode BMP message");
     out.to_vec()
+}
+
+async fn run_gobgp_route_fixture(
+    gobgp: &std::ffi::OsStr,
+    api: SocketAddr,
+    runtime: &DynamicRoutingRuntime,
+    prefix: &str,
+    lookup: &str,
+) {
+    for _ in 0..100 {
+        if Command::new(gobgp)
+            .arg("-u")
+            .arg(api.ip().to_string())
+            .arg("-p")
+            .arg(api.port().to_string())
+            .arg("global")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+
+    let status = Command::new(gobgp)
+        .arg("-u")
+        .arg(api.ip().to_string())
+        .arg("-p")
+        .arg(api.port().to_string())
+        .args([
+            "global",
+            "rib",
+            "add",
+            "-a",
+            "ipv4",
+            prefix,
+            "nexthop",
+            "192.0.2.254",
+            "aspath",
+            "64500,64501",
+        ])
+        .status()
+        .expect("run gobgp route add");
+    assert!(status.success(), "gobgp route add failed");
+
+    let lookup_addr = lookup.parse().expect("parse route lookup address");
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if let Some(route) = runtime.lookup(lookup_addr, None, None) {
+                assert_eq!(route.asn, 64_501);
+                assert_eq!(route.as_path, vec![64_500, 64_501]);
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    })
+    .await
+    .expect("GoBGP BMP route was not published to dynamic routing runtime");
+}
+
+fn stop_child(child: &mut Child) {
+    if matches!(child.try_wait(), Ok(Some(_))) {
+        return;
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+struct ChildGuard {
+    child: Child,
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        stop_child(&mut self.child);
+    }
 }

@@ -52,8 +52,9 @@ formats:
 
 - **Legacy v1 tokens** (`Authorization: Token <token>`) -- accepted by all NetBox
   versions, simplest to wire up.
-- **v2 tokens** (NetBox 4.5+, `Authorization: Bearer nbt_<key>.<token>`) -- the
-  prefix `nbt_` and the random key are concatenated with the token via a dot.
+- **v2 tokens** (NetBox 4.5+, `Authorization: Bearer nbt_<12-char-key>.<40-char-token>`) --
+  the prefix `nbt_`, the token key, a dot, and the token secret are all part of
+  the header value.
 
 The plugin transports either format -- the value is whatever NetBox issued for the
 service account.
@@ -105,7 +106,7 @@ and recommended. Token format depends on the NetBox version:
 - NetBox 3.x or earlier: `Token <40-char-hex>` (legacy).
 - NetBox 4.0 through 4.4: legacy `Token <hex>`.
 - NetBox 4.5+: legacy `Token <hex>` or new
-  `Bearer nbt_<key>.<token>` (v2 tokens).
+  `Bearer nbt_<12-char-key>.<40-char-token>` (v2 tokens).
 
 
 #### Bulk endpoint (`?limit=0` or aggregator)
@@ -145,7 +146,7 @@ auth helper.
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | url | NetBox prefixes API endpoint, including `?limit=` (recommend `?limit=0` for full inventory in one shot when the server's `MAX_PAGE_SIZE` allows it). |  | yes |
-| headers.Authorization | NetBox API token. Use `Token <hex>` for legacy v1 or `Bearer nbt_<key>.<token>` for v4.5+ v2 tokens. |  | yes |
+| headers.Authorization | NetBox API token. Use `Token <hex>` for legacy v1 or `Bearer nbt_<12-char-key>.<40-char-token>` for v4.5+ v2 tokens. |  | yes |
 | interval | How often to refresh. NetBox is your source of truth; 5 minutes is typical for IPAMs that change frequently, 1 hour is fine for static inventories. | 60s | no |
 | timeout | HTTP request timeout. Bump to 30-60s if your NetBox returns thousands of prefixes in one shot. | 10s | no |
 | transform | jq expression mapping NetBox's `.results[]` to per-prefix objects with `prefix` and any of `name`, `role`, `site`, `region`, `country`, `state`, `city`, `tenant`, `asn`, `asn_name`. | . | yes |
@@ -185,7 +186,7 @@ enrichment:
     netbox:
       url: "https://netbox.example.internal/api/ipam/prefixes/?limit=0"
       headers:
-        Authorization: "Bearer nbt_AbCdEf0123456789.GhIjKl0123456789"
+        Authorization: "Bearer nbt_<12-char-key>.<40-char-token>"
       interval: 5m
       timeout: 30s
       transform: |
@@ -303,10 +304,14 @@ aggregator endpoint.
 
 ### 401 / 403 from NetBox
 
-Token missing, expired, or wrong format. Verify with:
-`curl -H "Authorization: Token <tok>" https://netbox/api/ipam/prefixes/`.
+Token missing, expired, or wrong format. Verify with one of:
+`curl -H "Authorization: Token <legacy-token>" https://netbox/api/ipam/prefixes/`
+or
+`curl -H "Authorization: Bearer nbt_<12-char-key>.<40-char-token>" https://netbox/api/ipam/prefixes/`.
 On NetBox 4.5+ check whether the token is v1 (`Token <hex>`) or v2
-(`Bearer nbt_<key>.<token>`) and use the matching header. Watch the journal
+(`Bearer nbt_<12-char-key>.<40-char-token>`) and use the matching header.
+A v2 token sent with the legacy `Token` prefix is rejected as an invalid v1
+token. Watch the journal
 for `network-sources` warnings -- HTTP errors are logged there as
 refresh-failed warnings.
 

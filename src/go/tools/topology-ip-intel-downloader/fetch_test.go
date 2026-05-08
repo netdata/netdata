@@ -60,6 +60,86 @@ func TestResolveDBIPArtifactURL(t *testing.T) {
 	require.Equal(t, "https://download.db-ip.com/free/dbip-city-lite-2026-03.mmdb.gz", resolved)
 }
 
+func TestResolveCAIDAPrefix2ASURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/pfx2as-creation.log", r.URL.Path)
+		_, _ = w.Write([]byte(
+			"1\t1\t2026/05/routeviews-rv2-20260505-1200.pfx2as.gz\n" +
+				"2\t2\t2026/05/routeviews-rv2-20260506-1200.pfx2as.gz\n",
+		))
+	}))
+	defer server.Close()
+
+	dl := newDownloader(httpConfig{timeout: time.Second, userAgent: "test"})
+	resolved, err := dl.resolveCAIDAPrefix2ASURL(server.URL + "/pfx2as-creation.log")
+	require.NoError(t, err)
+	require.Equal(t, server.URL+"/2026/05/routeviews-rv2-20260506-1200.pfx2as.gz", resolved)
+}
+
+func TestResolveMaxMindSourceExpandsEnvForFetchAndRedactsMetadata(t *testing.T) {
+	t.Setenv("MAXMIND_LICENSE_KEY", "secret-license-key")
+
+	dl := newDownloader(httpConfig{timeout: time.Second, userAgent: "test"})
+	resolved, err := dl.resolveSource(sourceEntry{
+		name:     "maxmind-asn",
+		family:   sourceFamilyASN,
+		provider: providerMaxMind,
+		artifact: artifactMaxMindGeoLite2ASN,
+		format:   formatMMDB,
+	})
+	require.NoError(t, err)
+	require.Contains(t, resolved.fetchURL, "secret-license-key")
+	require.NotContains(t, resolved.ref.URL, "secret-license-key")
+	require.Contains(t, resolved.ref.URL, "redacted")
+}
+
+func TestResolveMaxMindSourceReportsMissingEnvWithoutSecretURL(t *testing.T) {
+	t.Setenv("MAXMIND_LICENSE_KEY", "")
+
+	dl := newDownloader(httpConfig{timeout: time.Second, userAgent: "test"})
+	_, err := dl.resolveSource(sourceEntry{
+		name:     "maxmind-asn",
+		family:   sourceFamilyASN,
+		provider: providerMaxMind,
+		artifact: artifactMaxMindGeoLite2ASN,
+		format:   formatMMDB,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "MAXMIND_LICENSE_KEY")
+}
+
+func TestDecodeMaxMindASNPayloadExtractsTarredMMDB(t *testing.T) {
+	payload := "fake mmdb"
+	tarball := buildTarGZ(t, map[string]string{
+		"GeoLite2-ASN_20260508/GeoLite2-ASN.mmdb": payload,
+	})
+
+	decoded, err := decodeMaxMindASNPayload(tarball)
+	require.NoError(t, err)
+	require.Equal(t, []byte(payload), decoded)
+}
+
+func TestDecodeMaxMindASNPayloadAcceptsGzippedMMDB(t *testing.T) {
+	payload := []byte("fake mmdb")
+	var compressed bytes.Buffer
+	zw := gzip.NewWriter(&compressed)
+	_, err := zw.Write(payload)
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+
+	decoded, err := decodeMaxMindASNPayload(compressed.Bytes())
+	require.NoError(t, err)
+	require.Equal(t, payload, decoded)
+}
+
+func TestExpandEnvPlaceholdersRequiresMissingVariable(t *testing.T) {
+	t.Setenv("TOPOLOGY_TEST_PRESENT", "value")
+	_, err := expandEnvPlaceholders("https://example.test/${TOPOLOGY_TEST_MISSING}/${TOPOLOGY_TEST_PRESENT}")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "TOPOLOGY_TEST_MISSING")
+	require.NotContains(t, err.Error(), "value")
+}
+
 func TestResolveSourceUsesLocalPathWithoutNetwork(t *testing.T) {
 	dl := newDownloader(httpConfig{timeout: time.Second, userAgent: "test"})
 	resolved, err := dl.resolveSource(sourceEntry{

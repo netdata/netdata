@@ -1275,6 +1275,108 @@ fn maxmind_geolite2_mmdb_enrichment_populates_asn_and_geo_fields() {
 }
 
 #[test]
+fn netdata_topology_mmdb_enrichment_populates_asn_and_geo_fields() {
+    let cfg = EnrichmentConfig {
+        geoip: GeoIpConfig {
+            asn_database: vec![mmdb_fixture_path("Netdata-Topology-ASN-Test.mmdb")],
+            geo_database: vec![mmdb_fixture_path("Netdata-Topology-GEO-Test.mmdb")],
+            optional: false,
+        },
+        ..Default::default()
+    };
+    let mut enricher = FlowEnricher::from_config(&cfg)
+        .expect("build enricher")
+        .expect("enricher must be enabled");
+
+    let mut fields = base_fields("192.0.2.10", 10, 20, 1000, 10, 20);
+    fields.insert("SRC_ADDR", Ipv4Addr::new(8, 8, 8, 8).to_string());
+    fields.insert("DST_ADDR", Ipv4Addr::new(8, 8, 8, 9).to_string());
+    fields.insert("SRC_AS", "0".to_string());
+    fields.insert("DST_AS", "0".to_string());
+    fields.insert("SRC_MASK", "24".to_string());
+    fields.insert("DST_MASK", "24".to_string());
+
+    assert!(enricher.enrich_fields(&mut fields));
+    assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("15169"));
+    assert_eq!(
+        fields.get("SRC_AS_NAME").map(String::as_str),
+        Some("AS15169 Google LLC")
+    );
+    assert_eq!(fields.get("DST_COUNTRY").map(String::as_str), Some("US"));
+    assert_eq!(
+        fields.get("DST_GEO_CITY").map(String::as_str),
+        Some("Mountain View")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_STATE").map(String::as_str),
+        Some("California")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_LATITUDE").map(String::as_str),
+        Some("37.405600")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_LONGITUDE").map(String::as_str),
+        Some("-122.077500")
+    );
+}
+
+#[test]
+fn actual_provider_mmdb_outputs_are_readable_when_root_is_set() {
+    let Some(root) = std::env::var_os("NETDATA_TOPOLOGY_IP_INTEL_PROVIDER_ROOT") else {
+        return;
+    };
+    let root = PathBuf::from(root);
+    let public_ip = "8.8.9.9".parse().expect("public test address");
+
+    for case in [
+        "dbip_asn_mmdb",
+        "dbip_asn_csv",
+        "iptoasn_asn",
+        "caida_asn",
+        "maxmind_asn",
+    ] {
+        let path = root.join(case).join("topology-ip-asn.mmdb");
+        let resolver = GeoIpResolver::from_config(&GeoIpConfig {
+            asn_database: vec![path.to_string_lossy().into_owned()],
+            geo_database: Vec::new(),
+            optional: false,
+        })
+        .unwrap_or_else(|err| panic!("{case}: failed to load ASN MMDB: {err}"))
+        .unwrap_or_else(|| panic!("{case}: ASN resolver disabled"));
+        let attrs = resolver
+            .lookup(public_ip)
+            .unwrap_or_else(|| panic!("{case}: ASN lookup returned no attributes"));
+        assert_ne!(attrs.asn, 0, "{case}: expected non-zero ASN");
+    }
+
+    for case in [
+        "dbip_geo_country_mmdb",
+        "dbip_geo_country_csv",
+        "dbip_geo_city_mmdb",
+        "dbip_geo_city_csv",
+        "iptoasn_geo",
+        "maxmind_geo",
+        "ip2location_geo",
+        "ipdeny_geo",
+        "ipip_geo",
+    ] {
+        let path = root.join(case).join("topology-ip-geo.mmdb");
+        let resolver = GeoIpResolver::from_config(&GeoIpConfig {
+            asn_database: Vec::new(),
+            geo_database: vec![path.to_string_lossy().into_owned()],
+            optional: false,
+        })
+        .unwrap_or_else(|err| panic!("{case}: failed to load GEO MMDB: {err}"))
+        .unwrap_or_else(|| panic!("{case}: GEO resolver disabled"));
+        let attrs = resolver
+            .lookup(public_ip)
+            .unwrap_or_else(|| panic!("{case}: GEO lookup returned no attributes"));
+        assert!(!attrs.country.is_empty(), "{case}: expected country");
+    }
+}
+
+#[test]
 fn static_metadata_without_sampling_keeps_flow() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_for_192(),

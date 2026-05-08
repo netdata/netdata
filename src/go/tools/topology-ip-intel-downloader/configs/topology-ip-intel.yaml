@@ -21,6 +21,39 @@ sources:
     artifact: city-lite
     format: mmdb
 
+  # Other supported ASN providers:
+  # - provider: iptoasn
+  #   artifact: combined
+  #   format: tsv
+  # - provider: caida
+  #   artifact: prefix2as
+  #   format: tsv
+  # - provider: maxmind
+  #   artifact: geolite2-asn
+  #   format: mmdb
+  #
+  # Other supported GEO providers:
+  # - provider: dbip
+  #   artifact: country-lite
+  #   format: mmdb
+  # - provider: iptoasn
+  #   artifact: combined
+  #   format: tsv
+  # - provider: maxmind
+  #   artifact: geolite2-country
+  #   format: csv
+  # - provider: ip2location
+  #   artifact: country-lite
+  #   format: csv
+  # - provider: ipdeny
+  #   artifact: country-zones
+  #   format: cidr
+  # - provider: ipip
+  #   artifact: country
+  #   format: txt
+  #
+  # MaxMind entries require MAXMIND_LICENSE_KEY in the downloader environment.
+
 output:
   # Destination directory for generated databases.
   directory: /var/cache/netdata/topology-ip-intel
