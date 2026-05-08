@@ -63,14 +63,21 @@ func Test_LibreNMSJuniperVMXFixture_MatchesJuniperMXBGPProfile(t *testing.T) {
 func Test_LibreNMSTiMOSIXRSFixture_MatchesNokiaSROSBGPProfile(t *testing.T) {
 	profile := matchedProfileFromIdentityFixture(t, "timos_ixr_s_identity.json", "nokia-service-router-os.yaml")
 
-	assertVirtualSources(t, profile, "bgpPeerAvailability", []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerAdminStatus", Table: "tBgpPeerNgTable", As: "admin_enabled", Dim: "start"},
-		{Metric: "bgpPeerState", Table: "tBgpPeerNgTable", As: "established", Dim: "established"},
-	})
-	assertVirtualSources(t, profile, "bgpPeerUpdates", []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerInUpdates", Table: "tBgpPeerNgOperTable", As: "received"},
-		{Metric: "bgpPeerOutUpdates", Table: "tBgpPeerNgOperTable", As: "sent"},
-	})
+	require.Len(t, profile.Definition.BGP, 7)
+	assert.True(t, profile.HasExtension("_nokia-timetra-bgp.yaml"))
+	assert.False(t, profile.HasExtension("_std-bgp4-mib.yaml"))
+
+	peer := requireBGPRowByID(t, profile, "nokia-timos-bgp-peer")
+	assert.Equal(t, "_nokia-timetra-bgp.yaml", peer.OriginProfileID)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeer, peer.Kind)
+	assert.Equal(t, "tBgpPeerNgTable", peer.Table.Name)
+	assert.Equal(t, "tBgpPeerNgOperTable", peer.Connection.EstablishedUptime.Table)
+
+	family := requireBGPRowByID(t, profile, "nokia-timos-bgp-peer-family-ipv4-vpn")
+	assert.Equal(t, "_nokia-timetra-bgp.yaml", family.OriginProfileID)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeerFamily, family.Kind)
+	assert.Equal(t, "tBgpPeerNgOperTable", family.Table.Name)
+	assert.Equal(t, "tBgpPeerNgTable", family.Identity.RemoteAS.Table)
 }
 
 func Test_LibreNMSCiscoIOSXRNCS540Fixture_MatchesCiscoNCSBGPProfile(t *testing.T) {
@@ -112,34 +119,6 @@ func matchedProfileFromIdentityFixture(t *testing.T, fixtureFile, profileFile st
 	require.NotEqual(t, -1, index, "expected %s profile to match", profileFile)
 
 	return matched[index]
-}
-
-func assertVirtualSources(t *testing.T, profile *Profile, name string, want []ddprofiledefinition.VirtualMetricSourceConfig) {
-	t.Helper()
-
-	vm := requireVirtualMetric(t, profile, name)
-
-	assert.Equal(t, want, vm.Sources)
-}
-
-func assertVirtualAlternativeSources(t *testing.T, profile *Profile, name string, alternative int, want []ddprofiledefinition.VirtualMetricSourceConfig) {
-	t.Helper()
-
-	vm := requireVirtualMetric(t, profile, name)
-	require.Less(t, alternative, len(vm.Alternatives), "expected virtual metric %s alternative %d", name, alternative)
-
-	assert.Equal(t, want, vm.Alternatives[alternative].Sources)
-}
-
-func requireVirtualMetric(t *testing.T, profile *Profile, name string) ddprofiledefinition.VirtualMetricConfig {
-	t.Helper()
-
-	vmIndex := slices.IndexFunc(profile.Definition.VirtualMetrics, func(vm ddprofiledefinition.VirtualMetricConfig) bool {
-		return vm.Name == name
-	})
-	require.NotEqual(t, -1, vmIndex, "expected virtual metric %s", name)
-
-	return profile.Definition.VirtualMetrics[vmIndex]
 }
 
 func requireBGPRowByID(t *testing.T, profile *Profile, id string) ddprofiledefinition.BGPConfig {

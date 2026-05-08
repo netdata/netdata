@@ -400,6 +400,15 @@ Open decisions:
   - Runtime BGP rows are skipped when required identity fields are missing at collection time.
   - Added BGP projection coverage to `collector/snmp/ddsnmp/profile_test.go`.
   - Reworked Juniper fixture tests to assert typed `BGPRows` from BGP-projected profiles and refactored similar test cases to `map[string]struct{}` tables.
+- Migrated Nokia/TiMOS BGP to typed rows:
+  - `_nokia-timetra-bgp.yaml` now declares typed peer and six typed peer-family BGP rows instead of raw `metrics:`/`virtual_metrics:`.
+  - Nokia no longer inherits `_std-bgp4-mib.yaml`; SR OS BGP rows come from TIMETRA-BGP-MIB only.
+  - Peer address is derived from the `tBgpPeerNgTable`/`tBgpPeerNgOperTable` row index because the MIB index objects are `MAX-ACCESS not-accessible`.
+  - Deleted unused `_juniper-bgp-virtual.yaml` after the Juniper migration removed all references.
+  - Updated BGP structural identity to include typed config ID so multiple logical typed rows over the same table/index do not collide.
+  - Updated Nokia profile, LibreNMS identity, and TiMOS fixture coverage to assert typed `BGPRows`.
+  - Added Nokia BGP projection coverage to `collector/snmp/ddsnmp/profile_test.go`.
+  - Reviewed new BGP tests for the branch's table-driven style rule and refactored same-shape Cisco prefix, Arista/Dell fixture, and TiMOS fixture tests to `map[string]struct{}` or equivalent map-keyed tables.
 
 ## Validation
 
@@ -444,6 +453,10 @@ Tests or equivalent validation:
 - `go test -count=1 ./collector/snmp` passed on 2026-05-08 after the Juniper typed-profile migration and BGP projection test refactor.
 - `go test -count=1 ./collector/snmp/...` passed on 2026-05-08 after the Juniper typed-profile migration and BGP projection test refactor.
 - `go test -race -count=1 ./collector/snmp` passed on 2026-05-08 after the Juniper typed-profile migration and BGP projection test refactor.
+- `go test -count=1 ./collector/snmp/ddsnmp ./collector/snmp/ddsnmp/ddprofiledefinition ./collector/snmp/ddsnmp/ddsnmpcollector` passed on 2026-05-08 after the Nokia/TiMOS typed-profile migration and test refactor.
+- `go test -count=1 ./collector/snmp` passed on 2026-05-08 after the Nokia/TiMOS typed-profile migration and test refactor.
+- `go test -count=1 ./collector/snmp/...` passed on 2026-05-08 after the Nokia/TiMOS typed-profile migration and test refactor.
+- `go test -race -count=1 ./collector/snmp` passed on 2026-05-08 after the Nokia/TiMOS typed-profile migration and test refactor.
 
 Real-use evidence:
 

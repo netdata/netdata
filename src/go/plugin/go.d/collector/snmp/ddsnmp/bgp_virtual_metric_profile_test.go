@@ -27,20 +27,6 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 		profileFile string
 		virtuals    map[string][]ddprofiledefinition.VirtualMetricSourceConfig
 	}{
-		"Nokia SR OS overrides generic contract with TiMOS peer tables": {
-			sysObjectID: "1.3.6.1.4.1.6527.1.3.17",
-			profileFile: "nokia-service-router-os.yaml",
-			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
-				"bgpPeerAvailability": {
-					{Metric: "bgpPeerAdminStatus", Table: "tBgpPeerNgTable", As: "admin_enabled", Dim: "start"},
-					{Metric: "bgpPeerState", Table: "tBgpPeerNgTable", As: "established", Dim: "established"},
-				},
-				"bgpPeerUpdates": {
-					{Metric: "bgpPeerInUpdates", Table: "tBgpPeerNgOperTable", As: "received"},
-					{Metric: "bgpPeerOutUpdates", Table: "tBgpPeerNgOperTable", As: "sent"},
-				},
-			},
-		},
 		"Arista switch overrides generic contract with Arista peer tables": {
 			sysObjectID: "1.3.6.1.4.1.30065.1.3011.7010.427.48",
 			profileFile: "arista-switch.yaml",

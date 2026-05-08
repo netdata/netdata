@@ -15,7 +15,113 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func Test_NokiaBgpPeerProfileMergedIntoNokiaSROS(t *testing.T) {
+func Test_NokiaBGPProfileMergedIntoNokiaSROS(t *testing.T) {
+	profile := mustLoadNokiaSROSBGPProfile(t)
+
+	require.Len(t, profile.Definition.BGP, 7)
+	assert.True(t, profile.HasExtension("_nokia-timetra-bgp.yaml"))
+	assert.False(t, profile.HasExtension("_std-bgp4-mib.yaml"))
+
+	peer := requireBGPRowByID(t, profile, "nokia-timos-bgp-peer")
+	assert.Equal(t, "_nokia-timetra-bgp.yaml", peer.OriginProfileID)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeer, peer.Kind)
+	assert.Equal(t, "tBgpPeerNgTable", peer.Table.Name)
+	assert.Equal(t, "1.3.6.1.4.1.6527.3.1.2.14.4.7", peer.Table.OID)
+	assert.Equal(t, "vRtrConfTable", peer.Identity.RoutingInstance.Table)
+	assert.Equal(t, "tBgpPeerNgAddress", peer.Identity.Neighbor.Name)
+	assert.Equal(t, "tBgpPeerNgPeerAS4Byte", peer.Identity.RemoteAS.Symbol.Name)
+	assert.Equal(t, "tBgpPeerNgOperTable", peer.Connection.EstablishedUptime.Table)
+	assert.Equal(t, "tBgpPeerNgOperTable", peer.Traffic.Updates.Received.Table)
+	assert.Equal(t, "tBgpPeerNgOperTable", peer.LastError.Code.Table)
+
+	tests := map[string]struct {
+		id     string
+		af     ddprofiledefinition.BGPAddressFamily
+		safi   ddprofiledefinition.BGPSubsequentAddressFamily
+		label  string
+		recv   string
+		active string
+		reject string
+	}{
+		"ipv4 unicast": {
+			id:     "nokia-timos-bgp-peer-family-ipv4-unicast",
+			af:     ddprofiledefinition.BGPAddressFamilyIPv4,
+			safi:   ddprofiledefinition.BGPSubsequentAddressFamilyUnicast,
+			label:  "ipv4 unicast",
+			recv:   "tBgpPeerNgOperReceivedPrefixes",
+			active: "tBgpPeerNgOperActivePrefixes",
+			reject: "tBgpPeerNgOperIpv4RejPfxs",
+		},
+		"ipv4 vpn": {
+			id:     "nokia-timos-bgp-peer-family-ipv4-vpn",
+			af:     ddprofiledefinition.BGPAddressFamilyIPv4,
+			safi:   ddprofiledefinition.BGPSubsequentAddressFamilyVPN,
+			label:  "vpnv4 unicast",
+			recv:   "tBgpPeerNgOperVpnRecvPrefixes",
+			active: "tBgpPeerNgOperVpnActivePrefixes",
+			reject: "tBgpPeerNgOperVpnIpv4RejPfxs",
+		},
+		"ipv6 unicast": {
+			id:     "nokia-timos-bgp-peer-family-ipv6-unicast",
+			af:     ddprofiledefinition.BGPAddressFamilyIPv6,
+			safi:   ddprofiledefinition.BGPSubsequentAddressFamilyUnicast,
+			label:  "ipv6 unicast",
+			recv:   "tBgpPeerNgOperV6ReceivedPrefixes",
+			active: "tBgpPeerNgOperV6ActivePrefixes",
+			reject: "tBgpPeerNgOperIpv6RejPfxs",
+		},
+		"ipv6 vpn": {
+			id:     "nokia-timos-bgp-peer-family-ipv6-vpn",
+			af:     ddprofiledefinition.BGPAddressFamilyIPv6,
+			safi:   ddprofiledefinition.BGPSubsequentAddressFamilyVPN,
+			label:  "vpnv6 unicast",
+			recv:   "tBgpPeerNgOperVpnIpv6RecvPfxs",
+			active: "tBgpPeerNgOperVpnIpv6ActivePfxs",
+			reject: "tBgpPeerNgOperVpnIpv6RejPfxs",
+		},
+		"l2vpn vpls": {
+			id:     "nokia-timos-bgp-peer-family-l2vpn-vpls",
+			af:     ddprofiledefinition.BGPAddressFamilyL2VPN,
+			safi:   ddprofiledefinition.BGPSubsequentAddressFamilyVPLS,
+			label:  "l2vpn vpls",
+			recv:   "tBgpPeerNgOperl2VpnRecvPfxs",
+			active: "tBgpPeerNgOperl2VpnActivePfxs",
+			reject: "tBgpPeerNgOperl2VpnRejPfxs",
+		},
+		"l2vpn evpn": {
+			id:     "nokia-timos-bgp-peer-family-l2vpn-evpn",
+			af:     ddprofiledefinition.BGPAddressFamilyL2VPN,
+			safi:   ddprofiledefinition.BGPSubsequentAddressFamilyEVPN,
+			label:  "l2vpn evpn",
+			recv:   "tBgpPeerNgOperEvpnRecvPfxs",
+			active: "tBgpPeerNgOperEvpnActivePfxs",
+			reject: "tBgpPeerNgOperEvpnRejPfxs",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			row := requireBGPRowByID(t, profile, tc.id)
+			assert.Equal(t, "_nokia-timetra-bgp.yaml", row.OriginProfileID)
+			assert.Equal(t, ddprofiledefinition.BGPRowKindPeerFamily, row.Kind)
+			assert.Equal(t, "tBgpPeerNgOperTable", row.Table.Name)
+			assert.Equal(t, "1.3.6.1.4.1.6527.3.1.2.14.4.8", row.Table.OID)
+			assert.Equal(t, "vRtrConfTable", row.Identity.RoutingInstance.Table)
+			assert.Equal(t, "tBgpPeerNgAddress", row.Identity.Neighbor.Name)
+			assert.Equal(t, "tBgpPeerNgTable", row.Identity.RemoteAS.Table)
+			assert.Equal(t, tc.af, ddprofiledefinition.BGPAddressFamily(row.Identity.AddressFamily.Value))
+			assert.Equal(t, tc.safi, ddprofiledefinition.BGPSubsequentAddressFamily(row.Identity.SubsequentAddressFamily.Value))
+			assert.True(t, hasStaticTag(row.StaticTags, "address_family_name", tc.label))
+			assert.Equal(t, tc.recv, row.Routes.Total.Received.Symbol.Name)
+			assert.Equal(t, tc.active, row.Routes.Current.Active.Symbol.Name)
+			assert.Equal(t, tc.reject, row.Routes.Total.Rejected.Symbol.Name)
+		})
+	}
+}
+
+func mustLoadNokiaSROSBGPProfile(t *testing.T) *Profile {
+	t.Helper()
+
 	dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
 
 	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
@@ -28,110 +134,7 @@ func Test_NokiaBgpPeerProfileMergedIntoNokiaSROS(t *testing.T) {
 	})
 	require.NotEqual(t, -1, index, "expected nokia-service-router-os profile to match")
 
-	profile := matched[index]
-
-	metricIndex := slices.IndexFunc(profile.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
-		return m.Table.Name == "tBgpPeerNgTable" && m.Table.OID == "1.3.6.1.4.1.6527.3.1.2.14.4.7"
-	})
-	require.NotEqual(t, -1, metricIndex, "expected merged Nokia profile to include tBgpPeerNgTable")
-
-	metric := profile.Definition.Metrics[metricIndex]
-
-	var symbolNames []string
-	for _, sym := range metric.Symbols {
-		symbolNames = append(symbolNames, sym.Name)
-	}
-
-	var tagNames []string
-	for _, tag := range metric.MetricTags {
-		tagNames = append(tagNames, tag.Tag)
-	}
-
-	assert.Contains(t, symbolNames, "bgpPeerAdminStatus")
-	assert.Contains(t, symbolNames, "bgpPeerState")
-	assert.Contains(t, symbolNames, "bgpPeerConnectRetryInterval")
-	assert.Contains(t, symbolNames, "bgpPeerHoldTimeConfigured")
-	assert.Contains(t, symbolNames, "bgpPeerKeepAliveConfigured")
-	assert.Contains(t, symbolNames, "bgpPeerMinRouteAdvertisementInterval")
-
-	assert.Contains(t, tagNames, "routing_instance")
-	assert.Contains(t, tagNames, "neighbor_address_type")
-	assert.Contains(t, tagNames, "neighbor")
-	assert.Contains(t, tagNames, "local_address_type")
-	assert.Contains(t, tagNames, "local_address")
-	assert.Contains(t, tagNames, "local_as")
-	assert.Contains(t, tagNames, "remote_as")
-	assert.Contains(t, tagNames, "peer_description")
-}
-
-func Test_NokiaBgpOperationalProfilesMergedIntoNokiaSROS(t *testing.T) {
-	dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-
-	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
-	require.NoError(t, err)
-	require.NotEmpty(t, profiles)
-
-	matched := FindProfiles("1.3.6.1.4.1.6527.1.3.17", "", nil)
-	index := slices.IndexFunc(matched, func(p *Profile) bool {
-		return strings.HasSuffix(p.SourceFile, "nokia-service-router-os.yaml")
-	})
-	require.NotEqual(t, -1, index, "expected nokia-service-router-os profile to match")
-
-	profile := matched[index]
-
-	peerOperIndex := slices.IndexFunc(profile.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
-		return m.Table.Name == "tBgpPeerNgOperTable" &&
-			hasSymbol(m.Symbols, "bgpPeerInUpdates") &&
-			hasSymbol(m.Symbols, "bgpPeerFsmEstablishedTime")
-	})
-	require.NotEqual(t, -1, peerOperIndex, "expected merged Nokia profile to include peer operational counters")
-
-	peerOper := profile.Definition.Metrics[peerOperIndex]
-
-	var peerOperSymbols []string
-	for _, sym := range peerOper.Symbols {
-		peerOperSymbols = append(peerOperSymbols, sym.Name)
-	}
-
-	assert.Contains(t, peerOperSymbols, "bgpPeerFlaps")
-	assert.Contains(t, peerOperSymbols, "bgpPeerFsmEstablishedTime")
-	assert.Contains(t, peerOperSymbols, "bgpPeerLastErrorCode")
-	assert.Contains(t, peerOperSymbols, "bgpPeerLastErrorSubcode")
-	assert.Contains(t, peerOperSymbols, "bgpPeerIdentifier")
-	assert.Contains(t, peerOperSymbols, "bgpPeerInUpdates")
-	assert.Contains(t, peerOperSymbols, "bgpPeerOutUpdates")
-	assert.Contains(t, peerOperSymbols, "bgpPeerInTotalMessages")
-	assert.Contains(t, peerOperSymbols, "bgpPeerOutTotalMessages")
-	assert.Contains(t, peerOperSymbols, "bgpPeerInNotifications")
-	assert.Contains(t, peerOperSymbols, "bgpPeerOutNotifications")
-	assert.Contains(t, peerOperSymbols, "bgpPeerInUpdateElapsedTime")
-
-	familyIndex := slices.IndexFunc(profile.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
-		return m.Table.Name == "tBgpPeerNgOperTable" &&
-			hasStaticTag(m.StaticTags, "address_family", "ipv4") &&
-			hasStaticTag(m.StaticTags, "subsequent_address_family", "unicast")
-	})
-	require.NotEqual(t, -1, familyIndex, "expected merged Nokia profile to include TiMOS AFI/SAFI prefix counters")
-
-	familyMetric := profile.Definition.Metrics[familyIndex]
-
-	var familySymbols []string
-	for _, sym := range familyMetric.Symbols {
-		familySymbols = append(familySymbols, sym.Name)
-	}
-
-	assert.Contains(t, familySymbols, "bgpPeerPrefixesReceivedTotal")
-	assert.Contains(t, familySymbols, "bgpPeerPrefixesAdvertisedTotal")
-	assert.Contains(t, familySymbols, "bgpPeerPrefixesActive")
-	assert.Contains(t, familySymbols, "bgpPeerPrefixesRejectedTotal")
-
-	assert.True(t, hasStaticTag(familyMetric.StaticTags, "address_family_name", "ipv4 unicast"))
-}
-
-func hasSymbol(symbols []ddprofiledefinition.SymbolConfig, name string) bool {
-	return slices.ContainsFunc(symbols, func(sym ddprofiledefinition.SymbolConfig) bool {
-		return sym.Name == name
-	})
+	return matched[index]
 }
 
 func hasStaticTag(tags []ddprofiledefinition.StaticMetricTagConfig, name, value string) bool {

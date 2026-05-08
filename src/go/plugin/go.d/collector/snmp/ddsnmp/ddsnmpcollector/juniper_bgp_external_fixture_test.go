@@ -29,7 +29,7 @@ func TestCollector_Collect_JuniperBGP_FromLibreNMSFixtures(t *testing.T) {
 			profileFile: "juniper-mx.yaml",
 			fixture:     "librenms/juniper_mx_bgp_peer_table.snmprec",
 			validate: func(t *testing.T, rows []ddsnmp.BGPRow) {
-				peer := requireJuniperBGPRow(t, rows, func(row ddsnmp.BGPRow) bool {
+				peer := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Kind == ddprofiledefinition.BGPRowKindPeer && row.Identity.Neighbor == "192.168.99.25"
 				})
 				assert.Equal(t, "_juniper-bgp4-v2.yaml", peer.OriginProfileID)
@@ -50,7 +50,7 @@ func TestCollector_Collect_JuniperBGP_FromLibreNMSFixtures(t *testing.T) {
 				assert.EqualValues(t, 13199, peer.Traffic.Messages.Received.Value)
 				assert.EqualValues(t, 13351, peer.Traffic.Messages.Sent.Value)
 
-				unicast := requireJuniperBGPRow(t, rows, func(row ddsnmp.BGPRow) bool {
+				unicast := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Kind == ddprofiledefinition.BGPRowKindPeerFamily &&
 						row.Identity.Neighbor == "192.168.99.25" &&
 						row.Identity.AddressFamily == ddprofiledefinition.BGPAddressFamilyIPv4 &&
@@ -64,7 +64,7 @@ func TestCollector_Collect_JuniperBGP_FromLibreNMSFixtures(t *testing.T) {
 				assert.EqualValues(t, 0, unicast.Routes.Current.Advertised.Value)
 				assert.EqualValues(t, 6, unicast.Routes.Current.Active.Value)
 
-				vpls := requireJuniperBGPRow(t, rows, func(row ddsnmp.BGPRow) bool {
+				vpls := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Kind == ddprofiledefinition.BGPRowKindPeerFamily &&
 						row.Identity.Neighbor == "192.168.99.25" &&
 						row.Identity.AddressFamily == ddprofiledefinition.BGPAddressFamilyL2VPN &&
@@ -78,7 +78,7 @@ func TestCollector_Collect_JuniperBGP_FromLibreNMSFixtures(t *testing.T) {
 			profileFile: "juniper-mx.yaml",
 			fixture:     "librenms/juniper_vmx_bgp_peer_table.snmprec",
 			validate: func(t *testing.T, rows []ddsnmp.BGPRow) {
-				firstPeer := requireJuniperBGPRow(t, rows, func(row ddsnmp.BGPRow) bool {
+				firstPeer := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Kind == ddprofiledefinition.BGPRowKindPeer && row.Identity.Neighbor == "10.1.1.1"
 				})
 				assert.Equal(t, "9", firstPeer.Identity.RoutingInstance)
@@ -92,7 +92,7 @@ func TestCollector_Collect_JuniperBGP_FromLibreNMSFixtures(t *testing.T) {
 				assert.EqualValues(t, 468, firstPeer.Traffic.Messages.Received.Value)
 				assert.EqualValues(t, 12859, firstPeer.Connection.EstablishedUptime.Value)
 
-				secondPeer := requireJuniperBGPRow(t, rows, func(row ddsnmp.BGPRow) bool {
+				secondPeer := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Kind == ddprofiledefinition.BGPRowKindPeer && row.Identity.Neighbor == "10.1.1.5"
 				})
 				assert.Equal(t, "10.1.1.6", secondPeer.Descriptors.LocalAddress)
@@ -100,7 +100,7 @@ func TestCollector_Collect_JuniperBGP_FromLibreNMSFixtures(t *testing.T) {
 				assert.EqualValues(t, 477, secondPeer.Traffic.Messages.Sent.Value)
 				assert.EqualValues(t, 12757, secondPeer.Connection.LastReceivedUpdateAge.Value)
 
-				firstFamily := requireJuniperBGPRow(t, rows, func(row ddsnmp.BGPRow) bool {
+				firstFamily := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Kind == ddprofiledefinition.BGPRowKindPeerFamily &&
 						row.Identity.Neighbor == "10.1.1.1" &&
 						row.Identity.AddressFamily == ddprofiledefinition.BGPAddressFamilyIPv4 &&
@@ -110,7 +110,7 @@ func TestCollector_Collect_JuniperBGP_FromLibreNMSFixtures(t *testing.T) {
 				assert.EqualValues(t, 2, firstFamily.Routes.Current.Advertised.Value)
 				assert.EqualValues(t, 1, firstFamily.Routes.Current.Active.Value)
 
-				secondFamily := requireJuniperBGPRow(t, rows, func(row ddsnmp.BGPRow) bool {
+				secondFamily := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Kind == ddprofiledefinition.BGPRowKindPeerFamily &&
 						row.Identity.Neighbor == "10.1.1.5" &&
 						row.Identity.AddressFamily == ddprofiledefinition.BGPAddressFamilyIPv4 &&
@@ -211,7 +211,7 @@ func expectBGPTableWalksFromFixture(mockHandler *snmpmock.MockHandler, profile *
 	}
 }
 
-func requireJuniperBGPRow(t *testing.T, rows []ddsnmp.BGPRow, match func(ddsnmp.BGPRow) bool) ddsnmp.BGPRow {
+func requireBGPRowMatching(t *testing.T, rows []ddsnmp.BGPRow, match func(ddsnmp.BGPRow) bool) ddsnmp.BGPRow {
 	t.Helper()
 
 	for _, row := range rows {

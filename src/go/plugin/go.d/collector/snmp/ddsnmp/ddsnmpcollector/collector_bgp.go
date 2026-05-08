@@ -355,7 +355,7 @@ func (c *Collector) buildTableBGPRowWithTags(cfg ddprofiledefinition.BGPConfig, 
 		TableOID:        trimOID(cfg.Table.OID),
 		Table:           cfg.Table.Name,
 		RowKey:          rowIndex,
-		StructuralID:    bgpTableStructuralID(cfg.OriginProfileID, cfg.Kind, trimOID(cfg.Table.OID), rowIndex),
+		StructuralID:    bgpTableStructuralID(cfg.OriginProfileID, cfg.Kind, cfg.ID, trimOID(cfg.Table.OID), rowIndex),
 		Tags:            parseStaticTags(cfg.StaticTags),
 	}
 	mergeStringMaps(row.Tags, rowTags)
@@ -1312,8 +1312,8 @@ func bgpScalarStructuralID(originProfileID string, kind ddprofiledefinition.BGPR
 	return lengthPrefixedKey(originProfileID, string(kind), "scalar", rowKey)
 }
 
-func bgpTableStructuralID(originProfileID string, kind ddprofiledefinition.BGPRowKind, tableOID, rowKey string) string {
-	return lengthPrefixedKey(originProfileID, string(kind), "table", tableOID, rowKey)
+func bgpTableStructuralID(originProfileID string, kind ddprofiledefinition.BGPRowKind, configID, tableOID, rowKey string) string {
+	return lengthPrefixedKey(originProfileID, string(kind), "table", configID, tableOID, rowKey)
 }
 
 func lengthPrefixedKey(parts ...string) string {

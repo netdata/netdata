@@ -133,7 +133,7 @@ func TestCollector_Collect_BGPRowsFromTableBGPConfig(t *testing.T) {
 			assert.Equal(t, "1.3.6.1.4.1.99999.30.1", row.TableOID)
 			assert.Equal(t, "vendorBgpPeerTable", row.Table)
 			assert.Equal(t, "42", row.RowKey)
-			assert.Equal(t, lengthPrefixedKey("_vendor-bgp.yaml", "peer", "table", "1.3.6.1.4.1.99999.30.1", "42"), row.StructuralID)
+			assert.Equal(t, lengthPrefixedKey("_vendor-bgp.yaml", "peer", "table", "table-peer", "1.3.6.1.4.1.99999.30.1", "42"), row.StructuralID)
 			assert.Equal(t, "42", row.Identity.Neighbor)
 			assert.Equal(t, "65001", row.Identity.RemoteAS)
 			assert.Equal(t, "blue", row.Tags["routing_instance"])

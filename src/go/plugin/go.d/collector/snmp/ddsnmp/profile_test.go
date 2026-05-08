@@ -174,7 +174,7 @@ func Test_FindProfiles(t *testing.T) {
 	}
 }
 
-func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *testing.T) {
+func TestDefaultCatalogResolveProject_LoadedProfilesSeparateConsumers(t *testing.T) {
 	tests := map[string]struct {
 		sysObjectID       string
 		consumer          ProfileConsumer
@@ -230,6 +230,22 @@ func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *te
 			sysObjectID:     "1.3.6.1.4.1.9.1.923",
 			consumer:        ConsumerBGP,
 			wantBGPIDs:      []string{"cisco-bgp-peer", "cisco-bgp-peer-family"},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_nokia": {
+			sysObjectID: "1.3.6.1.4.1.6527.1.3.17",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"nokia-timos-bgp-peer",
+				"nokia-timos-bgp-peer-family-ipv4-unicast",
+				"nokia-timos-bgp-peer-family-ipv4-vpn",
+				"nokia-timos-bgp-peer-family-ipv6-unicast",
+				"nokia-timos-bgp-peer-family-ipv6-vpn",
+				"nokia-timos-bgp-peer-family-l2vpn-vpls",
+				"nokia-timos-bgp-peer-family-l2vpn-evpn",
+			},
 			wantNoMetrics:   true,
 			wantNoTopology:  true,
 			wantNoLicensing: true,
