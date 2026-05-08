@@ -105,10 +105,9 @@ bearers, raw IP addresses, or raw flow rows into durable artifacts.
 
 - Prefer the Cloud transport for validation. It needs only the Cloud
   token and does not require a direct agent bearer.
-- Direct bearer minting can fail with a Cloud HTTP 400 in some
-  API-token contexts. When that happens, validate with
-  `agents_call_function --via cloud` and record the direct-bearer
-  failure as a transport blocker, not as a flow-collector failure.
+- Direct-agent validation is also possible. Use the sibling
+  direct-agent how-to when the test must prove the bearer mint/cache
+  path and the `X-Netdata-Auth` call path.
 - Negative `after` values are relative to `before`; `before: 0` means
   now. `top_n` accepts the documented values `25`, `50`, `100`,
   `200`, or `500`.
@@ -118,3 +117,4 @@ bearers, raw IP addresses, or raw flow rows into durable artifacts.
 - [Network-flow Functions](../query-flows.md)
 - [Generic Function invocation](../query-functions.md)
 - [Direct-agent sibling skill](../../query-netdata-agents/SKILL.md)
+- [Direct local flow Function validation](../../query-netdata-agents/how-tos/validate-direct-local-flow-function.md)

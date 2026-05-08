@@ -349,6 +349,9 @@ Real-use evidence:
   - Cloud discovery found the local node reachable in visible rooms by exact local node/machine identifiers.
   - `flows:netflow` info call returned `status: 200` and `type: flows`.
   - A documented flow query returned `status: 200`, 101 flow rows, expected group-by fields, and stats including decoded NetFlow v5, NetFlow v9, IPFIX, and sFlow counters with zero parse/template/journal-write errors.
+- Direct-agent bearer validation:
+  - A Cloud bearer mint using the local `/api/v3/info` node id, machine GUID, and claim id tuple returned HTTP 200 with a token present.
+  - `agents_call_function --via agent --function flows:netflow --body '{"info":true}'` against `127.0.0.1:19999` returned `status: 200`, `type: flows`, and `has_history: true`.
 
 Reviewer findings:
 
@@ -381,7 +384,7 @@ Artifact maintenance gate:
 - Runtime project skills: no project-local collector/integration skill update needed; existing `project-writing-collectors` and `integrations-lifecycle` rules were sufficient.
 - Specs: no separate spec update needed; this SOW did not change a durable product contract beyond making implementation match already published Function-query examples and MMDB metadata behavior.
 - End-user/operator docs: updated `src/crates/netflow-plugin/metadata.yaml` and regenerated affected integration pages.
-- End-user/operator skills: updated `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`; added a Cloud how-to for local flow Function validation.
+- End-user/operator skills: updated `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`; added Cloud and direct-agent how-tos for local flow Function validation.
 - SOW lifecycle: SOW remains `paused` in `.agents/sow/current/` until the user decides whether to provide external systems/credentials for the remaining real-provider validation.
 
 Specs update:
@@ -403,16 +406,19 @@ End-user/operator docs update:
   - `src/crates/netflow-plugin/integrations/bmp_bgp_monitoring_protocol.md`
   - `docs/netdata-ai/skills/query-netdata-cloud/how-tos/validate-local-netflow-function.md`
   - `docs/netdata-ai/skills/query-netdata-cloud/how-tos/INDEX.md`
+  - `docs/netdata-ai/skills/query-netdata-agents/how-tos/validate-direct-local-flow-function.md`
+  - `docs/netdata-ai/skills/query-netdata-agents/how-tos/INDEX.md`
 
 End-user/operator skills update:
 
 - Updated `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`.
+- Added `docs/netdata-ai/skills/query-netdata-agents/how-tos/validate-direct-local-flow-function.md`.
 - Validation: Bash self-test, zsh self-test, and shellcheck all passed.
 
 Lessons:
 
 - Testing the public instructions against the installed agent exposed real API-compatibility bugs that pure unit tests had missed.
-- The safest validation path for a bearer-protected local agent is currently Cloud-proxied Function calls; direct bearer minting may fail in API-token contexts even when the node is visible and reachable.
+- Direct-agent bearer validation works when the wrapper uses the exact local `/api/v3/info` node id, machine GUID, and claim id tuple. Mixed node/machine/claim tuples should be treated as identity-resolution bugs before treating direct bearer as blocked.
 - Masked command logging must redact identifiers as well as tokens, because node ids, machine GUIDs, claim ids, space ids, and room ids are sensitive enough to keep out of durable artifacts.
 
 Follow-up mapping:
@@ -422,18 +428,18 @@ Follow-up mapping:
   - Real bio-rd / RIPE RIS: current proof is an in-process gRPC fake service that exercises the Netdata BioRIS client path; no real external BioRIS/RIPE RIS service was supplied.
   - Real NetBox / custom IPAM / cloud-source credentials: current proof covers documented schemas, live public cloud schema checks, local HTTP fetch/refresher behavior, and transform output. No user NetBox/IPAM endpoint or credential was supplied.
   - Custom operator-provided MMDB: current proof uses public MaxMind test MMDB fixtures and a synthetic `netdata.ip_class` record; no user custom MMDB was supplied.
-  - Direct agent bearer mint via Cloud API token: Cloud-proxied Function calls work; direct bearer mint returned HTTP 400 with only a Cloud error code. User involvement is needed only if direct-bearer transport itself must be proven on this workstation.
 - Not tracked as a follow-up SOW yet:
   - CI job wiring, because the user corrected that immediate scope is unit/integration testing, not CI-job integration.
 
 ## Outcome
 
-Autonomous work completed as far as possible without external systems or user credentials. Automated coverage, docs/source corrections, installed runtime validation, journal proof, and Cloud-proxied Function validation are complete.
+Autonomous work completed as far as possible without external systems or user credentials. Automated coverage, docs/source corrections, installed runtime validation, journal proof, Cloud-proxied Function validation, and direct-agent bearer Function validation are complete.
 
 ## Lessons Extracted
 
 - Run public examples against the installed plugin, not only through Rust unit tests. This caught `after`/`top_n` request-shape bugs.
 - Include shell compatibility in public helper tests when examples are likely to be run from users' default shells.
+- Use the exact local `/api/v3/info` node id, machine GUID, and claim id tuple for direct-agent bearer minting; mixed identity tuples are the common failure mode.
 - Treat identity fields as sensitive in wrapper logging; masking only bearer/token values is insufficient.
 
 ## Followup
