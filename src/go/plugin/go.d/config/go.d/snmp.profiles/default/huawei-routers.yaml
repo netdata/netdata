@@ -1,5 +1,6 @@
 extends:
   - huawei.yaml
+  - _huawei-bgp-statistics.yaml
 
 selector:
   - sysobjectid:
@@ -11,6 +12,82 @@ metadata:
     fields:
       type:
         value: "Router"
+
+virtual_metrics:
+  - name: bgpPeerAvailability
+    per_row: true
+    group_by:
+      - _routing_instance
+      - _neighbor
+      - _address_family
+      - _subsequent_address_family
+      - _neighbor_address_type
+    emit_tags:
+      - {tag: routing_instance, from: _routing_instance}
+      - {tag: neighbor, from: _neighbor}
+      - {tag: remote_as, from: _remote_as}
+      - {tag: bgp_version, from: _bgp_version}
+      - {tag: peer_description, from: _peer_description}
+      - {tag: address_family, from: _address_family}
+      - {tag: subsequent_address_family, from: _subsequent_address_family}
+      - {tag: neighbor_address_type, from: _neighbor_address_type}
+    sources:
+      - {metric: huawei.hwBgpPeerAdminStatus, table: hwBgpPeerTable, as: admin_enabled, dim: start}
+      - {metric: huawei.hwBgpPeerState, table: hwBgpPeerTable, as: established, dim: established}
+    chart_meta:
+      description: BGP peer administrative and established availability
+      family: 'Network/Routing/BGP/Peer/Availability'
+      unit: "{status}"
+  - name: bgpPeerFsmEstablishedTransitions
+    per_row: true
+    group_by:
+      - _routing_instance
+      - _neighbor
+      - _address_family
+      - _subsequent_address_family
+      - _neighbor_address_type
+    emit_tags:
+      - {tag: routing_instance, from: _routing_instance}
+      - {tag: neighbor, from: _neighbor}
+      - {tag: remote_as, from: _remote_as}
+      - {tag: bgp_version, from: _bgp_version}
+      - {tag: peer_description, from: _peer_description}
+      - {tag: address_family, from: _address_family}
+      - {tag: subsequent_address_family, from: _subsequent_address_family}
+      - {tag: neighbor_address_type, from: _neighbor_address_type}
+    sources:
+      - {metric: huawei.hwBgpPeerFsmEstablishedCounter, table: hwBgpPeerTable}
+    chart_meta:
+      description: The total number of times the BGP FSM transitioned into the established state
+      family: 'Network/Routing/BGP/Peer/FSM/Transition/Established/Count'
+      unit: "{transition}/s"
+  - name: bgpPeerUpdates
+    per_row: true
+    group_by:
+      - _routing_instance
+      - _neighbor
+      - _address_family
+      - _subsequent_address_family
+      - _neighbor_address_type
+    emit_tags:
+      - {tag: routing_instance, from: _routing_instance}
+      - {tag: neighbor, from: _neighbor}
+      - {tag: remote_as, from: _remote_as}
+      - {tag: peer_description, from: _peer_description}
+      - {tag: address_family, from: _address_family}
+      - {tag: subsequent_address_family, from: _subsequent_address_family}
+      - {tag: neighbor_address_type, from: _neighbor_address_type}
+    alternatives:
+      - sources:
+          - {metric: huawei.hwBgpPeerInUpdateMsgCounter, table: hwBgpPeerMessageTable, as: received}
+          - {metric: huawei.hwBgpPeerOutUpdateMsgCounter, table: hwBgpPeerMessageTable, as: sent}
+      - sources:
+          - {metric: huawei.hwBgpPeerInUpdateMsgs, table: hwBgpPeerStatisticTable, as: received}
+          - {metric: huawei.hwBgpPeerOutUpdateMsgs, table: hwBgpPeerStatisticTable, as: sent}
+    chart_meta:
+      description: BGP peer update traffic by direction
+      family: 'Network/Routing/BGP/Peer/Message/Update'
+      unit: "{message}/s"
 
 # https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-BGP-VPN-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-BGP-VPN-MIB
@@ -27,6 +104,15 @@ metrics:
           description: The counter that records the times the remote BGP peer is correctly connected
           family: 'Network/Routing/BGP/Peer/Connection/Established/Count'
           unit: "{connection}/s"
+      - OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.11
+        name: huawei.hwBgpPeerAdminStatus
+        chart_meta:
+          description: Administrative status of the BGP peer connection
+          family: 'Network/Routing/BGP/Peer/Admin/Status'
+          unit: "{status}"
+        mapping:
+          1: stop
+          2: start
       - OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.5
         name: huawei.hwBgpPeerState
         chart_meta:
@@ -40,6 +126,33 @@ metrics:
           4: opensent
           5: openconfirm
           6: established
+      - OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.8
+        name: huawei.hwBgpPeerGRStatus
+        chart_meta:
+          description: Graceful restart status of the BGP peer
+          family: 'Network/Routing/BGP/Peer/GracefulRestart/Status'
+          unit: "{status}"
+        mapping:
+          1: peer_not_being_helped
+          2: peer_restarting
+          3: peer_finish_restart
+          4: peer_helping
+      - OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.9
+        name: huawei.hwBgpPeerLastErrorCode
+        format: hex
+        extract_value: '^([0-9a-f]{2})'
+        chart_meta:
+          description: The last BGP NOTIFICATION error code seen on this connection
+          family: 'Network/Routing/BGP/Peer/Error/Last/Code'
+          unit: "{code}"
+      - OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.9
+        name: huawei.hwBgpPeerLastErrorSubcode
+        format: hex
+        extract_value: '^[0-9a-f]{2}([0-9a-f]{2})'
+        chart_meta:
+          description: The last BGP NOTIFICATION error subcode seen on this connection
+          family: 'Network/Routing/BGP/Peer/Error/Last/Subcode'
+          unit: "{subcode}"
       - OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.10
         name: huawei.hwBgpPeerUnAvaiReason
         chart_meta:
@@ -56,6 +169,7 @@ metrics:
           7: route_limit
     metric_tags:
       - tag: huawei_hw_bgp_peer_vrf_name
+        table: hwBgpPeerAddrFamilyTable
         symbol:
           name: huawei.hwBgpPeerVrfName
           OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
@@ -64,6 +178,56 @@ metrics:
           name: huawei.hwBgpPeerRemoteAddr
           OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
           format: ip_address
+      - tag: _routing_instance
+        table: hwBgpPeerAddrFamilyTable
+        symbol:
+          name: huawei.hwBgpPeerVrfName
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
+      - tag: _neighbor
+        symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          format: ip_address
+      - tag: _remote_as
+        symbol:
+          name: huawei.hwBgpPeerRemoteAs
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2
+      - tag: _bgp_version
+        symbol:
+          name: huawei.hwBgpPeerNegotiatedVersion
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.1
+      - tag: _peer_description
+        symbol:
+          name: huawei.hwBgpPeerDescription
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12
+      - tag: _address_family
+        index: 2
+        mapping:
+          1: ipv4
+          2: ipv6
+          25: vpls
+          196: l2vpn
+      - tag: _subsequent_address_family
+        index: 3
+        mapping:
+          1: unicast
+          2: multicast
+          4: mpls
+          5: mcast-vpn
+          65: vpls
+          66: mdt
+          74: sd-wan
+          128: vpn
+          132: route-target
+      - tag: _neighbor_address_type
+        index: 4
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
 
   - MIB: HUAWEI-BGP-VPN-MIB
     table:
@@ -93,14 +257,65 @@ metrics:
           unit: "{prefix}"
     metric_tags:
       - tag: huawei_hw_bgp_peer_vrf_name
+        table: hwBgpPeerAddrFamilyTable
         symbol:
           name: huawei.hwBgpPeerVrfName
           OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
       - tag: huawei_hw_bgp_peer_remote_addr
+        table: hwBgpPeerTable
         symbol:
           name: huawei.hwBgpPeerRemoteAddr
           OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
           format: ip_address
+      - tag: _routing_instance
+        table: hwBgpPeerAddrFamilyTable
+        symbol:
+          name: huawei.hwBgpPeerVrfName
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
+      - tag: _neighbor
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          format: ip_address
+      - tag: _remote_as
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerRemoteAs
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2
+      - tag: _peer_description
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerDescription
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12
+      - tag: _address_family
+        index: 2
+        mapping:
+          1: ipv4
+          2: ipv6
+          25: vpls
+          196: l2vpn
+      - tag: _subsequent_address_family
+        index: 3
+        mapping:
+          1: unicast
+          2: multicast
+          4: mpls
+          5: mcast-vpn
+          65: vpls
+          66: mdt
+          74: sd-wan
+          128: vpn
+          132: route-target
+      - tag: _neighbor_address_type
+        index: 4
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
 
   - MIB: HUAWEI-BGP-VPN-MIB
     table:
@@ -181,11 +396,62 @@ metrics:
           unit: "{packet}/s"
     metric_tags:
       - tag: huawei_hw_bgp_peer_vrf_name
+        table: hwBgpPeerAddrFamilyTable
         symbol:
           name: huawei.hwBgpPeerVrfName
           OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
       - tag: huawei_hw_bgp_peer_remote_addr
+        table: hwBgpPeerTable
         symbol:
           name: huawei.hwBgpPeerRemoteAddr
           OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
           format: ip_address
+      - tag: _routing_instance
+        table: hwBgpPeerAddrFamilyTable
+        symbol:
+          name: huawei.hwBgpPeerVrfName
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
+      - tag: _neighbor
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          format: ip_address
+      - tag: _remote_as
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerRemoteAs
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2
+      - tag: _peer_description
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerDescription
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12
+      - tag: _address_family
+        index: 2
+        mapping:
+          1: ipv4
+          2: ipv6
+          25: vpls
+          196: l2vpn
+      - tag: _subsequent_address_family
+        index: 3
+        mapping:
+          1: unicast
+          2: multicast
+          4: mpls
+          5: mcast-vpn
+          65: vpls
+          66: mdt
+          74: sd-wan
+          128: vpn
+          132: route-target
+      - tag: _neighbor_address_type
+        index: 4
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns

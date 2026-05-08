@@ -1,0 +1,22 @@
+# Vendor-aware Juniper BGP virtual metrics that override the generic BGP4-MIB
+# alert contract with richer Juniper peer-table labels.
+
+virtual_metrics:
+  - name: bgpPeerAvailability
+    per_row: true
+    sources:
+      - {metric: bgpPeerAdminStatus, table: jnxBgpM2PeerTable, as: admin_enabled, dim: running}
+      - {metric: bgpPeerState, table: jnxBgpM2PeerTable, as: established, dim: established}
+    chart_meta:
+      description: BGP peer administrative and established availability
+      family: 'Network/Routing/BGP/Peer/Availability'
+      unit: "{status}"
+  - name: bgpPeerUpdates
+    per_row: true
+    sources:
+      - {metric: bgpPeerInUpdates, table: jnxBgpM2PeerCountersTable, as: received}
+      - {metric: bgpPeerOutUpdates, table: jnxBgpM2PeerCountersTable, as: sent}
+    chart_meta:
+      description: BGP peer update traffic by direction
+      family: 'Network/Routing/BGP/Peer/Message/Update'
+      unit: "{message}"

@@ -1,0 +1,502 @@
+extends:
+  - _std-bgp4-mib.yaml
+
+virtual_metrics:
+  - name: bgpPeerAvailability
+    per_row: true
+    alternatives:
+      - sources:
+          - {metric: bgpPeerAdminStatus, table: tBgpPeerNgTable, as: admin_enabled, dim: start}
+          - {metric: bgpPeerState, table: tBgpPeerNgTable, as: established, dim: established}
+      - sources:
+          - {metric: bgpPeerAdminStatus, table: bgpPeerTable, as: admin_enabled, dim: start}
+          - {metric: bgpPeerState, table: bgpPeerTable, as: established, dim: established}
+    chart_meta:
+      description: BGP peer administrative and established availability
+      family: 'Network/Routing/BGP/Peer/Availability'
+      unit: "{status}"
+  - name: bgpPeerUpdates
+    per_row: true
+    alternatives:
+      - sources:
+          - {metric: bgpPeerInUpdates, table: tBgpPeerNgOperTable, as: received}
+          - {metric: bgpPeerOutUpdates, table: tBgpPeerNgOperTable, as: sent}
+      - sources:
+          - {metric: bgpPeerInUpdates, table: bgpPeerTable, as: received}
+          - {metric: bgpPeerOutUpdates, table: bgpPeerTable, as: sent}
+    chart_meta:
+      description: BGP peer update traffic by direction
+      family: 'Network/Routing/BGP/Peer/Message/Update'
+      unit: "{message}"
+
+metrics:
+  - MIB: TIMETRA-BGP-MIB
+    table:
+      name: tBgpPeerNgTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7
+    symbols:
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.6
+        name: bgpPeerAdminStatus
+        chart_meta:
+          description: Administrative status of the BGP peer connection
+          family: 'Network/Routing/BGP/Peer/Admin/Status'
+          unit: "{status}"
+        mapping:
+          1: stop
+          2: start
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.59
+        name: bgpPeerState
+        chart_meta:
+          description: Current state of the BGP peer connection
+          family: 'Network/Routing/BGP/Peer/Connection/Status'
+          unit: "{status}"
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.8
+        name: bgpPeerConnectRetryInterval
+        chart_meta:
+          description: The configured interval for retrying TCP connection establishment to the peer
+          family: 'Network/Routing/BGP/Peer/Timer/ConnectRetry/Configured'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.9
+        name: bgpPeerHoldTimeConfigured
+        chart_meta:
+          description: The locally configured hold timer interval for the peer
+          family: 'Network/Routing/BGP/Peer/Timer/Hold/Configured'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.10
+        name: bgpPeerKeepAliveConfigured
+        chart_meta:
+          description: The locally configured keepalive timer interval for the peer
+          family: 'Network/Routing/BGP/Peer/Timer/KeepAlive/Configured'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.18
+        name: bgpPeerMinRouteAdvertisementInterval
+        chart_meta:
+          description: The minimum interval between route advertisements to the peer
+          family: 'Network/Routing/BGP/Peer/Timer/RouteAdvertisement/Minimum'
+          unit: "s"
+    metric_tags:
+      - tag: routing_instance
+        table: vRtrConfTable
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.3.1.1.4
+          name: vRtrName
+        index_transform:
+          - start: 0
+            end: 0
+      - tag: neighbor_address_type
+        index: 2
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      - tag: neighbor
+        symbol:
+          name: tBgpPeerNgPeerAddrIndex
+          format: ip_address
+          extract_value: '^(?:\d+\.){3}(.*)$'
+      - tag: local_address_type
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.14
+          name: tBgpPeerNgLocalAddressType
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      - tag: local_address
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.13
+          name: tBgpPeerNgLocalAddress
+          format: ip_address
+      - tag: local_as
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.65
+          name: tBgpPeerNgLocalAS4Byte
+          format: uint32
+      - tag: remote_as
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.66
+          name: tBgpPeerNgPeerAS4Byte
+          format: uint32
+      - tag: peer_description
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.7
+          name: tBgpPeerNgDescription
+
+  - MIB: TIMETRA-BGP-MIB
+    table:
+      name: tBgpPeerNgOperTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
+    symbols:
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.10
+        name: bgpPeerFlaps
+        metric_type: monotonic_count
+        chart_meta:
+          description: The number of times the peer session flapped
+          family: 'Network/Routing/BGP/Peer/Flap/Count'
+          unit: "{flap}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.177
+        name: bgpPeerFsmEstablishedTime
+        metric_type: gauge
+        chart_meta:
+          description: Time in seconds this peer has been in the Established state or since last in Established state
+          family: 'Network/Routing/BGP/Peer/FSM/Duration/Established'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.178
+        name: bgpPeerLastErrorCode
+        format: hex
+        extract_value: '^([0-9a-f]{2})'
+        chart_meta:
+          description: The last BGP NOTIFICATION error code seen on this connection
+          family: 'Network/Routing/BGP/Peer/Error/Last/Code'
+          unit: "{code}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.178
+        name: bgpPeerLastErrorSubcode
+        format: hex
+        extract_value: '^[0-9a-f]{2}([0-9a-f]{2})'
+        chart_meta:
+          description: The last BGP NOTIFICATION error subcode seen on this connection
+          family: 'Network/Routing/BGP/Peer/Error/Last/Subcode'
+          unit: "{subcode}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.181
+        name: bgpPeerIdentifier
+        format: ip_address
+        chart_meta:
+          description: The BGP identifier currently reported by the remote peer
+          family: 'Network/Routing/BGP/Peer/Identifier'
+          unit: "{identifier}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.182
+        name: bgpPeerInUpdates
+        chart_meta:
+          description: The number of BGP UPDATE messages received on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Update/In'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.183
+        name: bgpPeerOutUpdates
+        chart_meta:
+          description: The number of BGP UPDATE messages transmitted on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Update/Out'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.184
+        name: bgpPeerInTotalMessages
+        chart_meta:
+          description: The total number of BGP messages received from the remote peer on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Total/In'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.185
+        name: bgpPeerOutTotalMessages
+        chart_meta:
+          description: The total number of BGP messages transmitted to the remote peer on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Total/Out'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.186
+        name: bgpPeerInNotifications
+        chart_meta:
+          description: The number of BGP NOTIFICATION messages received from the remote peer on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Notification/In'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.187
+        name: bgpPeerOutNotifications
+        chart_meta:
+          description: The number of BGP NOTIFICATION messages transmitted to the remote peer on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Notification/Out'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.188
+        name: bgpPeerInUpdateElapsedTime
+        metric_type: gauge
+        chart_meta:
+          description: Time since the last BGP UPDATE message was received from the peer
+          family: 'Network/Routing/BGP/Peer/Message/Update/In/Elapsed'
+          unit: "s"
+    metric_tags: &nokia_bgp_peer_tags
+      - tag: routing_instance
+        table: vRtrConfTable
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.3.1.1.4
+          name: vRtrName
+        index_transform:
+          - start: 0
+            end: 0
+      - tag: neighbor_address_type
+        index: 2
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      - tag: neighbor
+        symbol:
+          name: tBgpPeerNgOperPeerAddrIndex
+          format: ip_address
+          extract_value: '^(?:\d+\.){3}(.*)$'
+      - tag: local_address
+        table: tBgpPeerNgTable
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.13
+          name: tBgpPeerNgLocalAddress
+          format: ip_address
+      - tag: local_as
+        table: tBgpPeerNgTable
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.65
+          name: tBgpPeerNgLocalAS4Byte
+          format: uint32
+      - tag: remote_as
+        table: tBgpPeerNgTable
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.66
+          name: tBgpPeerNgPeerAS4Byte
+          format: uint32
+      - tag: peer_description
+        table: tBgpPeerNgTable
+        symbol:
+          OID: 1.3.6.1.4.1.6527.3.1.2.14.4.7.1.7
+          name: tBgpPeerNgDescription
+
+  - MIB: TIMETRA-BGP-MIB
+    table:
+      name: tBgpPeerNgOperTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
+    static_tags:
+      - {tag: address_family, value: ipv4}
+      - {tag: subsequent_address_family, value: unicast}
+      - {tag: address_family_name, value: ipv4 unicast}
+    symbols:
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.5
+        name: bgpPeerPrefixesReceivedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of IPv4 prefixes received from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Received/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.6
+        name: bgpPeerPrefixesAdvertisedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of IPv4 prefixes advertised to this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Advertised/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.7
+        name: bgpPeerPrefixesActive
+        metric_type: gauge
+        chart_meta:
+          description: The current number of active IPv4 prefixes learned from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Active'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.98
+        name: bgpPeerPrefixesRejectedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of IPv4 prefixes rejected from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Rejected/Total'
+          unit: "{prefix}"
+    metric_tags: *nokia_bgp_peer_tags
+
+  - MIB: TIMETRA-BGP-MIB
+    table:
+      name: tBgpPeerNgOperTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
+    static_tags:
+      - {tag: address_family, value: ipv4}
+      - {tag: subsequent_address_family, value: vpn}
+      - {tag: address_family_name, value: vpnv4 unicast}
+    symbols:
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.13
+        name: bgpPeerPrefixesReceivedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of VPNv4 prefixes received from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Received/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.14
+        name: bgpPeerPrefixesAdvertisedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of VPNv4 prefixes advertised to this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Advertised/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.15
+        name: bgpPeerPrefixesActive
+        metric_type: gauge
+        chart_meta:
+          description: The current number of active VPNv4 prefixes learned from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Active'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.99
+        name: bgpPeerPrefixesRejectedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of VPNv4 prefixes rejected from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Rejected/Total'
+          unit: "{prefix}"
+    metric_tags: *nokia_bgp_peer_tags
+
+  - MIB: TIMETRA-BGP-MIB
+    table:
+      name: tBgpPeerNgOperTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
+    static_tags:
+      - {tag: address_family, value: ipv6}
+      - {tag: subsequent_address_family, value: unicast}
+      - {tag: address_family_name, value: ipv6 unicast}
+    symbols:
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.27
+        name: bgpPeerPrefixesReceivedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of IPv6 prefixes received from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Received/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.28
+        name: bgpPeerPrefixesAdvertisedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of IPv6 prefixes advertised to this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Advertised/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.29
+        name: bgpPeerPrefixesActive
+        metric_type: gauge
+        chart_meta:
+          description: The current number of active IPv6 prefixes learned from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Active'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.100
+        name: bgpPeerPrefixesRejectedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of IPv6 prefixes rejected from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Rejected/Total'
+          unit: "{prefix}"
+    metric_tags: *nokia_bgp_peer_tags
+
+  - MIB: TIMETRA-BGP-MIB
+    table:
+      name: tBgpPeerNgOperTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
+    static_tags:
+      - {tag: address_family, value: ipv6}
+      - {tag: subsequent_address_family, value: vpn}
+      - {tag: address_family_name, value: vpnv6 unicast}
+    symbols:
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.40
+        name: bgpPeerPrefixesReceivedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of VPNv6 prefixes received from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Received/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.41
+        name: bgpPeerPrefixesAdvertisedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of VPNv6 prefixes advertised to this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Advertised/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.42
+        name: bgpPeerPrefixesActive
+        metric_type: gauge
+        chart_meta:
+          description: The current number of active VPNv6 prefixes learned from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Active'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.101
+        name: bgpPeerPrefixesRejectedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of VPNv6 prefixes rejected from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Rejected/Total'
+          unit: "{prefix}"
+    metric_tags: *nokia_bgp_peer_tags
+
+  - MIB: TIMETRA-BGP-MIB
+    table:
+      name: tBgpPeerNgOperTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
+    static_tags:
+      - {tag: address_family, value: l2vpn}
+      - {tag: subsequent_address_family, value: vpls}
+      - {tag: address_family_name, value: l2vpn vpls}
+    symbols:
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.49
+        name: bgpPeerPrefixesReceivedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of L2VPN VPLS prefixes received from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Received/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.50
+        name: bgpPeerPrefixesAdvertisedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of L2VPN VPLS prefixes advertised to this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Advertised/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.51
+        name: bgpPeerPrefixesActive
+        metric_type: gauge
+        chart_meta:
+          description: The current number of active L2VPN VPLS prefixes learned from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Active'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.103
+        name: bgpPeerPrefixesRejectedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of L2VPN VPLS prefixes rejected from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Rejected/Total'
+          unit: "{prefix}"
+    metric_tags: *nokia_bgp_peer_tags
+
+  - MIB: TIMETRA-BGP-MIB
+    table:
+      name: tBgpPeerNgOperTable
+      OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
+    static_tags:
+      - {tag: address_family, value: l2vpn}
+      - {tag: subsequent_address_family, value: evpn}
+      - {tag: address_family_name, value: l2vpn evpn}
+    symbols:
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.88
+        name: bgpPeerPrefixesReceivedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of L2VPN EVPN prefixes received from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Received/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.89
+        name: bgpPeerPrefixesAdvertisedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of L2VPN EVPN prefixes advertised to this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Advertised/Total'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.90
+        name: bgpPeerPrefixesActive
+        metric_type: gauge
+        chart_meta:
+          description: The current number of active L2VPN EVPN prefixes learned from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Active'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.112
+        name: bgpPeerPrefixesRejectedTotal
+        metric_type: monotonic_count
+        chart_meta:
+          description: The total number of L2VPN EVPN prefixes rejected from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Rejected/Total'
+          unit: "{prefix}"
+    metric_tags: *nokia_bgp_peer_tags

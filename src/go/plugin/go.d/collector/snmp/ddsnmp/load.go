@@ -117,7 +117,7 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]*P
 		if err != nil {
 			return err
 		}
-		if !(strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
+		if !strings.HasSuffix(d.Name(), ".yaml") && !strings.HasSuffix(d.Name(), ".yml") {
 			return nil
 		}
 		// Skip abstract profiles

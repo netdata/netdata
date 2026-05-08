@@ -10,6 +10,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+// HandleCrossTableTagsWithoutMetrics is the exported entry point for callers outside
+// this package (notably tests in ddsnmpcollector) that need to prepare a profile in
+// isolation, without the additional enrichment performed by FinalizeProfiles.
+func HandleCrossTableTagsWithoutMetrics(prof *Profile) {
+	handleCrossTableTagsWithoutMetrics(prof)
+}
+
 // handleCrossTableTagsWithoutMetrics ensures tables referenced only by cross-table tags
 // are still walked during collection. Without this, if a table like ifXTable is used
 // only for cross-table tags (e.g., getting interface names) but has no metrics defined,

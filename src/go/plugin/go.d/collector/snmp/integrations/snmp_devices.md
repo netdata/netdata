@@ -505,6 +505,64 @@ Network interface metrics from cached SNMP data, including traffic rates, packet
 | Multicast In | float | packets/s | hidden | Rate of multicast packets (destined for a group) received per second. Common in video streaming, multicast applications, and routing protocols. |
 | Multicast Out | float | packets/s | hidden | Rate of multicast packets transmitted per second. |
 
+### BGP Peers
+
+Provides detailed current BGP peer and peer-family state from cached SNMP data.
+
+This function uses the normalized BGP surface produced during regular SNMP polling and presents it as a sortable, filterable troubleshooting table. It is designed for details that are operationally useful but should not be charted as regular time-series, such as previous state, last error, last down reason, graceful restart state, and vendor-specific unavailability reasons.
+
+Use cases:
+- Identify exactly which peer or peer-family is unhealthy right now
+- See the most recent BGP NOTIFICATION error as human-readable text
+- Inspect peer identity, AFI/SAFI scope, prefix gauges, and current troubleshooting context in one view
+
+Data is sourced from the last successful SNMP collection cycle. No additional SNMP requests are triggered when calling this function.
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `snmp:bgp-peers` |
+| Require Cloud | no |
+| Performance | Uses cached normalized SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many peers or peer-families may return many rows |
+| Security | Exposes current BGP control-plane state and identifiers only:<br/>• No authentication credentials are exposed<br/>• No device configuration changes are triggered<br/>• No packet payloads or full route inventory are exposed |
+| Availability | Available when:<br/>• The collector has completed at least one successful BGP-capable SNMP collection cycle<br/>• BGP peer data exists for the matched profile(s)<br/>• Returns HTTP 503 if no BGP rows are available yet |
+
+#### Prerequisites
+
+No additional configuration is required beyond matching a BGP-capable SNMP profile.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| View | select | Choose whether to show peer rows, peer-family rows, or both. | yes | peers | Peers (default), Peer Families, All |
+
+#### Returns
+
+Current BGP peer and peer-family details from cached normalized SNMP data. Each row represents either one peer or one peer plus AFI/SAFI, depending on the selected view. Additional hidden columns provide raw codes, message totals, and threshold fields for deeper inspection in the UI.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Scope | string |  |  | Whether the row represents a peer or a peer-family. |
+| Routing Instance | string |  |  | Routing-instance / VRF identifier when exposed by the source MIB. |
+| Neighbor | string |  |  | Remote peer address. |
+| Local Address | string |  |  | Local address used for the BGP session when exposed by the source MIB. |
+| Remote AS | string |  |  | Remote Autonomous System number. |
+| Peer Description | string |  |  | Peer description or label when exposed by the source MIB. |
+| Family | string |  |  | Address-family / SAFI scope for peer-family rows. |
+| Admin Status | string |  |  | Whether the peer is administratively enabled. |
+| Connection State | string |  |  | Current BGP FSM state. |
+| Previous State | string |  |  | Previous FSM state when the source MIB exposes it. |
+| Established Uptime | integer | seconds |  | Time spent in the Established state. |
+| Last Update Age | integer | seconds |  | Time since the last received UPDATE. |
+| Updates Received | integer | updates |  | Current received UPDATE counter from the latest poll. |
+| Updates Sent | integer | updates |  | Current sent UPDATE counter from the latest poll. |
+| Prefixes Accepted | integer | prefixes |  | Current accepted-prefix gauge where the source MIB exposes it. |
+| Prefixes Advertised | integer | prefixes |  | Current advertised-prefix gauge where the source MIB exposes it. |
+| Last Error | string |  |  | Human-readable BGP last-error text derived from the code/subcode pair when available. |
+| Down Reason | string |  |  | Last peer-down reason when the source MIB exposes it. |
+| GR State | string |  |  | Graceful-restart state for peer-family scoped rows when exposed by the source MIB. |
+| Unavailability Reason | string |  |  | Vendor-specific unavailability reason for peer-family scoped rows when exposed by the source MIB. |
+
 ### Network Topology
 
 Provides the agent-wide SNMP topology view built from all currently running topology-enabled SNMP jobs.
@@ -723,6 +781,5 @@ Table metrics are usually the slowest and often determine the total collection t
 1. Do logs show “skipping data collection”?  
 2. Does *Internal → Stats* show collection time > `update_every`?  
 3. Increase `update_every` until skips disappear.
-
 
 

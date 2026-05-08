@@ -355,7 +355,3 @@ func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddpr
 
 	return strings.Join(result, ".")
 }
-
-func (r *crossTableResolver) isCrossTable(tagCfg ddprofiledefinition.MetricTagConfig, currentTableName string) bool {
-	return tagCfg.Table != "" && tagCfg.Table != currentTableName && tagCfg.Index == 0
-}

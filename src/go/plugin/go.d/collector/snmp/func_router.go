@@ -17,12 +17,22 @@ type funcRouter struct {
 	handlers map[string]funcapi.MethodHandler
 }
 
-func newFuncRouter(ifaceCache *ifaceCache) *funcRouter {
+type registeredSNMPFunction struct {
+	methodID string
+	handler  funcapi.MethodHandler
+}
+
+func newFuncRouter(ifaceCache *ifaceCache, extraHandlers ...registeredSNMPFunction) *funcRouter {
 	r := &funcRouter{
 		ifaceCache: ifaceCache,
 		handlers:   make(map[string]funcapi.MethodHandler),
 	}
 	r.registerHandler(ifacesMethodID, newFuncInterfaces(r))
+	for _, h := range extraHandlers {
+		if h.methodID != "" {
+			r.registerHandler(h.methodID, h.handler)
+		}
+	}
 	addTopologyFunctionHandler(r.handlers)
 	return r
 }
@@ -64,6 +74,7 @@ func snmpBaseMethods() []funcapi.MethodConfig {
 	methods := []funcapi.MethodConfig{
 		ifacesMethodConfig(),
 	}
+	methods = append(methods, collectorSpecificMethodConfigs()...)
 	return appendTopologyMethodConfig(methods)
 }
 

@@ -73,6 +73,7 @@ func New() *Collector {
 
 		ifaceCache: newIfaceCache(),
 		licensing:  newLicensingIntegration(),
+		bgp:        newBGPIntegration(),
 
 		newPinger:     pinger.New,
 		newSnmpClient: gosnmp.NewHandler,
@@ -81,7 +82,7 @@ func New() *Collector {
 		},
 	}
 
-	c.funcRouter = newFuncRouter(c.ifaceCache)
+	c.funcRouter = newFuncRouter(c.ifaceCache, c.additionalFuncHandlers()...)
 	c.licensing.registerFunction(c.funcRouter)
 
 	return c
@@ -101,7 +102,8 @@ type (
 
 		ifaceCache *ifaceCache // interface metrics cache for functions
 		licensing  *licensingIntegration
-		funcRouter *funcRouter // function router for method handlers
+		bgp        *bgpIntegration // BGP metric normalization and function state
+		funcRouter *funcRouter     // function router for method handlers
 
 		pingClient pinger.Client
 		newPinger  func(pinger.Config, *logger.Logger) (pinger.Client, error)

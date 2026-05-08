@@ -563,7 +563,7 @@ func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
 	assert.Equal(t, "collect", calls[1].ctx.Value(collectKey{}))
 }
 
-func TestCollector_CollectMixedModeAllowsNilContext(t *testing.T) {
+func TestCollector_CollectMixedModeCollectsSNMPAndPingMetrics(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -603,7 +603,7 @@ func TestCollector_CollectMixedModeAllowsNilContext(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 
-	got := collr.Collect(nil)
+	got := collr.Collect(context.Background())
 
 	assert.Equal(t, map[string]int64{
 		"snmp_device_prof_test_stats_errors_processing_scalar":    0,

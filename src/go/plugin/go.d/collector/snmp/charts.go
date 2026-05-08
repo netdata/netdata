@@ -192,12 +192,12 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	}
 
 	chart := &collectorapi.Chart{
-		ID:       fmt.Sprintf("snmp_device_prof_%s", cleanMetricName.Replace(m.Name)),
+		ID:       chartIDFromName(m.Name),
 		Title:    m.Description,
 		Type:     collectorapi.ChartType(m.ChartType),
 		Units:    m.Unit,
 		Fam:      m.Family,
-		Ctx:      fmt.Sprintf("snmp.device_prof_%s", cleanMetricName.Replace(m.Name)),
+		Ctx:      chartContextID(m.Name),
 		Priority: prioProfileChart,
 	}
 	if chart.Title == "" {
@@ -226,12 +226,12 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 		for k := range m.MultiValue {
 			if !seen[k] {
 				seen[k] = true
-				id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, k)
+				id := metricIDFromName(m.Name, k)
 				chart.Dims = append(chart.Dims, &collectorapi.Dim{ID: id, Name: k, Algo: dimAlgoFromDdSnmpType(m)})
 			}
 		}
 	} else {
-		id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
+		id := metricIDFromName(m.Name)
 		chart.Dims = collectorapi.Dims{
 			{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)},
 		}
@@ -250,11 +250,11 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	key := tableMetricKey(m)
 
 	chart := &collectorapi.Chart{
-		ID:       fmt.Sprintf("snmp_device_prof_%s", cleanMetricName.Replace(key)),
+		ID:       chartIDFromKey(key),
 		Title:    m.Description,
 		Units:    m.Unit,
 		Fam:      m.Family,
-		Ctx:      fmt.Sprintf("snmp.device_prof_%s", cleanMetricName.Replace(m.Name)),
+		Ctx:      chartContextID(m.Name),
 		Priority: prioProfileChart,
 	}
 	if chart.Title == "" {
@@ -284,12 +284,12 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 		for k := range m.MultiValue {
 			if !seen[k] {
 				seen[k] = true
-				id := fmt.Sprintf("snmp_device_prof_%s_%s", key, k)
+				id := metricIDFromKey(key, k)
 				chart.Dims = append(chart.Dims, &collectorapi.Dim{ID: id, Name: k, Algo: dimAlgoFromDdSnmpType(m)})
 			}
 		}
 	} else {
-		id := fmt.Sprintf("snmp_device_prof_%s", key)
+		id := metricIDFromKey(key)
 		chart.Dims = collectorapi.Dims{
 			{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)},
 		}
@@ -301,7 +301,7 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 }
 
 func (c *Collector) removeProfileTableMetricChart(key string) {
-	id := fmt.Sprintf("snmp_device_prof_%s", cleanMetricName.Replace(key))
+	id := chartIDFromKey(key)
 	if chart := c.Charts().Get(id); chart != nil {
 		chart.MarkRemove()
 		chart.MarkNotCreated()
