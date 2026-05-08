@@ -8,6 +8,14 @@ Reopened 2026-05-07 after the netlify deploy preview for learn PR #2852 surfaced
 
 Reopened 2026-05-08 after PR #22449 review and CI reported additional issues after the SOW had been marked completed and moved to `done/`. The open items are tracked in `## Regression - 2026-05-08` and include automated review threads, `yamllint`, `check-documentation`, Codacy triage, a code-only review subagent requested by the user, and a new user-requested local Learn preview skill/workflow.
 
+Reopened 2026-05-08 after the merged integration artifacts broke downstream
+publishing contracts for the website and in-app integrations. The flow
+integration schema delegates to collector metadata, but the flow renderer did
+not render the collector-style `metrics` and `alerts` sections, leaving raw
+objects/arrays in `integrations.json` and `integrations.js`.
+The regression was repaired and revalidated on 2026-05-08; see
+`## Regression - 2026-05-08 - Flow Integration Section Rendering`.
+
 ## Requirements
 
 ### Purpose
@@ -2876,3 +2884,118 @@ Repairs:
 - **SOW lifecycle**: SOW 14 repair is complete; status is `completed`, and
   the file is moved back to `.agents/sow/done/` in the same commit as the
   repair.
+
+## Regression - 2026-05-08 - Flow Integration Section Rendering
+
+### What broke
+
+The merged network-flow integration artifacts expose `metrics` as a JSON object
+and `alerts` as a JSON array for `integration_type: flows` entries. Downstream
+surfaces expect rendered markdown strings for integration content sections.
+
+Evidence:
+
+- `integrations/schemas/flows.json` delegates to `collector.json`, so flow
+  metadata legitimately contains collector-style `metrics` and `alerts`.
+- `integrations/gen_integrations.py` `FLOWS_RENDER_KEYS` rendered only
+  `overview`, `related_resources`, `setup`, and `troubleshooting`, leaving
+  `metrics` and `alerts` in their source YAML shape.
+- The website PR generated from the merged artifacts failed production-pinned
+  Hugo `0.140.0` because `themes/tailwind/layouts/partials/integration-tabs.html`
+  calls `markdownify` on `.integration.metrics`.
+- The in-app integrations renderer in cloud-frontend adds tabs for truthy
+  `metrics` and `alerts`, while its Markdoc wrapper parses only string input.
+  The result would be blank Metrics and Alerts tabs after the next data sync.
+- The cloud-frontend integration link checker calls `.match()` on markdown
+  fields, so raw objects/arrays in `metrics`/`alerts` can break that check too.
+
+### Why previous validation missed it
+
+The earlier closeout validated the Netdata integrations generator and local
+Learn ingest/build, but did not validate the website Hugo renderer or the
+cloud-frontend integrations consumer against the newly introduced
+`integration_type: flows` artifacts. `gen_integrations.py` itself accepted the
+raw structured fields because they are schema-valid before rendering.
+
+### Repair plan
+
+Render flow `metrics` and `alerts` through the same markdown templates used by
+collector integrations. This keeps the source metadata schema unchanged and
+restores the downstream contract: content sections in `integrations.json` and
+`integrations.js` are markdown strings.
+
+### Validation plan
+
+- Run `python3 integrations/gen_integrations.py`.
+- Verify all `flows` entries in `integrations/integrations.json` have string
+  `metrics` and string `alerts`.
+- Run `python3 integrations/gen_docs_integrations.py`.
+- Run `python3 integrations/gen_doc_collector_page.py`.
+- Rebuild the website PR artifacts with the repaired generated
+  `integrations.json` and production-pinned Hugo `0.140.0`.
+- Verify cloud-frontend's current renderer and link checker receive strings
+  for `flows` `metrics` and `alerts`.
+
+### Artifact updates needed
+
+- **Code**: update `integrations/gen_integrations.py` flow render keys.
+- **Generated artifacts**: regenerate `integrations/integrations.json`,
+  `integrations/integrations.js`, per-integration markdown, and
+  `src/collectors/COLLECTORS.md` if the generator changes them.
+- **Runtime project skills**: update `integrations-lifecycle` if the durable
+  downstream contract was not already documented clearly enough.
+- **Specs**: no product behavior change is expected; this repairs generated
+  publishing artifacts.
+- **End-user/operator docs**: no content change is expected beyond generated
+  artifacts.
+
+### Repair completed
+
+`integrations/gen_integrations.py` now renders the flow `alerts`, `metrics`,
+and `functions` sections through the standard templates, matching the
+collector-like schema that `flows.json` delegates to.
+
+### Validation evidence
+
+- `python3 integrations/gen_integrations.py` passed.
+- `python3 integrations/gen_docs_integrations.py` passed.
+- `python3 integrations/gen_doc_collector_page.py` passed.
+- Flow artifact type check passed: every `integration_type: flows` entry in
+  `integrations/integrations.json` has string `metrics`, string `alerts`, and
+  string `functions`.
+- Non-deploy markdown-field type check passed: no non-deploy integration emits
+  raw object or array values for `overview`, `setup`, `troubleshooting`,
+  `alerts`, `metrics`, `functions`, or `related_resources`.
+- Website validation passed in a temporary copy of PR #1212 using the repaired
+  `integrations.json` and production-pinned Hugo `0.140.0`: `hugo --gc
+  --minify` built 3141 pages successfully.
+- Cloud-frontend compatibility check passed against the repaired
+  `integrations.json`: all flow markdown fields inspected by
+  `scripts/checkIntegrations.js` were strings, and `getMarkdownUrls()` extracted
+  52 markdown URLs without throwing.
+- `git diff --check` passed.
+- `.agents/sow/audit.sh` exited 2 because of a pre-existing unrelated
+  sensitive-pattern warning in
+  `.agents/skills/mirror-netdata-repos/SKILL.md`; SOW status/directory
+  consistency passed and SOW 14 reports `completed` in `.agents/sow/done/`.
+
+### Artifact maintenance gate
+
+- **AGENTS.md**: no update needed; this does not change repo-wide workflow.
+- **Runtime project skills**: updated `integrations-lifecycle` with the
+  downstream markdown-string contract and the new-integration-type validation
+  checklist.
+- **Specs**: no update needed; product behavior and public data semantics did
+  not change.
+- **End-user/operator docs**: no hand-authored user docs changed; this repairs
+  generated publishing artifacts.
+- **End-user/operator skills**: no update needed; no operator workflow changed.
+- **SOW lifecycle**: SOW 14 reopened as a regression, status returned to
+  `completed`, and the file is moved back to `.agents/sow/done/` in the same
+  commit as the repair.
+
+### Follow-up mapping
+
+No deferred follow-up remains for this regression. The website integration PR
+must be regenerated after this repair reaches `netdata/master`; that is the
+normal downstream propagation path rather than a separate source-code TODO.

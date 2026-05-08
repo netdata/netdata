@@ -29,7 +29,7 @@ Examples that would NOT qualify (use an existing type instead):
 
 Clone the closest existing schema and trim/adjust:
 
-- For data-bearing types (something that produces records / metrics / events): start from `collector.json`. Trim fields that don't apply (e.g., flows have no `metrics` or `alerts` sections in the traditional sense).
+- For data-bearing types (something that produces records / metrics / events): start from `collector.json`. If the new type keeps collector-style sections such as `metrics`, `alerts`, or `functions`, those sections still need to be rendered to markdown before publication, even when they describe non-metric data or say that no alerts exist.
 - For thin types (a config target with overview + setup + troubleshooting): start from `logs.json` or `exporter.json`.
 
 The schema field set drives validation. Anything not in the schema is rejected as an unknown property when `additionalProperties: false` is set on the relevant object.
@@ -42,6 +42,14 @@ There are typically 3-5 places that need updating:
 - Schema dispatch (the function that picks which schema to validate against based on file location or `integration_type`).
 - The render-keys table — which sections (overview, setup, troubleshooting, alerts, metrics, ...) the type renders.
 - The categorisation in `integrations.js` — making sure the new type ends up in the flat `integrations` array with a correct `integration_type` field.
+
+Render keys are a downstream contract, not only a docs-output choice. Any
+section name that website or cloud-frontend treats as markdown content must
+be emitted as a string in `integrations.json` and `integrations.js`. If a new
+type reuses `collector.json`, default to the collector render keys unless
+there is evidence a key is invalid for that type. Publishing raw YAML
+objects or arrays under keys such as `metrics` or `alerts` breaks website
+Hugo templates and cloud-frontend integration tabs/checkers.
 
 ### 3. Pipeline rendering (`integrations/gen_docs_integrations.py`)
 
@@ -120,7 +128,7 @@ Three downstream repos may need touching, in roughly decreasing likelihood:
 
 - **`netdata/website`** (`~/src/netdata/website`): the daily `update-integrations.yml` workflow renders marketing cards from `integrations.json`. Cards usually appear automatically. But pages that reference the type explicitly (FAQ entries, solution pages) may need rewriting if the new type changes the story (e.g., "we don't do flows" → "we do flows natively").
 - **`netdata/learn`** (`~/src/netdata/learn`): no PR usually needed. Learn ingest reads `map.yaml` + the `<!--startmeta-->` markers in the generated `.md` files. Sidebar regenerates automatically. ~3 hours after netdata-repo merge.
-- **`netdata/dashboard/cloud-frontend`** (`~/src/dashboard/cloud-frontend`): no PR usually needed. The catalog rendering in `src/domains/integrations/` is fully data-driven from `integrations.js`. New `integration_type` values appear automatically. Special UI (a dedicated tab elsewhere in the dashboard) is a separate concern.
+- **`netdata/dashboard/cloud-frontend`** (`~/src/dashboard/cloud-frontend`): cards/categories are mostly data-driven, but content tabs and validation scripts still assume rendered markdown strings for standard section keys. Before merging a new type, inspect the generated `integrations.js` shape against `src/domains/integrations/components/content/integration/tabs.js`, `src/components/markdown/useRenderableTree.js`, and `scripts/checkIntegrations.js`. Special UI (a dedicated tab elsewhere in the dashboard) is a separate concern.
 
 ## Verification checklist
 
@@ -128,10 +136,12 @@ After all the changes:
 
 1. `python3 integrations/gen_integrations.py` — exits 0, regenerates `integrations.js` and `integrations.json`. The new type appears in the flat list, in the new top-level category, with the correct count.
 2. `python3 integrations/gen_docs_integrations.py` — exits 0, generates per-integration `.md` files. Each has `<!--startmeta-->` with the correct `learn_rel_path`.
-3. Manual inspection of one generated `.md` — frontmatter complete (`custom_edit_url`, `meta_yaml`, `sidebar_label`, `learn_status: Published`, `learn_rel_path`, `keywords`, `message: "DO NOT EDIT..."`).
-4. `grep` the categories tree in `integrations.json` — the new top-level node exists with the new entries.
-5. Open `learn.netdata.cloud` after the next ingest cycle (~3 hours after merge) — confirm the new section renders in the sidebar.
-6. Open the in-app integrations catalog — confirm the new top-level filter appears in the sidebar with the correct entries.
+3. Type-check the generated artifacts — every standard content key consumed as markdown downstream (`overview`, `setup`, `troubleshooting`, `alerts`, `metrics`, `functions`, `related_resources`, and type-specific equivalents) is a string, not an object or array.
+4. Manual inspection of one generated `.md` — frontmatter complete (`custom_edit_url`, `meta_yaml`, `sidebar_label`, `learn_status: Published`, `learn_rel_path`, `keywords`, `message: "DO NOT EDIT..."`).
+5. `grep` the categories tree in `integrations.json` — the new top-level node exists with the new entries.
+6. Run or locally emulate the website integrations update/build when the new type introduces a new top-level category or a new section shape. The website PR must build with the Hugo version pinned in `netlify.toml`.
+7. Open `learn.netdata.cloud` after the next ingest cycle (~3 hours after merge) — confirm the new section renders in the sidebar.
+8. Open the in-app integrations catalog — confirm the new top-level filter appears in the sidebar with the correct entries and content tabs are not blank.
 
 ## What to commit, and where
 

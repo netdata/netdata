@@ -72,6 +72,16 @@ export const integrations = [
 ];
 ```
 
+All public content sections consumed by downstream renderers must be
+markdown strings in the generated artifacts, even when the source
+`metadata.yaml` stores them as structured YAML objects or arrays.
+Examples: collector-like `metrics`, `alerts`, `functions`, `overview`,
+`setup`, `troubleshooting`, and `related_resources` must pass through
+the renderer before reaching `integrations.js` / `integrations.json`.
+Leaving raw objects or arrays in these fields breaks the website Hugo
+renderer and produces blank tabs or link-check failures in
+cloud-frontend.
+
 The dashboard's renderer interprets the `{% details %}` /
 `{% /details %}` markers embedded in the rendered text (the
 `clean=False` variant is the one written into the `.js` file).
@@ -128,10 +138,16 @@ In practice this means:
    keys) is a contract. Avoid breaking changes; coordinate
    with the cloud-frontend team if a key must be renamed or
    removed.
-2. **Custom Jinja markers in metadata** (`{% details %}`,
+2. **Render structured metadata before publication**. A new
+   integration type that reuses collector-style sections must
+   include every structured content key in its render-key list.
+   Do not publish raw `metrics` objects, `alerts` arrays, or
+   similar YAML structures under the public markdown section
+   names.
+3. **Custom Jinja markers in metadata** (`{% details %}`,
    `{% relatedResource %}`, `{% if %}`) are part of the
    contract. The dashboard's renderer interprets them. Test
    any new marker against both surfaces before relying on it.
-3. **Do not commit `integrations.js` to this repo**. It is
+4. **Do not commit `integrations.js` to this repo**. It is
    gitignored on purpose; the dashboard pulls fresh on each
    build.

@@ -83,6 +83,9 @@ COLLECTOR_RENDER_KEYS = [
 ]
 
 FLOWS_RENDER_KEYS = [
+    'alerts',
+    'metrics',
+    'functions',
     'overview',
     'related_resources',
     'setup',
