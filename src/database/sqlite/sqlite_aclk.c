@@ -100,6 +100,12 @@ enum {
 // Returns the host (or NULL if creation skipped/failed) so the caller can update counters.
 static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
 {
+    // The COL_FETCH_* enum is in lock-step with SQL_FETCH_ALL_HOSTS' SELECT list.
+    // Catch drift early in debug builds; release builds compile this out.
+    internal_fatal(sqlite3_column_count(res) != COL_FETCH_IS_REGISTERED + 1,
+                   "SQL_FETCH_ALL_HOSTS column count (%d) does not match COL_FETCH_* enum (%d)",
+                   sqlite3_column_count(res), COL_FETCH_IS_REGISTERED + 1);
+
     nd_uuid_t host_uuid;
     if (!sqlite3_column_uuid_copy(res, COL_FETCH_HOST_ID, host_uuid))
         return NULL;
@@ -1097,7 +1103,9 @@ void aclk_synchronization_init(void)
             char uuid_str[UUID_STR_LEN];
             uuid_unparse_lower(host_uuid, uuid_str);
             RRDHOST *host = rrdhost_find_by_guid(uuid_str);
-            if (host != localhost)
+            // create_aclk_config() already null-checks `host`, but the explicit
+            // guard makes the intent clear and skips the call for unknown GUIDs.
+            if (host && host != localhost)
                 create_aclk_config(host, &host_uuid, &node_uuid);
         }
         if (step_rc != SQLITE_DONE)
