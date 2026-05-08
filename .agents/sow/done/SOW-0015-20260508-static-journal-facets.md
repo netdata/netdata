@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: implementation, focused validation, and SOW closure complete in clean worktree.
+Sub-state: reopened regression repaired and validated on a local RHEL 8.10 static install; selected journal facets now return rows with `slice:true`.
 
 ## Requirements
 
@@ -32,7 +32,7 @@ Inferences:
 
 Unknowns:
 
-- Exact remote server journal contents are not available in this worktree. Validation must rely on source-level root cause, targeted unit tests, and Rust crate tests unless the user later asks for remote-system testing.
+- None for the accepted scope. A local RHEL 8.10 static install was available for regression validation after the first PR iteration.
 
 ### Acceptance Criteria
 
@@ -202,7 +202,8 @@ Tests or equivalent validation:
 
 Real-use evidence:
 
-- Not run against the remote RHEL 8.10 server from this worktree. The user identified that server as separate, and this task was constrained to source edits in a clean local worktree.
+- Initial implementation was not run against the local RHEL 8.10 static install before opening the PR.
+- Regression validation below records live Function evidence from that static install after the reopened fix.
 
 Reviewer findings:
 
@@ -248,7 +249,7 @@ Lessons:
 
 Follow-up mapping:
 
-- No follow-up needed at this stage.
+- No follow-up was needed for the initial fix; the later live regression is tracked in the appended regression section.
 
 ## PR Review Iteration - 2026-05-08
 
@@ -453,8 +454,85 @@ Implemented, validated, and prepared for commit in `~/src/PRs/netdata-static-jou
 
 ## Followup
 
-None yet.
+None for the completed PR review iteration; the appended regression section records the live validation repair.
 
 ## Regression Log
 
-None yet.
+## Regression - 2026-05-08
+
+What broke:
+
+- Live static install testing on `[LOCAL_RHEL_8_10_TEST_AGENT]:19999` still returned empty rows when a systemd-journal facet value was selected.
+- The previous validation only proved compressed DATA lookup/decompression at the Rust crate level. It did not prove the full C plugin Function path that receives facet selections from the UI, converts them into backend matches, and streams rows back to the dashboard.
+
+Evidence:
+
+- User report: static build copied and installed on a local RHEL 8.10 test Agent; selecting a facet returns empty responses.
+- The regression is specific to facet filtering, not unfiltered journal access.
+- Direct agent Function evidence from `[LOCAL_RHEL_8_10_TEST_AGENT]:19999`: unfiltered `systemd-journal` with `slice:true` returned 20 rows and non-empty facets for the last 4 hours; selecting advertised values `SYSLOG_IDENTIFIER=netdata`, `_SYSTEMD_UNIT=netdata.service`, or `PRIORITY=6` returned 0 rows with `slice:true`, while the same selections returned 20 rows with `slice:false`.
+- Direct response stats for `SYSLOG_IDENTIFIER=netdata`, `slice:true`: request echoes the expected JSON `selections`, but `rows.evaluated=0`, `rows.matched=0`, and the journal file reports `rows_read=0`. This matches a failure before row scanning, during native match setup / filtered cursor resolution.
+- Source evidence: `src/crates/jf/journal_file/src/filter.rs:339-357` builds filtered cursors by hashing selected `field=value` bytes and resolving them through `find_data_offset()`.
+- Source evidence: `src/crates/jf/journal_file/src/hash.rs:4-8` still uses `twox_hash::XxHash64` behind a `FIXME` for the non-keyed Jenkins path.
+- Source evidence: `systemd/systemd @ d0c912899a33436d6676b2564eb1ac506f378571`, `src/libsystemd/sd-journal/journal-file.c:1585-1600`, uses `siphash24()` only for keyed journal files and `jenkins_hash64()` otherwise.
+- Source evidence: `systemd/systemd @ d0c912899a33436d6676b2564eb1ac506f378571`, `src/libsystemd/sd-journal/lookup3.h:14-20`, defines `jenkins_hash64()` as lookup3 `jenkins_hashlittle2()` with the primary value in the high 32 bits and the secondary value in the low 32 bits.
+- In-repository pattern: `src/crates/journal-core/src/file/hash.rs:4-17` already uses `hashers::jenkins::Lookup3Hasher` and swaps the 32-bit halves to match systemd's `jenkins_hash64()`.
+
+Repair plan:
+
+- Replace the legacy `src/crates/jf` non-keyed hash fallback with the same lookup3/Jenkins implementation used by `journal-core`.
+- Add reference-value tests for systemd-compatible Jenkins hashes.
+- Re-run focused Rust tests and direct selected-facet queries on the local RHEL 8.10 static install.
+
+Validation plan:
+
+- Focused Rust crate tests for the fixed path.
+- Direct API evidence from the local RHEL 8.10 static install showing the same facet values return rows after the fix.
+- Static build/install validation using the user-provided local static-binary workflow if a code change is needed.
+
+Why previous validation missed it:
+
+- The first fix validated compressed DATA enumeration and compressed payload lookup, but did not validate the full selected-facet Function path on a real non-keyed journal file.
+- The failing `slice:true` path builds filtered cursors before scanning rows; the incorrect hash function made `find_data_offset()` fail before row evaluation, so decompression tests alone could not catch it.
+
+Actions:
+
+- Replaced the legacy `src/crates/jf` non-keyed journal hash implementation with `hashers::jenkins::Lookup3Hasher`, matching the existing `journal-core` pattern and systemd lookup3 half ordering.
+- Added the empty-payload lookup3 guard because `hashers` returns `0` for empty input while systemd lookup3 with zero seeds returns `0xdeadbeefdeadbeef`.
+- Added systemd reference-value tests for the legacy reader hash path.
+- Applied the same empty-payload guard and reference-value test to `src/crates/journal-core` so the legacy and newer journal readers remain consistent.
+
+Validation:
+
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q` in `src/crates/jf`: passed; 11 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 24 tests passed plus the existing ignored tests.
+- Static build via the user-provided local static-binary workflow: passed; produced `artifacts/netdata-x86_64-latest.gz.run`.
+- Static install on the local RHEL 8.10 test Agent: passed; installer restarted `netdata` through systemd.
+- Direct Function validation after install:
+  - baseline `slice:true`: `data_len=20`, `rows_evaluated=2019`, `rows_matched=2019`, `rows_read=2019`.
+  - `SYSLOG_IDENTIFIER=netdata`, `slice:true`: `data_len=20`, `rows_evaluated=1499`, `rows_matched=1499`, `rows_read=1499`.
+  - `_SYSTEMD_UNIT=netdata.service`, `slice:true`: `data_len=20`, `rows_evaluated=1714`, `rows_matched=1714`, `rows_read=1714`.
+  - `PRIORITY=6`, `slice:true`: `data_len=20`, `rows_evaluated=1596`, `rows_matched=1596`, `rows_read=1596`.
+  - `SYSLOG_IDENTIFIER=netdata`, `slice:false`: `data_len=20`, `rows_evaluated=2019`, `rows_matched=1499`, `rows_read=2019`.
+- Same-failure scan: `rg -n "twox_hash|XxHash64|jenkins_hash|Lookup3Hasher|hashers" src/crates/jf src/crates/journal-core src/crates/Cargo.toml src/crates/Cargo.lock` found no remaining `twox_hash`/`XxHash64` use in the legacy journal hash path, and found both journal readers using `Lookup3Hasher`.
+- `git diff --check`: passed.
+- `.agents/sow/audit.sh`: SOW status/directory checks passed for this SOW; audit still exits non-zero for the pre-existing public SSH clone syntax false positive in `.agents/skills/mirror-netdata-repos/SKILL.md:112`, unrelated to this work.
+
+Sensitive data handling:
+
+- Bearer tokens, Cloud token values, claim identifiers, node identifiers, raw journal rows, and private endpoint names were not written to this SOW.
+- Raw response JSON from live validation was kept under `.local/audits/`, which is gitignored and not staged.
+
+Artifact updates:
+
+- AGENTS.md: no update needed; workflow and project guardrails did not change.
+- Runtime project skills: no update needed; the static-build skill worked as operational context and the fix did not change how agents should work on collectors.
+- Specs: no update needed; this restores the intended systemd-compatible journal hash behavior.
+- End-user/operator docs: no update needed; no user-facing configuration, command, or workflow changed.
+- End-user/operator skills: no update needed; public/operator skill behavior was not changed by this PR.
+- SOW lifecycle: SOW is moved back to `.agents/sow/done/` with `Status: completed` in the same commit as the regression repair.
+
+Follow-up mapping:
+
+- No follow-up remains for the static journal facet filtering regression.
