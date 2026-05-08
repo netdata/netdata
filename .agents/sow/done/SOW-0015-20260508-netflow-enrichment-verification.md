@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Copilot PR review thread on direct-agent bearer helper error propagation addressed.
+Sub-state: Copilot suppressed review signal on deterministic CAIDA prefix2as resolution addressed.
 
 ## Requirements
 
@@ -932,3 +932,37 @@ Artifact maintenance:
 - End-user/operator docs: no separate docs update needed; the script behavior now matches the existing token-safe helper contract.
 - End-user/operator skills: updated `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`.
 - SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` and moved back to `.agents/sow/done/` with the fix commit.
+
+### PR Review Follow-up - 2026-05-08 - Deterministic CAIDA Prefix2AS Resolution
+
+Trigger:
+
+- Copilot's refreshed review generated no new inline comments, but its review body listed a low-confidence note about `resolveCAIDAPrefix2ASURL` choosing the last `.pfx2as.gz` log entry.
+
+Findings:
+
+- The `parse.go` low-confidence note about missing `netipx` import was false; `src/go/tools/topology-ip-intel-downloader/parse.go` already imports `go4.org/netipx`.
+- The CAIDA note was valid. The resolver walked the creation log and retained the last matching candidate, so an out-of-order log could select an older dataset.
+- The live CAIDA creation log uses tab-separated rows with a numeric timestamp before the `.pfx2as.gz` path, so the resolver can select deterministically by timestamp and tie-break by path.
+
+Implementation:
+
+- Changed `resolveCAIDAPrefix2ASURL` to collect all `.pfx2as.gz` candidates.
+- Sorted candidates by parsed numeric timestamp when available, with path as a deterministic fallback/tie-breaker.
+- Updated `TestResolveCAIDAPrefix2ASURL` so an older candidate appears after the newer candidate, proving the resolver no longer depends on log order.
+
+Validation:
+
+- `curl -fsSL https://data.caida.org/datasets/routing/routeviews-prefix2as/pfx2as-creation.log | tail -n 20` confirmed the current CAIDA log row shape includes a numeric timestamp and path ending in `.pfx2as.gz`.
+- `go test ./tools/topology-ip-intel-downloader` from `src/go` passed.
+- `git diff --check` passed.
+- `bash .agents/sow/audit.sh` verified SOW status/directory consistency. It exited nonzero on the existing unmodified `.agents/skills/mirror-netdata-repos/SKILL.md:112` Git SSH URL pattern that the audit classifies as email-like sensitive data.
+
+Artifact maintenance:
+
+- AGENTS.md: no update needed; existing PR review and SOW lifecycle rules were sufficient.
+- Runtime project skills: no update needed; this did not change how future agents should work.
+- Specs: no update needed; this hardens an existing downloader behavior without changing the public contract.
+- End-user/operator docs: no update needed; no user-facing command, option, or provider contract changed.
+- End-user/operator skills: no update needed.
+- SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` for the deterministic CAIDA resolver commit.

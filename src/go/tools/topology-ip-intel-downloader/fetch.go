@@ -15,6 +15,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -171,7 +172,13 @@ func (d *downloader) resolveCAIDAPrefix2ASURL(logURL string) (string, error) {
 		return "", fmt.Errorf("failed to fetch CAIDA prefix2as creation log %s: %w", redactURLForDisplay(logURL), err)
 	}
 
-	var latest string
+	type caidaCandidate struct {
+		path      string
+		timestamp int64
+		hasTime   bool
+	}
+
+	candidates := make([]caidaCandidate, 0)
 	for _, line := range strings.Split(string(page), "\n") {
 		fields := strings.Fields(strings.TrimSpace(line))
 		if len(fields) == 0 {
@@ -179,12 +186,29 @@ func (d *downloader) resolveCAIDAPrefix2ASURL(logURL string) (string, error) {
 		}
 		candidate := fields[len(fields)-1]
 		if strings.HasSuffix(candidate, ".pfx2as.gz") {
-			latest = candidate
+			entry := caidaCandidate{path: candidate}
+			if len(fields) >= 2 {
+				if timestamp, err := strconv.ParseInt(fields[len(fields)-2], 10, 64); err == nil {
+					entry.timestamp = timestamp
+					entry.hasTime = true
+				}
+			}
+			candidates = append(candidates, entry)
 		}
 	}
-	if latest == "" {
+	if len(candidates) == 0 {
 		return "", fmt.Errorf("failed to resolve latest CAIDA prefix2as download from %s", redactURLForDisplay(logURL))
 	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].hasTime != candidates[j].hasTime {
+			return !candidates[i].hasTime
+		}
+		if candidates[i].timestamp != candidates[j].timestamp {
+			return candidates[i].timestamp < candidates[j].timestamp
+		}
+		return candidates[i].path < candidates[j].path
+	})
+	latest := candidates[len(candidates)-1].path
 
 	base := strings.TrimSuffix(logURL, "pfx2as-creation.log")
 	return base + latest, nil

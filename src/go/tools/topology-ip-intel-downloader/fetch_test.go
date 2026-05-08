@@ -64,8 +64,9 @@ func TestResolveCAIDAPrefix2ASURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/pfx2as-creation.log", r.URL.Path)
 		_, _ = w.Write([]byte(
-			"1\t1\t2026/05/routeviews-rv2-20260505-1200.pfx2as.gz\n" +
-				"2\t2\t2026/05/routeviews-rv2-20260506-1200.pfx2as.gz\n",
+			"1\t1778084001\t2026/05/routeviews-rv2-20260505-1200.pfx2as.gz\n" +
+				"2\t1778170446\t2026/05/routeviews-rv2-20260506-1200.pfx2as.gz\n" +
+				"3\t1777997562\t2026/05/routeviews-rv2-20260504-1200.pfx2as.gz\n",
 		))
 	}))
 	defer server.Close()
