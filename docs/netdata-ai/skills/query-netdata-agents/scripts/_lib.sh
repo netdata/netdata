@@ -189,7 +189,7 @@ _agents_get_claim_id() {
     if resp="$(curl -sS --max-time 10 "http://${host}/api/v3/info" 2>/dev/null)"; then
         resolved_claim="$(jq -r '.agents[0].cloud.claim_id // empty' <<< "${resp}" 2>/dev/null)"
         if [[ -n "${resolved_claim}" && "${resolved_claim}" != "null" ]]; then
-            _agents_set_outvar "${_out_var}" "${resolved_claim}"
+            _agents_set_outvar "${_out_var}" "${resolved_claim}" || return 1
             return 0
         fi
     fi
@@ -271,11 +271,11 @@ _agents_resolve_bearer() {
             #     ~3h-TTL bearers, so 2h leaves a 1h safety margin.
             if (( exp_s > 0 )); then
                 if (( exp_s - now > 3600 )); then
-                    _agents_set_outvar "${_out_var}" "${cached_token}"
+                    _agents_set_outvar "${_out_var}" "${cached_token}" || return 1
                     return 0
                 fi
             elif (( cached_at > 0 )) && (( now - cached_at < 7200 )); then
-                _agents_set_outvar "${_out_var}" "${cached_token}"
+                _agents_set_outvar "${_out_var}" "${cached_token}" || return 1
                 return 0
             fi
         fi
@@ -283,7 +283,7 @@ _agents_resolve_bearer() {
 
     # Need to mint -- resolve claim_id first.
     local claim
-    _agents_get_claim_id claim "${host}"
+    _agents_get_claim_id claim "${host}" || return 1
 
     local resp
     resp="$(_agents_mint_bearer_json "${node_id}" "${mg}" "${claim}")"
@@ -296,7 +296,7 @@ _agents_resolve_bearer() {
     # Stamp cache and persist.
     jq --argjson t "${now}" '. + {_cached_at: $t}' <<< "${resp}" > "${cache_file}"
     chmod 0600 "${cache_file}"
-    _agents_set_outvar "${_out_var}" "$(jq -r '.token' "${cache_file}")"
+    _agents_set_outvar "${_out_var}" "$(jq -r '.token' "${cache_file}")" || return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -368,7 +368,7 @@ agents_query_agent() {
     : "${mg:?--machine-guid required}"
 
     local bearer
-    _agents_resolve_bearer bearer "${node}" "${mg}" "${host}"
+    _agents_resolve_bearer bearer "${node}" "${mg}" "${host}" || return 1
 
     local args=(curl --fail --silent --show-error --max-time 120 -X "${method}" \
         -H "X-Netdata-Auth: Bearer ${bearer}" \
@@ -501,13 +501,22 @@ EOF
         NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
         return 1
     fi
-    PATH="${old_path}"
-    rm -rf "${fake_bin_dir}"
     if [[ "${claim}" != "${fake_claim}" ]]; then
+        PATH="${old_path}"
+        rm -rf "${fake_bin_dir}"
         echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_get_claim_id did not populate caller output variable" >&2
         NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
         return 1
     fi
+    if _agents_get_claim_id "not-a-valid-name" "agent.test:19999" 2>/dev/null; then
+        PATH="${old_path}"
+        rm -rf "${fake_bin_dir}"
+        echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_get_claim_id ignored invalid output variable failure" >&2
+        NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
+        return 1
+    fi
+    PATH="${old_path}"
+    rm -rf "${fake_bin_dir}"
 
     # 4. _agents_set_outvar must preserve shell metacharacters as data.
     # This protects bearer/claim assignment from accidental eval-style

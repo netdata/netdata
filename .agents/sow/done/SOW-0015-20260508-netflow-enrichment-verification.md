@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Netdata-side BioRIS/BMP contract hardening completed under the clarified beta validation bar. Production-router and production-bio-rd interoperability proof remains optional expanded validation, not a blocker for this beta pass.
+Sub-state: Copilot PR review thread on direct-agent bearer helper error propagation addressed.
 
 ## Requirements
 
@@ -895,3 +895,40 @@ Outcome:
 
 - Under the clarified beta validation target, no autonomous Netdata-side blocker remains for BMP or BioRIS contract proof.
 - Broader production-router or production-bio-rd interoperability is explicitly outside this beta blocker and can be handled later as expanded validation or beta feedback.
+
+### PR Review Follow-up - 2026-05-08 - Direct-agent Output Variable Failure Propagation
+
+Trigger:
+
+- Copilot opened one unresolved PR review thread on `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh:192`.
+
+Finding:
+
+- `_agents_get_claim_id` called `_agents_set_outvar` without checking its exit status.
+- Same-pattern search found additional `_agents_set_outvar` and helper-boundary call sites in `_agents_resolve_bearer` and `agents_query_agent`.
+- If a caller supplied an invalid output variable name, the helper could continue after an assignment failure and make a public wrapper proceed with an unset or stale claim/bearer value.
+
+Implementation:
+
+- Propagated `_agents_set_outvar` failures with `|| return 1` at every call site.
+- Propagated `_agents_get_claim_id` failure from `_agents_resolve_bearer`.
+- Propagated `_agents_resolve_bearer` failure from `agents_query_agent`.
+- Extended `agents_selftest_no_token_leak` with an invalid-output-variable path proving `_agents_get_claim_id` returns failure when `_agents_set_outvar` rejects the caller-provided variable name.
+
+Validation:
+
+- `bash -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
+- `zsh -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
+- `shellcheck --external-sources docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh` passed.
+- Same-pattern search confirmed all `_agents_set_outvar` call sites now propagate failure.
+- `git diff --check` passed.
+- `bash .agents/sow/audit.sh` verified SOW status/directory consistency. It exited nonzero on the existing unmodified `.agents/skills/mirror-netdata-repos/SKILL.md:112` Git SSH URL pattern that the audit classifies as email-like sensitive data.
+
+Artifact maintenance:
+
+- AGENTS.md: no update needed; existing public-skill and sensitive-data rules were sufficient.
+- Runtime project skills: no update needed.
+- Specs: no update needed; this repaired helper failure propagation for an existing public-skill contract.
+- End-user/operator docs: no separate docs update needed; the script behavior now matches the existing token-safe helper contract.
+- End-user/operator skills: updated `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`.
+- SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` and moved back to `.agents/sow/done/` with the fix commit.
