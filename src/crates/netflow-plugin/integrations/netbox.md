@@ -52,7 +52,7 @@ formats:
 
 - **Legacy v1 tokens** (`Authorization: Token <token>`) -- accepted by all NetBox
   versions, simplest to wire up.
-- **v2 tokens** (NetBox 4.x, `Authorization: Bearer nbt_<key>.<token>`) -- the
+- **v2 tokens** (NetBox 4.5+, `Authorization: Bearer nbt_<key>.<token>`) -- the
   prefix `nbt_` and the random key are concatenated with the token via a dot.
 
 The plugin transports either format -- the value is whatever NetBox issued for the
@@ -60,7 +60,7 @@ service account.
 
 The plugin runs the configured `transform` (jaq -- a jq-equivalent) over the
 parsed JSON body and produces per-prefix objects. NetBox's response is paginated;
-the plugin does **not** follow `next` links. Pass `?limit=0` (NetBox 4.x default
+the plugin does **not** follow `next` links. Pass `?limit=0` (NetBox default
 `MAX_PAGE_SIZE` is 1000; setting `0` removes the cap when the server config
 allows) or an explicit `?limit=N` greater than your prefix count, or expose a
 server-side aggregator that returns the full list at one URL.
@@ -96,15 +96,16 @@ One HTTP request per refresh interval plus a jq transform over the response. Run
 
 In NetBox, create or reuse a service-account user, then generate an API token
 under "Admin > Users > Tokens". Restrict the token to read-only and (for
-v4.x) limit the scope to `ipam.view_prefix`. The token value goes in the
+NetBox 4.x) limit the scope to `ipam.view_prefix`. The token value goes in the
 `Authorization` header.
 
 The plugin only reads -- never writes -- so a read-only token is sufficient
 and recommended. Token format depends on the NetBox version:
 
 - NetBox 3.x or earlier: `Token <40-char-hex>` (legacy).
-- NetBox 4.x: either legacy `Token <hex>` or new `Bearer nbt_<key>.<token>`
-  (v2 tokens, opt-in).
+- NetBox 4.0 through 4.4: legacy `Token <hex>`.
+- NetBox 4.5+: legacy `Token <hex>` or new
+  `Bearer nbt_<key>.<token>` (v2 tokens).
 
 
 #### Bulk endpoint (`?limit=0` or aggregator)
@@ -143,8 +144,8 @@ auth helper.
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| url | NetBox prefixes API endpoint, including `?limit=` (recommend `?limit=0` on 4.x for full inventory in one shot). |  | yes |
-| headers.Authorization | NetBox API token. Use `Token <hex>` for legacy v1 or `Bearer nbt_<key>.<token>` for v4.x v2 tokens. |  | yes |
+| url | NetBox prefixes API endpoint, including `?limit=` (recommend `?limit=0` for full inventory in one shot when the server's `MAX_PAGE_SIZE` allows it). |  | yes |
+| headers.Authorization | NetBox API token. Use `Token <hex>` for legacy v1 or `Bearer nbt_<key>.<token>` for v4.5+ v2 tokens. |  | yes |
 | interval | How often to refresh. NetBox is your source of truth; 5 minutes is typical for IPAMs that change frequently, 1 hour is fine for static inventories. | 60s | no |
 | timeout | HTTP request timeout. Bump to 30-60s if your NetBox returns thousands of prefixes in one shot. | 10s | no |
 | transform | jq expression mapping NetBox's `.results[]` to per-prefix objects with `prefix` and any of `name`, `role`, `site`, `region`, `country`, `state`, `city`, `tenant`, `asn`, `asn_name`. | . | yes |
@@ -170,12 +171,12 @@ sudo ./edit-config netflow.yaml
 
 ##### Examples
 
-###### NetBox 4.x with v2 token, scope-aware mapping
+###### NetBox 4.5+ with v2 token, scope-aware mapping
 
 Standard NetBox 4.2+ wiring. Maps tenant, role, the new `scope` field
 (covers site / region / site-group / location), and the human-readable
 description. `?limit=0` returns all prefixes in one call when
-`MAX_PAGE_SIZE` is unset on the NetBox server.
+`MAX_PAGE_SIZE` is set to `0` or `None` on the NetBox server.
 
 
 ```yaml
@@ -294,7 +295,7 @@ enrichment:
 ### Only first 50 prefixes loaded
 
 NetBox's default `PAGINATE_COUNT` is 50 and the plugin does not follow `next`
-links. Pass `?limit=0` (NetBox 4.x removes the cap when `MAX_PAGE_SIZE` is
+links. Pass `?limit=0` (NetBox removes the cap when `MAX_PAGE_SIZE` is
 `0` server-side) or `?limit=N` larger than your inventory. For inventories
 above the server's `MAX_PAGE_SIZE` (default 1000), expose a server-side
 aggregator endpoint.
@@ -304,7 +305,7 @@ aggregator endpoint.
 
 Token missing, expired, or wrong format. Verify with:
 `curl -H "Authorization: Token <tok>" https://netbox/api/ipam/prefixes/`.
-On NetBox 4.x check whether the token is v1 (`Token <hex>`) or v2
+On NetBox 4.5+ check whether the token is v1 (`Token <hex>`) or v2
 (`Bearer nbt_<key>.<token>`) and use the matching header. Watch the journal
 for `network-sources` warnings -- HTTP errors are logged there as
 refresh-failed warnings.

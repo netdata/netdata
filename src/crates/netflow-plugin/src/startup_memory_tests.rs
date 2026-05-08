@@ -1,5 +1,4 @@
 use super::{charts, facet_runtime, ingest, plugin_config, query, tiering};
-use bytesize::ByteSize;
 use rt::PluginRuntime;
 use std::env;
 use std::fs;

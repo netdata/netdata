@@ -70,6 +70,7 @@ netdata-plugin-error = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
 
 [dev-dependencies]
+bytes = { workspace = true }
 etherparse = { workspace = true }
 pcap-file = { workspace = true }
 proptest = { workspace = true }

@@ -54,8 +54,9 @@ convention -- RFC 7854 does not register a port, and IANA does not assign one
 for BMP. Each connecting router must first send an Initiation message; the plugin
 then processes RouteMonitoring (carrying BGP UPDATE), PeerDownNotification, and
 Termination frames. PeerUp, StatisticsReport, and RouteMirroring frames are
-accepted but not acted on. Only BMP **version 3** is processed; v1 and v2 frames
-are silently dropped.
+accepted but not acted on. Only BMP **version 3** is processed. Version 4 frames
+are decoded but ignored; draft v1/v2 frames are decode errors and count toward
+the consecutive decode-error threshold.
 
 NLRI families parsed: IPv4/IPv6 unicast, IPv4/IPv6 MPLS-labelled, VPNv4, VPNv6,
 and EVPN IP-prefix routes.
@@ -112,8 +113,9 @@ Common vendor configuration patterns:
   module: `bgpd` must be started with `-M bmp` or every BMP command silently
   fails.
 
-The plugin parses RFC 7854 BMP **version 3** only. Older draft versions (v1,
-v2) are silently dropped.
+The plugin parses RFC 7854 BMP **version 3** only. Version 4 frames are decoded
+but ignored. Older draft versions (v1, v2) are decode errors and count toward
+the consecutive decode-error threshold.
 
 
 #### TCP reachability between routers and the agent

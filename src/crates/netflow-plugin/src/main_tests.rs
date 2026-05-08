@@ -9,7 +9,7 @@ use journal_core::repository::File as RepoFile;
 use journal_core::{Direction, JournalFile, JournalReader, Location};
 use pcap_file::pcap::PcapReader;
 use rt::ProgressState;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::net::UdpSocket as StdUdpSocket;
 use std::num::NonZeroU64;
@@ -20,6 +20,8 @@ use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tokio::net::UdpSocket;
 use tokio_util::sync::CancellationToken;
+
+const E2E_INGEST_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_ingest_writes_journals_and_query_reads_flows() {
@@ -33,7 +35,7 @@ async fn e2e_ingest_writes_journals_and_query_reads_flows() {
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let request = query::FlowsRequest {
         view: query::ViewMode::TableSankey,
         after: Some(1),
@@ -70,6 +72,61 @@ async fn e2e_ingest_writes_journals_and_query_reads_flows() {
     assert!(
         metrics.journal_entries_written.load(Ordering::Relaxed) > 0,
         "expected raw journal entries written by ingest service"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_ingest_persists_enriched_fields_and_query_reads_them() {
+    let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+        ingest_fixture_with_config("nfv5.pcap", plugin_config::TimestampSource::Input, |cfg| {
+            cfg.enrichment.networks = BTreeMap::from([(
+                "161.202.212.0/24".to_string(),
+                plugin_config::NetworkAttributesValue::Attributes(
+                    plugin_config::NetworkAttributesConfig {
+                        name: "journal-src".to_string(),
+                        tenant: "fixture".to_string(),
+                        asn: 64_504,
+                        ..Default::default()
+                    },
+                ),
+            )]);
+        })
+        .await;
+
+    let fields = first_raw_journal_fields(&cfg.journal.raw_tier_dir());
+    assert_eq!(
+        fields.get("SRC_NET_NAME").map(String::as_str),
+        Some("journal-src")
+    );
+    assert_eq!(
+        fields.get("SRC_NET_TENANT").map(String::as_str),
+        Some("fixture")
+    );
+    assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("64504"));
+
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
+    let output = query_service
+        .query_flows(&query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec!["SRC_NET_NAME".to_string()],
+            top_n: query::TopN::N100,
+            ..Default::default()
+        })
+        .await
+        .expect("query enriched fields");
+
+    assert!(
+        output.flows.iter().any(|row| {
+            row["key"]["SRC_NET_NAME"]
+                .as_str()
+                .is_some_and(|value| value == "journal-src")
+        }),
+        "expected query output to include enriched SRC_NET_NAME"
     );
 }
 
@@ -155,7 +212,7 @@ async fn e2e_query_service_timeseries_path_returns_chart_data() {
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let after = before.saturating_sub(3600);
 
     let output = query_service
@@ -217,7 +274,7 @@ async fn e2e_flows_function_returns_expected_response_sections() {
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
 
     let response = handler
         .handle_request(query::FlowsRequest {
@@ -341,7 +398,7 @@ async fn e2e_flows_function_marks_progress_complete_with_execution_context() {
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let progress = ProgressState::default();
     let execution = query::QueryExecutionContext::new(progress.clone(), CancellationToken::new());
 
@@ -394,7 +451,7 @@ async fn e2e_flows_function_marks_progress_complete_for_empty_projected_query() 
         Arc::new(ingest::IngestMetrics::default()),
         Arc::new(query_service),
     );
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let progress = ProgressState::default();
     let execution = query::QueryExecutionContext::new(progress.clone(), CancellationToken::new());
 
@@ -443,7 +500,7 @@ async fn e2e_flows_function_honors_cancelled_execution_context() {
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let cancellation = CancellationToken::new();
     cancellation.cancel();
     let execution = query::QueryExecutionContext::new(ProgressState::default(), cancellation);
@@ -521,7 +578,7 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let after = before.saturating_sub(3600);
     let materialized_tier_files = tier_file_count(&cfg.journal.hour_1_tier_dir())
         + tier_file_count(&cfg.journal.minute_5_tier_dir())
@@ -614,7 +671,7 @@ async fn e2e_aggregated_safe_group_by_falls_back_to_on_disk_lower_tiers() {
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let request = query::FlowsRequest {
         view: query::ViewMode::TableSankey,
         after: Some(1),
@@ -682,7 +739,7 @@ async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
 
     let response = handler
         .handle_request(query::FlowsRequest {
@@ -757,7 +814,7 @@ async fn e2e_state_map_reuses_tuple_table_shape_with_state_keys() {
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
 
     let response = handler
         .handle_request(query::FlowsRequest {
@@ -808,7 +865,7 @@ async fn e2e_city_map_reuses_tuple_table_shape_with_city_and_coordinate_keys() {
         .await
         .expect("create query service");
     let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
 
     let response = handler
         .handle_request(query::FlowsRequest {
@@ -900,7 +957,7 @@ async fn e2e_selection_filter_uses_streaming_reader_path() {
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
 
     let request_base = query::FlowsRequest {
         view: query::ViewMode::TableSankey,
@@ -1019,7 +1076,7 @@ async fn e2e_post_style_nested_required_controls_still_filter_correctly() {
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let payload = format!(
         r#"{{
                 "after":1,
@@ -1083,7 +1140,7 @@ async fn profile_live_day_query_against_local_journals() {
         .await
         .expect("create query service for live journals");
 
-    let before = Utc::now().timestamp().max(1) as u32;
+    let before = Utc::now().timestamp().max(1);
     let after = before.saturating_sub(24 * 60 * 60);
     let request = query::FlowsRequest {
         view: query::ViewMode::TableSankey,
@@ -1234,7 +1291,7 @@ async fn profile_fixed_raw_plugin_scan_only_against_local_journals() {
         .await
         .expect("create query service for fixed raw journals");
 
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let request = query::FlowsRequest {
         view: query::ViewMode::TableSankey,
         after: Some(1),
@@ -1317,7 +1374,7 @@ async fn profile_fixed_raw_plugin_stage_breakdown_against_local_journals() {
         .await
         .expect("create query service for fixed raw journals");
 
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let request = query::FlowsRequest {
         view: query::ViewMode::TableSankey,
         after: Some(1),
@@ -1470,7 +1527,7 @@ async fn profile_fixed_raw_query_processing_against_local_journals() {
         .await
         .expect("create query service for fixed raw journals");
 
-    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let before = Utc::now().timestamp().max(1).saturating_add(3600);
     let request = query::FlowsRequest {
         view: query::ViewMode::TableSankey,
         after: Some(1),
@@ -1557,6 +1614,20 @@ async fn ingest_fixture_with_timestamp_source(
     Arc<RwLock<tiering::TierFlowIndexStore>>,
     TempDir,
 ) {
+    ingest_fixture_with_config(fixture_name, timestamp_source, |_| {}).await
+}
+
+async fn ingest_fixture_with_config(
+    fixture_name: &str,
+    timestamp_source: plugin_config::TimestampSource,
+    configure: impl FnOnce(&mut plugin_config::PluginConfig),
+) -> (
+    plugin_config::PluginConfig,
+    Arc<ingest::IngestMetrics>,
+    Arc<RwLock<tiering::OpenTierState>>,
+    Arc<RwLock<tiering::TierFlowIndexStore>>,
+    TempDir,
+) {
     let tmp = tempfile::tempdir().expect("create temp dir");
     let listen = reserve_udp_listen_addr();
     let mut cfg = plugin_config::PluginConfig::default();
@@ -1565,6 +1636,7 @@ async fn ingest_fixture_with_timestamp_source(
     cfg.listener.sync_interval = Duration::from_millis(50);
     cfg.listener.sync_every_entries = 1;
     cfg.protocols.timestamp_source = timestamp_source;
+    configure(&mut cfg);
 
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
@@ -1596,7 +1668,7 @@ async fn ingest_fixture_with_timestamp_source(
 }
 
 async fn wait_for_ingest_progress(metrics: &Arc<ingest::IngestMetrics>) {
-    tokio::time::timeout(Duration::from_secs(10), async {
+    tokio::time::timeout(E2E_INGEST_WAIT_TIMEOUT, async {
         loop {
             if metrics.journal_entries_written.load(Ordering::Relaxed) > 0 {
                 break;

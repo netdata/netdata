@@ -2454,6 +2454,7 @@ dependencies = [
  "async-trait",
  "bitflags 2.11.0",
  "bitvec",
+ "bytes",
  "bytesize",
  "chrono",
  "clap",

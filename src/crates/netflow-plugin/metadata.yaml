@@ -1362,8 +1362,9 @@ modules:
           for BMP. Each connecting router must first send an Initiation message; the plugin
           then processes RouteMonitoring (carrying BGP UPDATE), PeerDownNotification, and
           Termination frames. PeerUp, StatisticsReport, and RouteMirroring frames are
-          accepted but not acted on. Only BMP **version 3** is processed; v1 and v2 frames
-          are silently dropped.
+          accepted but not acted on. Only BMP **version 3** is processed. Version 4 frames
+          are decoded but ignored; draft v1/v2 frames are decode errors and count toward
+          the consecutive decode-error threshold.
 
           NLRI families parsed: IPv4/IPv6 unicast, IPv4/IPv6 MPLS-labelled, VPNv4, VPNv6,
           and EVPN IP-prefix routes.
@@ -1409,8 +1410,9 @@ modules:
                 module: `bgpd` must be started with `-M bmp` or every BMP command silently
                 fails.
 
-              The plugin parses RFC 7854 BMP **version 3** only. Older draft versions (v1,
-              v2) are silently dropped.
+              The plugin parses RFC 7854 BMP **version 3** only. Version 4 frames are decoded
+              but ignored. Older draft versions (v1, v2) are decode errors and count toward
+              the consecutive decode-error threshold.
           - title: TCP reachability between routers and the agent
             description: |
               Routers initiate the connection -- the plugin is a passive listener. Allow
@@ -2885,7 +2887,7 @@ modules:
 
           - **Legacy v1 tokens** (`Authorization: Token <token>`) -- accepted by all NetBox
             versions, simplest to wire up.
-          - **v2 tokens** (NetBox 4.x, `Authorization: Bearer nbt_<key>.<token>`) -- the
+          - **v2 tokens** (NetBox 4.5+, `Authorization: Bearer nbt_<key>.<token>`) -- the
             prefix `nbt_` and the random key are concatenated with the token via a dot.
 
           The plugin transports either format -- the value is whatever NetBox issued for the
@@ -2893,7 +2895,7 @@ modules:
 
           The plugin runs the configured `transform` (jaq -- a jq-equivalent) over the
           parsed JSON body and produces per-prefix objects. NetBox's response is paginated;
-          the plugin does **not** follow `next` links. Pass `?limit=0` (NetBox 4.x default
+          the plugin does **not** follow `next` links. Pass `?limit=0` (NetBox default
           `MAX_PAGE_SIZE` is 1000; setting `0` removes the cap when the server config
           allows) or an explicit `?limit=N` greater than your prefix count, or expose a
           server-side aggregator that returns the full list at one URL.
@@ -2918,15 +2920,16 @@ modules:
             description: |
               In NetBox, create or reuse a service-account user, then generate an API token
               under "Admin > Users > Tokens". Restrict the token to read-only and (for
-              v4.x) limit the scope to `ipam.view_prefix`. The token value goes in the
+              NetBox 4.x) limit the scope to `ipam.view_prefix`. The token value goes in the
               `Authorization` header.
 
               The plugin only reads -- never writes -- so a read-only token is sufficient
               and recommended. Token format depends on the NetBox version:
 
               - NetBox 3.x or earlier: `Token <40-char-hex>` (legacy).
-              - NetBox 4.x: either legacy `Token <hex>` or new `Bearer nbt_<key>.<token>`
-                (v2 tokens, opt-in).
+              - NetBox 4.0 through 4.4: legacy `Token <hex>`.
+              - NetBox 4.5+: legacy `Token <hex>` or new
+                `Bearer nbt_<key>.<token>` (v2 tokens).
           - title: Bulk endpoint (`?limit=0` or aggregator)
             description: |
               The plugin fetches a single page. NetBox's default `PAGINATE_COUNT` is 50
@@ -2956,11 +2959,11 @@ modules:
             enabled: true
           list:
             - name: url
-              description: NetBox prefixes API endpoint, including `?limit=` (recommend `?limit=0` on 4.x for full inventory in one shot).
+              description: NetBox prefixes API endpoint, including `?limit=` (recommend `?limit=0` for full inventory in one shot when the server's `MAX_PAGE_SIZE` allows it).
               default_value: ""
               required: true
             - name: headers.Authorization
-              description: 'NetBox API token. Use `Token <hex>` for legacy v1 or `Bearer nbt_<key>.<token>` for v4.x v2 tokens.'
+              description: 'NetBox API token. Use `Token <hex>` for legacy v1 or `Bearer nbt_<key>.<token>` for v4.5+ v2 tokens.'
               default_value: ""
               required: true
             - name: interval
@@ -2984,14 +2987,14 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: NetBox 4.x with v2 token, scope-aware mapping
+            - name: NetBox 4.5+ with v2 token, scope-aware mapping
               folding:
                 enabled: false
               description: |
                 Standard NetBox 4.2+ wiring. Maps tenant, role, the new `scope` field
                 (covers site / region / site-group / location), and the human-readable
                 description. `?limit=0` returns all prefixes in one call when
-                `MAX_PAGE_SIZE` is unset on the NetBox server.
+                `MAX_PAGE_SIZE` is set to `0` or `None` on the NetBox server.
               config: |
                 enrichment:
                   network_sources:
@@ -3089,7 +3092,7 @@ modules:
           - name: Only first 50 prefixes loaded
             description: |
               NetBox's default `PAGINATE_COUNT` is 50 and the plugin does not follow `next`
-              links. Pass `?limit=0` (NetBox 4.x removes the cap when `MAX_PAGE_SIZE` is
+              links. Pass `?limit=0` (NetBox removes the cap when `MAX_PAGE_SIZE` is
               `0` server-side) or `?limit=N` larger than your inventory. For inventories
               above the server's `MAX_PAGE_SIZE` (default 1000), expose a server-side
               aggregator endpoint.
@@ -3097,7 +3100,7 @@ modules:
             description: |
               Token missing, expired, or wrong format. Verify with:
               `curl -H "Authorization: Token <tok>" https://netbox/api/ipam/prefixes/`.
-              On NetBox 4.x check whether the token is v1 (`Token <hex>`) or v2
+              On NetBox 4.5+ check whether the token is v1 (`Token <hex>`) or v2
               (`Bearer nbt_<key>.<token>`) and use the matching header. Watch the journal
               for `network-sources` warnings -- HTTP errors are logged there as
               refresh-failed warnings.

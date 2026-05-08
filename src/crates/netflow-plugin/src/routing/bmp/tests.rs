@@ -12,6 +12,10 @@ use netgauze_bgp_pkt::nlri::{
     Ipv4Unicast, L2EvpnIpv4PrefixRoute, L2EvpnIpv6PrefixRoute, MplsLabel,
 };
 use netgauze_bgp_pkt::path_attribute::{As2PathSegment, As4PathSegment};
+use std::time::Duration;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+use tokio_util::codec::Encoder;
 
 #[test]
 fn parse_rd_text_accepts_akvorado_formats() {
@@ -262,4 +266,68 @@ fn bmp_session_accepts_initiation_and_then_processes_messages() {
         bmp_session_decision(&termination, &mut initialized),
         BmpSessionDecision::CloseTermination
     );
+}
+
+#[tokio::test]
+async fn bmp_listener_accepts_encoded_initiation_and_termination_messages() {
+    let listen = reserve_loopback_addr();
+    let shutdown = CancellationToken::new();
+    let runtime = DynamicRoutingRuntime::default();
+    let config = RoutingDynamicBmpConfig {
+        enabled: true,
+        listen: listen.to_string(),
+        keep: Duration::from_millis(10),
+        ..Default::default()
+    };
+    let listener_shutdown = shutdown.clone();
+    let listener =
+        tokio::spawn(async move { run_bmp_listener(config, runtime, listener_shutdown).await });
+
+    let mut stream = connect_with_retry(listen).await;
+    stream
+        .write_all(&encode_bmp(BmpMessage::V3(BmpMessageValue::Initiation(
+            netgauze_bmp_pkt::v3::InitiationMessage::new(Vec::new()),
+        ))))
+        .await
+        .expect("write BMP initiation");
+    stream
+        .write_all(&encode_bmp(BmpMessage::V3(BmpMessageValue::Termination(
+            netgauze_bmp_pkt::v3::TerminationMessage::new(Vec::new()),
+        ))))
+        .await
+        .expect("write BMP termination");
+    drop(stream);
+
+    shutdown.cancel();
+    listener
+        .await
+        .expect("join BMP listener")
+        .expect("BMP listener should stop cleanly");
+}
+
+fn reserve_loopback_addr() -> SocketAddr {
+    let socket = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve BMP listen socket");
+    let addr = socket.local_addr().expect("read BMP listen address");
+    drop(socket);
+    addr
+}
+
+async fn connect_with_retry(addr: SocketAddr) -> TcpStream {
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            match TcpStream::connect(addr).await {
+                Ok(stream) => return stream,
+                Err(_) => tokio::time::sleep(Duration::from_millis(10)).await,
+            }
+        }
+    })
+    .await
+    .expect("connect to BMP listener")
+}
+
+fn encode_bmp(message: BmpMessage) -> Vec<u8> {
+    let mut codec = BmpCodec::default();
+    let mut out = bytes::BytesMut::new();
+    codec.encode(message, &mut out).expect("encode BMP message");
+    out.to_vec()
 }

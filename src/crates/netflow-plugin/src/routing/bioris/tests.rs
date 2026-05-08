@@ -2,6 +2,11 @@ use super::client::bioris_peer_key;
 use super::route::{proto_ip_to_ip_addr, route_to_update, route_withdraw_keys};
 use super::runtime::AfiSafi;
 use super::*;
+use crate::ingest::IngestMetrics;
+use crate::plugin_config::RoutingDynamicBiorisConfig;
+use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
+use tonic::transport::Server;
 
 #[test]
 fn proto_ip_conversion_handles_ipv4_and_ipv6() {
@@ -230,4 +235,208 @@ fn peer_key_stability_is_deterministic() {
         AfiSafi::Ipv4Unicast,
     );
     assert_eq!(peer_a, peer_b);
+}
+
+#[tokio::test]
+async fn bioris_listener_fetches_dump_rib_from_in_process_grpc_server() {
+    let server_addr = reserve_loopback_addr();
+    let server_shutdown = CancellationToken::new();
+    let server_shutdown_task = server_shutdown.clone();
+    let server = tokio::spawn(async move {
+        Server::builder()
+            .add_service(
+                proto::bio::ris::routing_information_service_server::RoutingInformationServiceServer::new(
+                    TestRisService,
+                ),
+            )
+            .serve_with_shutdown(server_addr, server_shutdown_task.cancelled())
+            .await
+    });
+
+    let runtime = DynamicRoutingRuntime::default();
+    let metrics = Arc::new(IngestMetrics::default());
+    let shutdown = CancellationToken::new();
+    let listener_runtime = runtime.clone();
+    let listener_metrics = Arc::clone(&metrics);
+    let listener_shutdown = shutdown.clone();
+    let listener = tokio::spawn(async move {
+        run_bioris_listener(
+            RoutingDynamicBiorisConfig {
+                enabled: true,
+                ris_instances: vec![RoutingDynamicBiorisRisInstanceConfig {
+                    grpc_addr: server_addr.to_string(),
+                    grpc_secure: false,
+                    vrf_id: 10,
+                    vrf: "default".to_string(),
+                }],
+                timeout: Duration::from_secs(1),
+                refresh: Duration::from_secs(10),
+                refresh_timeout: Duration::from_secs(1),
+            },
+            listener_runtime,
+            listener_metrics,
+            listener_shutdown,
+        )
+        .await
+    });
+
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if let Some(route) = runtime.lookup(
+                "203.0.113.42".parse().expect("parse route lookup address"),
+                Some("198.51.100.1".parse().expect("parse next-hop")),
+                None,
+            ) {
+                assert_eq!(route.asn, 64_501);
+                assert_eq!(route.as_path, vec![64_500, 64_501]);
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    })
+    .await
+    .expect("BioRIS listener did not publish DumpRIB route");
+
+    shutdown.cancel();
+    listener
+        .await
+        .expect("join BioRIS listener")
+        .expect("BioRIS listener should stop cleanly");
+    server_shutdown.cancel();
+    server
+        .await
+        .expect("join BioRIS fixture server")
+        .expect("BioRIS fixture server should stop cleanly");
+}
+
+#[derive(Debug)]
+struct TestRisService;
+
+#[tonic::async_trait]
+impl proto::bio::ris::routing_information_service_server::RoutingInformationService
+    for TestRisService
+{
+    async fn lpm(
+        &self,
+        _request: tonic::Request<proto::bio::ris::LpmRequest>,
+    ) -> std::result::Result<tonic::Response<proto::bio::ris::LpmResponse>, tonic::Status> {
+        Ok(tonic::Response::new(proto::bio::ris::LpmResponse {
+            routes: Vec::new(),
+        }))
+    }
+
+    async fn get(
+        &self,
+        _request: tonic::Request<proto::bio::ris::GetRequest>,
+    ) -> std::result::Result<tonic::Response<proto::bio::ris::GetResponse>, tonic::Status> {
+        Ok(tonic::Response::new(proto::bio::ris::GetResponse {
+            routes: Vec::new(),
+        }))
+    }
+
+    async fn get_routers(
+        &self,
+        _request: tonic::Request<proto::bio::ris::GetRoutersRequest>,
+    ) -> std::result::Result<tonic::Response<proto::bio::ris::GetRoutersResponse>, tonic::Status>
+    {
+        Ok(tonic::Response::new(proto::bio::ris::GetRoutersResponse {
+            routers: vec![proto::bio::ris::Router {
+                sys_name: "fixture-router".to_string(),
+                vrf_ids: vec![10],
+                address: "203.0.113.10".to_string(),
+            }],
+        }))
+    }
+
+    async fn get_longer(
+        &self,
+        _request: tonic::Request<proto::bio::ris::GetLongerRequest>,
+    ) -> std::result::Result<tonic::Response<proto::bio::ris::GetLongerResponse>, tonic::Status>
+    {
+        Ok(tonic::Response::new(proto::bio::ris::GetLongerResponse {
+            routes: Vec::new(),
+        }))
+    }
+
+    type ObserveRIBStream = tokio_stream::Iter<
+        std::vec::IntoIter<std::result::Result<proto::bio::ris::RibUpdate, tonic::Status>>,
+    >;
+
+    async fn observe_rib(
+        &self,
+        _request: tonic::Request<proto::bio::ris::ObserveRibRequest>,
+    ) -> std::result::Result<tonic::Response<Self::ObserveRIBStream>, tonic::Status> {
+        Ok(tonic::Response::new(tokio_stream::iter(Vec::new())))
+    }
+
+    type DumpRIBStream = tokio_stream::Iter<
+        std::vec::IntoIter<std::result::Result<proto::bio::ris::DumpRibReply, tonic::Status>>,
+    >;
+
+    async fn dump_rib(
+        &self,
+        request: tonic::Request<proto::bio::ris::DumpRibRequest>,
+    ) -> std::result::Result<tonic::Response<Self::DumpRIBStream>, tonic::Status> {
+        let request = request.into_inner();
+        let routes = if request.afisafi == AfiSafi::Ipv4Unicast.as_proto() {
+            vec![Ok(proto::bio::ris::DumpRibReply {
+                route: Some(test_bioris_route()),
+            })]
+        } else {
+            Vec::new()
+        };
+        Ok(tonic::Response::new(tokio_stream::iter(routes)))
+    }
+}
+
+fn test_bioris_route() -> Route {
+    Route {
+        pfx: Some(ProtoPrefix {
+            address: Some(ProtoIp {
+                higher: 0,
+                lower: u64::from(u32::from(Ipv4Addr::new(203, 0, 113, 0))),
+                version: ProtoIpVersion::IPv4 as i32,
+            }),
+            length: 24,
+        }),
+        paths: vec![proto::bio::route::Path {
+            r#type: 0,
+            static_path: None,
+            bgp_path: Some(BgpPath {
+                path_identifier: 1,
+                next_hop: Some(ProtoIp {
+                    higher: 0,
+                    lower: u64::from(u32::from(Ipv4Addr::new(198, 51, 100, 1))),
+                    version: ProtoIpVersion::IPv4 as i32,
+                }),
+                local_pref: 0,
+                as_path: vec![ProtoAsPathSegment {
+                    as_sequence: true,
+                    asns: vec![64_500, 64_501],
+                }],
+                origin: 0,
+                med: 0,
+                ebgp: false,
+                bgp_identifier: 0,
+                source: None,
+                communities: vec![],
+                large_communities: vec![],
+                originator_id: 0,
+                cluster_list: vec![],
+                unknown_attributes: vec![],
+                bmp_post_policy: false,
+                only_to_customer: 0,
+            }),
+            hidden_reason: 0,
+            time_learned: 0,
+            grp_path: None,
+        }],
+    }
+}
+
+fn reserve_loopback_addr() -> SocketAddr {
+    let socket = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve BioRIS server socket");
+    let addr = socket.local_addr().expect("read BioRIS server address");
+    drop(socket);
+    addr
 }

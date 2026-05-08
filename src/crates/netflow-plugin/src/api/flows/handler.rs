@@ -211,7 +211,7 @@ fn args_to_value(function_call: &FunctionCall) -> Value {
     for arg in &function_call.args {
         if let Some((key, value)) = arg.split_once(':') {
             let json_value = if numeric_fields.contains(&key) {
-                value.parse::<u64>().map_or_else(
+                value.parse::<i64>().map_or_else(
                     |_| serde_json::json!(value),
                     |number| serde_json::json!(number),
                 )

@@ -359,9 +359,51 @@ fn request_deserialization_defaults_missing_view_group_by_sort_by_and_top_n() {
     )
     .expect_err("invalid top_n should fail");
     assert!(
-        invalid_top_n.to_string().contains("unknown variant `42`"),
+        invalid_top_n.to_string().contains("unsupported top_n `42`"),
         "unexpected error: {invalid_top_n}"
     );
+}
+
+#[test]
+fn request_deserialization_accepts_numeric_top_n_values() {
+    let request = serde_json::from_str::<FlowsRequest>(
+        r#"{"view":"table-sankey","group_by":["PROTOCOL"],"sort_by":"bytes","top_n":100}"#,
+    )
+    .expect("numeric top_n should match documented JSON examples");
+
+    assert_eq!(request.top_n, super::TopN::N100);
+
+    let invalid_top_n = serde_json::from_str::<FlowsRequest>(
+        r#"{"view":"table-sankey","group_by":["PROTOCOL"],"sort_by":"bytes","top_n":42}"#,
+    )
+    .expect_err("unsupported numeric top_n should fail");
+    assert!(
+        invalid_top_n.to_string().contains("unsupported top_n `42`"),
+        "unexpected error: {invalid_top_n}"
+    );
+}
+
+#[test]
+fn request_deserialization_accepts_relative_time_bounds() {
+    let request = serde_json::from_str::<FlowsRequest>(
+        r#"{"view":"table-sankey","after":-3600,"before":0,"group_by":["PROTOCOL"],"sort_by":"bytes","top_n":100}"#,
+    )
+    .expect("documented relative time bounds should parse");
+
+    assert_eq!(request.after, Some(-3600));
+    assert_eq!(request.before, Some(0));
+    assert_eq!(request.top_n, super::TopN::N100);
+}
+
+#[test]
+fn resolve_time_bounds_treats_negative_after_as_relative_to_before() {
+    let request = FlowsRequest {
+        after: Some(-300),
+        before: Some(1_000),
+        ..Default::default()
+    };
+
+    assert_eq!(super::resolve_time_bounds(&request), (700, 1_000));
 }
 
 #[test]

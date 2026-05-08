@@ -239,6 +239,14 @@ journal:
 }
 
 #[test]
+fn stock_netflow_yaml_parses_and_validates() {
+    let yaml = include_str!("../configs/netflow.yaml");
+    let cfg: PluginConfig = serde_yaml::from_str(yaml).expect("stock netflow.yaml should parse");
+
+    cfg.validate().expect("stock netflow.yaml should validate");
+}
+
+#[test]
 fn journal_tier_retention_uses_built_in_tier_defaults() {
     let cfg = PluginConfig::default();
 
