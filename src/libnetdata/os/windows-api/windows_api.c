@@ -9,6 +9,38 @@
 #include <string.h>
 #include <stdbool.h>
 
+static inline int netdata_win_tcp_state_to_index(DWORD state)
+{
+    switch(state) {
+    case MIB_TCP_STATE_CLOSED:
+        return NETDATA_WIN_TCP_STATE_CLOSED;
+    case MIB_TCP_STATE_LISTEN:
+        return NETDATA_WIN_TCP_STATE_LISTENING;
+    case MIB_TCP_STATE_SYN_SENT:
+        return NETDATA_WIN_TCP_STATE_SYN_SENT;
+    case MIB_TCP_STATE_SYN_RCVD:
+        return NETDATA_WIN_TCP_STATE_SYN_RECEIVED;
+    case MIB_TCP_STATE_ESTAB:
+        return NETDATA_WIN_TCP_STATE_ESTABLISHED;
+    case MIB_TCP_STATE_FIN_WAIT1:
+        return NETDATA_WIN_TCP_STATE_FIN_WAIT1;
+    case MIB_TCP_STATE_FIN_WAIT2:
+        return NETDATA_WIN_TCP_STATE_FIN_WAIT2;
+    case MIB_TCP_STATE_CLOSE_WAIT:
+        return NETDATA_WIN_TCP_STATE_CLOSE_WAIT;
+    case MIB_TCP_STATE_CLOSING:
+        return NETDATA_WIN_TCP_STATE_CLOSING;
+    case MIB_TCP_STATE_LAST_ACK:
+        return NETDATA_WIN_TCP_STATE_LAST_ACK;
+    case MIB_TCP_STATE_TIME_WAIT:
+        return NETDATA_WIN_TCP_STATE_TIME_WAIT;
+    case MIB_TCP_STATE_DELETE_TCB:
+        return NETDATA_WIN_TCP_STATE_DELETE_TCB;
+    default:
+        return -1;
+    }
+}
+
 struct netdata_windows_ip_labels {
     char *local_iface;
     char *ipaddr;
@@ -113,16 +145,16 @@ bool netdata_win_collect_tcp_state_counts(uint32_t af, uint32_t state_counts[])
     if (af == AF_INET) {
         PMIB_TCPTABLE_OWNER_PID tcp4 = table;
         for (DWORD i = 0; i < tcp4->dwNumEntries; i++) {
-            DWORD state = tcp4->table[i].dwState;
-            if (state < NETDATA_WIN_TCP_STATE_COUNT)
+            int state = netdata_win_tcp_state_to_index(tcp4->table[i].dwState);
+            if (state >= 0)
                 state_counts[state]++;
         }
     }
     else if (af == AF_INET6) {
         PMIB_TCP6TABLE_OWNER_PID tcp6 = table;
         for (DWORD i = 0; i < tcp6->dwNumEntries; i++) {
-            DWORD state = tcp6->table[i].dwState;
-            if (state < NETDATA_WIN_TCP_STATE_COUNT)
+            int state = netdata_win_tcp_state_to_index(tcp6->table[i].dwState);
+            if (state >= 0)
                 state_counts[state]++;
         }
     }

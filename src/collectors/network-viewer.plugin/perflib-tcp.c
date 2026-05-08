@@ -204,18 +204,18 @@ static void tcp_create_states_chart(TCP_FAMILY *tcp, int update_every)
 
 static void tcp_update_state_chart(TCP_FAMILY *tcp, uint32_t state_counts[NETDATA_WIN_TCP_STATE_COUNT])
 {
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_closed, (collected_number)state_counts[MIB_TCP_STATE_CLOSED]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_listening, (collected_number)state_counts[MIB_TCP_STATE_LISTEN]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_syn_sent, (collected_number)state_counts[MIB_TCP_STATE_SYN_SENT]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_syn_received, (collected_number)state_counts[MIB_TCP_STATE_SYN_RCVD]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_established, (collected_number)state_counts[MIB_TCP_STATE_ESTAB]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_fin_wait1, (collected_number)state_counts[MIB_TCP_STATE_FIN_WAIT1]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_fin_wait2, (collected_number)state_counts[MIB_TCP_STATE_FIN_WAIT2]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_close_wait, (collected_number)state_counts[MIB_TCP_STATE_CLOSE_WAIT]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_closing, (collected_number)state_counts[MIB_TCP_STATE_CLOSING]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_last_ack, (collected_number)state_counts[MIB_TCP_STATE_LAST_ACK]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_time_wait, (collected_number)state_counts[MIB_TCP_STATE_TIME_WAIT]);
-    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_delete_tcb, (collected_number)state_counts[MIB_TCP_STATE_DELETE_TCB]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_closed, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_CLOSED]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_listening, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_LISTENING]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_syn_sent, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_SYN_SENT]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_syn_received, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_SYN_RECEIVED]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_established, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_ESTABLISHED]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_fin_wait1, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_FIN_WAIT1]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_fin_wait2, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_FIN_WAIT2]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_close_wait, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_CLOSE_WAIT]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_closing, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_CLOSING]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_last_ack, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_LAST_ACK]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_time_wait, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_TIME_WAIT]);
+    rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_delete_tcb, (collected_number)state_counts[NETDATA_WIN_TCP_STATE_DELETE_TCB]);
 }
 
 static bool tcp_collect_family(TCP_FAMILY *tcp, int update_every)
