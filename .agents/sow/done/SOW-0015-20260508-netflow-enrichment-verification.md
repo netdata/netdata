@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Copilot suppressed review signal on deterministic CAIDA prefix2as resolution addressed.
+Sub-state: Copilot review on direct-agent helper wording and parser preallocation review signals addressed.
 
 ## Requirements
 
@@ -738,6 +738,8 @@ Validation:
 - `bash -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
 - `zsh -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
 - `shellcheck --external-sources docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh` passed.
+- `git diff --check` passed.
+- `bash .agents/sow/audit.sh` verified SOW status/directory consistency. It exited nonzero on the existing unmodified `.agents/skills/mirror-netdata-repos/SKILL.md:112` Git SSH URL pattern that the audit classifies as email-like sensitive data.
 - `go test ./tools/topology-ip-intel-downloader` passed from `src/go`.
 - Same-pattern search found no remaining eval-based `_agents_set_outvar` assignment in the public skill path.
 
@@ -966,3 +968,42 @@ Artifact maintenance:
 - End-user/operator docs: no update needed; no user-facing command, option, or provider contract changed.
 - End-user/operator skills: no update needed.
 - SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` for the deterministic CAIDA resolver commit.
+
+### PR Review Follow-up - 2026-05-08 - Helper Comment And Parser Preallocation
+
+Trigger:
+
+- Copilot opened a new unresolved PR review thread on `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh:172`.
+- The same review body listed low-confidence notes about fixed `1<<20` and `1<<18` parser preallocations in `src/go/tools/topology-ip-intel-downloader/parse.go`.
+
+Findings:
+
+- The shell helper logic works under both bash and zsh in local smoke tests, but the source comment over-explained caller-local dynamic scoping and made the zsh support claim look broader than necessary.
+- Same-pattern search found no other `Bash and zsh`, `dynamic scope`, or `dynamic scoping` wording in the direct-agent skill helper.
+- Same-pattern search found all remaining fixed large range-slice preallocations in `parse.go`.
+- The parser preallocation concern was valid: small payloads and tests paid immediate allocation cost for capacities intended for full datasets.
+
+Implementation:
+
+- Tightened the `_agents_set_outvar` comment to document only the `eval` avoidance reason.
+- Added `estimatedRangeCapacity` for bounded initial capacity based on payload or zip-entry size.
+- Replaced fixed `1<<20` and `1<<18` parser preallocations with size-based estimates where useful, or natural growth where no reliable row-count proxy exists.
+- Added unit coverage for the capacity-estimation helper.
+
+Validation:
+
+- Same-pattern search found no remaining fixed `make([]asnRange|[]geoRange, 0, 1<<...)` allocations in `parse.go`.
+- Same-pattern search found no remaining direct-agent helper comments claiming bash/zsh dynamic scoping.
+- `go test ./tools/topology-ip-intel-downloader` from `src/go` passed.
+- `bash -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
+- `zsh -c 'source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh; agents_selftest_no_token_leak'` passed.
+- `shellcheck --external-sources docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh` passed.
+
+Artifact maintenance:
+
+- AGENTS.md: no update needed; existing PR review and SOW lifecycle rules were sufficient.
+- Runtime project skills: no update needed.
+- Specs: no update needed; this is implementation hardening and comment clarification for existing behavior.
+- End-user/operator docs: no update needed; no user-facing command, option, or provider contract changed.
+- End-user/operator skills: updated `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`.
+- SOW lifecycle: reopened from `done`, recorded this PR review follow-up, then returned to `completed` for the helper-comment and parser-preallocation commit.

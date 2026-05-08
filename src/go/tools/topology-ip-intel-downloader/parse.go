@@ -199,8 +199,19 @@ func parseGeoSource(source sourceEntry, payload []byte) ([]geoRange, error) {
 	}
 }
 
+func estimatedRangeCapacity(size uint64, averageLineBytes, maxCapacity int) int {
+	if size == 0 || averageLineBytes <= 0 || maxCapacity <= 0 {
+		return 0
+	}
+	capacity := size / uint64(averageLineBytes)
+	if capacity > uint64(maxCapacity) {
+		return maxCapacity
+	}
+	return int(capacity)
+}
+
 func parseIPToASNCombinedTSVAsn(payload []byte) ([]asnRange, error) {
-	asnRanges := make([]asnRange, 0, 1<<20)
+	asnRanges := make([]asnRange, 0, estimatedRangeCapacity(uint64(len(payload)), 64, 1<<20))
 
 	scanner := bufio.NewScanner(bytes.NewReader(payload))
 	lineNo := 0
@@ -237,7 +248,7 @@ func parseIPToASNCombinedTSVAsn(payload []byte) ([]asnRange, error) {
 }
 
 func parseIPToASNCombinedTSVGeo(payload []byte) ([]geoRange, error) {
-	geoRanges := make([]geoRange, 0, 1<<20)
+	geoRanges := make([]geoRange, 0, estimatedRangeCapacity(uint64(len(payload)), 64, 1<<20))
 
 	scanner := bufio.NewScanner(bytes.NewReader(payload))
 	lineNo := 0
@@ -276,7 +287,7 @@ func parseDBIPAsnCSV(payload []byte) ([]asnRange, error) {
 	reader.FieldsPerRecord = -1
 	reader.TrimLeadingSpace = true
 
-	out := make([]asnRange, 0, 1<<18)
+	out := make([]asnRange, 0, estimatedRangeCapacity(uint64(len(payload)), 80, 1<<18))
 	lineNo := 0
 	for {
 		row, err := reader.Read()
@@ -318,7 +329,7 @@ func parseDBIPAsnCSV(payload []byte) ([]asnRange, error) {
 }
 
 func parseCAIDAPrefix2AS(payload []byte) ([]asnRange, error) {
-	out := make([]asnRange, 0, 1<<20)
+	out := make([]asnRange, 0, estimatedRangeCapacity(uint64(len(payload)), 32, 1<<20))
 	scanner := bufio.NewScanner(bytes.NewReader(payload))
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
@@ -370,7 +381,7 @@ func parseDBIPCountryCSV(payload []byte) ([]geoRange, error) {
 	reader.FieldsPerRecord = -1
 	reader.TrimLeadingSpace = true
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0, estimatedRangeCapacity(uint64(len(payload)), 64, 1<<18))
 	lineNo := 0
 	for {
 		row, err := reader.Read()
@@ -412,7 +423,7 @@ func parseDBIPCityCSV(payload []byte) ([]geoRange, error) {
 	reader.FieldsPerRecord = -1
 	reader.TrimLeadingSpace = true
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0, estimatedRangeCapacity(uint64(len(payload)), 128, 1<<18))
 	lineNo := 0
 	for {
 		row, err := reader.Read()
@@ -481,7 +492,7 @@ func parseDBIPAsnMMDB(payload []byte) ([]asnRange, error) {
 		return nil, fmt.Errorf("failed to open dbip ASN mmdb: %w", err)
 	}
 
-	out := make([]asnRange, 0, 1<<18)
+	out := make([]asnRange, 0)
 	networks := reader.Networks(maxminddb.SkipAliasedNetworks)
 	for networks.Next() {
 		var record dbipAsnMMDBRecord
@@ -523,7 +534,7 @@ func parseDBIPGeoMMDB(payload []byte) ([]geoRange, error) {
 		return nil, fmt.Errorf("failed to open dbip GEO mmdb: %w", err)
 	}
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0)
 	networks := reader.Networks(maxminddb.SkipAliasedNetworks)
 	for networks.Next() {
 		var record dbipGeoMMDBRecord
@@ -573,7 +584,7 @@ func parseMaxMindCountryCSVZip(payload []byte) ([]geoRange, error) {
 		return nil, err
 	}
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0)
 	for _, suffix := range []string{
 		"GeoLite2-Country-Blocks-IPv4.csv",
 		"GeoLite2-Country-Blocks-IPv6.csv",
@@ -665,7 +676,7 @@ func parseMaxMindCountryBlocks(
 	}
 	idColumns := []string{"geoname_id", "registered_country_geoname_id", "represented_country_geoname_id"}
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0, estimatedRangeCapacity(file.UncompressedSize64, 96, 1<<18))
 	lineNo := 1
 	for {
 		row, err := csvr.Read()
@@ -721,7 +732,7 @@ func parseIP2LocationCountryZip(payload []byte) ([]geoRange, error) {
 
 	csvr := csv.NewReader(rc)
 	csvr.FieldsPerRecord = -1
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0, estimatedRangeCapacity(file.UncompressedSize64, 64, 1<<18))
 	lineNo := 0
 	for {
 		row, err := csvr.Read()
@@ -759,7 +770,7 @@ func parseIPDenyCountryTarGZ(payload []byte) ([]geoRange, error) {
 	}
 	defer gz.Close()
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0)
 	tr := tar.NewReader(gz)
 	for {
 		header, err := tr.Next()
@@ -802,7 +813,7 @@ func parseIPIPCountryZip(payload []byte) ([]geoRange, error) {
 	}
 	defer rc.Close()
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0, estimatedRangeCapacity(file.UncompressedSize64, 48, 1<<18))
 	scanner := bufio.NewScanner(rc)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	lineNo := 0

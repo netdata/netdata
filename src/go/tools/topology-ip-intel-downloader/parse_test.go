@@ -149,6 +149,13 @@ func TestParseIPIPCountryZip(t *testing.T) {
 	require.Equal(t, "1.0.1.255", ranges[0].end.String())
 }
 
+func TestEstimatedRangeCapacity(t *testing.T) {
+	require.Equal(t, 0, estimatedRangeCapacity(0, 64, 1<<20))
+	require.Equal(t, 0, estimatedRangeCapacity(128, 0, 1<<20))
+	require.Equal(t, 2, estimatedRangeCapacity(128, 64, 1<<20))
+	require.Equal(t, 4, estimatedRangeCapacity(1024, 64, 4))
+}
+
 func TestParseIPDecimalIPv4(t *testing.T) {
 	addr, err := parseIP("16777216") // 1.0.0.0
 	require.NoError(t, err)

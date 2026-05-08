@@ -167,8 +167,7 @@ _agents_set_outvar() {
         echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Invalid output variable name: ${_agents_out_name}" >&2
         return 1
     fi
-    # Bash and zsh both support printf -v and preserve caller-local
-    # dynamic scope. Avoid eval here because values come from curl/jq output.
+    # Avoid eval here because values come from curl/jq output.
     if ! printf -v "${_agents_out_name}" '%s' "${_agents_out_value}"; then
         echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Failed to set output variable: ${_agents_out_name}" >&2
         return 1
