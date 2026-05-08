@@ -14,21 +14,17 @@ agent bearers, node ids, or raw flow rows?
 
 ## Steps
 
-1. Capture local agent identity without printing identifiers:
+1. Capture local agent identity in memory without printing identifiers:
 
    ```bash
-   mkdir -p .local/audits/query-netdata-agents
-   curl -sS --max-time 10 \
-     http://127.0.0.1:19999/api/v3/info \
-     > .local/audits/query-netdata-agents/local-api-v3-info.json
+   INFO_JSON="$(curl -sS --max-time 10 http://127.0.0.1:19999/api/v3/info)"
 
    jq -r '.agents[0] | {
-     hostname: .nm,
      cloud_status: .cloud.status,
      node_id_present: ((.nd // "") | length > 0),
      machine_guid_present: ((.mg // "") | length > 0),
      claim_id_present: ((.cloud.claim_id // "") | length > 0)
-   }' .local/audits/query-netdata-agents/local-api-v3-info.json
+   }' <<<"$INFO_JSON"
    ```
 
 2. Load the token-safe wrappers:
@@ -42,7 +38,9 @@ agent bearers, node ids, or raw flow rows?
 
    ```bash
    NODE_UUID="$(jq -r '.agents[0].nd' \
-     .local/audits/query-netdata-agents/local-api-v3-info.json)"
+     <<<"$INFO_JSON")"
+
+   mkdir -p .local/audits/query-netdata-agents
 
    agents_call_function \
      --via cloud \

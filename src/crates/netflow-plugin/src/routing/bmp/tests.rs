@@ -15,7 +15,8 @@ use netgauze_bgp_pkt::path_attribute::{As2PathSegment, As4PathSegment};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::process::Command as TokioCommand;
 use tokio_util::codec::Encoder;
 
 #[test]
@@ -271,7 +272,8 @@ fn bmp_session_accepts_initiation_and_then_processes_messages() {
 
 #[tokio::test]
 async fn bmp_listener_accepts_encoded_initiation_and_termination_messages() {
-    let listen = reserve_loopback_addr();
+    let listener = bind_loopback_listener().await;
+    let listen = listener.local_addr().expect("read BMP listen address");
     let shutdown = CancellationToken::new();
     let runtime = DynamicRoutingRuntime::default();
     let config = RoutingDynamicBmpConfig {
@@ -281,8 +283,15 @@ async fn bmp_listener_accepts_encoded_initiation_and_termination_messages() {
         ..Default::default()
     };
     let listener_shutdown = shutdown.clone();
-    let listener =
-        tokio::spawn(async move { run_bmp_listener(config, runtime, listener_shutdown).await });
+    let listener = tokio::spawn(async move {
+        super::listener::run_bmp_listener_with_bound_listener(
+            listener,
+            config,
+            runtime,
+            listener_shutdown,
+        )
+        .await
+    });
 
     let mut stream = connect_with_retry(listen).await;
     stream
@@ -315,7 +324,10 @@ async fn bmp_listener_accepts_gobgp_route_when_binaries_are_set() {
         return;
     };
 
-    let listen = reserve_loopback_addr();
+    let bmp_listener = bind_loopback_listener().await;
+    let listen = bmp_listener.local_addr().expect("read BMP listen address");
+    // GoBGP's gRPC API is owned by the external daemon, so this opt-in
+    // live test can only pass a concrete address and let gobgpd bind it.
     let gobgp_api = reserve_loopback_addr();
     let dir = tempfile::tempdir().expect("create GoBGP fixture dir");
     let config = dir.path().join("gobgpd.toml");
@@ -350,7 +362,13 @@ async fn bmp_listener_accepts_gobgp_route_when_binaries_are_set() {
     let listener_runtime = runtime.clone();
     let listener_shutdown = shutdown.clone();
     let listener = tokio::spawn(async move {
-        run_bmp_listener(config_bmp, listener_runtime, listener_shutdown).await
+        super::listener::run_bmp_listener_with_bound_listener(
+            bmp_listener,
+            config_bmp,
+            listener_runtime,
+            listener_shutdown,
+        )
+        .await
     });
 
     let mut daemon = ChildGuard {
@@ -386,10 +404,16 @@ async fn bmp_listener_accepts_gobgp_route_when_binaries_are_set() {
 }
 
 fn reserve_loopback_addr() -> SocketAddr {
-    let socket = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve BMP listen socket");
-    let addr = socket.local_addr().expect("read BMP listen address");
+    let socket = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve loopback socket");
+    let addr = socket.local_addr().expect("read loopback address");
     drop(socket);
     addr
+}
+
+async fn bind_loopback_listener() -> TcpListener {
+    TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind loopback listener")
 }
 
 async fn connect_with_retry(addr: SocketAddr) -> TcpStream {
@@ -420,7 +444,7 @@ async fn run_gobgp_route_fixture(
     lookup: &str,
 ) {
     for _ in 0..100 {
-        if Command::new(gobgp)
+        if TokioCommand::new(gobgp)
             .arg("-u")
             .arg(api.ip().to_string())
             .arg("-p")
@@ -429,6 +453,7 @@ async fn run_gobgp_route_fixture(
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
+            .await
             .map(|status| status.success())
             .unwrap_or(false)
         {
@@ -437,7 +462,7 @@ async fn run_gobgp_route_fixture(
         tokio::time::sleep(Duration::from_millis(25)).await;
     }
 
-    let status = Command::new(gobgp)
+    let status = TokioCommand::new(gobgp)
         .arg("-u")
         .arg(api.ip().to_string())
         .arg("-p")
@@ -455,6 +480,7 @@ async fn run_gobgp_route_fixture(
             "64500,64501",
         ])
         .status()
+        .await
         .expect("run gobgp route add");
     assert!(status.success(), "gobgp route add failed");
 

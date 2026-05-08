@@ -124,12 +124,17 @@ func TestParseIP2LocationCountryZip(t *testing.T) {
 func TestParseIPDenyCountryTarGZ(t *testing.T) {
 	payload := buildTarGZ(t, map[string]string{
 		"./us.zone": "1.0.0.0/24\n",
+		"./GR.ZONE": "1.0.1.0/24\n",
 	})
 	ranges, err := parseIPDenyCountryTarGZ(payload)
 	require.NoError(t, err)
-	require.Len(t, ranges, 1)
-	require.Equal(t, "US", ranges[0].country)
-	require.Equal(t, "1.0.0.255", ranges[0].end.String())
+	require.Len(t, ranges, 2)
+	byCountry := make(map[string]geoRange, len(ranges))
+	for _, rec := range ranges {
+		byCountry[rec.country] = rec
+	}
+	require.Equal(t, "1.0.0.255", byCountry["US"].end.String())
+	require.Equal(t, "1.0.1.255", byCountry["GR"].end.String())
 }
 
 func TestParseIPIPCountryZip(t *testing.T) {

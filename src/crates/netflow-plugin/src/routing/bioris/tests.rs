@@ -5,6 +5,8 @@ use super::*;
 use crate::ingest::IngestMetrics;
 use crate::plugin_config::RoutingDynamicBiorisConfig;
 use std::sync::Arc;
+use tokio::net::TcpListener;
+use tokio_stream::wrappers::TcpListenerStream;
 use tokio_util::sync::CancellationToken;
 use tonic::transport::Server;
 
@@ -239,7 +241,12 @@ fn peer_key_stability_is_deterministic() {
 
 #[tokio::test]
 async fn bioris_listener_fetches_dump_rib_from_in_process_grpc_server() {
-    let server_addr = reserve_loopback_addr();
+    let server_listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind BioRIS fixture server");
+    let server_addr = server_listener
+        .local_addr()
+        .expect("read BioRIS fixture server address");
     let server_shutdown = CancellationToken::new();
     let server_shutdown_task = server_shutdown.clone();
     let server = tokio::spawn(async move {
@@ -249,7 +256,10 @@ async fn bioris_listener_fetches_dump_rib_from_in_process_grpc_server() {
                     TestRisService,
                 ),
             )
-            .serve_with_shutdown(server_addr, server_shutdown_task.cancelled())
+            .serve_with_incoming_shutdown(
+                TcpListenerStream::new(server_listener),
+                server_shutdown_task.cancelled(),
+            )
             .await
     });
 
@@ -432,11 +442,4 @@ fn test_bioris_route() -> Route {
             grp_path: None,
         }],
     }
-}
-
-fn reserve_loopback_addr() -> SocketAddr {
-    let socket = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve BioRIS server socket");
-    let addr = socket.local_addr().expect("read BioRIS server address");
-    drop(socket);
-    addr
 }

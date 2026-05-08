@@ -407,6 +407,20 @@ fn resolve_time_bounds_treats_negative_after_as_relative_to_before() {
 }
 
 #[test]
+fn resolve_time_bounds_preserves_order_after_clamping() {
+    let request = FlowsRequest {
+        after: Some(i64::MAX - 10),
+        before: Some(i64::MAX),
+        ..Default::default()
+    };
+
+    assert_eq!(
+        super::resolve_time_bounds(&request),
+        (u32::MAX - 1, u32::MAX)
+    );
+}
+
+#[test]
 fn request_deserialization_accepts_state_and_city_map_views() {
     let state = serde_json::from_str::<FlowsRequest>(
         r#"{"view":"state-map","group_by":["PROTOCOL"],"sort_by":"bytes","top_n":"25"}"#,

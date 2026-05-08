@@ -78,8 +78,8 @@ fn documented_cloud_and_ipam_transforms_decode_provider_payloads() {
                 ]
             }),
             vec![
-                ("198.51.100.0/24", "amazon", "us-east-1", "ec2", ""),
-                ("2001:db8:1::/48", "amazon", "eu-west-1", "amazon", ""),
+                ("198.51.100.0/24", "amazon", "us-east-1", "ec2", "", ""),
+                ("2001:db8:1::/48", "amazon", "eu-west-1", "amazon", "", ""),
             ],
         ),
         (
@@ -105,7 +105,7 @@ fn documented_cloud_and_ipam_transforms_decode_provider_payloads() {
                     }
                 ]
             }),
-            vec![("203.0.113.0/24", "azure", "eastus", "azurestorage", "")],
+            vec![("203.0.113.0/24", "azure", "eastus", "azurestorage", "", "")],
         ),
         (
             "gcp",
@@ -122,8 +122,15 @@ fn documented_cloud_and_ipam_transforms_decode_provider_payloads() {
                 ]
             }),
             vec![
-                ("192.0.2.0/24", "gcp", "us-central1", "google-cloud", ""),
-                ("2001:db8:2::/48", "gcp", "europe-west1", "google-cloud", ""),
+                ("192.0.2.0/24", "gcp", "us-central1", "google-cloud", "", ""),
+                (
+                    "2001:db8:2::/48",
+                    "gcp",
+                    "europe-west1",
+                    "google-cloud",
+                    "",
+                    "",
+                ),
             ],
         ),
         (
@@ -146,7 +153,14 @@ fn documented_cloud_and_ipam_transforms_decode_provider_payloads() {
                     }
                 ]
             }),
-            vec![("198.51.100.0/25", "tenant-a", "", "edge", "edge subnet")],
+            vec![(
+                "198.51.100.0/25",
+                "tenant-a",
+                "",
+                "edge",
+                "dc1",
+                "edge subnet",
+            )],
         ),
         (
             "generic",
@@ -158,7 +172,7 @@ fn documented_cloud_and_ipam_transforms_decode_provider_payloads() {
             serde_json::json!([
                 {"prefix": "203.0.113.0/25", "name": "app subnet", "env": "prod"}
             ]),
-            vec![("203.0.113.0/25", "prod", "", "", "app subnet")],
+            vec![("203.0.113.0/25", "prod", "", "", "", "app subnet")],
         ),
     ];
 
@@ -168,7 +182,7 @@ fn documented_cloud_and_ipam_transforms_decode_provider_payloads() {
         let rows = decode_remote_records(payload, &transform)
             .unwrap_or_else(|err| panic!("{name} transform should decode: {err}"));
         assert_eq!(rows.len(), expected.len(), "{name} row count mismatch");
-        for (idx, (prefix, tenant, region, role, net_name)) in expected.iter().enumerate() {
+        for (idx, (prefix, tenant, region, role, site, net_name)) in expected.iter().enumerate() {
             assert_eq!(
                 rows[idx].prefix,
                 prefix.parse::<IpNet>().expect("parse expected prefix"),
@@ -177,6 +191,7 @@ fn documented_cloud_and_ipam_transforms_decode_provider_payloads() {
             assert_eq!(rows[idx].attrs.tenant, *tenant, "{name} tenant mismatch");
             assert_eq!(rows[idx].attrs.region, *region, "{name} region mismatch");
             assert_eq!(rows[idx].attrs.role, *role, "{name} role mismatch");
+            assert_eq!(rows[idx].attrs.site, *site, "{name} site mismatch");
             assert_eq!(rows[idx].attrs.name, *net_name, "{name} name mismatch");
         }
     }

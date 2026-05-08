@@ -20,6 +20,18 @@ pub(crate) async fn run_bmp_listener(
     let listener = TcpListener::bind(listen_addr)
         .await
         .with_context(|| format!("failed to bind BMP listener on {}", listen_addr))?;
+    run_bmp_listener_with_bound_listener(listener, config, runtime, shutdown).await
+}
+
+pub(crate) async fn run_bmp_listener_with_bound_listener(
+    listener: TcpListener,
+    config: RoutingDynamicBmpConfig,
+    runtime: DynamicRoutingRuntime,
+    shutdown: CancellationToken,
+) -> Result<()> {
+    let listen_addr = listener
+        .local_addr()
+        .with_context(|| "failed to read BMP listener address")?;
     let accepted_rds = Arc::new(
         parse_configured_rds(&config.rds)
             .with_context(|| "invalid enrichment.routing_dynamic.bmp.rds entries")?,

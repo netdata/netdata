@@ -8,16 +8,18 @@ pub(crate) fn resolve_time_bounds(request: &FlowsRequest) -> (u32, u32) {
     } else if before < 0 {
         before = now.saturating_add(before).max(1);
     }
-    let mut after = match request.after {
+    let after = match request.after {
         Some(after) if after < 0 => before.saturating_add(after),
         Some(after) => after,
         None => before.saturating_sub(i64::from(DEFAULT_QUERY_WINDOW_SECONDS)),
     }
     .max(0);
+    let before = clamp_query_timestamp(before);
+    let mut after = clamp_query_timestamp(after);
     if after >= before {
         after = before.saturating_sub(1);
     }
-    (clamp_query_timestamp(after), clamp_query_timestamp(before))
+    (after, before)
 }
 
 fn clamp_query_timestamp(timestamp: i64) -> u32 {

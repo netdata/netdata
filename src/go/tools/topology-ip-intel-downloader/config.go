@@ -277,7 +277,7 @@ func builtInSource(provider, artifact string) (builtInSourceSpec, bool) {
 		}, true
 	case provider == providerIPDeny && artifact == artifactIPDenyCountryZones:
 		return builtInSourceSpec{
-			directURL:     "http://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz",
+			directURL:     "https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz",
 			defaultFormat: formatCIDR,
 			allowedFamily: map[string]struct{}{
 				sourceFamilyGeo: {},

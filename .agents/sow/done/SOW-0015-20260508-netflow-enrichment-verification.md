@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: autonomous validation complete; remaining blockers require user-supplied credentials or real external routing systems.
+Sub-state: autonomous validation and PR review iteration complete; remaining blockers require user-supplied external systems.
 
 ## Requirements
 
@@ -535,6 +535,91 @@ Autonomous work completed as far as possible without external systems or user cr
 ## Followup
 
 User-required items are listed in Follow-up mapping above. No autonomous follow-up remains unattempted in this SOW.
+
+## PR Review Iteration - 2026-05-08
+
+Trigger:
+
+- User asked to solve PR comments/reviews on PR 22453 before continuing.
+
+Finding sources fetched:
+
+- `bash .agents/skills/pr-reviews/scripts/fetch-all.sh 22453`
+  - 8 open review threads.
+  - All open review threads are from `cubic-dev-ai[bot]`.
+  - No human review comments need a user decision before implementation.
+- `bash .agents/skills/pr-reviews/scripts/fetch-sonar-findings.sh 22453`
+  - 0 SonarCloud issues.
+  - 0 SonarCloud hotspots.
+- `bash .agents/skills/pr-reviews/scripts/ci-status.sh 22453`
+  - 0 failing checks.
+  - Most checks are still pending after the latest push.
+
+Open review threads to verify:
+
+- `src/crates/netflow-plugin/src/routing/bioris/tests.rs:242`: local gRPC test reserves and releases an ephemeral port before server bind.
+- `src/crates/netflow-plugin/src/routing/bmp/tests.rs:274`: BMP listener test reserves and releases an ephemeral port before listener bind.
+- `src/crates/netflow-plugin/src/query/planner/request.rs:20`: timestamp clamp may collapse `after` and `before`.
+- `docs/netdata-ai/skills/query-netdata-agents/how-tos/validate-direct-local-flow-function.md:25`: guide persists raw `/api/v3/info` payload containing sensitive identifiers.
+- `src/crates/netflow-plugin/src/network_sources/tests.rs:171`: NetBox transform test maps `site` but does not assert it.
+- `src/go/tools/topology-ip-intel-downloader/config.go:280`: IPDeny built-in source uses HTTP.
+- `src/crates/netflow-plugin/src/routing/bmp/tests.rs:431`: async test uses blocking `std::process::Command::status()`.
+- `src/go/tools/topology-ip-intel-downloader/parse.go:775`: IPDeny `.ZONE` extension handling is case-sensitive after case-insensitive filter.
+
+Plan:
+
+- Verify each bot finding against current code.
+- Fix valid findings and search touched PR files for the same failure class.
+- Run the narrow tests for modified areas plus formatting and diff checks.
+- Re-fetch findings before push.
+- Push one commit for the review fixes, reply per thread, resolve threads, and retrigger AI reviewers.
+
+Verified fixes:
+
+- BioRIS gRPC test now binds the Tokio listener first and serves tonic from that bound listener via `TcpListenerStream`, removing the reserve/release race.
+- BMP listener tests now pass a pre-bound Tokio listener into a shared listener helper, removing the reserve/release race for the Netdata listener side.
+- The remaining GoBGP API port is for an external daemon that requires a concrete address; the test records that limitation and keeps the path opt-in.
+- Query time-bound resolution now clamps first and enforces `after < before` after clamping.
+- Direct-agent and Cloud flow-validation how-tos no longer persist raw `/api/v3/info`; they keep the raw identity payload in shell memory and print only presence checks.
+- NetBox transform tests now assert the documented `site` mapping.
+- IPDeny built-in URL now uses HTTPS; live HEAD check returned HTTP 200 for the HTTPS URL.
+- GoBGP helper commands in the async BMP test now use `tokio::process::Command`.
+- IPDeny `.zone` parsing now handles uppercase `.ZONE` suffixes and has order-independent test coverage.
+
+Validation after fixes:
+
+- `go test ./tools/topology-ip-intel-downloader`
+- `cargo test -p netflow-plugin documented_cloud_and_ipam_transforms_decode_provider_payloads --manifest-path src/crates/Cargo.toml`
+- `cargo test -p netflow-plugin resolve_time_bounds --manifest-path src/crates/Cargo.toml`
+- `cargo test -p netflow-plugin routing::bioris --manifest-path src/crates/Cargo.toml`
+- `cargo test -p netflow-plugin routing::bmp --manifest-path src/crates/Cargo.toml`
+- `NETDATA_GOBGPD="$(pwd)/.local/audits/netflow-live/bin/gobgpd" NETDATA_GOBGP="$(pwd)/.local/audits/netflow-live/bin/gobgp" cargo test -p netflow-plugin bmp_listener_accepts_gobgp_route_when_binaries_are_set --manifest-path src/crates/Cargo.toml`
+- `cargo test -p netflow-plugin --manifest-path src/crates/Cargo.toml`
+  - Result: 448 passed, 18 ignored, 0 failed.
+  - `tests/grpc_build.rs`: 1 passed, 0 failed.
+- How-to jq snippets were smoke-tested with a synthetic `/api/v3/info` payload without writing raw identity JSON.
+- `git diff --check`
+
+Final pre-push sync:
+
+- `bash .agents/skills/pr-reviews/scripts/fetch-all.sh 22453`
+  - 8 open review threads, unchanged from the initial set.
+  - No new comments.
+- `bash .agents/skills/pr-reviews/scripts/fetch-sonar-findings.sh 22453`
+  - 0 issues.
+  - 0 hotspots.
+- `bash .agents/skills/pr-reviews/scripts/ci-status.sh 22453`
+  - 0 failing checks.
+  - 90 checks still running on the previous commit.
+
+Artifact maintenance for review pass:
+
+- AGENTS.md: no update needed; existing PR-review and sensitive-data rules were sufficient.
+- Runtime project skills: no update needed.
+- Specs: no update needed; fixes align implementation/tests/docs to existing intended behavior.
+- End-user/operator docs: updated direct-agent and Cloud validation how-tos to avoid durable raw identity payloads.
+- End-user/operator skills: no script behavior changed in this review pass.
+- SOW lifecycle: SOW returned to `completed` and is moved back to `.agents/sow/done/` with the review-fix commit.
 
 ## Regression Log
 

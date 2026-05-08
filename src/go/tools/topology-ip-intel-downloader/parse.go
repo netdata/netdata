@@ -769,10 +769,12 @@ func parseIPDenyCountryTarGZ(payload []byte) ([]geoRange, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to read ipdeny tar: %w", err)
 		}
-		if header.Typeflag != tar.TypeReg || !strings.HasSuffix(strings.ToLower(header.Name), ".zone") {
+		name := filepath.Base(header.Name)
+		zoneName, ok := strings.CutSuffix(strings.ToLower(name), ".zone")
+		if header.Typeflag != tar.TypeReg || !ok {
 			continue
 		}
-		country := normalizeCountry(strings.TrimSuffix(filepath.Base(header.Name), ".zone"))
+		country := normalizeCountry(zoneName)
 		if country == "" {
 			continue
 		}

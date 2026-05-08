@@ -15,14 +15,11 @@ machine GUIDs, claim ids, or raw flow rows?
 
 ## Steps
 
-1. Capture the local identity tuple under `.local/` and print only
-   presence checks:
+1. Capture the local identity tuple in memory and print only presence
+   checks:
 
    ```bash
-   mkdir -p .local/audits/query-netdata-agents
-   curl -sS --max-time 10 \
-     http://127.0.0.1:19999/api/v3/info \
-     > .local/audits/query-netdata-agents/local-api-v3-info.json
+   INFO_JSON="$(curl -sS --max-time 10 http://127.0.0.1:19999/api/v3/info)"
 
    jq '{
      agent_count: (.agents | length),
@@ -30,7 +27,7 @@ machine GUIDs, claim ids, or raw flow rows?
      machine_guid_present: ((.agents[0].mg // "") | length > 0),
      claim_id_present: ((.agents[0].cloud.claim_id // "") | length > 0),
      cloud_status: .agents[0].cloud.status
-   }' .local/audits/query-netdata-agents/local-api-v3-info.json
+   }' <<<"$INFO_JSON"
    ```
 
 2. Load the token-safe direct-agent wrappers:
@@ -44,9 +41,11 @@ machine GUIDs, claim ids, or raw flow rows?
 
    ```bash
    NODE_UUID="$(jq -r '.agents[0].nd' \
-     .local/audits/query-netdata-agents/local-api-v3-info.json)"
+     <<<"$INFO_JSON")"
    MACHINE_GUID="$(jq -r '.agents[0].mg' \
-     .local/audits/query-netdata-agents/local-api-v3-info.json)"
+     <<<"$INFO_JSON")"
+
+   mkdir -p .local/audits/query-netdata-agents
 
    agents_call_function \
      --via agent \
