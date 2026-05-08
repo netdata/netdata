@@ -55,22 +55,39 @@ func TestCollector_Collect_GenericBGP4Rows_WithMatchedStandardProfile(t *testing
 	require.Len(t, pm.BGPRows, 2)
 
 	rows := bgpRowsByNeighbor(pm.BGPRows)
+	tests := map[string]struct {
+		neighbor string
+		validate func(t *testing.T, row ddsnmp.BGPRow)
+	}{
+		"established FRR peer": {
+			neighbor: "169.254.1.1",
+			validate: func(t *testing.T, row ddsnmp.BGPRow) {
+				assert.Equal(t, "_std-bgp4-mib.yaml", row.OriginProfileID)
+				assert.Equal(t, "4200000000", row.Identity.RemoteAS)
+				assert.True(t, row.Admin.Enabled.Value)
+				assert.Equal(t, ddprofiledefinition.BGPPeerStateEstablished, row.State.State)
+				assert.EqualValues(t, 6, row.Traffic.Updates.Received.Value)
+				assert.EqualValues(t, 14, row.Traffic.Updates.Sent.Value)
+				assert.EqualValues(t, 4, row.LastError.Code.Value)
+				assert.EqualValues(t, 0, row.LastError.Subcode.Value)
+				assert.EqualValues(t, 96951, row.Connection.EstablishedUptime.Value)
+			},
+		},
+		"second FRR peer": {
+			neighbor: "169.254.1.9",
+			validate: func(t *testing.T, row ddsnmp.BGPRow) {
+				assert.Equal(t, "4200000004", row.Identity.RemoteAS)
+				assert.EqualValues(t, 2, row.LastError.Code.Value)
+				assert.EqualValues(t, 2, row.LastError.Subcode.Value)
+			},
+		},
+	}
 
-	first := rows["169.254.1.1"]
-	require.NotZero(t, first)
-	assert.Equal(t, "_std-bgp4-mib.yaml", first.OriginProfileID)
-	assert.Equal(t, "4200000000", first.Identity.RemoteAS)
-	assert.True(t, first.Admin.Enabled.Value)
-	assert.Equal(t, ddprofiledefinition.BGPPeerStateEstablished, first.State.State)
-	assert.EqualValues(t, 6, first.Traffic.Updates.Received.Value)
-	assert.EqualValues(t, 14, first.Traffic.Updates.Sent.Value)
-	assert.EqualValues(t, 4, first.LastError.Code.Value)
-	assert.EqualValues(t, 0, first.LastError.Subcode.Value)
-	assert.EqualValues(t, 96951, first.Connection.EstablishedUptime.Value)
-
-	second := rows["169.254.1.9"]
-	require.NotZero(t, second)
-	assert.Equal(t, "4200000004", second.Identity.RemoteAS)
-	assert.EqualValues(t, 2, second.LastError.Code.Value)
-	assert.EqualValues(t, 2, second.LastError.Subcode.Value)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			row := rows[tc.neighbor]
+			require.NotZero(t, row)
+			tc.validate(t, row)
+		})
+	}
 }

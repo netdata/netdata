@@ -56,72 +56,155 @@ func TestBGPLastErrorText(t *testing.T) {
 	}
 }
 
-func TestBGPPeerEntryKeyEscapesValues(t *testing.T) {
-	keyA := bgpPeerEntryKey("peers", map[string]string{
-		"neighbor":  "198.51.100.1|remote_as=65001",
-		"remote_as": "65002",
-	})
-	keyB := bgpPeerEntryKey("peers", map[string]string{
-		"neighbor":  "198.51.100.1",
-		"remote_as": "65001|remote_as=65002",
-	})
+func TestBGPPeerEntryKey(t *testing.T) {
+	tests := map[string]struct {
+		scope      string
+		tags       map[string]string
+		otherScope string
+		otherTags  map[string]string
+		wantEqual  bool
+		wantEmpty  bool
+	}{
+		"escapes delimiter-like values": {
+			scope: "peers",
+			tags: map[string]string{
+				"neighbor":  "198.51.100.1|remote_as=65001",
+				"remote_as": "65002",
+			},
+			otherScope: "peers",
+			otherTags: map[string]string{
+				"neighbor":  "198.51.100.1",
+				"remote_as": "65001|remote_as=65002",
+			},
+			wantEqual: false,
+		},
+		"ignores peer descriptor tags": {
+			scope: "peers",
+			tags: map[string]string{
+				"routing_instance": "blue",
+				"neighbor":         "198.51.100.1",
+				"remote_as":        "65001",
+				"local_address":    "192.0.2.1",
+				"peer_description": "Transit A",
+			},
+			otherScope: "peers",
+			otherTags: map[string]string{
+				"routing_instance": "blue",
+				"neighbor":         "198.51.100.1",
+				"remote_as":        "65001",
+				"local_address":    "192.0.2.2",
+				"peer_description": "Transit B",
+			},
+			wantEqual: true,
+		},
+		"scope participates in identity": {
+			scope: "peers",
+			tags: map[string]string{
+				"routing_instance": "blue",
+				"neighbor":         "198.51.100.1",
+				"remote_as":        "65001",
+			},
+			otherScope: "peer_families",
+			otherTags: map[string]string{
+				"routing_instance":          "blue",
+				"neighbor":                  "198.51.100.1",
+				"remote_as":                 "65001",
+				"address_family":            "ipv4",
+				"subsequent_address_family": "unicast",
+			},
+			wantEqual: false,
+		},
+		"family address family participates in identity": {
+			scope: "peer_families",
+			tags: map[string]string{
+				"routing_instance":          "blue",
+				"neighbor":                  "198.51.100.1",
+				"remote_as":                 "65001",
+				"address_family":            "ipv4",
+				"subsequent_address_family": "unicast",
+			},
+			otherScope: "peer_families",
+			otherTags: map[string]string{
+				"routing_instance":          "blue",
+				"neighbor":                  "198.51.100.1",
+				"remote_as":                 "65001",
+				"address_family":            "ipv6",
+				"subsequent_address_family": "unicast",
+			},
+			wantEqual: false,
+		},
+		"empty routing instance is same as missing": {
+			scope: "peers",
+			tags: map[string]string{
+				"neighbor":  "198.51.100.1",
+				"remote_as": "65001",
+			},
+			otherScope: "peers",
+			otherTags: map[string]string{
+				"routing_instance": "",
+				"neighbor":         "198.51.100.1",
+				"remote_as":        "65001",
+			},
+			wantEqual: true,
+		},
+		"routing instance partitions peers": {
+			scope: "peers",
+			tags: map[string]string{
+				"routing_instance": "blue",
+				"neighbor":         "198.51.100.1",
+				"remote_as":        "65001",
+			},
+			otherScope: "peers",
+			otherTags: map[string]string{
+				"neighbor":  "198.51.100.1",
+				"remote_as": "65001",
+			},
+			wantEqual: false,
+		},
+		"missing peer neighbor is empty": {
+			scope:     "peers",
+			tags:      map[string]string{"remote_as": "65001"},
+			wantEmpty: true,
+		},
+		"missing peer remote AS is empty": {
+			scope:     "peers",
+			tags:      map[string]string{"neighbor": "198.51.100.1"},
+			wantEmpty: true,
+		},
+		"missing peer-family SAFI is empty": {
+			scope: "peer_families",
+			tags: map[string]string{
+				"neighbor":                  "198.51.100.1",
+				"remote_as":                 "65001",
+				"address_family":            "ipv4",
+				"subsequent_address_family": "",
+			},
+			wantEmpty: true,
+		},
+	}
 
-	assert.NotEqual(t, keyA, keyB)
-}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			key := bgpPeerEntryKey(tc.scope, tc.tags)
+			if tc.wantEmpty {
+				assert.Empty(t, key)
+				return
+			}
 
-func TestBGPPeerEntryKeyUsesStableIdentityTags(t *testing.T) {
-	keyA := bgpPeerEntryKey("peers", map[string]string{
-		"routing_instance": "blue",
-		"neighbor":         "198.51.100.1",
-		"remote_as":        "65001",
-		"local_address":    "192.0.2.1",
-		"peer_description": "Transit A",
-	})
-	keyB := bgpPeerEntryKey("peers", map[string]string{
-		"routing_instance": "blue",
-		"neighbor":         "198.51.100.1",
-		"remote_as":        "65001",
-		"local_address":    "192.0.2.2",
-		"peer_description": "Transit B",
-	})
-	familyKey := bgpPeerEntryKey("peer_families", map[string]string{
-		"routing_instance":          "blue",
-		"neighbor":                  "198.51.100.1",
-		"remote_as":                 "65001",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "unicast",
-	})
-	otherFamilyKey := bgpPeerEntryKey("peer_families", map[string]string{
-		"routing_instance":          "blue",
-		"neighbor":                  "198.51.100.1",
-		"remote_as":                 "65001",
-		"address_family":            "ipv6",
-		"subsequent_address_family": "unicast",
-	})
-	keyWithoutRoutingInstance := bgpPeerEntryKey("peers", map[string]string{
-		"neighbor":  "198.51.100.1",
-		"remote_as": "65001",
-	})
-	keyWithEmptyRoutingInstance := bgpPeerEntryKey("peers", map[string]string{
-		"routing_instance": "",
-		"neighbor":         "198.51.100.1",
-		"remote_as":        "65001",
-	})
+			require.NotEmpty(t, key)
+			if tc.otherTags == nil {
+				return
+			}
 
-	assert.Equal(t, keyA, keyB)
-	assert.NotEqual(t, keyA, familyKey)
-	assert.NotEqual(t, familyKey, otherFamilyKey)
-	assert.NotEmpty(t, keyWithoutRoutingInstance)
-	assert.Equal(t, keyWithoutRoutingInstance, keyWithEmptyRoutingInstance)
-	assert.NotEqual(t, keyA, keyWithoutRoutingInstance)
-	assert.Empty(t, bgpPeerEntryKey("peers", map[string]string{"remote_as": "65001"}))
-	assert.Empty(t, bgpPeerEntryKey("peers", map[string]string{"neighbor": "198.51.100.1"}))
-	assert.Empty(t, bgpPeerEntryKey("peer_families", map[string]string{
-		"neighbor":                  "198.51.100.1",
-		"remote_as":                 "65001",
-		"address_family":            "ipv4",
-		"subsequent_address_family": "",
-	}))
+			otherKey := bgpPeerEntryKey(tc.otherScope, tc.otherTags)
+			require.NotEmpty(t, otherKey)
+			if tc.wantEqual {
+				assert.Equal(t, key, otherKey)
+			} else {
+				assert.NotEqual(t, key, otherKey)
+			}
+		})
+	}
 }
 
 func TestBGPPeerCacheClearsZeroLastError(t *testing.T) {

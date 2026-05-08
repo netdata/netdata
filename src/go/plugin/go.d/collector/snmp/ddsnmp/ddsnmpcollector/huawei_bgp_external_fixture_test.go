@@ -73,56 +73,139 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 	assert.EqualValues(t, 4, device.Device.InternalPeers.Value)
 	assert.EqualValues(t, 8, device.Device.ExternalPeers.Value)
 
-	ipv4Family := requireHuaweiPeerFamilyRow(t, results[0].BGPRows, "10.45.2.2", ddprofiledefinition.BGPAddressFamilyIPv4)
-	assert.Equal(t, "Public", ipv4Family.Identity.RoutingInstance)
-	assert.Equal(t, "26479", ipv4Family.Identity.RemoteAS)
-	assert.Equal(t, ddprofiledefinition.BGPSubsequentAddressFamilyUnicast, ipv4Family.Identity.SubsequentAddressFamily)
-	require.True(t, ipv4Family.Admin.Enabled.Has)
-	assert.True(t, ipv4Family.Admin.Enabled.Value)
-	require.True(t, ipv4Family.State.Has)
-	assert.Equal(t, ddprofiledefinition.BGPPeerStateEstablished, ipv4Family.State.State)
-	assert.EqualValues(t, 2, ipv4Family.Transitions.Established.Value)
-	assert.EqualValues(t, 5, ipv4Family.LastError.Code.Value)
-	assert.EqualValues(t, 0, ipv4Family.LastError.Subcode.Value)
+	families := map[string]struct {
+		neighbor         string
+		af               ddprofiledefinition.BGPAddressFamily
+		routingInstance  string
+		remoteAS         string
+		establishedTrans int64
+		lastErrorCode    int64
+		lastErrorSubcode int64
+		wantAdmin        bool
+		wantAdminEnabled bool
+		wantLastError    bool
+	}{
+		"IPv4 family": {
+			neighbor:         "10.45.2.2",
+			af:               ddprofiledefinition.BGPAddressFamilyIPv4,
+			routingInstance:  "Public",
+			remoteAS:         "26479",
+			establishedTrans: 2,
+			lastErrorCode:    5,
+			lastErrorSubcode: 0,
+			wantAdmin:        true,
+			wantAdminEnabled: true,
+			wantLastError:    true,
+		},
+		"IPv6 family": {
+			neighbor:         "2001:12f8::223:253",
+			af:               ddprofiledefinition.BGPAddressFamilyIPv6,
+			routingInstance:  "PublicV6",
+			remoteAS:         "26162",
+			establishedTrans: 7,
+		},
+	}
 
-	ipv4Routes := requireHuaweiPeerFamilyRowByTable(t, results[0].BGPRows, "hwBgpPeerRouteTable", "10.45.2.2", ddprofiledefinition.BGPAddressFamilyIPv4)
-	assert.EqualValues(t, 13970, ipv4Routes.Routes.Total.Received.Value)
-	assert.EqualValues(t, 1007, ipv4Routes.Routes.Total.Active.Value)
-	assert.EqualValues(t, 8, ipv4Routes.Routes.Total.Advertised.Value)
+	for name, tc := range families {
+		t.Run(name, func(t *testing.T) {
+			row := requireHuaweiPeerFamilyRow(t, results[0].BGPRows, tc.neighbor, tc.af)
+			assert.Equal(t, tc.routingInstance, row.Identity.RoutingInstance)
+			assert.Equal(t, tc.remoteAS, row.Identity.RemoteAS)
+			assert.Equal(t, ddprofiledefinition.BGPSubsequentAddressFamilyUnicast, row.Identity.SubsequentAddressFamily)
+			if tc.wantAdmin {
+				require.True(t, row.Admin.Enabled.Has)
+				assert.Equal(t, tc.wantAdminEnabled, row.Admin.Enabled.Value)
+			}
+			require.True(t, row.State.Has)
+			assert.Equal(t, ddprofiledefinition.BGPPeerStateEstablished, row.State.State)
+			assert.EqualValues(t, tc.establishedTrans, row.Transitions.Established.Value)
+			if tc.wantLastError {
+				assert.EqualValues(t, tc.lastErrorCode, row.LastError.Code.Value)
+				assert.EqualValues(t, tc.lastErrorSubcode, row.LastError.Subcode.Value)
+			}
+		})
+	}
 
-	ipv4Peer := requireHuaweiPeerRow(t, results[0].BGPRows, "10.45.2.2")
-	assert.Equal(t, "0", ipv4Peer.Identity.RoutingInstance)
-	assert.Equal(t, "26479", ipv4Peer.Identity.RemoteAS)
-	assert.Equal(t, "ipv4", ipv4Peer.Descriptors.PeerType)
-	assert.EqualValues(t, 2, ipv4Peer.Transitions.Established.Value)
-	assert.EqualValues(t, 1, ipv4Peer.Transitions.Down.Value)
-	assert.EqualValues(t, 70063, ipv4Peer.Traffic.Updates.Received.Value)
-	assert.EqualValues(t, 971, ipv4Peer.Traffic.Updates.Sent.Value)
-	assert.EqualValues(t, 99928, ipv4Peer.Traffic.Messages.Received.Value)
-	assert.EqualValues(t, 31448, ipv4Peer.Traffic.Messages.Sent.Value)
+	routeRows := map[string]struct {
+		neighbor   string
+		af         ddprofiledefinition.BGPAddressFamily
+		received   int64
+		active     int64
+		advertised int64
+	}{
+		"IPv4 routes": {
+			neighbor:   "10.45.2.2",
+			af:         ddprofiledefinition.BGPAddressFamilyIPv4,
+			received:   13970,
+			active:     1007,
+			advertised: 8,
+		},
+		"IPv6 routes": {
+			neighbor: "2001:12f8::223:253",
+			af:       ddprofiledefinition.BGPAddressFamilyIPv6,
+		},
+	}
 
-	ipv6Neighbor := "2001:12f8::223:253"
-	ipv6Family := requireHuaweiPeerFamilyRow(t, results[0].BGPRows, ipv6Neighbor, ddprofiledefinition.BGPAddressFamilyIPv6)
-	assert.Equal(t, "PublicV6", ipv6Family.Identity.RoutingInstance)
-	assert.Equal(t, "26162", ipv6Family.Identity.RemoteAS)
-	assert.Equal(t, ddprofiledefinition.BGPSubsequentAddressFamilyUnicast, ipv6Family.Identity.SubsequentAddressFamily)
-	require.True(t, ipv6Family.State.Has)
-	assert.Equal(t, ddprofiledefinition.BGPPeerStateEstablished, ipv6Family.State.State)
-	assert.EqualValues(t, 7, ipv6Family.Transitions.Established.Value)
+	for name, tc := range routeRows {
+		t.Run(name, func(t *testing.T) {
+			row := requireHuaweiPeerFamilyRowByTable(t, results[0].BGPRows, "hwBgpPeerRouteTable", tc.neighbor, tc.af)
+			assert.EqualValues(t, tc.received, row.Routes.Total.Received.Value)
+			assert.EqualValues(t, tc.active, row.Routes.Total.Active.Value)
+			assert.EqualValues(t, tc.advertised, row.Routes.Total.Advertised.Value)
+		})
+	}
 
-	ipv6Routes := requireHuaweiPeerFamilyRowByTable(t, results[0].BGPRows, "hwBgpPeerRouteTable", ipv6Neighbor, ddprofiledefinition.BGPAddressFamilyIPv6)
-	assert.EqualValues(t, 0, ipv6Routes.Routes.Total.Received.Value)
-	assert.EqualValues(t, 0, ipv6Routes.Routes.Total.Active.Value)
-	assert.EqualValues(t, 0, ipv6Routes.Routes.Total.Advertised.Value)
+	peers := map[string]struct {
+		neighbor         string
+		remoteAS         string
+		peerType         string
+		establishedTrans int64
+		downTrans        int64
+		wantTransitions  bool
+		updatesReceived  int64
+		updatesSent      int64
+		messagesReceived int64
+		messagesSent     int64
+	}{
+		"IPv4 peer": {
+			neighbor:         "10.45.2.2",
+			remoteAS:         "26479",
+			peerType:         "ipv4",
+			establishedTrans: 2,
+			downTrans:        1,
+			wantTransitions:  true,
+			updatesReceived:  70063,
+			updatesSent:      971,
+			messagesReceived: 99928,
+			messagesSent:     31448,
+		},
+		"IPv6 peer": {
+			neighbor:         "2001:12f8::223:253",
+			remoteAS:         "26162",
+			peerType:         "ipv6",
+			updatesReceived:  3318661,
+			updatesSent:      6,
+			messagesReceived: 3337254,
+			messagesSent:     19035,
+		},
+	}
 
-	ipv6Peer := requireHuaweiPeerRow(t, results[0].BGPRows, ipv6Neighbor)
-	assert.Equal(t, "0", ipv6Peer.Identity.RoutingInstance)
-	assert.Equal(t, "26162", ipv6Peer.Identity.RemoteAS)
-	assert.Equal(t, "ipv6", ipv6Peer.Descriptors.PeerType)
-	assert.EqualValues(t, 3318661, ipv6Peer.Traffic.Updates.Received.Value)
-	assert.EqualValues(t, 6, ipv6Peer.Traffic.Updates.Sent.Value)
-	assert.EqualValues(t, 3337254, ipv6Peer.Traffic.Messages.Received.Value)
-	assert.EqualValues(t, 19035, ipv6Peer.Traffic.Messages.Sent.Value)
+	for name, tc := range peers {
+		t.Run(name, func(t *testing.T) {
+			row := requireHuaweiPeerRow(t, results[0].BGPRows, tc.neighbor)
+			assert.Equal(t, "0", row.Identity.RoutingInstance)
+			assert.Equal(t, tc.remoteAS, row.Identity.RemoteAS)
+			assert.Equal(t, tc.peerType, row.Descriptors.PeerType)
+			if tc.wantTransitions {
+				assert.EqualValues(t, tc.establishedTrans, row.Transitions.Established.Value)
+				assert.EqualValues(t, tc.downTrans, row.Transitions.Down.Value)
+			}
+			assert.EqualValues(t, tc.updatesReceived, row.Traffic.Updates.Received.Value)
+			assert.EqualValues(t, tc.updatesSent, row.Traffic.Updates.Sent.Value)
+			assert.EqualValues(t, tc.messagesReceived, row.Traffic.Messages.Received.Value)
+			assert.EqualValues(t, tc.messagesSent, row.Traffic.Messages.Sent.Value)
+		})
+	}
 }
 
 func requireHuaweiPeerFamilyRow(t *testing.T, rows []ddsnmp.BGPRow, neighbor string, af ddprofiledefinition.BGPAddressFamily) ddsnmp.BGPRow {
