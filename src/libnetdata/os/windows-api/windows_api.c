@@ -5,6 +5,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
 
 struct netdata_windows_ip_labels {
@@ -87,4 +89,44 @@ char *netdata_win_local_ip()
         netdata_fill_default_ip();
 
     return default_ip.ipaddr;
+}
+
+bool netdata_win_collect_tcp_state_counts(uint32_t af, uint32_t state_counts[])
+{
+    DWORD size = 0;
+    DWORD ret = GetExtendedTcpTable(NULL, &size, FALSE, (DWORD)af, TCP_TABLE_OWNER_PID_ALL, 0);
+    if (ret != ERROR_INSUFFICIENT_BUFFER)
+        return false;
+
+    void *table = malloc(size);
+    if (!table)
+        return false;
+
+    ret = GetExtendedTcpTable(table, &size, FALSE, (DWORD)af, TCP_TABLE_OWNER_PID_ALL, 0);
+    if (ret != NO_ERROR) {
+        free(table);
+        return false;
+    }
+
+    memset(state_counts, 0, sizeof(uint32_t) * NETDATA_WIN_TCP_STATE_COUNT);
+
+    if (af == AF_INET) {
+        PMIB_TCPTABLE_OWNER_PID tcp4 = table;
+        for (DWORD i = 0; i < tcp4->dwNumEntries; i++) {
+            DWORD state = tcp4->table[i].dwState;
+            if (state < NETDATA_WIN_TCP_STATE_COUNT)
+                state_counts[state]++;
+        }
+    }
+    else if (af == AF_INET6) {
+        PMIB_TCP6TABLE_OWNER_PID tcp6 = table;
+        for (DWORD i = 0; i < tcp6->dwNumEntries; i++) {
+            DWORD state = tcp6->table[i].dwState;
+            if (state < NETDATA_WIN_TCP_STATE_COUNT)
+                state_counts[state]++;
+        }
+    }
+
+    free(table);
+    return true;
 }

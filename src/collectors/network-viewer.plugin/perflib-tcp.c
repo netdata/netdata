@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
 #include "../windows.plugin/windows_plugin.h"
 #include "../windows.plugin/windows-internals.h"
-
-#include <iphlpapi.h>
+#include "libnetdata/os/windows-api/windows_api.h"
 
 #define PLUGIN_NETWORK_VIEWER_NAME "network-viewer.plugin"
-#define TCP_STATE_COUNT (MIB_TCP_STATE_DELETE_TCB + 1)
 
 typedef struct {
     const char *af;
@@ -207,43 +202,7 @@ static void tcp_create_states_chart(TCP_FAMILY *tcp, int update_every)
     tcp->rd_state_delete_tcb = rrddim_add(tcp->states_chart, "delete_tcb", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 }
 
-static bool tcp_collect_state_counts(DWORD af, uint32_t state_counts[TCP_STATE_COUNT])
-{
-    DWORD size = 0;
-    DWORD ret = GetExtendedTcpTable(NULL, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
-    if (ret != ERROR_INSUFFICIENT_BUFFER)
-        return false;
-
-    void *table = mallocz(size);
-    ret = GetExtendedTcpTable(table, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
-    if (ret != NO_ERROR) {
-        freez(table);
-        return false;
-    }
-
-    memset(state_counts, 0, sizeof(uint32_t) * TCP_STATE_COUNT);
-
-    if (af == AF_INET) {
-        PMIB_TCPTABLE_OWNER_PID tcp4 = table;
-        for (DWORD i = 0; i < tcp4->dwNumEntries; i++) {
-            DWORD state = tcp4->table[i].dwState;
-            if (state < TCP_STATE_COUNT)
-                state_counts[state]++;
-        }
-    } else if (af == AF_INET6) {
-        PMIB_TCP6TABLE_OWNER_PID tcp6 = table;
-        for (DWORD i = 0; i < tcp6->dwNumEntries; i++) {
-            DWORD state = tcp6->table[i].dwState;
-            if (state < TCP_STATE_COUNT)
-                state_counts[state]++;
-        }
-    }
-
-    freez(table);
-    return true;
-}
-
-static void tcp_update_state_chart(TCP_FAMILY *tcp, uint32_t state_counts[TCP_STATE_COUNT])
+static void tcp_update_state_chart(TCP_FAMILY *tcp, uint32_t state_counts[NETDATA_WIN_TCP_STATE_COUNT])
 {
     rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_closed, (collected_number)state_counts[MIB_TCP_STATE_CLOSED]);
     rrddim_set_by_pointer(tcp->states_chart, tcp->rd_state_listening, (collected_number)state_counts[MIB_TCP_STATE_LISTEN]);
@@ -302,8 +261,8 @@ static bool tcp_collect_family(TCP_FAMILY *tcp, int update_every)
     perflib_rrddim_set_by_pointer(tcp->segments_chart, tcp->rd_segments_sent, &tcp->segments_sent);
     rrdset_done(tcp->segments_chart);
 
-    uint32_t state_counts[TCP_STATE_COUNT] = {0};
-    if (tcp_collect_state_counts(strcmp(tcp->af, "ipv4") == 0 ? AF_INET : AF_INET6, state_counts)) {
+    uint32_t state_counts[NETDATA_WIN_TCP_STATE_COUNT] = {0};
+    if (netdata_win_collect_tcp_state_counts(strcmp(tcp->af, "ipv4") == 0 ? AF_INET : AF_INET6, state_counts)) {
         tcp_update_state_chart(tcp, state_counts);
         rrdset_done(tcp->states_chart);
         have_any = true;
