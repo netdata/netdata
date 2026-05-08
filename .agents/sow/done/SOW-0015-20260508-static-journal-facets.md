@@ -361,6 +361,29 @@ Validation:
 - `cargo test -q -p journal-core` in `src/crates`: passed; 22 tests passed plus the existing ignored tests.
 - `git diff --check`: passed.
 
+## PR Review Iteration 6 - 2026-05-08
+
+Findings:
+
+- `PRRT_kwDOAKPxd86Atzu9`, `src/crates/journal-core/src/file/object.rs:916`: valid. The bounded Zstd/XZ stream helper cleared the buffer on over-limit or read errors but retained the potentially large allocation.
+- `PRRT_kwDOAKPxd86Atzv6`, `src/crates/jf/journal_file/src/object.rs:811`: valid. Same bounded stream allocation-retention issue in the legacy static reader.
+- `PRRT_kwDOAKPxd86Atzvg`, `src/crates/journal-core/src/file/object.rs:1052`: valid. The LZ4 path left `buf.len()` at the advertised size if the decoder returned fewer bytes than the prefix.
+- `PRRT_kwDOAKPxd86AtzwG`, `src/crates/jf/journal_file/src/object.rs:946`: valid. Same LZ4 size/length mismatch semantics in the legacy static reader.
+
+Actions:
+
+- Changed both bounded stream helpers to replace the reusable buffer with a new empty `Vec` on over-limit or read errors.
+- Changed both LZ4 branches to accept success only when the decoded length matches the systemd uncompressed-size prefix; mismatch now resets the buffer and returns `JournalError::DecompressorError`.
+- Added LZ4 size-mismatch regression tests in both readers and strengthened bounded stream tests to assert capacity release.
+
+Validation:
+
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q` in `src/crates/jf`: passed; 9 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 23 tests passed plus the existing ignored tests.
+- `git diff --check`: passed.
+
 ## Outcome
 
 Implemented, validated, and prepared for commit in `~/src/PRs/netdata-static-journal-facets`.

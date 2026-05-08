@@ -802,7 +802,7 @@ fn read_limited_to_end_with_cap<R: std::io::Read>(
     let len = match limited.read_to_end(buf) {
         Ok(len) if len <= max_size => len,
         Ok(_) | Err(_) => {
-            buf.clear();
+            *buf = Vec::new();
             return Err(JournalError::DecompressorError);
         }
     };
@@ -938,8 +938,8 @@ impl<B: ByteSlice> DataObject<B> {
             buf.resize(uncompressed_size, 0);
 
             match lz4_flex::block::decompress_into(compressed_data, buf) {
-                Ok(len) => Ok(len),
-                Err(_) => {
+                Ok(len) if len == uncompressed_size => Ok(len),
+                Ok(_) | Err(_) => {
                     *buf = Vec::new();
                     Err(JournalError::DecompressorError)
                 }
@@ -1013,6 +1013,7 @@ mod tests {
             Err(JournalError::DecompressorError)
         ));
         assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
     }
 
     #[test]
@@ -1035,6 +1036,25 @@ mod tests {
     }
 
     #[test]
+    fn lz4_decompress_rejects_size_mismatch() {
+        let uncompressed_size = 4usize;
+        let mut stored_payload = Vec::new();
+        stored_payload.extend_from_slice(&(uncompressed_size as u64).to_le_bytes());
+        stored_payload.extend_from_slice(&[0x30, b'a', b'b', b'c']);
+
+        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = b"stale".to_vec();
+
+        assert!(matches!(
+            object.decompress(&mut buf),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
+    }
+
+    #[test]
     fn read_limited_to_end_errors_and_clears_when_limit_is_exceeded() {
         let mut buf = b"stale".to_vec();
 
@@ -1043,6 +1063,7 @@ mod tests {
             Err(JournalError::DecompressorError)
         ));
         assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
     }
 
     #[test]
