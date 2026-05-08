@@ -107,8 +107,14 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
                    sqlite3_column_count(res), COL_FETCH_IS_REGISTERED + 1);
 
     nd_uuid_t host_uuid;
-    if (!sqlite3_column_uuid_copy(res, COL_FETCH_HOST_ID, host_uuid))
+    if (!sqlite3_column_uuid_copy(res, COL_FETCH_HOST_ID, host_uuid)) {
+        nd_log_daemon(
+            NDLP_ERR,
+            "Skipping archived host: host_id column is not a valid 16-byte UUID blob (type=%d, bytes=%d). Possible DB corruption.",
+            sqlite3_column_type(res, COL_FETCH_HOST_ID),
+            sqlite3_column_bytes(res, COL_FETCH_HOST_ID));
         return NULL;
+    }
 
     char guid[UUID_STR_LEN];
     uuid_unparse_lower(host_uuid, guid);
@@ -1095,10 +1101,22 @@ void aclk_synchronization_init(void)
         int step_rc;
         while ((step_rc = sqlite3_step_monitored(res_inst)) == SQLITE_ROW) {
             nd_uuid_t host_uuid, node_uuid;
-            if (!sqlite3_column_uuid_copy(res_inst, 0, host_uuid))
+            if (!sqlite3_column_uuid_copy(res_inst, 0, host_uuid)) {
+                nd_log_daemon(
+                    NDLP_ERR,
+                    "Skipping node_instance row: host_id (col 0) is not a valid 16-byte UUID blob (type=%d, bytes=%d). ACLK config not configured for this host.",
+                    sqlite3_column_type(res_inst, 0),
+                    sqlite3_column_bytes(res_inst, 0));
                 continue;
-            if (!sqlite3_column_uuid_copy(res_inst, 1, node_uuid))
+            }
+            if (!sqlite3_column_uuid_copy(res_inst, 1, node_uuid)) {
+                nd_log_daemon(
+                    NDLP_ERR,
+                    "Skipping node_instance row: node_id (col 1) is not a valid 16-byte UUID blob (type=%d, bytes=%d). ACLK config not configured for this host.",
+                    sqlite3_column_type(res_inst, 1),
+                    sqlite3_column_bytes(res_inst, 1));
                 continue;
+            }
 
             char uuid_str[UUID_STR_LEN];
             uuid_unparse_lower(host_uuid, uuid_str);
