@@ -28,7 +28,7 @@ This collector discovers and monitors any SNMP-enabled network device.
 - **Automatic vendor/model detection**: Devices are matched to the right profile using selectors such as `sysObjectID` and `sysDescr`.
 - **ICMP ping**: Optional round-trip latency monitoring alongside SNMP, with a `ping_only` mode available.
 - **SNMP v1, v2c, and v3 support**: Fully implemented via the [gosnmp](https://github.com/gosnmp/gosnmp) library.
-- **Shared device-level licensing metrics for supported profiles**: When a profile exposes license telemetry, Netdata emits compact per-device licensing charts for earliest expiry, license-state counts (`healthy`, `informational`, `degraded`, `broken`, `ignored`), and highest usage pressure. Current branch coverage includes Check Point licensing state and per-blade expiry, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state and per-license expiry telemetry, Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry, and basic MikroTik RouterOS upgrade-entitlement telemetry. For MikroTik, epoch-like placeholder `mtxrLicUpgrUntil` values are ignored instead of treated as real expired licenses.
+- **Shared device-level licensing metrics for supported profiles**: When a profile exposes license telemetry, Netdata emits compact per-device licensing charts for earliest expiry, license-state counts (`healthy`, `informational`, `degraded`, `broken`, `ignored`), and highest usage pressure. Supported profile coverage includes Check Point licensing state and per-blade expiry, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state and per-license expiry telemetry, Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry, and basic MikroTik RouterOS upgrade-entitlement telemetry. For MikroTik, epoch-like placeholder `mtxrLicUpgrUntil` values are ignored instead of treated as real expired licenses.
 - **Interactive licensing drill-down**: The `snmp:licenses` function follows the existing SNMP function pattern and shows normalized licensing rows for the selected SNMP job/device using cached collector data.
 
 
@@ -368,21 +368,20 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [snmp_license_expiring](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.remaining_time | The earliest monitored SNMP license or subscription on this device is close to expiration. |
-| [snmp_license_authorization_expiring](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.authorization_remaining_time | The license authorization timer on this device is close to expiration. |
-| [snmp_license_certificate_expiring](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.certificate_remaining_time | The license certificate timer on this device is close to expiration. |
-| [snmp_license_grace_period_ending](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.grace_remaining_time | The licensing grace or evaluation period on this device is ending or already expired. |
-| [snmp_license_state_warning](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are degraded, in grace, or otherwise in warning state. |
-| [snmp_license_state_critical](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are expired, invalid, unauthorized, or otherwise in critical state. |
-| [snmp_license_usage_high](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.usage_percent | The most constrained monitored license pool on this device is nearing exhaustion. |
+| [ snmp_license_expiring ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.remaining_time | The earliest monitored SNMP license or subscription on this device is close to expiration. |
+| [ snmp_license_authorization_expiring ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.authorization_remaining_time | The license authorization timer on this device is close to expiration. |
+| [ snmp_license_certificate_expiring ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.certificate_remaining_time | The license certificate timer on this device is close to expiration. |
+| [ snmp_license_grace_period_ending ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.grace_remaining_time | The licensing grace or evaluation period on this device is ending or already expired. |
+| [ snmp_license_state_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are degraded, in grace, or otherwise in warning state. |
+| [ snmp_license_state_critical ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are expired, invalid, unauthorized, or otherwise in critical state. |
+| [ snmp_license_usage_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.usage_percent | The most constrained monitored license pool on this device is nearing exhaustion. |
 
 
 ## Metrics
 
 Metrics grouped by *scope*.
 
-The scope defines the instance that the metric belongs to.
-An instance is uniquely identified by a set of labels.
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
 
@@ -422,7 +421,7 @@ If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or
 
 ### Per device licensing
 
-Shared device-level licensing health metrics emitted when the matched SNMP profile provides licensing telemetry. Current branch coverage includes Check Point licensing state and per-blade expiry, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state and per-license expiry telemetry, Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry, and basic MikroTik RouterOS upgrade-entitlement telemetry. MikroTik support is intentionally limited to the RouterOS upgrade-entitlement fields exposed by SNMP, and epoch-like placeholder `mtxrLicUpgrUntil` values are ignored.
+Shared device-level licensing health metrics emitted when the matched SNMP profile provides licensing telemetry. Supported profile coverage includes Check Point licensing state and per-blade expiry, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state and per-license expiry telemetry, Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry, and basic MikroTik RouterOS upgrade-entitlement telemetry. MikroTik support is intentionally limited to the RouterOS upgrade-entitlement fields exposed by SNMP, and epoch-like placeholder `mtxrLicUpgrUntil` values are ignored.
 
 Labels:
 
@@ -724,3 +723,6 @@ Table metrics are usually the slowest and often determine the total collection t
 1. Do logs show “skipping data collection”?  
 2. Does *Internal → Stats* show collection time > `update_every`?  
 3. Increase `update_every` until skips disappear.
+
+
+
