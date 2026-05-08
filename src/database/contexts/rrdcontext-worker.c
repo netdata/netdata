@@ -4,7 +4,7 @@
 
 static struct {
     bool enabled;
-    size_t db_rotations;
+    size_t db_rotations;            // count of actual dbengine rotations only
     size_t instances_count;
     size_t active_vs_archived_percentage;
 } extreme_cardinality = {
@@ -14,11 +14,16 @@ static struct {
     .active_vs_archived_percentage = 50,
 };
 
+void rrdcontext_count_db_rotation(void) {
+    __atomic_add_fetch(&extreme_cardinality.db_rotations, 1, __ATOMIC_RELAXED);
+}
+
 static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 
 static void rrdcontext_garbage_collect_for_all_hosts(void);
 
 extern usec_t rrdcontext_next_db_rotation_ut;
+extern size_t rrdcontext_full_gc_rerun_requested;
 
 // ----------------------------------------------------------------------------
 // version hash calculation
@@ -133,7 +138,12 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 }
 
 static void rrdcontext_recalculate_retention_all_hosts(void) {
-    rrdcontext_next_db_rotation_ut = 0;
+    // Don't pre-clear rrdcontext_next_db_rotation_ut here -- the caller in
+    // rrdcontext_main clears it via CAS at the end of the pass, expecting
+    // the same deadline value it observed. Pre-clearing would let a
+    // concurrent rrdcontext_request_full_gc() arm a new deadline that the
+    // caller's unconditional store-to-zero would then silently overwrite,
+    // dropping the request.
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host) {
         worker_is_busy(WORKER_JOB_RETENTION);
@@ -690,7 +700,7 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
         dfe_done(ri);
 
         if(extreme_cardinality.enabled &&
-            extreme_cardinality.db_rotations &&
+            __atomic_load_n(&extreme_cardinality.db_rotations, __ATOMIC_RELAXED) &&
             instances_active &&
             instances_no_tier0 >= extreme_cardinality.instances_count) {
             size_t percent = (100 * instances_no_tier0 / instances_active);
@@ -1058,11 +1068,45 @@ void rrdcontext_main(void *ptr) {
 
         usec_t now_ut = now_realtime_usec();
 
-        if(rrdcontext_next_db_rotation_ut && now_ut > rrdcontext_next_db_rotation_ut) {
-            extreme_cardinality.db_rotations++;
+        usec_t deadline = __atomic_load_n(&rrdcontext_next_db_rotation_ut, __ATOMIC_RELAXED);
+        if(deadline && now_ut > deadline) {
+            // db_rotations is bumped by rrdcontext_count_db_rotation() from
+            // rrdcontext_db_rotation() only -- the chart-cleanup trigger
+            // (rrdcontext_request_full_gc) does NOT bump it, so the
+            // extreme-cardinality guard at line ~700 still activates only
+            // after a real dbengine rotation.
             rrdcontext_recalculate_retention_all_hosts();
             rrdcontext_garbage_collect_for_all_hosts();
-            rrdcontext_next_db_rotation_ut = 0;
+            // Clear the slot only if it still holds the deadline we
+            // processed. Two writers can race this pass:
+            //   - rrdcontext_request_full_gc() arms only when the slot is
+            //     zero, but the slot stays non-zero throughout this pass,
+            //     so any such request during the pass is coalesced into
+            //     the in-flight pass and does not arm a new deadline.
+            //   - rrdcontext_db_rotation() stores unconditionally. If it
+            //     fires during this pass, the slot now holds a fresh
+            //     deadline; the CAS here fails and that deadline drives
+            //     the next iteration.
+            __atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
+                                        &deadline, 0,
+                                        false,
+                                        __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+
+            // If a rrdcontext_request_full_gc() landed mid-pass (its CAS
+            // failed because the slot was non-zero with an expired
+            // deadline), the host whose archive motivated it may have
+            // already been walked in this pass. Schedule a follow-up:
+            // arm a fresh deadline iff the slot is currently zero. If
+            // another path (e.g. dbengine rotation) just armed a new
+            // deadline, the CAS leaves it alone.
+            if(__atomic_exchange_n(&rrdcontext_full_gc_rerun_requested, 0, __ATOMIC_RELAXED)) {
+                usec_t expected = 0;
+                usec_t fresh = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+                __atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
+                                            &expected, fresh,
+                                            false,
+                                            __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+            }
         }
 
         size_t hub_queued_contexts_for_all_hosts = 0;

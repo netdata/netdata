@@ -28,9 +28,18 @@ static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     return true;
 }
 
-static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
+// Returns the number of dimensions actually archived this call.
+//
+// Two callable shapes:
+//   1. all_dimensions == false and RRDSET_FLAG_OBSOLETE_DIMENSIONS unset:
+//      early-return path. Nothing scanned, flag not touched, returns 0.
+//   2. Any other case: scans the dimensions. The flag is cleared up
+//      front, then re-set at the end iff some candidate could not be
+//      archived this pass. Callers on this path can detect "all
+//      candidates archived" by reading the flag after the call.
+static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
     if(!all_dimensions && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
-        return true;
+        return 0;
 
     worker_is_busy(UV_EVENT_ARCHIVE_CHART_DIMENSIONS);
 
@@ -59,12 +68,10 @@ static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_d
     }
     dfe_done(rd);
 
-    if(dim_archives != dim_candidates) {
+    if(dim_archives != dim_candidates)
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
-        return false;
-    }
 
-    return true;
+    return dim_archives;
 }
 
 static bool svc_rrdset_lock_for_deletion(RRDSET *st, time_t now) {
@@ -82,9 +89,9 @@ static bool svc_rrdset_lock_for_deletion(RRDSET *st, time_t now) {
     return false;
 }
 
-static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
+static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS|RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS))
-        return;
+        return 0;
 
     worker_is_busy(UV_EVENT_CLEANUP_OBSOLETE_CHARTS);
 
@@ -94,6 +101,11 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     size_t full_archives = 0;
     size_t partial_candidates = 0;
     size_t partial_archives = 0;
+    // Total archived metadata items (RRDMETRIC + RRDINSTANCE). Used by the
+    // caller to decide whether to schedule a deep rrdcontext GC pass.
+    // Counts every dimension archived (each produces an archived RRDMETRIC)
+    // plus every chart freed (each produces an archived RRDINSTANCE).
+    size_t archived_items = 0;
 
     time_t now = now_realtime_sec();
     RRDSET *st;
@@ -106,7 +118,10 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
         if(flags & RRDSET_FLAG_OBSOLETE_DIMENSIONS) {
             partial_candidates++;
 
-            if(svc_rrdset_archive_obsolete_dimensions(st, false))
+            archived_items += svc_rrdset_archive_obsolete_dimensions(st, false);
+
+            // "all candidates archived" -> flag was not re-set inside.
+            if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
                 partial_archives++;
         }
 
@@ -114,8 +129,11 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
             full_candidates++;
 
             if(svc_rrdset_lock_for_deletion(st, now)) {
-                if(svc_rrdset_archive_obsolete_dimensions(st, true)) {
+                archived_items += svc_rrdset_archive_obsolete_dimensions(st, true);
+
+                if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS)) {
                     full_archives++;
+                    archived_items++;       // rrdset_free archives the RRDINSTANCE
 
                     worker_is_busy(UV_EVENT_FREE_CHART);
                     rrdset_free(st);
@@ -134,6 +152,8 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
 
     if(full_archives != full_candidates)
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
+
+    return archived_items;
 }
 
 void svc_rrdhost_obsolete_all_charts(RRDHOST *host) {
@@ -151,12 +171,14 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
     rrd_rdlock();
 
+    size_t archived = 0;
+
     RRDHOST *host;
     rrdhost_foreach_read(host) {
         if(rrdhost_receiver_replicating_charts(host) || rrdhost_sender_replicating_charts(host))
             continue;
 
-        svc_rrdhost_cleanup_charts_marked_obsolete(host);
+        archived += svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
         if (rrdhost_is_local(host) || IS_VIRTUAL_HOST_OS(host))
             continue;
@@ -175,6 +197,14 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
     }
 
     rrd_rdunlock();
+
+    // If anything was archived (a chart freed, or just dimensions archived
+    // on a still-live chart), schedule a deep rrdcontext GC pass. On
+    // non-dbengine hosts, dbengine rotation never triggers it, so archived
+    // RRDINSTANCE / RRDMETRIC entries would otherwise accumulate forever in
+    // host->rrdctx.contexts -> rc->rrdinstances / ri->rrdmetrics.
+    if(archived)
+        rrdcontext_request_full_gc();
 }
 
 static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
