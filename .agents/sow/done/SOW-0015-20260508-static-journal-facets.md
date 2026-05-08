@@ -274,6 +274,29 @@ Validation:
 - `cargo test -q` in `src/crates/jf`: passed; 5 tests passed.
 - `cargo test -q -p journal-core` in `src/crates`: passed; 19 tests passed plus the existing ignored tests.
 
+## PR Review Iteration 2 - 2026-05-08
+
+Findings:
+
+- `PRRT_kwDOAKPxd86AtF96`, `src/crates/journal-core/src/file/object.rs:1019`: valid. `try_reserve_exact()` was given a delta from capacity, but the API expects additional capacity from current length.
+- `PRRT_kwDOAKPxd86AtF-U`, `src/crates/jf/journal_file/src/object.rs:911`: valid. Same fallible-reserve issue in the legacy reader.
+- `PRRT_kwDOAKPxd86AtF-e`, `src/crates/jf/journal_file/src/object.rs:890`: valid. The Zstd streaming path still used unbounded `read_to_end()`; same-class sweep also covered XZ and `journal-core`.
+- `PRRT_kwDOAKPxd86AtF-n`, `src/crates/jf/journal_file/src/object.rs:927`: valid. The newly added XZ decompression branch needed a focused positive test; same-class sweep added the same coverage to `journal-core`.
+
+Actions:
+
+- Corrected fallible LZ4 reserve logic to reserve the full required final length after `clear()`.
+- Added bounded `read_limited_to_end()` helpers for streaming Zstd/XZ decompression.
+- Applied the same bounded streaming decompression to both `src/crates/jf/journal_file` and `src/crates/journal-core`.
+- Added fixed XZ compressed-payload fixtures and positive decompression tests for both readers without enabling the encoder feature in production dependencies.
+
+Validation:
+
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q` in `src/crates/jf`: passed; 6 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 20 tests passed plus the existing ignored tests.
+
 ## Outcome
 
 Implemented, validated, and prepared for commit in `~/src/PRs/netdata-static-journal-facets`.

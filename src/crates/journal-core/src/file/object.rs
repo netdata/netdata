@@ -1,5 +1,6 @@
 use crate::error::{JournalError, Result};
 use crate::file::offset_array::{Cursor, InlinedCursor, List};
+use std::io::Read;
 use std::num::{NonZeroU32, NonZeroU64, NonZeroUsize};
 use zerocopy::{
     ByteSlice, ByteSliceMut, FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice,
@@ -887,6 +888,21 @@ pub struct DataObject<B: ByteSlice> {
 // systemd limits journal DATA field payloads to 768 MiB; reject corrupt size prefixes before allocating.
 const MAX_UNCOMPRESSED_DATA_OBJECT_SIZE: usize = 768 * 1024 * 1024;
 
+fn read_limited_to_end<R: std::io::Read>(reader: R, buf: &mut Vec<u8>) -> Result<usize> {
+    let mut limited = reader.take((MAX_UNCOMPRESSED_DATA_OBJECT_SIZE as u64) + 1);
+
+    buf.clear();
+    let len = limited
+        .read_to_end(buf)
+        .map_err(|_| JournalError::DecompressorError)?;
+    if len > MAX_UNCOMPRESSED_DATA_OBJECT_SIZE {
+        buf.clear();
+        return Err(JournalError::DecompressorError);
+    }
+
+    Ok(len)
+}
+
 impl<B: ByteSlice> std::fmt::Debug for DataObject<B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataObject")
@@ -983,16 +999,12 @@ impl<B: ByteSlice> DataObject<B> {
 
         if self.zstd_compressed() {
             use ruzstd::decoding::StreamingDecoder;
-            use ruzstd::io::Read;
 
             let payload = self.raw_payload();
-            let mut decoder =
+            let decoder =
                 StreamingDecoder::new(payload).map_err(|_| JournalError::DecompressorError)?;
 
-            buf.clear();
-            decoder
-                .read_to_end(buf)
-                .map_err(|_| JournalError::DecompressorError)
+            read_limited_to_end(decoder, buf)
         } else if self.lz4_compressed() {
             let payload = self.raw_payload();
 
@@ -1014,7 +1026,7 @@ impl<B: ByteSlice> DataObject<B> {
 
             buf.clear();
             if uncompressed_size > buf.capacity() {
-                buf.try_reserve_exact(uncompressed_size - buf.capacity())
+                buf.try_reserve_exact(uncompressed_size)
                     .map_err(|_| JournalError::DecompressorError)?;
             }
             buf.resize(uncompressed_size, 0);
@@ -1023,15 +1035,11 @@ impl<B: ByteSlice> DataObject<B> {
                 .map_err(|_| JournalError::DecompressorError)
         } else if self.xz_compressed() {
             use lzma_rust2::XzReader;
-            use std::io::Read;
 
             let payload = self.raw_payload();
-            let mut decoder = XzReader::new(payload, false);
+            let decoder = XzReader::new(payload, false);
 
-            buf.clear();
-            decoder
-                .read_to_end(buf)
-                .map_err(|_| JournalError::DecompressorError)
+            read_limited_to_end(decoder, buf)
         } else {
             Err(JournalError::UnknownCompressionMethod)
         }
@@ -1080,6 +1088,28 @@ mod tests {
             Err(JournalError::DecompressorError)
         ));
         assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn xz_decompress_returns_payload() {
+        let payload = b"_SYSTEMD_UNIT=netdata.service";
+        let compressed = [
+            0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x04, 0xc0,
+            0x21, 0x1d, 0x21, 0x01, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xe6, 0x6a, 0x1c, 0x77, 0x01, 0x00, 0x1c, 0x5f, 0x53, 0x59, 0x53, 0x54, 0x45, 0x4d,
+            0x44, 0x5f, 0x55, 0x4e, 0x49, 0x54, 0x3d, 0x6e, 0x65, 0x74, 0x64, 0x61, 0x74, 0x61,
+            0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x00, 0x00, 0x00, 0x00, 0x11, 0x15,
+            0x71, 0xd5, 0x00, 0x01, 0x39, 0x1d, 0x48, 0x54, 0x04, 0x4d, 0x90, 0x42, 0x99, 0x0d,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x59, 0x5a,
+        ];
+
+        let bytes = data_object_bytes(&compressed, ObjectFlags::CompressedXz as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = Vec::new();
+
+        let len = object.decompress(&mut buf).unwrap();
+
+        assert_eq!(&buf[..len], payload);
     }
 }
 
