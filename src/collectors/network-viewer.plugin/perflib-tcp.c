@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../windows.plugin/windows_plugin.h"
-#include "../windows.plugin/windows-internals.h"
 #include "daemon/daemon-service.h"
 #include "libnetdata/required_dummies.h"
 #include "libnetdata/os/windows-api/windows_api.h"
+#include "libnetdata/os/windows-perflib/perflib.h"
 
 #define PLUGIN_NETWORK_VIEWER_NAME "network-viewer.plugin"
 
