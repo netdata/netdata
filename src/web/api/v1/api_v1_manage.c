@@ -51,7 +51,9 @@ static char *get_mgmt_api_key(void) {
         // save it
 #ifdef O_NOFOLLOW
         struct stat st;
-        fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC|O_NOFOLLOW, 0600);
+        // O_RDWR avoids blocking on FIFOs (O_WRONLY blocks until a reader arrives).
+        // O_TRUNC is omitted so truncation only happens after fstat() confirms a regular file.
+        fd = open(api_key_filename, O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW, 0600);
         if(fd == -1) {
             netdata_log_error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
             goto temp_key;
@@ -59,6 +61,12 @@ static char *get_mgmt_api_key(void) {
 
         if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
             netdata_log_error("Management API key file '%s' is not a regular file.", api_key_filename);
+            close(fd);
+            goto temp_key;
+        }
+
+        if(ftruncate(fd, 0) != 0) {
+            netdata_log_error("Cannot truncate management API key file '%s'.", api_key_filename);
             close(fd);
             goto temp_key;
         }
