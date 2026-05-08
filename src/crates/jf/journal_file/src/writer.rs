@@ -637,7 +637,7 @@ mod tests {
             assert_eq!(
                 filtered_entries,
                 2 * iterations,
-                "Expected filtered entries"
+                "Expected 2 entries with _SYSTEMD_UNIT=test.service per iteration"
             );
         }
 

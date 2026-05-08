@@ -897,7 +897,11 @@ fn read_limited_to_end_with_cap<R: std::io::Read>(
     buf: &mut Vec<u8>,
     max_size: usize,
 ) -> Result<usize> {
-    let mut limited = reader.take((max_size as u64) + 1);
+    let limit = u64::try_from(max_size)
+        .ok()
+        .and_then(|value| value.checked_add(1))
+        .ok_or(JournalError::DecompressorError)?;
+    let mut limited = reader.take(limit);
 
     buf.clear();
     let len = match limited.read_to_end(buf) {

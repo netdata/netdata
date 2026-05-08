@@ -199,7 +199,7 @@ impl<'data, B: ByteSlice> PayloadMatcher<'data, FieldObject<B>> {
     }
 }
 
-impl<'a> BucketVisitor<'a> for DataPayloadMatcher<'_> {
+impl<'a, 'data> BucketVisitor<'a> for DataPayloadMatcher<'data> {
     type Object = DataObject<&'a [u8]>;
     type Output = NonZeroU64;
 

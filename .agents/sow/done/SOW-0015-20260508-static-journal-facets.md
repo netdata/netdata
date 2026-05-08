@@ -320,6 +320,27 @@ Validation:
 - `cargo test -q` in `src/crates/jf`: passed; 7 tests passed.
 - `cargo test -q -p journal-core` in `src/crates`: passed; 21 tests passed plus the existing ignored tests.
 
+## PR Review Iteration 4 - 2026-05-08
+
+Findings:
+
+- `PRRT_kwDOAKPxd86AteMb`, `src/crates/journal-core/src/file/object.rs:900`: valid. The testable size-cap helper converted `usize` to `u64` with `as` and then added 1.
+- `PRRT_kwDOAKPxd86AteNJ`, `src/crates/jf/journal_file/src/file.rs:204`: valid readability issue. The `BucketVisitor` implementation used an elided matcher lifetime.
+- `PRRT_kwDOAKPxd86AteNi`, `src/crates/jf/journal_file/src/writer.rs:640`: valid. The corrected assertion message lost useful context.
+
+Actions:
+
+- Changed both bounded-read helpers to use `u64::try_from(max_size)` plus `checked_add(1)`.
+- Made `DataPayloadMatcher`'s borrowed payload lifetime explicit in the `BucketVisitor` implementation.
+- Restored context in the filter-count assertion message.
+
+Validation:
+
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q` in `src/crates/jf`: passed; 7 tests passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 21 tests passed plus the existing ignored tests.
+
 ## Outcome
 
 Implemented, validated, and prepared for commit in `~/src/PRs/netdata-static-journal-facets`.
