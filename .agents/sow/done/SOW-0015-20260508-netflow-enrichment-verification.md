@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: autonomous validation and PR review iteration complete; remaining blockers require user-supplied external systems.
+Sub-state: regression repaired; user-facing metadata modules now cover all supported topology IP intelligence downloader Geo/ASN providers.
 
 ## Requirements
 
@@ -623,4 +623,62 @@ Artifact maintenance for review pass:
 
 ## Regression Log
 
-None yet.
+### Regression - 2026-05-08 - Missing Provider Integration Modules
+
+What broke:
+
+- The previous completion enhanced and validated the topology IP intelligence downloader for CAIDA, IP2Location, IPDeny, and IPIP, but the user-facing NetFlow enrichment metadata still exposed only DB-IP, MaxMind, IPtoASN, and Custom MMDB as IP intelligence integrations.
+- This made the generated integrations catalog incomplete: users could discover downloader tokens in the downloader README, but not from the NetFlow enrichment-method module list.
+
+Evidence:
+
+- `src/crates/netflow-plugin/metadata.yaml` had modules for `dbip`, `maxmind`, `iptoasn`, and `custom-mmdb`.
+- Generated pages under `src/crates/netflow-plugin/integrations/` existed only for `db-ip_ip_intelligence.md`, `maxmind_geoip_-_geolite2.md`, `iptoasn.md`, and `custom_mmdb_database.md`.
+- Downloader code supports `caida:prefix2as`, `ip2location:country-lite`, `ipdeny:country-zones`, and `ipip:country` in `src/go/tools/topology-ip-intel-downloader/config.go`.
+
+Why previous validation missed it:
+
+- Validation proved downloader parsing, live provider downloads, generated MMDB output, and Rust resolver consumption, but did not compare the complete downloader provider matrix against generated integration module coverage.
+
+Repair plan:
+
+- Add first-class `metadata.yaml` modules for CAIDA Routeviews Prefix-to-AS, IP2Location LITE IP-Country, IPDeny Country Zones, and IPIP Country.
+- Cross-link these modules with the existing DB-IP, MaxMind, IPtoASN, and Custom MMDB modules.
+- Regenerate generated integration pages from `metadata.yaml`.
+- Validate metadata generation and downloader tests.
+
+Sensitive data handling:
+
+- No secrets, private endpoints, node identifiers, or raw provider payloads are needed in durable artifacts. Provider descriptions use public source names, public URLs, and downloader tokens only.
+
+Implementation:
+
+- Added first-class NetFlow enrichment metadata modules for:
+  - `caida-prefix2as` - CAIDA Routeviews Prefix-to-AS.
+  - `ip2location` - IP2Location LITE IP-Country.
+  - `ipdeny` - IPDeny Country Zones.
+  - `ipip` - IPIP Country Database.
+- Updated related-resource links from DB-IP, MaxMind, IPtoASN, and Custom MMDB so the generated integration catalog surfaces the full supported IP intelligence provider set.
+- Regenerated the new NetFlow integration pages from `src/crates/netflow-plugin/metadata.yaml`.
+
+Validation:
+
+- `go test ./tools/topology-ip-intel-downloader` passed from `src/go`.
+- `python3 integrations/gen_integrations.py` passed.
+- `python3 integrations/gen_docs_integrations.py` generated the new NetFlow provider pages. It also reproduced a pre-existing unrelated SNMP generated-page diff; that unrelated SNMP churn was removed from this changeset.
+- A metadata coverage check verified all expected IP intelligence modules are present: `dbip`, `maxmind`, `iptoasn`, `custom-mmdb`, `caida-prefix2as`, `ip2location`, `ipdeny`, and `ipip`.
+- Generated page existence check verified:
+  - `src/crates/netflow-plugin/integrations/caida_routeviews_prefix-to-as.md`
+  - `src/crates/netflow-plugin/integrations/ip2location_lite_ip-country.md`
+  - `src/crates/netflow-plugin/integrations/ipdeny_country_zones.md`
+  - `src/crates/netflow-plugin/integrations/ipip_country_database.md`
+- `git diff --check` passed after removing unrelated generated SNMP churn.
+
+Artifact maintenance:
+
+- AGENTS.md: no update needed; existing integration-generation and SOW regression rules were sufficient.
+- Runtime project skills: no update needed; `integrations-lifecycle` already documents the source/generator contract.
+- Specs: no update needed; this is a documentation/catalog completeness repair for already-implemented provider behavior.
+- End-user/operator docs: updated `src/crates/netflow-plugin/metadata.yaml` and generated four new provider integration pages.
+- End-user/operator skills: no update needed; no public skill workflow changed.
+- SOW lifecycle: regression recorded here, then SOW returned to `completed` and moved back to `.agents/sow/done/` with the metadata/doc commit.

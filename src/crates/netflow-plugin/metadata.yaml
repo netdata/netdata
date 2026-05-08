@@ -466,6 +466,14 @@ modules:
             - plugin_name: netflow-plugin
               module_name: iptoasn
             - plugin_name: netflow-plugin
+              module_name: caida-prefix2as
+            - plugin_name: netflow-plugin
+              module_name: ip2location
+            - plugin_name: netflow-plugin
+              module_name: ipdeny
+            - plugin_name: netflow-plugin
+              module_name: ipip
+            - plugin_name: netflow-plugin
               module_name: custom-mmdb
       info_provided_to_referring_integrations:
         description: ""
@@ -660,6 +668,14 @@ modules:
               module_name: dbip
             - plugin_name: netflow-plugin
               module_name: iptoasn
+            - plugin_name: netflow-plugin
+              module_name: caida-prefix2as
+            - plugin_name: netflow-plugin
+              module_name: ip2location
+            - plugin_name: netflow-plugin
+              module_name: ipdeny
+            - plugin_name: netflow-plugin
+              module_name: ipip
             - plugin_name: netflow-plugin
               module_name: custom-mmdb
       info_provided_to_referring_integrations:
@@ -922,6 +938,14 @@ modules:
             - plugin_name: netflow-plugin
               module_name: maxmind
             - plugin_name: netflow-plugin
+              module_name: caida-prefix2as
+            - plugin_name: netflow-plugin
+              module_name: ip2location
+            - plugin_name: netflow-plugin
+              module_name: ipdeny
+            - plugin_name: netflow-plugin
+              module_name: ipip
+            - plugin_name: netflow-plugin
               module_name: custom-mmdb
       info_provided_to_referring_integrations:
         description: ""
@@ -1124,6 +1148,672 @@ modules:
       scopes: []
   - meta:
       plugin_name: netflow-plugin
+      module_name: caida-prefix2as
+      monitored_instance:
+        name: CAIDA Routeviews Prefix-to-AS
+        link: https://www.caida.org/catalog/datasets/routeviews-prefix2as/
+        categories:
+          - flows.enrichment-methods
+        icon_filename: network-wired.svg
+      keywords:
+        - caida
+        - routeviews
+        - prefix2as
+        - pfx2as
+        - asn
+        - bgp
+        - ip intelligence
+        - flow enrichment
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: netflow-plugin
+              module_name: dbip
+            - plugin_name: netflow-plugin
+              module_name: maxmind
+            - plugin_name: netflow-plugin
+              module_name: iptoasn
+            - plugin_name: netflow-plugin
+              module_name: custom-mmdb
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Enrich network flows with AS numbers from CAIDA's Routeviews Prefix-to-AS
+          mapping dataset. CAIDA derives this public dataset from RouteViews BGP data and
+          publishes one prefix-to-origin-AS mapping per line. The official format is
+          tab-separated `IP prefix`, `prefix length`, and `AS number`; multi-origin AS
+          entries can contain multiple ASNs, and the Netdata downloader keeps the first
+          listed origin AS as the simplified per-prefix value.
+
+          CAIDA Prefix-to-AS is ASN-only. It does not provide AS organization names or
+          geographic fields. Pair it with DB-IP, MaxMind, IP2Location, IPDeny, IPIP, or
+          another geo provider when you also need `*_COUNTRY`, city, state, or
+          coordinates.
+
+          For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
+          provider chains), see
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+        method_description: |
+          The netflow plugin reads MMDB files only. CAIDA publishes compressed text data,
+          so use Netdata's `topology-ip-intel-downloader` to fetch the latest Routeviews
+          Prefix-to-AS file, convert it to `topology-ip-asn.mmdb`, and place it in the
+          standard auto-detected cache directory. The plugin reloads the generated MMDB
+          automatically when the file changes.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "Not used by the default install. After the downloader writes `topology-ip-asn.mmdb` into the standard cache path, the plugin auto-detects the generated file."
+        limits:
+          description: "ASN number only. No AS organization name, country, state, city, or coordinates are available from this source."
+        performance_impact:
+          description: "Lookups are local MMDB reads after conversion. Memory use is mostly the mapped database file and the kernel page cache needed to keep active pages hot."
+    setup:
+      prerequisites:
+        list:
+          - title: Downloader with CAIDA Prefix-to-AS support
+            description: |
+              Run the bundled downloader when available. Packaged 32-bit installs do not
+              include this binary:
+
+              ```bash
+              sudo /usr/sbin/topology-ip-intel-downloader \
+                --asn caida:prefix2as \
+                --geo dbip:city-lite
+              ```
+
+              `caida:prefix2as` is valid only for `--asn`. The example keeps DB-IP
+              city-lite for geo fields; substitute any supported `--geo` provider if
+              country-only enrichment is sufficient.
+          - title: CAIDA acceptable use terms
+            description: |
+              CAIDA documents acceptable-use and attribution requirements on the dataset
+              page. Review the terms before redistributing generated datasets or derived
+              reports.
+      configuration:
+        file:
+          name: netflow.yaml
+        options:
+          description: |
+            Once the downloader has produced a CAIDA-derived ASN MMDB in the cache
+            directory, the plugin auto-detects it. To pin paths explicitly, set
+            `enrichment.geoip.asn_database` and keep `geo_database` pointed at your chosen
+            geographic provider.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: enrichment.geoip.asn_database
+              description: Path to the CAIDA-derived ASN MMDB. Empty = auto-detect from the cache directory.
+              default_value: "[]"
+              required: false
+            - name: enrichment.geoip.geo_database
+              description: Optional geographic MMDB paths supplied by another provider.
+              default_value: "[]"
+              required: false
+            - name: enrichment.geoip.optional
+              description: When true, missing or unreadable MMDBs are warnings, not fatal at startup.
+              default_value: "false (true when auto-detected)"
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: After running the downloader with CAIDA ASN and DB-IP geo
+              folding:
+                enabled: false
+              description: Auto-detection picks up both generated cache files.
+              config: |
+                enrichment:
+                  geoip:
+                    asn_database: []
+                    geo_database: []
+                    optional: true
+            - name: Explicit CAIDA ASN path
+              folding:
+                enabled: true
+              description: Pin CAIDA for AS numbers and keep a separate geo source for country/city fields.
+              config: |
+                enrichment:
+                  geoip:
+                    asn_database:
+                      - /var/cache/netdata/topology-ip-intel/topology-ip-asn.mmdb
+                    geo_database:
+                      - /var/cache/netdata/topology-ip-intel/topology-ip-geo.mmdb
+                    optional: false
+    troubleshooting:
+      problems:
+        list:
+          - name: AS names are empty
+            description: |
+              CAIDA Prefix-to-AS contains AS numbers, not organization names. Layer a
+              provider with AS organization data, such as MaxMind GeoLite2 ASN or DB-IP
+              ASN Lite, after the CAIDA MMDB in `asn_database` if AS names matter.
+          - name: Country fields are empty
+            description: |
+              This source is ASN-only. Configure a `--geo` provider in the downloader or
+              point `enrichment.geoip.geo_database` at a separate geo MMDB.
+          - name: Multi-origin AS simplification
+            description: |
+              CAIDA can represent multi-origin prefixes. The downloader uses the first
+              listed AS for the generated single-value MMDB record. If you need full MOAS
+              semantics, use BMP or BioRIS routing enrichment instead of an offline ASN
+              lookup database.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Enriches flow records with AS numbers; produces no metrics of its own.
+        Verify on the Network Flows view via `SRC_AS` and `DST_AS`.
+      availability: []
+      scopes: []
+  - meta:
+      plugin_name: netflow-plugin
+      module_name: ip2location
+      monitored_instance:
+        name: IP2Location LITE IP-Country
+        link: https://lite.ip2location.com/database/db1-ip-country?lang=en_US
+        categories:
+          - flows.enrichment-methods
+        icon_filename: network-wired.svg
+      keywords:
+        - ip2location
+        - ip2location lite
+        - geoip
+        - country
+        - csv
+        - ip intelligence
+        - flow enrichment
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: netflow-plugin
+              module_name: dbip
+            - plugin_name: netflow-plugin
+              module_name: maxmind
+            - plugin_name: netflow-plugin
+              module_name: iptoasn
+            - plugin_name: netflow-plugin
+              module_name: custom-mmdb
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Enrich network flows with country codes from the IP2Location LITE
+          IP-Country database. The supported downloader source is the DB1 LITE CSV ZIP
+          (`IP2LOCATION-LITE-DB1.CSV.ZIP`), whose documented fields are
+          `ip_from`, `ip_to`, `country_code`, and `country_name`.
+
+          IP2Location DB1 is country-only. It does not provide ASN, AS organization,
+          state, city, latitude, or longitude. Pair it with CAIDA, IPtoASN, DB-IP, or
+          MaxMind ASN data when you also need AS fields.
+
+          For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
+          provider chains), see
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+        method_description: |
+          The netflow plugin reads MMDB files only. Use Netdata's
+          `topology-ip-intel-downloader` to fetch the IP2Location LITE CSV ZIP, convert
+          the ranges to `topology-ip-geo.mmdb`, and write the file into the standard
+          auto-detected cache directory. The plugin reloads the generated MMDB
+          automatically when the file changes.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "Not used by the default install. After the downloader writes `topology-ip-geo.mmdb` into the standard cache path, the plugin auto-detects the generated file."
+        limits:
+          description: "Country only. No ASN, AS name, state, city, latitude, or longitude are available from this source."
+        performance_impact:
+          description: "Lookups are local MMDB reads after conversion. Memory use is mostly the mapped database file and the kernel page cache needed to keep active pages hot."
+    setup:
+      prerequisites:
+        list:
+          - title: Downloader with IP2Location LITE support
+            description: |
+              Run the bundled downloader when available. Packaged 32-bit installs do not
+              include this binary:
+
+              ```bash
+              sudo /usr/sbin/topology-ip-intel-downloader \
+                --asn iptoasn:combined \
+                --geo ip2location:country-lite
+              ```
+
+              `ip2location:country-lite` is valid only for `--geo`. The example pairs it
+              with IPtoASN so the resulting cache contains both AS and country fields.
+          - title: IP2Location LITE license
+            description: |
+              Review the IP2Location LITE terms before redistributing the data or
+              generated derivative files. The plugin consumes only the generated MMDB and
+              does not contact IP2Location during flow decoding.
+      configuration:
+        file:
+          name: netflow.yaml
+        options:
+          description: |
+            Once the downloader has produced an IP2Location-derived geo MMDB in the cache
+            directory, the plugin auto-detects it. To pin paths explicitly, set
+            `enrichment.geoip.geo_database` and keep `asn_database` pointed at your chosen
+            ASN provider.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: enrichment.geoip.asn_database
+              description: Optional ASN MMDB paths supplied by another provider.
+              default_value: "[]"
+              required: false
+            - name: enrichment.geoip.geo_database
+              description: Path to the IP2Location-derived geo MMDB. Empty = auto-detect from the cache directory.
+              default_value: "[]"
+              required: false
+            - name: enrichment.geoip.optional
+              description: When true, missing or unreadable MMDBs are warnings, not fatal at startup.
+              default_value: "false (true when auto-detected)"
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: After running the downloader with IPtoASN ASN and IP2Location country
+              folding:
+                enabled: false
+              description: Auto-detection picks up both generated cache files.
+              config: |
+                enrichment:
+                  geoip:
+                    asn_database: []
+                    geo_database: []
+                    optional: true
+            - name: Explicit IP2Location country path
+              folding:
+                enabled: true
+              description: Pin IP2Location for country and keep a separate ASN source.
+              config: |
+                enrichment:
+                  geoip:
+                    asn_database:
+                      - /var/cache/netdata/topology-ip-intel/topology-ip-asn.mmdb
+                    geo_database:
+                      - /var/cache/netdata/topology-ip-intel/topology-ip-geo.mmdb
+                    optional: false
+    troubleshooting:
+      problems:
+        list:
+          - name: ASN fields are empty
+            description: |
+              IP2Location DB1 is country-only. Configure `--asn iptoasn:combined`,
+              `--asn caida:prefix2as`, or another ASN provider in the downloader.
+          - name: City or coordinates are empty
+            description: |
+              The DB1 LITE source does not include city, state, latitude, or longitude.
+              Use DB-IP city-lite, MaxMind GeoLite2 City, GeoIP2 City, or a custom MMDB
+              when those fields are required.
+          - name: Stale country data
+            description: |
+              Check the upstream IP2Location LITE page for the current version and next
+              update date, then schedule the downloader accordingly. The plugin reloads
+              the generated MMDB in place when the file signature changes.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Enriches flow records with country codes; produces no metrics of its own.
+        Verify on the Network Flows view via `SRC_COUNTRY` and `DST_COUNTRY`.
+      availability: []
+      scopes: []
+  - meta:
+      plugin_name: netflow-plugin
+      module_name: ipdeny
+      monitored_instance:
+        name: IPDeny Country Zones
+        link: https://www.ipdeny.com/ipblocks/
+        categories:
+          - flows.enrichment-methods
+        icon_filename: network-wired.svg
+      keywords:
+        - ipdeny
+        - country zones
+        - geoip
+        - country
+        - cidr
+        - ip intelligence
+        - flow enrichment
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: netflow-plugin
+              module_name: dbip
+            - plugin_name: netflow-plugin
+              module_name: maxmind
+            - plugin_name: netflow-plugin
+              module_name: iptoasn
+            - plugin_name: netflow-plugin
+              module_name: custom-mmdb
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Enrich network flows with country codes from IPDeny country zone files.
+          IPDeny publishes country-specific CIDR lists and an `all-zones.tar.gz`
+          archive. The Netdata downloader reads the IPv4 country-zone archive and maps
+          each `<country>.zone` member to that ISO country code.
+
+          IPDeny Country Zones are country-only and the current built-in source is IPv4
+          only. They do not provide ASN, AS organization, state, city, latitude, or
+          longitude. Pair IPDeny with another ASN source when you also need AS fields,
+          and use DB-IP, MaxMind, IP2Location, or a custom MMDB when IPv6 country
+          coverage is required.
+
+          For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
+          provider chains), see
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+        method_description: |
+          The netflow plugin reads MMDB files only. Use Netdata's
+          `topology-ip-intel-downloader` to fetch IPDeny's HTTPS country-zone archive,
+          convert the CIDR lists to `topology-ip-geo.mmdb`, and write the file into the
+          standard auto-detected cache directory. The plugin reloads the generated MMDB
+          automatically when the file changes.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "Not used by the default install. After the downloader writes `topology-ip-geo.mmdb` into the standard cache path, the plugin auto-detects the generated file."
+        limits:
+          description: "Country-only IPv4 source. No ASN, AS name, IPv6 coverage, state, city, latitude, or longitude are available from this built-in source."
+        performance_impact:
+          description: "Lookups are local MMDB reads after conversion. Memory use is mostly the mapped database file and the kernel page cache needed to keep active pages hot."
+    setup:
+      prerequisites:
+        list:
+          - title: Downloader with IPDeny support
+            description: |
+              Run the bundled downloader when available. Packaged 32-bit installs do not
+              include this binary:
+
+              ```bash
+              sudo /usr/sbin/topology-ip-intel-downloader \
+                --asn iptoasn:combined \
+                --geo ipdeny:country-zones
+              ```
+
+              `ipdeny:country-zones` is valid only for `--geo`. The example pairs it
+              with IPtoASN so the resulting cache contains both AS and country fields.
+          - title: IPDeny usage policy
+            description: |
+              IPDeny publishes usage limits and copyright policy on its site. Review
+              those terms before mirroring, redistributing, or downloading more often
+              than needed.
+      configuration:
+        file:
+          name: netflow.yaml
+        options:
+          description: |
+            Once the downloader has produced an IPDeny-derived geo MMDB in the cache
+            directory, the plugin auto-detects it. To pin paths explicitly, set
+            `enrichment.geoip.geo_database` and keep `asn_database` pointed at your chosen
+            ASN provider.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: enrichment.geoip.asn_database
+              description: Optional ASN MMDB paths supplied by another provider.
+              default_value: "[]"
+              required: false
+            - name: enrichment.geoip.geo_database
+              description: Path to the IPDeny-derived geo MMDB. Empty = auto-detect from the cache directory.
+              default_value: "[]"
+              required: false
+            - name: enrichment.geoip.optional
+              description: When true, missing or unreadable MMDBs are warnings, not fatal at startup.
+              default_value: "false (true when auto-detected)"
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: After running the downloader with IPtoASN ASN and IPDeny country
+              folding:
+                enabled: false
+              description: Auto-detection picks up both generated cache files.
+              config: |
+                enrichment:
+                  geoip:
+                    asn_database: []
+                    geo_database: []
+                    optional: true
+            - name: Explicit IPDeny country path
+              folding:
+                enabled: true
+              description: Pin IPDeny for country and keep a separate ASN source.
+              config: |
+                enrichment:
+                  geoip:
+                    asn_database:
+                      - /var/cache/netdata/topology-ip-intel/topology-ip-asn.mmdb
+                    geo_database:
+                      - /var/cache/netdata/topology-ip-intel/topology-ip-geo.mmdb
+                    optional: false
+    troubleshooting:
+      problems:
+        list:
+          - name: IPv6 country fields are empty
+            description: |
+              The current built-in IPDeny downloader source uses the IPv4
+              `all-zones.tar.gz` archive. Use DB-IP, MaxMind, IP2Location, or a custom
+              MMDB if IPv6 country enrichment is required.
+          - name: ASN fields are empty
+            description: |
+              IPDeny zone files carry country CIDRs only. Configure a separate ASN
+              provider in the downloader.
+          - name: Download blocked or rate-limited
+            description: |
+              Check IPDeny's usage limits and retry later. The plugin continues using the
+              last generated MMDB file until the downloader publishes a replacement.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Enriches IPv4 flow records with country codes; produces no metrics of its own.
+        Verify on the Network Flows view via `SRC_COUNTRY` and `DST_COUNTRY`.
+      availability: []
+      scopes: []
+  - meta:
+      plugin_name: netflow-plugin
+      module_name: ipip
+      monitored_instance:
+        name: IPIP Country Database
+        link: https://en.ipip.net/about.html
+        categories:
+          - flows.enrichment-methods
+        icon_filename: network-wired.svg
+      keywords:
+        - ipip
+        - 17mon
+        - geoip
+        - country
+        - ip intelligence
+        - flow enrichment
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: netflow-plugin
+              module_name: dbip
+            - plugin_name: netflow-plugin
+              module_name: maxmind
+            - plugin_name: netflow-plugin
+              module_name: iptoasn
+            - plugin_name: netflow-plugin
+              module_name: custom-mmdb
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Enrich network flows with country codes from IPIP's country database. The
+          supported downloader source fetches IPIP's `country.zip` archive and reads the
+          `country.txt` file, where each line maps a prefix to a country token.
+
+          IPIP Country is country-only. The current `country.zip` source validated during
+          this work contained IPv4 prefixes only. It does not provide ASN, AS
+          organization, state, city, latitude, or longitude. Pair IPIP with another ASN
+          source when you also need AS fields, and use DB-IP, MaxMind, IP2Location, or a
+          custom MMDB when IPv6 country coverage is required.
+
+          For the IP-intelligence mechanism (lookup order, MMDB composition, refresh,
+          provider chains), see
+          [IP Intelligence](https://learn.netdata.cloud/docs/network-flows/enrichment).
+        method_description: |
+          The netflow plugin reads MMDB files only. Use Netdata's
+          `topology-ip-intel-downloader` to fetch the IPIP country ZIP, convert the
+          prefix list to `topology-ip-geo.mmdb`, and write the file into the standard
+          auto-detected cache directory. The plugin reloads the generated MMDB
+          automatically when the file changes.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "Not used by the default install. After the downloader writes `topology-ip-geo.mmdb` into the standard cache path, the plugin auto-detects the generated file."
+        limits:
+          description: "Country-only source. The currently validated `country.zip` payload is IPv4-only and carries no ASN, AS name, state, city, latitude, or longitude."
+        performance_impact:
+          description: "Lookups are local MMDB reads after conversion. Memory use is mostly the mapped database file and the kernel page cache needed to keep active pages hot."
+    setup:
+      prerequisites:
+        list:
+          - title: Downloader with IPIP support
+            description: |
+              Run the bundled downloader when available. Packaged 32-bit installs do not
+              include this binary:
+
+              ```bash
+              sudo /usr/sbin/topology-ip-intel-downloader \
+                --asn iptoasn:combined \
+                --geo ipip:country
+              ```
+
+              `ipip:country` is valid only for `--geo`. The example pairs it with
+              IPtoASN so the resulting cache contains both AS and country fields.
+          - title: IPIP data terms
+            description: |
+              Review IPIP's current terms before redistributing the data or generated
+              derivative files. The plugin consumes only the generated MMDB and does not
+              contact IPIP during flow decoding.
+      configuration:
+        file:
+          name: netflow.yaml
+        options:
+          description: |
+            Once the downloader has produced an IPIP-derived geo MMDB in the cache
+            directory, the plugin auto-detects it. To pin paths explicitly, set
+            `enrichment.geoip.geo_database` and keep `asn_database` pointed at your chosen
+            ASN provider.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: enrichment.geoip.asn_database
+              description: Optional ASN MMDB paths supplied by another provider.
+              default_value: "[]"
+              required: false
+            - name: enrichment.geoip.geo_database
+              description: Path to the IPIP-derived geo MMDB. Empty = auto-detect from the cache directory.
+              default_value: "[]"
+              required: false
+            - name: enrichment.geoip.optional
+              description: When true, missing or unreadable MMDBs are warnings, not fatal at startup.
+              default_value: "false (true when auto-detected)"
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: After running the downloader with IPtoASN ASN and IPIP country
+              folding:
+                enabled: false
+              description: Auto-detection picks up both generated cache files.
+              config: |
+                enrichment:
+                  geoip:
+                    asn_database: []
+                    geo_database: []
+                    optional: true
+            - name: Explicit IPIP country path
+              folding:
+                enabled: true
+              description: Pin IPIP for country and keep a separate ASN source.
+              config: |
+                enrichment:
+                  geoip:
+                    asn_database:
+                      - /var/cache/netdata/topology-ip-intel/topology-ip-asn.mmdb
+                    geo_database:
+                      - /var/cache/netdata/topology-ip-intel/topology-ip-geo.mmdb
+                    optional: false
+    troubleshooting:
+      problems:
+        list:
+          - name: IPv6 country fields are empty
+            description: |
+              The currently validated IPIP `country.zip` source contains IPv4 prefixes.
+              Use DB-IP, MaxMind, IP2Location, or a custom MMDB if IPv6 country
+              enrichment is required.
+          - name: ASN fields are empty
+            description: |
+              IPIP country data carries country prefixes only. Configure a separate ASN
+              provider in the downloader.
+          - name: City or coordinates are empty
+            description: |
+              The supported IPIP source is country-only. Use DB-IP city-lite, MaxMind
+              GeoLite2 City, GeoIP2 City, or a custom MMDB for richer geo fields.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Enriches flow records with country codes; produces no metrics of its own.
+        Verify on the Network Flows view via `SRC_COUNTRY` and `DST_COUNTRY`.
+      availability: []
+      scopes: []
+  - meta:
+      plugin_name: netflow-plugin
       module_name: custom-mmdb
       monitored_instance:
         name: Custom MMDB Database
@@ -1148,6 +1838,14 @@ modules:
               module_name: maxmind
             - plugin_name: netflow-plugin
               module_name: iptoasn
+            - plugin_name: netflow-plugin
+              module_name: caida-prefix2as
+            - plugin_name: netflow-plugin
+              module_name: ip2location
+            - plugin_name: netflow-plugin
+              module_name: ipdeny
+            - plugin_name: netflow-plugin
+              module_name: ipip
       info_provided_to_referring_integrations:
         description: ""
     overview:
