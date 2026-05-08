@@ -214,9 +214,9 @@ func (c *Collector) walkBGPTableDependencies(
 			errs = append(errs, fmt.Errorf("table OID %q: %w", depOID, err))
 			continue
 		}
+		walkedData[depOID] = pdus
 		if len(pdus) > 0 {
 			stats.SNMP.TablesWalked++
-			walkedData[depOID] = pdus
 		}
 	}
 	return errors.Join(errs...)
@@ -306,6 +306,9 @@ func (c *Collector) buildScalarBGPRow(cfg ddprofiledefinition.BGPConfig, pdus ma
 	if !bgpRowHasSignals(row) {
 		return ddsnmp.BGPRow{}, false, nil
 	}
+	if !bgpRowIdentityComplete(row) {
+		return ddsnmp.BGPRow{}, false, nil
+	}
 
 	return row, true, nil
 }
@@ -371,6 +374,9 @@ func (c *Collector) buildTableBGPRowWithTags(cfg ddprofiledefinition.BGPConfig, 
 	}
 
 	if !bgpRowHasSignals(row) {
+		return ddsnmp.BGPRow{}, false, nil
+	}
+	if !bgpRowIdentityComplete(row) {
 		return ddsnmp.BGPRow{}, false, nil
 	}
 
@@ -937,6 +943,17 @@ func (c *Collector) lookupBGPValuePDU(cfg ddprofiledefinition.BGPValueConfig, sy
 	if err != nil {
 		return gosnmp.SnmpPDU{}, "", false, err
 	}
+	tagCfg := ddprofiledefinition.MetricTagConfig{
+		Table:        cfg.Table,
+		Symbol:       ddprofiledefinition.SymbolConfigCompat(sym),
+		LookupSymbol: cfg.LookupSymbol,
+	}
+	if c.tableCollector.rowProcessor.crossTableResolver.requiresLookupByValue(tagCfg) {
+		lookupIndex, err = c.tableCollector.rowProcessor.crossTableResolver.resolveLookupIndexByValue(tagCfg, lookupIndex, refTableOID, refTablePDUs, ctx.crossTableCtx)
+		if err != nil {
+			return gosnmp.SnmpPDU{}, "", false, err
+		}
+	}
 
 	fullOID := sourceOID + "." + lookupIndex
 	pdu, ok := refTablePDUs[fullOID]
@@ -1049,6 +1066,9 @@ func bgpTableNameToOID(configs []ddprofiledefinition.BGPConfig) map[string]strin
 				return
 			}
 			if oid := bgpValueSymbol(valueCfg).OID; oid != "" {
+				crossTableOIDs[valueCfg.Table] = append(crossTableOIDs[valueCfg.Table], oid)
+			}
+			if oid := ddprofiledefinition.SymbolConfig(valueCfg.LookupSymbol).OID; oid != "" {
 				crossTableOIDs[valueCfg.Table] = append(crossTableOIDs[valueCfg.Table], oid)
 			}
 		})
@@ -1217,6 +1237,20 @@ func bgpRowHasSignals(row ddsnmp.BGPRow) bool {
 		row.RouteLimits.ClearThreshold.Has ||
 		row.Device.Peers.Has ||
 		row.Device.ByStateHas
+}
+
+func bgpRowIdentityComplete(row ddsnmp.BGPRow) bool {
+	switch row.Kind {
+	case ddprofiledefinition.BGPRowKindPeer:
+		return row.Identity.Neighbor != "" && row.Identity.RemoteAS != ""
+	case ddprofiledefinition.BGPRowKindPeerFamily:
+		return row.Identity.Neighbor != "" &&
+			row.Identity.RemoteAS != "" &&
+			row.Identity.AddressFamily != "" &&
+			row.Identity.SubsequentAddressFamily != ""
+	default:
+		return true
+	}
 }
 
 func bgpConnectionHasSignals(v ddsnmp.BGPConnection) bool {

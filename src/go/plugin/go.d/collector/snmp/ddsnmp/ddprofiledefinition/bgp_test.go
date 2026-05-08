@@ -40,6 +40,8 @@ bgp:
           items: { 1: idle, 2: connect, 3: active, 4: opensent, 5: openconfirm, 6: established }
     connection:
       established_uptime:
+        table: bgpPeerTimesTable
+        lookup_symbol: { OID: 1.3.6.1.2.1.15.3.1.8, name: bgpPeerIndex }
         symbol: { OID: 1.3.6.1.2.1.15.3.1.16, name: bgpPeerFsmEstablishedTime }
 `), &profile)
 
@@ -50,6 +52,7 @@ bgp:
 	assert.Equal(t, BGPRowKindPeer, profile.BGP[0].Kind)
 	assert.Equal(t, "bgpPeerRemoteAddr", profile.BGP[0].Identity.Neighbor.Symbol.Name)
 	assert.Equal(t, "bgpPeerFsmEstablishedTime", profile.BGP[0].Connection.EstablishedUptime.Symbol.Name)
+	assert.Equal(t, "bgpPeerIndex", SymbolConfig(profile.BGP[0].Connection.EstablishedUptime.LookupSymbol).Name)
 	require.Len(t, profile.MetricTags, 1)
 	assert.Equal(t, ConsumerSet{ConsumerBGP}, profile.MetricTags[0].Consumers)
 }
@@ -87,7 +90,11 @@ func TestProfileDefinition_CloneBGP(t *testing.T) {
 				},
 				Routes: BGPRoutesConfig{
 					Current: BGPRouteCountersConfig{
-						Accepted: BGPValueConfig{Symbol: SymbolConfig{OID: "1.2.4.1", Name: "acceptedPrefixes"}},
+						Accepted: BGPValueConfig{
+							Table:        "peerTable",
+							LookupSymbol: SymbolConfigCompat(SymbolConfig{OID: "1.2.3.14", Name: "peerIndex"}),
+							Symbol:       SymbolConfig{OID: "1.2.4.1", Name: "acceptedPrefixes"},
+						},
 					},
 				},
 				MetricTags: MetricTagConfigList{
@@ -102,11 +109,13 @@ func TestProfileDefinition_CloneBGP(t *testing.T) {
 
 	cloned.BGP[0].State.Symbol.Mapping.Items["1"] = "broken"
 	cloned.BGP[0].Routes.Current.Accepted.Symbol.Name = "brokenPrefixes"
+	cloned.BGP[0].Routes.Current.Accepted.LookupSymbol.Name = "brokenPeerIndex"
 	cloned.BGP[0].MetricTags[0].IndexTransform[0].Start = 2
 	cloned.BGP[0].Identity.AddressFamily.IndexFromEnd = 3
 
 	assert.Equal(t, "idle", profile.BGP[0].State.Symbol.Mapping.Items["1"])
 	assert.Equal(t, "acceptedPrefixes", profile.BGP[0].Routes.Current.Accepted.Symbol.Name)
+	assert.Equal(t, "peerIndex", profile.BGP[0].Routes.Current.Accepted.LookupSymbol.Name)
 	assert.Equal(t, uint(1), profile.BGP[0].MetricTags[0].IndexTransform[0].Start)
 	assert.Equal(t, uint(2), profile.BGP[0].Identity.AddressFamily.IndexFromEnd)
 }
@@ -224,6 +233,34 @@ func TestValidateEnrichProfile_BGP(t *testing.T) {
 				},
 			},
 			wantErrContains: []string{"bgp[0].identity.remote_as.table: table lookups require symbol.OID, OID, or from"},
+		},
+		"forbids lookup symbol without table": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					{
+						ID:    "peer-family",
+						Kind:  BGPRowKindPeerFamily,
+						Table: SymbolConfig{OID: "1.2.3", Name: "peerFamilyTable"},
+						Identity: BGPIdentityConfig{
+							Neighbor: BGPValueConfig{Value: "192.0.2.1"},
+							RemoteAS: BGPValueConfig{
+								Symbol:       SymbolConfig{OID: "1.2.3.1", Name: "remoteAS"},
+								LookupSymbol: SymbolConfigCompat(SymbolConfig{OID: "1.2.4.1", Name: "peerIndex"}),
+							},
+							AddressFamily: BGPAddressFamilyValueConfig{BGPValueConfig: BGPValueConfig{Value: "ipv4"}},
+							SubsequentAddressFamily: BGPSubsequentAddressFamilyValueConfig{
+								BGPValueConfig: BGPValueConfig{Value: "unicast"},
+							},
+						},
+						Routes: BGPRoutesConfig{
+							Current: BGPRouteCountersConfig{
+								Accepted: BGPValueConfig{Symbol: SymbolConfig{OID: "1.2.3.2", Name: "acceptedPrefixes"}},
+							},
+						},
+					},
+				},
+			},
+			wantErrContains: []string{"bgp[0].identity.remote_as.lookup_symbol: lookup_symbol requires table"},
 		},
 		"forbids incomplete state mapping unless partial": {
 			profile: ProfileDefinition{
@@ -498,6 +535,7 @@ func validBGPPeerFamilyRowWithCrossTableSource() BGPConfig {
 	row.Identity.RemoteAS = BGPValueConfig{
 		Table:          "bgpPeerTable",
 		IndexTransform: []MetricIndexTransform{{Start: 0, DropRight: 2}},
+		LookupSymbol:   SymbolConfigCompat(SymbolConfig{OID: "1.2.4.1.1", Name: "peerIndex"}),
 		Symbol: SymbolConfig{
 			OID:  "1.2.4.1.2",
 			Name: "remoteAS",

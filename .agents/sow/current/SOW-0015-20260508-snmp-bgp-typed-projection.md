@@ -392,6 +392,14 @@ Open decisions:
   - Included `config/go.d/snmp.profiles/default/cisco-ncs.yaml` in the slice because this SOW claims the new NCS profile.
   - Added repo-root `/mibs/` to `.gitignore` so local raw MIB audit files remain uncommitted.
   - Accepted remaining schema/spec/runtime hygiene findings as SOW-close items, not commit blockers for this slice.
+- Migrated Juniper BGP to typed rows:
+  - `_juniper-bgp4-v2.yaml` now declares typed peer and peer-family BGP rows instead of raw `metrics:`/`virtual_metrics:`.
+  - Juniper base/router profiles no longer extend `_juniper-bgp-virtual.yaml`; the old virtual-metric path is no longer referenced.
+  - `BGPValueConfig.lookup_symbol` now supports typed BGP cross-table value lookups, needed because Juniper prefix counters are keyed by peer ID while peer identity lives in `jnxBgpM2PeerTable`.
+  - Empty successful BGP dependency walks are cached as empty walked tables, so optional augmented tables do not drop otherwise valid peer rows.
+  - Runtime BGP rows are skipped when required identity fields are missing at collection time.
+  - Added BGP projection coverage to `collector/snmp/ddsnmp/profile_test.go`.
+  - Reworked Juniper fixture tests to assert typed `BGPRows` from BGP-projected profiles and refactored similar test cases to `map[string]struct{}` tables.
 
 ## Validation
 
@@ -432,6 +440,10 @@ Tests or equivalent validation:
 - `go test -count=1 ./collector/snmp/ddsnmp -run 'Test_CiscoBGPProfileMergedIntoCiscoCatalyst|Test_CiscoGenericProfilesDoNotInheritBGP|Test_CiscoBGPProfileMergedIntoCiscoASR|Test_CiscoBgpPrefixProfileMergedIntoCiscoASR'` passed on 2026-05-08 after Decision 23A.
 - `go test -count=1 ./collector/snmp/ddsnmp/...` passed on 2026-05-08 after Decision 23A.
 - `go test -count=1 ./collector/snmp/...` passed on 2026-05-08 after Decision 23A.
+- `go test -count=1 ./collector/snmp/ddsnmp ./collector/snmp/ddsnmp/ddprofiledefinition ./collector/snmp/ddsnmp/ddsnmpcollector` passed on 2026-05-08 after the Juniper typed-profile migration and BGP projection test refactor.
+- `go test -count=1 ./collector/snmp` passed on 2026-05-08 after the Juniper typed-profile migration and BGP projection test refactor.
+- `go test -count=1 ./collector/snmp/...` passed on 2026-05-08 after the Juniper typed-profile migration and BGP projection test refactor.
+- `go test -race -count=1 ./collector/snmp` passed on 2026-05-08 after the Juniper typed-profile migration and BGP projection test refactor.
 
 Real-use evidence:
 

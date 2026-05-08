@@ -176,23 +176,29 @@ func Test_FindProfiles(t *testing.T) {
 
 func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *testing.T) {
 	tests := map[string]struct {
+		sysObjectID       string
 		consumer          ProfileConsumer
 		consumers         []ProfileConsumer
 		wantMetrics       []string
 		wantTopologyKinds []ddprofiledefinition.TopologyKind
 		wantLicensingIDs  []string
+		wantBGPIDs        []string
 		wantNoMetrics     bool
 		wantNoTopology    bool
 		wantNoLicensing   bool
+		wantNoBGP         bool
 	}{
 		"metrics_projection": {
+			sysObjectID:     "1.3.6.1.4.1.9.1.1",
 			consumer:        ConsumerMetrics,
 			wantMetrics:     []string{"systemUptime", "tcpCurrEstab", "cpmCPUTotal5minRev"},
 			wantNoTopology:  true,
 			wantNoLicensing: true,
+			wantNoBGP:       true,
 		},
 		"topology_projection": {
-			consumer: ConsumerTopology,
+			sysObjectID: "1.3.6.1.4.1.9.1.1",
+			consumer:    ConsumerTopology,
 			wantTopologyKinds: []ddprofiledefinition.TopologyKind{
 				ddprofiledefinition.KindLldpRem,
 				ddprofiledefinition.KindCdpCache,
@@ -203,9 +209,11 @@ func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *te
 			},
 			wantNoMetrics:   true,
 			wantNoLicensing: true,
+			wantNoBGP:       true,
 		},
 		"licensing_projection": {
-			consumer: ConsumerLicensing,
+			sysObjectID: "1.3.6.1.4.1.9.1.1",
+			consumer:    ConsumerLicensing,
 			wantLicensingIDs: []string{
 				"cisco_traditional_licenses",
 				"smart_registration",
@@ -216,8 +224,18 @@ func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *te
 			},
 			wantNoMetrics:  true,
 			wantNoTopology: true,
+			wantNoBGP:      true,
+		},
+		"bgp_projection": {
+			sysObjectID:     "1.3.6.1.4.1.9.1.923",
+			consumer:        ConsumerBGP,
+			wantBGPIDs:      []string{"cisco-bgp-peer", "cisco-bgp-peer-family"},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
 		},
 		"metrics_and_licensing_projection": {
+			sysObjectID: "1.3.6.1.4.1.9.1.1",
 			consumer:    ConsumerMetrics,
 			consumers:   []ProfileConsumer{ConsumerLicensing},
 			wantMetrics: []string{"systemUptime", "tcpCurrEstab", "cpmCPUTotal5minRev"},
@@ -230,13 +248,14 @@ func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *te
 				"smart_entitlements",
 			},
 			wantNoTopology: true,
+			wantNoBGP:      true,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			profiles := DefaultCatalog().Resolve(ResolveRequest{
-				SysObjectID:  "1.3.6.1.4.1.9.1.1",
+				SysObjectID:  tc.sysObjectID,
 				ManualPolicy: ManualProfileFallback,
 			}).Project(tc.consumer, tc.consumers...).Profiles()
 			require.NotEmpty(t, profiles)
@@ -244,6 +263,7 @@ func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *te
 			metricNames := make(map[string]bool)
 			topologyKinds := make(map[ddprofiledefinition.TopologyKind]bool)
 			licensingIDs := make(map[string]bool)
+			bgpIDs := make(map[string]bool)
 
 			for _, prof := range profiles {
 				require.NotNil(t, prof.Definition)
@@ -256,6 +276,9 @@ func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *te
 				}
 				if tc.wantNoLicensing {
 					assert.Empty(t, prof.Definition.Licensing, prof.SourceFile)
+				}
+				if tc.wantNoBGP {
+					assert.Empty(t, prof.Definition.BGP, prof.SourceFile)
 				}
 
 				for _, metric := range prof.Definition.Metrics {
@@ -272,6 +295,9 @@ func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *te
 				for _, row := range prof.Definition.Licensing {
 					licensingIDs[row.ID] = true
 				}
+				for _, row := range prof.Definition.BGP {
+					bgpIDs[row.ID] = true
+				}
 			}
 
 			for _, metricName := range tc.wantMetrics {
@@ -282,6 +308,9 @@ func TestDefaultCatalogResolveProject_LoadedCiscoProfileSeparatesConsumers(t *te
 			}
 			for _, id := range tc.wantLicensingIDs {
 				assert.True(t, licensingIDs[id], "missing licensing row %q", id)
+			}
+			for _, id := range tc.wantBGPIDs {
+				assert.True(t, bgpIDs[id], "missing BGP row %q", id)
 			}
 		})
 	}

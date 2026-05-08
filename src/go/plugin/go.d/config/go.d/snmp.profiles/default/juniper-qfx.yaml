@@ -1,5 +1,4 @@
 extends:
-  - _juniper-bgp-virtual.yaml
   - _juniper-bgp4-v2.yaml
   - _std-host-resources-mib.yaml
   - _std-if-mib.yaml

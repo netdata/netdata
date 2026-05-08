@@ -27,20 +27,6 @@ func Test_BGPVirtualMetricContracts_ByProfile(t *testing.T) {
 		profileFile string
 		virtuals    map[string][]ddprofiledefinition.VirtualMetricSourceConfig
 	}{
-		"Juniper MX overrides generic contract with Juniper peer tables": {
-			sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.21",
-			profileFile: "juniper-mx.yaml",
-			virtuals: map[string][]ddprofiledefinition.VirtualMetricSourceConfig{
-				"bgpPeerAvailability": {
-					{Metric: "bgpPeerAdminStatus", Table: "jnxBgpM2PeerTable", As: "admin_enabled", Dim: "running"},
-					{Metric: "bgpPeerState", Table: "jnxBgpM2PeerTable", As: "established", Dim: "established"},
-				},
-				"bgpPeerUpdates": {
-					{Metric: "bgpPeerInUpdates", Table: "jnxBgpM2PeerCountersTable", As: "received"},
-					{Metric: "bgpPeerOutUpdates", Table: "jnxBgpM2PeerCountersTable", As: "sent"},
-				},
-			},
-		},
 		"Nokia SR OS overrides generic contract with TiMOS peer tables": {
 			sysObjectID: "1.3.6.1.4.1.6527.1.3.17",
 			profileFile: "nokia-service-router-os.yaml",

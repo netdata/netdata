@@ -1233,7 +1233,7 @@ metrics:
 
 **Important behavior**:
 
-- `lookup_symbol` is used only for **cross-table tags**
+- `lookup_symbol` is used for **cross-table tags** and typed BGP value fields
 - it works together with `index_transform`, not instead of it
 - if no row matches, the tag lookup fails for that row
 - if one row matches, the collector reads the requested tag from that row
@@ -1346,6 +1346,14 @@ Typed BGP value fields also support `index_from_end: N`, where `N` is
 1-based from the right side of the row index. Use it only when the target
 INDEX component is a trailing component after a variable-length field, such as
 AFI/SAFI after an `InetAddress` peer address.
+
+Typed BGP cross-table value fields can also use `lookup_symbol` with
+`table:` and `index_transform:`. This is needed when a BGP peer-family table is
+indexed by a compact peer ID, but peer identity fields such as neighbor and
+remote AS live in a peer table keyed by a different composite index. The
+collector extracts the lookup value from the current row index, finds the row
+in the referenced table whose `lookup_symbol` column has that value, and then
+reads the requested typed value symbol from the matched row.
 
 Examples:
 

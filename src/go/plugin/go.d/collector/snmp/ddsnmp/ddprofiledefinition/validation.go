@@ -1059,6 +1059,14 @@ func validateEnrichBGPValue(path string, value *BGPValueConfig, isTable bool) er
 	if value.Table != "" && bgpValueSymbolForValidation(*value).OID == "" {
 		errs = append(errs, fmt.Errorf("%s.table: table lookups require symbol.OID, OID, or from", path))
 	}
+	if value.LookupSymbol.OID != "" || value.LookupSymbol.Name != "" {
+		if value.Table == "" {
+			errs = append(errs, fmt.Errorf("%s.lookup_symbol: lookup_symbol requires table", path))
+		}
+		lookupSymbol := SymbolConfig(value.LookupSymbol)
+		errs = append(errs, validateEnrichBGPSymbol(path+".lookup_symbol", &lookupSymbol))
+		value.LookupSymbol = SymbolConfigCompat(lookupSymbol)
+	}
 	if value.Symbol.OID != "" || value.Symbol.Name != "" {
 		errs = append(errs, validateEnrichBGPSymbol(path, &value.Symbol))
 	}

@@ -44,14 +44,20 @@ func Test_LibreNMSCumulusIdentity_MatchesStandardBGPProjection(t *testing.T) {
 func Test_LibreNMSJuniperVMXFixture_MatchesJuniperMXBGPProfile(t *testing.T) {
 	profile := matchedProfileFromIdentityFixture(t, "junos_vmx_identity.json", "juniper-mx.yaml")
 
-	assertVirtualSources(t, profile, "bgpPeerAvailability", []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerAdminStatus", Table: "jnxBgpM2PeerTable", As: "admin_enabled", Dim: "running"},
-		{Metric: "bgpPeerState", Table: "jnxBgpM2PeerTable", As: "established", Dim: "established"},
-	})
-	assertVirtualSources(t, profile, "bgpPeerUpdates", []ddprofiledefinition.VirtualMetricSourceConfig{
-		{Metric: "bgpPeerInUpdates", Table: "jnxBgpM2PeerCountersTable", As: "received"},
-		{Metric: "bgpPeerOutUpdates", Table: "jnxBgpM2PeerCountersTable", As: "sent"},
-	})
+	require.Len(t, profile.Definition.BGP, 2)
+
+	peer := requireBGPRowByID(t, profile, "juniper-bgp-peer")
+	assert.Equal(t, "_juniper-bgp4-v2.yaml", peer.OriginProfileID)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeer, peer.Kind)
+	assert.Equal(t, "jnxBgpM2PeerTable", peer.Table.Name)
+	assert.Equal(t, "jnxBgpM2PeerCountersTable", peer.Traffic.Updates.Received.Table)
+
+	family := requireBGPRowByID(t, profile, "juniper-bgp-peer-family")
+	assert.Equal(t, "_juniper-bgp4-v2.yaml", family.OriginProfileID)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeerFamily, family.Kind)
+	assert.Equal(t, "jnxBgpM2PrefixCountersTable", family.Table.Name)
+	assert.Equal(t, "jnxBgpM2PeerTable", family.Identity.RemoteAS.Table)
+	assert.Equal(t, "jnxBgpM2PeerIndex", family.Identity.RemoteAS.LookupSymbol.Name)
 }
 
 func Test_LibreNMSTiMOSIXRSFixture_MatchesNokiaSROSBGPProfile(t *testing.T) {
@@ -134,4 +140,15 @@ func requireVirtualMetric(t *testing.T, profile *Profile, name string) ddprofile
 	require.NotEqual(t, -1, vmIndex, "expected virtual metric %s", name)
 
 	return profile.Definition.VirtualMetrics[vmIndex]
+}
+
+func requireBGPRowByID(t *testing.T, profile *Profile, id string) ddprofiledefinition.BGPConfig {
+	t.Helper()
+
+	rowIndex := slices.IndexFunc(profile.Definition.BGP, func(row ddprofiledefinition.BGPConfig) bool {
+		return row.ID == id
+	})
+	require.NotEqual(t, -1, rowIndex, "expected typed BGP row %s", id)
+
+	return profile.Definition.BGP[rowIndex]
 }

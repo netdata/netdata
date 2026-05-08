@@ -248,6 +248,15 @@ identity:
       name: vendorBgpPeerRemoteAs
 ```
 
+If the referenced table is keyed differently, a typed BGP value may also use
+`lookup_symbol:`. The collector first derives a lookup value from the current
+row index with `index_transform:`, scans the referenced table for a row whose
+`lookup_symbol` column has that value, and then reads the requested typed
+`symbol` from the matched row. This is required for MIBs such as Juniper
+BGP4-V2 where peer-family counters are indexed by peer ID, AFI, and SAFI while
+peer identity is stored in a peer table keyed by routing-instance/local/remote
+address components.
+
 Cross-table typed values are internal BGP row sources. They do not require
 synthetic metric labels and must not reintroduce underscore-prefixed side
 protocols. Scalar BGP rows cannot use `table:` sources.
@@ -442,6 +451,7 @@ Profile validation rejects:
   `index_from_end:`, or `index_transform:`;
 - BGP cross-table value sources without a referenced table, source OID, or
   valid index transform;
+- BGP `lookup_symbol` value sources without a referenced table;
 - underscore-prefixed BGP value names;
 - regular metric chart/export-only fields, transforms, scale factors, and
   constant-value hacks on BGP row value symbols;

@@ -17,84 +17,15 @@ import (
 )
 
 func TestCollector_Collect_BGPAlertSurface_FromMatchedProfiles(t *testing.T) {
-	type scenario struct {
-		name        string
+	tests := map[string]struct {
 		sysObjectID string
 		profileFile string
 		tables      map[string][]string
 		virtuals    []string
 		walks       func(t *testing.T, p *ddsnmp.Profile) map[string][]gosnmp.SnmpPDU
 		assertions  func(t *testing.T, metrics []ddsnmp.Metric)
-	}
-
-	tests := []scenario{
-		{
-			name:        "Juniper MX emits the common contract and accepted prefixes",
-			sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.21",
-			profileFile: "juniper-mx.yaml",
-			tables: map[string][]string{
-				"jnxBgpM2PeerTable":           {"bgpPeerAdminStatus", "bgpPeerState"},
-				"jnxBgpM2PeerCountersTable":   {"bgpPeerInUpdates", "bgpPeerOutUpdates", "bgpPeerFsmEstablishedTransitions"},
-				"jnxBgpM2PrefixCountersTable": {"bgpPeerPrefixesAccepted"},
-			},
-			virtuals: []string{"bgpPeerAvailability", "bgpPeerUpdates"},
-			walks: func(t *testing.T, p *ddsnmp.Profile) map[string][]gosnmp.SnmpPDU {
-				peerIdx := "101"
-				prefixIdx := "101.1.128"
-				return map[string][]gosnmp.SnmpPDU{
-					"jnxBgpM2PeerTable": {
-						createIntegerPDU(oidWithIndex(requireSymbolOID(t, p, "jnxBgpM2PeerTable", "bgpPeerAdminStatus"), peerIdx), 2),
-						createIntegerPDU(oidWithIndex(requireSymbolOID(t, p, "jnxBgpM2PeerTable", "bgpPeerState"), peerIdx), 6),
-						createPDU(oidWithIndex(requireMetricTagOID(t, p, "jnxBgpM2PeerTable", "routing_instance"), peerIdx), gosnmp.OctetString, []byte("blue")),
-						createIntegerPDU(oidWithIndex(requireMetricTagOID(t, p, "jnxBgpM2PeerTable", "neighbor_address_type"), peerIdx), 1),
-						createPDU(oidWithIndex(requireMetricTagOID(t, p, "jnxBgpM2PeerTable", "neighbor"), peerIdx), gosnmp.OctetString, []byte{192, 0, 2, 11}),
-						createPDU(oidWithIndex(requireMetricTagOID(t, p, "jnxBgpM2PeerTable", "local_address"), peerIdx), gosnmp.OctetString, []byte{198, 51, 100, 11}),
-						createGauge32PDU(oidWithIndex(requireMetricTagOID(t, p, "jnxBgpM2PeerTable", "local_as"), peerIdx), 65000),
-						createGauge32PDU(oidWithIndex(requireMetricTagOID(t, p, "jnxBgpM2PeerTable", "remote_as"), peerIdx), 65001),
-						createPDU(oidWithIndex(requireMetricTagOID(t, p, "jnxBgpM2PeerTable", "peer_identifier"), peerIdx), gosnmp.OctetString, []byte{203, 0, 113, 11}),
-						createIntegerPDU(oidWithIndex(requireMetricTagOID(t, p, "jnxBgpM2PeerTable", "bgp_version"), peerIdx), 4),
-						createGauge32PDU(oidWithIndex(requireCrossTableLookupOID(t, p, "jnxBgpM2PrefixCountersTable", "routing_instance"), peerIdx), 101),
-					},
-					"jnxBgpM2PeerCountersTable": {
-						createCounter32PDU(oidWithIndex(requireSymbolOID(t, p, "jnxBgpM2PeerCountersTable", "bgpPeerInUpdates"), peerIdx), 14),
-						createCounter32PDU(oidWithIndex(requireSymbolOID(t, p, "jnxBgpM2PeerCountersTable", "bgpPeerOutUpdates"), peerIdx), 28),
-						createCounter32PDU(oidWithIndex(requireSymbolOID(t, p, "jnxBgpM2PeerCountersTable", "bgpPeerFsmEstablishedTransitions"), peerIdx), 4),
-					},
-					"jnxBgpM2PrefixCountersTable": {
-						createGauge32PDU(oidWithIndex(requireSymbolOID(t, p, "jnxBgpM2PrefixCountersTable", "bgpPeerPrefixesAccepted"), prefixIdx), 1200),
-					},
-				}
-			},
-			assertions: func(t *testing.T, metrics []ddsnmp.Metric) {
-				availability := requireMetricWithTags(t, metrics, "bgpPeerAvailability", map[string]string{
-					"routing_instance": "blue",
-					"neighbor":         "192.0.2.11",
-					"remote_as":        "65001",
-				})
-				assert.Equal(t, map[string]int64{"admin_enabled": 1, "established": 1}, availability.MultiValue)
-
-				updates := requireMetricWithTags(t, metrics, "bgpPeerUpdates", map[string]string{
-					"routing_instance": "blue",
-					"neighbor":         "192.0.2.11",
-				})
-				assert.Equal(t, map[string]int64{"received": 14, "sent": 28}, updates.MultiValue)
-
-				transitions := requireMetricWithTags(t, metrics, "bgpPeerFsmEstablishedTransitions", map[string]string{
-					"routing_instance": "blue",
-					"neighbor":         "192.0.2.11",
-				})
-				assert.EqualValues(t, 4, transitions.Value)
-
-				accepted := requireMetricWithTags(t, metrics, "bgpPeerPrefixesAccepted", map[string]string{
-					"neighbor":                  "192.0.2.11",
-					"address_family":            "ipv4",
-					"subsequent_address_family": "vpn",
-				})
-				assert.EqualValues(t, 1200, accepted.Value)
-			},
-		},
-		{
-			name:        "Nokia SR OS emits the common contract from TiMOS peer tables and keeps family gauges labeled",
+	}{
+		"Nokia SR OS emits the common contract from TiMOS peer tables and keeps family gauges labeled": {
 			sysObjectID: "1.3.6.1.4.1.6527.1.3.17",
 			profileFile: "nokia-service-router-os.yaml",
 			tables: map[string][]string{
@@ -166,8 +97,7 @@ func TestCollector_Collect_BGPAlertSurface_FromMatchedProfiles(t *testing.T) {
 				assert.EqualValues(t, 2, rejected.Value)
 			},
 		},
-		{
-			name:        "Arista switch emits the common contract and accepted prefixes with a neighbor label derived from the row index",
+		"Arista switch emits the common contract and accepted prefixes with a neighbor label derived from the row index": {
 			sysObjectID: "1.3.6.1.4.1.30065.1.3011.7010.427.48",
 			profileFile: "arista-switch.yaml",
 			tables: map[string][]string{
@@ -226,8 +156,7 @@ func TestCollector_Collect_BGPAlertSurface_FromMatchedProfiles(t *testing.T) {
 				assert.EqualValues(t, 1300, accepted.Value)
 			},
 		},
-		{
-			name:        "Dell OS10 emits the common contract and accepted prefixes with a neighbor label derived from the row index",
+		"Dell OS10 emits the common contract and accepted prefixes with a neighbor label derived from the row index": {
 			sysObjectID: "1.3.6.1.4.1.674.11000.5000.100.2.1.1",
 			profileFile: "dell-os10.yaml",
 			tables: map[string][]string{
@@ -286,8 +215,7 @@ func TestCollector_Collect_BGPAlertSurface_FromMatchedProfiles(t *testing.T) {
 				assert.EqualValues(t, 1400, accepted.Value)
 			},
 		},
-		{
-			name:        "Huawei routers emit standardized alert tags and keep AFI/SAFI rows separate",
+		"Huawei routers emit standardized alert tags and keep AFI/SAFI rows separate": {
 			sysObjectID: "1.3.6.1.4.1.2011.2.224.279",
 			profileFile: "huawei-routers.yaml",
 			tables: map[string][]string{
@@ -375,8 +303,8 @@ func TestCollector_Collect_BGPAlertSurface_FromMatchedProfiles(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			profile := matchedProfileByFile(t, tc.sysObjectID, tc.profileFile)
 			filterProfileForAlertSurface(profile, tc.tables, tc.virtuals)
 

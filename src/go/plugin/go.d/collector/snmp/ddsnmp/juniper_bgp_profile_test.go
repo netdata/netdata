@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 func Test_JuniperBGPProfilesUseOnlyJuniperPeerTables(t *testing.T) {
@@ -23,20 +22,19 @@ func Test_JuniperBGPProfilesUseOnlyJuniperPeerTables(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, profiles)
 
-	tests := []struct {
-		name        string
+	tests := map[string]struct {
 		sysObjectID string
 		profileFile string
 	}{
-		{name: "generic Juniper", sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.9999", profileFile: "juniper.yaml"},
-		{name: "Juniper MX", sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.21", profileFile: "juniper-mx.yaml"},
-		{name: "Juniper EX", sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.30", profileFile: "juniper-ex.yaml"},
-		{name: "Juniper QFX", sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.82", profileFile: "juniper-qfx.yaml"},
-		{name: "Juniper SRX", sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.26", profileFile: "juniper-srx.yaml"},
+		"generic Juniper": {sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.9999", profileFile: "juniper.yaml"},
+		"Juniper MX":      {sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.21", profileFile: "juniper-mx.yaml"},
+		"Juniper EX":      {sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.30", profileFile: "juniper-ex.yaml"},
+		"Juniper QFX":     {sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.82", profileFile: "juniper-qfx.yaml"},
+		"Juniper SRX":     {sysObjectID: "1.3.6.1.4.1.2636.1.1.1.2.26", profileFile: "juniper-srx.yaml"},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			matched := FindProfiles(tc.sysObjectID, "", nil)
 			index := slices.IndexFunc(matched, func(p *Profile) bool {
 				return strings.HasSuffix(p.SourceFile, tc.profileFile)
@@ -45,10 +43,12 @@ func Test_JuniperBGPProfilesUseOnlyJuniperPeerTables(t *testing.T) {
 
 			profile := matched[index]
 			assertNoMetricTable(t, profile, "bgpPeerTable")
-			assertMetricTableForSymbol(t, profile, "bgpPeerState", "jnxBgpM2PeerTable")
-			assertMetricTableForSymbol(t, profile, "bgpPeerLastErrorCode", "jnxBgpM2PeerErrorsTable")
-			assertMetricTableForSymbol(t, profile, "bgpPeerInUpdates", "jnxBgpM2PeerCountersTable")
-			assertMetricTableForSymbol(t, profile, "bgpPeerFsmEstablishedTransitions", "jnxBgpM2PeerCountersTable")
+			assertNoMetricTable(t, profile, "jnxBgpM2PeerTable")
+			assertNoMetricTable(t, profile, "jnxBgpM2PeerCountersTable")
+			assertNoVirtualMetric(t, profile, "bgpPeerAvailability")
+			assertNoVirtualMetric(t, profile, "bgpPeerUpdates")
+			assertBGPTableForRowID(t, profile, "juniper-bgp-peer", "jnxBgpM2PeerTable")
+			assertBGPTableForRowID(t, profile, "juniper-bgp-peer-family", "jnxBgpM2PrefixCountersTable")
 		})
 	}
 }
@@ -61,25 +61,23 @@ func assertNoMetricTable(t *testing.T, profile *Profile, tableName string) {
 	}
 }
 
-func assertMetricTableForSymbol(t *testing.T, profile *Profile, symbolName, wantTable string) {
+func assertNoVirtualMetric(t *testing.T, profile *Profile, name string) {
+	t.Helper()
+
+	for _, metric := range profile.Definition.VirtualMetrics {
+		assert.NotEqual(t, name, metric.Name, "did not expect virtual metric %s in %s", name, profile.SourceFile)
+	}
+}
+
+func assertBGPTableForRowID(t *testing.T, profile *Profile, rowID, wantTable string) {
 	t.Helper()
 
 	var tables []string
-	for _, metric := range profile.Definition.Metrics {
-		if !metricDefinesSymbol(metric, symbolName) {
-			continue
-		}
-		tables = append(tables, metric.Table.Name)
-	}
-
-	require.Equal(t, []string{wantTable}, tables, "unexpected tables for %s in %s", symbolName, profile.SourceFile)
-}
-
-func metricDefinesSymbol(metric ddprofiledefinition.MetricsConfig, symbolName string) bool {
-	for _, symbol := range metric.Symbols {
-		if symbol.Name == symbolName {
-			return true
+	for _, row := range profile.Definition.BGP {
+		if row.ID == rowID {
+			tables = append(tables, row.Table.Name)
 		}
 	}
-	return false
+
+	require.Equal(t, []string{wantTable}, tables, "unexpected BGP tables for %s in %s", rowID, profile.SourceFile)
 }
