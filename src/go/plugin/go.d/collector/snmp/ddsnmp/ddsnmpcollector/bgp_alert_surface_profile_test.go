@@ -587,6 +587,8 @@ func filterProfileForAlertSurface(profile *ddsnmp.Profile, keepTables map[string
 	profile.Definition.StaticTags = nil
 	profile.Definition.Metadata = nil
 	profile.Definition.SysobjectIDMetadata = nil
+	profile.Definition.Topology = nil
+	profile.Definition.Licensing = nil
 
 	keepTableSymbols := make(map[string]map[string]struct{}, len(keepTables))
 	for tableName, symbols := range keepTables {
