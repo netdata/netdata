@@ -384,10 +384,15 @@ fn get_timestamp_field(
     entry_offset: NonZeroU64,
 ) -> Result<u64> {
     let data_iter = journal_file.entry_data_objects(entry_offset)?;
+    let mut payload_buf = Vec::new();
 
     for data_result in data_iter {
         let data_object = data_result?;
-        match crate::field_types::parse_timestamp(field_name.as_bytes(), &data_object) {
+        match crate::field_types::parse_timestamp_with_scratch(
+            field_name.as_bytes(),
+            &data_object,
+            &mut payload_buf,
+        ) {
             Ok(timestamp) => return Ok(timestamp),
             Err(IndexError::InvalidFieldPrefix) => {
                 continue;
@@ -485,12 +490,7 @@ fn entry_matches_regex(
         // Cache miss - load the data object and check if it matches
         let data_object = journal_file.data_ref(data_offset)?;
 
-        let payload_bytes = if data_object.is_compressed() {
-            data_object.decompress(scratch_buffer)?;
-            &scratch_buffer[..]
-        } else {
-            data_object.raw_payload()
-        };
+        let payload_bytes = data_object.logical_payload(scratch_buffer)?;
 
         let matches = if let Ok(payload_str) = std::str::from_utf8(payload_bytes) {
             regex.is_match(payload_str)

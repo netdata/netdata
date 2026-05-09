@@ -147,8 +147,8 @@ nd_journal_file_get_boot_id_annotations(NsdJournal *j __maybe_unused, struct nd_
 
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
-    NSD_JOURNAL_FOREACH_UNIQUE(j, data, data_length)
-    {
+    nsd_journal_restart_unique(j);
+    while ((r = nsd_journal_enumerate_available_unique(j, &data, &data_length)) > 0) {
         const char *key, *value;
         size_t key_length, value_length;
 
@@ -163,6 +163,16 @@ nd_journal_file_get_boot_id_annotations(NsdJournal *j __maybe_unused, struct nd_
         buf[32] = '\0';
 
         dictionary_set(dict, buf, NULL, 0);
+    }
+
+    if (r < 0) {
+        errno = -r;
+        internal_error(
+            true,
+            "JOURNAL: while enumerating the unique _BOOT_ID values, "
+            "sd_journal_enumerate_available_unique() on file '%s' returned %d",
+            njf->filename,
+            r);
     }
 
     void *nothing;

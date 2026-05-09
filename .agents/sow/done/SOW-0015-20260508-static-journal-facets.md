@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: reopened regression and same-class core-library gap repaired; selected journal facets now return rows with `slice:true`, and both journal readers resolve compressed DATA objects by logical payload.
+Sub-state: external-review rerun fixes and static x86_64 build validation completed.
 
 ## Requirements
 
@@ -39,6 +39,7 @@ Unknowns:
 - Rust journal provider can return decompressed payloads for LZ4/XZ/Zstd compressed data objects.
 - Unique-value enumeration returns logical `field=value` bytes, not compressed payload bytes.
 - Data-object lookup used by match filters can find compressed data objects when the caller provides logical `field=value`.
+- Facet filter setup falls back to a full query if unique-value enumeration returns an error while constructing backend matches.
 - Existing uncompressed data behavior remains unchanged.
 - Focused Rust tests pass for `src/crates/jf/`.
 
@@ -578,3 +579,78 @@ Artifact updates:
 Follow-up mapping:
 
 - No follow-up remains for the underlying `journal-core` compressed DATA lookup gap.
+
+## External Review Follow-up - 2026-05-09
+
+Why reopened:
+
+- The user requested external review of the performance and side effects of the changes before merge.
+- Reviewers agreed the original static facet fix is correct, but flagged same-family raw-payload reads outside the original `find_data_offset()` lookup path.
+
+Confirmed findings:
+
+- `src/crates/journal-core/src/file/file.rs:595` read remapping entry DATA bytes with `raw_payload()` after the marker lookup had become compressed-aware.
+- `src/crates/journal-core/src/file/reader.rs:428` copied remapping entry DATA bytes with `raw_payload()`.
+- `src/crates/journal-index/src/field_types.rs:233` parsed source timestamp DATA bytes with `raw_payload()`, with callers in `src/crates/journal-index/src/file_index.rs:390` and `src/crates/journal-index/src/file_indexer.rs:437`.
+- The `hashers` crate contains suspicious optimized alignment branches, but local inspection showed its `offset_to_align()` helper never returns `0` for normal alignments, so the crate falls back to the byte path used by the passing reference-value tests and the live RHEL 8.10 validation. This is not a current PR blocker.
+
+Actions:
+
+- Added `DataObject::logical_payload()` in `src/crates/journal-core/src/file/object.rs`.
+- Updated `journal-core` remapping reads to use logical payload bytes and return `JournalError::InvalidField` instead of panicking on non-UTF-8 data.
+- Updated `journal-index` source timestamp parsing to use logical payload bytes, while preserving a scratch-buffer variant to avoid repeated allocations in loops.
+- Added focused `journal-core` tests for logical raw payloads and LZ4-compressed logical payloads.
+
+Validation:
+
+- `cargo fmt -p journal-core -p journal-index` in `src/crates`: passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 29 tests passed plus the existing ignored doc tests.
+- `cargo test -q -p journal-index` in `src/crates`: passed; 66 tests passed across the package test binaries.
+
+Follow-up mapping:
+
+- Stale uncompiled `src/crates/jf/journal_file/src/journal_file.rs` still contains a raw-payload lookup helper with no callers. This is not runtime behavior for this PR and should be handled only if that stale module is removed or revived.
+- Zstd/XZ integration tests through `find_data_offset()` would improve coverage but do not block this RHEL LZ4 regression fix because object-level XZ and bounded streaming behavior are already tested, and the logical matcher delegates to the same decompression API.
+
+## External Review Rerun Closure - 2026-05-09
+
+Why updated:
+
+- The user asked to run the external reviewers again after the first follow-up fixes.
+- The rerun found no evidence that the live RHEL 8.10 static facet failure remained, but it did identify two local hardening issues in the same code path.
+
+Confirmed findings:
+
+- `src/crates/journal-core/src/file/file.rs:629` still used `expect("utf8 data")` for FIELD names in the same `load_fields()` path where DATA payload parsing had already been converted to `JournalError::InvalidField`.
+- `src/collectors/systemd-journal.plugin/provider/rust_provider.h:13` exposed unique enumeration through a foreach macro that stops on `<= 0`; when `rsd_journal_enumerate_available_unique()` returned a negative decompression error, `src/collectors/systemd-journal.plugin/systemd-journal.c:583` could silently stop without incrementing `failures`, so the fallback at `systemd-journal.c:621` would not run.
+- `src/crates/journal-index/src/file_index.rs:493` manually decompressed regex payloads even though `DataObject::logical_payload()` now exists.
+
+Reviewed and rejected as non-blocking for this SOW:
+
+- `src/crates/journal-index/src/file_indexer.rs:39-43` documents that compressed values are skipped by the bitmap indexer; `file_indexer.rs:296-309` implements that existing index-size policy. Changing it would require a separate product/performance decision because it would decompress and index every unique compressed value. This PR keeps the documented indexing limit unchanged.
+- A reviewer claimed the Zstd object flag should be `1 << 3`. That finding was false. Current systemd source has `OBJECT_COMPRESSED_ZSTD = 1 << 2` and `HEADER_INCOMPATIBLE_COMPRESSED_ZSTD = 1 << 3`; Netdata's object/header constants match that split. Evidence: `https://raw.githubusercontent.com/systemd/systemd/main/src/libsystemd/sd-journal/journal-def.h`, lines 62-64 and 186.
+- The stale uncompiled `src/crates/jf/journal_file/src/journal_file.rs` helper still has no runtime callers. It is rejected for this SOW because changing dead code would increase review surface without changing shipped behavior.
+- Zstd/XZ `find_data_offset()` integration tests and Zstd object-level tests are useful coverage, but they are rejected for this SOW because the production regression is the RHEL LZ4 path and the shared decompression paths are already covered by object-level LZ4/XZ and bounded-stream tests.
+
+Actions:
+
+- Converted the remaining FIELD-name panic in `journal-core` `load_fields()` to `JournalError::InvalidField`.
+- Added `nsd_journal_enumerate_available_unique()` to the provider abstraction.
+- Replaced the filter builder's `NSD_JOURNAL_FOREACH_UNIQUE()` macro use with an explicit restart/enumerate loop that counts negative `query_unique()` and enumeration returns as setup failures, preserving the existing full-query fallback.
+- Replaced `_BOOT_ID` annotation unique enumeration with the same explicit wrapper and logged negative enumeration returns.
+- Replaced the manual regex-path decompression in `journal-index` with `DataObject::logical_payload()`.
+
+Validation:
+
+- `curl -fsSL https://raw.githubusercontent.com/systemd/systemd/main/src/libsystemd/sd-journal/journal-def.h | rg -n "OBJECT_COMPRESSED_(XZ|LZ4|ZSTD)|HEADER_INCOMPATIBLE_COMPRESSED_ZSTD"`: verified object Zstd is `1 << 2` and header incompatible Zstd is `1 << 3`.
+- `cargo fmt -p journal-core -p journal-index` in `src/crates`: passed.
+- `git diff --check`: passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 29 tests passed plus the existing ignored doc tests.
+- `cargo test -q -p journal-index` in `src/crates`: passed; 66 tests passed across the package test binaries.
+- `cargo test -q --all-targets` in `src/crates/jf`: passed; 11 tests passed.
+- `./packaging/makeself/build-static.sh x86_64`: passed; produced `artifacts/netdata-x86_64-latest.gz.run` after compiling `systemd-journal.plugin`, `journal_reader_ffi`, `journal-core`, and `journal-index` in the static musl build.
+- `.agents/sow/audit.sh`: SOW status/directory checks passed for this SOW; the audit still exits non-zero on the pre-existing public SSH clone syntax pattern in `.agents/skills/mirror-netdata-repos/SKILL.md:112`, unrelated to this work and not staged by this PR.
+
+Follow-up mapping:
+
+- No follow-up remains for the static journal facet filtering regression.

@@ -6,7 +6,7 @@ use crate::file::{
     cursor::{JournalCursor, Location},
     file::{EntryDataIterator, FieldDataIterator, FieldIterator, JournalFile},
     filter::{FilterExpr, JournalFilter, LogicalOp},
-    object::{DataObject, FieldObject, HashableObject},
+    object::{DataObject, FieldObject},
     offset_array::Direction,
     value_guard::ValueGuard,
 };
@@ -420,12 +420,13 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     ) -> Result<()> {
         // Collect all payloads first to avoid guard lifetime issues
         let mut payloads: Vec<Vec<u8>> = Vec::new();
+        let mut payload_buf = Vec::new();
 
         {
             let data_iter = journal_file.entry_data_objects(entry_offset)?;
             for data_result in data_iter {
                 let data_guard = data_result?;
-                let payload = data_guard.raw_payload();
+                let payload = data_guard.logical_payload(&mut payload_buf)?;
                 payloads.push(payload.to_vec());
             }
         }

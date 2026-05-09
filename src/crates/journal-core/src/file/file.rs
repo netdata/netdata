@@ -583,6 +583,7 @@ impl<M: MemoryMap> JournalFile<M> {
                 ic.collect_offsets(self, &mut entry_offsets)?;
 
                 let mut data_offsets = Vec::new();
+                let mut payload_buf = Vec::new();
                 for entry_offset in entry_offsets {
                     {
                         let entry_object = self.entry_ref(entry_offset)?;
@@ -592,13 +593,14 @@ impl<M: MemoryMap> JournalFile<M> {
 
                     for data_offset in data_offsets.iter().copied() {
                         let data_object = self.data_ref(data_offset)?;
-                        let payload = data_object.raw_payload();
+                        let payload = data_object.logical_payload(&mut payload_buf)?;
 
                         if payload == remapping_payload {
                             continue;
                         }
 
-                        let s = std::str::from_utf8(payload).expect("utf8 data");
+                        let s =
+                            std::str::from_utf8(payload).map_err(|_| JournalError::InvalidField)?;
 
                         let Some((field, value)) = s.split_once('=') else {
                             return Err(JournalError::InvalidField);
@@ -624,7 +626,8 @@ impl<M: MemoryMap> JournalFile<M> {
             if field.payload.starts_with(b"ND") {
                 continue;
             }
-            let s = String::from_utf8(field.raw_payload().to_vec()).expect("utf8 data");
+            let s = String::from_utf8(field.raw_payload().to_vec())
+                .map_err(|_| JournalError::InvalidField)?;
             field_map.insert(s.clone(), s);
         }
 

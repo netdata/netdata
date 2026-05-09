@@ -1026,6 +1026,15 @@ impl<B: ByteSlice> DataObject<B> {
         }
     }
 
+    pub fn logical_payload<'a>(&'a self, buf: &'a mut Vec<u8>) -> Result<&'a [u8]> {
+        if self.is_compressed() {
+            let len = self.decompress(buf)?;
+            Ok(&buf[..len])
+        } else {
+            Ok(self.raw_payload())
+        }
+    }
+
     pub fn inlined_cursor(&self) -> Option<InlinedCursor> {
         self.header.inlined_cursor()
     }
@@ -1141,6 +1150,32 @@ mod tests {
         bytes.extend_from_slice(header.as_bytes());
         bytes.extend_from_slice(payload);
         bytes
+    }
+
+    #[test]
+    fn logical_payload_returns_raw_payload() {
+        let payload = b"_SYSTEMD_UNIT=netdata.service";
+        let bytes = data_object_bytes(payload, 0);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = b"stale".to_vec();
+
+        assert_eq!(object.logical_payload(&mut buf).unwrap(), payload);
+        assert_eq!(buf, b"stale");
+    }
+
+    #[test]
+    fn logical_payload_decompresses_lz4_payload() {
+        let payload = b"_SYSTEMD_UNIT=netdata.service";
+        let compressed = lz4_flex::block::compress(payload);
+        let mut stored_payload = Vec::with_capacity(std::mem::size_of::<u64>() + compressed.len());
+        stored_payload.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+        stored_payload.extend_from_slice(&compressed);
+
+        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = Vec::new();
+
+        assert_eq!(object.logical_payload(&mut buf).unwrap(), payload);
     }
 
     #[test]

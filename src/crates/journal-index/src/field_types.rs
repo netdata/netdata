@@ -230,7 +230,16 @@ pub fn parse_timestamp(
     field_name: &[u8],
     data_object: &journal_core::file::DataObject<&[u8]>,
 ) -> crate::Result<u64> {
-    let payload = data_object.raw_payload();
+    let mut scratch = Vec::new();
+    parse_timestamp_with_scratch(field_name, data_object, &mut scratch)
+}
+
+pub(crate) fn parse_timestamp_with_scratch(
+    field_name: &[u8],
+    data_object: &journal_core::file::DataObject<&[u8]>,
+    scratch: &mut Vec<u8>,
+) -> crate::Result<u64> {
+    let payload = data_object.logical_payload(scratch)?;
 
     let value_bytes = FieldValuePair::strip_field_prefix(field_name, payload)
         .ok_or_else(|| crate::IndexError::InvalidFieldPrefix)?;

@@ -427,15 +427,18 @@ impl FileIndexer {
 
         // Collect all the inlined cursors of the source timestamp field
         self.source_timestamp_cursor_pairs.clear();
+        let mut payload_buf = Vec::new();
         for data_object_result in field_data_iterator {
             let Ok(data_object) = data_object_result else {
                 warn!("loading data object failed");
                 continue;
             };
 
-            let Ok(source_timestamp) =
-                crate::field_types::parse_timestamp(source_field_name, &data_object)
-            else {
+            let Ok(source_timestamp) = crate::field_types::parse_timestamp_with_scratch(
+                source_field_name,
+                &data_object,
+                &mut payload_buf,
+            ) else {
                 warn!("parsing source timestamp failed");
                 continue;
             };

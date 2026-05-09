@@ -145,6 +145,22 @@ void nsd_journal_restart_unique(NsdJournal *j)
 }
 #endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */
 
+#if defined(HAVE_SD_JOURNAL_RESTART_FIELDS)
+int nsd_journal_enumerate_available_unique(NsdJournal *j, const void **data, size_t *l)
+{
+#if defined(HAVE_RUST_PROVIDER)
+    uintptr_t rust_size = 0;
+    int r = rsd_journal_enumerate_available_unique(j, data, &rust_size);
+    if (r > 0)
+        *l = (size_t) rust_size;
+
+    return r;
+#else
+    return sd_journal_enumerate_available_unique(j, data, l);
+#endif
+}
+#endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */
+
 int nsd_journal_add_match(NsdJournal *j, const void *data, uintptr_t size)
 {
 #if defined(HAVE_RUST_PROVIDER)
