@@ -843,6 +843,8 @@ func validateEnrichBGP(rows []BGPConfig) error {
 		}
 	}
 
+	errs = append(errs, validateBGPTableReferences(rows))
+
 	return errors.Join(errs...)
 }
 
@@ -1040,6 +1042,7 @@ func validateEnrichBGPValue(path string, value *BGPValueConfig, isTable bool) er
 		errs = append(errs, fmt.Errorf("%s: must define value, from, symbol.OID, OID, index, index_from_end, or index_transform", path))
 	}
 	errs = append(errs, validateMapping(value.Mapping, MetadataSymbol))
+	errs = append(errs, validateBGPRowIndexSelector(path, value))
 
 	if strings.HasPrefix(value.Name, "_") {
 		errs = append(errs, fmt.Errorf("%s.name: name %q cannot be underscore-prefixed", path, value.Name))
@@ -1074,6 +1077,23 @@ func validateEnrichBGPValue(path string, value *BGPValueConfig, isTable bool) er
 	}
 
 	return errors.Join(errs...)
+}
+
+func validateBGPRowIndexSelector(path string, value *BGPValueConfig) error {
+	var selectors []string
+	if value.Index != 0 {
+		selectors = append(selectors, "index")
+	}
+	if value.IndexFromEnd != 0 {
+		selectors = append(selectors, "index_from_end")
+	}
+	if len(value.IndexTransform) > 0 {
+		selectors = append(selectors, "index_transform")
+	}
+	if len(selectors) <= 1 {
+		return nil
+	}
+	return fmt.Errorf("%s: index, index_from_end, and index_transform are mutually exclusive (set: %s)", path, strings.Join(selectors, ", "))
 }
 
 func validateEnrichBGPSymbol(path string, symbol *SymbolConfig) error {
@@ -1206,6 +1226,39 @@ func validateBGPFromReferences(rowIdx int, row *BGPConfig) error {
 		fromOID := TrimBGPOID(ref.value.From)
 		if !oidHasPrefix(fromOID, tableOID) {
 			errs = append(errs, fmt.Errorf("bgp[%d].%s.from: OID %q is outside table %q", rowIdx, ref.path, ref.value.From, row.Table.OID))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func validateBGPTableReferences(rows []BGPConfig) error {
+	tableNameToOID := make(map[string]string)
+	for i := range rows {
+		row := &rows[i]
+		if row.Table.Name != "" && row.Table.OID != "" {
+			tableNameToOID[row.Table.Name] = TrimBGPOID(row.Table.OID)
+		}
+	}
+
+	var errs []error
+	for rowIdx := range rows {
+		row := &rows[rowIdx]
+		for _, ref := range collectBGPValueReferences(*row) {
+			if ref.value.Table == "" {
+				continue
+			}
+			refTableOID, ok := tableNameToOID[ref.value.Table]
+			if !ok {
+				continue
+			}
+			sourceOID := TrimBGPOID(BGPValueSourceOID(ref.value))
+			if sourceOID != "" && !oidHasPrefix(sourceOID, refTableOID) {
+				errs = append(errs, fmt.Errorf("bgp[%d].%s.table: referenced table %q uses OID %q; source OID %q is outside referenced table", rowIdx, ref.path, ref.value.Table, refTableOID, sourceOID))
+			}
+			lookupOID := TrimBGPOID(SymbolConfig(ref.value.LookupSymbol).OID)
+			if lookupOID != "" && !oidHasPrefix(lookupOID, refTableOID) {
+				errs = append(errs, fmt.Errorf("bgp[%d].%s.lookup_symbol: referenced table %q uses OID %q; lookup OID %q is outside referenced table", rowIdx, ref.path, ref.value.Table, refTableOID, lookupOID))
+			}
 		}
 	}
 	return errors.Join(errs...)

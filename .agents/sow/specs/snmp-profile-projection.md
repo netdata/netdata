@@ -240,9 +240,8 @@ sources can use `index: N`, `index_transform:`, or `index_from_end: N`.
 `index_from_end` selects one OID index component from the tail and is for MIBs
 where the wanted trailing INDEX component follows a variable-length component
 such as `InetAddress`. Profiles should declare only one row-index selector per
-typed BGP value. If a profile declares more than one today, runtime precedence
-is `index_from_end`, then `index`, then `index_transform`; validation hardening
-for mutual exclusivity is tracked as a follow-up.
+typed BGP value. Validation rejects configs that set more than one of
+`index`, `index_from_end`, and `index_transform` on the same typed BGP value.
 
 A cross-table typed value uses `table: <table_name>` with `index_transform:`
 to derive the referenced row index:
@@ -475,7 +474,12 @@ Profile validation rejects:
 - BGP scalar values that use `table:` sources;
 - BGP scalar values that use row-index sources such as `index:`,
   `index_from_end:`, or `index_transform:`;
+- BGP values that set more than one row-index selector (`index`,
+  `index_from_end`, or `index_transform`);
 - BGP cross-table value sources without a source OID;
+- BGP cross-table value sources whose source or lookup OID is outside the
+  referenced table when that referenced table is declared by another BGP row in
+  the resolved profile;
 - BGP `lookup_symbol` value sources without a referenced table;
 - underscore-prefixed BGP value names;
 - regular metric chart/export-only fields, transforms, scale factors, and

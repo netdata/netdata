@@ -380,19 +380,24 @@ func (c *bgpPeerCache) finalize() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	now := c.updateTime
+	if now.IsZero() {
+		now = time.Now()
+	}
+
 	hadUpdatedEntries := false
 	for key, entry := range c.entries {
 		if !entry.updated && !entry.stale {
 			delete(c.entries, key)
 			continue
 		}
+		if !entry.updated && entry.stale && !entry.lastUpdate.IsZero() && c.staleAfter > 0 && now.Sub(entry.lastUpdate) >= c.staleAfter {
+			delete(c.entries, key)
+			continue
+		}
 		if entry.updated {
 			hadUpdatedEntries = true
-			if c.updateTime.IsZero() {
-				entry.lastUpdate = time.Now()
-			} else {
-				entry.lastUpdate = c.updateTime
-			}
+			entry.lastUpdate = now
 			entry.lastFailure = time.Time{}
 			entry.lastError = ""
 		}
@@ -400,11 +405,7 @@ func (c *bgpPeerCache) finalize() {
 	}
 
 	if hadUpdatedEntries || len(c.entries) == 0 {
-		if c.updateTime.IsZero() {
-			c.lastUpdate = time.Now()
-		} else {
-			c.lastUpdate = c.updateTime
-		}
+		c.lastUpdate = now
 	}
 	c.lastFailure = time.Time{}
 	c.lastError = ""

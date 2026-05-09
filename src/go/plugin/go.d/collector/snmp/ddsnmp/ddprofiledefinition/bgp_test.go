@@ -135,6 +135,14 @@ func TestValidateEnrichProfile_BGP(t *testing.T) {
 				BGP: []BGPConfig{validBGPPeerFamilyRowWithCrossTableSource()},
 			},
 		},
+		"valid peer family with declared cross-table value source": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					validBGPPeerFamilyRowWithCrossTableSource(),
+					validBGPPeerRowForTable("bgpPeerTable", "1.2.4"),
+				},
+			},
+		},
 		"invalid kind": {
 			profile: ProfileDefinition{
 				BGP: []BGPConfig{
@@ -261,6 +269,32 @@ func TestValidateEnrichProfile_BGP(t *testing.T) {
 				},
 			},
 			wantErrContains: []string{"bgp[0].identity.remote_as.lookup_symbol: lookup_symbol requires table"},
+		},
+		"forbids cross-table source outside declared referenced table": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					func() BGPConfig {
+						row := validBGPPeerFamilyRowWithCrossTableSource()
+						row.Identity.RemoteAS.Symbol.OID = "1.9.9.1"
+						return row
+					}(),
+					validBGPPeerRowForTable("bgpPeerTable", "1.2.4"),
+				},
+			},
+			wantErrContains: []string{`bgp[0].identity.remote_as.table: referenced table "bgpPeerTable" uses OID "1.2.4"; source OID "1.9.9.1" is outside referenced table`},
+		},
+		"forbids lookup symbol outside declared referenced table": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					func() BGPConfig {
+						row := validBGPPeerFamilyRowWithCrossTableSource()
+						row.Identity.RemoteAS.LookupSymbol.OID = "1.9.9.2"
+						return row
+					}(),
+					validBGPPeerRowForTable("bgpPeerTable", "1.2.4"),
+				},
+			},
+			wantErrContains: []string{`bgp[0].identity.remote_as.lookup_symbol: referenced table "bgpPeerTable" uses OID "1.2.4"; lookup OID "1.9.9.2" is outside referenced table`},
 		},
 		"forbids incomplete state mapping unless partial": {
 			profile: ProfileDefinition{
@@ -500,6 +534,115 @@ func TestValidateEnrichProfile_BGP(t *testing.T) {
 			},
 			wantErrContains: []string{"bgp[0].connection.established_uptime.index_from_end: scalar BGP values do not support `index_from_end` lookups"},
 		},
+		"forbids multiple BGP row index selectors": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					func() BGPConfig {
+						row := validBGPPeerFamilyRow()
+						row.Identity.Neighbor = BGPValueConfig{
+							Index:        1,
+							IndexFromEnd: 2,
+						}
+						return row
+					}(),
+				},
+			},
+			wantErrContains: []string{"bgp[0].identity.neighbor: index, index_from_end, and index_transform are mutually exclusive (set: index, index_from_end)"},
+		},
+		"forbids index and index_transform together": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					func() BGPConfig {
+						row := validBGPPeerFamilyRow()
+						row.Identity.Neighbor = BGPValueConfig{
+							Index:          1,
+							IndexTransform: []MetricIndexTransform{{Start: 1}},
+						}
+						return row
+					}(),
+				},
+			},
+			wantErrContains: []string{"bgp[0].identity.neighbor: index, index_from_end, and index_transform are mutually exclusive (set: index, index_transform)"},
+		},
+		"forbids index_from_end and index_transform together": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					func() BGPConfig {
+						row := validBGPPeerFamilyRow()
+						row.Identity.AddressFamily = BGPAddressFamilyValueConfig{BGPValueConfig: BGPValueConfig{
+							IndexFromEnd:   2,
+							IndexTransform: []MetricIndexTransform{{Start: 1}},
+							Mapping:        NewExactMapping(map[string]string{"1": "ipv4"}),
+						}}
+						return row
+					}(),
+				},
+			},
+			wantErrContains: []string{"bgp[0].identity.address_family: index, index_from_end, and index_transform are mutually exclusive (set: index_from_end, index_transform)"},
+		},
+		"forbids all row index selectors together": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					func() BGPConfig {
+						row := validBGPPeerFamilyRow()
+						row.Identity.Neighbor = BGPValueConfig{
+							Index:          1,
+							IndexFromEnd:   2,
+							IndexTransform: []MetricIndexTransform{{Start: 1}},
+						}
+						return row
+					}(),
+				},
+			},
+			wantErrContains: []string{"bgp[0].identity.neighbor: index, index_from_end, and index_transform are mutually exclusive (set: index, index_from_end, index_transform)"},
+		},
+		"forbids non-device fields on device rows": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					{
+						Kind:  BGPRowKindDevice,
+						State: BGPStateConfig{BGPValueConfig: BGPValueConfig{Symbol: bgpStateSymbol()}},
+					},
+				},
+			},
+			wantErrContains: []string{"bgp[0].state: device rows only support device_counts fields"},
+		},
+		"forbids device counts on peer rows": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					{
+						Kind: BGPRowKindPeer,
+						Identity: BGPIdentityConfig{
+							Neighbor: BGPValueConfig{Value: "192.0.2.1"},
+							RemoteAS: BGPValueConfig{Value: "65001"},
+						},
+						Device: BGPDeviceCountsConfig{
+							Peers: BGPValueConfig{Symbol: SymbolConfig{OID: "1.2.3.1", Name: "peerCount"}},
+						},
+					},
+				},
+			},
+			wantErrContains: []string{"bgp[0].device_counts.peers: device_counts fields require kind=device"},
+		},
+		"forbids route fields on peer rows": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					{
+						Kind: BGPRowKindPeer,
+						Identity: BGPIdentityConfig{
+							Neighbor: BGPValueConfig{Value: "192.0.2.1"},
+							RemoteAS: BGPValueConfig{Value: "65001"},
+						},
+						Routes: BGPRoutesConfig{
+							Current: BGPRouteCountersConfig{
+								Received: BGPValueConfig{Symbol: SymbolConfig{OID: "1.2.3.1", Name: "receivedRoutes"}},
+							},
+						},
+					},
+				},
+			},
+			wantErrContains: []string{"bgp[0].routes.current.received: route fields require kind=peer_family"},
+		},
 		"forbids unknown consumers": {
 			profile: ProfileDefinition{
 				MetricTags: []GlobalMetricTagConfig{
@@ -565,9 +708,26 @@ func validBGPPeerFamilyRowWithCrossTableSource() BGPConfig {
 	return row
 }
 
+func validBGPPeerRowForTable(name, oid string) BGPConfig {
+	return BGPConfig{
+		ID:    name + "-peer",
+		Kind:  BGPRowKindPeer,
+		Table: SymbolConfig{Name: name, OID: oid},
+		Identity: BGPIdentityConfig{
+			Neighbor: BGPValueConfig{Symbol: SymbolConfig{OID: oid + ".1.1", Name: name + "RemoteAddr", Format: "ip_address"}},
+			RemoteAS: BGPValueConfig{Symbol: SymbolConfig{OID: oid + ".1.2", Name: name + "RemoteAs", Format: "uint32"}},
+		},
+		State: BGPStateConfig{BGPValueConfig: BGPValueConfig{Symbol: bgpStateSymbolWithOID(oid + ".1.3")}},
+	}
+}
+
 func bgpStateSymbol() SymbolConfig {
+	return bgpStateSymbolWithOID("1.2.3.1.1")
+}
+
+func bgpStateSymbolWithOID(oid string) SymbolConfig {
 	return SymbolConfig{
-		OID:  "1.2.3.1.1",
+		OID:  oid,
 		Name: "bgpPeerState",
 		Mapping: NewExactMapping(map[string]string{
 			"1": "idle",

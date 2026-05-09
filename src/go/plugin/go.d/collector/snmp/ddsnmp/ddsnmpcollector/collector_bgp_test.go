@@ -156,6 +156,7 @@ func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 		expectedNeighbor string
 		expectedAFI      ddprofiledefinition.BGPAddressFamily
 		expectedSAFI     ddprofiledefinition.BGPSubsequentAddressFamily
+		expectedPeerType string
 	}{
 		"ipv4 peer family row resolves identity from peer table": {
 			mainPDUs: []gosnmp.SnmpPDU{
@@ -169,6 +170,7 @@ func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 			expectedNeighbor: "192.0.2.1",
 			expectedAFI:      ddprofiledefinition.BGPAddressFamilyIPv4,
 			expectedSAFI:     ddprofiledefinition.BGPSubsequentAddressFamilyUnicast,
+			expectedPeerType: "01",
 		},
 		"ipv6 peer family row resolves AFI and SAFI from the tail of a variable-length row index": {
 			mainPDUs: []gosnmp.SnmpPDU{
@@ -182,6 +184,7 @@ func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 			expectedNeighbor: "2001:db8::1",
 			expectedAFI:      ddprofiledefinition.BGPAddressFamilyIPv6,
 			expectedSAFI:     ddprofiledefinition.BGPSubsequentAddressFamilyUnicast,
+			expectedPeerType: "02",
 		},
 	}
 
@@ -221,6 +224,7 @@ func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 			assert.Equal(t, tc.expectedAFI, row.Identity.AddressFamily)
 			assert.Equal(t, tc.expectedSAFI, row.Identity.SubsequentAddressFamily)
 			assert.Equal(t, "blue", row.Identity.RoutingInstance)
+			assert.Equal(t, tc.expectedPeerType, row.Descriptors.PeerType)
 			require.True(t, row.Routes.Current.Accepted.Has)
 			assert.EqualValues(t, 42, row.Routes.Current.Accepted.Value)
 			assert.Equal(t, "1.3.6.1.4.1.99999.70.1.1", row.Routes.Current.Accepted.SourceOID)
@@ -575,6 +579,12 @@ func crossTableBGPTestConfig() ddprofiledefinition.BGPConfig {
 						"1": "unicast",
 					}),
 				},
+			},
+		},
+		Descriptors: ddprofiledefinition.BGPDescriptorsConfig{
+			PeerType: ddprofiledefinition.BGPValueConfig{
+				IndexFromEnd: 2,
+				Format:       "hex",
 			},
 		},
 		Routes: ddprofiledefinition.BGPRoutesConfig{

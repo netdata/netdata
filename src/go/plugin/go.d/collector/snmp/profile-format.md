@@ -1352,9 +1352,8 @@ INDEX component is a trailing component after a variable-length field, such as
 AFI/SAFI after an `InetAddress` peer address.
 
 Use exactly one row-index selector per typed BGP value: `index`,
-`index_from_end`, or `index_transform`. If more than one is set, the current
-collector reads `index_from_end` first, then `index`, then
-`index_transform`; profiles should not rely on that precedence.
+`index_from_end`, or `index_transform`. Profile validation rejects typed BGP
+values that set more than one of these selectors.
 
 Typed BGP cross-table value fields can also use `lookup_symbol` with
 `table:` and `index_transform:`. This is needed when a BGP peer-family table is

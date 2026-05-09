@@ -115,6 +115,63 @@ func TestTypedBGPMetricsFromProfileMetrics(t *testing.T) {
 	}
 }
 
+func TestTypedBGPMetricsUseLogicalChartIdentity(t *testing.T) {
+	tests := map[string]struct {
+		profileMetrics []*ddsnmp.ProfileMetrics
+		wantKey        string
+	}{
+		"same logical peer from different BGP rows keeps one public chart identity": {
+			profileMetrics: []*ddsnmp.ProfileMetrics{
+				{
+					Source: "profile-a.yaml",
+					BGPRows: []ddsnmp.BGPRow{
+						typedBGPPeerRowWithIdentity("profile-a-peer", "192.0.2.1", "65001", "blue", ddprofiledefinition.BGPPeerStateEstablished),
+					},
+				},
+				{
+					Source: "profile-b.yaml",
+					BGPRows: []ddsnmp.BGPRow{
+						func() ddsnmp.BGPRow {
+							row := typedBGPPeerRowWithIdentity("profile-b-peer", "192.0.2.1", "65001", "blue", ddprofiledefinition.BGPPeerStateEstablished)
+							row.Descriptors.LocalAddress = "203.0.113.9"
+							row.Descriptors.Description = "Backup Peer"
+							return row
+						}(),
+					},
+				},
+			},
+			wantKey: "bgp.peers.availability_192.0.2.1_65001_blue",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			metrics := typedBGPMetricsFromProfileMetrics(tc.profileMetrics)
+
+			keys := make(map[string]struct{})
+			var availabilityMetrics []ddsnmp.Metric
+			for _, metric := range metrics {
+				if metric.Name != "bgp.peers.availability" {
+					continue
+				}
+				keys[tableMetricKey(metric)] = struct{}{}
+				availabilityMetrics = append(availabilityMetrics, metric)
+			}
+
+			require.Len(t, availabilityMetrics, 2)
+			assert.Equal(t, map[string]struct{}{tc.wantKey: {}}, keys)
+			for _, metric := range availabilityMetrics {
+				key := tableMetricKey(metric)
+				assert.NotContains(t, key, "profile-")
+				assert.NotContains(t, key, metric.Tags["_local_address"])
+				assert.NotContains(t, key, metric.Tags["_peer_description"])
+				assert.Contains(t, metric.Tags, "_local_address")
+				assert.Contains(t, metric.Tags, "_peer_description")
+			}
+		})
+	}
+}
+
 func requireMetric(t *testing.T, metrics []ddsnmp.Metric, name string, subset map[string]string) ddsnmp.Metric {
 	t.Helper()
 	for _, metric := range metrics {
@@ -421,6 +478,7 @@ func TestBGPIntegration_ExpiredFailedProfileDoesNotKeepStaleRowsWithFreshProfile
 			require.Contains(t, byNeighbor, "192.0.2.2")
 			assert.Equal(t, false, byNeighbor["192.0.2.2"][findBGPPeerColIdx("Stale")])
 			assert.Equal(t, "active", byNeighbor["192.0.2.2"][findBGPPeerColIdx("Connection State")])
+			requireBGPCacheKeyAbsent(t, collr.bgp.peerCache, "peer-a")
 		})
 	}
 }
@@ -549,6 +607,13 @@ func markBGPCacheSourceLastUpdate(t *testing.T, cache *bgpPeerCache, source stri
 		}
 	}
 	t.Fatalf("BGP cache source %q not found", source)
+}
+
+func requireBGPCacheKeyAbsent(t *testing.T, cache *bgpPeerCache, key string) {
+	t.Helper()
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+	require.NotContains(t, cache.entries, key)
 }
 
 func typedBGPPeerFamilyRow() ddsnmp.BGPRow {
