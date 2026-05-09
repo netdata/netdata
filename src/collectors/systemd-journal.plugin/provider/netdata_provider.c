@@ -155,8 +155,10 @@ int nsd_journal_enumerate_available_unique(NsdJournal *j, const void **data, siz
         *l = (size_t) rust_size;
 
     return r;
-#else
+#elif defined(HAVE_SD_JOURNAL_ENUMERATE_AVAILABLE_UNIQUE)
     return sd_journal_enumerate_available_unique(j, data, l);
+#else
+    return sd_journal_enumerate_unique(j, data, l);
 #endif
 }
 #endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */

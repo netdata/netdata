@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: external-review rerun fixes and static x86_64 build validation completed.
+Sub-state: libsystemd compatibility follow-up completed.
 
 ## Requirements
 
@@ -654,3 +654,50 @@ Validation:
 Follow-up mapping:
 
 - No follow-up remains for the static journal facet filtering regression.
+
+## Libsystemd Compatibility Follow-up - 2026-05-09
+
+Why reopened:
+
+- The user asked whether the new explicit C call could break old `libsystemd` builds if older `SD_JOURNAL_FOREACH_UNIQUE()` macros did not use `sd_journal_enumerate_available_unique()`.
+
+Evidence:
+
+- systemd v245 `src/systemd/sd-journal.h` declares `sd_journal_enumerate_unique()` and defines `SD_JOURNAL_FOREACH_UNIQUE()` with `sd_journal_enumerate_unique()`.
+- systemd v246 `src/systemd/sd-journal.h` declares `sd_journal_enumerate_available_unique()` and defines `SD_JOURNAL_FOREACH_UNIQUE()` with `sd_journal_enumerate_available_unique()`.
+- The current systemd manual records `sd_journal_query_unique()`, `sd_journal_enumerate_unique()`, `sd_journal_restart_unique()`, and `SD_JOURNAL_FOREACH_UNIQUE()` as added in version 195; `sd_journal_enumerate_available_unique()` was added in version 246.
+
+Conclusion:
+
+- The user's concern was valid. The previous C wrapper would have broken builds against libsystemd headers older than v246 when `HAVE_SD_JOURNAL_RESTART_FIELDS` was set.
+
+Actions:
+
+- Added `HAVE_SD_JOURNAL_ENUMERATE_AVAILABLE_UNIQUE` detection in `packaging/cmake/Modules/NetdataDetectSystemd.cmake`.
+- Added the generated config define to `packaging/cmake/config.cmake.h.in`.
+- Updated `nsd_journal_enumerate_available_unique()` so:
+  - Rust provider builds call `rsd_journal_enumerate_available_unique()`.
+  - Modern libsystemd builds call `sd_journal_enumerate_available_unique()`.
+  - Older libsystemd builds fall back to `sd_journal_enumerate_unique()`, matching the old `SD_JOURNAL_FOREACH_UNIQUE()` macro behavior.
+
+Validation:
+
+- systemd v245 header check: confirmed `SD_JOURNAL_FOREACH_UNIQUE()` uses `sd_journal_enumerate_unique()`.
+- systemd v246 header check: confirmed `SD_JOURNAL_FOREACH_UNIQUE()` uses `sd_journal_enumerate_available_unique()`.
+- Current systemd manual check: confirmed `sd_journal_enumerate_available_unique()` was added in version 246.
+- Compiled `src/collectors/systemd-journal.plugin/provider/netdata_provider.c` with a temporary config where `HAVE_SD_JOURNAL_RESTART_FIELDS` is defined and `HAVE_SD_JOURNAL_ENUMERATE_AVAILABLE_UNIQUE` is not defined: passed, proving the old-libsystemd branch compiles.
+- Compiled the same provider file with both `HAVE_SD_JOURNAL_RESTART_FIELDS` and `HAVE_SD_JOURNAL_ENUMERATE_AVAILABLE_UNIQUE` defined: passed, proving the modern-libsystemd branch compiles.
+- `git diff --check`: passed.
+
+Artifact updates:
+
+- AGENTS.md: no update needed; workflow and project guardrails did not change.
+- Runtime project skills: no update needed; this is a compatibility guard in project code.
+- Specs: no update needed; this preserves existing libsystemd compatibility.
+- End-user/operator docs: no update needed; no user-facing configuration, command, or workflow changed.
+- End-user/operator skills: no update needed; public/operator skill behavior was not changed.
+- SOW lifecycle: SOW reopened for this compatibility fix and will be moved back to done with `Status: completed` in the same commit.
+
+Follow-up mapping:
+
+- No follow-up remains for libsystemd unique-enumeration symbol compatibility.
