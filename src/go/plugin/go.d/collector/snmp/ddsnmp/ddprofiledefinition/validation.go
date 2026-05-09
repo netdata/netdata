@@ -1105,6 +1105,9 @@ func validateEnrichBGPSymbol(path string, symbol *SymbolConfig) error {
 func validateBGPPeerStateMapping(path string, state *BGPStateConfig) error {
 	mapping := effectiveBGPValueMapping(state.BGPValueConfig)
 	if !mapping.HasItems() {
+		if state.Partial {
+			return fmt.Errorf("%s.mapping: partial state mapping requires at least one RFC 4271 state", path)
+		}
 		return fmt.Errorf("%s.mapping: state mapping must cover all six RFC 4271 states", path)
 	}
 

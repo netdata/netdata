@@ -54,6 +54,17 @@ func Test_AristaAndDellBGPProfilesUseTypedRows(t *testing.T) {
 			for rowID, table := range tc.bgpTables {
 				assertBGPTableForRowID(t, profile, rowID, table)
 			}
+
+			for rowID := range tc.bgpTables {
+				if strings.Contains(rowID, "peer-family") {
+					continue
+				}
+				peer := requireBGPRowByID(t, profile, rowID)
+				assertBGPSixStateMapping(t, peer.State)
+				if peer.Previous.IsSet() {
+					assertBGPSixStateMapping(t, peer.Previous)
+				}
+			}
 		})
 	}
 }

@@ -146,3 +146,15 @@ func requireBGPRowByID(t *testing.T, profile *Profile, id string) ddprofiledefin
 
 	return profile.Definition.BGP[rowIndex]
 }
+
+func assertBGPSixStateMapping(t *testing.T, state ddprofiledefinition.BGPStateConfig) {
+	t.Helper()
+	assert.Equal(t, map[string]string{
+		"1": "idle",
+		"2": "connect",
+		"3": "active",
+		"4": "opensent",
+		"5": "openconfirm",
+		"6": "established",
+	}, state.Symbol.Mapping.Items)
+}

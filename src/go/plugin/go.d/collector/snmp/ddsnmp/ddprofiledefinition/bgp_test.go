@@ -309,6 +309,27 @@ func TestValidateEnrichProfile_BGP(t *testing.T) {
 				},
 			},
 		},
+		"forbids partial state mapping without mapping items": {
+			profile: ProfileDefinition{
+				BGP: []BGPConfig{
+					{
+						ID:   "peer",
+						Kind: BGPRowKindPeer,
+						Identity: BGPIdentityConfig{
+							Neighbor: BGPValueConfig{Value: "192.0.2.1"},
+							RemoteAS: BGPValueConfig{Value: "65001"},
+						},
+						State: BGPStateConfig{
+							BGPValueConfig: BGPValueConfig{
+								Symbol: SymbolConfig{OID: "1.2.3.1", Name: "bgpPeerState"},
+							},
+							Partial: true,
+						},
+					},
+				},
+			},
+			wantErrContains: []string{"bgp[0].state.mapping: partial state mapping requires at least one RFC 4271 state"},
+		},
 		"forbids invalid state mapping value": {
 			profile: ProfileDefinition{
 				BGP: []BGPConfig{

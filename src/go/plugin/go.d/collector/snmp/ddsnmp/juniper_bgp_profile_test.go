@@ -49,6 +49,7 @@ func Test_JuniperBGPProfilesUseOnlyJuniperPeerTables(t *testing.T) {
 			assertNoVirtualMetric(t, profile, "bgpPeerUpdates")
 			assertBGPTableForRowID(t, profile, "juniper-bgp-peer", "jnxBgpM2PeerTable")
 			assertBGPTableForRowID(t, profile, "juniper-bgp-peer-family", "jnxBgpM2PrefixCountersTable")
+			assertBGPSixStateMapping(t, requireBGPRowByID(t, profile, "juniper-bgp-peer").State)
 		})
 	}
 }

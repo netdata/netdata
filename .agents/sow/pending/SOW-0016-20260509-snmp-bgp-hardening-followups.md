@@ -43,17 +43,13 @@ Inferences:
 
 Unknowns:
 
-- Nokia/TiMOS high-numbered oper OIDs `.177-.188` require a current public
-  SR OS MIB, upstream profile comparison, or real device walk before they can
-  be confirmed or corrected.
+- None currently identified for planning.
 
 ### Acceptance Criteria
 
 - Typed BGP cross-table `table:` references are validated against available
   table evidence or explicitly documented when the source table is inferred
   from the value OID rather than a declared row table.
-- BGP state `partial: true` behavior is made internally consistent between
-  spec, docs, and validator tests.
 - BGP value configs reject or clearly document invalid combinations of
   `index`, `index_from_end`, and `index_transform`.
 - `index_from_end` plus `format` propagation has focused test coverage.
@@ -61,8 +57,6 @@ Unknowns:
 - Cross-profile chart-key collision risk is either fixed or rejected with
   concrete evidence that the typed structural ID and current chart-key model
   are sufficient.
-- Nokia/TiMOS high-numbered oper OIDs are verified against current evidence or
-  corrected.
 - Additional fixture/test gaps from SOW-0015 are disposed, including Dell IPv6
   typed rows and typed BGP descriptor-label handling.
 
@@ -87,8 +81,9 @@ Current state:
   table name.
 - Validation requires cross-table BGP values to have a source OID, but does not
   yet validate every referenced `table:` name against a declared table map.
-- `partial: true` state mapping behavior has reviewer-noted edge cases around
-  empty mappings and `partial_states`.
+- `partial: true` state configs with empty mappings are rejected in SOW-0015
+  and covered by validator tests. This SOW may still adjust related docs only
+  if later validation work changes the contract.
 - Runtime precedence for multiple row-index selectors is
   `index_from_end`, then `index`, then `index_transform`; profiles should use
   one selector, but validation does not yet reject combinations.
@@ -109,8 +104,9 @@ Risks:
   compatibility plan.
 - Reaping stale cache entries too aggressively can remove useful stale function
   output before the intended stale window.
-- Correcting Nokia OIDs without real evidence can regress SR OS coverage if the
-  local MIB excerpt is stale rather than authoritative.
+- Overcorrecting vendor OIDs without real evidence can regress existing
+  coverage; profile changes must stay grounded in current MIB or fixture
+  evidence.
 
 ## Pre-Implementation Gate
 
@@ -129,8 +125,8 @@ Evidence reviewed:
   `BGPSignalKind`, `bgpScopeAuto`, or legacy public router identifiers.
 - SOW-0015 close-out scans found typed BGP still using underscore-prefixed
   descriptor tags for the generic "visible label but not chart-key" convention.
-- SOW-0015 reviewer findings identified RT-4, RT3-1, SCH-2, SCH-3, SCH2-4,
-  SCH2-6, NOK-1, and Dell IPv6 coverage as post-migration hardening items.
+- SOW-0015 reviewer findings identified RT-4, RT3-1, SCH-2, SCH2-4,
+  SCH2-6, and Dell IPv6 coverage as post-migration hardening items.
 
 Affected contracts and surfaces:
 
@@ -165,8 +161,8 @@ Sensitive data handling plan:
 
 Implementation plan:
 
-1. Add focused validation tests for partial-state, row-index-selector, and
-   cross-table source cases.
+1. Add focused validation tests for row-index-selector and cross-table source
+   cases.
 2. Decide whether to enforce or document each validation behavior based on
    existing stock profiles.
 3. Add stale-cache expiry/reaping tests and implement bounded retention if the
@@ -174,9 +170,7 @@ Implementation plan:
 4. Add chart-key collision coverage and decide whether to fix chart identity
    or reject with evidence.
 5. Add Dell IPv6 typed BGP fixture coverage.
-6. Verify Nokia/TiMOS high-numbered OIDs against current public evidence or
-   correct the profile.
-7. Update spec/profile-format docs and project skill guidance for any behavior
+6. Update spec/profile-format docs and project skill guidance for any behavior
    changed.
 
 Validation plan:
@@ -202,13 +196,14 @@ Artifact impact plan:
 
 Open-source reference evidence:
 
-- None yet. Nokia/TiMOS OID verification may require public MIB/profile
-  evidence before implementation.
+- Nokia/TiMOS high-numbered oper OID verification was resolved during
+  SOW-0015 pre-merge review against an untracked local
+  `TIMETRA-BGP-MIB.mib` refreshed to `LAST-UPDATED "202302150000Z"`.
 
 Open decisions:
 
-- None for planning. Any chart identity or Nokia OID correction decision must
-  be made with concrete evidence before code changes.
+- None for planning. Any chart identity change must be made with concrete
+  evidence before code changes.
 
 ## Implications And Decisions
 

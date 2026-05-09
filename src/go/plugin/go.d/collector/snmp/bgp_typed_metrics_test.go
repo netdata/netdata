@@ -170,6 +170,34 @@ func TestBGPPeerCache_UpdateRow(t *testing.T) {
 				assert.Equal(t, "peer not ready", rows[1][findBGPPeerColIdx("Unavailability Reason")])
 			},
 		},
+		"same peer identity from different profile rows keeps distinct cache rows": {
+			rows: []ddsnmp.BGPRow{
+				typedBGPPeerRowWithIdentity("profile-a-peer", "192.0.2.1", "65001", "blue", ddprofiledefinition.BGPPeerStateEstablished),
+				typedBGPPeerRowWithIdentity("profile-b-peer", "192.0.2.1", "65001", "blue", ddprofiledefinition.BGPPeerStateActive),
+			},
+			params: resolveBGPPeerParams(nil),
+			validate: func(t *testing.T, resp *funcapi.FunctionResponse) {
+				assert.Equal(t, 200, resp.Status)
+				rows := responseRows(t, resp)
+				require.Len(t, rows, 2)
+
+				stateByRowID := make(map[string]string, len(rows))
+				for _, row := range rows {
+					assert.Equal(t, "192.0.2.1", row[findBGPPeerColIdx("Neighbor")])
+					assert.Equal(t, "65001", row[findBGPPeerColIdx("Remote AS")])
+					rowID, ok := row[findBGPPeerColIdx("rowId")].(string)
+					require.True(t, ok)
+					state, ok := row[findBGPPeerColIdx("Connection State")].(string)
+					require.True(t, ok)
+					stateByRowID[rowID] = state
+				}
+
+				assert.Equal(t, map[string]string{
+					"profile-a-peer": "established",
+					"profile-b-peer": "active",
+				}, stateByRowID)
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -226,6 +254,61 @@ func TestBGPIntegration_PreservesFunctionCacheOnProfileBGPError(t *testing.T) {
 			rows := responseRows(t, resp)
 			require.Len(t, rows, 1)
 			assert.Equal(t, true, rows[0][findBGPPeerColIdx("Stale")])
+		})
+	}
+}
+
+func TestBGPIntegration_RecoveryClearsStaleFunctionRows(t *testing.T) {
+	tests := map[string]struct {
+		initial   []*ddsnmp.ProfileMetrics
+		failed    []*ddsnmp.ProfileMetrics
+		recovered []*ddsnmp.ProfileMetrics
+	}{
+		"success then failure then success clears stale flag and help banner": {
+			initial: []*ddsnmp.ProfileMetrics{{
+				Source:  "typed-bgp-profile.yaml",
+				BGPRows: []ddsnmp.BGPRow{typedBGPPeerRowWithIdentity("peer-a", "192.0.2.1", "65001", "blue", ddprofiledefinition.BGPPeerStateEstablished)},
+			}},
+			failed: []*ddsnmp.ProfileMetrics{{
+				Source:          "typed-bgp-profile.yaml",
+				BGPCollectError: errors.New("BGP table walk failed"),
+			}},
+			recovered: []*ddsnmp.ProfileMetrics{{
+				Source:  "typed-bgp-profile.yaml",
+				BGPRows: []ddsnmp.BGPRow{typedBGPPeerRowWithIdentity("peer-a", "192.0.2.1", "65001", "blue", ddprofiledefinition.BGPPeerStateActive)},
+			}},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.sysInfo = &snmputils.SysInfo{}
+			collr.enableBGPIntegration()
+
+			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
+			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+
+			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.failed}
+			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+
+			resp := newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
+			assert.Equal(t, 200, resp.Status)
+			assert.Contains(t, resp.Help, "showing stale BGP rows")
+			rows := responseRows(t, resp)
+			require.Len(t, rows, 1)
+			assert.Equal(t, true, rows[0][findBGPPeerColIdx("Stale")])
+
+			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.recovered}
+			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+
+			resp = newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
+			assert.Equal(t, 200, resp.Status)
+			assert.NotContains(t, resp.Help, "stale BGP rows")
+			rows = responseRows(t, resp)
+			require.Len(t, rows, 1)
+			assert.Equal(t, false, rows[0][findBGPPeerColIdx("Stale")])
+			assert.Equal(t, "active", rows[0][findBGPPeerColIdx("Connection State")])
 		})
 	}
 }

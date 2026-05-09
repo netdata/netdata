@@ -536,6 +536,11 @@ Tests or equivalent validation:
 - `go test -count=1 ./collector/snmp/ddsnmp/ddsnmpcollector -run 'TestCollector_Collect_(LicensingProfiles|LicensingProfileFixtures|SophosLicensingProfile|FortiGate|BlueCoat|HuaweiBGP|AlcatelBGP|AristaAndDellBGP|TiMOSBGP|GenericBGP4Rows)'` passed on 2026-05-09 after typed-domain profile fragment extraction.
 - `go test -count=1 ./collector/snmp/...` passed on 2026-05-09 after typed-domain profile fragment extraction.
 - `git diff --check` passed on 2026-05-09 after typed-domain profile fragment extraction.
+- `go test -count=1 ./collector/snmp -run 'Test(BGPPeerCache_UpdateRow|BGPIntegration_(PreservesFunctionCacheOnProfileBGPError|RecoveryClearsStaleFunctionRows|MixedProfileBGPErrorRefreshesSuccessfulProfiles|ExpiredFailedProfileDoesNotKeepStaleRowsWithFreshProfiles))'` passed on 2026-05-09 after pre-merge BGP cache hardening tests.
+- `go test -count=1 ./collector/snmp/ddsnmp/ddprofiledefinition -run 'TestValidateEnrichProfile_BGP'` passed on 2026-05-09 after adding the `partial: true` empty-mapping rejection test.
+- `go test -count=1 ./collector/snmp/ddsnmp -run 'Test_(AristaAndDellBGPProfilesUseTypedRows|JuniperBGPProfilesUseOnlyJuniperPeerTables|AlcatelBGPProfileUsesTypedRows|HuaweiBGPProfileUsesTypedRows|NokiaBGPProfileMergedIntoNokiaSROS)'` passed on 2026-05-09 after adding vendor six-state mapping assertions.
+- `go test -count=1 ./collector/snmp/...` passed on 2026-05-09 after pre-merge hardening tests.
+- `go test -race -count=1 ./collector/snmp` passed on 2026-05-09 after pre-merge hardening tests.
 
 Real-use evidence:
 
@@ -658,12 +663,24 @@ Follow-up mapping:
   - RT-4 typed BGP cross-profile chart-key collision risk.
   - RT3-1 stale BGP cache entries from permanent per-source failure.
   - SCH-2 typed BGP cross-table `table:` reference load-time resolution.
-  - SCH-3 `partial: true` empty mapping/spec-validator consistency.
   - SCH2-4 `index`, `index_from_end`, and `index_transform` mutual-exclusivity validation.
   - SCH2-6 `index_from_end` plus `format` propagation coverage.
-  - NOK-1 Nokia/TiMOS `tBgpPeerNgOperTable` high-numbered OID verification.
   - Dell IPv6 typed BGP fixture coverage.
   - Typed BGP descriptor underscore label behavior verification.
+- Resolved during pre-merge review:
+  - NOK-1 Nokia/TiMOS `tBgpPeerNgOperTable` high-numbered OID verification.
+    The local untracked `mibs/TIMETRA-BGP-MIB.mib` was refreshed to
+    `LAST-UPDATED "202302150000Z"` and confirms OIDs `.177`, `.178`, and
+    `.181-.188` as `MAX-ACCESS read-only` objects under
+    `tBgpPeerNgOperEntry`.
+  - SCH-3 `partial: true` empty mapping/spec-validator consistency. The
+    validator now returns a specific error for `partial: true` state configs
+    without mapping items, and `TestValidateEnrichProfile_BGP` covers that
+    contract.
+  - TST5-2/TST5-4/TST5-9 pre-merge test gaps. Added function-cache coverage
+    for same-peer structural IDs from different profile rows, stale failure
+    recovery, and vendor six-state mapping assertions for Arista, Dell,
+    Juniper, and Alcatel.
 - Rejected as a SOW-0015 follow-up:
   - Generated function-name capitalization (`Snmp:*`, `Docker:*`, `Mysql:*`, etc.) is a pre-existing global integration template behavior in `integrations/templates/functions.md`, not specific to BGP typed projection. It should be handled only as a separate integrations-docs decision if the project wants to normalize all generated Function names.
 - Still pending before SOW close:

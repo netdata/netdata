@@ -37,4 +37,6 @@ func Test_AlcatelBGPProfileUsesTypedRows(t *testing.T) {
 	assertBGPTableForRowID(t, profile, "alcatel-bgp4-peer-family", "alaBgpPeerTable")
 	assertBGPTableForRowID(t, profile, "alcatel-bgp6-peer", "alaBgpPeer6Table")
 	assertBGPTableForRowID(t, profile, "alcatel-bgp6-peer-family", "alaBgpPeer6Table")
+	assertBGPSixStateMapping(t, requireBGPRowByID(t, profile, "alcatel-bgp4-peer").State)
+	assertBGPSixStateMapping(t, requireBGPRowByID(t, profile, "alcatel-bgp6-peer").State)
 }
