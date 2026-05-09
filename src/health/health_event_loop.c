@@ -244,8 +244,8 @@ static void health_initialize_rrdhost(RRDHOST *host) {
     host->health_log.next_log_id = get_uint32_id();
     host->health_log.next_alarm_id = 0;
 
-    sql_health_alarm_log_load(host);
     rw_spinlock_init(&host->health_log.spinlock);
+    sql_health_alarm_log_load(host);
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
 
 
