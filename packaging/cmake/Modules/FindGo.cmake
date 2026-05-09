@@ -27,9 +27,11 @@ elseif(OS_WINDOWS)
     find_program(GO_EXECUTABLE go PATHS /c/go/bin "/c/Program Files/go/bin" /mingw64/lib/go/bin /ucrt64/lib/go/bin /clang64/lib/go/bin DOC "Go toolchain" NO_DEFAULT_PATH)
   endif()
 else()
-  find_program(GO_EXECUTABLE go PATHS /usr/local/go/bin DOC "Go toolchain" NO_DEFAULT_PATH)
+  find_program(GO_EXECUTABLE go DOC "Go toolchain")
+  if(NOT GO_EXECUTABLE)
+    find_program(GO_EXECUTABLE go PATHS /usr/local/go/bin DOC "Go toolchain" NO_DEFAULT_PATH)
+  endif()
 endif()
-find_program(GO_EXECUTABLE go DOC "Go toolchain")
 
 if (GO_EXECUTABLE)
   execute_process(

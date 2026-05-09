@@ -380,7 +380,7 @@ if(ENABLE_JEMALLOC)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
@@ -3017,6 +3017,32 @@ if(ENABLE_PLUGIN_EBPF)
     netdata_add_ebpf_co_re_to_target(ebpf.plugin)
 
     install(TARGETS ebpf.plugin
+            COMPONENT plugin-ebpf
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    file(GLOB_RECURSE EBPF_GO_PLUGIN_FILES CONFIGURE_DEPENDS
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.go")
+    list(APPEND EBPF_GO_PLUGIN_FILES
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod")
+
+    add_custom_command(
+            OUTPUT "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
+            COMMAND "${CMAKE_COMMAND}" -E env
+                    GOROOT=${GO_ROOT}
+                    CGO_ENABLED=1
+                    GOPROXY=https://proxy.golang.org,direct
+                    "${GO_EXECUTABLE}" build -buildvcs=false
+                    -o "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
+                    "."
+            DEPENDS ${EBPF_GO_PLUGIN_FILES}
+            COMMENT "Building Go eBPF plugin ebpf-go.plugin"
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin"
+            VERBATIM)
+
+    add_custom_target(ebpf-go-plugin ALL
+            DEPENDS "${CMAKE_BINARY_DIR}/ebpf-go.plugin")
+
+    install(PROGRAMS "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
             COMPONENT plugin-ebpf
             DESTINATION usr/libexec/netdata/plugins.d)
 
