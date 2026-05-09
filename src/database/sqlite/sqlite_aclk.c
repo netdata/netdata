@@ -122,7 +122,7 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
     const char *hostname     = (const char *)sqlite3_column_text(res, COL_FETCH_HOSTNAME);
     const char *registry     = (const char *)sqlite3_column_text(res, COL_FETCH_REGISTRY);
     const char *os           = (const char *)sqlite3_column_text(res, COL_FETCH_OS);
-    const char *timezone     = (const char *)sqlite3_column_text(res, COL_FETCH_TIMEZONE);
+    const char *host_tz      = (const char *)sqlite3_column_text(res, COL_FETCH_TIMEZONE);
     const char *abbrev_tz    = (const char *)sqlite3_column_text(res, COL_FETCH_ABBREV_TIMEZONE);
     const char *prog_name    = (const char *)sqlite3_column_text(res, COL_FETCH_PROGRAM_NAME);
     const char *prog_version = (const char *)sqlite3_column_text(res, COL_FETCH_PROGRAM_VERSION);
@@ -168,7 +168,7 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
         registry,
         guid,
         os,
-        timezone,
+        host_tz,
         abbrev_tz,
         (int32_t)utc_offset,
         prog_name    ? prog_name    : "unknown",
