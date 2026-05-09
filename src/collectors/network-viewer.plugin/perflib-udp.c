@@ -4,55 +4,40 @@
 #include "libnetdata/os/windows-api/windows_api.h"
 #include "libnetdata/os/windows-perflib/perflib.h"
 
-#define PLUGIN_NETWORK_VIEWER_NAME "network-viewer.plugin"
+#define PLUGIN_NETWORK_VIEWER_NAME   "network-viewer.plugin"
+#define NV_WIN_FUNCTION_UDP_HELP     "Windows UDP statistics by IP family (datagrams)"
+#define NV_WIN_FUNCTION_UPDATE_EVERY 5
 
-// Priority values continue after the TCP charts used by the same executable.
-#define PRIO_UDP_IPV4_DATAGRAMS 21075
-#define PRIO_UDP_IPV6_DATAGRAMS 21076
+// Defined in perflib-tcp.c
+extern netdata_mutex_t stdout_mutex;
+extern bool plugin_should_exit;
 
 typedef struct {
     const char *af;
     const char *object_name;
-    const char *type;
-    const char *family;
-    const char *title_prefix;
-    const char *context_prefix;
-    int datagrams_priority;
 
     COUNTER_DATA datagrams_no_port;
     COUNTER_DATA datagrams_received_errors;
     COUNTER_DATA datagrams_received;
     COUNTER_DATA datagrams_sent;
-
-    bool datagrams_chart_created;
 } UDP_FAMILY;
 
 static UDP_FAMILY udp_ipv4 = {
-    .af = "ipv4",
+    .af = "IPv4",
     .object_name = "UDPv4",
-    .type = "ipv4",
-    .family = "udp",
-    .title_prefix = "IPv4",
-    .context_prefix = "ipv4.udp",
-    .datagrams_priority = PRIO_UDP_IPV4_DATAGRAMS,
 };
 
 static UDP_FAMILY udp_ipv6 = {
-    .af = "ipv6",
+    .af = "IPv6",
     .object_name = "UDPv6",
-    .type = "ipv6",
-    .family = "udp6",
-    .title_prefix = "IPv6",
-    .context_prefix = "ipv6.udp",
-    .datagrams_priority = PRIO_UDP_IPV6_DATAGRAMS,
 };
 
 static void initialize_udp_keys(UDP_FAMILY *udp)
 {
-    udp->datagrams_no_port.key = "Datagrams No Port/sec";
+    udp->datagrams_no_port.key         = "Datagrams No Port/sec";
     udp->datagrams_received_errors.key = "Datagrams Received Errors";
-    udp->datagrams_received.key = "Datagrams Received/sec";
-    udp->datagrams_sent.key = "Datagrams Sent/sec";
+    udp->datagrams_received.key        = "Datagrams Received/sec";
+    udp->datagrams_sent.key            = "Datagrams Sent/sec";
 }
 
 static void initialize(void)
@@ -61,27 +46,7 @@ static void initialize(void)
     initialize_udp_keys(&udp_ipv6);
 }
 
-static void udp_create_datagrams_chart(UDP_FAMILY *udp, int update_every)
-{
-    if (udp->datagrams_chart_created)
-        return;
-    udp->datagrams_chart_created = true;
-
-    char context[64];
-    char title[64];
-    snprintfz(context, sizeof(context), "%s.datagrams", udp->context_prefix);
-    snprintfz(title, sizeof(title), "%s UDP Datagrams", udp->title_prefix);
-
-    fprintf(stdout,
-            "CHART %s.datagrams '' '%s' datagrams/s %s %s line %d %d '' '" PLUGIN_NETWORK_VIEWER_NAME "' PerflibUDP\n",
-            udp->type, title, udp->family, context, udp->datagrams_priority, update_every);
-    fprintf(stdout, "DIMENSION no_port '' incremental 1 1\n");
-    fprintf(stdout, "DIMENSION received_errors '' incremental 1 1\n");
-    fprintf(stdout, "DIMENSION received '' incremental 1 1\n");
-    fprintf(stdout, "DIMENSION sent '' incremental 1 1\n");
-}
-
-static bool udp_collect_family(UDP_FAMILY *udp, int update_every, usec_t dt)
+static bool udp_collect_family(UDP_FAMILY *udp)
 {
     DWORD id = RegistryFindIDByName(udp->object_name);
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
@@ -96,36 +61,97 @@ static bool udp_collect_family(UDP_FAMILY *udp, int update_every, usec_t dt)
         return false;
 
     bool have_any = false;
-
     have_any |= perflibGetObjectCounter(pDataBlock, pObjectType, &udp->datagrams_no_port);
     have_any |= perflibGetObjectCounter(pDataBlock, pObjectType, &udp->datagrams_received_errors);
     have_any |= perflibGetObjectCounter(pDataBlock, pObjectType, &udp->datagrams_received);
     have_any |= perflibGetObjectCounter(pDataBlock, pObjectType, &udp->datagrams_sent);
 
-    udp_create_datagrams_chart(udp, update_every);
-
-    fprintf(stdout, "BEGIN %s.datagrams %" PRIu64 "\n", udp->type, dt);
-    fprintf(stdout, "SET no_port = %lld\n", (long long)udp->datagrams_no_port.current.Data);
-    fprintf(stdout, "SET received_errors = %lld\n", (long long)udp->datagrams_received_errors.current.Data);
-    fprintf(stdout, "SET received = %lld\n", (long long)udp->datagrams_received.current.Data);
-    fprintf(stdout, "SET sent = %lld\n", (long long)udp->datagrams_sent.current.Data);
-    fprintf(stdout, "END\n");
-
     return have_any;
 }
 
-int do_PerflibUDP(int update_every, usec_t dt)
+static void udp_emit_row(BUFFER *wb, const UDP_FAMILY *udp)
+{
+    buffer_json_add_array_item_array(wb);
+    {
+        buffer_json_add_array_item_string(wb, udp->af);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_no_port.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_received_errors.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_received.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_sent.current.Data);
+    }
+    buffer_json_array_close(wb);
+}
+
+void function_udp_stats(
+    const char *transaction, char *function __maybe_unused,
+    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+    BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused)
 {
     static bool initialized = false;
-
     if (unlikely(!initialized)) {
         initialize();
         initialized = true;
     }
 
-    bool have_any = false;
-    have_any |= udp_collect_family(&udp_ipv4, update_every, dt);
-    have_any |= udp_collect_family(&udp_ipv6, update_every, dt);
+    udp_collect_family(&udp_ipv4);
+    udp_collect_family(&udp_ipv6);
 
-    return have_any ? 0 : -1;
+    time_t now_s = now_realtime_sec();
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", NV_WIN_FUNCTION_UPDATE_EVERY);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", NV_WIN_FUNCTION_UDP_HELP);
+
+    buffer_json_member_add_array(wb, "data");
+    {
+        udp_emit_row(wb, &udp_ipv4);
+        udp_emit_row(wb, &udp_ipv6);
+    }
+    buffer_json_array_close(wb); // data
+
+    size_t field_id = 0;
+    buffer_json_member_add_object(wb, "columns");
+    {
+        buffer_rrdf_table_add_field(wb, field_id++, "Protocol", "IP Protocol Family",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "DatagramsNoPort", "Datagrams with No Port",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+            0, "datagrams", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "DatagramsErrors", "Datagrams Received with Errors",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+            0, "datagrams", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "DatagramsReceived", "Received Datagrams",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+            0, "datagrams", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "DatagramsSent", "Sent Datagrams",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+            0, "datagrams", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_time_t(wb, "expires", now_s + NV_WIN_FUNCTION_UPDATE_EVERY);
+    buffer_json_finalize(wb);
+
+    netdata_mutex_lock(&stdout_mutex);
+    wb->response_code = HTTP_RESP_OK;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_s + NV_WIN_FUNCTION_UPDATE_EVERY;
+    pluginsd_function_result_to_stdout(transaction, wb);
+    netdata_mutex_unlock(&stdout_mutex);
 }
