@@ -159,6 +159,13 @@ func (b *bgpIntegration) functionHandlers() []registeredSNMPFunction {
 	}}
 }
 
+func collectorSpecificFunctionHandlers() []registeredSNMPFunction {
+	return []registeredSNMPFunction{{
+		methodID: bgpPeersMethodID,
+		handler:  newFuncBGPPeers(nil),
+	}}
+}
+
 func collectorSpecificMethodConfigs() []funcapi.MethodConfig {
 	return []funcapi.MethodConfig{
 		bgpPeersMethodConfig(),

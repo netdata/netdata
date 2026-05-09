@@ -408,14 +408,14 @@ func TestFuncBGPPeers_HandleStaleAndFilteredRows(t *testing.T) {
 	}
 }
 
-func TestCollector_BGPFunctionHandlerIsRegisteredOnlyWhenEnabled(t *testing.T) {
+func TestCollector_BGPFunctionHandlerIsAlwaysRegistered(t *testing.T) {
 	tests := map[string]struct {
 		prepare    func(c *Collector)
 		wantStatus int
 		wantBGP    bool
 	}{
-		"new collector has no BGP handler": {
-			wantStatus: 404,
+		"new collector has unavailable BGP handler": {
+			wantStatus: 503,
 		},
 		"enabled BGP integration registers handler": {
 			prepare: func(c *Collector) {
@@ -434,6 +434,10 @@ func TestCollector_BGPFunctionHandlerIsRegisteredOnlyWhenEnabled(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.wantBGP, collr.bgp != nil)
+
+			params, err := collr.funcRouter.MethodParams(context.Background(), bgpPeersMethodID)
+			require.NoError(t, err)
+			require.NotEmpty(t, params)
 
 			resp := collr.funcRouter.Handle(context.Background(), bgpPeersMethodID, nil)
 			assert.Equal(t, tc.wantStatus, resp.Status)

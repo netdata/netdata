@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: completed
+Status: in-progress
 
-Sub-state: user decisions 1-23 resolved; all BGP-bearing stock profiles migrated to typed `bgp:` rows; legacy `bgp_public*` runtime deleted; metadata and generated SNMP integration docs regenerated; local `mibs/` reference files removed.
+Sub-state: reopened for final review-feedback fixes before merge; user decisions 1-23 resolved; all BGP-bearing stock profiles migrated to typed `bgp:` rows; legacy `bgp_public*` runtime deleted; metadata and generated SNMP integration docs regenerated; local `mibs/` reference files removed.
 
 ## Requirements
 

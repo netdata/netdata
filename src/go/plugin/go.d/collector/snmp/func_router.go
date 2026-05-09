@@ -30,6 +30,11 @@ func newFuncRouter(ifaceCache *ifaceCache, extraHandlers ...registeredSNMPFuncti
 		handlers:   make(map[string]funcapi.MethodHandler),
 	}
 	r.registerHandler(ifacesMethodID, newFuncInterfaces(r))
+	for _, h := range collectorSpecificFunctionHandlers() {
+		if h.methodID != "" {
+			r.registerHandler(h.methodID, h.handler)
+		}
+	}
 	for _, h := range extraHandlers {
 		if h.methodID != "" {
 			r.registerHandler(h.methodID, h.handler)

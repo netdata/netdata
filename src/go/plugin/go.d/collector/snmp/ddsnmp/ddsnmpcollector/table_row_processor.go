@@ -173,11 +173,20 @@ func (p *tableRowProcessor) extractIndexPositionFromEnd(index string, position u
 		return "", false
 	}
 
-	parts := strings.Split(index, ".")
-	if int(position) > len(parts) {
-		return "", false
+	end := len(index)
+	for n := uint(1); ; n++ {
+		start := strings.LastIndexByte(index[:end], '.')
+		if n == position {
+			if start == -1 {
+				return index[:end], end > 0
+			}
+			return index[start+1 : end], start+1 < end
+		}
+		if start == -1 {
+			return "", false
+		}
+		end = start
 	}
-	return parts[len(parts)-int(position)], true
 }
 
 func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {

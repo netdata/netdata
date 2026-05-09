@@ -73,7 +73,7 @@ func (f *funcBGPPeers) Handle(_ context.Context, method string, params funcapi.R
 		return funcapi.NotFoundResponse(method)
 	}
 	if f.cache == nil {
-		return funcapi.UnavailableResponse("BGP peer data not available yet, please retry after data collection")
+		return funcapi.UnavailableResponse("BGP peer data is not available for this device")
 	}
 
 	view := params.GetOne(bgpPeersParamView)
