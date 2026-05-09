@@ -170,7 +170,7 @@ nd_journal_file_get_boot_id_annotations(NsdJournal *j __maybe_unused, struct nd_
         internal_error(
             true,
             "JOURNAL: while enumerating the unique _BOOT_ID values, "
-            "sd_journal_enumerate_available_unique() on file '%s' returned %d",
+            "nsd_journal_enumerate_available_unique() on file '%s' returned %d",
             njf->filename,
             r);
     }

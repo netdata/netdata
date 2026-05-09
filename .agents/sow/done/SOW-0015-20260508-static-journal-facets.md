@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: PR review cleanup completed.
+Sub-state: PR review rerun cleanup completed.
 
 ## Requirements
 
@@ -756,3 +756,54 @@ Artifact updates:
 Follow-up mapping:
 
 - No follow-up remains for these unresolved review comments.
+
+## PR Review Rerun Cleanup - 2026-05-09
+
+Why reopened:
+
+- Re-triggered PR review after commit `709857f261` opened three new bot review threads.
+
+Findings:
+
+- `PRRT_kwDOAKPxd86Aymui`, `src/crates/journal-core/src/file/file.rs:67`: valid. `DataPayloadMatcher::payload_matches()` propagated decompression failures, so one corrupt compressed DATA object in a hash bucket could stop lookup before a later matching object.
+- `PRRT_kwDOAKPxd86Aymuv`, `src/crates/jf/journal_file/src/file.rs:184`: valid. The legacy static reader had the same hash-bucket lookup resilience issue.
+- `PRRT_kwDOAKPxd86Aymu0`, `src/collectors/systemd-journal.plugin/systemd-journal-files.c:173`: valid. The log message named `sd_journal_enumerate_available_unique()` even though the call goes through `nsd_journal_enumerate_available_unique()`, which can fall back to older libsystemd APIs.
+
+Planned actions:
+
+- Treat DATA-object decompression failures in both payload matchers as non-matches so hash-bucket traversal continues.
+- Add bucket-level tests where a bad compressed DATA object precedes a valid matching compressed DATA object in the same bucket.
+- Update the C diagnostic to name the provider wrapper.
+- Re-run focused tests and PR sync before commit/push.
+
+Actions:
+
+- Changed both `DataPayloadMatcher::payload_matches()` implementations to return `Ok(false)` for `JournalError::DecompressorError` and `JournalError::UnknownCompressionMethod`.
+- Added bucket-level regression tests in both readers proving `find_data_offset()` skips a bad compressed DATA object and finds a later valid compressed DATA object in the same hash bucket.
+- Changed the `_BOOT_ID` annotation diagnostic to name `nsd_journal_enumerate_available_unique()`.
+
+Validation:
+
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 31 tests passed plus existing ignored doc tests.
+- `cargo test -q --all-targets` in `src/crates/jf`: passed; 13 tests passed.
+- `git diff --check`: passed.
+- Same-failure scan: `rg` found no remaining `decompress(&mut self.decompressed_payload)?` direct propagation and confirmed the diagnostic now names the wrapper.
+- PR sync barrier: `fetch-all.sh 22456` still showed the same three unresolved rerun threads and no newer unresolved threads.
+- Sonar sync barrier: `fetch-sonar-findings.sh 22456` reported 0 issues and 0 hotspots.
+- CI sync barrier: `ci-status.sh 22456` reported 0 failing checks and 94 running checks before this push.
+- `.agents/sow/audit.sh`: SOW status/directory checks passed; audit still exits non-zero on the pre-existing public SSH clone syntax pattern in `.agents/skills/mirror-netdata-repos/SKILL.md:112`, unrelated to this work and not staged by this PR.
+
+Artifact updates:
+
+- AGENTS.md: no update needed; workflow and project guardrails did not change.
+- Runtime project skills: no update needed; this is continued PR review cleanup.
+- Specs: no update needed; this preserves intended journal lookup resilience.
+- End-user/operator docs: no update needed; no user-facing configuration, command, or workflow changed.
+- End-user/operator skills: no update needed; public/operator skill behavior was not changed.
+- SOW lifecycle: SOW reopened for rerun review comments and moved back to done with `Status: completed` in the same commit.
+
+Follow-up mapping:
+
+- No follow-up remains for these rerun review comments.
