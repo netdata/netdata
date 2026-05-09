@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: reopened regression repaired and validated on a local RHEL 8.10 static install; selected journal facets now return rows with `slice:true`.
+Sub-state: reopened regression and same-class core-library gap repaired; selected journal facets now return rows with `slice:true`, and both journal readers resolve compressed DATA objects by logical payload.
 
 ## Requirements
 
@@ -536,3 +536,45 @@ Artifact updates:
 Follow-up mapping:
 
 - No follow-up remains for the static journal facet filtering regression.
+
+## Core Library Extension - 2026-05-09
+
+Question answered:
+
+- The user asked whether the same compatibility-layer changes were also needed in the underlying `journal-core` library.
+
+Evidence:
+
+- `src/crates/journal-core/src/file/hash.rs:4-64` already had the systemd-compatible Jenkins lookup3 hash implementation and reference-value test from the regression repair.
+- `src/crates/journal-core/src/file/object.rs:1049-1103` already had bounded Zstd/LZ4/XZ DATA decompression support from the earlier PR review iterations.
+- `src/crates/journal-core/src/file/file.rs:39-79` still used the generic `PayloadMatcher`, which compared `object.raw_payload() == self.payload`.
+- `src/crates/journal-core/src/file/file.rs:485-488` used that raw-only matcher in `find_data_offset()`.
+- `src/crates/journal-core/src/file/filter.rs:283` and `src/crates/journal-core/src/file/filter.rs:297` build filter expressions through `find_data_offset()`, so compressed DATA objects could still fail filter construction in core-library users.
+
+Actions:
+
+- Added `DataPayloadMatcher` to `src/crates/journal-core/src/file/file.rs`, matching the `src/crates/jf` repair pattern.
+- Kept the raw-payload comparison as the first path for uncompressed DATA objects.
+- Added a compressed-payload comparison path that decompresses only compressed DATA objects in the selected hash bucket.
+- Changed `journal-core` `find_data_offset()` to use `DataPayloadMatcher`.
+- Added focused `journal-core` tests for direct LZ4 compressed matching, negative compressed matching, and the `find_data_offset()` hash-bucket traversal path.
+
+Validation:
+
+- `cargo fmt -p journal-core` in `src/crates`: passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 27 tests passed plus the existing ignored tests.
+- `cargo test -q` in `src/crates/jf`: passed; 11 tests passed.
+- Same-failure scan: `rg -n "raw_payload\\(\\) == self\\.payload|DataPayloadMatcher|find_data_offset\\(|payload_matches" src/crates/jf src/crates/journal-core` confirmed both readers now use `DataPayloadMatcher` for DATA hash-bucket lookup; the remaining raw-payload comparison is the generic field-object matcher path, which is correct because FIELD objects are not compressed DATA payloads.
+
+Artifact updates:
+
+- AGENTS.md: no update needed; workflow and project guardrails did not change.
+- Runtime project skills: no update needed; this is a code-path consistency fix, not a workflow change.
+- Specs: no update needed; this preserves the intended journal-format behavior.
+- End-user/operator docs: no update needed; no user-facing configuration, command, or workflow changed.
+- End-user/operator skills: no update needed; public/operator skill behavior was not changed.
+- SOW lifecycle: same SOW reopened for the same-class core-library gap and moved back to `.agents/sow/done/` with `Status: completed` in the same commit.
+
+Follow-up mapping:
+
+- No follow-up remains for the underlying `journal-core` compressed DATA lookup gap.
