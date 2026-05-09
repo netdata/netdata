@@ -3021,17 +3021,35 @@ if(ENABLE_PLUGIN_EBPF)
             DESTINATION usr/libexec/netdata/plugins.d)
 
     file(GLOB_RECURSE EBPF_GO_PLUGIN_FILES CONFIGURE_DEPENDS
-            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.go")
-    list(APPEND EBPF_GO_PLUGIN_FILES
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.go"
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.c"
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod")
+
+    set(EBPF_GO_LIBBPF_LIB_DIR lib)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
+        set(EBPF_GO_LIBBPF_LIB_DIR lib64)
+    endif()
+
+    set(EBPF_GO_CGO_CFLAGS "")
+    foreach(include_dir IN LISTS NETDATA_LIBBPF_INCLUDE_DIRECTORIES)
+        string(APPEND EBPF_GO_CGO_CFLAGS " -I${include_dir}")
+    endforeach()
+    string(APPEND EBPF_GO_CGO_CFLAGS " -I${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin")
+    string(STRIP "${EBPF_GO_CGO_CFLAGS}" EBPF_GO_CGO_CFLAGS)
+    set(EBPF_GO_CGO_LDFLAGS
+            "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz")
 
     add_custom_command(
             OUTPUT "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
             COMMAND "${CMAKE_COMMAND}" -E env
                     GOROOT=${GO_ROOT}
                     CGO_ENABLED=1
+                    CGO_CFLAGS=${EBPF_GO_CGO_CFLAGS}
+                    CGO_LDFLAGS=${EBPF_GO_CGO_LDFLAGS}
                     GOPROXY=https://proxy.golang.org,direct
                     "${GO_EXECUTABLE}" build -buildvcs=false
+                    -tags netdata_ebpf_libbpf
                     -o "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
                     "."
             DEPENDS ${EBPF_GO_PLUGIN_FILES}
@@ -3041,6 +3059,10 @@ if(ENABLE_PLUGIN_EBPF)
 
     add_custom_target(ebpf-go-plugin ALL
             DEPENDS "${CMAKE_BINARY_DIR}/ebpf-go.plugin")
+
+    if(TARGET libbpf)
+        add_dependencies(ebpf-go-plugin libbpf)
+    endif()
 
     install(PROGRAMS "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
             COMPONENT plugin-ebpf
