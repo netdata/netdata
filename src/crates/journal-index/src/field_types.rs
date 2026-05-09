@@ -239,7 +239,9 @@ pub(crate) fn parse_timestamp_with_scratch(
     data_object: &journal_core::file::DataObject<&[u8]>,
     scratch: &mut Vec<u8>,
 ) -> crate::Result<u64> {
-    let payload = data_object.logical_payload(scratch)?;
+    let payload = data_object
+        .logical_payload(scratch)
+        .map_err(timestamp_payload_error)?;
 
     let value_bytes = FieldValuePair::strip_field_prefix(field_name, payload)
         .ok_or_else(|| crate::IndexError::InvalidFieldPrefix)?;
@@ -252,9 +254,21 @@ pub(crate) fn parse_timestamp_with_scratch(
         .map_err(|_| crate::IndexError::NonIntegerPayload)
 }
 
+fn timestamp_payload_error(error: journal_core::error::JournalError) -> crate::IndexError {
+    use journal_core::error::JournalError;
+
+    match error {
+        JournalError::DecompressorError | JournalError::UnknownCompressionMethod => {
+            crate::IndexError::InvalidFieldPrefix
+        }
+        error => error.into(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use journal_core::error::JournalError;
 
     #[test]
     fn test_field_name_creation() {
@@ -371,5 +385,22 @@ mod tests {
         // Payload shorter than field name
         let value = FieldValuePair::strip_field_prefix(b"PRIORITY", b"PRI");
         assert_eq!(value, None);
+    }
+
+    #[test]
+    fn timestamp_payload_compression_errors_are_non_matches() {
+        assert!(matches!(
+            timestamp_payload_error(JournalError::DecompressorError),
+            crate::IndexError::InvalidFieldPrefix
+        ));
+        assert!(matches!(
+            timestamp_payload_error(JournalError::UnknownCompressionMethod),
+            crate::IndexError::InvalidFieldPrefix
+        ));
+
+        assert!(matches!(
+            timestamp_payload_error(JournalError::InvalidField),
+            crate::IndexError::Journal(JournalError::InvalidField)
+        ));
     }
 }

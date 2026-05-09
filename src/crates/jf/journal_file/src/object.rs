@@ -948,32 +948,49 @@ impl<B: ByteSlice> DataObject<B> {
             use ruzstd::decoding::StreamingDecoder;
 
             let payload = self.payload_bytes();
-            let decoder =
-                StreamingDecoder::new(payload).map_err(|_| JournalError::DecompressorError)?;
+            let decoder = match StreamingDecoder::new(payload) {
+                Ok(decoder) => decoder,
+                Err(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+            };
 
             read_limited_to_end(decoder, buf)
         } else if self.lz4_compressed() {
             let payload = self.payload_bytes();
 
             if payload.len() < 8 {
+                *buf = Vec::new();
                 return Err(JournalError::DecompressorError);
             }
 
-            let uncompressed_size = usize::try_from(u64::from_le_bytes(
-                payload[..8]
-                    .try_into()
-                    .map_err(|_| JournalError::DecompressorError)?,
-            ))
-            .map_err(|_| JournalError::DecompressorError)?;
+            let size_bytes = match payload[..8].try_into() {
+                Ok(size_bytes) => size_bytes,
+                Err(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+            };
+            let uncompressed_size = match usize::try_from(u64::from_le_bytes(size_bytes)) {
+                Ok(uncompressed_size) => uncompressed_size,
+                Err(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+            };
             if uncompressed_size > MAX_UNCOMPRESSED_DATA_OBJECT_SIZE {
+                *buf = Vec::new();
                 return Err(JournalError::DecompressorError);
             }
             let compressed_data = &payload[8..];
 
             buf.clear();
             if uncompressed_size > buf.capacity() {
-                buf.try_reserve_exact(uncompressed_size)
-                    .map_err(|_| JournalError::DecompressorError)?;
+                if buf.try_reserve_exact(uncompressed_size).is_err() {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
             }
             buf.resize(uncompressed_size, 0);
 
@@ -992,6 +1009,7 @@ impl<B: ByteSlice> DataObject<B> {
 
             read_limited_to_end(decoder, buf)
         } else {
+            *buf = Vec::new();
             Err(JournalError::UnknownCompressionMethod)
         }
     }
@@ -1038,6 +1056,20 @@ mod tests {
     }
 
     #[test]
+    fn lz4_decompress_clears_buffer_on_short_prefix() {
+        let bytes = data_object_bytes(b"short", ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = b"stale".to_vec();
+
+        assert!(matches!(
+            object.decompress(&mut buf),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
+    }
+
+    #[test]
     fn lz4_decompress_rejects_oversized_payload_prefix() {
         let mut stored_payload = Vec::new();
         stored_payload
@@ -1046,7 +1078,7 @@ mod tests {
 
         let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
         let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
-        let mut buf = Vec::new();
+        let mut buf = b"stale".to_vec();
 
         assert!(matches!(
             object.decompress(&mut buf),

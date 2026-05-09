@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: libsystemd compatibility follow-up completed.
+Sub-state: PR review cleanup completed.
 
 ## Requirements
 
@@ -701,3 +701,58 @@ Artifact updates:
 Follow-up mapping:
 
 - No follow-up remains for libsystemd unique-enumeration symbol compatibility.
+
+## PR Review Cleanup - 2026-05-09
+
+Why reopened:
+
+- The user reported that old PR comments/reviews were still unresolved.
+- Current PR review state showed three unresolved bot review threads.
+
+Findings:
+
+- `PRRT_kwDOAKPxd86AyMvL`, `src/crates/journal-core/src/file/object.rs:1085`: valid. Several `DataObject::decompress()` error paths can return without clearing the caller-provided scratch buffer, including short LZ4 prefix, oversized LZ4 prefix, LZ4 reserve failure, Zstd decoder creation failure, and unknown compression method.
+- `PRRT_kwDOAKPxd86AyMwE`, `src/crates/jf/journal_file/src/object.rs:971`: valid. The legacy static reader has the same scratch-buffer error-path issue.
+- `PRRT_kwDOAKPxd86Aye5J`, `src/crates/journal-index/src/field_types.rs:242`: valid. `get_timestamp_field()` scans all entry DATA objects for the configured timestamp field. A decompression failure in an unrelated compressed DATA object can abort the search instead of being treated like a non-match and allowing `get_entry_timestamp()` to fall back to the entry realtime timestamp.
+
+Planned actions:
+
+- Reset decompression scratch buffers to a new empty `Vec` on every `DataObject::decompress()` error path that occurs before the bounded stream reader or LZ4 decoder already clears it.
+- Add regression tests in both readers for short LZ4 prefixes and stale-buffer oversized prefixes.
+- Treat compressed-payload decompression failures as timestamp-field non-matches during timestamp parsing, while preserving other journal errors.
+- Run focused Rust validation and GitHub review sync before commit/push.
+
+Actions:
+
+- Changed `src/crates/journal-core/src/file/object.rs` and `src/crates/jf/journal_file/src/object.rs` so early decompression failures reset the scratch buffer to a new empty `Vec`.
+- Added short LZ4-prefix regression tests in both readers.
+- Strengthened the oversized LZ4-prefix tests in both readers to start with a stale buffer and assert capacity release.
+- Changed `src/crates/journal-index/src/field_types.rs` so `JournalError::DecompressorError` and `JournalError::UnknownCompressionMethod` become `IndexError::InvalidFieldPrefix` for timestamp parsing. Other journal errors still propagate.
+- Added a focused timestamp error-classification test.
+
+Validation:
+
+- `cargo fmt -p journal-core -p journal-index` in `src/crates`: passed.
+- `cargo fmt -p journal_file -p journal_reader_ffi` in `src/crates/jf`: passed.
+- `cargo test -q -p journal-core` in `src/crates`: passed; 30 tests passed plus existing ignored doc tests.
+- `cargo test -q -p journal-index` in `src/crates`: passed; 67 tests passed across package test binaries.
+- `cargo test -q --all-targets` in `src/crates/jf`: passed; 12 tests passed.
+- `git diff --check`: passed.
+- Same-failure scan: checked the affected decompression error returns and confirmed the remaining early returns in both `DataObject::decompress()` implementations clear the scratch buffer before returning; bounded-stream and LZ4 decoder failure paths already clear internally.
+- PR sync barrier: `fetch-all.sh 22456` still showed the same three unresolved threads and no newer unresolved threads.
+- Sonar sync barrier: `fetch-sonar-findings.sh 22456` reported 0 issues and 0 hotspots.
+- CI sync barrier: `ci-status.sh 22456` reported 0 failing checks and 94 running checks before this push.
+- `.agents/sow/audit.sh`: SOW status/directory checks passed; audit still exits non-zero on the pre-existing public SSH clone syntax pattern in `.agents/skills/mirror-netdata-repos/SKILL.md:112`, unrelated to this work and not staged by this PR.
+
+Artifact updates:
+
+- AGENTS.md: no update needed; workflow and project guardrails did not change.
+- Runtime project skills: no update needed; this is a code review cleanup in an existing workflow.
+- Specs: no update needed; this preserves intended journal error resilience.
+- End-user/operator docs: no update needed; no user-facing configuration, command, or workflow changed.
+- End-user/operator skills: no update needed; public/operator skill behavior was not changed.
+- SOW lifecycle: SOW reopened for unresolved PR comments and will be moved back to done with `Status: completed` in the same commit.
+
+Follow-up mapping:
+
+- No follow-up remains for these unresolved review comments.
