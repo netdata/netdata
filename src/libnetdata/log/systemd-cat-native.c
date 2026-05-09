@@ -674,9 +674,49 @@ static bool journal_local_send_buffer(int fd, BUFFER *msg) {
     return ret;
 }
 
+static void log_to_stderr_logfmt(BUFFER *msg) {
+    // Parse the message buffer and output in logfmt format
+    const char *s = msg->buffer;
+    const char *end = s + msg->len;
+
+    while(s < end) {
+        const char *line_end = strchr(s, '\n');
+        if(!line_end) line_end = end;
+
+        size_t line_len = line_end - s;
+        if(line_len > 0) {
+            const char *equal = memchr(s, '=', line_len);
+            if(equal) {
+                // Found KEY=VALUE format
+                size_t key_len = equal - s;
+                size_t value_len = line_len - key_len - 1;
+
+                // Print key
+                fprintf(stderr, "%.*s=", (int)key_len, s);
+
+                // Print value (quote if contains spaces)
+                const char *value = equal + 1;
+                bool needs_quotes = (memchr(value, ' ', value_len) != NULL);
+
+                if(needs_quotes) fputc('"', stderr);
+                fprintf(stderr, "%.*s", (int)value_len, value);
+                if(needs_quotes) fputc('"', stderr);
+
+                fputc(' ', stderr);
+            }
+        }
+
+        s = line_end;
+        if(s < end && *s == '\n') s++;
+    }
+
+    fputc('\n', stderr);
+}
+
 static int log_input_to_journal(const char *socket, const char *namespace, const char *newline, int timeout_ms) {
     char path[FILENAME_MAX + 1];
     int fd = -1;
+    bool fallback_to_stderr = false;
 
     if(socket)
         snprintfz(path, sizeof(path), "%s", socket);
@@ -687,7 +727,8 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     if (fd == -1) {
         fprintf(stderr, "Cannot open '%s' as a UNIX socket (errno = %d)\n",
                 path, errno);
-        return 1;
+        fprintf(stderr, "Falling back to stderr logging in logfmt format.\n");
+        fallback_to_stderr = true;
     }
 
     struct buffered_reader reader;
@@ -702,7 +743,11 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
         if (!line->len) {
             // an empty line - we are done for this message
             if (msg->len) {
-                if(journal_local_send_buffer(fd, msg))
+                if(fallback_to_stderr) {
+                    log_to_stderr_logfmt(msg);
+                    messages_logged++;
+                }
+                else if(journal_local_send_buffer(fd, msg))
                     messages_logged++;
                 else {
                     failed_messages++;
@@ -719,7 +764,11 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     }
 
     if (msg && msg->len) {
-        if(journal_local_send_buffer(fd, msg))
+        if(fallback_to_stderr) {
+            log_to_stderr_logfmt(msg);
+            messages_logged++;
+        }
+        else if(journal_local_send_buffer(fd, msg))
             messages_logged++;
         else
             failed_messages++;
