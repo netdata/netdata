@@ -1,0 +1,137 @@
+{
+  "status": 200,
+  "type": "topology",
+  "has_history": false,
+  "update_every": 1,
+  "data": {
+    "schema_version": "netdata.topology.v1",
+    "producer": {
+      "source": "streaming",
+      "instance": "sample-stream",
+      "node_id": "child-node",
+      "machine_guid": "child-machine",
+      "agent_version": "test",
+      "plugin": "netdata",
+      "capabilities": ["topology-v1"]
+    },
+    "collected_at": "2026-05-09T00:00:00Z",
+    "view": {
+      "id": "streaming-path",
+      "scope": "node",
+      "mode": "detailed",
+      "group_by": ["node"]
+    },
+    "dictionaries": {
+      "strings": [
+        "stream_node",
+        "child-node",
+        "parent-node",
+        "child-machine",
+        "parent-machine",
+        "stream_parent",
+        "stream_path",
+        "direct",
+        "replicating"
+      ]
+    },
+    "types": {
+      "actor_types": {
+        "stream_node": {
+          "layer": "streaming",
+          "identity": ["node_id"],
+          "merge_identity": ["node_id"],
+          "aggregation_scopes": ["node"]
+        }
+      },
+      "link_types": {
+        "stream_parent": {
+          "orientation": "hierarchical",
+          "direction_role": "ownership",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "append"
+          }
+        }
+      },
+      "table_types": {
+        "stream_path": {
+          "role": "actor_detail",
+          "owner": "actor",
+          "aggregation": "append",
+          "columns": [
+            {"id": "actor", "type": "actor_ref", "role": "reference"},
+            {"id": "hop", "type": "uint"},
+            {"id": "node_id", "type": "string_ref", "dictionary": "strings"},
+            {"id": "parent_node_id", "type": "string_ref", "dictionary": "strings"},
+            {"id": "path_kind", "type": "string_ref", "dictionary": "strings"},
+            {"id": "since", "type": "timestamp"}
+          ]
+        }
+      },
+      "aggregation_scopes": {
+        "node": {"columns": ["node_id"], "evidence_policy": "preserve"}
+      }
+    },
+    "actors": {
+      "rows": 2,
+      "columns": [
+        {"id": "type", "type": "string_ref", "dictionary": "strings"},
+        {"id": "node_id", "type": "string_ref", "dictionary": "strings", "role": "identity"},
+        {"id": "machine_guid", "type": "string_ref", "dictionary": "strings"}
+      ],
+      "values": [
+        {"codec": "const", "value": 0},
+        {"codec": "values", "values": [1, 2]},
+        {"codec": "values", "values": [3, 4]}
+      ]
+    },
+    "links": {
+      "rows": 1,
+      "columns": [
+        {"id": "src_actor", "type": "actor_ref", "role": "reference"},
+        {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
+        {"id": "type", "type": "string_ref", "dictionary": "strings"},
+        {"id": "state", "type": "string_ref", "dictionary": "strings"},
+        {"id": "stream_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+      ],
+      "values": [
+        {"codec": "const", "value": 0},
+        {"codec": "const", "value": 1},
+        {"codec": "const", "value": 5},
+        {"codec": "const", "value": 8},
+        {"codec": "const", "value": 1}
+      ]
+    },
+    "tables": {
+      "actor": {
+        "stream_path": {
+          "type": "stream_path",
+          "table": {
+            "rows": 1,
+            "columns": [
+              {"id": "actor", "type": "actor_ref", "role": "reference"},
+              {"id": "hop", "type": "uint"},
+              {"id": "node_id", "type": "string_ref", "dictionary": "strings"},
+              {"id": "parent_node_id", "type": "string_ref", "dictionary": "strings"},
+              {"id": "path_kind", "type": "string_ref", "dictionary": "strings"},
+              {"id": "since", "type": "timestamp"}
+            ],
+            "values": [
+              {"codec": "const", "value": 0},
+              {"codec": "const", "value": 1},
+              {"codec": "const", "value": 1},
+              {"codec": "const", "value": 2},
+              {"codec": "const", "value": 7},
+              {"codec": "const", "value": "2026-05-09T00:00:00Z"}
+            ]
+          }
+        }
+      }
+    },
+    "stats": {
+      "actors": 2,
+      "links": 1,
+      "actor_detail_rows": 1
+    }
+  }
+}

@@ -2,42 +2,54 @@
 
 This guide is part of the [`query-netdata-cloud`](./SKILL.md) skill.
 Read the [SKILL.md prerequisites](./SKILL.md#prerequisites) first.
-For the generic Function transport (used by topology, logs, flows,
-and table-snapshot Functions alike), see
-[query-functions.md](./query-functions.md).
+For the generic Function transport, see [query-functions.md](./query-functions.md).
 
-Topology Functions return a graph: a list of **actors** (nodes in
-the graph) and **links** (edges). They differ from log Functions
-(which return a time-windowed skim of a larger dataset) and from
-table-snapshot Functions (which return one full table).
+Topology Functions return compact graph payloads using the production topology
+schema:
 
----
+- [FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md](../../../../src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md)
+- [FUNCTION_TOPOLOGY_SCHEMA.json](../../../../src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json)
 
-## Function names registered today
+The response contains actors, graph links, relationship evidence, optional
+actor detail tables, and optional telemetry overlay refs. Large sections use
+compact columnar tables.
 
-Verified live and in source:
+## Function namespace
 
-| Function | Source collector | Layer | What it discovers |
-|---|---|---|---|
-| `topology:snmp` | `src/go/plugin/go.d/collector/snmp_topology/` | L2 | LLDP/CDP-discovered switches+routers, FDB-derived endpoint locations, STP-derived parent-child relationships |
+Topology Functions use the `topology:<source>` namespace.
 
-The `topology:` prefix is the canonical namespace; only `snmp` is
-registered today (as of `STATUS_FILE_VERSION = 28`). When new
-topology collectors land (network-viewer connections, streaming
-parent-child, k8s service mesh, etc.), they will follow the same
-`topology:<source>` naming pattern and the same response envelope
-documented below. Always confirm via the function-listing endpoint
-in [query-functions.md](./query-functions.md) before assuming a
-given topology Function exists on a node.
+Known producer families:
 
----
+| Function | Source | Typical topology |
+|---|---|---|
+| `topology:network-connections` | Network Viewer plugin | process, endpoint, socket evidence |
+| `topology:streaming` | Netdata streaming subsystem | parent/child streaming graph |
+| `topology:snmp` | SNMP topology collector | L2 devices, interfaces, endpoints, adjacencies |
+| `topology:vsphere` | vSphere collector | inventory and virtualization relationships |
 
-## Endpoint and request
+Always start with an info request to discover the parameters supported by the
+Agent version you are querying.
 
-Use the standard Cloud Function-call endpoint. Topology is just a
-Function; nothing is special about its URL.
+## Endpoint
 
-`POST /api/v2/nodes/{nodeId}/function?function=topology:snmp`
+Use the standard Cloud Function endpoint:
+
+`POST /api/v2/nodes/{nodeId}/function?function=topology:<source>`
+
+Example info request:
+
+```bash
+TOKEN="YOUR_API_TOKEN"
+NODE="YOUR_NODE_UUID"
+
+curl -sS -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
+  -d '{"info":true,"timeout":30000}'
+```
+
+Example data request:
 
 ```bash
 TOKEN="YOUR_API_TOKEN"
@@ -46,209 +58,106 @@ NODE="YOUR_NODE_UUID"
 read -r -d '' PAYLOAD <<'EOF'
 {
   "selections": {
-    "nodes_identity":            ["mac"],
-    "map_type":                  ["lldp_cdp_managed"],
-    "inference_strategy":        ["fdb_minimum_knowledge"],
-    "managed_snmp_device_focus": ["all_devices"],
-    "depth":                     ["all"]
+    "mode": ["aggregated"]
   },
-  "timeout": 60000,
-  "last":    200
+  "timeout": 60000
 }
 EOF
 
 curl -sS -X POST \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:snmp" \
+  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
   -d "$PAYLOAD"
 ```
 
-Always start with `{"info":true}` to discover the parameters the
-node currently accepts -- topology Function parameter sets evolve
-with the collector.
+## Response shape
 
-### Body parameters (topology:snmp)
+Top-level response:
 
-Verified against `src/go/plugin/go.d/collector/snmp_topology/`:
-
-| Parameter | Type | Allowed values | Purpose |
-|---|---|---|---|
-| `nodes_identity` | string | `ip`, `mac` | Collapse / distinguish actors by IP or MAC |
-| `map_type` | string | `lldp_cdp_managed`, `high_confidence_inferred`, `all_devices_low_confidence` | Which discovery sources to include |
-| `inference_strategy` | string | `fdb_minimum_knowledge`, `stp_parent_tree`, `fdb_pairwise_minimum_knowledge`, `stp_fdb_correlated`, `cdp_fdb_hybrid` | How endpoint-to-switch placement is inferred when LLDP/CDP coverage is incomplete |
-| `managed_snmp_device_focus` | string | `all_devices`, `ip:<prefix>` | Restrict the discovery surface to a subset of managed SNMP devices |
-| `depth` | string | `0`-`10`, or `all` | Hops away from the focus device to include |
-
-`selections` is the standard Function selection object; values are
-arrays even for single-valued parameters (Netdata convention).
-
----
-
-## Response envelope
-
-Topology Functions wrap their content in the standard Function
-envelope. Top-level keys (verified live):
-
-| Key | Description |
-|---|---|
-| `status` | HTTP-style status integer (200 on success) |
-| `v` | Function schema version |
-| `type` | **`topology`** -- the family discriminator |
-| `help` | Human description |
-| `accepted_params` | Parameter names the Function accepts |
-| `required_params` | Per-parameter UI widgets |
-| `has_history` | Whether the Function supports `after`/`before` history |
-| `update_every` | Suggested refresh interval (seconds) |
-| `data` | The graph payload (object) |
-
-### `data` object
-
-| Key | Description |
-|---|---|
-| `schema_version` | Topology schema version (e.g. `2.0`) |
-| `source` | Discovery source string (e.g. `snmp`) |
-| `layer` | OSI layer the topology lives at (e.g. `2`, `3`) |
-| `agent_id` | Identifier of the producing agent |
-| `collected_at` | RFC3339 timestamp |
-| `view` | Rendered view kind (e.g. `summary`, `detail`) |
-| `actors[]` | Graph nodes -- see schema below |
-| `links[]` | Graph edges -- see schema below |
-| `flows[]` | Optional, for sources that emit flow records alongside the topology |
-| `stats` | Per-source counters (devices polled, fdb entries, etc.) |
-| `metrics` | Optional metric block |
-| `ip_policy` | Optional, when `nodes_identity:ip` is in effect |
-
-### Actor record
-
-| Key | Description |
-|---|---|
-| `actor_id` | Stable identifier of the actor; format is source-specific (e.g. `mac:<addr>[,<addr>...]` for SNMP at L2; `ip:<addr>` when collapsed by IP) |
-| `actor_type` | e.g. `device`, `endpoint`, `vlan`, `service` |
-| `layer` | OSI layer (`2`, `3`, ...) |
-| `source` | Source collector (e.g. `snmp`) |
-| `match` | Discovery facts (sysName, sysObjectID, OUI, ...) |
-| `attributes` | Free-form per-actor properties |
-| `derived` | Computed annotations (vendor inference, role, ...) |
-| `labels` | Tag-style key/value pairs |
-| `tables` | Per-actor sub-tables (e.g. interfaces, ARP entries) |
-
-### Link record
-
-| Key | Description |
-|---|---|
-| `layer` | Link layer |
-| `protocol` | Discovery protocol (`lldp`, `cdp`, `fdb`, `stp`, ...) |
-| `link_type` | Refinement (e.g. `lldp`, `inferred-fdb`, `stp-parent`) |
-| `direction` | `bidirectional`, `forward`, `reverse` |
-| `state` | Operational state (`up`, `down`, ...) |
-| `src_actor_id` / `dst_actor_id` | The two endpoints (match an entry in `actors[]`) |
-| `src` / `dst` | Per-end interface / port details |
-| `discovered_at` / `last_seen` | RFC3339 timestamps |
-| `metrics` | Optional per-link metrics |
-
----
-
-## Examples
-
-### Example 1: full LLDP/CDP topology
-
-```bash
-TOKEN="YOUR_API_TOKEN"
-NODE="YOUR_NODE_UUID"
-
-read -r -d '' PAYLOAD <<'EOF'
+```json
 {
-  "selections": {
-    "nodes_identity":            ["mac"],
-    "map_type":                  ["lldp_cdp_managed"],
-    "inference_strategy":        ["fdb_minimum_knowledge"],
-    "managed_snmp_device_focus": ["all_devices"],
-    "depth":                     ["all"]
-  },
-  "timeout": 60000
+  "status": 200,
+  "type": "topology",
+  "has_history": false,
+  "data": {
+    "schema_version": "netdata.topology.v1",
+    "producer": {},
+    "collected_at": "2026-05-09T10:00:00Z",
+    "dictionaries": {},
+    "types": {},
+    "actors": {},
+    "links": {},
+    "evidence": {},
+    "tables": {},
+    "overlays": {},
+    "stats": {}
+  }
 }
-EOF
-
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:snmp" \
-  -d "$PAYLOAD" \
-  | jq '.data | {actors: (.actors|length), links: (.links|length)}'
 ```
 
-### Example 2: include FDB-derived low-confidence endpoints
+The important fields:
+
+| Field | Description |
+|---|---|
+| `data.schema_version` | Topology contract version, currently `netdata.topology.v1` |
+| `data.producer` | Producer source, instance, node, plugin, and version metadata |
+| `data.dictionaries` | Shared dictionaries, especially `strings` |
+| `data.types.actor_types` | Actor identity and aggregation-scope metadata |
+| `data.types.link_types` | Link direction and aggregation policy |
+| `data.types.evidence_types` | Evidence role and exact match columns |
+| `data.actors` | Compact table of graph actors |
+| `data.links` | Compact table of renderable graph links |
+| `data.evidence` | Compact relationship evidence sections |
+| `data.tables` | Optional actor or relationship detail tables |
+| `data.overlays` | Optional metric/function overlay refs |
+| `data.stats` | Producer and payload counters |
+
+## Decode compact tables
+
+Every table has:
+
+- `rows`: number of rows;
+- `columns`: column definitions;
+- `values`: parallel array of column encodings.
+
+Supported codecs:
+
+| Codec | Meaning |
+|---|---|
+| `const` | one value repeated for all rows |
+| `values` | one value per row |
+| `dict` | per-column dictionary plus row indexes |
+
+Minimal jq-friendly counts:
 
 ```bash
-read -r -d '' PAYLOAD <<'EOF'
-{
-  "selections": {
-    "nodes_identity":            ["mac"],
-    "map_type":                  ["all_devices_low_confidence"],
-    "inference_strategy":        ["fdb_pairwise_minimum_knowledge"],
-    "managed_snmp_device_focus": ["all_devices"],
-    "depth":                     ["all"]
-  },
-  "timeout": 120000
-}
-EOF
+jq '.data | {
+  schema: .schema_version,
+  actors: .actors.rows,
+  links: .links.rows,
+  evidence_rows: (.evidence | to_entries | map(.value.table.rows) | add // 0),
+  stats
+}'
 ```
 
-### Example 3: focus on a single device + 2 hops
+## Interpretation rules
 
-```bash
-read -r -d '' PAYLOAD <<'EOF'
-{
-  "selections": {
-    "nodes_identity":            ["ip"],
-    "map_type":                  ["lldp_cdp_managed"],
-    "inference_strategy":        ["stp_parent_tree"],
-    "managed_snmp_device_focus": ["ip:YOUR_FOCUS_DEVICE_IP"],
-    "depth":                     ["2"]
-  },
-  "timeout": 60000
-}
-EOF
-```
+- Actors are entities.
+- Links are graph edges.
+- Evidence rows are the exact facts behind links.
+- Actor custom tables are separate from relationship evidence.
+- Direction semantics come from `data.types.link_types`.
+- Telemetry overlays come from `data.types.overlay_templates` plus
+  `data.overlays.refs`.
 
-### Example 4: discover supported parameters before querying
+Do not assume every evidence row is rendered as a graph edge. A single graph
+link may summarize many evidence rows.
 
-```bash
-TOKEN="YOUR_API_TOKEN"
-NODE="YOUR_NODE_UUID"
+## See also
 
-read -r -d '' PAYLOAD <<'EOF'
-{ "info": true }
-EOF
-
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:snmp" \
-  -d "$PAYLOAD" \
-  | jq '{accepted_params, required_params}'
-```
-
----
-
-## Limits and gotchas
-
-- **Topology Functions are slow.** A full SNMP sweep can take tens
-  of seconds. Bump `timeout` to 60-120 seconds.
-- **`actor_id` for L2 SNMP topology can be a comma-separated list
-  of MACs** -- when a single device exposes many MACs (one per
-  port), they collapse into one actor with all MACs in
-  `actor_id`. Use `nodes_identity:ip` to collapse by IP instead.
-- **Privacy**: actor and link records carry MAC addresses, IP
-  addresses, sysName strings, and SNMP descriptions. Treat as
-  network-identifying data; do not paste raw responses into
-  committed files. Use `<repo>/.local/audits/...` for working
-  output (gitignored).
-- **`info=true` is cheap and always available.** Use it to confirm
-  the parameter set on a specific node before constructing a real
-  query.
-- **Topology Functions are agent-only sources.** Cloud only
-  proxies; there is no Cloud-side aggregation across nodes for
-  topology. For multi-agent topology composition, fetch each
-  agent's response and merge client-side.
+- [query-functions.md](./query-functions.md) -- generic Function transport.
+- [../query-netdata-agents/query-topology.md](../query-netdata-agents/query-topology.md)
+  -- direct-agent transport for the same topology payload.
+- [../create-topology/SKILL.md](../create-topology/SKILL.md)
+  -- authoring and migration workflow for topology producers.

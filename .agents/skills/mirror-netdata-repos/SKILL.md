@@ -109,8 +109,8 @@ output, end-of-run summary). Run it on demand.
 4. Required tools: `git` and `jq`. Install via your package
    manager.
 5. For Phase 2 (auto-discovery): install `gh` (the GitHub CLI)
-   and run `gh auth login`. SSH clone access to the Netdata GitHub
-   organization must work for clones.
+   and run `gh auth login`. SSH clone access to GitHub for the
+   `netdata` organization must work for clones.
 
 ### First sync
 

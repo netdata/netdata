@@ -1,6 +1,6 @@
 # Netdata Functions v3 Protocol - Technical Reference
 
-> **Note**: This is the technical specification. For a practical guide to implementing functions, see [Functions Developer Guide](/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md).
+> **Note**: This is the technical specification. For a practical guide to implementing functions, see [Functions Developer Guide](/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md). Topology Functions use the dedicated [Topology Function Schema](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md).
 
 ## Overview
 
@@ -32,6 +32,11 @@ Netdata Functions allow collectors/plugins to expose interactive data through a 
 2. **Log Explorer Format** (`has_history: true`)
    - Advanced table with backend-powered faceted search, histograms, and infinite scroll
    - Examples: `systemd-journal`, `windows-events`
+
+3. **Topology Format** (`type: "topology"`)
+   - Compact graph payload with actors, graph links, relationship evidence, custom actor detail tables, and overlay references
+   - Uses [FUNCTION_TOPOLOGY_SCHEMA.json](/src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json)
+   - Examples: `topology:network-connections`, `topology:streaming`, `topology:snmp`
 
 ### Critical Implementation Differences
 

@@ -1,0 +1,183 @@
+{
+  "status": 200,
+  "type": "topology",
+  "has_history": false,
+  "update_every": 1,
+  "data": {
+    "schema_version": "netdata.topology.v1",
+    "producer": {
+      "source": "network-connections",
+      "instance": "sample-node",
+      "node_id": "node-a",
+      "machine_guid": "machine-a",
+      "agent_version": "test",
+      "plugin": "network-viewer.plugin",
+      "capabilities": ["topology-v1"]
+    },
+    "collected_at": "2026-05-09T00:00:00Z",
+    "view": {
+      "id": "process-connections",
+      "scope": "process_name",
+      "mode": "detailed",
+      "group_by": ["process_name"]
+    },
+    "dictionaries": {
+      "strings": [
+        "node",
+        "process",
+        "endpoint",
+        "node-a",
+        "machine-a",
+        "nginx",
+        "198.51.100.10",
+        "socket",
+        "192.0.2.10",
+        "tcp",
+        "outbound",
+        "established",
+        "host"
+      ]
+    },
+    "types": {
+      "actor_types": {
+        "node": {
+          "layer": "node",
+          "identity": ["node_id"],
+          "merge_identity": ["node_id"],
+          "aggregation_scopes": ["node"]
+        },
+        "process": {
+          "layer": "process",
+          "identity": ["node_id", "process_name", "pid"],
+          "merge_identity": ["node_id", "process_name"],
+          "parent_identity": ["node_id"],
+          "aggregation_scopes": ["node", "process_name", "pid"]
+        },
+        "endpoint": {
+          "layer": "network",
+          "identity": ["ip", "port"],
+          "merge_identity": ["ip", "port"],
+          "aggregation_scopes": ["node"]
+        }
+      },
+      "link_types": {
+        "socket": {
+          "orientation": "directed",
+          "direction_role": "flow",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "append",
+            "metrics": {
+              "socket_count": "sum",
+              "evidence_count": "sum"
+            }
+          },
+          "evidence_types": ["socket"]
+        }
+      },
+      "evidence_types": {
+        "socket": {
+          "link_type": "socket",
+          "role": "relationship_evidence",
+          "match_columns": [
+            "local_ip",
+            "local_port",
+            "remote_ip",
+            "remote_port",
+            "protocol",
+            "direction"
+          ],
+          "columns": [
+            {"id": "link", "type": "link_ref", "role": "reference"},
+            {"id": "local_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "local_port", "type": "uint", "role": "group_key"},
+            {"id": "remote_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "remote_port", "type": "uint", "role": "group_key"},
+            {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "direction", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "state", "type": "string_ref", "dictionary": "strings"},
+            {"id": "namespace", "type": "string_ref", "dictionary": "strings"}
+          ]
+        }
+      },
+      "aggregation_scopes": {
+        "node": {"columns": ["node_id"], "evidence_policy": "preserve"},
+        "process_name": {"columns": ["node_id", "process_name"], "evidence_policy": "preserve"},
+        "pid": {"columns": ["node_id", "pid"], "evidence_policy": "preserve"}
+      }
+    },
+    "actors": {
+      "rows": 3,
+      "columns": [
+        {"id": "type", "type": "string_ref", "dictionary": "strings"},
+        {"id": "node_id", "type": "string_ref", "dictionary": "strings", "nullable": true, "role": "identity"},
+        {"id": "machine_guid", "type": "string_ref", "dictionary": "strings", "nullable": true},
+        {"id": "process_name", "type": "string_ref", "dictionary": "strings", "nullable": true, "role": "identity"},
+        {"id": "pid", "type": "uint", "nullable": true, "role": "identity"},
+        {"id": "ip", "type": "ip_ref", "dictionary": "strings", "nullable": true, "role": "identity"},
+        {"id": "port", "type": "uint", "nullable": true, "role": "identity"}
+      ],
+      "values": [
+        {"codec": "dict", "values": [0, 1, 2], "indexes": [0, 1, 2]},
+        {"codec": "values", "values": [3, 3, null]},
+        {"codec": "values", "values": [4, 4, null]},
+        {"codec": "values", "values": [null, 5, null]},
+        {"codec": "values", "values": [null, 1001, null]},
+        {"codec": "values", "values": [null, null, 6]},
+        {"codec": "values", "values": [null, null, 443]}
+      ]
+    },
+    "links": {
+      "rows": 1,
+      "columns": [
+        {"id": "src_actor", "type": "actor_ref", "role": "reference"},
+        {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
+        {"id": "type", "type": "string_ref", "dictionary": "strings"},
+        {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"},
+        {"id": "evidence_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+      ],
+      "values": [
+        {"codec": "const", "value": 1},
+        {"codec": "const", "value": 2},
+        {"codec": "const", "value": 7},
+        {"codec": "const", "value": 2},
+        {"codec": "const", "value": 2}
+      ]
+    },
+    "evidence": {
+      "socket": {
+        "type": "socket",
+        "table": {
+          "rows": 2,
+          "columns": [
+            {"id": "link", "type": "link_ref", "role": "reference"},
+            {"id": "local_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "local_port", "type": "uint", "role": "group_key"},
+            {"id": "remote_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "remote_port", "type": "uint", "role": "group_key"},
+            {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "direction", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "state", "type": "string_ref", "dictionary": "strings"},
+            {"id": "namespace", "type": "string_ref", "dictionary": "strings"}
+          ],
+          "values": [
+            {"codec": "const", "value": 0},
+            {"codec": "const", "value": 8},
+            {"codec": "values", "values": [43000, 43001]},
+            {"codec": "const", "value": 6},
+            {"codec": "const", "value": 443},
+            {"codec": "const", "value": 9},
+            {"codec": "const", "value": 10},
+            {"codec": "const", "value": 11},
+            {"codec": "const", "value": 12}
+          ]
+        }
+      }
+    },
+    "stats": {
+      "actors": 3,
+      "links": 1,
+      "evidence_rows": 2
+    }
+  }
+}

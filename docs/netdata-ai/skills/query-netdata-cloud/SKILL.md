@@ -39,6 +39,8 @@ authoritative sources directly:
 | `<repo>/src/plugins.d/FUNCTION_UI_REFERENCE.md` | Functions v3 protocol -- envelope, simple-table vs log-explorer, facets, histograms, charts, field types, pagination, delta mode, PLAY mode, error handling. The single most important reference for any Function work. |
 | `<repo>/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` | Practical guide for collector authors implementing a Function (simple-table or log-explorer) |
 | `<repo>/src/plugins.d/FUNCTION_UI_SCHEMA.json` | JSON Schema for validating Function responses |
+| `<repo>/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | Production topology Function schema guide -- actors, graph links, evidence, detail tables, overlays, aggregation policy |
+| `<repo>/src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | JSON Schema for validating production topology payloads |
 | `<repo>/src/plugins.d/DYNCFG.md` | External-plugin DynCfg protocol (go.d.plugin and other external collectors) |
 | `<repo>/src/daemon/dyncfg/README.md` | Internal DynCfg (high-level and low-level APIs, command enums, lifecycle) |
 | `<repo>/src/database/rrdfunctions.h` | C-level Function registration API (`rrd_function_add`) |

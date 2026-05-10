@@ -348,6 +348,10 @@ Runtime input skills:
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`; relative symlinks at `.agents/skills/<name>`):
 
+- `docs/netdata-ai/skills/create-topology/`
+  Trigger: creating or updating Netdata topology producers and topology Function payloads using the production topology schema; migrating `topology:network-connections`, `topology:streaming`, `topology:snmp`, vSphere topology, or future topology producers; defining actor/link/evidence/table types, direction semantics, aggregation policy, drilldowns, and telemetry overlays.
+  Symlink: `.agents/skills/create-topology` -> `../../docs/netdata-ai/skills/create-topology`.
+  Status: live. SKILL.md plus `how-tos/INDEX.md`.
 - `docs/netdata-ai/skills/query-netdata-cloud/`
   Trigger: querying Netdata Cloud REST API -- metrics, logs (systemd-journal), alerts, generic Function calls on a node.
   Symlink: `.agents/skills/query-netdata-cloud` -> `../../docs/netdata-ai/skills/query-netdata-cloud`.

@@ -4,7 +4,7 @@
 
 Status: open
 
-Sub-state: scope captured, awaiting user decisions on merge semantics, identity-matching policy, conflict resolution, storage model, and scale targets before implementation planning advances.
+Sub-state: scope captured, awaiting user decisions on merge semantics, identity-matching policy, conflict resolution, storage model, and scale targets before implementation planning advances. Immediate detailed/aggregated topology Function payload migration is owned by SOW-0020; this SOW remains the future unified merge/correlation work.
 
 ## Requirements
 
@@ -82,6 +82,7 @@ Current state:
 - Each source today produces its own topology output as a separate function. There is no merged endpoint.
 - Where merge does exist (same-source, per-poll snapshot fusion in the SNMP topology engine), it is implementation-internal — no shared abstraction, no reuse path for cross-source.
 - The codebase has hooks for layered presentation in the topology UI (the `PresentationActorType`, `PresentationLinkType` and friends in `types.go`), suggesting prior thinking about layered views, but no live data wiring.
+- Scope boundary recorded 2026-05-06: SOW-0020 owns the immediate shared topology Function payload migration, including lossless detailed encoding and view-oriented aggregation contracts. This SOW owns the later unified merge/correlation layer that consumes those detailed payloads.
 
 Risks (cross-cutting):
 
@@ -257,6 +258,10 @@ Filled after Decisions 1-6 are recorded. Default skeleton (assuming the recommen
 - SOW opened in `pending/` per user request following completion of the third review round on SOW-0001.
 - Existing prior planning artifact (`TODO-UNIFIED-TOPOLOGY-SCHEMA.md`, 6797 lines) noted as historical context; this SOW is the canonical replacement once user decisions are locked.
 - Six open decisions recorded; no implementation work begins until they are resolved.
+
+### 2026-05-06
+
+- Scope boundary recorded from SOW-0020: detailed/aggregated topology Function payload migration is owned by SOW-0020. This SOW remains pending for unified merge semantics, identity matching, conflict resolution, storage/indexing, scale targets, and cross-layer view behavior.
 
 ## Validation
 

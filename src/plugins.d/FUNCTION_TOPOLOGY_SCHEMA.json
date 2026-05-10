@@ -1,0 +1,1624 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.netdata.cloud/functions/topology/v1.json",
+  "title": "Netdata Topology Function Payload",
+  "description": "Production topology Function payload schema. This schema carries canonical topology facts for aggregation and UI rendering. It intentionally does not carry rollout-adapter reconstruction instructions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "type",
+    "data"
+  ],
+  "properties": {
+    "status": {
+      "type": "integer",
+      "const": 200
+    },
+    "type": {
+      "type": "string",
+      "const": "topology"
+    },
+    "has_history": {
+      "type": "boolean",
+      "const": false
+    },
+    "accepted_params": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "required_params": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "help": {
+      "type": "string"
+    },
+    "update_every": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expires": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "data": {
+      "$ref": "#/$defs/topology_data"
+    }
+  },
+  "$defs": {
+    "topology_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "producer",
+        "collected_at",
+        "dictionaries",
+        "types",
+        "actors",
+        "links"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "const": "netdata.topology.v1"
+        },
+        "producer": {
+          "$ref": "#/$defs/producer"
+        },
+        "collected_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_after": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "view": {
+          "$ref": "#/$defs/view"
+        },
+        "dictionaries": {
+          "$ref": "#/$defs/dictionaries"
+        },
+        "types": {
+          "$ref": "#/$defs/type_registry"
+        },
+        "presentation": {
+          "$ref": "#/$defs/topology_presentation"
+        },
+        "actors": {
+          "$ref": "#/$defs/table"
+        },
+        "links": {
+          "$ref": "#/$defs/table"
+        },
+        "evidence": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/evidence_section"
+          },
+          "default": {}
+        },
+        "tables": {
+          "$ref": "#/$defs/detail_tables"
+        },
+        "overlays": {
+          "$ref": "#/$defs/overlay_refs"
+        },
+        "stats": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/scalar_or_array"
+          },
+          "default": {}
+        },
+        "extensions": {
+          "type": "object",
+          "description": "Producer-private metadata. Extensions must be small, non-sensitive, and must not be required for core aggregation.",
+          "additionalProperties": {
+            "$ref": "#/$defs/scalar_or_array"
+          },
+          "default": {}
+        }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "instance"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/id",
+          "description": "Stable producer id, for example network-connections, streaming, snmp-l2, vsphere."
+        },
+        "instance": {
+          "type": "string",
+          "description": "Source-local producer instance id."
+        },
+        "node_id": {
+          "type": "string"
+        },
+        "machine_guid": {
+          "type": "string"
+        },
+        "agent_version": {
+          "type": "string"
+        },
+        "plugin": {
+          "type": "string"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "scope": {
+          "$ref": "#/$defs/id"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "aggregated",
+            "detailed"
+          ]
+        },
+        "group_by": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
+    "dictionaries": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/scalar_or_array"
+        }
+      },
+      "properties": {
+        "strings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      }
+    },
+    "type_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_types",
+        "link_types"
+      ],
+      "properties": {
+        "actor_types": {
+          "$ref": "#/$defs/actor_type_map"
+        },
+        "link_types": {
+          "$ref": "#/$defs/link_type_map"
+        },
+        "port_types": {
+          "$ref": "#/$defs/port_type_map"
+        },
+        "evidence_types": {
+          "$ref": "#/$defs/evidence_type_map"
+        },
+        "table_types": {
+          "$ref": "#/$defs/table_type_map"
+        },
+        "overlay_templates": {
+          "$ref": "#/$defs/overlay_template_map"
+        },
+        "aggregation_scopes": {
+          "$ref": "#/$defs/aggregation_scope_map"
+        }
+      }
+    },
+    "actor_type_map": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/actor_type"
+      }
+    },
+    "link_type_map": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/link_type"
+      }
+    },
+    "port_type_map": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/port_type"
+      },
+      "default": {}
+    },
+    "evidence_type_map": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/evidence_type"
+      },
+      "default": {}
+    },
+    "table_type_map": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/table_type"
+      },
+      "default": {}
+    },
+    "overlay_template_map": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/overlay_template"
+      },
+      "default": {}
+    },
+    "aggregation_scope_map": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/aggregation_scope"
+      },
+      "default": {}
+    },
+    "actor_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer",
+        "identity"
+      ],
+      "properties": {
+        "layer": {
+          "$ref": "#/$defs/layer"
+        },
+        "identity": {
+          "type": "array",
+          "description": "Actor-table column ids that form the source-local canonical identity.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "merge_identity": {
+          "type": "array",
+          "description": "Actor-table column ids that may be used by a cross-node or cross-source aggregator.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "parent_identity": {
+          "type": "array",
+          "description": "Actor-table column ids that identify the actor this actor lives on or belongs to.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "aggregation_scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "presentation": {
+          "$ref": "#/$defs/actor_type_presentation"
+        }
+      }
+    },
+    "link_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orientation",
+        "direction_role",
+        "aggregation"
+      ],
+      "properties": {
+        "orientation": {
+          "type": "string",
+          "enum": [
+            "directed",
+            "undirected",
+            "hierarchical",
+            "observed_bidirectional"
+          ]
+        },
+        "direction_role": {
+          "type": "string",
+          "enum": [
+            "none",
+            "flow",
+            "dependency",
+            "ownership",
+            "observation"
+          ]
+        },
+        "aggregation": {
+          "$ref": "#/$defs/link_aggregation"
+        },
+        "evidence_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "overlay_templates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "presentation": {
+          "$ref": "#/$defs/link_type_presentation"
+        }
+      }
+    },
+    "port_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "presentation": {
+          "$ref": "#/$defs/port_type_presentation"
+        }
+      }
+    },
+    "topology_presentation": {
+      "type": "object",
+      "description": "Graph-level presentation policy. Type-specific visual tokens live inside actor, link, and port type definitions; this object carries only cross-type policies such as selection, legend, port field labels, and scale-key labels.",
+      "additionalProperties": false,
+      "properties": {
+        "profile_version": {
+          "type": "string",
+          "description": "Producer presentation profile version for diagnostics. This does not replace data.schema_version."
+        },
+        "selection": {
+          "$ref": "#/$defs/selection_presentation"
+        },
+        "legend": {
+          "$ref": "#/$defs/presentation_legend"
+        },
+        "port_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/presentation_field"
+          },
+          "default": []
+        },
+        "scale_keys": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/scale_key_presentation"
+          },
+          "default": {}
+        }
+      }
+    },
+    "actor_type_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "actor",
+            "endpoint",
+            "group"
+          ]
+        },
+        "icon": {
+          "$ref": "#/$defs/icon_token"
+        },
+        "color_slot": {
+          "$ref": "#/$defs/color_slot"
+        },
+        "opacity": {
+          "$ref": "#/$defs/opacity_token"
+        },
+        "border": {
+          "$ref": "#/$defs/border_presentation"
+        },
+        "annotation": {
+          "$ref": "#/$defs/annotation_presentation"
+        },
+        "size": {
+          "$ref": "#/$defs/actor_size_presentation"
+        },
+        "label_policy": {
+          "$ref": "#/$defs/label_policy"
+        },
+        "ports": {
+          "$ref": "#/$defs/actor_ports_presentation"
+        },
+        "hover": {
+          "$ref": "#/$defs/hover_presentation"
+        }
+      }
+    },
+    "link_type_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "color_slot": {
+          "$ref": "#/$defs/color_slot"
+        },
+        "opacity": {
+          "$ref": "#/$defs/opacity_token"
+        },
+        "line_style": {
+          "type": "string",
+          "enum": [
+            "solid",
+            "dashed",
+            "dotted"
+          ]
+        },
+        "width": {
+          "$ref": "#/$defs/width_token"
+        },
+        "curve": {
+          "type": "string",
+          "enum": [
+            "straight",
+            "clockwise",
+            "counter_clockwise",
+            "auto"
+          ]
+        },
+        "arrow": {
+          "type": "string",
+          "enum": [
+            "none",
+            "forward",
+            "reverse",
+            "both",
+            "auto"
+          ]
+        },
+        "variable": {
+          "$ref": "#/$defs/link_variable_presentation"
+        },
+        "hover": {
+          "$ref": "#/$defs/hover_presentation"
+        }
+      }
+    },
+    "port_type_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "color_slot": {
+          "$ref": "#/$defs/color_slot"
+        },
+        "opacity": {
+          "$ref": "#/$defs/opacity_token"
+        }
+      }
+    },
+    "selection_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actor_click": {
+          "$ref": "#/$defs/actor_click_presentation"
+        }
+      }
+    },
+    "actor_click_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "highlight_connections",
+            "highlight_path"
+          ]
+        },
+        "path_table": {
+          "$ref": "#/$defs/id"
+        },
+        "path_owner_column": {
+          "$ref": "#/$defs/id"
+        },
+        "path_actor_column": {
+          "$ref": "#/$defs/id"
+        },
+        "path_order_column": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "highlight_path"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "path_table",
+              "path_actor_column",
+              "path_order_column"
+            ]
+          }
+        }
+      ]
+    },
+    "presentation_legend": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/legend_entry"
+          },
+          "default": []
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/legend_entry"
+          },
+          "default": []
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/legend_entry"
+          },
+          "default": []
+        }
+      }
+    },
+    "legend_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "presentation_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "scale_key_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        }
+      }
+    },
+    "border_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "color_slot": {
+          "$ref": "#/$defs/color_slot"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "solid",
+            "dashed",
+            "dotted"
+          ],
+          "default": "solid"
+        }
+      }
+    },
+    "annotation_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color_slot": {
+          "$ref": "#/$defs/color_slot"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "ring",
+            "dot",
+            "none"
+          ]
+        }
+      }
+    },
+    "actor_size_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "fixed",
+            "link_count",
+            "metric"
+          ]
+        },
+        "metric_column": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "metric"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "metric_column"
+            ]
+          }
+        }
+      ]
+    },
+    "label_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "type": "array",
+          "description": "Actor-table columns that are safe to use as display labels, in priority order.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "fallback": {
+          "type": "string",
+          "enum": [
+            "type_label",
+            "row_index",
+            "none"
+          ],
+          "default": "type_label"
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 256,
+          "default": 80
+        },
+        "array": {
+          "type": "string",
+          "enum": [
+            "reject",
+            "first",
+            "summarize"
+          ],
+          "default": "reject"
+        }
+      }
+    },
+    "actor_ports_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show_bullets": {
+          "type": "boolean",
+          "default": false
+        },
+        "sources": {
+          "type": "array",
+          "description": "Port-bullet sources. The UI derives bullets from these compact table references instead of using domain-specific hardcoding.",
+          "items": {
+            "$ref": "#/$defs/port_source_presentation"
+          },
+          "default": []
+        }
+      }
+    },
+    "port_source_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "actor_column",
+        "name_column"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "links",
+            "evidence",
+            "actor_table"
+          ]
+        },
+        "table": {
+          "$ref": "#/$defs/id",
+          "description": "Actor detail table id when source is actor_table."
+        },
+        "evidence": {
+          "$ref": "#/$defs/id",
+          "description": "Evidence section or evidence type id when source is evidence."
+        },
+        "actor_column": {
+          "$ref": "#/$defs/id",
+          "description": "Column in the source table that references the actor receiving the bullet."
+        },
+        "name_column": {
+          "$ref": "#/$defs/id",
+          "description": "Column in the source table used as the bullet key or label."
+        },
+        "type_column": {
+          "$ref": "#/$defs/id",
+          "description": "Optional source-table column whose value selects a port_types entry."
+        },
+        "default_type": {
+          "$ref": "#/$defs/id",
+          "description": "Port type to use when type_column is absent or a row has no usable type value."
+        },
+        "status_column": {
+          "$ref": "#/$defs/id"
+        },
+        "mode_column": {
+          "$ref": "#/$defs/id"
+        },
+        "role_column": {
+          "$ref": "#/$defs/id"
+        },
+        "sources_column": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "hover_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/presentation_field"
+          },
+          "default": []
+        }
+      }
+    },
+    "link_variable_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "scale_key",
+        "value_column"
+      ],
+      "properties": {
+        "channel": {
+          "type": "string",
+          "enum": [
+            "width",
+            "opacity"
+          ]
+        },
+        "scale_key": {
+          "$ref": "#/$defs/id"
+        },
+        "value_column": {
+          "$ref": "#/$defs/id"
+        },
+        "min": {
+          "type": "string",
+          "description": "Visual token lower bound for the selected channel."
+        },
+        "max": {
+          "type": "string",
+          "description": "Visual token upper bound for the selected channel."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "channel": {
+                "const": "width"
+              }
+            },
+            "required": [
+              "channel"
+            ]
+          },
+          "then": {
+            "properties": {
+              "min": {
+                "$ref": "#/$defs/width_token"
+              },
+              "max": {
+                "$ref": "#/$defs/width_token"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "channel": {
+                "const": "opacity"
+              }
+            },
+            "required": [
+              "channel"
+            ]
+          },
+          "then": {
+            "properties": {
+              "min": {
+                "$ref": "#/$defs/opacity_token"
+              },
+              "max": {
+                "$ref": "#/$defs/opacity_token"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "link_aggregation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "direction"
+      ],
+      "properties": {
+        "direction": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "ignore",
+            "canonicalize_unordered"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "enum": [
+            "append",
+            "count",
+            "drop"
+          ],
+          "default": "append"
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/aggregation_rule"
+          },
+          "default": {}
+        }
+      }
+    },
+    "evidence_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "link_type",
+        "role",
+        "columns"
+      ],
+      "properties": {
+        "link_type": {
+          "$ref": "#/$defs/id"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "relationship_evidence",
+            "observation_evidence",
+            "metric_sample"
+          ]
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/column"
+          },
+          "minItems": 1
+        },
+        "match_columns": {
+          "type": "array",
+          "description": "Evidence column ids required to preserve exact relationship matching.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
+    "table_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "owner",
+        "aggregation",
+        "columns"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "actor_detail",
+            "actor_inventory",
+            "relationship_evidence",
+            "relationship_summary"
+          ]
+        },
+        "owner": {
+          "type": "string",
+          "enum": [
+            "actor",
+            "link",
+            "evidence",
+            "topology"
+          ]
+        },
+        "aggregation": {
+          "type": "string",
+          "enum": [
+            "none",
+            "append",
+            "set",
+            "sum",
+            "min",
+            "max",
+            "last",
+            "first"
+          ]
+        },
+        "source_evidence": {
+          "$ref": "#/$defs/id"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/column"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "overlay_template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "merge"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "netdata.metrics",
+            "netdata.function",
+            "external"
+          ]
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "selector_params": {
+          "type": "array",
+          "description": "Parameter names supplied by overlay refs.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "merge": {
+          "$ref": "#/$defs/overlay_merge"
+        }
+      }
+    },
+    "overlay_merge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "refs",
+        "values"
+      ],
+      "properties": {
+        "refs": {
+          "type": "string",
+          "enum": [
+            "append",
+            "set"
+          ]
+        },
+        "values": {
+          "type": "string",
+          "enum": [
+            "sum",
+            "min",
+            "max",
+            "avg",
+            "last",
+            "none"
+          ]
+        }
+      }
+    },
+    "aggregation_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "columns"
+      ],
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "evidence_policy": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "count"
+          ],
+          "default": "preserve"
+        }
+      }
+    },
+    "evidence_section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "table"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/id"
+        },
+        "table": {
+          "$ref": "#/$defs/table"
+        }
+      }
+    },
+    "detail_tables": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/detail_table"
+          },
+          "default": {}
+        },
+        "relationship": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/detail_table"
+          },
+          "default": {}
+        }
+      },
+      "default": {}
+    },
+    "detail_table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "table"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/id"
+        },
+        "table": {
+          "$ref": "#/$defs/table"
+        }
+      }
+    },
+    "overlay_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "refs": {
+          "$ref": "#/$defs/table"
+        }
+      },
+      "default": {}
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rows",
+        "columns",
+        "values"
+      ],
+      "properties": {
+        "rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/column"
+          }
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/column_encoding"
+          }
+        }
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "bool",
+            "int",
+            "uint",
+            "float",
+            "string",
+            "string_ref",
+            "timestamp",
+            "duration",
+            "ip",
+            "ip_ref",
+            "mac",
+            "mac_ref",
+            "actor_ref",
+            "link_ref",
+            "evidence_ref",
+            "array",
+            "json"
+          ]
+        },
+        "dictionary": {
+          "$ref": "#/$defs/id"
+        },
+        "nullable": {
+          "type": "boolean",
+          "default": false
+        },
+        "unit": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "identity",
+            "merge_identity",
+            "parent_identity",
+            "group_key",
+            "metric",
+            "attribute",
+            "timestamp",
+            "reference"
+          ]
+        },
+        "aggregation": {
+          "$ref": "#/$defs/aggregation_rule"
+        }
+      }
+    },
+    "column_encoding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "codec",
+            "value"
+          ],
+          "properties": {
+            "codec": {
+              "type": "string",
+              "const": "const"
+            },
+            "value": {
+              "$ref": "#/$defs/cell_value"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "codec",
+            "values"
+          ],
+          "properties": {
+            "codec": {
+              "type": "string",
+              "const": "values"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/cell_value"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "codec",
+            "values",
+            "indexes"
+          ],
+          "properties": {
+            "codec": {
+              "type": "string",
+              "const": "dict"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/cell_value"
+              }
+            },
+            "indexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "aggregation_rule": {
+      "type": "string",
+      "enum": [
+        "none",
+        "first",
+        "last",
+        "set",
+        "count",
+        "sum",
+        "min",
+        "max",
+        "avg"
+      ]
+    },
+    "layer": {
+      "type": "string",
+      "enum": [
+        "node",
+        "virtualization",
+        "container",
+        "kubernetes",
+        "process",
+        "network",
+        "storage",
+        "streaming",
+        "service",
+        "custom"
+      ]
+    },
+    "color_slot": {
+      "type": "string",
+      "enum": [
+        "primary",
+        "secondary",
+        "accent",
+        "self",
+        "neutral",
+        "muted",
+        "dim",
+        "derived",
+        "info",
+        "structural",
+        "warning",
+        "success",
+        "danger",
+        "blue",
+        "green",
+        "orange",
+        "purple",
+        "cyan",
+        "yellow",
+        "teal",
+        "gray"
+      ]
+    },
+    "opacity_token": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "muted",
+        "faded"
+      ]
+    },
+    "width_token": {
+      "type": "string",
+      "enum": [
+        "thin",
+        "normal",
+        "thick",
+        "emphasis"
+      ]
+    },
+    "icon_token": {
+      "type": "string",
+      "enum": [
+        "router",
+        "switch",
+        "firewall",
+        "access_point",
+        "server",
+        "storage",
+        "load_balancer",
+        "printer",
+        "phone",
+        "ups",
+        "camera",
+        "process",
+        "agent",
+        "netdata-agent",
+        "parent",
+        "remote-endpoint",
+        "local-endpoint",
+        "segment",
+        "self",
+        "ip",
+        "cloud",
+        "container",
+        "vm",
+        "database",
+        "service",
+        "datacenter",
+        "cluster",
+        "host",
+        "network",
+        "datastore",
+        "datastore_cluster",
+        "resource_pool"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$"
+    },
+    "scalar_or_array": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "cell_value": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cell_value"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/cell_value"
+          }
+        }
+      ]
+    }
+  }
+}

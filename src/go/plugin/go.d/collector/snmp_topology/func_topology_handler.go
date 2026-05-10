@@ -40,12 +40,16 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 	if !ok {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after topology refresh")
 	}
+	payload, err := snmpTopologyToV1(data)
+	if err != nil {
+		return funcapi.InternalErrorResponse("failed to build topology response: %v", err)
+	}
 
 	return &funcapi.FunctionResponse{
 		Status:       200,
 		Help:         "SNMP topology and neighbor discovery data",
 		ResponseType: "topology",
-		Data:         data,
+		Data:         payload,
 	}
 }
 

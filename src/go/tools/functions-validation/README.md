@@ -27,6 +27,18 @@ echo '{"status":200,"type":"table","columns":{},"data":[]}' | \
   (cd src/go && go run ./tools/functions-validation/validate)
 ```
 
+## Validate topology v1 fixtures
+```
+(cd src/go && \
+  go run ./tools/functions-validation/validate \
+    --schema ../plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json \
+    --input tools/functions-validation/fixtures/topology-v1/network-connections.json)
+```
+
+Topology v1 validation uses the JSON Schema and additional compact-table
+semantic checks: decoded column lengths must match `rows`, dictionary indexes
+must be in range, and actor/link references must point to existing rows.
+
 ## Validate output (require rows)
 ```
 src/go/go.d.plugin \
@@ -69,3 +81,4 @@ src/go/go.d.plugin \
 - MSSQL uses an init container to enable Query Store and seed data.
 - MongoDB enables the profiler to populate `system.profile`.
 - The validator reads the canonical schema at `src/plugins.d/FUNCTION_UI_SCHEMA.json`.
+- Topology v1 fixtures live under `src/go/tools/functions-validation/fixtures/topology-v1/`.
