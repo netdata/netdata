@@ -62,6 +62,35 @@ func TestRedHatReleaseFromFile(t *testing.T) {
 	}
 }
 
+func TestDebianFlavorFromOSRelease(t *testing.T) {
+	tests := map[string]struct {
+		contents string
+		want     bool
+	}{
+		"debian": {
+			contents: "ID=debian\nNAME=\"Debian GNU/Linux\"\n",
+			want:     true,
+		},
+		"ubuntu-like-not-debian": {
+			contents: "ID=ubuntu\nID_LIKE=debian\nNAME=\"Ubuntu\"\n",
+			want:     false,
+		},
+		"other-distro": {
+			contents: "ID=fedora\nID_LIKE=\"rhel fedora\"\n",
+			want:     false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := DebianFlavorFromOSRelease(tc.contents)
+			if got != tc.want {
+				t.Fatalf("DebianFlavorFromOSRelease() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestSelectHelpers(t *testing.T) {
 	tests := map[string]struct {
 		kernels uint32
@@ -76,6 +105,13 @@ func TestSelectHelpers(t *testing.T) {
 			kver:    397850,
 			wantIdx: 10,
 			wantObj: "pnetdata_ebpf_process.6.8.o",
+		},
+		"kernel-612": {
+			kernels: 1 << 11,
+			isRHF:   -1,
+			kver:    397850,
+			wantIdx: 11,
+			wantObj: "pnetdata_ebpf_process.6.12.o",
 		},
 		"rhf": {
 			kernels: 1<<3 | 1<<4 | 1<<7,
@@ -159,50 +195,124 @@ func TestSelectLoadAndAttachModes(t *testing.T) {
 
 func TestBuildLoadPlan(t *testing.T) {
 	tests := map[string]struct {
-		kernels    uint32
-		isRHF      int
-		kver       uint32
-		name       string
-		isReturn   bool
-		hasBTF     bool
-		load       LoadMethod
-		coreAttach string
-		mode       RunMode
-		want       LoadPlan
+		kernels          uint32
+		isRHF            int
+		kver             uint32
+		name             string
+		isReturn         bool
+		hasResizableMaps bool
+		isDebian         bool
+		hasBTF           bool
+		load             LoadMethod
+		coreAttach       string
+		mode             RunMode
+		want             LoadPlan
 	}{
 		"core-mode": {
-			kernels:    1<<1 | 1<<2 | 1<<10,
-			isRHF:      -1,
-			kver:       397850,
-			name:       "process",
-			isReturn:   false,
-			hasBTF:     true,
-			load:       LoadCore,
-			coreAttach: "probe",
-			mode:       RunModeEntry,
+			kernels:          1<<1 | 1<<2 | 1<<10,
+			isRHF:            -1,
+			kver:             397850,
+			name:             "process",
+			isReturn:         false,
+			hasResizableMaps: false,
+			isDebian:         false,
+			hasBTF:           true,
+			load:             LoadCore,
+			coreAttach:       "probe",
+			mode:             RunModeEntry,
 			want: LoadPlan{
 				KernelVersion: 397850,
 				IsRHF:         -1,
 				Selector:      10,
+				Flavor:        ObjectFlavorBase,
 				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process.6.8.o",
 				LoadMode:      LoadCore,
 				ProgramMode:   LoadProbe,
 			},
 		},
+		"buffer-mode": {
+			kernels:          1<<1 | 1<<2 | 1<<10,
+			isRHF:            -1,
+			kver:             395264,
+			name:             "process",
+			isReturn:         false,
+			hasResizableMaps: true,
+			isDebian:         false,
+			hasBTF:           true,
+			load:             LoadCore,
+			coreAttach:       "probe",
+			mode:             RunModeEntry,
+			want: LoadPlan{
+				KernelVersion: 395264,
+				IsRHF:         -1,
+				Selector:      10,
+				Flavor:        ObjectFlavorBuffer,
+				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process_buffer.6.8.o",
+				LoadMode:      LoadCore,
+				ProgramMode:   LoadProbe,
+			},
+		},
+		"arena-mode": {
+			kernels:          1 << 11,
+			isRHF:            -1,
+			kver:             397850,
+			name:             "process",
+			isReturn:         false,
+			hasResizableMaps: true,
+			isDebian:         false,
+			hasBTF:           true,
+			load:             LoadCore,
+			coreAttach:       "probe",
+			mode:             RunModeEntry,
+			want: LoadPlan{
+				KernelVersion: 397850,
+				IsRHF:         -1,
+				Selector:      11,
+				Flavor:        ObjectFlavorArena,
+				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process_arena.6.12.o",
+				LoadMode:      LoadCore,
+				ProgramMode:   LoadProbe,
+			},
+		},
+		"debian-buffer-only": {
+			kernels:          1 << 11,
+			isRHF:            -1,
+			kver:             397850,
+			name:             "process",
+			isReturn:         false,
+			hasResizableMaps: true,
+			isDebian:         true,
+			hasBTF:           true,
+			load:             LoadCore,
+			coreAttach:       "probe",
+			mode:             RunModeEntry,
+			want: LoadPlan{
+				KernelVersion: 397850,
+				IsRHF:         -1,
+				Selector:      11,
+				Flavor:        ObjectFlavorBuffer,
+				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process_buffer.6.12.o",
+				LoadMode:      LoadCore,
+				ProgramMode:   LoadProbe,
+			},
+		},
 		"legacy-fallback": {
-			kernels:    1<<3 | 1<<4 | 1<<7,
-			isRHF:      1,
-			kver:       328800,
-			name:       "process",
-			isReturn:   true,
-			hasBTF:     false,
-			load:       LoadPlayDice,
-			coreAttach: "tracepoint",
-			mode:       RunModeReturn,
+			kernels:          1<<3 | 1<<4 | 1<<7,
+			isRHF:            1,
+			kver:             328800,
+			name:             "process",
+			isReturn:         true,
+			hasResizableMaps: false,
+			isDebian:         false,
+			hasBTF:           false,
+			load:             LoadPlayDice,
+			coreAttach:       "tracepoint",
+			mode:             RunModeReturn,
 			want: LoadPlan{
 				KernelVersion: 328800,
 				IsRHF:         1,
 				Selector:      4,
+				Flavor:        ObjectFlavorBase,
 				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/rnetdata_ebpf_process.5.4.rhf.o",
 				LoadMode:      LoadLegacy,
 				ProgramMode:   LoadTracepoint,
@@ -219,6 +329,8 @@ func TestBuildLoadPlan(t *testing.T) {
 				tc.kver,
 				tc.name,
 				tc.isReturn,
+				tc.hasResizableMaps,
+				tc.isDebian,
 				tc.hasBTF,
 				tc.load,
 				tc.coreAttach,

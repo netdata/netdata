@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	minimumKernelVersion = 4<<16 + 11<<8
-	minimumRHVersion     = 7*256 + 5
+	minimumKernelVersion       = 4<<16 + 11<<8
+	minimumKernelVersionBuffer = 5<<16 + 10<<8
+	minimumKernelVersionArena  = 6<<16 + 12<<8
+	minimumRHVersion           = 7*256 + 5
 )
 
 type LoadMethod uint32
@@ -46,10 +48,19 @@ type LoadPlan struct {
 	KernelVersion uint32
 	IsRHF         int
 	Selector      uint32
+	Flavor        ObjectFlavor
 	ObjectPath    string
 	LoadMode      LoadMethod
 	ProgramMode   ProgramMode
 }
+
+type ObjectFlavor string
+
+const (
+	ObjectFlavorBase   ObjectFlavor = ""
+	ObjectFlavorBuffer ObjectFlavor = "buffer"
+	ObjectFlavorArena  ObjectFlavor = "arena"
+)
 
 var kernelReleaseRe = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)`)
 var redHatReleaseRe = regexp.MustCompile(`([0-9]+)\.([0-9]+)`)
@@ -165,6 +176,42 @@ func KernelRejected(versionString string, rejectListFiles ...string) (bool, erro
 	return false, nil
 }
 
+func DebianFlavorFromOSRelease(contents string) bool {
+	scanner := bufio.NewScanner(strings.NewReader(contents))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+
+		key = strings.TrimSpace(key)
+		if key != "ID" {
+			continue
+		}
+
+		value = strings.Trim(value, `"'`)
+		if value == "debian" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func IsDebianFlavor() bool {
+	contents, err := readFirstExistingFile("/etc/os-release", "/usr/lib/os-release")
+	if err != nil {
+		return false
+	}
+
+	return DebianFlavorFromOSRelease(contents)
+}
+
 func KernelSupported(version uint32, rhVersion int, rejected bool) bool {
 	if rejected {
 		return false
@@ -202,6 +249,7 @@ func SelectKernelName(selector uint32) string {
 		"5.15",
 		"5.16",
 		"6.8",
+		"6.12",
 	}
 
 	if selector >= uint32(len(kernelNames)) {
@@ -226,6 +274,8 @@ func SelectMaxIndex(isRHF int, kver uint32) int {
 	}
 
 	switch {
+	case kver >= minimumKernelVersionArena:
+		return 11
 	case kver >= 395264:
 		return 10
 	case kver >= 331776:
@@ -263,9 +313,41 @@ func SelectIndex(kernels uint32, isRHF int, kver uint32) uint32 {
 }
 
 func BuildObjectPath(pluginsDir string, selector uint32, name string, isReturn bool, isRHF int) string {
+	return BuildObjectPathWithFlavor(pluginsDir, selector, name, isReturn, isRHF, ObjectFlavorBase)
+}
+
+func SelectObjectFlavor(kver uint32, hasResizableMaps bool, isDebian bool) ObjectFlavor {
+	if !hasResizableMaps {
+		return ObjectFlavorBase
+	}
+
+	if kver >= minimumKernelVersionArena && !isDebian {
+		return ObjectFlavorArena
+	}
+
+	if kver >= minimumKernelVersionBuffer {
+		return ObjectFlavorBuffer
+	}
+
+	return ObjectFlavorBase
+}
+
+func BuildObjectPathWithFlavor(
+	pluginsDir string,
+	selector uint32,
+	name string,
+	isReturn bool,
+	isRHF int,
+	flavor ObjectFlavor,
+) string {
 	prefix := 'p'
 	if isReturn {
 		prefix = 'r'
+	}
+
+	objectName := name
+	if flavor != ObjectFlavorBase {
+		objectName = fmt.Sprintf("%s_%s", name, flavor)
 	}
 
 	suffix := ""
@@ -276,7 +358,7 @@ func BuildObjectPath(pluginsDir string, selector uint32, name string, isReturn b
 	return filepath.Join(
 		pluginsDir,
 		"ebpf.d",
-		fmt.Sprintf("%cnetdata_ebpf_%s.%s%s.o", prefix, name, SelectKernelName(selector), suffix),
+		fmt.Sprintf("%cnetdata_ebpf_%s.%s%s.o", prefix, objectName, SelectKernelName(selector), suffix),
 	)
 }
 
@@ -319,14 +401,7 @@ func ConvertCoreType(value string, mode RunMode) ProgramMode {
 }
 
 func PlanObjectPath(pluginsDir string, kernels uint32, isRHF int, kver uint32, name string, isReturn bool) LoadPlan {
-	selector := SelectIndex(kernels, isRHF, kver)
-
-	return LoadPlan{
-		KernelVersion: kver,
-		IsRHF:         isRHF,
-		Selector:      selector,
-		ObjectPath:    BuildObjectPath(pluginsDir, selector, name, isReturn, isRHF),
-	}
+	return BuildLoadPlan(pluginsDir, kernels, isRHF, kver, name, isReturn, false, false, false, LoadLegacy, "", RunModeEntry)
 }
 
 func BuildLoadPlan(
@@ -336,19 +411,23 @@ func BuildLoadPlan(
 	kver uint32,
 	name string,
 	isReturn bool,
+	hasResizableMaps bool,
+	isDebian bool,
 	hasBTF bool,
 	load LoadMethod,
 	coreAttach string,
 	mode RunMode,
 ) LoadPlan {
 	selector := SelectIndex(kernels, isRHF, kver)
+	flavor := SelectObjectFlavor(kver, hasResizableMaps, isDebian)
 	resolvedLoad := SelectLoadMode(hasBTF, load, kver, isRHF)
 
 	return LoadPlan{
 		KernelVersion: kver,
 		IsRHF:         isRHF,
 		Selector:      selector,
-		ObjectPath:    BuildObjectPath(pluginsDir, selector, name, isReturn, isRHF),
+		Flavor:        flavor,
+		ObjectPath:    BuildObjectPathWithFlavor(pluginsDir, selector, name, isReturn, isRHF, flavor),
 		LoadMode:      resolvedLoad,
 		ProgramMode:   ConvertCoreType(coreAttach, mode),
 	}
