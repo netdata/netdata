@@ -96,6 +96,9 @@
         "presentation": {
           "$ref": "#/$defs/topology_presentation"
         },
+        "correlation": {
+          "$ref": "#/$defs/topology_correlation"
+        },
         "actors": {
           "$ref": "#/$defs/table"
         },
@@ -463,6 +466,134 @@
         }
       }
     },
+    "topology_correlation": {
+      "type": "object",
+      "description": "Producer-visible correlation contract used by aggregators to resolve pure correlation actors across independently produced topology maps. This is not an aggregator state dump; final aggregated payloads remain normal topology graphs.",
+      "additionalProperties": false,
+      "required": [
+        "rules"
+      ],
+      "properties": {
+        "rules": {
+          "type": "object",
+          "description": "Correlation rules keyed by producer-local rule id. Rules define how keys are built, the action to apply on a match, and the link type used for the final visible graph.",
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/correlation_rule"
+          },
+          "minProperties": 1
+        },
+        "points": {
+          "description": "Compact table of pure correlation actors and their match keys. Required columns are actor, rule, and every column referenced by each referenced rule key.",
+          "$ref": "#/$defs/table"
+        },
+        "claims": {
+          "description": "Compact table of real actors and the keys they can satisfy. Required columns are actor, rule, and every column referenced by each referenced rule key.",
+          "$ref": "#/$defs/table"
+        }
+      }
+    },
+    "correlation_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "priority",
+        "key_space",
+        "key",
+        "point_actor_types",
+        "output_link_type"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "Visible output semantics when a point matches a claim. absorb removes matching correlation actors and rewrites links. link keeps the correlation actor visible and links it to the matched actor.",
+          "enum": [
+            "absorb",
+            "link"
+          ]
+        },
+        "priority": {
+          "type": "integer",
+          "description": "Lower numbers run first. Exact rules should use higher priority than partial/broader rules.",
+          "minimum": 0
+        },
+        "key_space": {
+          "$ref": "#/$defs/id"
+        },
+        "key": {
+          "type": "array",
+          "description": "Declarative key template. The aggregator concatenates normalized column values and literals; it does not execute code or know the semantic meaning of the columns.",
+          "items": {
+            "$ref": "#/$defs/correlation_key_part"
+          },
+          "minItems": 1
+        },
+        "point_actor_types": {
+          "type": "array",
+          "description": "Actor type ids that represent pure correlation points for this rule.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "claim_actor_types": {
+          "type": "array",
+          "description": "Actor type ids that may satisfy points for this rule. Empty means any actor type that emits a claim row may satisfy the rule.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "correlation_link_types": {
+          "type": "array",
+          "description": "Link type ids that connect real actors to correlation actors and may be consumed or rewritten by this rule.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "output_link_type": {
+          "description": "Link type id to emit for rewritten absorb links or visible partial/link correlations.",
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "correlation_key_part": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "column"
+          ],
+          "properties": {
+            "column": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "literal"
+          ],
+          "properties": {
+            "literal": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        }
+      ]
+    },
     "actor_type_presentation": {
       "type": "object",
       "additionalProperties": false,
@@ -555,6 +686,22 @@
         },
         "hover": {
           "$ref": "#/$defs/hover_presentation"
+        },
+        "layout": {
+          "$ref": "#/$defs/link_layout_presentation"
+        }
+      }
+    },
+    "link_layout_presentation": {
+      "type": "object",
+      "description": "Tokenized layout hints for the UI force graph. Producers choose relative tokens; the UI owns numeric force and distance values.",
+      "additionalProperties": false,
+      "properties": {
+        "strength": {
+          "$ref": "#/$defs/layout_strength_token"
+        },
+        "distance": {
+          "$ref": "#/$defs/layout_distance_token"
         }
       }
     },
@@ -872,6 +1019,10 @@
         "name_column": {
           "$ref": "#/$defs/id",
           "description": "Column in the source table used as the bullet key or label."
+        },
+        "value_column": {
+          "$ref": "#/$defs/id",
+          "description": "Optional numeric source-table column whose values are summed for weighted bullet count and actor sizing."
         },
         "type_column": {
           "$ref": "#/$defs/id",
@@ -1505,6 +1656,26 @@
         "normal",
         "thick",
         "emphasis"
+      ]
+    },
+    "layout_strength_token": {
+      "type": "string",
+      "enum": [
+        "weakest",
+        "weaker",
+        "normal",
+        "stronger",
+        "strongest"
+      ]
+    },
+    "layout_distance_token": {
+      "type": "string",
+      "enum": [
+        "closest",
+        "closer",
+        "normal",
+        "farther",
+        "farthest"
       ]
     },
     "icon_token": {

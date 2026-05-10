@@ -27,7 +27,6 @@ agent API.
 | Node identity, hardware, vnodes | [query-nodes.md](./query-nodes.md) |
 | Streaming (parent / child / replication) -- agent-only | [query-streaming.md](./query-streaming.md) |
 | **Operational how-tos (live catalog)** | [how-tos/INDEX.md](./how-tos/INDEX.md) |
-| **Verification questions (consumed by SOW-0006 harness)** | [verify/questions.md](./verify/questions.md) |
 
 
 | Transport | Auth | When to use |
@@ -55,7 +54,11 @@ implementation.
    a new how-to and add it to
    [`how-tos/INDEX.md`](./how-tos/INDEX.md) BEFORE completing the
    task. The catalog is **live** -- the next assistant should not
-   redo the same analysis.
+   redo the same analysis. Keep this catalog operator-facing:
+   recipes here should explain how to fetch or use Agent data.
+   Developer contract validation for topology producers, schemas,
+   fixtures, UI adapters, or aggregator handoffs belongs in the
+   relevant project developer skill, not in this public skill.
 2. **Use the token-safe wrappers.** `agents_query_cloud`,
    `agents_query_agent`, `agents_call_function` from
    [`scripts/_lib.sh`](./scripts/_lib.sh) handle auth internally

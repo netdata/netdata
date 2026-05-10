@@ -35,7 +35,12 @@
         "tcp",
         "outbound",
         "established",
-        "host"
+        "public",
+        "ownership",
+        "endpoint_socket",
+        "socket_exact",
+        "network_socket",
+        "correlated_socket"
       ]
     },
     "types": {
@@ -51,7 +56,25 @@
           "identity": ["node_id", "process_name", "pid"],
           "merge_identity": ["node_id", "process_name"],
           "parent_identity": ["node_id"],
-          "aggregation_scopes": ["node", "process_name", "pid"]
+          "aggregation_scopes": ["node", "process_name", "pid"],
+          "presentation": {
+            "label": "Process",
+            "color_slot": "primary",
+            "size": {"mode": "metric", "metric_column": "socket_count"},
+            "ports": {
+              "show_bullets": true,
+              "sources": [
+                {
+                  "source": "actor_table",
+                  "table": "socket_ports",
+                  "actor_column": "actor",
+                  "name_column": "port",
+                  "value_column": "socket_count",
+                  "default_type": "topology"
+                }
+              ]
+            }
+          }
         },
         "endpoint": {
           "layer": "network",
@@ -61,6 +84,26 @@
         }
       },
       "link_types": {
+        "ownership": {
+          "orientation": "hierarchical",
+          "direction_role": "ownership",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "count"
+          },
+          "presentation": {
+            "label": "Process ownership",
+            "color_slot": "dim",
+            "opacity": "faded",
+            "line_style": "dotted",
+            "width": "thin",
+            "arrow": "none",
+            "layout": {
+              "strength": "normal",
+              "distance": "normal"
+            }
+          }
+        },
         "socket": {
           "orientation": "directed",
           "direction_role": "flow",
@@ -72,7 +115,88 @@
               "evidence_count": "sum"
             }
           },
-          "evidence_types": ["socket"]
+          "evidence_types": ["socket"],
+          "presentation": {
+            "label": "Local socket",
+            "color_slot": "gray",
+            "line_style": "solid",
+            "width": "thin",
+            "arrow": "forward",
+            "variable": {
+              "channel": "width",
+              "scale_key": "sockets",
+              "value_column": "socket_count",
+              "min": "thin",
+              "max": "emphasis"
+            },
+            "layout": {
+              "strength": "stronger",
+              "distance": "farther"
+            }
+          }
+        },
+        "endpoint_socket": {
+          "orientation": "directed",
+          "direction_role": "flow",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "append",
+            "metrics": {
+              "socket_count": "sum",
+              "evidence_count": "sum"
+            }
+          },
+          "evidence_types": ["socket"],
+          "presentation": {
+            "label": "Endpoint connection",
+            "color_slot": "primary",
+            "line_style": "solid",
+            "width": "thin",
+            "arrow": "forward",
+            "layout": {
+              "strength": "weakest",
+              "distance": "normal"
+            }
+          }
+        },
+        "correlated_socket": {
+          "orientation": "directed",
+          "direction_role": "flow",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "append",
+            "metrics": {
+              "socket_count": "sum",
+              "evidence_count": "sum"
+            }
+          },
+          "evidence_types": ["socket"],
+          "presentation": {
+            "label": "Correlated socket",
+            "color_slot": "primary",
+            "line_style": "solid",
+            "width": "thin",
+            "arrow": "forward",
+            "variable": {
+              "channel": "width",
+              "scale_key": "sockets",
+              "value_column": "socket_count",
+              "min": "thin",
+              "max": "emphasis"
+            },
+            "layout": {
+              "strength": "weakest",
+              "distance": "farthest"
+            }
+          }
+        }
+      },
+      "port_types": {
+        "topology": {
+          "presentation": {
+            "label": "Socket",
+            "color_slot": "primary"
+          }
         }
       },
       "evidence_types": {
@@ -100,10 +224,106 @@
           ]
         }
       },
+      "table_types": {
+        "socket_ports": {
+          "role": "actor_inventory",
+          "owner": "actor",
+          "aggregation": "sum",
+          "columns": [
+            {"id": "actor", "type": "actor_ref", "role": "reference"},
+            {"id": "port", "type": "uint", "role": "group_key"},
+            {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "direction", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+          ]
+        }
+      },
       "aggregation_scopes": {
         "node": {"columns": ["node_id"], "evidence_policy": "preserve"},
         "process_name": {"columns": ["node_id", "process_name"], "evidence_policy": "preserve"},
         "pid": {"columns": ["node_id", "pid"], "evidence_policy": "preserve"}
+      }
+    },
+    "presentation": {
+      "legend": {
+        "actors": [
+          {"type": "node", "label": "Node"},
+          {"type": "process", "label": "Process"},
+          {"type": "endpoint", "label": "Correlation endpoint"}
+        ],
+        "links": [
+          {"type": "ownership", "label": "Process ownership"},
+          {"type": "socket", "label": "Local socket"},
+          {"type": "endpoint_socket", "label": "Endpoint connection"},
+          {"type": "correlated_socket", "label": "Correlated socket"}
+        ]
+      },
+      "port_fields": [
+        {"key": "type", "label": "Type"},
+        {"key": "socket_count", "label": "Sockets"}
+      ],
+      "scale_keys": {
+        "sockets": {"label": "Sockets", "unit": "count"}
+      }
+    },
+    "correlation": {
+      "rules": {
+        "socket_exact": {
+          "action": "absorb",
+          "priority": 1,
+          "key_space": "network_socket",
+          "key": [
+            {"column": "protocol"},
+            {"literal": ":"},
+            {"column": "address_space"},
+            {"literal": ":"},
+            {"column": "ip"},
+            {"literal": ":"},
+            {"column": "port"}
+          ],
+          "point_actor_types": ["endpoint"],
+          "claim_actor_types": ["process"],
+          "correlation_link_types": ["endpoint_socket"],
+          "output_link_type": "correlated_socket"
+        }
+      },
+      "points": {
+        "rows": 1,
+        "columns": [
+          {"id": "actor", "type": "actor_ref", "role": "reference"},
+          {"id": "rule", "type": "string_ref", "dictionary": "strings"},
+          {"id": "protocol", "type": "string_ref", "dictionary": "strings"},
+          {"id": "address_space", "type": "string_ref", "dictionary": "strings"},
+          {"id": "ip", "type": "ip_ref", "dictionary": "strings"},
+          {"id": "port", "type": "uint"}
+        ],
+        "values": [
+          {"codec": "const", "value": 2},
+          {"codec": "const", "value": 15},
+          {"codec": "const", "value": 9},
+          {"codec": "const", "value": 12},
+          {"codec": "const", "value": 6},
+          {"codec": "const", "value": 443}
+        ]
+      },
+      "claims": {
+        "rows": 1,
+        "columns": [
+          {"id": "actor", "type": "actor_ref", "role": "reference"},
+          {"id": "rule", "type": "string_ref", "dictionary": "strings"},
+          {"id": "protocol", "type": "string_ref", "dictionary": "strings"},
+          {"id": "address_space", "type": "string_ref", "dictionary": "strings"},
+          {"id": "ip", "type": "ip_ref", "dictionary": "strings"},
+          {"id": "port", "type": "uint"}
+        ],
+        "values": [
+          {"codec": "const", "value": 1},
+          {"codec": "const", "value": 15},
+          {"codec": "const", "value": 9},
+          {"codec": "const", "value": 12},
+          {"codec": "const", "value": 8},
+          {"codec": "const", "value": 43000}
+        ]
       }
     },
     "actors": {
@@ -115,7 +335,8 @@
         {"id": "process_name", "type": "string_ref", "dictionary": "strings", "nullable": true, "role": "identity"},
         {"id": "pid", "type": "uint", "nullable": true, "role": "identity"},
         {"id": "ip", "type": "ip_ref", "dictionary": "strings", "nullable": true, "role": "identity"},
-        {"id": "port", "type": "uint", "nullable": true, "role": "identity"}
+        {"id": "port", "type": "uint", "nullable": true, "role": "identity"},
+        {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
       ],
       "values": [
         {"codec": "dict", "values": [0, 1, 2], "indexes": [0, 1, 2]},
@@ -124,11 +345,12 @@
         {"codec": "values", "values": [null, 5, null]},
         {"codec": "values", "values": [null, 1001, null]},
         {"codec": "values", "values": [null, null, 6]},
-        {"codec": "values", "values": [null, null, 443]}
+        {"codec": "values", "values": [null, null, 443]},
+        {"codec": "values", "values": [2, 2, 2]}
       ]
     },
     "links": {
-      "rows": 1,
+      "rows": 2,
       "columns": [
         {"id": "src_actor", "type": "actor_ref", "role": "reference"},
         {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
@@ -137,12 +359,36 @@
         {"id": "evidence_count", "type": "uint", "role": "metric", "aggregation": "sum"}
       ],
       "values": [
-        {"codec": "const", "value": 1},
-        {"codec": "const", "value": 2},
-        {"codec": "const", "value": 7},
-        {"codec": "const", "value": 2},
-        {"codec": "const", "value": 2}
+        {"codec": "values", "values": [0, 1]},
+        {"codec": "values", "values": [1, 2]},
+        {"codec": "values", "values": [13, 14]},
+        {"codec": "values", "values": [0, 2]},
+        {"codec": "values", "values": [0, 2]}
       ]
+    },
+    "tables": {
+      "actor": {
+        "socket_ports": {
+          "type": "socket_ports",
+          "table": {
+            "rows": 1,
+            "columns": [
+              {"id": "actor", "type": "actor_ref", "role": "reference"},
+              {"id": "port", "type": "uint", "role": "group_key"},
+              {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+              {"id": "direction", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+              {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+            ],
+            "values": [
+              {"codec": "const", "value": 1},
+              {"codec": "const", "value": 43000},
+              {"codec": "const", "value": 9},
+              {"codec": "const", "value": 10},
+              {"codec": "const", "value": 2}
+            ]
+          }
+        }
+      }
     },
     "evidence": {
       "socket": {
@@ -161,7 +407,7 @@
             {"id": "namespace", "type": "string_ref", "dictionary": "strings"}
           ],
           "values": [
-            {"codec": "const", "value": 0},
+            {"codec": "const", "value": 1},
             {"codec": "const", "value": 8},
             {"codec": "values", "values": [43000, 43001]},
             {"codec": "const", "value": 6},

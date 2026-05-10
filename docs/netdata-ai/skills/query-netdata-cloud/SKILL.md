@@ -27,24 +27,19 @@ runnable curl commands.
 | Members (per-space user enumeration) | [query-members.md](./query-members.md) |
 | Event feed (audit + activity log) | [query-feed.md](./query-feed.md) |
 | **Operational how-tos (live catalog)** | [how-tos/INDEX.md](./how-tos/INDEX.md) |
-| **Verification questions (consumed by SOW-0006 harness)** | [verify/questions.md](./verify/questions.md) |
 
 ### Canonical reference docs (in this repo)
 
-For the protocol-level details these guides build on, read the
-authoritative sources directly:
+For the query protocol details these guides build on, read the authoritative
+sources directly:
 
 | File | What it covers |
 |---|---|
 | `<repo>/src/plugins.d/FUNCTION_UI_REFERENCE.md` | Functions v3 protocol -- envelope, simple-table vs log-explorer, facets, histograms, charts, field types, pagination, delta mode, PLAY mode, error handling. The single most important reference for any Function work. |
-| `<repo>/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` | Practical guide for collector authors implementing a Function (simple-table or log-explorer) |
 | `<repo>/src/plugins.d/FUNCTION_UI_SCHEMA.json` | JSON Schema for validating Function responses |
-| `<repo>/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | Production topology Function schema guide -- actors, graph links, evidence, detail tables, overlays, aggregation policy |
 | `<repo>/src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | JSON Schema for validating production topology payloads |
 | `<repo>/src/plugins.d/DYNCFG.md` | External-plugin DynCfg protocol (go.d.plugin and other external collectors) |
 | `<repo>/src/daemon/dyncfg/README.md` | Internal DynCfg (high-level and low-level APIs, command enums, lifecycle) |
-| `<repo>/src/database/rrdfunctions.h` | C-level Function registration API (`rrd_function_add`) |
-| `<repo>/src/go/plugin/framework/functions/README.md` | Go-plugin Function framework |
 
 For querying agents directly (without going through Cloud) -- including
 auto-minting agent bearer tokens from a Cloud token -- see the sibling
@@ -60,7 +55,12 @@ skill [`query-netdata-agents`](../query-netdata-agents/SKILL.md).
    author a new how-to in this directory and add it to
    [`how-tos/INDEX.md`](./how-tos/INDEX.md) BEFORE completing the
    task. The catalog is meant to be **live** -- the next assistant
-   should not redo the same analysis from scratch.
+   should not redo the same analysis from scratch. Keep this
+   catalog operator-facing: recipes here should explain how to fetch
+   or use Cloud data. Developer contract validation for collectors,
+   topology producers, schemas, fixtures, UI adapters, or aggregator
+   handoffs belongs in the relevant project developer skill, not in
+   this public skill.
 2. **Use the token-safe wrappers.** Every example in this skill
    uses `agents_query_cloud` (and friends) from
    `../query-netdata-agents/scripts/_lib.sh`. Never paste raw

@@ -4,7 +4,9 @@
 
 Status: open
 
-Sub-state: pending follow-up after SOW-0021 restores topology presentation profiles.
+Sub-state: pending follow-up after SOW-0021/SOW-0023 graph presentation and
+correlation contracts. Table/modal composition must build on the new
+correlation plane instead of displaying correlation internals as raw rows.
 
 ## Requirements
 
@@ -48,6 +50,9 @@ Unknowns:
 - Update schema/docs/skill/specs and backend producers as needed.
 - Create Cloud frontend and Cloud aggregator handoff requirements for modal/table composition.
 - Validate with sanitized fixtures covering SNMP/L2, streaming, and network-connections modal examples.
+- Ensure `data.correlation.points` and `data.correlation.claims` are not shown
+  as raw actor modal tables unless a future schema explicitly exposes a curated
+  debug/diagnostic view.
 
 ## Analysis
 
@@ -57,7 +62,8 @@ Sources checked:
 
 Current state:
 
-- Pending SOW-0021 inventory.
+- SOW-0021 presentation contract.
+- SOW-0023 correlation and link layout contract.
 
 Risks:
 
@@ -83,11 +89,13 @@ Affected contracts and surfaces:
 - Cloud frontend actor/link modal renderer.
 - Cloud topology aggregator table merge behavior.
 - Backend topology producers.
-- Developer guide, topology spec, and create-topology skill.
+- Developer guide, topology spec, and `project-create-topology` skill.
 
 Existing patterns to reuse:
 
 - SOW-0021 presentation profiles.
+- SOW-0023 pure correlation actors, points, claims, and semantic correlation
+  link types.
 - Existing compact table roles and column metadata.
 - Old topology presentation table and modal-tab metadata as inventory input.
 
@@ -105,7 +113,8 @@ Sensitive data handling plan:
 
 Implementation plan:
 
-1. Wait for SOW-0021 presentation profile inventory and schema direction.
+1. Wait for SOW-0021 presentation profile inventory and SOW-0023 correlation
+   schema direction.
 2. Inventory current modal/table behavior across producers and UI.
 3. Define compact table-composition profiles.
 4. Update schema/docs/skill/specs and backend producers.
@@ -113,7 +122,7 @@ Implementation plan:
 
 Validation plan:
 
-- Pending SOW-0021 output.
+- Pending SOW-0021 and SOW-0023 output.
 
 Artifact impact plan:
 
@@ -121,7 +130,8 @@ Artifact impact plan:
 - Runtime project skills: likely no update except collector/topology workflow references if needed.
 - Specs: likely update `.agents/sow/specs/topology-function-schema.md`.
 - End-user/operator docs: likely update `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`.
-- End-user/operator skills: likely update `docs/netdata-ai/skills/create-topology/SKILL.md`.
+- Runtime project skills: likely update `.agents/skills/project-create-topology/SKILL.md`.
+- End-user/operator skills: likely unaffected unless public operator workflows change.
 - SOW lifecycle: remains pending until SOW-0021 is complete or explicitly paused.
 
 Open-source reference evidence:
@@ -138,7 +148,7 @@ Open decisions:
 
 ## Plan
 
-1. Wait for SOW-0021.
+1. Wait for SOW-0021 and SOW-0023.
 2. Inventory modals and tables.
 3. Define composition schema.
 4. Implement and validate.
@@ -148,6 +158,12 @@ Open decisions:
 ### 2026-05-09
 
 - Opened as pending follow-up from user direction.
+
+### 2026-05-10
+
+- Updated dependencies after SOW-0023 added the correlation plane and link
+  layout contract. Actor modals must not expose correlation point/claim tables
+  as raw user-facing content.
 
 ## Validation
 

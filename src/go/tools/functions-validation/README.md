@@ -37,7 +37,9 @@ echo '{"status":200,"type":"table","columns":{},"data":[]}' | \
 
 Topology v1 validation uses the JSON Schema and additional compact-table
 semantic checks: decoded column lengths must match `rows`, dictionary indexes
-must be in range, and actor/link references must point to existing rows.
+must be in range, actor/link references must point to existing rows, and
+correlation rules must reference existing actor/link types and point/claim key
+columns.
 
 ## Validate output (require rows)
 ```

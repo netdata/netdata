@@ -34,7 +34,7 @@ Netdata Functions allow collectors/plugins to expose interactive data through a 
    - Examples: `systemd-journal`, `windows-events`
 
 3. **Topology Format** (`type: "topology"`)
-   - Compact graph payload with actors, graph links, relationship evidence, custom actor detail tables, and overlay references
+   - Compact graph payload with actors, graph links, relationship evidence, custom actor detail tables, correlation rules, and overlay references
    - Uses [FUNCTION_TOPOLOGY_SCHEMA.json](/src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json)
    - Examples: `topology:network-connections`, `topology:streaming`, `topology:snmp`
 

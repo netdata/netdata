@@ -4,7 +4,12 @@
 
 Status: open
 
-Sub-state: scope captured, awaiting user decisions on merge semantics, identity-matching policy, conflict resolution, storage model, and scale targets before implementation planning advances. Immediate detailed/aggregated topology Function payload migration is owned by SOW-0020; this SOW remains the future unified merge/correlation work.
+Sub-state: scope captured, awaiting user decisions on merge semantics,
+cross-layer identity-matching policy, conflict resolution, storage model, and
+scale targets before implementation planning advances. Immediate
+detailed/aggregated topology Function payload migration is owned by SOW-0020.
+Same-kind producer-visible correlation points/claims are owned by SOW-0023.
+This SOW remains the future unified cross-layer merge/correlation work.
 
 ## Requirements
 
@@ -22,9 +27,17 @@ This SOW captures the problem space, references existing prior planning (`TODO-U
 
 ### Assistant Understanding
 
-Facts (verified):
+Facts (verified when this SOW was opened, updated 2026-05-10):
 
-- The current schema already exists at `src/go/pkg/topology/types.go`. Each `Actor` has a `Layer` field, a `Source` field, and a `Match` struct with extended identity fields: `ChassisIDs`, `MacAddresses`, `IPAddresses`, `Hostnames`, `DNSNames`, `SysObjectID`, `SysName`, `NetdataNodeID`, `NetdataMachineGUID`, `CloudInstanceID`, `CloudAccountID`, `ContainerIDs`, `PodNames`, `NamespaceIDs` (`types.go:7-22`). Each `Link` carries `Layer`, `Protocol`, `LinkType`, source/destination endpoints, direction, state, timestamps, and metrics (`types.go:42-55`).
+- Historical note: this SOW originally referenced the legacy
+  `src/go/pkg/topology/types.go` `Actor`/`Link`/`Match` model. That model is no
+  longer the target contract for new topology Function payloads.
+- The current producer-facing contract is `netdata.topology.v1` in
+  `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`, with durable semantics recorded
+  in `.agents/sow/specs/topology-function-schema.md`.
+- SOW-0023 adds producer-visible `data.correlation` rules, points, and claims
+  for same-kind correlation. Future unified cross-layer work must reuse that
+  plane where it fits instead of resurrecting a parallel legacy `Match` surface.
 - Topology data is produced today by four distinct sources (paths verified in repo):
   1. **SNMP L2** — Go, in `src/go/pkg/topology/engine/` and `src/go/plugin/go.d/collector/snmp_topology/`. Produces actors of type `device` and `endpoint` with chassis IDs, MACs, IPs, sysName/sysObjectID. LLDP, CDP, FDB, ARP, STP.
   2. **NetFlow / IPFIX / sFlow L3** — Rust, in `src/crates/netdata-netflow/`, plus Go plumbing in `src/go/`. Produces flow records with src/dst IP, ports, protocol, AS info, geolocation.
@@ -32,7 +45,11 @@ Facts (verified):
   4. **Netdata streaming** — C, in `src/database/contexts/` and streaming subsystem. Produces parent ↔ child agent relationships with `NetdataNodeID`, `NetdataMachineGUID`.
 - A 6797-line prior-planning artifact exists at `TODO-UNIFIED-TOPOLOGY-SCHEMA.md` with extensive notes on the design space, source coverage, IP tracking policy, ASN/geo enrichment options, and several decision items already taken or pending. This SOW supersedes the unstructured TODO once committed; the TODO stays in place as historical reference until the SOW closes.
 - The codebase has helper code at `src/go/tools/topology-flow-merge/` and a per-poll merge implementation in `src/go/plugin/go.d/collector/snmp_topology/topology_output_merge.go` (sub-second scope: merging successive snapshots of the same SNMP topology). Cross-source / cross-layer merge does NOT exist today.
-- The `Match` struct is the right shape for cross-layer correlation in principle: each source contributes whatever identity fields it knows, and a downstream merge step can correlate any two actors that share at least one identity field. This is the "extended match fields, match on any overlapping field" principle stated in `TODO-UNIFIED-TOPOLOGY-SCHEMA.md:69-72`.
+- The underlying identity principle remains valid: each source contributes the
+  identity facts it knows, and a downstream merge step can correlate actors when
+  compatible identity facts overlap. In v1, those facts are represented through
+  actor identity columns, evidence rows, and SOW-0023 correlation point/claim
+  rows.
 
 Inferences:
 
@@ -55,7 +72,10 @@ Unknowns (real, blocking design decisions):
 
 (Final acceptance criteria are gated on user decisions in `## Implications And Decisions`. Until those decisions land, the criteria below are the high-level shape; they will be sharpened to specific verifiable outcomes once decisions are recorded.)
 
-- A single, documented unified topology schema is in production use by all four current sources (SNMP L2, NetFlow L3, network-viewer L7, Netdata streaming), with the existing `Match`/`Actor`/`Link` types as the canonical contract or a clearly evolved version.
+- A single, documented unified topology schema is in production use by all four
+  current sources (SNMP L2, NetFlow L3, network-viewer L7, Netdata streaming),
+  using `netdata.topology.v1` or a clearly evolved version of it as the
+  canonical contract.
 - A merge engine exists that takes N topology graphs (same-kind or cross-kind) and produces one merged graph following the chosen identity-match and conflict-resolution policies. Same-kind (L2 + L2) and cross-kind (L2 + L3, L2 + L3 + L7) cases each have explicit test coverage with expected merged output.
 - Identity-matching and conflict-resolution behavior is unit-tested with targeted fixtures covering: actors that should merge, actors that should NOT merge despite an incidental field overlap, sources that legitimately disagree, and stale entries aged across sources with different freshness windows.
 - A scale benchmark exists that exercises the merge engine at the chosen actors/links/sources targets and reports merge latency.
@@ -66,7 +86,9 @@ Unknowns (real, blocking design decisions):
 
 Sources checked:
 
-- `src/go/pkg/topology/types.go` — current `Match`, `Actor`, `Link` schema.
+- `src/go/pkg/topology/types.go` — legacy `Match`, `Actor`, `Link` schema
+  reviewed when this SOW was opened; superseded for new Function payload work
+  by `netdata.topology.v1`.
 - `src/go/pkg/topology/engine/` — current SNMP L2 merge logic (within-source).
 - `src/go/plugin/go.d/collector/snmp_topology/topology_output_merge.go` — per-poll snapshot merge (within-source).
 - `src/go/tools/topology-flow-merge/` — standalone helper, not currently wired into the runtime path (see TODO-UNIFIED-TOPOLOGY-SCHEMA.md branch-cleanup audit).
@@ -78,15 +100,25 @@ Sources checked:
 
 Current state:
 
-- Schema shape is good. The extended-match principle is already encoded in `Match`. What's missing is the merge layer that uses these identity fields across sources.
+- The old extended-match principle remains useful, but the implementation path
+  now needs to use v1 actor identity, evidence, and SOW-0023 correlation facts.
+  What's missing is the merge layer that uses these identity facts across
+  sources and layers.
 - Each source today produces its own topology output as a separate function. There is no merged endpoint.
 - Where merge does exist (same-source, per-poll snapshot fusion in the SNMP topology engine), it is implementation-internal — no shared abstraction, no reuse path for cross-source.
 - The codebase has hooks for layered presentation in the topology UI (the `PresentationActorType`, `PresentationLinkType` and friends in `types.go`), suggesting prior thinking about layered views, but no live data wiring.
-- Scope boundary recorded 2026-05-06: SOW-0020 owns the immediate shared topology Function payload migration, including lossless detailed encoding and view-oriented aggregation contracts. This SOW owns the later unified merge/correlation layer that consumes those detailed payloads.
+- Scope boundary recorded 2026-05-06: SOW-0020 owns the immediate shared topology Function payload migration, including lossless detailed encoding and view-oriented aggregation contracts.
+- Scope boundary recorded 2026-05-10: SOW-0023 owns generic same-kind
+  `netdata.topology.v1` correlation rules, pure correlation actors,
+  point/claim tables, and link layout tokens. This SOW owns the later unified
+  cross-layer merge/correlation layer that consumes those detailed payloads and
+  SOW-0023 correlation facts.
 
 Risks (cross-cutting):
 
-- **Schema lock-in**: any merge engine that consumes the current `Match` shape effectively freezes that shape for downstream Cloud consumers. A future schema change costs two migrations (sources + merge + Cloud).
+- **Schema lock-in**: any merge engine that consumes the wrong identity surface
+  freezes that surface for downstream Cloud consumers. Future work must avoid
+  reintroducing the legacy `Match` shape as a second public contract.
 - **Identity correlation false positives**: matching on "any overlapping field" is dangerous if a field is non-unique (e.g. private RFC1918 IP that recurs across customer subnets, hostname `localhost`). Without canonicalization and field-quality weighting, merge can fuse unrelated actors.
 - **Scale**: cross-layer merge expands actor count; L7 process granularity especially. If the design persists everything, storage grows; if it doesn't, historical queries degrade.
 - **Conflict noise**: two sources legitimately disagreeing produces user-visible warnings unless conflict resolution is automatic. Policy choice affects perceived data quality.
@@ -99,7 +131,14 @@ Status: needs-user-decision
 
 Problem / root-cause model:
 
-- Topology evidence is produced by four distinct sources at three distinct layers (L2/L3/L7) plus a streaming hierarchy. Each source has its own view, none is reconciled with the others, and there is no merge engine that takes evidence from multiple sources and produces a single coherent graph. The schema (`Match`/`Actor`/`Link`) is already shaped for cross-layer correlation, but the runtime layer that performs the correlation does not exist. Implementation cannot start until merge semantics, identity-matching policy, conflict resolution, and storage model are locked.
+- Topology evidence is produced by four distinct sources at three distinct
+  layers (L2/L3/L7) plus a streaming hierarchy. Each source has its own view,
+  none is reconciled with the others, and there is no merge engine that takes
+  evidence from multiple sources and produces a single coherent graph.
+  `netdata.topology.v1` now has actor identity and SOW-0023 same-kind
+  correlation facts, but the cross-layer runtime layer that performs unified
+  correlation does not exist. Implementation cannot start until merge semantics,
+  identity-matching policy, conflict resolution, and storage model are locked.
 
 Evidence reviewed:
 
@@ -107,7 +146,10 @@ Evidence reviewed:
 
 Affected contracts and surfaces:
 
-- `src/go/pkg/topology/types.go` — schema may evolve.
+- `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` — schema may evolve.
+- `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` — SOW-0023 correlation plane
+  is the current v1 payload contract to reuse instead of inventing a parallel
+  matching surface.
 - All four source producers (SNMP topology Go path, netflow Rust+Go, network-viewer C, streaming C) — output schema may need conformance changes.
 - Topology functions exposed to the UI — possibly a new "merged" function or the existing per-source functions extended.
 - Cloud-side consumers — the merged output schema becomes a Cloud contract.
@@ -116,7 +158,8 @@ Affected contracts and surfaces:
 
 Existing patterns to reuse:
 
-- The `Match` extended-fields model in `types.go:7-22` is the right contract for identity. Reuse, possibly extend.
+- Reuse the v1 identity and correlation contract rather than adding another
+  public identity surface.
 - Per-source within-source merge logic in `topology_output_merge.go` and the SNMP topology engine — the same shape (deduplicate by identity, union links) likely generalizes; a candidate to lift to a shared package.
 - `src/go/tools/topology-flow-merge/` exists but is not wired in. Decide whether it's the seed of the cross-source merge engine or whether it gets retired.
 - The Netdata streaming hierarchy already establishes a parent/child actor relation — useful as a precedent for the "lives-on" cross-layer relationship.
@@ -139,7 +182,8 @@ Implementation plan:
 
 To be filled after the user decisions below are recorded. The plan will likely have these phases (illustrative, not committed):
 
-1. Lock the schema (extend `Match`/`Actor`/`Link` if needed; document version semantics).
+1. Reuse the SOW-0023 `data.correlation` contract where it fits cross-layer
+   correlation; extend only when cross-layer semantics require additional facts.
 2. Build a shared `topology/merge` package implementing the chosen identity-match + conflict-resolution policy. Unit-test thoroughly with same-kind and cross-kind fixtures.
 3. Wire the merge engine behind a new topology function (`topology:unified` or similar). Keep per-source functions intact; the merged function is additive.
 4. Add Cloud-side consumer integration plus migration notes for existing UI surfaces.
@@ -184,9 +228,12 @@ The decisions below are unresolved and block implementation. Each is presented w
 ### Decision 2 — Identity-matching algorithm
 
 **Options:**
-- **A. Strict any-overlap equality on raw `Match` fields.** Two actors merge if any one of their `Match` slices intersects.
+- **A. Strict any-overlap equality on raw identity facts.** Two actors merge if
+  any one of their identity fact sets intersects.
 - **B. Canonicalized equality.** MACs lowercased / colon-stripped, hostnames lowercased / FQDN-normalized, IPs canonicalized, before equality check.
-- **C. Field-quality-weighted scoring.** Each `Match` field has a discriminator weight (high for chassis ID, low for hostname `localhost`). Merge above a threshold.
+- **C. Field-quality-weighted scoring.** Each identity field has a
+  discriminator weight (high for chassis ID, low for hostname `localhost`).
+  Merge above a threshold.
 - **D. Probabilistic / learned per deployment.** A model decides; tunable per environment.
 
 **Implications/Risks:** A produces false positives on ambient identifiers (`localhost`, RFC1918 reuse). B handles 90% of false positives at low complexity. C handles ambiguity well but introduces a tuning knob users must understand. D is overkill for opening this work.
@@ -203,7 +250,10 @@ The decisions below are unresolved and block implementation. Each is presented w
 
 **Implications/Risks:** A loses provenance; B requires getting the priority right and is hard to change later; C grows attribute payloads without bound but never silently drops information; D produces UX friction.
 
-**Recommendation: C for `Match` fields, B for `Attributes`/`Derived` fields.** Identity should be inclusive (preserve all evidence so future merges can still match); attributes should be resolvable (one displayed value at a time). Provenance in either case is preserved as a per-value `source` tag.
+**Recommendation: C for identity facts, B for `Attributes`/`Derived` fields.**
+Identity should be inclusive (preserve all evidence so future merges can still
+match); attributes should be resolvable (one displayed value at a time).
+Provenance in either case is preserved as a per-value `source` tag.
 
 ### Decision 4 — Storage model
 
@@ -243,7 +293,10 @@ The decisions below are unresolved and block implementation. Each is presented w
 
 Filled after Decisions 1-6 are recorded. Default skeleton (assuming the recommendations above):
 
-1. Lock and document the schema (extend `Match` if a decision requires it; otherwise leave as-is). Add a per-value `source` provenance tag mechanism to support Decision 3.
+1. Lock and document the v1-based unified schema. Extend
+   `netdata.topology.v1` only if the recorded decisions require it. Add a
+   per-value `source` provenance tag mechanism to support Decision 3 if still
+   needed after reviewing existing v1 evidence/correlation provenance.
 2. Implement a `topology/merge` package on the agent side with the chosen identity-match (Decision 2) and conflict-resolution (Decision 3) policies. Unit tests cover same-kind and cross-kind matrices.
 3. Wire the merge engine behind a new topology function on the local agent. Per-source functions remain available unchanged.
 4. Sanitized fixture set covering at least: a 2-switch L2 same-kind merge, an L2 + L3 cross-kind merge, an L2 + L3 + L7 cross-kind merge with a host-level L7 aggregation per Decision 6.
@@ -262,6 +315,13 @@ Filled after Decisions 1-6 are recorded. Default skeleton (assuming the recommen
 ### 2026-05-06
 
 - Scope boundary recorded from SOW-0020: detailed/aggregated topology Function payload migration is owned by SOW-0020. This SOW remains pending for unified merge semantics, identity matching, conflict resolution, storage/indexing, scale targets, and cross-layer view behavior.
+
+### 2026-05-10
+
+- Updated scope boundary after SOW-0023 added the v1 correlation plane. This
+  SOW must not reintroduce the legacy `Match` schema as a second public
+  contract; future work starts from `netdata.topology.v1`, actor/evidence
+  identity facts, and SOW-0023 correlation points/claims.
 
 ## Validation
 

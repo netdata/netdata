@@ -6,8 +6,7 @@ Read the [SKILL.md prerequisites](./SKILL.md#prerequisites) first.
 This file documents the **generic** Function transport: the URL,
 the standard response envelope, the `info` discovery query, the
 four Function families and where each family's data lives in the
-response, plus pointers to the developer documentation for
-collector authors.
+response.
 
 For three of the four families there is a dedicated guide:
 
@@ -324,70 +323,6 @@ curl -sS -X POST \
   -d "$PAYLOAD" \
   | jq -r '.functions[] | "\(.name)\t\(.tags // "")\t\(.help)"'
 ```
-
----
-
-## Developer reference (for collector authors)
-
-If you maintain a collector and want to register a Function (or are
-debugging why a Function returns `400 ErrInfoMissing`), read these
-files in this order. They are the authoritative sources.
-
-| File | Audience | Read for |
-|---|---|---|
-| `<repo>/src/plugins.d/FUNCTION_UI_REFERENCE.md` | All implementers | Functions v3 protocol -- envelope, simple-table vs log-explorer, facets, histograms, charts, field types, anchor/delta/PLAY pagination, error handling, edge cases. **The single most important reference.** |
-| `<repo>/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` | Collector authors | Practical step-by-step: how to ship a simple-table or log-explorer Function, with backend examples |
-| `<repo>/src/plugins.d/FUNCTION_UI_SCHEMA.json` | Validation | JSON Schema for Function responses; use it in unit tests |
-| `<repo>/src/plugins.d/README.md` (sections 470-637) | External plugins (any language) | Plugin protocol, `FUNCTION` / `FUNCTION_PAYLOAD` parsing, response framing, ACL, lifecycle |
-| `<repo>/src/plugins.d/DYNCFG.md` | External plugins exposing config | DynCfg protocol for go.d.plugin and other external collectors |
-| `<repo>/src/daemon/dyncfg/README.md` | Internal plugins exposing config | Internal DynCfg API |
-| `<repo>/src/database/rrdfunctions.h` | C collectors | C API: `rrd_function_add(host, st, name, timeout, priority, version, help, tags, access, sync, execute_cb, data)`; handler signature `rrd_function_execute_cb_t` |
-| `<repo>/src/go/plugin/framework/functions/README.md` | Go.d.plugin collectors | Go function manager: `manager.Register`, handler lifecycle, cancellation, worker pool |
-| `<repo>/docs/functions/` | Operators | Per-Function user docs and examples |
-
-Skeleton signatures (extracted from the headers above, for
-orientation only -- read the source for the real contract):
-
-```c
-/* C: register at boot, then emit responses via a buffer in the callback */
-void rrd_function_add(
-    RRDHOST *host, RRDSET *st,
-    const char *name,           /* "module:method" */
-    int timeout, int priority, uint32_t version,
-    const char *help, const char *tags,
-    HTTP_ACCESS access, bool sync,
-    rrd_function_execute_cb_t execute_cb, void *execute_cb_data);
-
-typedef int (*rrd_function_execute_cb_t)(
-    struct rrd_function_execute *rfe, void *data);
-```
-
-```go
-// Go: register a Function with the framework's manager
-manager.Register(functions.Function{
-    Name:        "module:method",
-    Description: "Help text",
-    Timeout:     30 * time.Second,
-    Params:      []ParamDescriptor{ /* maps to required_params */ },
-    Handler:     func(fn Function) { /* emit FuncResponse */ },
-})
-```
-
-```text
-# External plugins via the plugins.d protocol:
-FUNCTION [GLOBAL] "name params" timeout "help" "tags" "access" priority version
-# On call:
-FUNCTION <txn_id> <timeout> "name params" "<access>" "<source>"
-# Reply:
-FUNCTION_RESULT_BEGIN <txn_id> <http_code> <content_type> <expiry>
-<JSON envelope: status, v, type, help, accepted_params, required_params, has_history, update_every, data, ...>
-FUNCTION_RESULT_END
-```
-
-The full envelope and required-params widget schemas above ARE the
-contract a collector implementation must satisfy. Read
-`src/plugins.d/README.md` for the line-protocol details and
-`src/database/rrdfunctions.h` for the C API.
 
 ---
 

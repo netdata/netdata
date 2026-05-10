@@ -90,6 +90,10 @@ func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 						Hover: &HoverPresentation{
 							Fields: []PresentationField{{Key: "weight", Label: "Requests"}},
 						},
+						Layout: &LinkLayoutPresentation{
+							Strength: "weaker",
+							Distance: "farther",
+						},
 					},
 				},
 			},
@@ -142,6 +146,45 @@ func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 			PortFields: []PresentationField{{Key: "type", Label: "Type"}},
 			ScaleKeys: map[string]ScaleKeyPresentation{
 				"requests": {Label: "Requests", Unit: "count"},
+			},
+		},
+		Correlation: &Correlation{
+			Rules: map[string]CorrelationRule{
+				"node_name": {
+					Action:          "link",
+					Priority:        10,
+					KeySpace:        "node_name",
+					Key:             []CorrelationKeyPart{{Column: "name"}},
+					PointActorTypes: []string{"node"},
+					ClaimActorTypes: []string{"node"},
+					OutputLinkType:  "dependency",
+				},
+			},
+			Points: &Table{
+				Rows: 1,
+				Columns: []Column{
+					NewColumn("actor", "actor_ref"),
+					NewColumn("rule", "string"),
+					NewColumn("name", "string_ref", WithDictionary("strings")),
+				},
+				Values: []ColumnEncoding{
+					Values(0),
+					Const("node_name"),
+					Values(0),
+				},
+			},
+			Claims: &Table{
+				Rows: 1,
+				Columns: []Column{
+					NewColumn("actor", "actor_ref"),
+					NewColumn("rule", "string"),
+					NewColumn("name", "string_ref", WithDictionary("strings")),
+				},
+				Values: []ColumnEncoding{
+					Values(0),
+					Const("node_name"),
+					Values(0),
+				},
 			},
 		},
 		Actors: MustTable(1,
@@ -411,12 +454,170 @@ func TestValidateDecodedResponseRejectsMissingPortSourceTable(t *testing.T) {
 	assert.Contains(t, err.Error(), "references unknown actor table")
 }
 
+func TestValidateDecodedResponseRejectsCorrelationMissingKeyColumn(t *testing.T) {
+	payload := NewResponse(Data{
+		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
+		CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
+		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
+		Types: TypeRegistry{
+			ActorTypes: map[string]ActorType{
+				"node": {Layer: "node", Identity: []string{"id"}},
+			},
+			LinkTypes: map[string]LinkType{
+				"dependency": {
+					Orientation:   "directed",
+					DirectionRole: "dependency",
+					Aggregation:   LinkAggregation{Direction: "preserve"},
+				},
+			},
+		},
+		Correlation: &Correlation{
+			Rules: map[string]CorrelationRule{
+				"node_name": {
+					Action:          "link",
+					Priority:        10,
+					KeySpace:        "node_name",
+					Key:             []CorrelationKeyPart{{Column: "name"}},
+					PointActorTypes: []string{"node"},
+					OutputLinkType:  "dependency",
+				},
+			},
+			Points: &Table{
+				Rows: 1,
+				Columns: []Column{
+					NewColumn("actor", "actor_ref"),
+					NewColumn("rule", "string"),
+				},
+				Values: []ColumnEncoding{
+					Values(0),
+					Const("node_name"),
+				},
+			},
+		},
+		Actors: MustTable(1,
+			[]Column{
+				NewColumn("id", "string", WithRole("identity")),
+				NewColumn("type", "string"),
+			},
+			[]ColumnEncoding{
+				Values("node-a"),
+				Const("node"),
+			},
+		),
+		Links: MustTable(0,
+			[]Column{
+				NewColumn("src", "actor_ref"),
+				NewColumn("dst", "actor_ref"),
+				NewColumn("type", "string"),
+			},
+			[]ColumnEncoding{
+				Const(0),
+				Const(0),
+				Const("dependency"),
+			},
+		),
+	})
+
+	payloadBytes, err := json.Marshal(payload)
+	require.NoError(t, err)
+	var decoded any
+	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+
+	err = ValidateDecodedResponse(decoded)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing correlation key column")
+}
+
+func TestValidateDecodedResponseAllowsUnusedCorrelationRuleColumns(t *testing.T) {
+	payload := NewResponse(Data{
+		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
+		CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
+		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
+		Types: TypeRegistry{
+			ActorTypes: map[string]ActorType{
+				"node": {Layer: "node", Identity: []string{"id"}},
+			},
+			LinkTypes: map[string]LinkType{
+				"dependency": {
+					Orientation:   "directed",
+					DirectionRole: "dependency",
+					Aggregation:   LinkAggregation{Direction: "preserve"},
+				},
+			},
+		},
+		Correlation: &Correlation{
+			Rules: map[string]CorrelationRule{
+				"node_name": {
+					Action:          "link",
+					Priority:        10,
+					KeySpace:        "node_name",
+					Key:             []CorrelationKeyPart{{Column: "name"}},
+					PointActorTypes: []string{"node"},
+					OutputLinkType:  "dependency",
+				},
+				"node_owner": {
+					Action:          "link",
+					Priority:        20,
+					KeySpace:        "node_owner",
+					Key:             []CorrelationKeyPart{{Column: "owner"}},
+					PointActorTypes: []string{"node"},
+					OutputLinkType:  "dependency",
+				},
+			},
+			Points: &Table{
+				Rows: 1,
+				Columns: []Column{
+					NewColumn("actor", "actor_ref"),
+					NewColumn("rule", "string"),
+					NewColumn("name", "string_ref", WithDictionary("strings")),
+				},
+				Values: []ColumnEncoding{
+					Values(0),
+					Const("node_name"),
+					Values(0),
+				},
+			},
+		},
+		Actors: MustTable(1,
+			[]Column{
+				NewColumn("id", "string", WithRole("identity")),
+				NewColumn("type", "string"),
+			},
+			[]ColumnEncoding{
+				Values("node-a"),
+				Const("node"),
+			},
+		),
+		Links: MustTable(0,
+			[]Column{
+				NewColumn("src", "actor_ref"),
+				NewColumn("dst", "actor_ref"),
+				NewColumn("type", "string"),
+			},
+			[]ColumnEncoding{
+				Const(0),
+				Const(0),
+				Const("dependency"),
+			},
+		),
+	})
+
+	payloadBytes, err := json.Marshal(payload)
+	require.NoError(t, err)
+	var decoded any
+	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+
+	require.NoError(t, ValidateDecodedResponse(decoded))
+}
+
 func TestPresentationTokenEnumsMatchSchema(t *testing.T) {
 	schemaDoc := loadTopologySchema(t)
 
 	assert.ElementsMatch(t, colorSlotTokens, schemaEnum(t, schemaDoc, "color_slot"))
 	assert.ElementsMatch(t, opacityTokens, schemaEnum(t, schemaDoc, "opacity_token"))
 	assert.ElementsMatch(t, widthTokens, schemaEnum(t, schemaDoc, "width_token"))
+	assert.ElementsMatch(t, layoutStrengthTokens, schemaEnum(t, schemaDoc, "layout_strength_token"))
+	assert.ElementsMatch(t, layoutDistanceTokens, schemaEnum(t, schemaDoc, "layout_distance_token"))
 	assert.ElementsMatch(t, iconTokens, schemaEnum(t, schemaDoc, "icon_token"))
 }
 

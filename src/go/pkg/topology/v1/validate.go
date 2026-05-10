@@ -97,6 +97,9 @@ func ValidateDecodedData(data map[string]any) error {
 	if err := validatePresentation(data, shape); err != nil {
 		return err
 	}
+	if err := validateCorrelation(data["correlation"], shape, ctx); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -514,6 +517,58 @@ func validateTypeColumnValues(path string, raw any, known map[string]struct{}, t
 	return fmt.Errorf("%s is missing required type column", path)
 }
 
+func validateStringColumnValuesInSet(path string, raw any, columnID string, known map[string]struct{}, typeName string, dictionaries map[string]any) error {
+	_, err := collectStringColumnValuesInSet(path, raw, columnID, known, typeName, dictionaries)
+	return err
+}
+
+func collectStringColumnValuesInSet(path string, raw any, columnID string, known map[string]struct{}, typeName string, dictionaries map[string]any) (map[string]struct{}, error) {
+	table, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("%s is not an object", path)
+	}
+	rows, err := decodedTableRows(table)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	columns, ok := table["columns"].([]any)
+	if !ok {
+		return nil, fmt.Errorf("%s.columns is not an array", path)
+	}
+	values, ok := table["values"].([]any)
+	if !ok {
+		return nil, fmt.Errorf("%s.values is not an array", path)
+	}
+	for i, rawColumn := range columns {
+		column, ok := rawColumn.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("%s.columns[%d] is not an object", path, i)
+		}
+		if id, _ := column["id"].(string); id != columnID {
+			continue
+		}
+		columnType, _ := column["type"].(string)
+		dictionary, _ := column["dictionary"].(string)
+		decoded, err := decodeColumn(path, i, rows, values[i])
+		if err != nil {
+			return nil, err
+		}
+		found := make(map[string]struct{}, len(decoded))
+		for row, value := range decoded {
+			id, ok := resolveStringValue(value, columnType, dictionary, dictionaries)
+			if !ok || id == "" {
+				return nil, fmt.Errorf("%s.%s[%d] is not a non-empty string", path, columnID, row)
+			}
+			if _, ok := known[id]; !ok {
+				return nil, fmt.Errorf("%s.%s[%d] references unknown %s %q", path, columnID, row, typeName, id)
+			}
+			found[id] = struct{}{}
+		}
+		return found, nil
+	}
+	return nil, fmt.Errorf("%s is missing required %s column", path, columnID)
+}
+
 func resolveStringValue(value any, columnType, dictionary string, dictionaries map[string]any) (string, bool) {
 	if text, ok := value.(string); ok {
 		return text, true
@@ -638,8 +693,25 @@ func validateLinkTypePresentation(raw any, shape topologyShape) error {
 		if err := validateHoverPresentation(path+".hover", presentation["hover"], shape.linkColumns); err != nil {
 			return err
 		}
+		if err := validateLinkLayoutPresentation(path+".layout", presentation["layout"]); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func validateLinkLayoutPresentation(path string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	layout, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	if err := optionalEnum(path+".strength", layout["strength"], layoutStrengthTokens...); err != nil {
+		return err
+	}
+	return optionalEnum(path+".distance", layout["distance"], layoutDistanceTokens...)
 }
 
 func validatePortTypePresentation(raw any) error {
@@ -861,6 +933,16 @@ func validatePortSourcePresentation(path string, source map[string]any, shape to
 	if columnType := columns[nameColumn]; !isDisplayColumnType(columnType) {
 		return fmt.Errorf("%s.name_column references non-display source column %q (%s)", path, nameColumn, columnType)
 	}
+	valueColumn, _ := source["value_column"].(string)
+	if valueColumn != "" {
+		columnType, ok := columns[valueColumn]
+		if !ok {
+			return fmt.Errorf("%s.value_column references unknown source column %q", path, valueColumn)
+		}
+		if !isNumericColumnType(columnType) {
+			return fmt.Errorf("%s.value_column references non-numeric source column %q (%s)", path, valueColumn, columnType)
+		}
+	}
 	for _, field := range []string{"type_column", "status_column", "mode_column", "role_column", "sources_column"} {
 		column, _ := source[field].(string)
 		if column == "" {
@@ -943,6 +1025,146 @@ func validateHoverPresentation(path string, raw any, columns map[string]string) 
 		}
 		if !isDisplayColumnType(columnType) {
 			return fmt.Errorf("%s.fields[%d].key references non-display column %q (%s)", path, i, key, columnType)
+		}
+	}
+	return nil
+}
+
+func validateCorrelation(raw any, shape topologyShape, ctx validationContext) error {
+	if raw == nil {
+		return nil
+	}
+	correlation, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("data.correlation is not an object")
+	}
+	rules, ok := correlation["rules"].(map[string]any)
+	if !ok || len(rules) == 0 {
+		return fmt.Errorf("data.correlation.rules is empty")
+	}
+
+	ruleIDs := make(map[string]struct{}, len(rules))
+	requiredColumnsByRule := make(map[string]map[string]struct{}, len(rules))
+	for ruleID, rawRule := range rules {
+		ruleIDs[ruleID] = struct{}{}
+		requiredColumns := make(map[string]struct{})
+		requiredColumnsByRule[ruleID] = requiredColumns
+		rule, ok := rawRule.(map[string]any)
+		if !ok {
+			return fmt.Errorf("data.correlation.rules.%s is not an object", ruleID)
+		}
+		if _, err := requiredEnum("data.correlation.rules."+ruleID+".action", rule["action"], "absorb", "link"); err != nil {
+			return err
+		}
+		if _, ok := integerValue(rule["priority"]); !ok {
+			return fmt.Errorf("data.correlation.rules.%s.priority is not an integer", ruleID)
+		}
+		outputLinkType, ok := rule["output_link_type"].(string)
+		if !ok || outputLinkType == "" {
+			return fmt.Errorf("data.correlation.rules.%s.output_link_type is empty", ruleID)
+		}
+		if _, ok := shape.linkTypes[outputLinkType]; !ok {
+			return fmt.Errorf("data.correlation.rules.%s.output_link_type references unknown link type %q", ruleID, outputLinkType)
+		}
+		if err := validateIDArrayRefs("data.correlation.rules."+ruleID+".point_actor_types", rule["point_actor_types"], shape.actorTypes, "actor type"); err != nil {
+			return err
+		}
+		if err := validateOptionalIDArrayRefs("data.correlation.rules."+ruleID+".claim_actor_types", rule["claim_actor_types"], shape.actorTypes, "actor type"); err != nil {
+			return err
+		}
+		if err := validateOptionalIDArrayRefs("data.correlation.rules."+ruleID+".correlation_link_types", rule["correlation_link_types"], shape.linkTypes, "link type"); err != nil {
+			return err
+		}
+		key, ok := rule["key"].([]any)
+		if !ok || len(key) == 0 {
+			return fmt.Errorf("data.correlation.rules.%s.key is empty", ruleID)
+		}
+		for i, rawPart := range key {
+			part, ok := rawPart.(map[string]any)
+			if !ok {
+				return fmt.Errorf("data.correlation.rules.%s.key[%d] is not an object", ruleID, i)
+			}
+			if column, ok := part["column"].(string); ok && column != "" {
+				requiredColumns[column] = struct{}{}
+				continue
+			}
+			if literal, ok := part["literal"].(string); ok && literal != "" {
+				continue
+			}
+			return fmt.Errorf("data.correlation.rules.%s.key[%d] must define column or literal", ruleID, i)
+		}
+	}
+
+	if err := validateCorrelationTable("data.correlation.points", correlation["points"], ctx, ruleIDs, requiredColumnsByRule); err != nil {
+		return err
+	}
+	return validateCorrelationTable("data.correlation.claims", correlation["claims"], ctx, ruleIDs, requiredColumnsByRule)
+}
+
+func validateCorrelationTable(path string, raw any, ctx validationContext, ruleIDs map[string]struct{}, requiredColumnsByRule map[string]map[string]struct{}) error {
+	if raw == nil {
+		return nil
+	}
+	if _, err := validateCompactTable(path, raw, ctx); err != nil {
+		return err
+	}
+	columns, err := columnTypesFromTable(raw, path)
+	if err != nil {
+		return err
+	}
+	if columnType := columns["actor"]; columnType != "actor_ref" {
+		return fmt.Errorf("%s.actor must be actor_ref, got %q", path, columnType)
+	}
+	ruleColumnType := columns["rule"]
+	if ruleColumnType != "string" && ruleColumnType != "string_ref" {
+		return fmt.Errorf("%s.rule must be string or string_ref, got %q", path, ruleColumnType)
+	}
+	referencedRules, err := collectStringColumnValuesInSet(path, raw, "rule", ruleIDs, "correlation rule", ctx.dictionaries)
+	if err != nil {
+		return err
+	}
+	for ruleID := range referencedRules {
+		for column := range requiredColumnsByRule[ruleID] {
+			if _, ok := columns[column]; !ok {
+				return fmt.Errorf("%s is missing correlation key column %q for rule %q", path, column, ruleID)
+			}
+		}
+	}
+	return nil
+}
+
+func validateIDArrayRefs(path string, raw any, known map[string]struct{}, kind string) error {
+	values, ok := raw.([]any)
+	if !ok || len(values) == 0 {
+		return fmt.Errorf("%s is empty", path)
+	}
+	for i, rawValue := range values {
+		value, ok := rawValue.(string)
+		if !ok || value == "" {
+			return fmt.Errorf("%s[%d] is not a non-empty string", path, i)
+		}
+		if _, ok := known[value]; !ok {
+			return fmt.Errorf("%s[%d] references unknown %s %q", path, i, kind, value)
+		}
+	}
+	return nil
+}
+
+func validateOptionalIDArrayRefs(path string, raw any, known map[string]struct{}, kind string) error {
+	if raw == nil {
+		return nil
+	}
+	values, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("%s is not an array", path)
+	}
+	for i, rawValue := range values {
+		value, ok := rawValue.(string)
+		if !ok || value == "" {
+			return fmt.Errorf("%s[%d] is not a non-empty string", path, i)
+		}
+		if _, ok := known[value]; !ok {
+			return fmt.Errorf("%s[%d] references unknown %s %q", path, i, kind, value)
 		}
 	}
 	return nil
@@ -1276,9 +1498,11 @@ var (
 		"info", "structural", "warning", "success", "danger", "blue", "green", "orange",
 		"purple", "cyan", "yellow", "teal", "gray",
 	}
-	opacityTokens = []string{"normal", "muted", "faded"}
-	widthTokens   = []string{"thin", "normal", "thick", "emphasis"}
-	iconTokens    = []string{
+	opacityTokens        = []string{"normal", "muted", "faded"}
+	widthTokens          = []string{"thin", "normal", "thick", "emphasis"}
+	layoutStrengthTokens = []string{"weakest", "weaker", "normal", "stronger", "strongest"}
+	layoutDistanceTokens = []string{"closest", "closer", "normal", "farther", "farthest"}
+	iconTokens           = []string{
 		"router", "switch", "firewall", "access_point", "server", "storage", "load_balancer",
 		"printer", "phone", "ups", "camera", "process", "agent", "netdata-agent", "parent",
 		"remote-endpoint", "local-endpoint", "segment", "self", "ip", "cloud", "container",

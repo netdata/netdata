@@ -42,6 +42,7 @@ type Data struct {
 	Dictionaries  Dictionaries   `json:"dictionaries"`
 	Types         TypeRegistry   `json:"types"`
 	Presentation  *Presentation  `json:"presentation,omitempty"`
+	Correlation   *Correlation   `json:"correlation,omitempty"`
 	Actors        Table          `json:"actors"`
 	Links         Table          `json:"links"`
 	Evidence      EvidenceMap    `json:"evidence,omitempty"`
@@ -167,6 +168,12 @@ type LinkPresentation struct {
 	Arrow     string                    `json:"arrow,omitempty"`
 	Variable  *LinkVariablePresentation `json:"variable,omitempty"`
 	Hover     *HoverPresentation        `json:"hover,omitempty"`
+	Layout    *LinkLayoutPresentation   `json:"layout,omitempty"`
+}
+
+type LinkLayoutPresentation struct {
+	Strength string `json:"strength,omitempty"`
+	Distance string `json:"distance,omitempty"`
 }
 
 type PortPresentation struct {
@@ -213,6 +220,7 @@ type PortSourcePresentation struct {
 	Evidence      string `json:"evidence,omitempty"`
 	ActorColumn   string `json:"actor_column"`
 	NameColumn    string `json:"name_column"`
+	ValueColumn   string `json:"value_column,omitempty"`
 	TypeColumn    string `json:"type_column,omitempty"`
 	DefaultType   string `json:"default_type,omitempty"`
 	StatusColumn  string `json:"status_column,omitempty"`
@@ -233,6 +241,28 @@ type LinkAggregation struct {
 	Direction string            `json:"direction"`
 	Evidence  string            `json:"evidence,omitempty"`
 	Metrics   map[string]string `json:"metrics,omitempty"`
+}
+
+type Correlation struct {
+	Rules  map[string]CorrelationRule `json:"rules"`
+	Points *Table                     `json:"points,omitempty"`
+	Claims *Table                     `json:"claims,omitempty"`
+}
+
+type CorrelationRule struct {
+	Action               string               `json:"action"`
+	Priority             int                  `json:"priority"`
+	KeySpace             string               `json:"key_space"`
+	Key                  []CorrelationKeyPart `json:"key"`
+	PointActorTypes      []string             `json:"point_actor_types"`
+	ClaimActorTypes      []string             `json:"claim_actor_types,omitempty"`
+	CorrelationLinkTypes []string             `json:"correlation_link_types,omitempty"`
+	OutputLinkType       string               `json:"output_link_type"`
+}
+
+type CorrelationKeyPart struct {
+	Column  string `json:"column,omitempty"`
+	Literal string `json:"literal,omitempty"`
 }
 
 type EvidenceType struct {

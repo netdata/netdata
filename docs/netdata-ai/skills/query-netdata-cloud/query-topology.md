@@ -7,7 +7,6 @@ For the generic Function transport, see [query-functions.md](./query-functions.m
 Topology Functions return compact graph payloads using the production topology
 schema:
 
-- [FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md](../../../../src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md)
 - [FUNCTION_TOPOLOGY_SCHEMA.json](../../../../src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json)
 
 The response contains actors, graph links, relationship evidence, optional
@@ -159,5 +158,3 @@ link may summarize many evidence rows.
 - [query-functions.md](./query-functions.md) -- generic Function transport.
 - [../query-netdata-agents/query-topology.md](../query-netdata-agents/query-topology.md)
   -- direct-agent transport for the same topology payload.
-- [../create-topology/SKILL.md](../create-topology/SKILL.md)
-  -- authoring and migration workflow for topology producers.

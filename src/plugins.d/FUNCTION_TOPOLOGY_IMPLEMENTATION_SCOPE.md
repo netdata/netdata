@@ -171,7 +171,13 @@ Producer path:
 Required behavior:
 
 - emit actors as compact actor table rows;
-- emit graph links as grouped process/endpoints relationships;
+- emit graph links as three semantic families:
+  - node-to-process ownership links that keep each node cluster together;
+  - local process-to-process links when both process endpoints are known;
+  - process-to-correlation-endpoint links for unresolved or cross-node socket
+    endpoints;
+- emit pure correlation endpoint actors plus `data.correlation.points` and
+  `data.correlation.claims` rows for socket tuple resolution;
 - emit one socket evidence row per socket tuple needed for cross-node matching;
 - default to aggregated graph projection while preserving detailed evidence;
 - support aggregation scopes prepared for node, process name, PID, container,
@@ -197,6 +203,8 @@ Current state:
   not as actor-owned duplicated modal data;
 - link and evidence string columns choose dictionary encoding only when it
   reduces raw payload size;
+- SOW-0023 semantic-link split and correlation endpoint/point/claim emission
+  are implemented in the Agent producer;
 - remaining network-connections work is corpus-scale validation with captured
   Cloud payloads and Cloud/frontend integration once the parallel workers are
   ready.
@@ -345,6 +353,8 @@ topology kinds.
 - a `netdata.topology.v1` payload with:
   - merged actor rows;
   - merged graph links;
+  - resolved correlation output as normal actors and links, with no exposed
+    aggregator internal states;
   - preserved or counted evidence rows according to schema policy;
   - merged detail tables according to table type policy;
   - merged overlay refs according to overlay template policy;
@@ -358,7 +368,8 @@ Suggested package split:
 - `codec`: compact table decode/encode helpers;
 - `model`: canonical in-memory actors, links, evidence, tables, overlays;
 - `aggregate`: scope-based actor/link/evidence merge logic;
-- `match`: identity normalization and exact tuple matching;
+- `match`: declarative correlation-key normalization, priority handling, exact
+  and partial match resolution, and exact tuple matching;
 - `validate`: schema and semantic validation;
 - `fixtures`: sanitized corpus and synthetic scale fixtures.
 
@@ -367,6 +378,13 @@ Suggested package split:
 Required behavior:
 
 - merge actors by the requested scope and actor type identity;
+- apply `data.correlation.rules` without hardcoding topology-kind-specific key
+  names in the aggregator;
+- remove pure correlation actors only for exact unambiguous `absorb` matches,
+  rewiring incident correlation links to the matched actor with the rule's
+  `output_link_type`;
+- keep correlation actors visible for no-match, ambiguous, and `link` partial
+  matches, emitting weak semantic correlation links for visible partial matches;
 - preserve evidence rows when evidence policy is `preserve`;
 - count evidence rows when evidence policy is `count`;
 - never silently truncate evidence;
@@ -377,9 +395,12 @@ Required behavior:
 
 Network socket matching:
 
-- exact reverse-tuple matching is in scope;
+- exact reverse-tuple matching should be expressed through the generic
+  correlation contract using process claims, endpoint points, correlation link
+  types, rule priorities, and output link types;
 - NAT, load balancer, and proxy inference are out of scope for the first
-  aggregator;
+  aggregator, but later NAT evidence can add extra point/claim rows for the
+  same rule without changing the aggregator's key-building mechanism;
 - unresolved endpoints can aggregate by visible endpoint identity, but the
   evidence row must remain available when the requested mode preserves it.
 
@@ -425,7 +446,7 @@ Required test classes:
 
 ## Rollout Plan
 
-1. Land schema docs, public skill, and implementation scope.
+1. Land schema docs, developer project skill, and implementation scope.
 2. Add validator support and compact-table helpers.
 3. Add Cloud frontend new-schema decoder and temporary compatibility adapter so
    mixed Agent rollout is safe before producers emit the new schema broadly.

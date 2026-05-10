@@ -289,6 +289,10 @@ Link types define direction and aggregation semantics:
           "width": "normal",
           "curve": "auto",
           "arrow": "forward",
+          "layout": {
+            "strength": "normal",
+            "distance": "normal"
+          },
           "variable": {
             "channel": "width",
             "scale_key": "sockets",
@@ -339,7 +343,8 @@ Type definitions carry their own presentation:
 - actor types choose label, role, icon token, fill color token, border,
   annotation ring, size policy, safe label policy, and graph port-bullet policy;
 - link types choose label, color token, line style, width token, curve token,
-  arrow token, and one optional variable visual channel;
+  arrow token, tokenized layout strength/distance, and one optional variable
+  visual channel;
 - port types choose label, color token, and opacity token.
 
 The graph-level `data.presentation` object carries definitions that are not
@@ -407,11 +412,21 @@ share the same key. `min` and `max` are visual tokens for the selected channel:
 width scaling uses width tokens and opacity scaling uses opacity tokens. Do not
 pre-scale to pixels or opacity in the producer.
 
+Link layout is also tokenized. Producers may set
+`types.link_types.<id>.presentation.layout.strength` and `.distance` for any
+link type. These are relative hints for the UI force layout, not raw physics
+values. The allowed strength tokens are `weakest`, `weaker`, `normal`,
+`stronger`, and `strongest`. The allowed distance tokens are `closest`,
+`closer`, `normal`, `farther`, and `farthest`. Use weaker/farther tokens for
+dense mesh, local-noise, inferred, and partial-correlation links; use
+stronger/closer tokens for ownership or containment links that should keep a
+cluster together.
+
 Actor size supports:
 
 - `fixed`: no data-driven size changes;
 - `link_count`: size may reflect graph degree;
-- `metric`: size comes from a numeric actor-table column named by
+- `metric`: size comes from a numeric actor row column named by
   `metric_column`.
 
 When `selection.actor_click.mode` is `highlight_path`, the payload must also
@@ -431,9 +446,13 @@ Each source says where bullets come from:
 - `actor_table`: read from a named actor detail table when present.
 
 Each source must define `actor_column` and `name_column`. Optional
-`type_column`, `status_column`, `mode_column`, `role_column`, and
-`sources_column` enrich bullet color and tooltip fields. `default_type` must
-reference `types.port_types` and is used when `type_column` is absent or empty.
+`value_column`, `type_column`, `status_column`, `mode_column`, `role_column`,
+and `sources_column` enrich bullet multiplicity, color, and tooltip fields.
+`value_column` must reference a numeric source-table column; the UI sums it per
+bullet key and uses the sum for visible bullet count, overflow, and sizing. Use
+it when an aggregated row represents several observations, such as several
+sockets on the same process port. `default_type` must reference
+`types.port_types` and is used when `type_column` is absent or empty.
 `name_column` must reference a scalar display column, not raw actor/link/
 evidence references, arrays, or JSON cells. For evidence sources, `evidence`
 names an evidence type id.
@@ -632,10 +651,62 @@ Common column rules:
 If a table or column has no valid aggregation, mark it `none` and keep rows
 attached to their owner. Do not silently drop rows.
 
+## Correlation Plane
+
+Correlation is producer-visible graph semantics, not aggregator state. Producers
+emit pure correlation actors when a real peer is unknown or must be resolved
+against another independently produced topology map. Correlation actors are real
+actors in the input graph, with their own actor type and presentation. Internal
+aggregator states such as candidate, absorbed, rewrite plan, or equivalence
+class must not be emitted in the final payload.
+
+Use `data.correlation` when a topology can resolve correlation actors across
+payloads:
+
+- `rules` defines named correlation rules, priority, key space, key template,
+  action, point actor types, optional claim actor types, correlation link types,
+  and the final output link type;
+- `points` is a compact table of pure correlation actors and their keys;
+- `claims` is a compact table of real actors and the keys they satisfy.
+
+Correlation keys are declarative. A key is built from table columns and string
+literals. The aggregator normalizes values by column type and concatenates the
+parts; it does not execute code and does not need to know what IP, port, MAC,
+chassis id, vSphere MOID, or another domain value means.
+
+Supported rule actions:
+
+- `absorb`: on an exact unambiguous match, matching correlation actors are
+  removed from the aggregated output and incident correlation links are rewired
+  to the matched real actor using `output_link_type`;
+- `link`: on an unambiguous broader/partial match, the correlation actor remains
+  visible and a weak correlation link to the matched actor is emitted using
+  `output_link_type`.
+
+No match keeps the correlation actor visible. Ambiguous matches must stay
+unresolved and produce diagnostics in the aggregator; producers must not encode
+guessing policy in the schema.
+
+NAT or other alias evidence can be represented by adding more point or claim
+rows for the same actor and rule. The original key remains intact; aliases are
+additional facts, not mutations of the source observation.
+
+Links between real actors and correlation actors must use semantic correlation
+link types even in a single-node topology. The UI and aggregator must not infer
+correlation behavior from actor type names or topology kind. The legend should
+include correlation actor and link types so users can distinguish unresolved,
+partial, inferred, and resolved relationships.
+
 ## Network Connections Shape
 
-For network-connections, graph links are grouped process-to-endpoint
-relationships. Socket evidence preserves exact tuples.
+For network-connections, graph links must be split into semantic families:
+
+- node-to-process ownership links that keep the graph together;
+- local process-to-process links where both process endpoints are already known;
+- process-to-correlation-endpoint links for unresolved or cross-node remote
+  socket endpoints.
+
+Socket evidence preserves exact tuples.
 
 Canonical socket evidence columns:
 
@@ -662,6 +733,38 @@ Do not emit these per socket:
 In the measured Cloud corpus, this production-only socket evidence shape was
 about 7.25 MB raw for 323,077 socket evidence rows, or about 11.25 MB raw when
 including current RTT/retransmission metrics.
+
+For outbound sockets, the process claims the local `protocol + local_ip +
+local_port` tuple and the correlation endpoint points at the remote `protocol +
+remote_ip + remote_port` tuple. For inbound sockets, the process claims the
+local destination tuple and the correlation endpoint points at the remote source
+tuple. Local sockets where both processes are identified should emit a resolved
+process-to-process link. Listening sockets have no remote correlation point.
+The current `socket_exact` rule key is `protocol + address_space + ip + port`;
+`address_space` prevents private or otherwise scoped endpoint identities from
+matching across unrelated address domains.
+
+Network-connections uses four link types with different graph semantics:
+
+- `endpoint_socket`: process-to-correlation-endpoint links. These are the
+  primary unresolved network dependencies in a single-node view. They should be
+  solid, colored, thin, weak, and normal-distance so unresolved endpoints do not
+  force the graph to zoom out.
+- `correlated_socket`: aggregator output after exact endpoint absorption. These
+  are cross-payload process-to-process dependencies and should be weak and
+  farthest so independent topology clusters do not blend into one dense layout.
+- `socket`: resolved local process-to-process socket links. These are gray,
+  thin, farther links whose width can vary by `socket_count`.
+- `ownership`: node-to-process containment links. These are graph-coherence
+  links, not network traffic. They should be dotted, faded/dim, thin, normal
+  strength, and normal distance.
+
+Aggregated network-connections payloads still need process port bullets without
+shipping detailed socket evidence. Emit an `actor_inventory` table such as
+`socket_ports` with `actor`, `port`, and numeric `socket_count`, then point the
+process actor type's `presentation.ports.sources[]` at that actor table with
+`value_column: "socket_count"`. Size process actors with
+`presentation.size: {"mode": "metric", "metric_column": "socket_count"}`.
 
 ## Streaming Shape
 

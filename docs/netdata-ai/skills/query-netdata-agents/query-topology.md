@@ -67,5 +67,3 @@ agents_query_agent \
   -- full response reference.
 - [query-functions.md](./query-functions.md) -- generic direct-agent Function
   transport.
-- [../create-topology/SKILL.md](../create-topology/SKILL.md) -- authoring
-  workflow for topology producers.

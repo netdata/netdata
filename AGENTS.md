@@ -280,6 +280,24 @@ Output/reference skills may also exist under product documentation or generated 
 
 End-user-facing AI skills under `docs/netdata-ai/skills/` follow the directory shape `docs/netdata-ai/skills/<skill-name>/SKILL.md`, with optional supporting docs (`<topic>.md`) and an optional `scripts/` subdirectory for helper code. SKILL.md frontmatter has `name` and `description`; the description is the trigger-matching text and must enumerate the phrases users will actually type.
 
+Public skills are for operators and end-users. They may teach users how to
+query Netdata Cloud, query Agents, inspect metrics/logs/topology/alerts, or run
+safe operational commands. They must not contain developer-contract validation,
+schema migration plans, producer authoring workflows, UI adapter work,
+aggregator implementation notes, SOW handoff instructions, fixture maintenance,
+PR-review tasks, or codebase-internal implementation recipes.
+
+Developer-facing skills must live under `.agents/skills/`, preferably with a
+`project-` prefix when they are runtime input for repository work. If a workflow
+requires reading source files, updating schemas, validating fixtures, changing
+collectors/producers, or coordinating frontend/backend/aggregator code, it is a
+project developer skill, not a public skill.
+
+Skill verification harness inputs are not public skill content. Keep seed
+questions, grader rubrics, runner scripts, and transcript-generation prompts
+under `.agents/skill-verification/<skill>/`, not under
+`docs/netdata-ai/skills/<skill>/`.
+
 Each public skill is reachable from `.agents/skills/<skill-name>` via a relative symlink (`.agents/skills/<name>` → `../../docs/netdata-ai/skills/<name>`) so local AI assistants reading from `.agents/skills/` see the same skill as end-users. Create the symlink with `ln -srfn`. Verify with `readlink -f .agents/skills/<name>`.
 
 Public-skill scripts must follow the same `_lib.sh` shape as existing skills (`set -euo pipefail`, ANSI colors with real ESC bytes via `$'\033[...]'`, `<prefix>_repo_root` via `git rev-parse --show-toplevel`, `<prefix>_load_env` that sources `<repo>/.env` with `: "${VAR:?}"` validation, `<prefix>_audit_dir` that creates `<repo>/.local/audits/<topic>/`, masked-token `<prefix>_run`/`<prefix>_run_read` wrappers).
@@ -288,7 +306,12 @@ Public-skill scripts that touch credentials (cloud tokens, per-agent bearers, cl
 
 ### How-tos catalog rule
 
-Each public skill ships a `how-tos/` subdirectory with `INDEX.md`. The catalog is **live**: every time an AI assistant is asked a concrete question that requires analysis (multiple wrapper calls, jq pipelines, or cross-referencing more than one per-domain guide) and the answer isn't already documented under `how-tos/`, the assistant MUST author a new how-to and add it to `INDEX.md` BEFORE completing the task. This rule is repeated in each skill's `SKILL.md` so future assistants honor it. Skipping it means the next assistant repeats the same analysis from scratch -- an explicit framework violation.
+Each public skill ships a `how-tos/` subdirectory with `INDEX.md`. The catalog is **live**: every time an AI assistant is asked a concrete operator/end-user question that requires analysis (multiple wrapper calls, jq pipelines, or cross-referencing more than one per-domain guide) and the answer isn't already documented under `how-tos/`, the assistant MUST author a new how-to and add it to `INDEX.md` BEFORE completing the task. This rule is repeated in each skill's `SKILL.md` so future assistants honor it. Skipping it means the next assistant repeats the same analysis from scratch -- an explicit framework violation.
+
+The how-to rule does not override audience boundaries. If the analysis produced
+a developer validation recipe, put it in the matching `.agents/skills/` project
+skill and update that skill's index instead of adding it under
+`docs/netdata-ai/skills/`.
 
 The existing private skills (`coverity-audit`, `sonarqube-audit`, `graphql-audit`, `pr-reviews`) keep their `.agents/skills/<name>/` location -- they are intentionally private and have no `docs/netdata-ai/skills/` counterpart.
 
@@ -303,6 +326,10 @@ Runtime input skills:
 - `.agents/skills/project-writing-collectors/`
   Trigger: authoring or modifying any Netdata data-collection plugin or module (Go go.d / ibm.d, Rust crates, internal C plugins, external plugins via PLUGINSD). Read before adding a new collector, modifying an existing one, working on NetFlow/sFlow/IPFIX, OTEL ingestion, topology, SNMP profiles, or interactive Functions.
   Status: live. Updates that close gaps or fix outdated pointers must ship in the same PR that exposed the issue.
+
+- `.agents/skills/project-create-topology/`
+  Trigger: creating or updating Netdata topology producers, topology Function payloads, topology schema fixtures, graph presentation, correlation rules, direction semantics, topology drilldowns, telemetry overlays, or Cloud topology aggregation fixtures.
+  Status: live. Developer-facing topology authoring workflow. End-user/operator-facing AI skills belong under `docs/netdata-ai/skills/`; this project skill is the runtime guidance for repository work.
 
 - `.agents/skills/project-writing-go-modules-framework-v2/`
   Trigger: creating or migrating a Go go.d collector to framework V2; touching `CollectorV2`, `metrix.CollectorStore`, `ChartTemplateYAML` / `charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, or V2 collector tests.
@@ -348,10 +375,6 @@ Runtime input skills:
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`; relative symlinks at `.agents/skills/<name>`):
 
-- `docs/netdata-ai/skills/create-topology/`
-  Trigger: creating or updating Netdata topology producers and topology Function payloads using the production topology schema; migrating `topology:network-connections`, `topology:streaming`, `topology:snmp`, vSphere topology, or future topology producers; defining actor/link/evidence/table types, direction semantics, aggregation policy, drilldowns, and telemetry overlays.
-  Symlink: `.agents/skills/create-topology` -> `../../docs/netdata-ai/skills/create-topology`.
-  Status: live. SKILL.md plus `how-tos/INDEX.md`.
 - `docs/netdata-ai/skills/query-netdata-cloud/`
   Trigger: querying Netdata Cloud REST API -- metrics, logs (systemd-journal), alerts, generic Function calls on a node.
   Symlink: `.agents/skills/query-netdata-cloud` -> `../../docs/netdata-ai/skills/query-netdata-cloud`.

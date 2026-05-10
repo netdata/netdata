@@ -6,7 +6,8 @@ Status: open
 
 `completed` is the successful terminal status. `done` is a directory name, not a status value. Do not use `Status: done` or `Status: complete`.
 
-Sub-state: pending until SOW-0021 graph presentation, SOW-0023 cross-payload matching, and SOW-0022 table/modal composition are finished.
+Sub-state: pending until SOW-0021 graph presentation, SOW-0023 cross-payload
+matching/link layout, and SOW-0022 table/modal composition are finished.
 
 ## Requirements
 
@@ -25,6 +26,8 @@ Facts:
 - The vSphere topology producer lives in the separate worktree `~/src/PRs/vsphere-extensions`.
 - The vSphere producer currently uses the legacy Go topology package and `WithPresentation()`.
 - Agent SOW-0021 explicitly did not migrate vSphere, but added color/icon tokens so the later vSphere migration should not need another graph-presentation schema redesign.
+- Agent SOW-0023 added generic correlation rules and link layout tokens that
+  vSphere must respect when migrated.
 - The frontend must remain topology-schema agnostic; it must not branch on vSphere as a special UI domain.
 
 Inferences:
@@ -45,6 +48,12 @@ Unknowns:
 - Link types cover contains, connects, runs, and any other vSphere relationship emitted by the producer.
 - Actor identities use stable vSphere managed object identifiers where available, with display labels kept separate through `presentation.label_policy`.
 - vSphere graph presentation is expressed through `types.actor_types.<id>.presentation`, `types.link_types.<id>.presentation`, optional `types.port_types`, and `data.presentation`.
+- vSphere link types use SOW-0023 `presentation.layout.strength` and
+  `presentation.layout.distance` tokens where ownership, dependency, inferred,
+  or weak relationships need different graph forces.
+- vSphere stable object identifiers are evaluated for SOW-0023
+  `data.correlation.claims` only when they can help cross-payload matching;
+  producer output must not expose aggregator internal states.
 - vSphere actor detail/inventory tables use the SOW-0022 table/modal composition contract if that contract is complete before this SOW starts.
 - JSON Schema validation and Go semantic validation pass.
 - Payload size is measured on realistic or synthetic vSphere inventory shapes.
@@ -54,7 +63,7 @@ Unknowns:
 
 Sources checked:
 
-- `docs/netdata-ai/skills/create-topology/SKILL.md`
+- `.agents/skills/project-create-topology/SKILL.md`
 - `.agents/sow/current/SOW-0021-20260509-topology-presentation-contract.md`
 - `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`
 - `.agents/sow/specs/topology-function-schema.md`
@@ -88,8 +97,11 @@ Problem / root-cause model:
 Evidence reviewed:
 
 - SOW-0021 vSphere migration posture records that vSphere is not migrated by SOW-0021 and should be coordinated separately.
+- SOW-0023 records the final correlation and link layout contract that vSphere
+  must use when migrated.
 - The vSphere worktree producer still uses the legacy topology package and `WithPresentation()`.
-- The create-topology skill states the vSphere worktree must not be edited before telling the user because another agent may be working there.
+- The project topology skill states the vSphere worktree must not be edited
+  before telling the user because another agent may be working there.
 
 Affected contracts and surfaces:
 
@@ -105,7 +117,8 @@ Existing patterns to reuse:
 - `src/go/pkg/topology/v1` compact-table helpers from this worktree.
 - Network-connections, streaming, and SNMP v1 producers after SOW-0021.
 - SOW-0022 table/modal composition contract once complete.
-- SOW-0023 identity/matching vocabulary once complete.
+- SOW-0023 correlation rules, pure correlation actors, point/claim tables, and
+  link layout tokens once complete.
 
 Risk and blast radius:
 
@@ -128,7 +141,8 @@ Implementation plan:
 4. Design the v1 actor/link/evidence/table types for vSphere.
 5. Implement v1 payload generation using compact tables.
 6. Preserve graph presentation through v1 type-level and graph-level presentation.
-7. Add fixtures/tests and validate against the schema and semantic validator.
+7. Add fixtures/tests and validate against the schema and semantic validator,
+   including link layout tokens and any vSphere correlation claims.
 8. Coordinate Cloud frontend and Cloud aggregator validation with generic topology fixtures.
 
 Validation plan:
@@ -143,7 +157,8 @@ Validation plan:
 Artifact impact plan:
 
 - AGENTS.md: likely unaffected.
-- Runtime project skills: update `docs/netdata-ai/skills/create-topology/SKILL.md` only if migration reveals new reusable vSphere topology guidance.
+- Runtime project skills: update `.agents/skills/project-create-topology/SKILL.md`
+  only if migration reveals new reusable vSphere topology guidance.
 - Specs: update `.agents/sow/specs/topology-function-schema.md` if this migration changes durable topology semantics.
 - End-user/operator docs: update only if public vSphere topology behavior or Function docs exist and change.
 - End-user/operator skills: update only if public topology skill guidance changes.
@@ -175,6 +190,10 @@ Open decisions:
 ### 2026-05-10
 
 - Created pending SOW after the user noted that vSphere remains legacy and should be migrated after the other topology SOWs.
+
+- Updated prerequisites after SOW-0023 added declarative correlation rules and
+  link layout tokens. vSphere migration must use the final v1 contract rather
+  than the older presentation-only contract.
 
 ## Validation
 

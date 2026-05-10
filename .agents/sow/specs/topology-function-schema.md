@@ -30,6 +30,9 @@ Topology payloads separate these planes:
 - presentation: backend-selected UI-token composition for labels, colors,
   icons, legends, highlighting, link styles, scale keys, and graph port
   bullets;
+- correlation: producer-visible rules, pure correlation actors, points, and
+  claims used by an aggregator to correlate independently produced topology
+  maps without exposing aggregator internal states;
 - overlay refs: compact references for refreshable metrics or Function-backed
   snapshots.
 
@@ -79,7 +82,7 @@ Link types declare:
   `observation`;
 - aggregation policy for direction, evidence, metrics, tables, and overlays.
 - optional `presentation` with UI-owned color, line style, width, curve, arrow,
-  and one variable visual channel.
+  tokenized layout strength/distance, and one variable visual channel.
 
 Port types are optional and declare graph port-bullet presentation only. Full
 modal/table composition is separate from this graph presentation contract.
@@ -116,7 +119,7 @@ Graph-level `data.presentation` carries legend order, actor-click highlight
 behavior, port tooltip field labels, and scale-key definitions.
 
 Presentation uses closed UI-owned tokens. Producers must not emit raw SVG, raw
-CSS, coordinates, component names, force-layout physics, or viewport state.
+CSS, coordinates, component names, raw force-layout physics, or viewport state.
 
 Closed token values are part of the schema contract:
 
@@ -125,6 +128,10 @@ Closed token values are part of the schema contract:
   `blue`, `green`, `orange`, `purple`, `cyan`, `yellow`, `teal`, `gray`;
 - opacity tokens: `normal`, `muted`, `faded`;
 - width tokens: `thin`, `normal`, `thick`, `emphasis`;
+- link layout strength tokens: `weakest`, `weaker`, `normal`, `stronger`,
+  `strongest`;
+- link layout distance tokens: `closest`, `closer`, `normal`, `farther`,
+  `farthest`;
 - icons: `router`, `switch`, `firewall`, `access_point`, `server`, `storage`,
   `load_balancer`, `printer`, `phone`, `ups`, `camera`, `process`, `agent`,
   `netdata-agent`, `parent`, `remote-endpoint`, `local-endpoint`, `segment`,
@@ -150,6 +157,13 @@ per `scale_key` across the visible graph. `variable.min` and `variable.max`
 are visual tokens for the chosen channel: width variables use width tokens,
 opacity variables use opacity tokens.
 
+Link types may also define tokenized force-layout hints using
+`presentation.layout.strength` and `presentation.layout.distance`. These are
+relative UI-owned tokens, not numeric physics. Use weak/far tokens for dense
+mesh, local-noise, inferred, partial-correlation, and cross-topology links. Use
+strong/close tokens for ownership and containment links that keep a cluster
+together.
+
 Actor port bullets require explicit `ports.sources[]` when
 `show_bullets: true`. The source may be `links`, `evidence`, or an
 `actor_table`. Source column names are table-local and must remain unchanged
@@ -157,6 +171,10 @@ during Cloud aggregation. Type ids inside row values and `default_type` values
 are rewritten only when they refer to type registries. `ports.sources[].evidence`
 is an evidence type id. `name_column` must reference a scalar display column,
 not a raw actor/link/evidence reference, array, or JSON cell.
+`ports.sources[].value_column` is optional and must reference a numeric source
+column. When present, the UI sums values for matching bullet keys and uses the
+sum for bullet multiplicity, overflow, and sizing. Aggregated producers should
+use this instead of sending repeated rows only to drive presentation.
 
 `selection.actor_click.mode: highlight_path` requires `path_table`,
 `path_actor_column`, and `path_order_column`. `path_actor_column` identifies
@@ -176,6 +194,50 @@ Presentation conflict policy:
 - `profile_version` is diagnostic. It may help choose a preferred display
   profile later, but it is not a comparable semantic-version contract and must
   not be used to drop facts or rows.
+
+## Correlation Contract
+
+Correlation points are pure topology actors. Producers must not encode
+correlation as hidden flags on real actors, and must not expose aggregator
+internal states such as absorbed, candidate, equivalence class, or rewrite plan.
+The final aggregated output is always a normal topology payload.
+
+`data.correlation.rules` defines how independent payloads of the same topology
+kind can be correlated. Each rule defines:
+
+- `action`: `absorb` for exact matches that remove correlation actors and
+  rewrite incident correlation links, or `link` for partial/broader matches
+  that keep the correlation actor visible and add a weak correlation link;
+- `priority`: lower numbers run first;
+- `key_space`: namespace for exact string-key matching;
+- `key`: a declarative template built from point/claim table columns and
+  literals;
+- `point_actor_types`: actor types that are pure correlation points;
+- optional `claim_actor_types`: actor types that may satisfy the point;
+- optional `correlation_link_types`: link types that connect real actors to
+  correlation actors and may be consumed/replaced by the rule;
+- `output_link_type`: link type emitted for rewritten absorb links or visible
+  partial correlation links.
+
+`data.correlation.points` is a compact table of correlation actors and keys.
+`data.correlation.claims` is a compact table of real actors and keys they can
+satisfy. Both tables require `actor`, `rule`, and the key columns referenced by
+their rules.
+
+The aggregator is intentionally agnostic. It builds normalized keys from
+declared columns and literals, applies rule priority, and handles ambiguity
+conservatively. It must not need new code to understand every future IP, port,
+MAC, chassis id, object id, label, or topology-domain key.
+
+No match keeps the correlation actor visible. Ambiguous matches remain
+unresolved and produce diagnostics. NAT or other alias evidence can be modeled
+by adding extra point/claim rows for the same actor and rule; aliases add facts
+without mutating the original observation.
+
+Correlation links must be semantic link types even for single-node payloads.
+The legend must include correlation actors and links when they are visible, so
+users can distinguish unresolved, partial, inferred, and resolved graph
+relationships.
 
 ## Telemetry Overlays
 
@@ -214,13 +276,22 @@ the UI can use it for only some topology kinds while bypassing it for others.
 
 `topology:network-connections` now emits `netdata.topology.v1` directly from
 the C network-viewer Function. Aggregated mode is the default and emits compact
-actor and graph-link tables only. Detailed mode adds a shared socket
-relationship-evidence table for exact tuple matching and drilldowns. The
-producer no longer emits the superseded old-schema presentation object or
-duplicated actor-nested socket modal tables. It now emits compact graph
-presentation metadata in type definitions plus `data.presentation`, and
-repeated string columns use dictionary encoding when it reduces raw payload
-size.
+actor, graph-link, and actor-owned `socket_ports` tables. Detailed mode adds a
+shared socket relationship-evidence table for exact tuple matching and
+drilldowns. Process actor size uses the actor row `socket_count` metric, while
+process port bullets read the `socket_ports.socket_count` value column so an
+aggregated port row can represent several sockets. The producer no longer emits
+the superseded old-schema presentation object or duplicated actor-nested socket
+modal tables. It now emits compact graph presentation metadata in type
+definitions plus `data.presentation`, and repeated string columns use
+dictionary encoding when it reduces raw payload size.
+
+Network-connections distinguishes unresolved endpoint links from aggregator
+correlation output. `endpoint_socket` connects a process to a visible unresolved
+endpoint actor and must not use the farthest layout distance because that makes
+single-node maps zoom out unnecessarily. `correlated_socket` is the output link
+type after exact endpoint absorption by an aggregator and may use farthest
+distance to keep independent topology clusters from blending.
 
 `topology:snmp` now emits `netdata.topology.v1` from the Function handler
 through an adapter over the existing SNMP topology engine output. The adapter
