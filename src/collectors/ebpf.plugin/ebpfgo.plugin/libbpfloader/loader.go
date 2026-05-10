@@ -10,6 +10,8 @@ type BTF struct {
 	Path string
 }
 
+type CachestatRuntime struct{}
+
 func OpenObject(path string) (*Object, error) {
 	return nil, ErrDisabled
 }
@@ -33,3 +35,25 @@ func (b *BTF) Free() {}
 func IsFunctionInsideBTF(file *BTF, function string) (bool, error) {
 	return false, ErrDisabled
 }
+
+func NewCachestatRuntime(path string) (*CachestatRuntime, error) {
+	_ = path
+	return nil, ErrDisabled
+}
+
+func (r *CachestatRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error {
+	_ = pidTableSize
+	_ = mapsPerCore
+	return ErrDisabled
+}
+
+func (r *CachestatRuntime) Load() error {
+	return ErrDisabled
+}
+
+func (r *CachestatRuntime) Attach(accountFunction string) error {
+	_ = accountFunction
+	return ErrDisabled
+}
+
+func (r *CachestatRuntime) Close() {}

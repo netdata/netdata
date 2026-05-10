@@ -1,33 +1,39 @@
 package main
 
 import (
+	"bufio"
 	"os"
+	"strings"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
 const cachestatKernelMask uint32 = (1 << 12) - 1
+const cachestatDefaultPIDTableSize uint32 = 32768
 
 type CachestatLegacyConfig struct {
-	PluginsDir    string
-	Kernels       uint32
-	IsRHF         int
-	KernelVersion uint32
-	IsDebian      bool
+	PluginsDir      string
+	Kernels         uint32
+	IsRHF           int
+	KernelVersion   uint32
+	IsDebian        bool
+	PidTableSize    uint32
+	MapsPerCore     bool
+	AccountFunction string
 }
 
 type CachestatLegacyHandle struct {
-	Plan   LoadPlan
-	Object *libbpfloader.Object
+	Plan    LoadPlan
+	Runtime *libbpfloader.CachestatRuntime
 }
 
 func (h *CachestatLegacyHandle) Close() {
-	if h == nil || h.Object == nil {
+	if h == nil || h.Runtime == nil {
 		return
 	}
 
-	h.Object.Close()
-	h.Object = nil
+	h.Runtime.Close()
+	h.Runtime = nil
 }
 
 func defaultPluginsDir() string {
@@ -40,10 +46,13 @@ func defaultPluginsDir() string {
 
 func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 	return CachestatLegacyConfig{
-		PluginsDir: defaultPluginsDir(),
-		Kernels:    cachestatKernelMask,
-		IsRHF:      -1,
-		IsDebian:   IsDebianFlavor(),
+		PluginsDir:      defaultPluginsDir(),
+		Kernels:         cachestatKernelMask,
+		IsRHF:           -1,
+		IsDebian:        IsDebianFlavor(),
+		PidTableSize:    cachestatDefaultPIDTableSize,
+		MapsPerCore:     true,
+		AccountFunction: selectCachestatDirtyAccountFunction(),
 	}
 }
 
@@ -58,6 +67,10 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 
 	if rhf, err := RedHatRelease(); err == nil {
 		cfg.IsRHF = rhf
+	}
+
+	if cfg.AccountFunction == "" {
+		cfg.AccountFunction = selectCachestatDirtyAccountFunction()
 	}
 
 	return cfg, nil
@@ -78,4 +91,37 @@ func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
 		"",
 		RunModeEntry,
 	)
+}
+
+func selectCachestatDirtyAccountFunction() string {
+	candidates := []string{
+		"__folio_mark_dirty",
+		"__set_page_dirty",
+		"account_page_dirtied",
+	}
+
+	file, err := os.Open("/proc/kallsyms")
+	if err != nil {
+		return candidates[len(candidates)-1]
+	}
+	defer file.Close()
+
+	seen := make(map[string]struct{}, len(candidates))
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		for _, candidate := range candidates {
+			if strings.Contains(line, candidate) {
+				seen[candidate] = struct{}{}
+			}
+		}
+	}
+
+	for _, candidate := range candidates {
+		if _, ok := seen[candidate]; ok {
+			return candidate
+		}
+	}
+
+	return candidates[len(candidates)-1]
 }
