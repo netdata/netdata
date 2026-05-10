@@ -56,4 +56,9 @@ func (r *CachestatRuntime) Attach(accountFunction string) error {
 	return ErrDisabled
 }
 
+func (r *CachestatRuntime) Snapshot(mapsPerCore bool) (CachestatSnapshot, error) {
+	_ = mapsPerCore
+	return CachestatSnapshot{}, ErrDisabled
+}
+
 func (r *CachestatRuntime) Close() {}

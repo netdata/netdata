@@ -12,6 +12,7 @@ netdata_cachestat_pid_t *cachestat_vector = NULL;
 
 static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
 static netdata_idx_t *cachestat_values = NULL;
+
 static bool cachestat_safe_clean = false;
 
 ebpf_local_maps_t cachestat_maps[] = {
@@ -635,8 +636,6 @@ static void ebpf_cachestat_exit(void *pptr)
 
     freez(cachestat_vector);
     cachestat_vector = NULL;
-    freez(cachestat_values);
-    cachestat_values = NULL;
 }
 
 /*****************************************************************
@@ -1588,19 +1587,14 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
 */
 static void cachestat_collector(ebpf_module_t *em)
 {
-    netdata_publish_cachestat_t publish;
-    memset(&publish, 0, sizeof(publish));
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
-    int maps_per_core = em->maps_per_core;
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     int counter = update_every - 1;
     //This will be cancelled by its parent
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    netdata_idx_t *stats = em->hash_table_stats;
-    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb);
 
@@ -1612,27 +1606,16 @@ static void cachestat_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_cachestat_read_global_tables(stats, maps_per_core);
-
-        if (ebpf_plugin_stop())
-            break;
-
-        netdata_mutex_lock(&lock);
-
-        cachestat_send_global(&publish);
 
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_cache_send_apps_data(apps_groups_root_target);
 
         if (ebpf_plugin_stop()) {
-            netdata_mutex_unlock(&lock);
             break;
         }
 
         if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_cachestat_send_cgroup_data(update_every);
-
-        netdata_mutex_unlock(&lock);
 
         if (ebpf_plugin_stop())
             break;
@@ -1734,9 +1717,7 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
 static void ebpf_cachestat_allocate_global_vectors()
 {
     cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
-    cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
-    memset(cachestat_hash_values, 0, NETDATA_CACHESTAT_END * sizeof(netdata_idx_t));
     memset(cachestat_counter_aggregated_data, 0, NETDATA_CACHESTAT_END * sizeof(netdata_syscall_stat_t));
     memset(cachestat_counter_publish_aggregated, 0, NETDATA_CACHESTAT_END * sizeof(netdata_publish_syscall_t));
 }
@@ -1867,7 +1848,6 @@ void ebpf_cachestat_thread(void *ptr)
     netdata_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-    ebpf_create_memory_charts(em);
 
     netdata_mutex_unlock(&lock);
 

@@ -5,12 +5,21 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
+#include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
 struct netdata_ebpf_cachestat_runtime {
     struct bpf_object *obj;
     struct bpf_link **links;
+};
+
+struct netdata_ebpf_cachestat_snapshot {
+    uint64_t mark_page_accessed;
+    uint64_t mark_buffer_dirty;
+    uint64_t add_to_page_cache_lru;
+    uint64_t account_page_dirtied;
 };
 
 static const char *cachestat_account_program_name(const char *account_function)
@@ -94,6 +103,14 @@ static struct bpf_link *cachestat_attach_program_by_name(struct bpf_object *obj,
     return bpf_program__attach_kprobe(prog, false, target);
 }
 
+static uint64_t cachestat_sum_percpu_values(const uint64_t *values, int count)
+{
+    uint64_t total = 0;
+    for (int i = 0; i < count; i++)
+        total += values[i];
+    return total;
+}
+
 static void cachestat_destroy_links(struct netdata_ebpf_cachestat_runtime *rt)
 {
     if (!rt || !rt->links)
@@ -173,6 +190,52 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
         }
     }
 
+    return 0;
+}
+
+int netdata_cachestat_runtime_snapshot(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    int maps_per_core,
+    struct netdata_ebpf_cachestat_snapshot *out)
+{
+    if (!rt || !rt->obj || !out)
+        return -1;
+
+    struct bpf_map *map = bpf_object__find_map_by_name(rt->obj, "cstat_global");
+    if (!map)
+        return -1;
+
+    int fd = bpf_map__fd(map);
+    if (fd < 0)
+        return -1;
+
+    int count = maps_per_core ? libbpf_num_possible_cpus() : 1;
+    if (count < 1)
+        count = 1;
+
+    uint64_t *values = calloc((size_t)count, sizeof(*values));
+    if (!values)
+        return -1;
+
+    struct {
+        uint64_t *dst;
+        uint32_t key;
+    } entries[] = {
+        {&out->add_to_page_cache_lru, 0},
+        {&out->mark_page_accessed, 1},
+        {&out->account_page_dirtied, 2},
+        {&out->mark_buffer_dirty, 3},
+    };
+
+    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
+        uint32_t key = entries[i].key;
+        *entries[i].dst = 0;
+
+        if (bpf_map_lookup_elem(fd, &key, values) == 0)
+            *entries[i].dst = cachestat_sum_percpu_values(values, count);
+    }
+
+    free(values);
     return 0;
 }
 
