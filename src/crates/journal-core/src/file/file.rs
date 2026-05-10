@@ -42,38 +42,13 @@ struct PayloadMatcher<'data, T> {
     _phantom: PhantomData<T>,
 }
 
-struct DataPayloadMatcher<'data> {
-    payload: &'data [u8],
-    hash: u64,
-    decompressed_payload: Vec<u8>,
-}
-
-impl<'data> DataPayloadMatcher<'data> {
-    fn new(payload: &'data [u8], hash: u64) -> Self {
+impl<'data, B: ByteSlice> PayloadMatcher<'data, DataObject<B>> {
+    fn data_matcher(payload: &'data [u8], hash: u64) -> Self {
         Self {
             payload,
             hash,
-            decompressed_payload: Vec::new(),
+            _phantom: PhantomData::<DataObject<B>>,
         }
-    }
-
-    fn payload_matches<B: ByteSlice>(&mut self, object: &DataObject<B>) -> Result<bool> {
-        if object.raw_payload() == self.payload {
-            return Ok(true);
-        }
-
-        if object.is_compressed() {
-            let len = match object.decompress(&mut self.decompressed_payload) {
-                Ok(len) => len,
-                Err(JournalError::DecompressorError | JournalError::UnknownCompressionMethod) => {
-                    return Ok(false);
-                }
-                Err(e) => return Err(e),
-            };
-            return Ok(&self.decompressed_payload[..len] == self.payload);
-        }
-
-        Ok(false)
     }
 }
 
@@ -83,19 +58,6 @@ impl<'data, B: ByteSlice> PayloadMatcher<'data, FieldObject<B>> {
             payload,
             hash,
             _phantom: PhantomData::<FieldObject<B>>,
-        }
-    }
-}
-
-impl<'a, 'data> BucketVisitor<'a> for DataPayloadMatcher<'data> {
-    type Object = DataObject<&'a [u8]>;
-    type Output = NonZeroU64;
-
-    fn visit(&mut self, object: &ValueGuard<'a, Self::Object>) -> Result<Option<Self::Output>> {
-        if object.hash() == self.hash && self.payload_matches(object)? {
-            Ok(Some(object.offset()))
-        } else {
-            Ok(None)
         }
     }
 }
@@ -521,7 +483,7 @@ impl<M: MemoryMap> JournalFile<M> {
     }
 
     pub fn find_data_offset(&self, hash: u64, payload: &[u8]) -> Result<Option<NonZeroU64>> {
-        let visitor = DataPayloadMatcher::new(payload, hash);
+        let visitor = PayloadMatcher::data_matcher(payload, hash);
         self.visit_bucket(self.data_hash_table_ref(), hash, visitor)
     }
 
@@ -589,7 +551,6 @@ impl<M: MemoryMap> JournalFile<M> {
                 ic.collect_offsets(self, &mut entry_offsets)?;
 
                 let mut data_offsets = Vec::new();
-                let mut payload_buf = Vec::new();
                 for entry_offset in entry_offsets {
                     {
                         let entry_object = self.entry_ref(entry_offset)?;
@@ -599,14 +560,13 @@ impl<M: MemoryMap> JournalFile<M> {
 
                     for data_offset in data_offsets.iter().copied() {
                         let data_object = self.data_ref(data_offset)?;
-                        let payload = data_object.logical_payload(&mut payload_buf)?;
+                        let payload = data_object.raw_payload();
 
                         if payload == remapping_payload {
                             continue;
                         }
 
-                        let s =
-                            std::str::from_utf8(payload).map_err(|_| JournalError::InvalidField)?;
+                        let s = std::str::from_utf8(payload).expect("utf8 data");
 
                         let Some((field, value)) = s.split_once('=') else {
                             return Err(JournalError::InvalidField);
@@ -632,8 +592,7 @@ impl<M: MemoryMap> JournalFile<M> {
             if field.payload.starts_with(b"ND") {
                 continue;
             }
-            let s = String::from_utf8(field.raw_payload().to_vec())
-                .map_err(|_| JournalError::InvalidField)?;
+            let s = String::from_utf8(field.raw_payload().to_vec()).expect("utf8 data");
             field_map.insert(s.clone(), s);
         }
 
@@ -1257,176 +1216,11 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::file::mmap::MmapMut;
     use crate::file::writer::JournalWriter;
     use tempfile::TempDir;
-    use zerocopy::IntoBytes;
 
     fn test_uuid(seed: u8) -> uuid::Uuid {
         uuid::Uuid::from_bytes([seed; 16])
-    }
-
-    fn data_object_bytes(payload: &[u8], flags: u8) -> Vec<u8> {
-        let header = DataObjectHeader {
-            object_header: ObjectHeader {
-                type_: ObjectType::Data as u8,
-                flags,
-                reserved: [0; 6],
-                size: (std::mem::size_of::<DataObjectHeader>() + payload.len()) as u64,
-            },
-            hash: 0,
-            next_hash_offset: None,
-            next_field_offset: None,
-            entry_offset: None,
-            entry_array_offset: None,
-            n_entries: None,
-        };
-
-        let mut bytes = Vec::with_capacity(header.object_header.size as usize);
-        bytes.extend_from_slice(header.as_bytes());
-        bytes.extend_from_slice(payload);
-        bytes
-    }
-
-    #[test]
-    fn data_payload_matcher_matches_lz4_compressed_payload() {
-        let payload = b"_SYSTEMD_UNIT=netdata.service";
-        let compressed = lz4_flex::block::compress(payload);
-        let mut stored_payload = Vec::with_capacity(std::mem::size_of::<u64>() + compressed.len());
-        stored_payload.extend_from_slice(&(payload.len() as u64).to_le_bytes());
-        stored_payload.extend_from_slice(&compressed);
-
-        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
-        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
-
-        let mut matcher = DataPayloadMatcher::new(payload, 0);
-        assert!(matcher.payload_matches(&object).unwrap());
-    }
-
-    #[test]
-    fn find_data_offset_matches_lz4_compressed_payload_in_hash_bucket() -> Result<()> {
-        let payload = b"_SYSTEMD_UNIT=netdata.service";
-        let dir = TempDir::new().map_err(JournalError::Io)?;
-        let journal_dir = dir.path().join("journals");
-        std::fs::create_dir_all(&journal_dir).map_err(JournalError::Io)?;
-        let path = journal_dir.join("system.journal");
-        let repo_file =
-            crate::repository::File::from_path(&path).expect("test journal path should parse");
-        let mut journal_file = JournalFile::<MmapMut>::create(
-            &repo_file,
-            JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3)),
-        )?;
-        let data_offset = {
-            let writer = JournalWriter::new(&mut journal_file, 1, test_uuid(4))?;
-            NonZeroU64::new(writer.current_file_size()).unwrap()
-        };
-        let hash = journal_file.hash(payload);
-
-        let compressed = lz4_flex::block::compress(payload);
-        let mut stored_payload = Vec::with_capacity(std::mem::size_of::<u64>() + compressed.len());
-        stored_payload.extend_from_slice(&(payload.len() as u64).to_le_bytes());
-        stored_payload.extend_from_slice(&compressed);
-
-        let data_size = {
-            let mut data_guard =
-                journal_file.data_mut(data_offset, Some(stored_payload.len() as u64))?;
-            data_guard.header.hash = hash;
-            data_guard.header.object_header.flags = ObjectFlags::CompressedLz4 as u8;
-            data_guard.set_payload(&stored_payload);
-
-            data_guard.header.object_header.aligned_size()
-        };
-        {
-            let header = journal_file.journal_header_mut();
-            header.arena_size = data_offset.get() + data_size - header.header_size;
-        }
-
-        journal_file.data_hash_table_set_tail_offset(hash, data_offset)?;
-
-        assert_eq!(
-            journal_file.find_data_offset(hash, payload)?,
-            Some(data_offset)
-        );
-        assert_eq!(
-            journal_file.find_data_offset(hash, b"_SYSTEMD_UNIT=sshd.service")?,
-            None
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn find_data_offset_skips_bad_compressed_payload_in_hash_bucket() -> Result<()> {
-        let payload = b"_SYSTEMD_UNIT=netdata.service";
-        let dir = TempDir::new().map_err(JournalError::Io)?;
-        let journal_dir = dir.path().join("journals");
-        std::fs::create_dir_all(&journal_dir).map_err(JournalError::Io)?;
-        let path = journal_dir.join("system.journal");
-        let repo_file =
-            crate::repository::File::from_path(&path).expect("test journal path should parse");
-        let mut journal_file = JournalFile::<MmapMut>::create(
-            &repo_file,
-            JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3)),
-        )?;
-        let bad_offset = {
-            let writer = JournalWriter::new(&mut journal_file, 1, test_uuid(4))?;
-            NonZeroU64::new(writer.current_file_size()).unwrap()
-        };
-        let hash = journal_file.hash(payload);
-
-        let bad_size = {
-            let mut data_guard = journal_file.data_mut(bad_offset, Some(5))?;
-            data_guard.header.hash = hash;
-            data_guard.header.object_header.flags = ObjectFlags::CompressedLz4 as u8;
-            data_guard.set_payload(b"short");
-
-            data_guard.header.object_header.aligned_size()
-        };
-        let good_offset = NonZeroU64::new(bad_offset.get() + bad_size).unwrap();
-
-        let compressed = lz4_flex::block::compress(payload);
-        let mut stored_payload = Vec::with_capacity(std::mem::size_of::<u64>() + compressed.len());
-        stored_payload.extend_from_slice(&(payload.len() as u64).to_le_bytes());
-        stored_payload.extend_from_slice(&compressed);
-
-        let good_size = {
-            let mut data_guard =
-                journal_file.data_mut(good_offset, Some(stored_payload.len() as u64))?;
-            data_guard.header.hash = hash;
-            data_guard.header.object_header.flags = ObjectFlags::CompressedLz4 as u8;
-            data_guard.set_payload(&stored_payload);
-
-            data_guard.header.object_header.aligned_size()
-        };
-        {
-            let header = journal_file.journal_header_mut();
-            header.arena_size = good_offset.get() + good_size - header.header_size;
-        }
-
-        journal_file.data_hash_table_set_tail_offset(hash, bad_offset)?;
-        journal_file.data_hash_table_set_tail_offset(hash, good_offset)?;
-
-        assert_eq!(
-            journal_file.find_data_offset(hash, payload)?,
-            Some(good_offset)
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn data_payload_matcher_rejects_different_compressed_payload() {
-        let payload = b"_SYSTEMD_UNIT=netdata.service";
-        let compressed = lz4_flex::block::compress(payload);
-        let mut stored_payload = Vec::with_capacity(std::mem::size_of::<u64>() + compressed.len());
-        stored_payload.extend_from_slice(&(payload.len() as u64).to_le_bytes());
-        stored_payload.extend_from_slice(&compressed);
-
-        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
-        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
-
-        let mut matcher = DataPayloadMatcher::new(b"_SYSTEMD_UNIT=sshd.service", 0);
-        assert!(!matcher.payload_matches(&object).unwrap());
     }
 
     #[test]
