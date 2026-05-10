@@ -157,6 +157,25 @@ family_safe() {
     done <<< "${keys}"
 }
 
+family_ack() {
+    local rule="$1" comment="$2"
+    sq_require_ascii "${comment}"
+    local keys
+    keys="$(list_open_hotspots_for_rule "${rule}")"
+    local count
+    count="$(printf '%s\n' "${keys}" | grep -c . || true)"
+    if [[ "${count}" == "0" ]]; then
+        echo -e "${SQ_YELLOW}No open hotspots for rule ${rule}.${SQ_NC}" >&2
+        return 0
+    fi
+    echo "${keys}" >&2
+    confirm_family "${rule}" "${count}" "mark REVIEWED/ACKNOWLEDGED" || { echo "Aborted." >&2; return 1; }
+    while IFS= read -r key; do
+        [[ -z "${key}" ]] && continue
+        hotspot_change_status "${key}" "ACKNOWLEDGED" "${comment}"
+    done <<< "${keys}"
+}
+
 usage() {
     sed -n '4,33p' "$0"
     exit 2
@@ -172,6 +191,7 @@ case "${cmd}" in
     fixed)     hotspot_change_status      "${1:?key required}" "FIXED"        "${2:?comment required}" ;;
     family-fp)   family_fp   "${1:?rule id required (e.g. go:S2077)}" "${2:?comment required}" ;;
     family-safe) family_safe "${1:?rule id required (e.g. c:S5443)}"  "${2:?comment required}" ;;
+    family-ack)  family_ack  "${1:?rule id required (e.g. c:S5443)}"  "${2:?comment required}" ;;
     ""|-h|--help|help) usage ;;
     *) echo -e "${SQ_RED}[ERROR]${SQ_NC} Unknown subcommand: ${cmd}" >&2; usage ;;
 esac

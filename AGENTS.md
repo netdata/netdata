@@ -328,19 +328,19 @@ Runtime input skills:
 
 - `.agents/skills/coverity-audit/`
   Trigger: Coverity Scan defect triage for this repository.
-  Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+  Status: live.
 
 - `.agents/skills/sonarqube-audit/`
   Trigger: SonarCloud findings triage for this repository.
-  Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+  Status: live.
 
 - `.agents/skills/graphql-audit/`
   Trigger: GitHub Code Scanning/CodeQL triage for this repository.
-  Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+  Status: live.
 
 - `.agents/skills/pr-reviews/`
   Trigger: PR comment and review iteration work for this repository.
-  Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+  Status: live.
 
 - `.agents/skills/codacy-audit/`
   Trigger: Codacy Cloud workflow for this repository -- pre-push local analysis (`codacy-analysis-cli` via docker or local binary) and read-only PR-issue fetching via the v3 API.
