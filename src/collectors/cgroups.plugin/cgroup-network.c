@@ -266,22 +266,61 @@ static int switch_namespace(const char *prefix, pid_t pid) {
         }
     }
 
+    // Verify critical namespaces were successfully switched
+    for(i = 0; all_ns[i].name ; i++) {
+        if(all_ns[i].fd != -1 && !all_ns[i].status) {
+            if(all_ns[i].nstype == CLONE_NEWNET) {
+                // Network namespace is mandatory for correct interface detection
+                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                       "Failed to switch to %s namespace of pid %d",
+                       all_ns[i].name, (int) pid);
+                if(root_fd != -1) close(root_fd);
+                if(cwd_fd != -1) close(cwd_fd);
+                for(int j = 0; all_ns[j].name ; j++)
+                    if(all_ns[j].fd != -1) close(all_ns[j].fd);
+                return 1;
+            }
+            // Mount/PID namespace failure is non-critical for network detection
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "Failed to switch to %s namespace of pid %d (continuing)",
+                   all_ns[i].name, (int) pid);
+        }
+    }
+
     gettid_uncached();
     setgroups(0, NULL);
 
     if(root_fd != -1) {
-        if(fchdir(root_fd) < 0)
+        if(fchdir(root_fd) < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d root directory", (int)pid);
+            close(root_fd);
+            if(cwd_fd != -1) close(cwd_fd);
+            return 1;
+        }
 
-        if(chroot(".") < 0)
+        if(chroot(".") < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot chroot() to pid %d root directory", (int)pid);
+            close(root_fd);
+            if(cwd_fd != -1) close(cwd_fd);
+            return 1;
+        }
+
+        if(chdir("/") < 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot chdir() to / after chroot for pid %d", (int)pid);
+            close(root_fd);
+            if(cwd_fd != -1) close(cwd_fd);
+            return 1;
+        }
 
         close(root_fd);
     }
 
     if(cwd_fd != -1) {
-        if(fchdir(cwd_fd) < 0)
+        if(fchdir(cwd_fd) < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d current working directory", (int)pid);
+            close(cwd_fd);
+            return 1;
+        }
 
         close(cwd_fd);
     }
