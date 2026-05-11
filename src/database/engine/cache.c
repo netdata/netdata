@@ -719,8 +719,6 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
                    page_get_status_flags(page),
         q->flags);
 
-    page_flag_clear(page, q->flags);
-
     struct section_pages *sp_to_free = NULL;
 
     if(q->linked_list_in_sections_judy) {
@@ -755,6 +753,13 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(q->base, page, link.prev, link.next);
         q->version++;
     }
+
+    // Clear the queue flag only after the unlink, while still under the queue
+    // lock. A lockless reader that sees the queue flag set is guaranteed the
+    // page is still on this queue's list; once we clear the flag below, the
+    // page is also no longer on the list. This matches the re-validation
+    // pattern added to page_has_been_accessed by commit 2733e6fc60 (#21793).
+    page_flag_clear(page, q->flags);
 
     if(!having_lock)
         pgc_queue_unlock(cache, q);
