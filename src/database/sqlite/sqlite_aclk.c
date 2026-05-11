@@ -697,10 +697,10 @@ static void aclk_synchronization_event_loop(void *arg)
                     // NODE STATE
                 case ACLK_DATABASE_NODE_STATE:
                     host = cmd.param[0];
-                    aclk_host_config = host->aclk_host_config;
+                    aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     if (unlikely(!aclk_host_config)) {
                         create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
-                        aclk_host_config = host->aclk_host_config;
+                        aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     }
 
                     if (aclk_host_config) {
@@ -730,17 +730,17 @@ static void aclk_synchronization_event_loop(void *arg)
                 case ACLK_QUEUE_NODE_INFO:
                     host = cmd.param[0];
                     bool immediate = (bool)(uintptr_t)cmd.param[1];
-                    aclk_host_config = host->aclk_host_config;
+                    aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     if (unlikely(!aclk_host_config)) {
                         create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
-                        aclk_host_config = host->aclk_host_config;
+                        aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     }
                     aclk_host_config->node_info_send_time = (host == localhost || immediate) ? 1 : now_realtime_sec();
                     break;
                 case ACLK_CANCEL_NODE_UPDATE_TIMER:
                     host = cmd.param[0];
                     struct completion *compl = cmd.param[1];
-                    aclk_host_config = host->aclk_host_config;
+                    aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     if (!aclk_host_config || !aclk_host_config->timer_initialized) {
                         completion_mark_complete(compl);
                         break;
@@ -988,7 +988,7 @@ static void aclk_initialize_event_loop(void)
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_uuid_t *node_id __maybe_unused)
 {
 
-    if (!host || host->aclk_host_config)
+    if (!host || __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE))
         return;
 
     struct aclk_sync_cfg_t *aclk_host_config = callocz(1, sizeof(struct aclk_sync_cfg_t));
@@ -996,8 +996,16 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
     if (node_id && !uuid_is_null(*node_id))
         uuid_unparse_lower(*node_id, aclk_host_config->node_id);
 
+    // Initialize every field BEFORE publishing the pointer via CAS; the RELEASE on
+    // the CAS pairs with ACQUIRE loads of host->aclk_host_config in readers so they
+    // cannot observe the pointer with zero-initialized fields (host == NULL etc.).
+    aclk_host_config->host = host;
+    aclk_host_config->stream_alerts = false;
+    time_t now = now_realtime_sec();
+    aclk_host_config->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
+
     struct aclk_sync_cfg_t *expected = NULL;
-    if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+    if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
         if (node_id && UUIDiszero(host->node_id))
             uuid_copy(host->node_id.uuid, *node_id);
     }
@@ -1005,11 +1013,6 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
         freez(aclk_host_config);
         return;
     }
-
-    aclk_host_config->host = host;
-    aclk_host_config->stream_alerts = false;
-    time_t now = now_realtime_sec();
-    aclk_host_config->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
 }
 
 #define SQL_FETCH_ALL_HOSTS                                                                                            \
@@ -1208,7 +1211,7 @@ void destroy_aclk_config(RRDHOST *host)
     if (!host)
         return;
 
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (!aclk_host_config)
         return;
 
@@ -1221,7 +1224,7 @@ void destroy_aclk_config(RRDHOST *host)
         completion_destroy(&compl);
     }
 
-    struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_ACQUIRE);
     if (!old_aclk_host_config)
         return;
 

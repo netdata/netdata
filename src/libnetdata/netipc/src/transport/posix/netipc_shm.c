@@ -22,6 +22,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/types.h>
 
 #include <linux/futex.h>
 
@@ -147,32 +148,57 @@ static inline uint32_t *shm_u32_ptr(void *base, int offset)
  *  -1  = doesn't exist
  *  -2  = exists but undersized / invalid (treated as stale, unlinked)
  */
-static int check_shm_stale(const char *path)
+static int unlink_same_file(const char *path, const struct stat *expected)
 {
-    struct stat st;
-    if (stat(path, &st) != 0)
+    struct stat current;
+    if (lstat(path, &current) != 0)
+        return (errno == ENOENT) ? 0 : -1;
+
+    if (current.st_dev != expected->st_dev || current.st_ino != expected->st_ino)
         return -1;
 
-    /* Must be at least header-sized to inspect. */
-    if ((size_t)st.st_size < NIPC_SHM_HEADER_LEN) {
-        unlink(path);
-        return -2;
+    if (unlink(path) == 0 || errno == ENOENT)
+        return 0;
+
+    return -1;
+}
+
+static int check_shm_stale(const char *path)
+{
+#ifdef O_NOFOLLOW
+    int fd = open(path, O_RDONLY | O_NOFOLLOW);
+#else
+    int fd = open(path, O_RDONLY);
+#endif
+    if (fd < 0) {
+        if (errno == ENOENT)
+            return -1;
+        /* Symlinks, permission failures, and other ambiguous path states are
+         * treated as live so stale recovery cannot remove an unsafe path. */
+        return 1;
     }
 
-    int fd = open(path, O_RDONLY);
-    if (fd < 0) {
-        /* Don't unlink on permission errors — the file may be owned by
-         * another user/process and we just can't read it. */
-        if (errno != EACCES && errno != EPERM)
-            unlink(path);
-        return -2;
+    struct stat st;
+    if (fstat(fd, &st) != 0) {
+        close(fd);
+        return 1;
+    }
+
+    if (!S_ISREG(st.st_mode)) {
+        close(fd);
+        return 1;
+    }
+
+    /* Must be at least header-sized to inspect. */
+    if (st.st_size < (off_t)NIPC_SHM_HEADER_LEN) {
+        close(fd);
+        return (unlink_same_file(path, &st) == 0) ? -2 : 1;
     }
 
     void *map = mmap(NULL, NIPC_SHM_HEADER_LEN, PROT_READ, MAP_SHARED, fd, 0);
     close(fd);
     if (map == MAP_FAILED) {
-        unlink(path);
-        return -2;
+        return (unlink_same_file(path, &st) == 0) ? -2 : 1;
     }
 
     const nipc_shm_region_header_t *hdr = (const nipc_shm_region_header_t *)map;
@@ -180,8 +206,7 @@ static int check_shm_stale(const char *path)
     /* Validate magic first. */
     if (hdr->magic != NIPC_SHM_REGION_MAGIC) {
         munmap(map, NIPC_SHM_HEADER_LEN);
-        unlink(path);
-        return -2;
+        return (unlink_same_file(path, &st) == 0) ? -2 : 1;
     }
 
     int32_t owner = hdr->owner_pid;
@@ -193,8 +218,7 @@ static int check_shm_stale(const char *path)
     }
 
     /* Dead owner or zero generation (uninitialized/legacy) — stale */
-    unlink(path);
-    return 0;
+    return (unlink_same_file(path, &st) == 0) ? 0 : 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -232,6 +256,9 @@ nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
     if (req_capacity > UINT32_MAX - req_off)
         return NIPC_SHM_ERR_BAD_PARAM;
     uint32_t resp_off = align64(req_off + req_capacity);
+    if (resp_capacity > UINT32_MAX - resp_off ||
+        (size_t)resp_off > SIZE_MAX - (size_t)resp_capacity)
+        return NIPC_SHM_ERR_BAD_PARAM;
     size_t region_size = (size_t)resp_off + resp_capacity;
 
     /* Try O_EXCL create first (fast path, no stale check needed). */

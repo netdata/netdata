@@ -306,6 +306,11 @@ func (tc *tableCache) isConfigCached(cfg ddprofiledefinition.MetricsConfig) bool
 func (tc *tableCache) generateConfigID(cfg ddprofiledefinition.MetricsConfig) string {
 	var sb strings.Builder
 
+	if cfg.MIB != "" {
+		sb.WriteString(cfg.MIB)
+		sb.WriteString("|")
+	}
+
 	if cfg.Table.Name != "" {
 		sb.WriteString(cfg.Table.Name)
 	}

@@ -1,0 +1,6 @@
+# Extracted from public Datadog test data:
+# DataDog/integrations-core snmp/tests/compose/data/mikrotik-router.snmprec
+# Source repository license: BSD 3-Clause.
+# Keep only the RouterOS licensing OIDs needed by the fixture-backed licensing test.
+1.3.6.1.4.1.14988.1.1.4.1.0|4x|64726976696e672064726976696e67206b65707420666f72776172642064726976696e67206f78656e
+1.3.6.1.4.1.14988.1.1.4.2.0|4x|07d209150d352003

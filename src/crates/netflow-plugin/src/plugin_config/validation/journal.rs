@@ -3,20 +3,8 @@ use crate::tiering::TierKind;
 use anyhow::Result;
 
 pub(super) fn validate_journal(cfg: &PluginConfig) -> Result<()> {
-    if cfg.journal.query_1m_max_window.is_zero() {
-        anyhow::bail!("journal.query_1m_max_window must be greater than 0");
-    }
-    if cfg.journal.query_5m_max_window.is_zero() {
-        anyhow::bail!("journal.query_5m_max_window must be greater than 0");
-    }
-    if cfg.journal.query_5m_max_window < cfg.journal.query_1m_max_window {
-        anyhow::bail!("journal.query_5m_max_window must be >= journal.query_1m_max_window");
-    }
     if cfg.journal.query_max_groups == 0 {
         anyhow::bail!("journal.query_max_groups must be greater than 0");
-    }
-    if cfg.journal.query_facet_max_values_per_field == 0 {
-        anyhow::bail!("journal.query_facet_max_values_per_field must be greater than 0");
     }
 
     for (scope, tier) in [

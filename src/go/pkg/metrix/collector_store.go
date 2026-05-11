@@ -3,6 +3,7 @@
 package metrix
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -69,6 +70,9 @@ type committedSeries struct {
 	hash64 uint64
 	key    string
 	name   string
+	// hostScope is immutable after publish and partitions otherwise-identical series.
+	hostScopeKey string
+	hostScope    HostScope
 	// labels are immutable after series publish and can be safely shared across snapshots.
 	labels    []Label
 	labelsKey string
@@ -122,6 +126,8 @@ type readSnapshot struct {
 
 type cycleFrame struct {
 	seq                uint64
+	err                error
+	hostScopes         map[string]HostScope
 	gauges             map[string]*stagedGauge
 	counters           map[string]*stagedCounter
 	histograms         map[string]*stagedHistogram
@@ -205,7 +211,7 @@ func (s *storeView) Read(opts ...ReadOption) Reader {
 	if cfg.flatten {
 		snap = flattenSnapshot(snap)
 	}
-	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten}
+	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten, hostScopeKey: cfg.hostScopeKey}
 }
 
 func (s *storeView) Write() Writer {
@@ -236,6 +242,7 @@ func (c *storeCycleController) BeginCycle() {
 	c.core.sequence++
 	c.core.active = &cycleFrame{
 		seq:                c.core.sequence,
+		hostScopes:         make(map[string]HostScope),
 		gauges:             make(map[string]*stagedGauge),
 		counters:           make(map[string]*stagedCounter),
 		histograms:         make(map[string]*stagedHistogram),
@@ -247,7 +254,7 @@ func (c *storeCycleController) BeginCycle() {
 }
 
 // CommitCycleSuccess publishes staged writes into a new committed snapshot.
-func (c *storeCycleController) CommitCycleSuccess() {
+func (c *storeCycleController) CommitCycleSuccess() error {
 	c.core.mu.Lock()
 	defer c.core.mu.Unlock()
 
@@ -256,23 +263,39 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	oldSnap := c.core.snapshot.Load()
+	if c.core.active.err != nil {
+		abortSnap := &readSnapshot{
+			collectMeta: oldSnap.collectMeta,
+			series:      oldSnap.series,
+			byName:      oldSnap.byName,
+		}
+		abortSnap.collectMeta.LastAttemptSeq = c.core.active.seq
+		abortSnap.collectMeta.LastAttemptStatus = CollectStatusFailed
+		c.core.snapshot.Store(abortSnap)
+		err := c.core.active.err
+		c.core.active = nil
+		return err
+	}
 	successSeq := c.core.successSeq + 1
 	next := &readSnapshot{
 		collectMeta: oldSnap.collectMeta,
 		series:      make(map[string]*committedSeries, len(oldSnap.series)),
 		byName:      nil,
 	}
+	commitHostScopes := make(map[string]HostScope)
 
 	maps.Copy(next.series, oldSnap.series)
 
 	for key, staged := range c.core.active.gauges {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 		series.value = staged.value
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.counters {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
 		if hadCurrent {
@@ -292,7 +315,8 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.histograms {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		if series.desc == nil {
 			panic("metrix: missing histogram descriptor")
@@ -319,7 +343,8 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.summaries {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		if staged.desc.mode == modeStateful && len(staged.desc.summaryQuantiles()) > 0 {
 			if staged.sketch != nil {
@@ -346,20 +371,23 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.stateSet {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		series.stateSetValues = cloneStateMap(staged.states)
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.measureSetGauges {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 		series.measureSetValues = append(series.measureSetValues[:0], staged.values...)
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.measureSetCounters {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		if series.desc != nil && series.desc.kind == kindMeasureSet && series.desc.measureSet != nil && series.desc.measureSet.semantics == MeasureSetSemanticsCounter && series.measureSetCurrentSeq > 0 {
 			series.measureSetPreviousValues = append(series.measureSetPreviousValues[:0], series.measureSetValues...)
@@ -376,6 +404,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
+	refreshCommittedHostScopes(oldSnap, next, commitHostScopes)
 	applyCollectorRetention(next.series, c.core.retention, successSeq)
 	next.collectMeta.LastAttemptSeq = c.core.active.seq
 	next.collectMeta.LastAttemptStatus = CollectStatusSuccess
@@ -384,18 +413,21 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	c.core.snapshot.Store(next)
 	c.core.successSeq = successSeq
 	c.core.active = nil
+	return nil
 }
 
-func newCommittedSeries(key, name string, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+func newCommittedSeries(key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
 	return &committedSeries{
-		id:        SeriesID(key),
-		hash64:    seriesIDHash(SeriesID(key)),
-		key:       key,
-		name:      name,
-		labels:    append([]Label(nil), labels...),
-		labelsKey: labelsKey,
-		desc:      desc,
-		meta:      baseSeriesMeta(desc),
+		id:           SeriesID(key),
+		hash64:       seriesIDHash(SeriesID(key)),
+		key:          key,
+		name:         name,
+		hostScopeKey: hostScopeKey,
+		hostScope:    cloneHostScope(hostScope),
+		labels:       append([]Label(nil), labels...),
+		labelsKey:    labelsKey,
+		desc:         desc,
+		meta:         baseSeriesMeta(desc),
 	}
 }
 
@@ -412,14 +444,31 @@ func ensureCommitSeriesMutable(old, next *readSnapshot, key string) *committedSe
 	return series
 }
 
-func getOrCreateCommitSeries(old, next *readSnapshot, key, name string, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+func getOrCreateCommitSeries(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
 	series := ensureCommitSeriesMutable(old, next, key)
 	if series != nil {
 		return series
 	}
-	series = newCommittedSeries(key, name, labels, labelsKey, desc)
+	series = newCommittedSeries(key, name, hostScopeKey, hostScope, labels, labelsKey, desc)
 	next.series[key] = series
 	return series
+}
+
+func refreshCommittedHostScopes(old, next *readSnapshot, scopes map[string]HostScope) {
+	if len(scopes) == 0 {
+		return
+	}
+	for key, series := range next.series {
+		scope, ok := scopes[series.hostScopeKey]
+		if !ok || hostScopeEqual(series.hostScope, scope) {
+			continue
+		}
+		series = ensureCommitSeriesMutable(old, next, key)
+		if series == nil {
+			continue
+		}
+		series.hostScope = cloneHostScope(scope)
+	}
 }
 
 func markSeriesSeen(series *committedSeries, attemptSeq, successSeq uint64) {
@@ -463,6 +512,9 @@ func buildByName(series map[string]*committedSeries) map[string][]*committedSeri
 	}
 	for _, lst := range byName {
 		sort.Slice(lst, func(i, j int) bool {
+			if lst[i].hostScopeKey != lst[j].hostScopeKey {
+				return lst[i].hostScopeKey < lst[j].hostScopeKey
+			}
 			return lst[i].labelsKey < lst[j].labelsKey
 		})
 	}
@@ -648,17 +700,47 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	return d, nil
 }
 
-// makeSeriesKey joins metric name and canonical label key into one stable identity key.
-func makeSeriesKey(name, labelsKey string) string {
-	if labelsKey == "" {
-		return name
+func (c *storeCore) prepareHostScopeForWriteLocked(scope HostScope) (HostScope, bool) {
+	scope = mustNormalizeHostScope(scope)
+	if c.active == nil {
+		return scope, true
 	}
-	return name + "\xfe" + labelsKey
+	if existing, ok := c.active.hostScopes[scope.ScopeKey]; ok {
+		if hostScopeEqual(existing, scope) {
+			return existing, true
+		}
+		c.recordCycleErrorLocked(fmt.Errorf("%w: scope_key=%q", ErrHostScopeConflict, scope.ScopeKey))
+		return scope, false
+	}
+	c.active.hostScopes[scope.ScopeKey] = cloneHostScope(scope)
+	return scope, true
+}
+
+func (c *storeCore) recordCycleErrorLocked(err error) {
+	if err == nil || c.active == nil {
+		return
+	}
+	c.active.err = errors.Join(c.active.err, err)
+}
+
+// makeSeriesKey joins host scope, metric name, and canonical label key into one stable identity key.
+func makeSeriesKey(hostScopeKey, name, labelsKey string) string {
+	base := name
+	if labelsKey == "" {
+		base = name
+	} else {
+		base = name + "\xfe" + labelsKey
+	}
+	if hostScopeKey == "" {
+		return base
+	}
+	return hostScopeKey + "\xff" + base
 }
 
 func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	cp := *s
 	ensureSeriesMeta(cp.desc, &cp.meta)
+	cp.hostScope = cloneHostScope(s.hostScope)
 	// cp.labels intentionally reuses the original immutable label slice.
 	// Label identity is part of the series key and is never mutated after publish.
 	if s.stateSetValues != nil {

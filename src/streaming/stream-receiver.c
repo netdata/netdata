@@ -1135,7 +1135,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     rrdhost_receiver_lock(host);
 
     if (!host->receiver) {
-        object_state_activate(&host->state_id);
+        object_state_activate_if_not_activated(&host->state_id);
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
         rrdhost_set_health_evloop_iteration(host);

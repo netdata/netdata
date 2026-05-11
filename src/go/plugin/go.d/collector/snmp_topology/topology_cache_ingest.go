@@ -18,14 +18,23 @@ func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
 
 	for _, pm := range pms {
 		tags := topologyMetadataValues(pm.DeviceMetadata)
-		if len(tags) == 0 {
-			continue
+		if len(pm.Tags) > 0 {
+			if tags == nil {
+				tags = make(map[string]string, len(pm.Tags))
+			}
+			for k, v := range pm.Tags {
+				if v != "" {
+					tags[k] = v
+				}
+			}
 		}
 
-		c.topologyCache.applyLLDPLocalDeviceProfileTags(tags)
-		c.topologyCache.updateLocalBridgeIdentityFromTags(tags)
-		c.topologyCache.applySTPProfileTags(tags)
-		c.topologyCache.applyVTPProfileTags(tags)
+		if len(tags) > 0 {
+			c.topologyCache.applyLLDPLocalDeviceProfileTags(tags)
+			c.topologyCache.updateLocalBridgeIdentityFromTags(tags)
+			c.topologyCache.applySTPProfileTags(tags)
+			c.topologyCache.applyVTPProfileTags(tags)
+		}
 	}
 }
 
@@ -37,14 +46,14 @@ func (c *Collector) updateTopologyCacheEntry(m ddsnmp.Metric) {
 	c.topologyCache.mu.Lock()
 	defer c.topologyCache.mu.Unlock()
 
-	c.topologyCache.ingestMetric(m.Name, m.Tags)
+	c.topologyCache.ingestMetric(m.TopologyKind, m.Tags)
 }
 
-func (c *Collector) updateTopologyScalarMetric(m ddsnmp.Metric) {
+func (c *Collector) updateTopologySysUptime(value int64) {
 	if c == nil || c.topologyCache == nil {
 		return
 	}
-	if !isTopologySysUptimeMetric(m.Name) || m.Value <= 0 {
+	if value <= 0 {
 		return
 	}
 
@@ -52,9 +61,9 @@ func (c *Collector) updateTopologyScalarMetric(m ddsnmp.Metric) {
 	defer c.topologyCache.mu.Unlock()
 
 	local := c.topologyCache.localDevice
-	local.SysUptime = m.Value
+	local.SysUptime = value
 	local.Labels = ensureLabels(local.Labels)
-	setTopologyMetadataLabelIfMissing(local.Labels, "sys_uptime", strconv.FormatInt(m.Value, 10))
+	setTopologyMetadataLabelIfMissing(local.Labels, "sys_uptime", strconv.FormatInt(value, 10))
 	c.topologyCache.localDevice = local
 }
 

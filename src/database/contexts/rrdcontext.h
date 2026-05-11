@@ -128,6 +128,7 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host);
 // public API for threads
 
 void rrdcontext_db_rotation(void);
+void rrdcontext_request_full_gc(void);
 void rrdcontext_main(void *);
 
 // ----------------------------------------------------------------------------

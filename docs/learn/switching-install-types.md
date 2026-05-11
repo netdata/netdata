@@ -162,7 +162,7 @@ sh /tmp/netdata-kickstart.sh --reinstall --nightly-channel
 Follow the standard container recreation process used for updates, but replace the image tag with the one corresponding to your target release channel:
 
 - **Stable**: Use the `stable` tag
-- **Nightly**: Use the `latest` tag
+- **Nightly**: Use the `edge` tag
 
 ### Native Packages
 

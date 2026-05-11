@@ -117,13 +117,64 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
                        (unsigned long long)db_last_time_t,
                        (unsigned long long)now);
 
-        RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-        if(!(old & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
-            if(rrdhost_sender_replicating_charts_plus_one(st->rrdhost) == 1)
-                pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_REPLICATING, 0);
-        }
+        // The receiver skips replication for obsolete charts (stream-receiver.c),
+        // so do not enter the replication bookkeeping here either: it would pin
+        // rrdhost_sender_replicating_charts and permanently gate the cleanup loop
+        // in svc_rrd_cleanup_obsolete_charts_from_all_hosts.
+        if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)) {
+            // Claim before publish: increment the host counter BEFORE setting
+            // RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS, so any concurrent
+            // observer (obsoleter at rrdset.c, finalizer at
+            // stream-replication-sender.c, reset at stream-sender.c) that
+            // sees the flag set in its CAS old-value also sees a counter
+            // already incremented to match. Without this ordering, an
+            // observer can clear the flag and call rrdhost_sender_replicating
+            // _charts_minus_one() before the sender's increment, causing a
+            // transient underflow that other concurrent inc/dec can latch.
+            bool first_claim = (rrdhost_sender_replicating_charts_plus_one(st->rrdhost) == 1);
 
-        replication_progress = true;
+            RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            bool we_caused_transition = !(old & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+
+            if(we_caused_transition) {
+                if(first_claim)
+                    pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_REPLICATING, 0);
+            }
+            else {
+                // Lost race: another sender already had IN_PROGRESS set, so
+                // our +1 is one too many. Roll it back; mirror the natural-
+                // finalize pulse-status flip on the 0 boundary.
+                if(rrdhost_sender_replicating_charts_minus_one(st->rrdhost) == 0)
+                    pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_RUNNING, 0);
+            }
+
+            // Recheck after our CAS: a concurrent obsoleter may have set
+            // RRDSET_FLAG_OBSOLETE, OR a concurrent disconnect may have
+            // cleared the host's metadata-readiness flag. In either case the
+            // parent will not drive replication for this chart to completion
+            // and the natural decrement never fires; undo our state to keep
+            // the host counter and pulse status balanced. The atomic CAS
+            // ensures only the thread that observes IN_PROGRESS=1 actually
+            // decrements (handles the case where stream_sender_charts_and_
+            // replication_reset() already cleared the flag during a disconnect
+            // racing with this push).
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) ||
+                        !rrdhost_can_stream_metadata_to_parent(st->rrdhost))) {
+                if(we_caused_transition) {
+                    RRDSET_FLAGS undo = rrdset_flag_set_and_clear(
+                        st,
+                        RRDSET_FLAG_SENDER_REPLICATION_FINISHED,
+                        RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+                    if(undo & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS) {
+                        if(rrdhost_sender_replicating_charts_minus_one(st->rrdhost) == 0)
+                            pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_RUNNING, 0);
+                    }
+                }
+            }
+            else {
+                replication_progress = true;
+            }
+        }
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(true, "REPLAY: 'host:%s/chart:%s' replication starts",

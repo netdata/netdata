@@ -17,6 +17,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+func globalMetricTags(tags ...ddprofiledefinition.MetricTagConfig) []ddprofiledefinition.GlobalMetricTagConfig {
+	globalTags := make([]ddprofiledefinition.GlobalMetricTagConfig, 0, len(tags))
+	for _, tag := range tags {
+		globalTags = append(globalTags, ddprofiledefinition.GlobalMetricTagConfig{MetricTagConfig: tag})
+	}
+	return globalTags
+}
+
 func TestGlobalTagsCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		profile        *ddsnmp.Profile
@@ -28,7 +36,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"no tags configured": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					MetricTags: []ddprofiledefinition.MetricTagConfig{},
+					MetricTags: globalMetricTags(),
 					StaticTags: []ddprofiledefinition.StaticMetricTagConfig{},
 				},
 			},
@@ -57,22 +65,22 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"dynamic tags only": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{
+					MetricTags: globalMetricTags(
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "device_vendor",
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.1.0",
 								Name: "sysDescr",
 							},
 						},
-						{
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "location",
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.6.0",
 								Name: "sysLocation",
 							},
 						},
-					},
+					),
 				},
 			},
 			setupMock: func(m *snmpmock.MockHandler) {
@@ -110,15 +118,15 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 						{Tag: "environment", Value: "production"},
 						{Tag: "managed", Value: "true"},
 					},
-					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{
+					MetricTags: globalMetricTags(
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "hostname",
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.5.0",
 								Name: "sysName",
 							},
 						},
-					},
+					),
 				},
 			},
 			setupMock: func(m *snmpmock.MockHandler) {
@@ -145,8 +153,8 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"tag with mapping": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{
+					MetricTags: globalMetricTags(
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "device_type",
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.2.0",
@@ -158,7 +166,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 								"1.3.6.1.4.1.9.1.3": "firewall",
 							}),
 						},
-					},
+					),
 				},
 			},
 			setupMock: func(m *snmpmock.MockHandler) {
@@ -183,8 +191,8 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"tag with pattern matching": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{
+					MetricTags: globalMetricTags(
+						ddprofiledefinition.MetricTagConfig{
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.5.0",
 								Name: "sysName",
@@ -196,7 +204,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 								"unit_num": "$3",
 							},
 						},
-					},
+					),
 				},
 			},
 			setupMock: func(m *snmpmock.MockHandler) {
@@ -223,15 +231,15 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"missing OID": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{
+					MetricTags: globalMetricTags(
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "hostname",
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.5.0",
 								Name: "sysName",
 							},
 						},
-					},
+					),
 				},
 			},
 			setupMock: func(m *snmpmock.MockHandler) {
@@ -254,15 +262,15 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"SNMP error": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{
+					MetricTags: globalMetricTags(
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "hostname",
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.5.0",
 								Name: "sysName",
 							},
 						},
-					},
+					),
 				},
 			},
 			setupMock: func(m *snmpmock.MockHandler) {
@@ -279,15 +287,15 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"empty tag name falls back to symbol name": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{
+					MetricTags: globalMetricTags(
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "", // Empty tag name
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.5.0",
 								Name: "sysName",
 							},
 						},
-					},
+					),
 				},
 			},
 			setupMock: func(m *snmpmock.MockHandler) {
@@ -312,29 +320,29 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"chunked requests": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{
+					MetricTags: globalMetricTags(
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "tag1",
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.1.0",
 								Name: "oid1",
 							},
 						},
-						{
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "tag2",
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.2.0",
 								Name: "oid2",
 							},
 						},
-						{
+						ddprofiledefinition.MetricTagConfig{
 							Tag: "tag3",
 							Symbol: ddprofiledefinition.SymbolConfigCompat{
 								OID:  "1.3.6.1.2.1.1.3.0",
 								Name: "oid3",
 							},
 						},
-					},
+					),
 				},
 			},
 			setupMock: func(m *snmpmock.MockHandler) {

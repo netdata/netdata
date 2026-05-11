@@ -14,10 +14,21 @@ import (
 )
 
 func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
-	matchedProfiles := ddsnmp.FindProfiles(si.SysObjectID, si.Descr, c.ManualProfiles)
+	resolved := ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
+		SysObjectID:    si.SysObjectID,
+		SysDescr:       si.Descr,
+		ManualProfiles: c.ManualProfiles,
+		ManualPolicy:   ddsnmp.ManualProfileFallback,
+	})
+	matchedProfiles := resolved.Profiles()
 	c.logMatchedProfiles(matchedProfiles, si.SysObjectID)
 
-	return selectCollectionProfiles(matchedProfiles)
+	profiles := resolved.Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing, ddsnmp.ConsumerBGP).Profiles()
+	if profilesHaveBGP(profiles) {
+		c.enableBGPIntegration()
+	}
+
+	return profiles
 }
 
 func (c *Collector) logMatchedProfiles(profiles []*ddsnmp.Profile, sysObjectID string) {

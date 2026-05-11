@@ -75,7 +75,7 @@ func (s *runtimeStoreView) Read(opts ...ReadOption) Reader {
 	if cfg.flatten {
 		snap = flattenSnapshot(snap)
 	}
-	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten}
+	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten, hostScopeKey: cfg.hostScopeKey}
 }
 
 func (s *runtimeStoreView) Write() RuntimeWriter {
@@ -118,43 +118,45 @@ func (r *runtimeStoreBackend) registerInstrument(name string, kind metricKind, m
 	return desc, nil
 }
 
-func (r *runtimeStoreBackend) recordGaugeSet(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordGaugeSet(desc *instrumentDescriptor, scope HostScope, value SampleValue, sets []LabelSet) {
 	mustFiniteSample(value)
 
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
 		panic(err)
 	}
-	key := makeSeriesKey(desc.name, labelsKey)
+	scope = mustNormalizeHostScope(scope)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 		series.value = value
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
-func (r *runtimeStoreBackend) recordGaugeAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordGaugeAdd(desc *instrumentDescriptor, scope HostScope, delta SampleValue, sets []LabelSet) {
 	mustFiniteSample(delta)
 
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
 		panic(err)
 	}
-	key := makeSeriesKey(desc.name, labelsKey)
+	scope = mustNormalizeHostScope(scope)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 		series.value += delta
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
-func (r *runtimeStoreBackend) recordCounterObserveTotal(_ *instrumentDescriptor, _ SampleValue, _ []LabelSet) {
+func (r *runtimeStoreBackend) recordCounterObserveTotal(_ *instrumentDescriptor, _ HostScope, _ SampleValue, _ []LabelSet) {
 	panic(errRuntimeSnapshotWrite)
 }
 
-func (r *runtimeStoreBackend) recordCounterAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordCounterAdd(desc *instrumentDescriptor, scope HostScope, delta SampleValue, sets []LabelSet) {
 	mustFiniteSample(delta)
 
 	if delta < 0 {
@@ -165,9 +167,10 @@ func (r *runtimeStoreBackend) recordCounterAdd(desc *instrumentDescriptor, delta
 	if err != nil {
 		panic(err)
 	}
-	key := makeSeriesKey(desc.name, labelsKey)
+	scope = mustNormalizeHostScope(scope)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 
 		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
 		if hadCurrent {
@@ -189,11 +192,11 @@ func (r *runtimeStoreBackend) recordCounterAdd(desc *instrumentDescriptor, delta
 	})
 }
 
-func (r *runtimeStoreBackend) recordHistogramObservePoint(_ *instrumentDescriptor, _ HistogramPoint, _ []LabelSet) {
+func (r *runtimeStoreBackend) recordHistogramObservePoint(_ *instrumentDescriptor, _ HostScope, _ HistogramPoint, _ []LabelSet) {
 	panic(errRuntimeSnapshotWrite)
 }
 
-func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor, scope HostScope, value SampleValue, sets []LabelSet) {
 	mustFiniteSample(value)
 
 	schema := desc.histogram
@@ -208,10 +211,11 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 	if labelsContainKey(labels, HistogramBucketLabel) {
 		panic(errHistogramLabelKey)
 	}
+	scope = mustNormalizeHostScope(scope)
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 
 		if series.desc.histogram == nil || !equalHistogramBounds(series.desc.histogram.bounds, schema.bounds) {
 			panic("metrix: histogram schema drift detected")
@@ -233,11 +237,11 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 	})
 }
 
-func (r *runtimeStoreBackend) recordSummaryObservePoint(_ *instrumentDescriptor, _ SummaryPoint, _ []LabelSet) {
+func (r *runtimeStoreBackend) recordSummaryObservePoint(_ *instrumentDescriptor, _ HostScope, _ SummaryPoint, _ []LabelSet) {
 	panic(errRuntimeSnapshotWrite)
 }
 
-func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, scope HostScope, value SampleValue, sets []LabelSet) {
 	mustFiniteSample(value)
 
 	labels, labelsKey, err := labelsFromSet(sets, r)
@@ -247,10 +251,11 @@ func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, v
 	if labelsContainKey(labels, SummaryQuantileLabel) {
 		panic(errSummaryLabelKey)
 	}
+	scope = mustNormalizeHostScope(scope)
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 
 		series.summaryCount++
 		series.summarySum += value
@@ -273,7 +278,7 @@ func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, v
 	})
 }
 
-func (r *runtimeStoreBackend) recordStateSetObserve(desc *instrumentDescriptor, point StateSetPoint, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordStateSetObserve(desc *instrumentDescriptor, scope HostScope, point StateSetPoint, sets []LabelSet) {
 	schema := desc.stateSet
 	if schema == nil {
 		panic(errStateSetSchema)
@@ -286,22 +291,23 @@ func (r *runtimeStoreBackend) recordStateSetObserve(desc *instrumentDescriptor, 
 	if labelsContainKey(labels, desc.name) {
 		panic(errStateSetLabelKey)
 	}
+	scope = mustNormalizeHostScope(scope)
 	states := normalizeStateSetPoint(point, schema)
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 		series.stateSetValues = cloneStateMap(states)
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
-func (r *runtimeStoreBackend) recordMeasureSetGaugeObservePoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
+func (r *runtimeStoreBackend) recordMeasureSetGaugeObservePoint(_ *instrumentDescriptor, _ HostScope, _ MeasureSetPoint, _ []LabelSet) {
 	panic(errRuntimeSnapshotWrite)
 }
 
-func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, scope HostScope, point MeasureSetPoint, sets []LabelSet) {
 	schema := desc.measureSet
 	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
 		panic(errMeasureSetSchema)
@@ -316,16 +322,17 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDesc
 	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
-	key := makeSeriesKey(desc.name, labelsKey)
+	scope = mustNormalizeHostScope(scope)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 		series.measureSetValues = append(series.measureSetValues[:0], values...)
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
-func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, scope HostScope, delta MeasureSetPoint, sets []LabelSet) {
 	schema := desc.measureSet
 	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
 		panic(errMeasureSetSchema)
@@ -340,9 +347,10 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDesc
 	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
-	key := makeSeriesKey(desc.name, labelsKey)
+	scope = mustNormalizeHostScope(scope)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 		if len(series.measureSetValues) == 0 {
 			series.measureSetValues = make([]SampleValue, len(schema.fields))
 		}
@@ -354,7 +362,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDesc
 	})
 }
 
-func (r *runtimeStoreBackend) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, field string, value SampleValue, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, scope HostScope, field string, value SampleValue, sets []LabelSet) {
 	schema := desc.measureSet
 	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
 		panic(errMeasureSetSchema)
@@ -370,9 +378,10 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetField(desc *instrumentDesc
 	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
-	key := makeSeriesKey(desc.name, labelsKey)
+	scope = mustNormalizeHostScope(scope)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 		if len(series.measureSetValues) == 0 {
 			series.measureSetValues = make([]SampleValue, len(schema.fields))
 		}
@@ -382,11 +391,11 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetField(desc *instrumentDesc
 	})
 }
 
-func (r *runtimeStoreBackend) recordMeasureSetCounterObserveTotalPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
+func (r *runtimeStoreBackend) recordMeasureSetCounterObserveTotalPoint(_ *instrumentDescriptor, _ HostScope, _ MeasureSetPoint, _ []LabelSet) {
 	panic(errRuntimeSnapshotWrite)
 }
 
-func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet) {
+func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, scope HostScope, delta MeasureSetPoint, sets []LabelSet) {
 	schema := desc.measureSet
 	if schema == nil || schema.semantics != MeasureSetSemanticsCounter {
 		panic(errMeasureSetSchema)
@@ -401,9 +410,10 @@ func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDe
 	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
-	key := makeSeriesKey(desc.name, labelsKey)
+	scope = mustNormalizeHostScope(scope)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 		if len(series.measureSetValues) == 0 {
 			series.measureSetValues = make([]SampleValue, len(schema.fields))
 		}
@@ -460,7 +470,7 @@ func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnaps
 	r.core.snapshot.Store(next)
 }
 
-func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name string, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
 	series := next.series[key]
 	if series != nil {
 		ensureSeriesMeta(series.desc, &series.meta)
@@ -473,14 +483,16 @@ func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name string, label
 		return series
 	}
 	series = &committedSeries{
-		id:        SeriesID(key),
-		hash64:    seriesIDHash(SeriesID(key)),
-		key:       key,
-		name:      name,
-		labels:    append([]Label(nil), labels...),
-		labelsKey: labelsKey,
-		desc:      desc,
-		meta:      baseSeriesMeta(desc),
+		id:           SeriesID(key),
+		hash64:       seriesIDHash(SeriesID(key)),
+		key:          key,
+		name:         name,
+		hostScopeKey: hostScopeKey,
+		hostScope:    cloneHostScope(hostScope),
+		labels:       append([]Label(nil), labels...),
+		labelsKey:    labelsKey,
+		desc:         desc,
+		meta:         baseSeriesMeta(desc),
 	}
 	next.series[key] = series
 	return series

@@ -9,15 +9,16 @@ metadata:
           OID: 1.3.6.1.4.1.9.9.46.1.1.1
           name: vtpVersion
 
-metrics:
-  - MIB: CISCO-VTP-MIB
+topology:
+  - kind: vtp_vlan
+    MIB: CISCO-VTP-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.46.1.3.1.1
       name: vtpVlanTable
     symbols:
       # Numeric anchor to force row emission.
       - OID: 1.3.6.1.4.1.9.9.46.1.3.1.1.2
-        name: _topology_vtp_vlan_entry
+        name: vtp_vlan
     metric_tags:
       - tag: vtp_vlan_index
         index: 1

@@ -20,7 +20,7 @@ pub(super) async fn connect_bioris_client(
     Ok(RoutingInformationServiceClient::new(channel))
 }
 
-fn build_endpoint_uri(instance: &RoutingDynamicBiorisRisInstanceConfig) -> String {
+pub(super) fn build_endpoint_uri(instance: &RoutingDynamicBiorisRisInstanceConfig) -> String {
     if instance.grpc_addr.contains("://") {
         instance.grpc_addr.clone()
     } else if instance.grpc_secure {

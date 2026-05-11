@@ -19,6 +19,7 @@ pub(super) struct ResourceEnvelopeReport {
     pub(super) methodology: String,
     pub(super) layer: String,
     pub(super) profile: String,
+    pub(super) protocol: String,
     pub(super) requested_flows_per_sec: u64,
     pub(super) achieved_flows_per_sec: f64,
     pub(super) cpu_percent_of_one_core: f64,
@@ -72,6 +73,7 @@ pub(super) fn print_resource_report(report: &ResourceEnvelopeReport) {
     eprintln!();
     eprintln!("Layer:                  {}", report.layer);
     eprintln!("Profile:                {}", report.profile);
+    eprintln!("Protocol:               {}", report.protocol);
     eprintln!(
         "  offered load:         {} flows/s",
         report.requested_flows_per_sec
@@ -170,16 +172,59 @@ fn bytes_to_mib(bytes: u64) -> f64 {
     bytes as f64 / (1024.0 * 1024.0)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct StorageFootprintSample {
+    pub(super) elapsed_secs: u64,
+    pub(super) raw_dir_bytes: u64,
+    pub(super) minute_1_dir_bytes: u64,
+    pub(super) minute_5_dir_bytes: u64,
+    pub(super) hour_1_dir_bytes: u64,
+    pub(super) total_disk_bytes: u64,
+    pub(super) cumulative_io_write_bytes: u64,
+    pub(super) cumulative_logical_bytes: u64,
+    pub(super) cumulative_flows_ingested: u64,
+    pub(super) rss_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct StorageFootprintReport {
+    pub(super) protocol: String,
+    pub(super) profile: String,
+    pub(super) flows_per_sec: u64,
+    pub(super) duration_secs: u64,
+    pub(super) sample_interval_secs: u64,
+    pub(super) samples: Vec<StorageFootprintSample>,
+    pub(super) final_total_flows: u64,
+    pub(super) final_disk_bytes: u64,
+    pub(super) final_logical_bytes: u64,
+    pub(super) final_io_write_bytes: u64,
+}
+
 #[allow(dead_code)]
+pub(super) fn parse_storage_child_report(output: &std::process::Output) -> StorageFootprintReport {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("{stdout}\n{stderr}");
+    let json = combined
+        .lines()
+        .find_map(|line| {
+            line.split_once("STORAGE_BENCH_RESULT:")
+                .map(|(_, json)| json)
+        })
+        .unwrap_or_else(|| panic!("storage bench child did not emit result\n{combined}"));
+    serde_json::from_str(json)
+        .unwrap_or_else(|err| panic!("parse storage bench result JSON: {err}\n{combined}"))
+}
+
 pub(super) fn journal_dir_size_bytes(path: &Path) -> u64 {
     let mut total = 0_u64;
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                total += journal_dir_size_bytes(&path);
+                total = total.saturating_add(journal_dir_size_bytes(&path));
             } else if let Ok(meta) = entry.metadata() {
-                total += meta.len();
+                total = total.saturating_add(meta.len());
             }
         }
     }

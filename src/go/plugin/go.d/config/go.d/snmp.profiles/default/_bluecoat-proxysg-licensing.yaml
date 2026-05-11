@@ -1,0 +1,47 @@
+# References: LibreNMS SGOS OS detection and BLUECOAT-LICENSE-MIB.
+
+licensing:
+  - MIB: BLUECOAT-LICENSE-MIB
+    id: app_license_status
+    table:
+      OID: 1.3.6.1.4.1.3417.2.16.1.1.1
+      name: appLicenseStatusTable
+    identity:
+      id:
+        index: 1
+      name:
+        OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.2
+        name: appLicenseStatusApplicationName
+      feature:
+        OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.3
+        name: appLicenseStatusFeatureName
+      component:
+        OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.4
+        name: appLicenseStatusComponentName
+    descriptors:
+      type:
+        OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.5
+        name: appLicenseStatusExpireType
+        mapping:
+          0: unknown
+          1: perpetual
+          2: subscription
+          3: demo
+      perpetual:
+        OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.5
+        name: appLicenseStatusExpireType
+        mapping:
+          1: "true"
+    state:
+      OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.7
+      name: appLicenseStatusLicenseState
+      mapping:
+        0: "1"
+        1: "0"
+        2: "2"
+    signals:
+      expiry:
+        timestamp:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.6
+          name: appLicenseStatusExpireDate
+          format: snmp_dateandtime

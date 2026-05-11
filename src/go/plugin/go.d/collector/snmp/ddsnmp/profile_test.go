@@ -174,6 +174,213 @@ func Test_FindProfiles(t *testing.T) {
 	}
 }
 
+func TestDefaultCatalogResolveProject_LoadedProfilesSeparateConsumers(t *testing.T) {
+	tests := map[string]struct {
+		sysObjectID       string
+		consumer          ProfileConsumer
+		consumers         []ProfileConsumer
+		wantMetrics       []string
+		wantTopologyKinds []ddprofiledefinition.TopologyKind
+		wantLicensingIDs  []string
+		wantBGPIDs        []string
+		wantNoMetrics     bool
+		wantNoTopology    bool
+		wantNoLicensing   bool
+		wantNoBGP         bool
+	}{
+		"metrics_projection": {
+			sysObjectID:     "1.3.6.1.4.1.9.1.1",
+			consumer:        ConsumerMetrics,
+			wantMetrics:     []string{"systemUptime", "tcpCurrEstab", "cpmCPUTotal5minRev"},
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+			wantNoBGP:       true,
+		},
+		"topology_projection": {
+			sysObjectID: "1.3.6.1.4.1.9.1.1",
+			consumer:    ConsumerTopology,
+			wantTopologyKinds: []ddprofiledefinition.TopologyKind{
+				ddprofiledefinition.KindLldpRem,
+				ddprofiledefinition.KindCdpCache,
+				ddprofiledefinition.KindFdbEntry,
+				ddprofiledefinition.KindQbridgeFdbEntry,
+				ddprofiledefinition.KindStpPort,
+				ddprofiledefinition.KindVtpVlan,
+			},
+			wantNoMetrics:   true,
+			wantNoLicensing: true,
+			wantNoBGP:       true,
+		},
+		"licensing_projection": {
+			sysObjectID: "1.3.6.1.4.1.9.1.1",
+			consumer:    ConsumerLicensing,
+			wantLicensingIDs: []string{
+				"cisco_traditional_licenses",
+				"smart_registration",
+				"smart_authorization",
+				"smart_id_certificate",
+				"smart_evaluation_period",
+				"smart_entitlements",
+			},
+			wantNoMetrics:  true,
+			wantNoTopology: true,
+			wantNoBGP:      true,
+		},
+		"bgp_projection": {
+			sysObjectID:     "1.3.6.1.4.1.9.1.923",
+			consumer:        ConsumerBGP,
+			wantBGPIDs:      []string{"cisco-bgp-peer", "cisco-bgp-peer-family"},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_nokia": {
+			sysObjectID: "1.3.6.1.4.1.6527.1.3.17",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"nokia-timos-bgp-peer",
+				"nokia-timos-bgp-peer-family-ipv4-unicast",
+				"nokia-timos-bgp-peer-family-ipv4-vpn",
+				"nokia-timos-bgp-peer-family-ipv6-unicast",
+				"nokia-timos-bgp-peer-family-ipv6-vpn",
+				"nokia-timos-bgp-peer-family-l2vpn-vpls",
+				"nokia-timos-bgp-peer-family-l2vpn-evpn",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_huawei": {
+			sysObjectID: "1.3.6.1.4.1.2011.2.224.279",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"huawei-bgp-device-counts",
+				"huawei-bgp-peer-family",
+				"huawei-bgp-peer-family-routes",
+				"huawei-bgp-peer-family-messages",
+				"huawei-bgp-peer-statistics",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_arista": {
+			sysObjectID: "1.3.6.1.4.1.30065.1.3011.7010.427.48",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"arista-bgp-peer",
+				"arista-bgp-peer-family",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_dell_os10": {
+			sysObjectID: "1.3.6.1.4.1.674.11000.5000.100.2.1.1",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"dell-os10-bgp-peer",
+				"dell-os10-bgp-peer-family",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_alcatel": {
+			sysObjectID: "1.3.6.1.4.1.6486.801.1.1.2.1.1",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"alcatel-bgp4-peer",
+				"alcatel-bgp4-peer-family",
+				"alcatel-bgp6-peer",
+				"alcatel-bgp6-peer-family",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"metrics_and_licensing_projection": {
+			sysObjectID: "1.3.6.1.4.1.9.1.1",
+			consumer:    ConsumerMetrics,
+			consumers:   []ProfileConsumer{ConsumerLicensing},
+			wantMetrics: []string{"systemUptime", "tcpCurrEstab", "cpmCPUTotal5minRev"},
+			wantLicensingIDs: []string{
+				"cisco_traditional_licenses",
+				"smart_registration",
+				"smart_authorization",
+				"smart_id_certificate",
+				"smart_evaluation_period",
+				"smart_entitlements",
+			},
+			wantNoTopology: true,
+			wantNoBGP:      true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profiles := DefaultCatalog().Resolve(ResolveRequest{
+				SysObjectID:  tc.sysObjectID,
+				ManualPolicy: ManualProfileFallback,
+			}).Project(tc.consumer, tc.consumers...).Profiles()
+			require.NotEmpty(t, profiles)
+
+			metricNames := make(map[string]bool)
+			topologyKinds := make(map[ddprofiledefinition.TopologyKind]bool)
+			licensingIDs := make(map[string]bool)
+			bgpIDs := make(map[string]bool)
+
+			for _, prof := range profiles {
+				require.NotNil(t, prof.Definition)
+				if tc.wantNoMetrics {
+					assert.Empty(t, prof.Definition.Metrics, prof.SourceFile)
+					assert.Empty(t, prof.Definition.VirtualMetrics, prof.SourceFile)
+				}
+				if tc.wantNoTopology {
+					assert.Empty(t, prof.Definition.Topology, prof.SourceFile)
+				}
+				if tc.wantNoLicensing {
+					assert.Empty(t, prof.Definition.Licensing, prof.SourceFile)
+				}
+				if tc.wantNoBGP {
+					assert.Empty(t, prof.Definition.BGP, prof.SourceFile)
+				}
+
+				for _, metric := range prof.Definition.Metrics {
+					if metric.Symbol.Name != "" {
+						metricNames[metric.Symbol.Name] = true
+					}
+					for _, sym := range metric.Symbols {
+						metricNames[sym.Name] = true
+					}
+				}
+				for _, topo := range prof.Definition.Topology {
+					topologyKinds[topo.Kind] = true
+				}
+				for _, row := range prof.Definition.Licensing {
+					licensingIDs[row.ID] = true
+				}
+				for _, row := range prof.Definition.BGP {
+					bgpIDs[row.ID] = true
+				}
+			}
+
+			for _, metricName := range tc.wantMetrics {
+				assert.True(t, metricNames[metricName], "missing metric %q", metricName)
+			}
+			for _, kind := range tc.wantTopologyKinds {
+				assert.True(t, topologyKinds[kind], "missing topology kind %q", kind)
+			}
+			for _, id := range tc.wantLicensingIDs {
+				assert.True(t, licensingIDs[id], "missing licensing row %q", id)
+			}
+			for _, id := range tc.wantBGPIDs {
+				assert.True(t, bgpIDs[id], "missing BGP row %q", id)
+			}
+		})
+	}
+}
+
 func Test_Profile_merge(t *testing.T) {
 	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216", "", nil) // cisco-nexus
 
@@ -202,14 +409,14 @@ func TestProfileMerge_ColumnSymbolsWithSameNameFromBaseArePreserved(t *testing.T
 				{
 					Table: ddprofiledefinition.SymbolConfig{OID: "1.2.3", Name: "tableA"},
 					Symbols: []ddprofiledefinition.SymbolConfig{
-						{OID: "1.2.3.1", Name: "_license_row"},
-						{OID: "1.2.3.2", Name: "_license_row"},
+						{OID: "1.2.3.1", Name: "duplicated.column"},
+						{OID: "1.2.3.2", Name: "duplicated.column"},
 					},
 				},
 				{
 					Table: ddprofiledefinition.SymbolConfig{OID: "1.2.4", Name: "tableB"},
 					Symbols: []ddprofiledefinition.SymbolConfig{
-						{OID: "1.2.4.1", Name: "_license_row"},
+						{OID: "1.2.4.1", Name: "duplicated.column"},
 					},
 				},
 			},

@@ -2,7 +2,10 @@
 
 package snmptopology
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 func newTopologyCache() *topologyCache {
 	return &topologyCache{
@@ -43,6 +46,8 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.fdbEntries = src.fdbEntries
 	c.fdbIDToVlanID = src.fdbIDToVlanID
 	c.vlanIDToName = src.vlanIDToName
+	c.fdbRowsDroppedNoMAC = src.fdbRowsDroppedNoMAC
+	c.fdbRowsUnmappedPort = src.fdbRowsUnmappedPort
 	c.vtpVersion = src.vtpVersion
 	c.stpBaseBridgeAddress = src.stpBaseBridgeAddress
 	c.stpDesignatedRoot = src.stpDesignatedRoot
@@ -61,12 +66,39 @@ func (c *topologyCache) hasFreshSnapshotAt(now time.Time) bool {
 }
 
 func (c *Collector) finalizeTopologyCache() {
-	if c.topologyCache == nil {
+	cache := c.topologyCache
+	if cache == nil {
 		return
 	}
 
-	c.topologyCache.mu.Lock()
-	defer c.topologyCache.mu.Unlock()
+	cache.mu.Lock()
+	cache.updateFDBDiagnostics()
+	droppedNoMAC := cache.fdbRowsDroppedNoMAC
+	unmappedPort := cache.fdbRowsUnmappedPort
+	agentID := cache.agentID
+	cache.lastUpdate = cache.updateTime
+	cache.mu.Unlock()
 
-	c.topologyCache.lastUpdate = c.topologyCache.updateTime
+	if droppedNoMAC > 0 {
+		c.Warningf("device '%s': dropped %d topology FDB row(s) with empty MAC", agentID, droppedNoMAC)
+	}
+	if unmappedPort > 0 {
+		c.Warningf("device '%s': observed %d topology FDB row(s) with bridge ports missing ifIndex mapping", agentID, unmappedPort)
+	}
+}
+
+func (c *topologyCache) updateFDBDiagnostics() {
+	c.fdbRowsUnmappedPort = 0
+	for _, entry := range c.fdbEntries {
+		if entry == nil || strings.TrimSpace(entry.mac) == "" {
+			continue
+		}
+		bridgePort := strings.TrimSpace(entry.bridgePort)
+		if bridgePort == "" || bridgePort == "0" {
+			continue
+		}
+		if parseIndex(c.bridgePortToIf[bridgePort]) == 0 {
+			c.fdbRowsUnmappedPort++
+		}
+	}
 }

@@ -63,6 +63,18 @@
   name: Logs
   description: "Monitoring logs on your infrastructure"
   children: []
+- id: flows
+  name: Network Flows
+  description: "Network flow ingestion and enrichment data sources for NetFlow / IPFIX / sFlow analysis"
+  children:
+    - id: flows.sources
+      name: Flow Protocols
+      description: "Flow protocols Netdata receives directly from routers, switches, and software exporters"
+      children: []
+    - id: flows.enrichment-methods
+      name: Enrichment Methods
+      description: "Configurable data sources that label flow records with operational context: geolocation, AS / BGP routing, network ownership, exporter / interface metadata, classifiers, and inner-packet decapsulation"
+      children: []
 - id: export
   name: exporters
   description: "Exporter Integrations"

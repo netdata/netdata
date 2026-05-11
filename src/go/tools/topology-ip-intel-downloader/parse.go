@@ -3,14 +3,18 @@
 package main
 
 import (
+	"archive/tar"
+	"archive/zip"
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"math/big"
 	"net"
 	"net/netip"
+	"path"
 	"strconv"
 	"strings"
 
@@ -122,6 +126,16 @@ func parseASNSource(source sourceEntry, payload []byte) ([]asnRange, error) {
 		default:
 			return nil, fmt.Errorf("unsupported dbip ASN format %q", source.format)
 		}
+	case source.provider == providerCAIDA && source.artifact == artifactCAIDAPrefix2AS:
+		if source.format != formatTSV {
+			return nil, fmt.Errorf("caida prefix2as requires tsv format, got %q", source.format)
+		}
+		return parseCAIDAPrefix2AS(payload)
+	case source.provider == providerMaxMind && source.artifact == artifactMaxMindGeoLite2ASN:
+		if source.format != formatMMDB {
+			return nil, fmt.Errorf("maxmind geolite2 ASN requires mmdb format, got %q", source.format)
+		}
+		return parseDBIPAsnMMDB(payload)
 	default:
 		return nil, fmt.Errorf(
 			"unsupported ASN source %q/%q",
@@ -156,6 +170,26 @@ func parseGeoSource(source sourceEntry, payload []byte) ([]geoRange, error) {
 		default:
 			return nil, fmt.Errorf("unsupported dbip GEO format %q", source.format)
 		}
+	case source.provider == providerMaxMind && source.artifact == artifactMaxMindGeoLite2Country:
+		if source.format != formatCSV {
+			return nil, fmt.Errorf("maxmind geolite2 country requires csv format, got %q", source.format)
+		}
+		return parseMaxMindCountryCSVZip(payload)
+	case source.provider == providerIP2Location && source.artifact == artifactIP2LocationCountryLite:
+		if source.format != formatCSV {
+			return nil, fmt.Errorf("ip2location country-lite requires csv format, got %q", source.format)
+		}
+		return parseIP2LocationCountryZip(payload)
+	case source.provider == providerIPDeny && source.artifact == artifactIPDenyCountryZones:
+		if source.format != formatCIDR {
+			return nil, fmt.Errorf("ipdeny country-zones requires cidr format, got %q", source.format)
+		}
+		return parseIPDenyCountryTarGZ(payload)
+	case source.provider == providerIPIP && source.artifact == artifactIPIPCountry:
+		if source.format != formatTXT {
+			return nil, fmt.Errorf("ipip country requires txt format, got %q", source.format)
+		}
+		return parseIPIPCountryZip(payload)
 	default:
 		return nil, fmt.Errorf(
 			"unsupported GEO source %q/%q",
@@ -165,8 +199,19 @@ func parseGeoSource(source sourceEntry, payload []byte) ([]geoRange, error) {
 	}
 }
 
+func estimatedRangeCapacity(size uint64, averageLineBytes, maxCapacity int) int {
+	if size == 0 || averageLineBytes <= 0 || maxCapacity <= 0 {
+		return 0
+	}
+	capacity := size / uint64(averageLineBytes)
+	if capacity > uint64(maxCapacity) {
+		return maxCapacity
+	}
+	return int(capacity)
+}
+
 func parseIPToASNCombinedTSVAsn(payload []byte) ([]asnRange, error) {
-	asnRanges := make([]asnRange, 0, 1<<20)
+	asnRanges := make([]asnRange, 0, estimatedRangeCapacity(uint64(len(payload)), 64, 1<<20))
 
 	scanner := bufio.NewScanner(bytes.NewReader(payload))
 	lineNo := 0
@@ -203,7 +248,7 @@ func parseIPToASNCombinedTSVAsn(payload []byte) ([]asnRange, error) {
 }
 
 func parseIPToASNCombinedTSVGeo(payload []byte) ([]geoRange, error) {
-	geoRanges := make([]geoRange, 0, 1<<20)
+	geoRanges := make([]geoRange, 0, estimatedRangeCapacity(uint64(len(payload)), 64, 1<<20))
 
 	scanner := bufio.NewScanner(bytes.NewReader(payload))
 	lineNo := 0
@@ -242,7 +287,7 @@ func parseDBIPAsnCSV(payload []byte) ([]asnRange, error) {
 	reader.FieldsPerRecord = -1
 	reader.TrimLeadingSpace = true
 
-	out := make([]asnRange, 0, 1<<18)
+	out := make([]asnRange, 0, estimatedRangeCapacity(uint64(len(payload)), 80, 1<<18))
 	lineNo := 0
 	for {
 		row, err := reader.Read()
@@ -283,12 +328,60 @@ func parseDBIPAsnCSV(payload []byte) ([]asnRange, error) {
 	return out, nil
 }
 
+func parseCAIDAPrefix2AS(payload []byte) ([]asnRange, error) {
+	out := make([]asnRange, 0, estimatedRangeCapacity(uint64(len(payload)), 32, 1<<20))
+	scanner := bufio.NewScanner(bytes.NewReader(payload))
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			return nil, fmt.Errorf("caida prefix2as line %d: expected >= 3 columns", lineNo)
+		}
+
+		prefixLength, err := strconv.Atoi(strings.TrimSpace(fields[1]))
+		if err != nil {
+			return nil, fmt.Errorf("caida prefix2as line %d: invalid prefix length %q: %w", lineNo, fields[1], err)
+		}
+		prefix, err := netip.ParsePrefix(fmt.Sprintf("%s/%d", strings.TrimSpace(fields[0]), prefixLength))
+		if err != nil {
+			return nil, fmt.Errorf("caida prefix2as line %d: invalid prefix: %w", lineNo, err)
+		}
+		start, end := rangeFromPrefix(prefix.Masked())
+
+		asn, err := parsePrimaryASN(fields[2])
+		if err != nil {
+			return nil, fmt.Errorf("caida prefix2as line %d: %w", lineNo, err)
+		}
+		if asn == 0 {
+			continue
+		}
+
+		rec := asnRange{start: start, end: end, asn: asn}
+		if err := rec.validate(); err != nil {
+			return nil, fmt.Errorf("caida prefix2as line %d: %w", lineNo, err)
+		}
+		out = append(out, rec)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to scan caida prefix2as payload: %w", err)
+	}
+	return out, nil
+}
+
 func parseDBIPCountryCSV(payload []byte) ([]geoRange, error) {
 	reader := csv.NewReader(strings.NewReader(string(payload)))
 	reader.FieldsPerRecord = -1
 	reader.TrimLeadingSpace = true
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0, estimatedRangeCapacity(uint64(len(payload)), 64, 1<<18))
 	lineNo := 0
 	for {
 		row, err := reader.Read()
@@ -330,7 +423,7 @@ func parseDBIPCityCSV(payload []byte) ([]geoRange, error) {
 	reader.FieldsPerRecord = -1
 	reader.TrimLeadingSpace = true
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0, estimatedRangeCapacity(uint64(len(payload)), 128, 1<<18))
 	lineNo := 0
 	for {
 		row, err := reader.Read()
@@ -399,7 +492,7 @@ func parseDBIPAsnMMDB(payload []byte) ([]asnRange, error) {
 		return nil, fmt.Errorf("failed to open dbip ASN mmdb: %w", err)
 	}
 
-	out := make([]asnRange, 0, 1<<18)
+	out := make([]asnRange, 0)
 	networks := reader.Networks(maxminddb.SkipAliasedNetworks)
 	for networks.Next() {
 		var record dbipAsnMMDBRecord
@@ -441,7 +534,7 @@ func parseDBIPGeoMMDB(payload []byte) ([]geoRange, error) {
 		return nil, fmt.Errorf("failed to open dbip GEO mmdb: %w", err)
 	}
 
-	out := make([]geoRange, 0, 1<<18)
+	out := make([]geoRange, 0)
 	networks := reader.Networks(maxminddb.SkipAliasedNetworks)
 	for networks.Next() {
 		var record dbipGeoMMDBRecord
@@ -476,6 +569,272 @@ func parseDBIPGeoMMDB(payload []byte) ([]geoRange, error) {
 	}
 	if err := networks.Err(); err != nil {
 		return nil, fmt.Errorf("failed to iterate dbip GEO mmdb: %w", err)
+	}
+	return out, nil
+}
+
+func parseMaxMindCountryCSVZip(payload []byte) ([]geoRange, error) {
+	archive, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open maxmind country csv zip: %w", err)
+	}
+
+	countryByID, err := parseMaxMindCountryLocations(archive)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]geoRange, 0)
+	for _, suffix := range []string{
+		"GeoLite2-Country-Blocks-IPv4.csv",
+		"GeoLite2-Country-Blocks-IPv6.csv",
+	} {
+		ranges, err := parseMaxMindCountryBlocks(archive, suffix, countryByID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ranges...)
+	}
+	return out, nil
+}
+
+func parseMaxMindCountryLocations(archive *zip.Reader) (map[string]string, error) {
+	file, err := openZipEntrySuffix(archive, "GeoLite2-Country-Locations-en.csv")
+	if err != nil {
+		return nil, err
+	}
+	rc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	csvr := csv.NewReader(rc)
+	csvr.FieldsPerRecord = -1
+	header, err := csvr.Read()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read maxmind locations header: %w", err)
+	}
+	idx := csvHeaderIndex(header)
+	idIdx, ok := idx["geoname_id"]
+	if !ok {
+		return nil, fmt.Errorf("maxmind locations missing geoname_id column")
+	}
+	countryIdx, ok := idx["country_iso_code"]
+	if !ok {
+		return nil, fmt.Errorf("maxmind locations missing country_iso_code column")
+	}
+
+	out := map[string]string{}
+	lineNo := 1
+	for {
+		row, err := csvr.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("maxmind locations line %d: %w", lineNo+1, err)
+		}
+		lineNo++
+		if len(row) <= idIdx || len(row) <= countryIdx {
+			continue
+		}
+		id := strings.TrimSpace(row[idIdx])
+		country := normalizeCountry(row[countryIdx])
+		if id != "" && country != "" {
+			out[id] = country
+		}
+	}
+	return out, nil
+}
+
+func parseMaxMindCountryBlocks(
+	archive *zip.Reader,
+	suffix string,
+	countryByID map[string]string,
+) ([]geoRange, error) {
+	file, err := openZipEntrySuffix(archive, suffix)
+	if err != nil {
+		return nil, err
+	}
+	rc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	csvr := csv.NewReader(rc)
+	csvr.FieldsPerRecord = -1
+	header, err := csvr.Read()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read maxmind blocks header %s: %w", suffix, err)
+	}
+	idx := csvHeaderIndex(header)
+	networkIdx, ok := idx["network"]
+	if !ok {
+		return nil, fmt.Errorf("maxmind blocks %s missing network column", suffix)
+	}
+	idColumns := []string{"geoname_id", "registered_country_geoname_id", "represented_country_geoname_id"}
+
+	out := make([]geoRange, 0, estimatedRangeCapacity(file.UncompressedSize64, 96, 1<<18))
+	lineNo := 1
+	for {
+		row, err := csvr.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("maxmind blocks %s line %d: %w", suffix, lineNo+1, err)
+		}
+		lineNo++
+		if len(row) <= networkIdx {
+			continue
+		}
+
+		country := ""
+		for _, column := range idColumns {
+			columnIdx, ok := idx[column]
+			if !ok || len(row) <= columnIdx {
+				continue
+			}
+			if c := countryByID[strings.TrimSpace(row[columnIdx])]; c != "" {
+				country = c
+				break
+			}
+		}
+		if country == "" {
+			continue
+		}
+
+		rec, err := geoRangeFromToken(row[networkIdx], country)
+		if err != nil {
+			return nil, fmt.Errorf("maxmind blocks %s line %d: %w", suffix, lineNo, err)
+		}
+		out = append(out, rec)
+	}
+	return out, nil
+}
+
+func parseIP2LocationCountryZip(payload []byte) ([]geoRange, error) {
+	archive, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open ip2location country zip: %w", err)
+	}
+	file, err := openZipEntryBase(archive, "IP2LOCATION-LITE-DB1.CSV")
+	if err != nil {
+		return nil, err
+	}
+	rc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	csvr := csv.NewReader(rc)
+	csvr.FieldsPerRecord = -1
+	out := make([]geoRange, 0, estimatedRangeCapacity(file.UncompressedSize64, 64, 1<<18))
+	lineNo := 0
+	for {
+		row, err := csvr.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("ip2location line %d: %w", lineNo+1, err)
+		}
+		lineNo++
+		if len(row) < 3 {
+			continue
+		}
+		country := normalizeCountry(row[2])
+		if country == "" {
+			continue
+		}
+		start, end, err := parseRangeEndpoints(row[0], row[1])
+		if err != nil {
+			return nil, fmt.Errorf("ip2location line %d: %w", lineNo, err)
+		}
+		rec := geoRange{start: start, end: end, country: country}
+		if err := rec.validate(); err != nil {
+			return nil, fmt.Errorf("ip2location line %d: %w", lineNo, err)
+		}
+		out = append(out, rec)
+	}
+	return out, nil
+}
+
+func parseIPDenyCountryTarGZ(payload []byte) ([]geoRange, error) {
+	gz, err := gzip.NewReader(bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open ipdeny tar.gz: %w", err)
+	}
+	defer gz.Close()
+
+	out := make([]geoRange, 0)
+	tr := tar.NewReader(gz)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to read ipdeny tar: %w", err)
+		}
+		name := path.Base(header.Name)
+		zoneName, ok := strings.CutSuffix(strings.ToLower(name), ".zone")
+		if header.Typeflag != tar.TypeReg || !ok {
+			continue
+		}
+		country := normalizeCountry(zoneName)
+		if country == "" {
+			continue
+		}
+		ranges, err := parseCountryTokenLines(tr, country, "ipdeny "+header.Name)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ranges...)
+	}
+	return out, nil
+}
+
+func parseIPIPCountryZip(payload []byte) ([]geoRange, error) {
+	archive, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open ipip country zip: %w", err)
+	}
+	file, err := openZipEntryBase(archive, "country.txt")
+	if err != nil {
+		return nil, err
+	}
+	rc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	out := make([]geoRange, 0, estimatedRangeCapacity(file.UncompressedSize64, 48, 1<<18))
+	scanner := bufio.NewScanner(rc)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		fields := strings.Fields(strings.ReplaceAll(scanner.Text(), "\r", ""))
+		if len(fields) < 2 {
+			continue
+		}
+		country := normalizeCountry(fields[len(fields)-1])
+		if country == "" {
+			continue
+		}
+		rec, err := geoRangeFromToken(fields[0], country)
+		if err != nil {
+			return nil, fmt.Errorf("ipip line %d: %w", lineNo, err)
+		}
+		out = append(out, rec)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to scan ipip country payload: %w", err)
 	}
 	return out, nil
 }
@@ -593,4 +952,117 @@ func parseASN(raw string) (uint32, error) {
 		return 0, fmt.Errorf("invalid ASN %q: %w", raw, err)
 	}
 	return uint32(n), nil
+}
+
+func parsePrimaryASN(raw string) (uint32, error) {
+	value := strings.TrimSpace(strings.Trim(raw, "\"{}"))
+	if value == "" {
+		return 0, nil
+	}
+	for _, sep := range []string{"_", ","} {
+		if idx := strings.Index(value, sep); idx >= 0 {
+			value = strings.TrimSpace(value[:idx])
+		}
+	}
+	return parseASN(value)
+}
+
+func csvHeaderIndex(header []string) map[string]int {
+	out := make(map[string]int, len(header))
+	for i, name := range header {
+		out[strings.TrimSpace(name)] = i
+	}
+	return out
+}
+
+func openZipEntryBase(archive *zip.Reader, name string) (*zip.File, error) {
+	for _, file := range archive.File {
+		if path.Base(file.Name) == name {
+			return file, nil
+		}
+	}
+	return nil, fmt.Errorf("zip entry %q not found", name)
+}
+
+func openZipEntrySuffix(archive *zip.Reader, suffix string) (*zip.File, error) {
+	for _, file := range archive.File {
+		if strings.HasSuffix(file.Name, suffix) {
+			return file, nil
+		}
+	}
+	return nil, fmt.Errorf("zip entry with suffix %q not found", suffix)
+}
+
+func parseCountryTokenLines(r io.Reader, country, label string) ([]geoRange, error) {
+	out := make([]geoRange, 0)
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		token := strings.TrimSpace(scanner.Text())
+		if token == "" || strings.HasPrefix(token, "#") {
+			continue
+		}
+		fields := strings.Fields(token)
+		if len(fields) == 0 {
+			continue
+		}
+		rec, err := geoRangeFromToken(fields[0], country)
+		if err != nil {
+			return nil, fmt.Errorf("%s line %d: %w", label, lineNo, err)
+		}
+		out = append(out, rec)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to scan %s: %w", label, err)
+	}
+	return out, nil
+}
+
+func geoRangeFromToken(raw, country string) (geoRange, error) {
+	start, end, err := rangeFromToken(raw)
+	if err != nil {
+		return geoRange{}, err
+	}
+	rec := geoRange{start: start, end: end, country: country}
+	if err := rec.validate(); err != nil {
+		return geoRange{}, err
+	}
+	return rec, nil
+}
+
+func rangeFromToken(raw string) (netip.Addr, netip.Addr, error) {
+	token := strings.TrimSpace(strings.Trim(raw, "\""))
+	if token == "" {
+		return netip.Addr{}, netip.Addr{}, fmt.Errorf("empty range token")
+	}
+
+	if strings.Contains(token, "/") {
+		prefix, err := netip.ParsePrefix(token)
+		if err != nil {
+			return netip.Addr{}, netip.Addr{}, err
+		}
+		start, end := rangeFromPrefix(prefix.Masked())
+		return start, end, nil
+	}
+
+	if strings.Contains(token, "-") {
+		left, right, ok := strings.Cut(strings.ReplaceAll(token, " ", ""), "-")
+		if !ok {
+			return netip.Addr{}, netip.Addr{}, fmt.Errorf("invalid range token %q", raw)
+		}
+		return parseRangeEndpoints(left, right)
+	}
+
+	addr, err := parseIP(token)
+	if err != nil {
+		return netip.Addr{}, netip.Addr{}, err
+	}
+	return addr, addr, nil
+}
+
+func rangeFromPrefix(prefix netip.Prefix) (netip.Addr, netip.Addr) {
+	rng := netipx.RangeOfPrefix(prefix.Masked())
+	return rng.From(), rng.To()
 }

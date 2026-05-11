@@ -1,7 +1,8 @@
 use super::FacetFileContribution;
-use crate::facet_catalog::FACET_FIELD_SPECS;
+use crate::facet_catalog::{AutocompleteMatchKind, FACET_FIELD_SPECS};
 use anyhow::{Context, Result};
 use fst::{Automaton, IntoStreamer, Set, SetBuilder, Streamer, automaton::Str};
+use memchr::memmem::Finder;
 use memmap2::Mmap;
 use std::fs::{self, File};
 use std::io::BufWriter;
@@ -42,6 +43,7 @@ pub(crate) fn search_sidecar(
     field: &str,
     term: &str,
     limit: usize,
+    match_kind: AutocompleteMatchKind,
 ) -> Result<Vec<String>> {
     let sidecar = sidecar_path(journal_path, field);
     if !sidecar.exists() {
@@ -54,15 +56,33 @@ pub(crate) fn search_sidecar(
         .with_context(|| format!("failed to mmap facet sidecar {}", sidecar.display()))?;
     let set = Set::new(mmap)
         .with_context(|| format!("failed to load facet sidecar {}", sidecar.display()))?;
-    let matcher = Str::new(term).starts_with();
-    let mut stream = set.search(&matcher).into_stream();
-    let mut out = Vec::new();
 
-    while let Some(key) = stream.next() {
-        let rendered = String::from_utf8_lossy(key).into_owned();
-        out.push(rendered);
-        if out.len() >= limit {
-            break;
+    let mut out = Vec::new();
+    match match_kind {
+        AutocompleteMatchKind::Prefix => {
+            // FST automaton can prune the trie; cheap.
+            let matcher = Str::new(term).starts_with();
+            let mut stream = set.search(&matcher).into_stream();
+            while let Some(key) = stream.next() {
+                out.push(String::from_utf8_lossy(key).into_owned());
+                if out.len() >= limit {
+                    break;
+                }
+            }
+        }
+        AutocompleteMatchKind::Substring => {
+            // FST has no substring automaton; stream every key and use a
+            // SIMD-accelerated finder. Bounded by `limit` early-stop.
+            let finder = Finder::new(term.as_bytes());
+            let mut stream = set.stream();
+            while let Some(key) = stream.next() {
+                if finder.find(key).is_some() {
+                    out.push(String::from_utf8_lossy(key).into_owned());
+                    if out.len() >= limit {
+                        break;
+                    }
+                }
+            }
         }
     }
 

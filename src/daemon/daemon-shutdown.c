@@ -216,6 +216,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
 
+    // Drain websocket threads while data substrates are still alive. Websocket
+    // message dispatch (e.g. MCP) is synchronous on the websocket thread; an
+    // in-flight handler will not let the loop observe its cancel flag until it
+    // returns. If we wait until after dbengine/metasync/workers are gone, an
+    // MCP request that needs them never returns and the watchdog aborts.
+    websocket_threads_join();
+    watcher_step_complete(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS);
+
     stream_threads_cancel();
     service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 20 * USEC_PER_SEC);
     service_signal_exit(SERVICE_STREAMING_CONNECTOR);
@@ -305,9 +313,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // Don't register a shutdown event if we crashed
     if (!abnormal)
         add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
-
-    websocket_threads_join();
-    watcher_step_complete(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS);
 
     nd_thread_join_threads();
     watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);

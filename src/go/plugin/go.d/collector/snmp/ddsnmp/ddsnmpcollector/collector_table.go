@@ -628,10 +628,6 @@ func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats) (m
 		}
 	}
 
-	if len(pdus) == 0 {
-		tc.missingOIDs[trimOID(oid)] = true
-	}
-
 	return pdus, nil
 }
 

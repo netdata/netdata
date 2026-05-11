@@ -441,7 +441,7 @@ static inline STRING *comm_from_cmdline_sanitized(STRING *comm, STRING *cmdline)
 
     size_t comm_len = string_strlen(comm);
     char *start = strstr(buf, string2str(comm));
-    while (start) {
+    if (start) {
         char *end = start + comm_len;
         while (*end &&
                !isspace((uint8_t) *end) &&

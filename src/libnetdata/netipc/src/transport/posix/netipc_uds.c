@@ -31,6 +31,17 @@
 /*  Internal helpers                                                   */
 /* ------------------------------------------------------------------ */
 
+static bool header_payload_len(size_t payload_len, size_t *msg_len_out)
+{
+#if SIZE_MAX <= UINT32_MAX
+    if (payload_len > SIZE_MAX - NIPC_HEADER_LEN)
+        return false;
+#endif
+
+    *msg_len_out = NIPC_HEADER_LEN + payload_len;
+    return true;
+}
+
 /* Validate service_name: only [a-zA-Z0-9._-], non-empty, not "." or "..". */
 static int validate_service_name(const char *name)
 {
@@ -491,13 +502,24 @@ static nipc_uds_error_t server_handshake(int fd,
 /*  Stale endpoint recovery                                            */
 /* ------------------------------------------------------------------ */
 
+static int unlink_stale_socket_path(const char *path)
+{
+    struct stat st;
+    if (lstat(path, &st) != 0)
+        return (errno == ENOENT) ? 0 : -1;
+
+    if (!S_ISSOCK(st.st_mode))
+        return -1;
+
+    if (unlink(path) == 0 || errno == ENOENT)
+        return 0;
+
+    return -1;
+}
+
 /* Returns: 0 = stale (unlinked), 1 = live server, -1 = doesn't exist */
 static int check_and_recover_stale(const char *path)
 {
-    struct stat st;
-    if (stat(path, &st) != 0)
-        return -1; /* doesn't exist */
-
     /* Try connecting to check if a live server is there */
     int probe = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (probe < 0)
@@ -516,11 +538,12 @@ static int check_and_recover_stale(const char *path)
     } else {
         int saved_errno = errno;
         close(probe);
-        /* Only unlink on ECONNREFUSED/ENOENT (stale socket).
-         * Other errors (EACCES, etc.) should not remove the file. */
-        if (saved_errno == ECONNREFUSED || saved_errno == ENOENT) {
-            unlink(path);
-            ret = 0;
+        /* Only ECONNREFUSED proves a stale socket path. Other errors
+         * (including regular files at the path) must not remove anything. */
+        if (saved_errno == ENOENT) {
+            ret = -1;
+        } else if (saved_errno == ECONNREFUSED) {
+            ret = (unlink_stale_socket_path(path) == 0) ? 0 : 1;
         } else {
             /* Can't determine ownership — treat as live to prevent overwriting */
             ret = 1;
@@ -792,7 +815,12 @@ nipc_uds_error_t nipc_uds_send(nipc_uds_session_t *session,
     hdr->header_len = NIPC_HEADER_LEN;
     hdr->payload_len = (uint32_t)payload_len;
 
-    size_t total_msg = NIPC_HEADER_LEN + payload_len;
+    size_t total_msg;
+    if (!header_payload_len(payload_len, &total_msg)) {
+        if (tracked)
+            inflight_remove(session, hdr->message_id);
+        return NIPC_UDS_ERR_LIMIT_EXCEEDED;
+    }
 
     /* Does it fit in one packet? */
     if (total_msg <= session->packet_size) {
@@ -979,7 +1007,9 @@ nipc_uds_error_t nipc_uds_receive(nipc_uds_session_t *session,
             return NIPC_UDS_ERR_UNKNOWN_MSG_ID;
     }
 
-    size_t total_msg = NIPC_HEADER_LEN + hdr_out->payload_len;
+    size_t total_msg;
+    if (!header_payload_len(hdr_out->payload_len, &total_msg))
+        return NIPC_UDS_ERR_LIMIT_EXCEEDED;
 
     /* Non-chunked: entire message arrived in one packet */
     if ((size_t)n >= total_msg) {

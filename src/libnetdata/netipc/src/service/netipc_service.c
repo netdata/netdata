@@ -16,6 +16,7 @@
 
 #include <errno.h>
 #include <poll.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -152,6 +153,26 @@ static bool ensure_buffer(uint8_t **buf, size_t *buf_size, size_t need, int faul
     return true;
 }
 
+static bool header_payload_len(size_t payload_len, size_t *msg_len_out)
+{
+#if SIZE_MAX <= UINT32_MAX
+    if (payload_len > SIZE_MAX - NIPC_HEADER_LEN)
+        return false;
+#endif
+
+    *msg_len_out = NIPC_HEADER_LEN + payload_len;
+    return true;
+}
+
+static bool header_payload_len_u32(uint32_t payload_len, uint32_t *msg_len_out)
+{
+    if (payload_len > UINT32_MAX - NIPC_HEADER_LEN)
+        return false;
+
+    *msg_len_out = payload_len + NIPC_HEADER_LEN;
+    return true;
+}
+
 static void client_note_request_capacity(nipc_client_ctx_t *ctx, uint32_t payload_len)
 {
     uint32_t grown = next_power_of_2_u32(payload_len);
@@ -172,7 +193,9 @@ static void client_note_response_capacity(nipc_client_ctx_t *ctx, uint32_t paylo
 
 static bool client_prepare_session_buffers(nipc_client_ctx_t *ctx)
 {
-    size_t response_need = (size_t)ctx->session.max_response_payload_bytes + NIPC_HEADER_LEN;
+    size_t response_need;
+    if (!header_payload_len(ctx->session.max_response_payload_bytes, &response_need))
+        return false;
     if (response_need < NIPC_HEADER_LEN + 1024u)
         response_need = NIPC_HEADER_LEN + 1024u;
 
@@ -182,7 +205,9 @@ static bool client_prepare_session_buffers(nipc_client_ctx_t *ctx)
 
     if (ctx->session.selected_profile == NIPC_PROFILE_SHM_HYBRID ||
         ctx->session.selected_profile == NIPC_PROFILE_SHM_FUTEX) {
-        size_t send_need = (size_t)ctx->session.max_request_payload_bytes + NIPC_HEADER_LEN;
+        size_t send_need;
+        if (!header_payload_len(ctx->session.max_request_payload_bytes, &send_need))
+            return false;
         if (!ensure_buffer(&ctx->send_buf, &ctx->send_buf_size, send_need,
                            NIPC_POSIX_SERVICE_TEST_FAULT_CLIENT_SEND_BUF_REALLOC_INTERNAL))
             return false;
@@ -373,7 +398,10 @@ static nipc_error_t transport_send(nipc_client_ctx_t *ctx,
             return NIPC_ERR_OVERFLOW;
         }
 
-        size_t msg_len = NIPC_HEADER_LEN + payload_len;
+        size_t msg_len;
+        if (!header_payload_len(payload_len, &msg_len))
+            return NIPC_ERR_OVERFLOW;
+
         uint8_t *msg = ctx->send_buf;
         if (!msg || msg_len > ctx->send_buf_size)
             return NIPC_ERR_OVERFLOW;
@@ -830,7 +858,9 @@ static void server_handle_session(nipc_managed_server_t *server,
                                    size_t resp_buf_size)
 {
     /* Allocate recv buffer based on negotiated max request size */
-    size_t recv_size = NIPC_HEADER_LEN + session->max_request_payload_bytes;
+    size_t recv_size;
+    if (!header_payload_len(session->max_request_payload_bytes, &recv_size))
+        return;
     if (recv_size < NIPC_HEADER_LEN + 1024u)
         recv_size = NIPC_HEADER_LEN + 1024u;
     uint8_t *recv_buf = service_malloc(
@@ -948,7 +978,9 @@ static void server_handle_session(nipc_managed_server_t *server,
 
         switch (dispatch_err) {
         case NIPC_OK:
-            if (response_len > session->max_response_payload_bytes) {
+            if (response_len > resp_buf_size ||
+                response_len > session->max_response_payload_bytes ||
+                response_len > SIZE_MAX - NIPC_HEADER_LEN) {
                 server_note_response_capacity(
                     server,
                     response_len >= UINT32_MAX ? UINT32_MAX : (uint32_t)response_len);
@@ -987,7 +1019,9 @@ static void server_handle_session(nipc_managed_server_t *server,
 
         /* Send response via the active transport */
         if (shm) {
-            size_t msg_len = NIPC_HEADER_LEN + response_len;
+            size_t msg_len;
+            if (!header_payload_len(response_len, &msg_len))
+                break;
 
             resp_hdr.magic      = NIPC_MAGIC_MSG;
             resp_hdr.version    = NIPC_VERSION;
@@ -1109,6 +1143,15 @@ static bool server_prepare_accept_config(nipc_managed_server_t *server,
     if (shm_profiles == 0)
         return true;
 
+    uint32_t request_capacity;
+    uint32_t response_capacity;
+    if (!header_payload_len_u32(NIPC_MAX_PAYLOAD_CAP, &request_capacity) ||
+        !header_payload_len_u32(cfg_out->max_response_payload_bytes, &response_capacity)) {
+        cfg_out->supported_profiles &= ~shm_profiles;
+        cfg_out->preferred_profiles &= ~shm_profiles;
+        return cfg_out->supported_profiles != 0;
+    }
+
     nipc_shm_ctx_t *shm = service_calloc(
         1, sizeof(nipc_shm_ctx_t),
         NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SHM_CTX_CALLOC_INTERNAL);
@@ -1120,8 +1163,8 @@ static bool server_prepare_accept_config(nipc_managed_server_t *server,
     nipc_shm_error_t serr = nipc_shm_server_create(
         server->run_dir, server->service_name,
         sid,
-        NIPC_MAX_PAYLOAD_CAP + NIPC_HEADER_LEN,
-        cfg_out->max_response_payload_bytes + NIPC_HEADER_LEN,
+        request_capacity,
+        response_capacity,
         shm);
     if (serr == NIPC_SHM_OK) {
         *shm_out = shm;
@@ -1147,12 +1190,15 @@ static nipc_error_t server_init_raw(nipc_managed_server_t *server,
                                     nipc_server_handler_fn handler,
                                     void *user)
 {
+    if (!server)
+        return NIPC_ERR_BAD_LAYOUT;
+
     memset(server, 0, sizeof(*server));
     server->listener.fd = -1;
     __atomic_store_n(&server->running, false, __ATOMIC_RELAXED);
     server->acceptor_started = false;
 
-    if (!run_dir || !service_name || !handler)
+    if (!run_dir || !service_name || !config || !handler)
         return NIPC_ERR_BAD_LAYOUT;
 
     if (worker_count < 1)

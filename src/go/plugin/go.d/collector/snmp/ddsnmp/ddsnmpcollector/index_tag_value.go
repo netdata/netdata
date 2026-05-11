@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -50,9 +51,53 @@ func formatIndexTagValue(raw string, format string) (string, error) {
 		return raw, nil
 	case "ip_address":
 		return formatIndexIPAddress(raw)
+	case "mac_address":
+		return formatIndexMACAddress(raw)
+	case "hex":
+		return formatIndexHex(raw)
 	default:
 		return raw, nil
 	}
+}
+
+func formatIndexHex(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", fmt.Errorf("cannot convert transformed index '%s' to hex", raw)
+	}
+
+	parts := strings.Split(raw, ".")
+
+	bytes := make([]byte, 0, len(parts))
+	for _, part := range parts {
+		n, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || n < 0 || n > 255 {
+			return "", fmt.Errorf("cannot convert transformed index '%s' to hex", raw)
+		}
+		bytes = append(bytes, byte(n))
+	}
+
+	return hex.EncodeToString(bytes), nil
+}
+
+func formatIndexMACAddress(raw string) (string, error) {
+	parts := strings.Split(raw, ".")
+	if len(parts) == 7 && strings.TrimSpace(parts[0]) == "6" {
+		parts = parts[1:]
+	}
+	if len(parts) != 6 {
+		return "", fmt.Errorf("cannot convert transformed index '%s' to MAC address", raw)
+	}
+
+	octets := make([]string, 0, len(parts))
+	for _, part := range parts {
+		n, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || n < 0 || n > 255 {
+			return "", fmt.Errorf("cannot convert transformed index '%s' to MAC address", raw)
+		}
+		octets = append(octets, fmt.Sprintf("%02x", n))
+	}
+
+	return strings.Join(octets, ":"), nil
 }
 
 func formatIndexIPAddress(raw string) (string, error) {

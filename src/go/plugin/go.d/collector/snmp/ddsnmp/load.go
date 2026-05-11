@@ -74,7 +74,8 @@ func loadProfiles() {
 }
 
 // LoadProfileByName loads a single profile by filename (with or without extension).
-// This supports loading abstract profiles (e.g., "_std-*.yaml") for programmatic use.
+// This supports loading abstract profiles (e.g., "_std-*.yaml") for tests and
+// programmatic profile checks that intentionally bypass selector matching.
 func LoadProfileByName(name string) (*Profile, error) {
 	paths := getProfilesDirs()
 
@@ -96,13 +97,9 @@ func LoadProfileByName(name string) (*Profile, error) {
 			return nil, err
 		}
 
-		if err := profile.validate(); err != nil {
+		if err := prepareLoadedProfile(profile); err != nil {
 			return nil, err
 		}
-		if err := CompileTransforms(profile); err != nil {
-			return nil, err
-		}
-		profile.removeConstantMetrics()
 
 		return profile, nil
 	}
@@ -120,7 +117,7 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]*P
 		if err != nil {
 			return err
 		}
-		if !(strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
+		if !strings.HasSuffix(d.Name(), ".yaml") && !strings.HasSuffix(d.Name(), ".yml") {
 			return nil
 		}
 		// Skip abstract profiles
@@ -134,16 +131,10 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]*P
 			return nil
 		}
 
-		if err := profile.validate(); err != nil {
+		if err := prepareLoadedProfile(profile); err != nil {
 			log.Warningf("invalid profile '%s': %v", path, err)
 			return nil
 		}
-		if err := CompileTransforms(profile); err != nil {
-			log.Warningf("invalid profile '%s': %v", path, err)
-			return nil
-		}
-
-		profile.removeConstantMetrics()
 
 		profiles = append(profiles, profile)
 		return nil
@@ -172,6 +163,9 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 	if prof.SourceFile == "" {
 		prof.SourceFile, _ = filepath.Abs(filename)
 	}
+	originID := profileOriginID(filename, extendsPaths)
+	setLicensingOriginProfileID(&prof, originID)
+	setBGPOriginProfileID(&prof, originID)
 
 	// Handle empty profiles - these are profiles where content has been deliberately removed,
 	// but the file itself is preserved. This ensures that when users update, their existing
@@ -211,10 +205,66 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 	// Merge in reverse so later extends override earlier ones while the
 	// current profile still keeps the highest precedence.
 	for i := len(mergedBases) - 1; i >= 0; i-- {
-		prof.merge(mergedBases[i])
+		if err := prof.merge(mergedBases[i]); err != nil {
+			return nil, err
+		}
 	}
 
 	return &prof, nil
+}
+
+func setLicensingOriginProfileID(prof *Profile, originID string) {
+	if prof == nil || prof.Definition == nil {
+		return
+	}
+	for i := range prof.Definition.Licensing {
+		if prof.Definition.Licensing[i].OriginProfileID == "" {
+			prof.Definition.Licensing[i].OriginProfileID = originID
+		}
+	}
+}
+
+func setBGPOriginProfileID(prof *Profile, originID string) {
+	if prof == nil || prof.Definition == nil {
+		return
+	}
+	for i := range prof.Definition.BGP {
+		if prof.Definition.BGP[i].OriginProfileID == "" {
+			prof.Definition.BGP[i].OriginProfileID = originID
+		}
+	}
+}
+
+func profileOriginID(filename string, paths multipath.MultiPath) string {
+	absFile, err := filepath.Abs(filename)
+	if err != nil {
+		absFile = filename
+	}
+	for _, dir := range paths {
+		absDir, err := filepath.Abs(dir)
+		if err != nil {
+			continue
+		}
+		rel, err := filepath.Rel(absDir, absFile)
+		if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
+			continue
+		}
+		return filepath.ToSlash(rel)
+	}
+	return filepath.ToSlash(filepath.Base(filename))
+}
+
+func prepareLoadedProfile(profile *Profile) error {
+	if err := profile.validate(); err != nil {
+		return err
+	}
+	if err := CompileTransforms(profile); err != nil {
+		return err
+	}
+	profile.removeConstantMetrics()
+	enrichProfile(profile)
+	handleCrossTableTagsWithoutMetrics(profile)
+	return nil
 }
 
 func getProfilesDirs() multipath.MultiPath {

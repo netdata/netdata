@@ -29,7 +29,11 @@ func (c *topologyCache) appendObservedFDBEntries(observation *topologyengine.L2O
 		ifIndex := parseIndex(c.bridgePortToIf[strings.TrimSpace(entry.bridgePort)])
 		vlanID := strings.TrimSpace(entry.vlanID)
 		if vlanID == "" && strings.TrimSpace(entry.fdbID) != "" {
-			vlanID = strings.TrimSpace(c.fdbIDToVlanID[strings.TrimSpace(entry.fdbID)])
+			fdbID := strings.TrimSpace(entry.fdbID)
+			vlanID = strings.TrimSpace(c.fdbIDToVlanID[fdbID])
+			if vlanID == "" {
+				vlanID = fdbID
+			}
 		}
 		observation.FDBEntries = append(observation.FDBEntries, topologyengine.FDBObservation{
 			MAC:        strings.TrimSpace(entry.mac),
