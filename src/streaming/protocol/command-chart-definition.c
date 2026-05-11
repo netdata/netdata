@@ -119,8 +119,9 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
 
         // The receiver skips replication for obsolete charts (stream-receiver.c),
         // so do not enter the replication bookkeeping here either: it would pin
-        // rrdhost_sender_replicating_charts and permanently gate the cleanup loop
-        // in svc_rrd_cleanup_obsolete_charts_from_all_hosts.
+        // rrdhost_sender_replicating_charts above zero and keep the host's
+        // pulse SND_REPLICATING / SND_RUNNING observability stuck on the wrong
+        // state.
         if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)) {
             // Claim before publish: increment the host counter BEFORE setting
             // RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS, so any concurrent
