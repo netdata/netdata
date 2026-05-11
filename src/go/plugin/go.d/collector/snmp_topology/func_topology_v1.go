@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -312,6 +313,12 @@ func modalActorRefColumn(id, label, actorColumn string) topologyv1.ModalColumn {
 	}
 }
 
+func modalActorRefColumnWithVisibility(id, label, actorColumn, visibility string) topologyv1.ModalColumn {
+	column := modalActorRefColumn(id, label, actorColumn)
+	column.Visibility = visibility
+	return column
+}
+
 func snmpTopologyV1PortTypes() map[string]topologyv1.PortType {
 	return map[string]topologyv1.PortType{
 		"lldp":           {Presentation: &topologyv1.PortPresentation{Label: "lldp/cdp", ColorSlot: "accent", Opacity: "normal"}},
@@ -456,7 +463,8 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 		return topologyv1.Data{}, err
 	}
 
-	actorDetails, tableTypes, err := buildSNMPTopologyV1ActorDetails(data.Actors, stringsDict)
+	portNeighborSummaries := buildSNMPTopologyV1PortNeighborSummaries(data.Links, actorIndex)
+	actorDetails, tableTypes, err := buildSNMPTopologyV1ActorDetails(data.Actors, stringsDict, portNeighborSummaries)
 	if err != nil {
 		return topologyv1.Data{}, err
 	}
@@ -570,7 +578,7 @@ func snmpTopologyV1ActorPortsTableType() topologyv1.TableType {
 
 func snmpTopologyV1PortModalColumns() []topologyv1.ModalColumn {
 	return []topologyv1.ModalColumn{
-		modalDirectColumn("if_index", "Port ID", "if_index", "number"),
+		modalDirectColumn("port_number", "Port #", "port_number", "number"),
 		modalDirectColumn("name", "Port", "name", "text"),
 		modalDirectColumn("oper_status", "Status", "oper_status", "badge"),
 		modalDirectColumn("admin_status", "Admin", "admin_status", "badge"),
@@ -581,6 +589,9 @@ func snmpTopologyV1PortModalColumns() []topologyv1.ModalColumn {
 		modalDirectColumn("fdb_mac_count", "FDB", "fdb_mac_count", "number"),
 		modalDirectColumn("link_count", "Links", "link_count", "number"),
 		modalDirectColumn("neighbor_count", "Neighbors", "neighbor_count", "number"),
+		modalActorRefColumnWithVisibility("neighbor_actor", "Neighbor", "neighbor_actor", "expanded"),
+		modalDirectColumnWithVisibility("neighbor_port_name", "Neighbor Port", "neighbor_port_name", "text", "expanded"),
+		modalDirectColumnWithVisibility("if_index", "SNMP ifIndex", "if_index", "number", "expanded"),
 		modalDirectColumnWithVisibility("if_name", "ifName", "if_name", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_descr", "ifDescr", "if_descr", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_alias", "Alias", "if_alias", "text", "expanded"),
@@ -658,6 +669,7 @@ func snmpTopologyV1ActorLabelsTableType() topologyv1.TableType {
 func snmpTopologyV1ActorPortsColumns() []topologyv1.Column {
 	return []topologyv1.Column{
 		topologyv1.NewColumn("actor", "actor_ref", topologyv1.WithRole("reference")),
+		topologyv1.NewColumn("port_number", "uint", topologyv1.WithNullable()),
 		topologyv1.NewColumn("if_index", "uint", topologyv1.WithNullable()),
 		topologyv1.NewColumn("port_id", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("name", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
@@ -676,6 +688,8 @@ func snmpTopologyV1ActorPortsColumns() []topologyv1.Column {
 		topologyv1.NewColumn("fdb_mac_count", "uint", topologyv1.WithNullable()),
 		topologyv1.NewColumn("link_count", "uint", topologyv1.WithNullable()),
 		topologyv1.NewColumn("neighbor_count", "uint", topologyv1.WithNullable()),
+		topologyv1.NewColumn("neighbor_actor", "actor_ref", topologyv1.WithNullable(), topologyv1.WithRole("reference")),
+		topologyv1.NewColumn("neighbor_port_name", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("neighbors", "json", topologyv1.WithNullable()),
 		topologyv1.NewColumn("vlans", "json", topologyv1.WithNullable()),
 		topologyv1.NewColumn("extra", "json", topologyv1.WithNullable()),
@@ -1070,6 +1084,7 @@ func snmpTopologyV1LinkIsProbable(link topologyLink) bool {
 func buildSNMPTopologyV1ActorDetails(
 	actors []topologyActor,
 	stringsDict *topologyv1.StringDictionary,
+	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
 ) (map[string]topologyv1.DetailTable, map[string]topologyv1.TableType, error) {
 	details := make(map[string]topologyv1.DetailTable)
 	tableTypes := make(map[string]topologyv1.TableType)
@@ -1121,7 +1136,7 @@ func buildSNMPTopologyV1ActorDetails(
 		var table topologyv1.Table
 		var err error
 		if tableID == "actor_ports" {
-			table = buildSNMPTopologyV1ActorPortsTable(rows, stringsDict)
+			table = buildSNMPTopologyV1ActorPortsTable(rows, stringsDict, portNeighborSummaries)
 		} else {
 			table, err = buildSNMPTopologyV1DynamicTable(rows, stringsDict)
 		}
@@ -1322,6 +1337,103 @@ type topologyV1DynamicRow struct {
 	values   map[string]any
 }
 
+type snmpTopologyV1PortNeighborKey struct {
+	actorRef int
+	ifIndex  uint64
+	portName string
+}
+
+type snmpTopologyV1PortNeighborSummary struct {
+	remoteActor    any
+	remotePortName string
+	ambiguous      bool
+}
+
+func snmpTopologyV1PortNeighborKeyFor(actorRef int, ifIndex any, portName string) snmpTopologyV1PortNeighborKey {
+	if index, ok := uintValue(ifIndex); ok && index > 0 {
+		return snmpTopologyV1PortNeighborKey{actorRef: actorRef, ifIndex: index}
+	}
+	portName = strings.ToLower(strings.TrimSpace(portName))
+	if portName == "" {
+		return snmpTopologyV1PortNeighborKey{actorRef: -1}
+	}
+	return snmpTopologyV1PortNeighborKey{actorRef: actorRef, portName: portName}
+}
+
+func buildSNMPTopologyV1PortNeighborSummaries(
+	links []topologyLink,
+	actorIndex map[string]int,
+) map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary {
+	summaries := make(map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary)
+	appendSide := func(actorID, remoteActorID string, endpoint, remoteEndpoint topologyLinkEndpoint) {
+		actorRef, ok := actorIndex[strings.TrimSpace(actorID)]
+		if !ok {
+			return
+		}
+		remoteActorRef, ok := actorIndex[strings.TrimSpace(remoteActorID)]
+		if !ok {
+			return
+		}
+		key := snmpTopologyV1PortNeighborKeyFor(actorRef, endpoint.Attributes["if_index"], topologyV1EndpointPortName(endpoint))
+		if key.actorRef < 0 {
+			return
+		}
+		if existing, exists := summaries[key]; exists {
+			if existing.remoteActor != remoteActorRef || strings.TrimSpace(existing.remotePortName) != strings.TrimSpace(topologyV1EndpointPortName(remoteEndpoint)) {
+				existing.ambiguous = true
+				summaries[key] = existing
+			}
+			return
+		}
+		summaries[key] = snmpTopologyV1PortNeighborSummary{
+			remoteActor:    remoteActorRef,
+			remotePortName: topologyV1EndpointPortName(remoteEndpoint),
+		}
+	}
+
+	for _, link := range links {
+		appendSide(link.SrcActorID, link.DstActorID, link.Src, link.Dst)
+		appendSide(link.DstActorID, link.SrcActorID, link.Dst, link.Src)
+	}
+	return summaries
+}
+
+func snmpTopologyV1PortNeighborSummaryFor(
+	row topologyV1DynamicRow,
+	portName string,
+	summaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
+) (snmpTopologyV1PortNeighborSummary, bool) {
+	candidates := []string{
+		portName,
+		topologyV1ScalarLabelValue(row.values["if_name"]),
+		topologyV1ScalarLabelValue(row.values["port_name"]),
+		topologyV1ScalarLabelValue(row.values["port_id"]),
+	}
+	seen := make(map[snmpTopologyV1PortNeighborKey]struct{}, len(candidates)+1)
+	keys := []snmpTopologyV1PortNeighborKey{
+		snmpTopologyV1PortNeighborKeyFor(row.actorRef, row.values["if_index"], ""),
+	}
+	for _, candidate := range candidates {
+		keys = append(keys, snmpTopologyV1PortNeighborKeyFor(row.actorRef, nil, candidate))
+	}
+	for _, key := range keys {
+		if key.actorRef < 0 {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		if summary, ok := summaries[key]; ok {
+			if summary.ambiguous {
+				return snmpTopologyV1PortNeighborSummary{}, false
+			}
+			return summary, true
+		}
+	}
+	return snmpTopologyV1PortNeighborSummary{}, false
+}
+
 func collectSNMPTopologyV1ActorTableRows(actors []topologyActor) map[string][]topologyV1DynamicRow {
 	tables := make(map[string][]topologyV1DynamicRow)
 	for actorIndex, actor := range actors {
@@ -1347,8 +1459,10 @@ func collectSNMPTopologyV1ActorTableRows(actors []topologyActor) map[string][]to
 func buildSNMPTopologyV1ActorPortsTable(
 	rows []topologyV1DynamicRow,
 	stringsDict *topologyv1.StringDictionary,
+	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
 ) topologyv1.Table {
 	actorRefs := make([]any, len(rows))
+	portNumbers := make([]any, len(rows))
 	ifIndexes := make([]any, len(rows))
 	portIDs := make([]any, len(rows))
 	names := make([]any, len(rows))
@@ -1367,20 +1481,24 @@ func buildSNMPTopologyV1ActorPortsTable(
 	fdbMACCounts := make([]any, len(rows))
 	linkCounts := make([]any, len(rows))
 	neighborCounts := make([]any, len(rows))
+	neighborActors := make([]any, len(rows))
+	neighborPortNames := make([]any, len(rows))
 	neighbors := make([]any, len(rows))
 	vlans := make([]any, len(rows))
 	extra := make([]any, len(rows))
 
 	for i, row := range rows {
 		actorRefs[i] = row.actorRef
+		portNumbers[i] = nullableSNMPTopologyV1PortNumber(row.values)
 		ifIndexes[i] = nullableUintValue(row.values["if_index"])
 		portIDs[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["port_id"]))
-		names[i] = nullableStringRef(stringsDict, firstNonEmptyString(
+		portName := firstNonEmptyString(
 			topologyV1ScalarLabelValue(row.values["name"]),
 			topologyV1ScalarLabelValue(row.values["if_name"]),
 			topologyV1ScalarLabelValue(row.values["port_name"]),
 			topologyV1ScalarLabelValue(row.values["port_id"]),
-		))
+		)
+		names[i] = nullableStringRef(stringsDict, portName)
 		ifNames[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["if_name"]))
 		ifDescrs[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["if_descr"]))
 		ifAliases[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["if_alias"]))
@@ -1413,6 +1531,10 @@ func buildSNMPTopologyV1ActorPortsTable(
 				neighborCounts[i] = uint64(len(values))
 			}
 		}
+		if summary, ok := snmpTopologyV1PortNeighborSummaryFor(row, portName, portNeighborSummaries); ok {
+			neighborActors[i] = summary.remoteActor
+			neighborPortNames[i] = nullableStringRef(stringsDict, summary.remotePortName)
+		}
 		neighbors[i] = nullableJSON(row.values["neighbors"])
 		vlans[i] = nullableJSON(row.values["vlans"])
 		extra[i] = nullableJSON(snmpTopologyV1ExtraPortValues(row.values))
@@ -1420,6 +1542,7 @@ func buildSNMPTopologyV1ActorPortsTable(
 
 	return topologyv1.MustTable(len(rows), snmpTopologyV1ActorPortsColumns(), []topologyv1.ColumnEncoding{
 		topologyv1.Values(actorRefs...),
+		topologyv1.Values(portNumbers...),
 		topologyv1.Values(ifIndexes...),
 		topologyv1.Values(portIDs...),
 		topologyv1.Values(names...),
@@ -1438,6 +1561,8 @@ func buildSNMPTopologyV1ActorPortsTable(
 		topologyv1.Values(fdbMACCounts...),
 		topologyv1.Values(linkCounts...),
 		topologyv1.Values(neighborCounts...),
+		topologyv1.Values(neighborActors...),
+		topologyv1.Values(neighborPortNames...),
 		topologyv1.Values(neighbors...),
 		topologyv1.Values(vlans...),
 		topologyv1.Values(extra...),
@@ -1543,30 +1668,33 @@ func (rows *snmpTopologyV1ActorPortLinkRows) table() topologyv1.Table {
 }
 
 var snmpTopologyV1ActorPortCanonicalKeys = map[string]struct{}{
-	"admin_status":    {},
-	"fdb_mac_count":   {},
-	"if_admin_status": {},
-	"if_alias":        {},
-	"if_descr":        {},
-	"if_index":        {},
-	"if_name":         {},
-	"if_oper_status":  {},
-	"if_type":         {},
-	"link_count":      {},
-	"link_mode":       {},
-	"mac":             {},
-	"name":            {},
-	"neighbor_count":  {},
-	"neighbors":       {},
-	"oper_status":     {},
-	"port_id":         {},
-	"port_name":       {},
-	"port_type":       {},
-	"speed":           {},
-	"stp_state":       {},
-	"topology_role":   {},
-	"vlan_ids":        {},
-	"vlans":           {},
+	"admin_status":       {},
+	"fdb_mac_count":      {},
+	"if_admin_status":    {},
+	"if_alias":           {},
+	"if_descr":           {},
+	"if_index":           {},
+	"if_name":            {},
+	"if_oper_status":     {},
+	"if_type":            {},
+	"link_count":         {},
+	"link_mode":          {},
+	"mac":                {},
+	"name":               {},
+	"neighbor_actor":     {},
+	"neighbor_count":     {},
+	"neighbor_port_name": {},
+	"neighbors":          {},
+	"oper_status":        {},
+	"port_id":            {},
+	"port_name":          {},
+	"port_number":        {},
+	"port_type":          {},
+	"speed":              {},
+	"stp_state":          {},
+	"topology_role":      {},
+	"vlan_ids":           {},
+	"vlans":              {},
 }
 
 func snmpTopologyV1ExtraPortValues(values map[string]any) map[string]any {
@@ -1774,6 +1902,21 @@ func nullableUintValue(value any) any {
 		return nil
 	}
 	return out
+}
+
+func nullableSNMPTopologyV1PortNumber(values map[string]any) any {
+	if value, ok := uintValue(values["port_number"]); ok {
+		return value
+	}
+	portID := strings.TrimSpace(topologyV1ScalarLabelValue(values["port_id"]))
+	if portID == "" {
+		return nil
+	}
+	value, err := strconv.ParseUint(portID, 10, 64)
+	if err != nil {
+		return nil
+	}
+	return value
 }
 
 func uintValue(value any) (uint64, bool) {

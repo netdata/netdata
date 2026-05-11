@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: implementation, documentation, and validation completed on 2026-05-11. This SOW is intentionally separate from network-connections and streaming modal work.
+Sub-state: regression repair, documentation updates, and validation completed on 2026-05-11.
 
 ## Requirements
 
@@ -381,9 +381,9 @@ Lessons:
 
 Follow-up mapping:
 
-- No deferred implementation work remains in this SOW. Future SNMP overlay work
-  for interface traffic/packets/errors/state remains covered by the existing
-  topology overlay refinement notes in the spec and developer guide.
+- No deferred implementation work remains in this SOW. Interface overlay work
+  for traffic/packets/errors/state is a separate topology overlay topic already
+  documented in the spec and developer guide.
 
 ## Outcome
 
@@ -406,3 +406,147 @@ None yet.
 None yet.
 
 Append regression entries here only after this SOW was completed or closed and later testing or use found broken behavior. Use a dated `## Regression - YYYY-MM-DD` heading at the end of the file. Never prepend regression content above the original SOW narrative.
+
+## Regression - 2026-05-11
+
+### What Broke
+
+- The SNMP device `Ports` section labels `if_index` as `Port ID`, which looks like
+  an invented/autoincrement port number. The user requirement is no synthetic
+  numbering anywhere. Real port numbers may be shown only when sourced from
+  canonical producer data.
+- The `Ports` expanded row does not show the neighboring actor as a clickable
+  actor link. The separate `Port Neighbors` section has clickable remote actors,
+  but the port-owned row must also expose the directly related neighbor.
+- Actor links in v1 modal tables were not clickable in the frontend because the
+  producer emits `actor_ref_label` projections with `actor_link` cells, while
+  the frontend projection engine returned labels instead of actor IDs for that
+  cell type.
+
+### Evidence
+
+- `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go` currently
+  emits the first `Ports` modal column as `if_index` with label `Port ID`.
+- `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go` currently
+  defines `actor_ports` without neighbor actor-ref columns, so the expanded
+  `Ports` view cannot link to the neighbor.
+- `cloud-frontend/src/domains/functions/topology/v1/buildModalSections.js`
+  projected `actor_ref_label` to a label string even when the declared cell type
+  was `actor_link`.
+
+### Root Cause
+
+- The SOW correctly made SNMP modals port-first, but it still reused SNMP
+  `ifIndex` as the visible port identity. `ifIndex` is useful technical
+  metadata, but it is not a physical/source port number and should not be
+  presented as `Port ID`.
+- Port inventory and port-neighbor rows were aligned in separate tables, but the
+  inventory table did not carry a compact derived neighbor actor reference for
+  the expanded row.
+- The frontend projection engine treated projection kind as the only source of
+  output shape. For `actor_link` cells, the renderer needs the actor ID, not the
+  already formatted actor label.
+
+### Repair Plan
+
+- Add a nullable `port_number` column to `actor_ports`. Populate it only from an
+  explicit numeric source field such as `port_number` or numeric `port_id`.
+  Never derive it from row order or `if_index`.
+- Rename the expanded `if_index` modal column to `SNMP ifIndex` and remove it
+  from the visible table columns.
+- Add compact nullable `neighbor_actor` and `neighbor_port_name` columns to
+  `actor_ports`, derived from the same graph-link endpoint facts used by
+  `actor_port_links`.
+- Show `Neighbor` as an expanded `actor_link` cell and `Neighbor Port` as an
+  expanded text cell in the `Ports` section.
+- Fix the frontend modal projection engine so `actor_ref_label` returns actor IDs
+  when the cell type is `actor_link`.
+
+### Validation Plan
+
+- Add/adjust SNMP topology tests proving:
+  - `port_number` is present and populated only from explicit source data;
+  - `if_index` remains available as expanded SNMP metadata;
+  - `neighbor_actor` and `neighbor_port_name` are derived from graph-link facts;
+  - the main `Ports` modal no longer labels `if_index` as `Port ID`.
+- Add frontend projection tests proving `actor_ref_label` + `actor_link` produces
+  actor IDs.
+- Run targeted Go and frontend tests plus schema validation and `git diff --check`.
+
+### Implementation
+
+- Added nullable `actor_ports.port_number`, populated only from explicit
+  `port_number` or numeric source `port_id`.
+- Kept SNMP `if_index` as expanded technical metadata labelled `SNMP ifIndex`,
+  not as visible `Port ID`.
+- Added nullable `actor_ports.neighbor_actor` and `neighbor_port_name`, derived
+  from graph-link endpoint facts so the expanded port row can link to the same
+  neighbor shown in `actor_port_links` when the port has one unambiguous remote
+  actor.
+- Fixed the frontend v1 modal projection engine so `actor_ref_label` returns
+  actor IDs for `actor_link` cells while keeping text/badge cells label-based.
+- Updated the topology developer guide, topology specs, and project topology
+  skill with the stricter SNMP port identity and expanded-row neighbor rules.
+
+### Validation
+
+Acceptance criteria evidence:
+
+- `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go` now emits
+  `port_number` as the visible first Ports column and `if_index` as expanded
+  `SNMP ifIndex`.
+- `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go` now emits
+  `neighbor_actor` and `neighbor_port_name` in `actor_ports`.
+- `cloud-frontend/src/domains/functions/topology/v1/buildModalSections.js`
+  now returns actor IDs for `actor_ref_label` projections when the cell is
+  `actor_link`.
+
+Tests or equivalent validation:
+
+- `cd src/go && go test -count=1 ./plugin/go.d/collector/snmp_topology ./pkg/topology/v1 ./tools/functions-validation/validate`
+- `yarn test src/domains/functions/topology/v1/buildModalSections.test.js --runInBand`
+- `sudo -n cmake --build build --target go.d.plugin -- -j2`
+- `git diff --check` in the Agent repository.
+- `git diff --check` in the frontend repository.
+
+Real-use evidence:
+
+- Built the local `go.d.plugin` target successfully. Browser inspection can be
+  repeated after the rebuilt Agent and UI are installed; no code change remains
+  blocked on that check.
+
+Reviewer findings:
+
+- External AI reviewers were not requested for this regression repair. The fix
+  is covered by targeted producer and frontend unit tests plus schema validation.
+
+Same-failure search:
+
+- Verified the repaired modal contract by searching for `Port ID`, `if_index`,
+  `actor_ports`, `neighbor_actor`, and `actor_ref_label` in the affected producer,
+  specs, skill, and frontend projection files.
+
+Artifact maintenance gate:
+
+- `AGENTS.md`: unchanged. No project-wide workflow rule changed.
+- Runtime project skills: updated `.agents/skills/project-create-topology/SKILL.md`
+  with stricter SNMP `port_number`, `if_index`, and expanded neighbor rules.
+- Specs: updated `.agents/sow/specs/topology-function-schema.md` and
+  `.agents/sow/specs/topology-modes-correlation-aggregation.md`.
+- End-user/operator docs: unchanged. This is developer-facing topology payload
+  composition, not an operator workflow.
+- End-user/operator skills: unchanged. No public/operator skill semantics
+  changed.
+- SOW lifecycle: reopened regression SOW moved back to `current/`, repaired,
+  then returned to `done/` with `Status: completed`.
+
+Follow-up mapping:
+
+- No new deferred implementation work remains in this SOW. Manual visual
+  polishing of topology layout remains outside this SNMP modal regression.
+
+### Regression Outcome
+
+Completed. SNMP Ports no longer display SNMP `ifIndex` as a synthetic-looking
+port number, expanded port rows can expose a clickable neighbor actor when link
+facts allow it, and frontend v1 actor-link cells navigate again.

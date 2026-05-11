@@ -1079,11 +1079,16 @@ Managed SNMP device actor modals are port-centric:
   device name, management IP, vendor, model, port counts, and LLDP/CDP counts
   in the modal identification area;
 - use `actor_ports` as the primary `Ports` section;
-- expose real port identity columns, including `if_index`, source `port_id`,
-  display `name`, `if_name`, `if_descr`, `if_alias`, MAC, speed, status, mode,
-  role, VLAN, FDB, link, and neighbor counts;
-- never invent numeric port IDs. Show `if_index` only when the producer knows
-  the actual SNMP interface index;
+- expose real port identity columns, including nullable `port_number` when a
+  real numeric source port is known, SNMP `if_index`, source `port_id`, display
+  `name`, `if_name`, `if_descr`, `if_alias`, MAC, speed, status, mode, role,
+  VLAN, FDB, link, and neighbor counts;
+- never invent numeric port IDs. Do not use row order or SNMP `if_index` as
+  `port_number`; `if_index` is SNMP technical metadata and should be labelled as
+  such;
+- include compact expanded-row neighbor columns such as nullable
+  `neighbor_actor` and `neighbor_port_name` when graph-link facts can align the
+  port to a remote actor;
 - use `actor_port_links` as the `Port Neighbors` section when device modal
   rows need remote actor/port/evidence details;
 - keep endpoint, segment, and custom actors on a generic graph-link `Links`
