@@ -755,10 +755,12 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
     }
 
     // Clear the queue flag only after the unlink, while still under the queue
-    // lock. A lockless reader that sees the queue flag set is guaranteed the
-    // page is still on this queue's list; once we clear the flag below, the
-    // page is also no longer on the list. This matches the re-validation
-    // pattern added to page_has_been_accessed by commit 2733e6fc60 (#21793).
+    // lock. This guarantees that "flag cleared" implies "page already unlinked",
+    // so a lockless reader observing "no longer on this queue" cannot race
+    // with an in-progress unlink. The reciprocal (flag set implies on the
+    // list) is intentionally not provided; readers that act on link pointers
+    // must re-validate under the queue lock, as commit 2733e6fc60 (#21793)
+    // does in page_has_been_accessed.
     page_flag_clear(page, q->flags);
 
     if(!having_lock)
@@ -1399,8 +1401,8 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     internal_fatal(entry->start_time_s < 0 || entry->end_time_s < 0,
                    "DBENGINE CACHE: timestamps are negative");
 
-    // Clamp before any read of entry->start_time_s / entry->end_time_s so the
-    // PGC_PAGE struct and the Judy index key are built from the same value.
+    // Clamp before the values are copied into the new PGC_PAGE and used as
+    // the Judy index key, so the struct and the index agree.
     if(unlikely(entry->start_time_s < 0))
         entry->start_time_s = 0;
 
