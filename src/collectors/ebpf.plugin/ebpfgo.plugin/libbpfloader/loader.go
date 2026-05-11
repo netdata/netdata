@@ -62,4 +62,9 @@ func (r *CachestatRuntime) Snapshot(mapsPerCore bool) (CachestatSnapshot, error)
 	return CachestatSnapshot{}, ErrDisabled
 }
 
+func (r *CachestatRuntime) SnapshotApps(mapsPerCore bool) ([]CachestatAppSnapshot, error) {
+	_ = mapsPerCore
+	return nil, ErrDisabled
+}
+
 func (r *CachestatRuntime) Close() {}

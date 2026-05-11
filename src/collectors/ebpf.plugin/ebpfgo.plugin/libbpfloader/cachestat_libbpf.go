@@ -13,6 +13,22 @@ struct netdata_ebpf_cachestat_snapshot {
     unsigned long long account_page_dirtied;
 };
 
+struct netdata_ebpf_cachestat_pid_snapshot {
+    unsigned int pid;
+    unsigned int ppid;
+    unsigned long long ct;
+    char comm[96];
+    unsigned int add_to_page_cache_lru;
+    unsigned int mark_page_accessed;
+    unsigned int account_page_dirtied;
+    unsigned int mark_buffer_dirty;
+};
+
+struct netdata_ebpf_cachestat_pid_snapshot_list {
+    struct netdata_ebpf_cachestat_pid_snapshot *items;
+    size_t count;
+};
+
 struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const char *path, int use_core);
 int netdata_cachestat_runtime_prepare(struct netdata_ebpf_cachestat_runtime *rt, unsigned int pid_table_size, int maps_per_core);
 int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt);
@@ -21,6 +37,11 @@ int netdata_cachestat_runtime_snapshot(
     struct netdata_ebpf_cachestat_runtime *rt,
     int maps_per_core,
     struct netdata_ebpf_cachestat_snapshot *out);
+int netdata_cachestat_runtime_snapshot_apps(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    int maps_per_core,
+    struct netdata_ebpf_cachestat_pid_snapshot_list *out);
+void netdata_cachestat_runtime_free_apps_snapshot(struct netdata_ebpf_cachestat_pid_snapshot_list *out);
 void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt);
 */
 import "C"
@@ -122,6 +143,46 @@ func (r *CachestatRuntime) Snapshot(mapsPerCore bool) (CachestatSnapshot, error)
 		AddToPageCacheLru:  uint64(cSnapshot.add_to_page_cache_lru),
 		AccountPageDirtied: uint64(cSnapshot.account_page_dirtied),
 	}, nil
+}
+
+func (r *CachestatRuntime) SnapshotApps(mapsPerCore bool) ([]CachestatAppSnapshot, error) {
+	if r == nil || r.ptr == nil {
+		return nil, ErrDisabled
+	}
+
+	var cList C.struct_netdata_ebpf_cachestat_pid_snapshot_list
+	cMapsPerCore := C.int(0)
+	if mapsPerCore {
+		cMapsPerCore = 1
+	}
+
+	if ret := C.netdata_cachestat_runtime_snapshot_apps(r.ptr, cMapsPerCore, &cList); ret != 0 {
+		return nil, fmt.Errorf("snapshot cachestat apps failed: %d", int(ret))
+	}
+	defer C.netdata_cachestat_runtime_free_apps_snapshot(&cList)
+
+	if cList.count == 0 || cList.items == nil {
+		return nil, nil
+	}
+
+	items := unsafe.Slice((*C.struct_netdata_ebpf_cachestat_pid_snapshot)(unsafe.Pointer(cList.items)), int(cList.count))
+	out := make([]CachestatAppSnapshot, 0, len(items))
+	for _, item := range items {
+		var comm [CachestatAppCommLen]byte
+		copy(comm[:], C.GoBytes(unsafe.Pointer(&item.comm[0]), C.int(CachestatAppCommLen)))
+		out = append(out, CachestatAppSnapshot{
+			Pid:                uint32(item.pid),
+			Ppid:               uint32(item.ppid),
+			Comm:               comm,
+			Ct:                 uint64(item.ct),
+			AddToPageCacheLru:  uint32(item.add_to_page_cache_lru),
+			MarkPageAccessed:   uint32(item.mark_page_accessed),
+			AccountPageDirtied: uint32(item.account_page_dirtied),
+			MarkBufferDirty:    uint32(item.mark_buffer_dirty),
+		})
+	}
+
+	return out, nil
 }
 
 func (r *CachestatRuntime) Close() {

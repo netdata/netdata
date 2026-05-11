@@ -212,6 +212,7 @@ func runCachestatGlobalCollector(handle *CachestatLegacyHandle, stop <-chan stru
 }
 
 func runCachestatPlugin(handle *CachestatLegacyHandle) {
+	store := NewCachestatSharedMemoryStore()
 	service := NewSharedSnapshotService(
 		"/var/run/netdata",
 		defaultSharedSnapshotServiceName,
@@ -234,7 +235,7 @@ func runCachestatPlugin(handle *CachestatLegacyHandle) {
 	if handle != nil && handle.Runtime != nil {
 		go func() {
 			defer close(doneCollector)
-			runCachestatGlobalCollector(handle, stop)
+			runCachestatSharedMemoryCollector(handle, stop, store)
 		}()
 	} else {
 		close(doneCollector)
