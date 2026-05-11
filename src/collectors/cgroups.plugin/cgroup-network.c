@@ -199,7 +199,7 @@ static void continue_as_child(void) {
     exit(EXIT_FAILURE);
 }
 
-int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
+int proc_pid_fd(const char *prefix, const char *ns, pid_t pid, ND_LOG_PRIORITY priority) {
     if(!prefix) prefix = "";
 
     char filename[FILENAME_MAX + 1];
@@ -207,7 +207,7 @@ int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
     int fd = open(filename, O_RDONLY | O_CLOEXEC);
 
     if(fd == -1)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open proc_pid_fd() file '%s'", filename);
+        nd_log(NDLS_COLLECTORS, priority, "Cannot open proc_pid_fd() file '%s'", filename);
 
     return fd;
 }
@@ -237,11 +237,14 @@ static int switch_namespace(const char *prefix, pid_t pid) {
     int root_fd = -1;
     int cwd_fd = -1;
 
-    for(i = 0; all_ns[i].name ; i++)
-        all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid);
+    for(i = 0; all_ns[i].name ; i++) {
+        // Only network namespace is mandatory; optional namespaces log warnings
+        ND_LOG_PRIORITY prio = (all_ns[i].nstype == CLONE_NEWNET) ? NDLP_ERR : NDLP_WARNING;
+        all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid, prio);
+    }
 
-    root_fd = proc_pid_fd(prefix, "root", pid);
-    cwd_fd  = proc_pid_fd(prefix, "cwd", pid);
+    root_fd = proc_pid_fd(prefix, "root", pid, NDLP_ERR);
+    cwd_fd  = proc_pid_fd(prefix, "cwd", pid, NDLP_ERR);
 
     // Verify we can access the network namespace fd
     // This is the only namespace critical for correct interface detection
