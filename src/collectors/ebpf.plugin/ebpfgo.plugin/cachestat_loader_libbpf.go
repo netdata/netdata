@@ -7,7 +7,7 @@ import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libb
 func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, error) {
 	plan := BuildCachestatLegacyPlan(cfg)
 
-	rt, err := libbpfloader.NewCachestatRuntime(plan.ObjectPath)
+	rt, err := libbpfloader.NewCachestatRuntime(plan.ObjectPath, plan.LoadMode == LoadCore)
 	if err != nil {
 		return nil, err
 	}

@@ -10,9 +10,42 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+/*
+ * The repo-local CO-RE bundle currently ships the skeleton wrapper but not the
+ * arena BPF-side state type header. Keep the shim size aligned with the
+ * generated skeleton so the Go collector can still build in this workspace.
+ */
+#ifndef NETDATA_CACHSTAT_ARENA_STATE_T_DEFINED
+struct netdata_cachestat_arena_state_t {
+    unsigned char __pad[49160];
+};
+#endif
+
+#include "cachestat.skel.h"
+#include "cachestat_buffer.skel.h"
+#include "cachestat_arena.skel.h"
+
+enum netdata_ebpf_cachestat_runtime_kind {
+    NETDATA_CACHESTAT_RUNTIME_LEGACY = 0,
+    NETDATA_CACHESTAT_RUNTIME_CORE = 1,
+};
+
+enum netdata_ebpf_cachestat_runtime_flavor {
+    NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE = 0,
+    NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER = 1,
+    NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA = 2,
+};
+
 struct netdata_ebpf_cachestat_runtime {
+    int kind;
+    int flavor;
     struct bpf_object *obj;
     struct bpf_link **links;
+    union {
+        struct cachestat_bpf *base;
+        struct cachestat_buffer_bpf *buffer;
+        struct cachestat_arena_bpf *arena;
+    } core;
 };
 
 struct netdata_ebpf_cachestat_snapshot {
@@ -22,8 +55,16 @@ struct netdata_ebpf_cachestat_snapshot {
     uint64_t account_page_dirtied;
 };
 
-static const char *cachestat_account_program_name(const char *account_function)
+static const char *cachestat_account_program_name(const char *account_function, int flavor)
 {
+    if (flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
+        if (!strcmp(account_function, "__folio_mark_dirty"))
+            return "netdata_folio_mark_dirty_buffer";
+        if (!strcmp(account_function, "__set_page_dirty"))
+            return "netdata_set_page_dirty_buffer";
+        return "netdata_account_page_dirtied_buffer";
+    }
+
     if (!strcmp(account_function, "__folio_mark_dirty"))
         return "netdata_folio_mark_dirty_kprobe";
     if (!strcmp(account_function, "__set_page_dirty"))
@@ -49,17 +90,20 @@ static void cachestat_disable_fentry_programs(struct bpf_object *obj)
     }
 }
 
-static void cachestat_prepare_autoload(struct bpf_object *obj, const char *account_function)
+static void cachestat_prepare_autoload(struct bpf_object *obj, const char *account_function, int flavor)
 {
     cachestat_disable_fentry_programs(obj);
     cachestat_disable_program_if_present(obj, "netdata_folio_mark_dirty_kprobe");
     cachestat_disable_program_if_present(obj, "netdata_set_page_dirty_kprobe");
     cachestat_disable_program_if_present(obj, "netdata_account_page_dirtied_kprobe");
+    cachestat_disable_program_if_present(obj, "netdata_folio_mark_dirty_buffer");
+    cachestat_disable_program_if_present(obj, "netdata_set_page_dirty_buffer");
+    cachestat_disable_program_if_present(obj, "netdata_account_page_dirtied_buffer");
 
     if (!account_function)
         account_function = "account_page_dirtied";
 
-    struct bpf_program *prog = bpf_object__find_program_by_name(obj, cachestat_account_program_name(account_function));
+    struct bpf_program *prog = bpf_object__find_program_by_name(obj, cachestat_account_program_name(account_function, flavor));
     if (prog)
         bpf_program__set_autoload(prog, true);
 }
@@ -125,33 +169,126 @@ static void cachestat_destroy_links(struct netdata_ebpf_cachestat_runtime *rt)
     rt->links = NULL;
 }
 
-struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open(const char *path)
+static int cachestat_runtime_flavor_from_path(const char *path)
 {
-    struct bpf_object *obj = bpf_object__open_file(path, NULL);
-    if (!obj || libbpf_get_error(obj)) {
-        if (obj && libbpf_get_error(obj))
-            bpf_object__close(obj);
+    if (!path)
+        return NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE;
+
+    if (strstr(path, "_arena."))
+        return NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA;
+
+    if (strstr(path, "_buffer."))
+        return NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER;
+
+    return NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE;
+}
+
+static struct bpf_object *cachestat_runtime_object(struct netdata_ebpf_cachestat_runtime *rt)
+{
+    if (!rt)
         return NULL;
+
+    if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
+        switch (rt->flavor) {
+        case NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER:
+            return rt->core.buffer ? rt->core.buffer->obj : NULL;
+        case NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA:
+            return rt->core.arena ? rt->core.arena->obj : NULL;
+        default:
+            return rt->core.base ? rt->core.base->obj : NULL;
+        }
     }
 
+    return rt->obj;
+}
+
+static int cachestat_runtime_load_core(struct netdata_ebpf_cachestat_runtime *rt)
+{
+    switch (rt->flavor) {
+    case NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER:
+        return cachestat_buffer_bpf__load(rt->core.buffer);
+    case NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA:
+        return cachestat_arena_bpf__load(rt->core.arena);
+    default:
+        return cachestat_bpf__load(rt->core.base);
+    }
+}
+
+static void cachestat_runtime_destroy_core(struct netdata_ebpf_cachestat_runtime *rt)
+{
+    if (!rt)
+        return;
+
+    switch (rt->flavor) {
+    case NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER:
+        if (rt->core.buffer)
+            cachestat_buffer_bpf__destroy(rt->core.buffer);
+        break;
+    case NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA:
+        if (rt->core.arena)
+            cachestat_arena_bpf__destroy(rt->core.arena);
+        break;
+    default:
+        if (rt->core.base)
+            cachestat_bpf__destroy(rt->core.base);
+        break;
+    }
+}
+
+struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const char *path, int use_core)
+{
     struct netdata_ebpf_cachestat_runtime *rt = calloc(1, sizeof(*rt));
     if (!rt) {
-        bpf_object__close(obj);
         return NULL;
     }
 
-    rt->obj = obj;
+    if (use_core) {
+        rt->kind = NETDATA_CACHESTAT_RUNTIME_CORE;
+        rt->flavor = cachestat_runtime_flavor_from_path(path);
+        switch (rt->flavor) {
+        case NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER:
+            rt->core.buffer = cachestat_buffer_bpf__open();
+            rt->obj = rt->core.buffer ? rt->core.buffer->obj : NULL;
+            break;
+        case NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA:
+            rt->core.arena = cachestat_arena_bpf__open();
+            rt->obj = rt->core.arena ? rt->core.arena->obj : NULL;
+            break;
+        default:
+            rt->core.base = cachestat_bpf__open();
+            rt->obj = rt->core.base ? rt->core.base->obj : NULL;
+            break;
+        }
+
+        if (!rt->obj || libbpf_get_error(rt->obj)) {
+            cachestat_runtime_destroy_core(rt);
+            free(rt);
+            return NULL;
+        }
+    } else {
+        struct bpf_object *obj = bpf_object__open_file(path, NULL);
+        if (!obj || libbpf_get_error(obj)) {
+            if (obj && libbpf_get_error(obj))
+                bpf_object__close(obj);
+            free(rt);
+            return NULL;
+        }
+
+        rt->obj = obj;
+    }
+
     return rt;
 }
 
 int netdata_cachestat_runtime_prepare(struct netdata_ebpf_cachestat_runtime *rt, unsigned int pid_table_size, int maps_per_core)
 {
-    if (!rt || !rt->obj)
+    struct bpf_object *obj = cachestat_runtime_object(rt);
+    if (!rt || !obj)
         return -1;
 
-    cachestat_prepare_autoload(rt->obj, NULL);
-    cachestat_update_map_types(rt->obj, maps_per_core);
-    cachestat_update_map_sizes(rt->obj, pid_table_size);
+    cachestat_prepare_autoload(obj, NULL, rt->flavor);
+    cachestat_update_map_types(obj, maps_per_core);
+    cachestat_update_map_sizes(obj, pid_table_size);
     return 0;
 }
 
@@ -160,12 +297,16 @@ int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
     if (!rt || !rt->obj)
         return -1;
 
+    if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE)
+        return cachestat_runtime_load_core(rt);
+
     return bpf_object__load(rt->obj);
 }
 
 int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *account_function)
 {
-    if (!rt || !rt->obj)
+    struct bpf_object *obj = cachestat_runtime_object(rt);
+    if (!rt || !obj)
         return -1;
 
     if (rt->links)
@@ -178,10 +319,21 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
     if (!rt->links)
         return -1;
 
-    rt->links[0] = cachestat_attach_program_by_name(rt->obj, "netdata_add_to_page_cache_lru_kprobe", "add_to_page_cache_lru");
-    rt->links[1] = cachestat_attach_program_by_name(rt->obj, "netdata_mark_page_accessed_kprobe", "mark_page_accessed");
-    rt->links[2] = cachestat_attach_program_by_name(rt->obj, cachestat_account_program_name(account_function), account_function);
-    rt->links[3] = cachestat_attach_program_by_name(rt->obj, "netdata_mark_buffer_dirty_kprobe", "mark_buffer_dirty");
+    const char *account_prog = cachestat_account_program_name(account_function, rt->flavor);
+    const char *add_prog = (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE && rt->flavor != NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE) ?
+                               "netdata_add_to_page_cache_lru_buffer" :
+                               "netdata_add_to_page_cache_lru_kprobe";
+    const char *access_prog = (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE && rt->flavor != NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE) ?
+                                  "netdata_mark_page_accessed_buffer" :
+                                  "netdata_mark_page_accessed_kprobe";
+    const char *dirty_prog = (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE && rt->flavor != NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE) ?
+                                 "netdata_mark_buffer_dirty_buffer" :
+                                 "netdata_mark_buffer_dirty_kprobe";
+
+    rt->links[0] = cachestat_attach_program_by_name(obj, add_prog, "add_to_page_cache_lru");
+    rt->links[1] = cachestat_attach_program_by_name(obj, access_prog, "mark_page_accessed");
+    rt->links[2] = cachestat_attach_program_by_name(obj, account_prog, account_function);
+    rt->links[3] = cachestat_attach_program_by_name(obj, dirty_prog, "mark_buffer_dirty");
 
     for (size_t i = 0; i < 4; i++) {
         if (!rt->links[i] || libbpf_get_error(rt->links[i])) {
@@ -201,7 +353,11 @@ int netdata_cachestat_runtime_snapshot(
     if (!rt || !rt->obj || !out)
         return -1;
 
-    struct bpf_map *map = bpf_object__find_map_by_name(rt->obj, "cstat_global");
+    struct bpf_object *obj = cachestat_runtime_object(rt);
+    if (!obj)
+        return -1;
+
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, "cstat_global");
     if (!map)
         return -1;
 
@@ -245,7 +401,9 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
         return;
 
     cachestat_destroy_links(rt);
-    if (rt->obj)
+    if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE)
+        cachestat_runtime_destroy_core(rt);
+    else if (rt->obj)
         bpf_object__close(rt->obj);
     free(rt);
 }

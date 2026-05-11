@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
@@ -10,6 +11,8 @@ import (
 
 const cachestatKernelMask uint32 = (1 << 12) - 1
 const cachestatDefaultPIDTableSize uint32 = 32768
+const cachestatDefaultBTFPath = "/sys/kernel/btf"
+const cachestatDefaultBTFFile = "vmlinux"
 
 type CachestatLegacyConfig struct {
 	PluginsDir      string
@@ -17,6 +20,7 @@ type CachestatLegacyConfig struct {
 	IsRHF           int
 	KernelVersion   uint32
 	IsDebian        bool
+	HasBTF          bool
 	PidTableSize    uint32
 	MapsPerCore     bool
 	AccountFunction string
@@ -41,7 +45,7 @@ func defaultPluginsDir() string {
 		return dir
 	}
 
-	return "/usr/libexec/netdata/plugins.d"
+	return filepath.Join(netdataRuntimePrefix, "usr/libexec/netdata/plugins.d")
 }
 
 func defaultCachestatLegacyConfig() CachestatLegacyConfig {
@@ -50,6 +54,7 @@ func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 		Kernels:         cachestatKernelMask,
 		IsRHF:           -1,
 		IsDebian:        IsDebianFlavor(),
+		HasBTF:          kernelBTFSupported(),
 		PidTableSize:    cachestatDefaultPIDTableSize,
 		MapsPerCore:     true,
 		AccountFunction: selectCachestatDirtyAccountFunction(),
@@ -86,11 +91,16 @@ func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
 		false,
 		true,
 		cfg.IsDebian,
-		false,
-		LoadLegacy,
+		cfg.HasBTF,
+		LoadCore,
 		"",
 		RunModeEntry,
 	)
+}
+
+func kernelBTFSupported() bool {
+	_, err := os.Stat(filepath.Join(cachestatDefaultBTFPath, cachestatDefaultBTFFile))
+	return err == nil
 }
 
 func selectCachestatDirtyAccountFunction() string {

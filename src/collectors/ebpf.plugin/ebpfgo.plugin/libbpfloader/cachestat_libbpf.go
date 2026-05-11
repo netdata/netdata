@@ -13,7 +13,7 @@ struct netdata_ebpf_cachestat_snapshot {
     unsigned long long account_page_dirtied;
 };
 
-struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open(const char *path);
+struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const char *path, int use_core);
 int netdata_cachestat_runtime_prepare(struct netdata_ebpf_cachestat_runtime *rt, unsigned int pid_table_size, int maps_per_core);
 int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt);
 int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *account_function);
@@ -40,11 +40,16 @@ type CachestatRuntimeConfig struct {
 	AccountFunction string
 }
 
-func NewCachestatRuntime(path string) (*CachestatRuntime, error) {
+func NewCachestatRuntime(path string, useCore bool) (*CachestatRuntime, error) {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
 
-	rt := C.netdata_cachestat_runtime_open(cpath)
+	cUseCore := C.int(0)
+	if useCore {
+		cUseCore = 1
+	}
+
+	rt := C.netdata_cachestat_runtime_open_mode(cpath, cUseCore)
 	if rt == nil {
 		return nil, fmt.Errorf("open cachestat object %q failed", path)
 	}

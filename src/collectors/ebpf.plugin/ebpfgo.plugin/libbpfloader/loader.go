@@ -36,8 +36,9 @@ func IsFunctionInsideBTF(file *BTF, function string) (bool, error) {
 	return false, ErrDisabled
 }
 
-func NewCachestatRuntime(path string) (*CachestatRuntime, error) {
+func NewCachestatRuntime(path string, useCore bool) (*CachestatRuntime, error) {
 	_ = path
+	_ = useCore
 	return nil, ErrDisabled
 }
 

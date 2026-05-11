@@ -64,6 +64,7 @@ const (
 
 var kernelReleaseRe = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)`)
 var redHatReleaseRe = regexp.MustCompile(`([0-9]+)\.([0-9]+)`)
+var netdataRuntimePrefix = "/opt/netdata"
 
 func KernelVersionFromRelease(release string) (uint32, error) {
 	release = strings.TrimSpace(release)

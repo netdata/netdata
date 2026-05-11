@@ -129,9 +129,10 @@ func TestSelectHelpers(t *testing.T) {
 				t.Fatalf("SelectIndex() = %d, want %d", gotIdx, tc.wantIdx)
 			}
 
-			got := BuildObjectPath("/opt/netdata/plugins.d", gotIdx, "process", false, tc.isRHF)
-			if got != "/opt/netdata/plugins.d/ebpf.d/"+tc.wantObj {
-				t.Fatalf("BuildObjectPath() = %q, want %q", got, "/opt/netdata/plugins.d/ebpf.d/"+tc.wantObj)
+			got := BuildObjectPath(defaultPluginsDir(), gotIdx, "process", false, tc.isRHF)
+			want := filepath.Join(defaultPluginsDir(), "ebpf.d", tc.wantObj)
+			if got != want {
+				t.Fatalf("BuildObjectPath() = %q, want %q", got, want)
 			}
 		})
 	}
@@ -225,7 +226,7 @@ func TestBuildLoadPlan(t *testing.T) {
 				IsRHF:         -1,
 				Selector:      10,
 				Flavor:        ObjectFlavorBase,
-				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process.6.8.o",
+				ObjectPath:    "pnetdata_ebpf_process.6.8.o",
 				LoadMode:      LoadCore,
 				ProgramMode:   LoadProbe,
 			},
@@ -247,7 +248,7 @@ func TestBuildLoadPlan(t *testing.T) {
 				IsRHF:         -1,
 				Selector:      10,
 				Flavor:        ObjectFlavorBuffer,
-				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process_buffer.6.8.o",
+				ObjectPath:    "pnetdata_ebpf_process_buffer.6.8.o",
 				LoadMode:      LoadCore,
 				ProgramMode:   LoadProbe,
 			},
@@ -269,7 +270,7 @@ func TestBuildLoadPlan(t *testing.T) {
 				IsRHF:         -1,
 				Selector:      11,
 				Flavor:        ObjectFlavorArena,
-				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process_arena.6.12.o",
+				ObjectPath:    "pnetdata_ebpf_process_arena.6.12.o",
 				LoadMode:      LoadCore,
 				ProgramMode:   LoadProbe,
 			},
@@ -291,7 +292,7 @@ func TestBuildLoadPlan(t *testing.T) {
 				IsRHF:         -1,
 				Selector:      11,
 				Flavor:        ObjectFlavorBuffer,
-				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process_buffer.6.12.o",
+				ObjectPath:    "pnetdata_ebpf_process_buffer.6.12.o",
 				LoadMode:      LoadCore,
 				ProgramMode:   LoadProbe,
 			},
@@ -313,7 +314,7 @@ func TestBuildLoadPlan(t *testing.T) {
 				IsRHF:         1,
 				Selector:      4,
 				Flavor:        ObjectFlavorBase,
-				ObjectPath:    "/opt/netdata/plugins.d/ebpf.d/rnetdata_ebpf_process.5.4.rhf.o",
+				ObjectPath:    "rnetdata_ebpf_process.5.4.rhf.o",
 				LoadMode:      LoadLegacy,
 				ProgramMode:   LoadTracepoint,
 			},
@@ -323,7 +324,7 @@ func TestBuildLoadPlan(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			got := BuildLoadPlan(
-				"/opt/netdata/plugins.d",
+				defaultPluginsDir(),
 				tc.kernels,
 				tc.isRHF,
 				tc.kver,
@@ -336,6 +337,8 @@ func TestBuildLoadPlan(t *testing.T) {
 				tc.coreAttach,
 				tc.mode,
 			)
+
+			tc.want.ObjectPath = filepath.Join(defaultPluginsDir(), "ebpf.d", tc.want.ObjectPath)
 
 			if got != tc.want {
 				t.Fatalf("BuildLoadPlan() = %#v, want %#v", got, tc.want)
