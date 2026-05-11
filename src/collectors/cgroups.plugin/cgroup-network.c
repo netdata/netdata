@@ -234,11 +234,26 @@ static struct ns {
 static int switch_namespace(const char *prefix, pid_t pid) {
 #ifdef HAVE_SETNS
     int i;
+    int root_fd = -1;
+    int cwd_fd = -1;
+
     for(i = 0; all_ns[i].name ; i++)
         all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid);
 
-    int root_fd = proc_pid_fd(prefix, "root", pid);
-    int cwd_fd  = proc_pid_fd(prefix, "cwd", pid);
+    root_fd = proc_pid_fd(prefix, "root", pid);
+    cwd_fd  = proc_pid_fd(prefix, "cwd", pid);
+
+    // Verify we can access the network namespace fd
+    // This is the only namespace critical for correct interface detection
+    for(i = 0; all_ns[i].name ; i++) {
+        if(all_ns[i].nstype == CLONE_NEWNET) {
+            if(all_ns[i].fd == -1) {
+                // proc_pid_fd() already logs the open failure
+                goto cleanup_and_fail;
+            }
+            break;
+        }
+    }
 
     setgroups(0, NULL);
 
@@ -255,9 +270,13 @@ static int switch_namespace(const char *prefix, pid_t pid) {
                 if(setns(all_ns[i].fd, all_ns[i].nstype) == -1) {
                     if(pass == 1) {
                         all_ns[i].status = 0;
-                        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                               "Cannot switch to %s namespace of pid %d",
-                               all_ns[i].name, (int) pid);
+                        // Only log critical namespace failures here;
+                        // non-critical failures are logged in the verification loop below
+                        if(all_ns[i].nstype == CLONE_NEWNET) {
+                            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                                   "Cannot switch to %s namespace of pid %d",
+                                   all_ns[i].name, (int) pid);
+                        }
                     }
                 }
                 else
@@ -274,11 +293,7 @@ static int switch_namespace(const char *prefix, pid_t pid) {
                 nd_log(NDLS_COLLECTORS, NDLP_ERR,
                        "Failed to switch to %s namespace of pid %d",
                        all_ns[i].name, (int) pid);
-                if(root_fd != -1) close(root_fd);
-                if(cwd_fd != -1) close(cwd_fd);
-                for(int j = 0; all_ns[j].name ; j++)
-                    if(all_ns[j].fd != -1) close(all_ns[j].fd);
-                return 1;
+                goto cleanup_and_fail;
             }
             // Mount/PID namespace failure is non-critical for network detection
             nd_log(NDLS_COLLECTORS, NDLP_WARNING,
@@ -293,36 +308,30 @@ static int switch_namespace(const char *prefix, pid_t pid) {
     if(root_fd != -1) {
         if(fchdir(root_fd) < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d root directory", (int)pid);
-            close(root_fd);
-            if(cwd_fd != -1) close(cwd_fd);
-            return 1;
+            goto cleanup_and_fail;
         }
 
         if(chroot(".") < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot chroot() to pid %d root directory", (int)pid);
-            close(root_fd);
-            if(cwd_fd != -1) close(cwd_fd);
-            return 1;
+            goto cleanup_and_fail;
         }
 
         if(chdir("/") < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot chdir() to / after chroot for pid %d", (int)pid);
-            close(root_fd);
-            if(cwd_fd != -1) close(cwd_fd);
-            return 1;
+            goto cleanup_and_fail;
         }
 
         close(root_fd);
+        root_fd = -1;
     }
 
     if(cwd_fd != -1) {
-        if(fchdir(cwd_fd) < 0) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d current working directory", (int)pid);
-            close(cwd_fd);
-            return 1;
-        }
-
+        // After chroot, cwd_fd may point outside the new root.
+        // This fchdir is not needed for network interface detection
+        // since all subsequent file access uses absolute paths.
+        // Skip it to avoid reintroducing a chroot escape.
         close(cwd_fd);
+        cwd_fd = -1;
     }
 
     int do_fork = 0;
@@ -334,12 +343,25 @@ static int switch_namespace(const char *prefix, pid_t pid) {
                 do_fork = 1;
 
             close(all_ns[i].fd);
+            all_ns[i].fd = -1;
         }
 
     if(do_fork)
         continue_as_child();
 
     return 0;
+
+cleanup_and_fail:
+    if(root_fd != -1) close(root_fd);
+    if(cwd_fd != -1) close(cwd_fd);
+    for(i = 0; all_ns[i].name ; i++) {
+        if(all_ns[i].fd != -1) {
+            close(all_ns[i].fd);
+            all_ns[i].fd = -1;
+        }
+        all_ns[i].status = -1;
+    }
+    return 1;
 
 #else
 
