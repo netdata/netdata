@@ -1073,6 +1073,35 @@ For SNMP/L2:
 - FDB/ARP/LLDP/CDP rows are evidence sections or actor inventory tables,
   depending on whether each row proves a relationship.
 
+Managed SNMP device actor modals are port-centric:
+
+- use `modal.labels.identification.fields[]` to show key device labels such as
+  device name, management IP, vendor, model, port counts, and LLDP/CDP counts
+  in the modal identification area;
+- use `actor_ports` as the primary `Ports` section;
+- expose real port identity columns, including `if_index`, source `port_id`,
+  display `name`, `if_name`, `if_descr`, `if_alias`, MAC, speed, status, mode,
+  role, VLAN, FDB, link, and neighbor counts;
+- never invent numeric port IDs. Show `if_index` only when the producer knows
+  the actual SNMP interface index;
+- use `actor_port_links` as the `Port Neighbors` section when device modal
+  rows need remote actor/port/evidence details;
+- keep endpoint, segment, and custom actors on a generic graph-link `Links`
+  section when they do not own port inventory.
+
+`actor_port_links` is an actor-owned modal index over existing graph links and
+evidence. It may duplicate compact references and side-specific port facts so
+the UI can show a device's local port next to its remote actor, but it must not
+duplicate raw LLDP/CDP/FDB/ARP/STP evidence JSON. Every row should include the
+selected actor, link reference, remote actor, local `if_index`, local port name,
+remote port facts, protocol, link type, state, evidence count, confidence,
+inference, attachment mode, and timestamps when known.
+
+SNMP endpoint port names must come only from real port fields: `port_name`,
+`if_name`, `if_descr`, or source `port_id`. Do not fall back to actor labels
+such as `display_name` or `sys_name`; those belong in actor labels, not in
+local/remote port cells.
+
 SNMP interface traffic, packets, errors, and state should use overlay
 templates with compact refs to node/context/label selectors.
 

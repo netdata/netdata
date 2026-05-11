@@ -257,6 +257,31 @@ For socket correlation:
   aggregation;
 - `correlated_socket` is the farthest output link type after exact absorption.
 
+## SNMP/L2 Modal Rules
+
+For SNMP/L2 managed device actor modals:
+
+- Treat the device as a collection of ports. The primary section is `Ports`
+  over `actor_ports`.
+- Put important device facts in `modal.labels.identification.fields[]`, backed
+  by `actor_labels`. Typical keys are display name, management IP, vendor,
+  model, port counts, and LLDP/CDP neighbor counts.
+- Expose real port identity as typed `actor_ports` columns: `if_index`,
+  source `port_id`, display `name`, `if_name`, `if_descr`, `if_alias`, MAC,
+  speed, status, mode, role, VLAN, FDB, link, and neighbor counts.
+- Do not fabricate numeric port IDs. Show `if_index` only when it is the real
+  SNMP interface index.
+- Use an actor-owned `actor_port_links` modal index for `Port Neighbors` when
+  the device modal needs remote actor, remote port, link type, evidence count,
+  confidence, inference, attachment mode, or timestamps.
+- `actor_port_links` may carry compact side-specific refs and scalar facts, but
+  must not duplicate raw LLDP/CDP/FDB/ARP/STP evidence JSON.
+- Keep generic graph-link `Links` sections only for endpoint, segment, or
+  custom actors that do not own port inventory.
+- Build link endpoint port labels only from real port fields: `port_name`,
+  `if_name`, `if_descr`, or source `port_id`. Never use actor labels such as
+  `display_name` or `sys_name` as port-name fallbacks.
+
 ## Validation Checklist
 
 - JSON validates against the topology schema.

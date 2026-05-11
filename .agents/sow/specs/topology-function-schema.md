@@ -415,12 +415,33 @@ preserves actors, links, L2 observation evidence, actor metadata, and actor
 custom detail tables. Remaining SNMP refinement is to promote interface metric
 lookup fragments into first-class overlay templates/refs.
 
-SNMP modal composition must not depend on raw `actor_metadata` and endpoint JSON
-for polished UI. Important scalar/count summary values live in typed actor or
-actor-detail columns and are also available through `actor_labels`. Port
-inventory uses stable typed columns for normal table display. Nested neighbors,
-VLANs, unknown custom port attributes, and endpoint objects stay in expanded or
-debug sections unless a structured child table is defined.
+SNMP modal composition must be port-centric for managed device actors. A managed
+device modal uses actor-label identification for important device facts, a
+primary `Ports` section over `actor_ports`, and a `Port Neighbors` section over
+`actor_port_links`. Generic graph-link `Links` sections are reserved for
+endpoint, segment, or custom actors that do not own port inventory.
+
+SNMP `actor_ports` exposes real port identity and status as typed columns:
+`if_index`, source `port_id`, display `name`, `if_name`, `if_descr`,
+`if_alias`, MAC, speed, status, mode, role, VLAN, FDB, link, and neighbor
+counts. It must never fabricate numeric port IDs; `if_index` is present only
+when the producer knows the real value.
+
+SNMP `actor_port_links` is a compact actor-owned modal index over existing graph
+links and evidence. It has one row per incident actor side and carries the local
+`if_index`/port name, remote actor, remote port facts, protocol, link type,
+state, evidence count, confidence, inference, attachment mode, and timestamps.
+It exists so device modals can align neighbor rows with the same port identity
+shown in `actor_ports`; it is not a second copy of raw evidence.
+
+SNMP polished UI must not depend on raw `actor_metadata` and endpoint JSON.
+Important scalar/count summary values live in typed actor or actor-detail
+columns and are also available through `actor_labels`. Nested neighbors, VLANs,
+unknown custom port attributes, and endpoint objects stay in expanded or debug
+sections unless a structured child table is defined. Link endpoint port labels
+must come only from real port fields such as `port_name`, `if_name`,
+`if_descr`, or source `port_id`; actor labels such as `display_name` or
+`sys_name` must not be used as port-name fallbacks.
 
 `topology:streaming` now emits `netdata.topology.v1` directly from the C
 Function. It models streaming agents as compact actor rows, streaming/virtual/

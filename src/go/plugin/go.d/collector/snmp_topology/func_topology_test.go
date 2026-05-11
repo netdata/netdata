@@ -274,7 +274,14 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 				Tables: map[string][]map[string]any{
 					"ports": {
 						{
+							"if_index":       uint64(1),
+							"port_id":        "1",
 							"name":           "Gi0/1",
+							"if_name":        "Gi0/1",
+							"if_descr":       "GigabitEthernet0/1",
+							"if_alias":       "uplink to sw-b",
+							"mac":            "00:11:22:33:44:56",
+							"speed":          uint64(1000000000),
 							"neighbor_count": uint64(0),
 							"vlan_ids":       []int{10, 20},
 							"vendor_note":    "uplink",
@@ -324,10 +331,15 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
 				Src: topologyLinkEndpoint{
-					Attributes: map[string]any{"if_name": "Gi0/1", "if_index": uint64(0)},
+					Attributes: map[string]any{"if_name": "Gi0/1", "if_index": uint64(1), "port_id": "1"},
 				},
 				Dst: topologyLinkEndpoint{
-					Attributes: map[string]any{"if_name": "Gi0/2", "if_index": uint64(0)},
+					Attributes: map[string]any{"if_name": "Gi0/2", "if_index": uint64(2), "port_id": "2"},
+				},
+				Metrics: map[string]any{
+					"confidence":      "high",
+					"inference":       "observed",
+					"attachment_mode": "lldp",
 				},
 			},
 		},
@@ -338,6 +350,7 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	require.NoError(t, validateTopologyV1Data(payload))
 	require.NotNil(t, payload.Tables)
 	require.Contains(t, payload.Tables.Actor, "actor_ports")
+	require.Contains(t, payload.Tables.Actor, "actor_port_links")
 	require.Contains(t, payload.Tables.Actor, "actor_labels")
 	require.Contains(t, payload.Tables.Actor, "actor_metadata")
 	require.Contains(t, payload.Tables.Actor, "actor_custom_labels")
@@ -346,15 +359,43 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 
 	portTable := payload.Tables.Actor["actor_ports"].Table
 	assert.Equal(t, 1, portTable.Rows)
+	assert.Equal(t, "uint", topologyV1ColumnType(portTable, "if_index"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "port_id"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "if_name"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "if_descr"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "if_alias"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "mac"))
+	assert.Equal(t, "uint", topologyV1ColumnType(portTable, "speed"))
 	assert.Equal(t, "json", topologyV1ColumnType(portTable, "neighbors"))
 	assert.Equal(t, "json", topologyV1ColumnType(portTable, "vlans"))
 	assert.Equal(t, "json", topologyV1ColumnType(portTable, "extra"))
 	assert.Equal(t, []any{uint64(0), nil}, topologyV1ColumnValues(t, payload.Actors, "ports_total"))
 	assert.Equal(t, []any{nil, []any{"arp"}}, topologyV1ColumnValues(t, payload.Actors, "protocols"))
 	assert.Equal(t, []any{nil, nil}, topologyV1ColumnValues(t, payload.Actors, "capabilities"))
+	assert.Equal(t, []any{uint64(1)}, topologyV1ColumnValues(t, portTable, "if_index"))
+	assert.Equal(t, []string{"1"}, topologyV1StringColumnValues(t, payload, portTable, "port_id"))
+	assert.Equal(t, []string{"Gi0/1"}, topologyV1StringColumnValues(t, payload, portTable, "if_name"))
+	assert.Equal(t, []string{"GigabitEthernet0/1"}, topologyV1StringColumnValues(t, payload, portTable, "if_descr"))
+	assert.Equal(t, []string{"uplink to sw-b"}, topologyV1StringColumnValues(t, payload, portTable, "if_alias"))
+	assert.Equal(t, []string{"00:11:22:33:44:56"}, topologyV1StringColumnValues(t, payload, portTable, "mac"))
+	assert.Equal(t, []any{uint64(1000000000)}, topologyV1ColumnValues(t, portTable, "speed"))
 	assert.Equal(t, []any{[]any{"10", "20"}}, topologyV1ColumnValues(t, portTable, "vlan_ids"))
 	assert.Equal(t, []any{uint64(0)}, topologyV1ColumnValues(t, portTable, "neighbor_count"))
 	assert.Equal(t, []any{map[string]any{"vendor_note": "uplink"}}, topologyV1ColumnValues(t, portTable, "extra"))
+
+	portLinksTable := payload.Tables.Actor["actor_port_links"].Table
+	assert.Equal(t, 2, portLinksTable.Rows)
+	assert.Equal(t, "actor_ref", topologyV1ColumnType(portLinksTable, "actor"))
+	assert.Equal(t, "link_ref", topologyV1ColumnType(portLinksTable, "link"))
+	assert.Equal(t, "actor_ref", topologyV1ColumnType(portLinksTable, "remote_actor"))
+	assert.Equal(t, []any{0, 1}, topologyV1ColumnValues(t, portLinksTable, "actor"))
+	assert.Equal(t, []any{0, 0}, topologyV1ColumnValues(t, portLinksTable, "link"))
+	assert.Equal(t, []any{1, 0}, topologyV1ColumnValues(t, portLinksTable, "remote_actor"))
+	assert.Equal(t, []any{uint64(1), uint64(2)}, topologyV1ColumnValues(t, portLinksTable, "if_index"))
+	assert.Equal(t, []any{uint64(2), uint64(1)}, topologyV1ColumnValues(t, portLinksTable, "remote_if_index"))
+	assert.Equal(t, []string{"Gi0/1", "Gi0/2"}, topologyV1StringColumnValues(t, payload, portLinksTable, "port_name"))
+	assert.Equal(t, []string{"Gi0/2", "Gi0/1"}, topologyV1StringColumnValues(t, payload, portLinksTable, "remote_port_name"))
+	assert.Equal(t, []string{"high", "high"}, topologyV1StringColumnValues(t, payload, portLinksTable, "confidence"))
 
 	labelTable := payload.Tables.Actor["actor_labels"].Table
 	assert.GreaterOrEqual(t, labelTable.Rows, 2)
@@ -373,26 +414,76 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "confidence"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "inference"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "attachment_mode"))
-	assert.Equal(t, []any{uint64(0)}, topologyV1ColumnValues(t, evidenceTable, "src_if_index"))
-	assert.Equal(t, []any{uint64(0)}, topologyV1ColumnValues(t, evidenceTable, "dst_if_index"))
+	assert.Equal(t, []any{uint64(1)}, topologyV1ColumnValues(t, evidenceTable, "src_if_index"))
+	assert.Equal(t, []any{uint64(2)}, topologyV1ColumnValues(t, evidenceTable, "dst_if_index"))
 
 	deviceType := payload.Types.ActorTypes["device"]
 	require.NotNil(t, deviceType.Presentation)
 	require.NotNil(t, deviceType.Presentation.Modal)
-	assert.NotEmpty(t, deviceType.Presentation.Modal.Sections)
+	require.NotNil(t, deviceType.Presentation.Modal.Labels)
+	require.NotNil(t, deviceType.Presentation.Modal.Labels.Identification)
+	assert.Equal(t, "management_ip", deviceType.Presentation.Modal.Labels.Identification.Fields[1].Key)
+	require.Len(t, deviceType.Presentation.Modal.Sections, 2)
+	assert.Equal(t, "ports", deviceType.Presentation.Modal.Sections[0].ID)
+	assert.Equal(t, "port_neighbors", deviceType.Presentation.Modal.Sections[1].ID)
+	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[1].Source.Kind)
+	assert.Equal(t, "actor_port_links", deviceType.Presentation.Modal.Sections[1].Source.Table)
 
-	linksSection := deviceType.Presentation.Modal.Sections[1]
-	assert.Equal(t, "links", linksSection.ID)
-	require.Len(t, linksSection.Columns, 7)
-	assert.Equal(t, "local_port", linksSection.Columns[1].ID)
-	assert.Equal(t, "selected_side_endpoint", linksSection.Columns[1].Projection.Kind)
-	assert.Equal(t, "src_actor", linksSection.Columns[1].Projection.SrcActorColumn)
-	assert.Equal(t, "dst_actor", linksSection.Columns[1].Projection.DstActorColumn)
-	assert.Equal(t, "src_port_name", linksSection.Columns[1].Projection.LocalPortColumn)
-	assert.Equal(t, "dst_port_name", linksSection.Columns[1].Projection.RemotePortColumn)
-	assert.Equal(t, "remote_port", linksSection.Columns[2].ID)
-	assert.Equal(t, "dst_port_name", linksSection.Columns[2].Projection.LocalPortColumn)
-	assert.Equal(t, "src_port_name", linksSection.Columns[2].Projection.RemotePortColumn)
+	endpointType := payload.Types.ActorTypes["endpoint"]
+	require.NotNil(t, endpointType.Presentation)
+	require.NotNil(t, endpointType.Presentation.Modal)
+	require.Len(t, endpointType.Presentation.Modal.Sections, 1)
+	assert.Equal(t, "links", endpointType.Presentation.Modal.Sections[0].ID)
+	assert.Equal(t, "selected_side_endpoint", endpointType.Presentation.Modal.Sections[0].Columns[1].Projection.Kind)
+}
+
+func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
+	data := topologyData{
+		AgentID: "agent-test",
+		View:    "summary",
+		Actors: []topologyActor{
+			{
+				ActorID:   "device-a",
+				ActorType: "device",
+				Match: topologyMatch{
+					SysName: "sw-a",
+				},
+			},
+			{
+				ActorID:   "device-b",
+				ActorType: "device",
+				Match: topologyMatch{
+					SysName: "sw-b",
+				},
+			},
+		},
+		Links: []topologyLink{
+			{
+				Protocol:   "lldp",
+				LinkType:   "lldp",
+				SrcActorID: "device-a",
+				DstActorID: "device-b",
+				Src: topologyLinkEndpoint{
+					Attributes: map[string]any{"display_name": "10.0.0.10"},
+				},
+				Dst: topologyLinkEndpoint{
+					Attributes: map[string]any{"sys_name": "sw-b"},
+				},
+			},
+		},
+	}
+
+	payload, err := snmpTopologyToV1(data)
+	require.NoError(t, err)
+	require.NoError(t, validateTopologyV1Data(payload))
+
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, payload.Links, "src_port_name"))
+	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, payload.Links, "dst_port_name"))
+
+	require.NotNil(t, payload.Tables)
+	portLinksTable := payload.Tables.Actor["actor_port_links"].Table
+	assert.Equal(t, []any{nil, nil}, topologyV1ColumnValues(t, portLinksTable, "port_name"))
+	assert.Equal(t, []any{nil, nil}, topologyV1ColumnValues(t, portLinksTable, "remote_port_name"))
 }
 
 func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
