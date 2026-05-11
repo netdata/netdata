@@ -1394,6 +1394,14 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     internal_fatal(entry->start_time_s < 0 || entry->end_time_s < 0,
                    "DBENGINE CACHE: timestamps are negative");
 
+    // Clamp before any read of entry->start_time_s / entry->end_time_s so the
+    // PGC_PAGE struct and the Judy index key are built from the same value.
+    if(unlikely(entry->start_time_s < 0))
+        entry->start_time_s = 0;
+
+    if(unlikely(entry->end_time_s < 0))
+        entry->end_time_s = 0;
+
     p2_add_fetch(&cache->stats.p2_workers_add, 1);
 
     size_t partition = pgc_indexing_partition(cache, entry->metric_id);
@@ -1403,7 +1411,7 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 #else
     PGC_PAGE *allocation = mallocz(sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page);
 #endif
-    
+
     allocation->refcount = 1;
     allocation->accesses = (entry->hot) ? 0 : 1;
     allocation->flags = 0;
@@ -1417,22 +1425,16 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     spinlock_init(&allocation->transition_spinlock);
     allocation->link.prev = NULL;
     allocation->link.next = NULL;
-    
+
     if(cache->config.additional_bytes_per_page) {
         if(entry->custom_data)
             memcpy(allocation->custom_data, entry->custom_data, cache->config.additional_bytes_per_page);
         else
             memset(allocation->custom_data, 0, cache->config.additional_bytes_per_page);
     }
-    
+
     PGC_PAGE *page;
     size_t spins = 0;
-
-    if(unlikely(entry->start_time_s < 0))
-        entry->start_time_s = 0;
-
-    if(unlikely(entry->end_time_s < 0))
-        entry->end_time_s = 0;
 
     do {
         spins++;
