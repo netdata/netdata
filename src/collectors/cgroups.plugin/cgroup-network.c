@@ -235,7 +235,6 @@ static int switch_namespace(const char *prefix, pid_t pid) {
 #ifdef HAVE_SETNS
     int i;
     int root_fd = -1;
-    int cwd_fd = -1;
 
     for(i = 0; all_ns[i].name ; i++) {
         // Only network namespace is mandatory; optional namespaces log warnings
@@ -244,7 +243,6 @@ static int switch_namespace(const char *prefix, pid_t pid) {
     }
 
     root_fd = proc_pid_fd(prefix, "root", pid, NDLP_ERR);
-    cwd_fd  = proc_pid_fd(prefix, "cwd", pid, NDLP_ERR);
 
     // Verify we can access the network namespace fd
     // This is the only namespace critical for correct interface detection
@@ -328,15 +326,6 @@ static int switch_namespace(const char *prefix, pid_t pid) {
         root_fd = -1;
     }
 
-    if(cwd_fd != -1) {
-        // After chroot, cwd_fd may point outside the new root.
-        // This fchdir is not needed for network interface detection
-        // since all subsequent file access uses absolute paths.
-        // Skip it to avoid reintroducing a chroot escape.
-        close(cwd_fd);
-        cwd_fd = -1;
-    }
-
     int do_fork = 0;
     for(i = 0; all_ns[i].name ; i++)
         if(all_ns[i].fd != -1) {
@@ -356,7 +345,6 @@ static int switch_namespace(const char *prefix, pid_t pid) {
 
 cleanup_and_fail:
     if(root_fd != -1) close(root_fd);
-    if(cwd_fd != -1) close(cwd_fd);
     for(i = 0; all_ns[i].name ; i++) {
         if(all_ns[i].fd != -1) {
             close(all_ns[i].fd);
