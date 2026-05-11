@@ -16,6 +16,9 @@ backend, frontend, producer, and aggregator changes.
   adapter during Agent rollout.
 - Production payloads carry canonical topology facts, not reconstruction
   instructions for compatibility payloads.
+- Actor/link modals are composed from schema-declared recipes over existing
+  actors, links, evidence, detail tables, and actor labels. Production payloads
+  must not duplicate high-cardinality rows only for modal display.
 - Test-only reconstruction/projection code may derive older shapes to prove
   information parity, but that code must not affect production payloads.
 - Raw payload captures from real systems stay under `.local/` and are never
@@ -87,6 +90,9 @@ Likely homes:
   graph-presentation metadata inside type definitions plus `data.presentation`.
   Actor modal socket lists must be derived from evidence by the Cloud
   frontend/aggregator during rollout.
+- modal-composition producer work now emits `actor_labels`, process
+  `username`, process `cmdline`, self `local_ip_count`, socket-port inventory,
+  and modal recipes. Remaining work is integrated UI/aggregator QA.
 
 `topology:streaming`:
 
@@ -103,8 +109,11 @@ Likely homes:
 - streaming, virtual, and stale links have explicit directed link-type metadata
   and separate evidence type ids at
   `src/web/api/functions/function-topology-streaming.c:1226`;
-- remaining streaming work is parity/UX validation with the Cloud frontend and
-  Cloud aggregator once those parallel workers are ready.
+- modal-composition producer work now emits `actor_labels`, complete host labels
+  where available, host/system metadata labels, OS/architecture/CPU fields, link
+  metric columns, and modal recipes. Remaining streaming work is parity/UX
+  validation with the Cloud frontend and Cloud aggregator once those parallel
+  workers are ready.
 
 `topology:snmp`:
 
@@ -276,8 +285,11 @@ Current state:
 - the adapter emits compact actor, link, evidence, actor metadata, and
   actor-detail tables and preserves nested custom actor cells with `json`
   columns where needed;
-- remaining SNMP work is to migrate metric lookup fragments into first-class
-  overlay templates/refs instead of only preserving them in actor/detail data.
+- modal-composition producer work now emits `actor_labels`, promoted
+  scalar/count actor fields, stable `actor_ports` rows, structured endpoint
+  evidence, and modal recipes. Remaining SNMP work is to migrate metric lookup
+  fragments into first-class overlay templates/refs instead of only preserving
+  them in actor/detail data, plus integrated UI/aggregator QA.
 
 ### vSphere Topology
 
@@ -308,6 +320,10 @@ Required changes:
 - build graph edges from the links table;
 - derive actor drilldown relationship tables from evidence rows;
 - render actor custom tables from typed actor-detail tables;
+- decode and execute `presentation.modal` recipes for actor/link modals;
+- render `actor_labels` as actor labels instead of raw metadata JSON;
+- reuse existing topology modal/table components where practical, extending
+  them for v1 projections rather than building a separate v1 table stack;
 - use link type direction metadata to decide whether links are directed,
   undirected, hierarchical, or observation-only;
 - use overlay templates and refs for metric refreshes;
@@ -329,6 +345,9 @@ Frontend risks:
   thread; use streaming, workers, or chunked decode if needed;
 - mixed Agent versions need clear adapter selection;
 - actor modal tables must not duplicate evidence in memory unnecessarily.
+- v1 actor modals can regress visually if they bypass the existing table,
+  port-table, labels, and navigation components. Component reuse is part of the
+  frontend migration, not just a cleanup preference.
 
 ## Cloud Aggregator Scope
 
@@ -357,6 +376,8 @@ topology kinds.
     aggregator internal states;
   - preserved or counted evidence rows according to schema policy;
   - merged detail tables according to table type policy;
+  - preserved and remapped modal/table presentation recipes;
+  - merged actor labels according to actor table policy;
   - merged overlay refs according to overlay template policy;
   - stats describing input rows, output rows, evidence rows, and drops/errors.
 
@@ -387,6 +408,13 @@ Required behavior:
   matches, emitting weak semantic correlation links for visible partial matches;
 - preserve evidence rows when evidence policy is `preserve`;
 - count evidence rows when evidence policy is `count`;
+- preserve modal composition definitions and rewrite their type, table,
+  evidence, and column references after namespacing/deduplication;
+- do not materialize modal rows during aggregation unless the underlying
+  canonical table is already being merged;
+- merge `actor_labels` after actor reference remapping and preserve repeated
+  values as repeated rows; `string` and `string_ref` label columns are
+  equivalent logical strings and must be normalized before label deduplication;
 - never silently truncate evidence;
 - fail explicitly when a requested payload would exceed configured limits;
 - canonicalize undirected links only when link type policy allows it;
@@ -434,6 +462,8 @@ Required test classes:
 - directed vs undirected link aggregation;
 - relationship evidence preservation;
 - actor-detail table aggregation;
+- actor-label table aggregation;
+- modal presentation recipe preservation and reference rewriting;
 - overlay ref merge;
 - network socket exact reverse-tuple matching;
 - streaming hierarchy and actor-detail custom tables;

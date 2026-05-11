@@ -63,6 +63,88 @@ func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 						Hover: &HoverPresentation{
 							Fields: []PresentationField{{Key: "name", Label: "Name"}},
 						},
+						Modal: &ModalPresentation{
+							Enabled: Bool(true),
+							Labels: &ModalLabelsPresentation{
+								Table:       "actor_labels",
+								ActorColumn: "actor",
+								KeyColumn:   "key",
+								ValueColumn: "value",
+							},
+							MiniTopology: &ModalMiniTopologyPresentation{
+								Enabled: Bool(true),
+								Depth:   1,
+							},
+							Sections: []ModalSection{
+								{
+									ID:    "ports",
+									Label: "Ports",
+									Source: ModalSource{
+										Kind:  "actor_table",
+										Table: "ports",
+									},
+									OwnerFilter: &ModalOwnerFilter{
+										Mode:        "actor_column",
+										ActorColumn: "actor",
+									},
+									Columns: []ModalColumn{
+										{
+											ID:    "neighbors",
+											Label: "Neighbors",
+											Projection: ModalProjection{
+												Kind:   "direct",
+												Column: "neighbors",
+											},
+											Cell:       "debug_json",
+											Visibility: "debug",
+										},
+									},
+								},
+								{
+									ID:    "paths",
+									Label: "Paths",
+									Source: ModalSource{
+										Kind:  "actor_table",
+										Table: "path",
+									},
+									OwnerFilter: &ModalOwnerFilter{
+										Mode:        "actor_column",
+										ActorColumn: "actor",
+									},
+									Columns: []ModalColumn{
+										{
+											ID:    "path_actor",
+											Label: "Path actor",
+											Projection: ModalProjection{
+												Kind:        "actor_ref_label",
+												ActorColumn: "path_actor",
+											},
+											Cell: "actor_link",
+										},
+										{
+											ID:    "path_index",
+											Label: "Hop",
+											Projection: ModalProjection{
+												Kind:   "direct",
+												Column: "path_index",
+											},
+											Cell: "number",
+										},
+										{
+											ID:    "source",
+											Label: "Source",
+											Projection: ModalProjection{
+												Kind:  "const",
+												Value: "test",
+											},
+											Cell:       "text",
+											Visibility: "expanded",
+										},
+									},
+									Sort: &ModalSort{Column: "path_index", Direction: "asc"},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -106,6 +188,19 @@ func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 				},
 			},
 			TableTypes: map[string]TableType{
+				"actor_labels": {
+					Role:        "actor_inventory",
+					Owner:       "actor",
+					Aggregation: "set",
+					Columns: []Column{
+						NewColumn("actor", "actor_ref"),
+						NewColumn("key", "string"),
+						NewColumn("value", "string"),
+						NewColumn("source", "string", WithNullable()),
+						NewColumn("kind", "string", WithNullable()),
+						NewColumn("value_index", "uint", WithNullable()),
+					},
+				},
 				"port_detail": {
 					Role:        "actor_detail",
 					Owner:       "actor",
@@ -217,6 +312,27 @@ func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 		),
 		Tables: &DetailTables{
 			Actor: map[string]DetailTable{
+				"actor_labels": {
+					Type: "actor_labels",
+					Table: MustTable(1,
+						[]Column{
+							NewColumn("actor", "actor_ref"),
+							NewColumn("key", "string"),
+							NewColumn("value", "string"),
+							NewColumn("source", "string", WithNullable()),
+							NewColumn("kind", "string", WithNullable()),
+							NewColumn("value_index", "uint", WithNullable()),
+						},
+						[]ColumnEncoding{
+							Values(0),
+							Const("hostname"),
+							Values("node-a"),
+							Const("producer"),
+							Const("identity"),
+							Values(nil),
+						},
+					),
+				},
 				"ports": {
 					Type: "port_detail",
 					Table: MustTable(1,
@@ -454,6 +570,878 @@ func TestValidateDecodedResponseRejectsMissingPortSourceTable(t *testing.T) {
 	assert.Contains(t, err.Error(), "references unknown actor table")
 }
 
+func TestValidateDecodedResponseRejectsMissingModalActorTable(t *testing.T) {
+	payload := NewResponse(Data{
+		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
+		CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
+		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
+		Types: TypeRegistry{
+			ActorTypes: map[string]ActorType{
+				"node": {
+					Layer:    "node",
+					Identity: []string{"id"},
+					Presentation: &ActorPresentation{
+						Modal: &ModalPresentation{
+							Sections: []ModalSection{
+								{
+									ID:    "missing",
+									Label: "Missing",
+									Source: ModalSource{
+										Kind:  "actor_table",
+										Table: "missing_table",
+									},
+									Columns: []ModalColumn{
+										{
+											ID:    "name",
+											Label: "Name",
+											Projection: ModalProjection{
+												Kind:   "direct",
+												Column: "name",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			LinkTypes: map[string]LinkType{
+				"dependency": {
+					Orientation:   "directed",
+					DirectionRole: "dependency",
+					Aggregation:   LinkAggregation{Direction: "preserve"},
+				},
+			},
+		},
+		Actors: MustTable(1,
+			[]Column{
+				NewColumn("id", "string", WithRole("identity")),
+				NewColumn("type", "string"),
+				NewColumn("name", "string_ref", WithDictionary("strings")),
+			},
+			[]ColumnEncoding{
+				Values("node-a"),
+				Const("node"),
+				Values(0),
+			},
+		),
+		Links: MustTable(0,
+			[]Column{
+				NewColumn("src", "actor_ref"),
+				NewColumn("dst", "actor_ref"),
+				NewColumn("type", "string"),
+			},
+			[]ColumnEncoding{
+				Const(0),
+				Const(0),
+				Const("dependency"),
+			},
+		),
+	})
+
+	payloadBytes, err := json.Marshal(payload)
+	require.NoError(t, err)
+	var decoded any
+	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+
+	err = ValidateDecodedResponse(decoded)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "modal.sections[0].source.table references unknown actor table")
+}
+
+func TestValidateDecodedResponseRejectsInvalidModalProjectionShapes(t *testing.T) {
+	cases := map[string]struct {
+		projection ModalProjection
+		want       string
+	}{
+		"direct missing column": {
+			projection: ModalProjection{Kind: "direct"},
+			want:       "column is required",
+		},
+		"actor label missing actor column": {
+			projection: ModalProjection{Kind: "actor_ref_label"},
+			want:       "actor_column is required",
+		},
+		"opposite actor missing actor columns": {
+			projection: ModalProjection{Kind: "opposite_actor"},
+			want:       "src_actor_column is required",
+		},
+		"const missing value": {
+			projection: ModalProjection{Kind: "const"},
+			want:       "value is required when kind is const",
+		},
+		"selected endpoint missing local side": {
+			projection: ModalProjection{Kind: "selected_side_endpoint", SrcActorColumn: "src", DstActorColumn: "dst", RemoteIPColumn: "remote_ip"},
+			want:       "requires local_ip_column or local_port_column",
+		},
+		"selected endpoint missing remote side": {
+			projection: ModalProjection{Kind: "selected_side_endpoint", SrcActorColumn: "src", DstActorColumn: "dst", LocalIPColumn: "local_ip"},
+			want:       "requires remote_ip_column or remote_port_column",
+		},
+		"selected endpoint empty local side": {
+			projection: ModalProjection{Kind: "selected_side_endpoint", SrcActorColumn: "src", DstActorColumn: "dst", LocalIPColumn: "", RemoteIPColumn: "remote_ip"},
+			want:       "requires local_ip_column or local_port_column",
+		},
+		"selected endpoint missing side actor columns": {
+			projection: ModalProjection{Kind: "selected_side_endpoint", LocalIPColumn: "local_ip", RemoteIPColumn: "remote_ip"},
+			want:       "src_actor_column is required",
+		},
+		"label lookup missing key": {
+			projection: ModalProjection{Kind: "label_lookup", ActorColumn: "src"},
+			want:       "label_key is required when kind is label_lookup",
+		},
+		"json path missing path": {
+			projection: ModalProjection{Kind: "json_path", Column: "metadata"},
+			want:       "path is required when kind is json_path",
+		},
+		"json path missing column": {
+			projection: ModalProjection{Kind: "json_path", Path: "$.state"},
+			want:       "column is required",
+		},
+		"coalesce missing columns": {
+			projection: ModalProjection{Kind: "coalesce"},
+			want:       "columns is required when kind is coalesce",
+		},
+		"formatted endpoint missing endpoint columns": {
+			projection: ModalProjection{Kind: "formatted_endpoint", ProtocolColumn: "type"},
+			want:       "requires ip_column or port_column",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			payload := NewResponse(Data{
+				Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
+				CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
+				Dictionaries: Dictionaries{"strings": StringValues("node-a")},
+				Types: TypeRegistry{
+					ActorTypes: map[string]ActorType{
+						"node": {
+							Layer:    "node",
+							Identity: []string{"id"},
+							Presentation: &ActorPresentation{
+								Modal: &ModalPresentation{
+									Sections: []ModalSection{
+										{
+											ID:     "links",
+											Label:  "Links",
+											Source: ModalSource{Kind: "links"},
+											Columns: []ModalColumn{
+												{
+													ID:         "endpoint",
+													Label:      "Endpoint",
+													Projection: tc.projection,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					LinkTypes: map[string]LinkType{
+						"dependency": {
+							Orientation:   "directed",
+							DirectionRole: "dependency",
+							Aggregation:   LinkAggregation{Direction: "preserve"},
+						},
+					},
+				},
+				Actors: MustTable(1,
+					[]Column{
+						NewColumn("id", "string", WithRole("identity")),
+						NewColumn("type", "string"),
+					},
+					[]ColumnEncoding{
+						Values("node-a"),
+						Const("node"),
+					},
+				),
+				Links: MustTable(1,
+					[]Column{
+						NewColumn("src", "actor_ref"),
+						NewColumn("dst", "actor_ref"),
+						NewColumn("type", "string"),
+						NewColumn("local_ip", "string", WithNullable()),
+						NewColumn("remote_ip", "string", WithNullable()),
+						NewColumn("metadata", "json", WithNullable()),
+					},
+					[]ColumnEncoding{
+						Const(0),
+						Const(0),
+						Const("dependency"),
+						Values("10.0.0.1"),
+						Values("10.0.0.2"),
+						Values(map[string]any{"state": "open"}),
+					},
+				),
+			})
+
+			payloadBytes, err := json.Marshal(payload)
+			require.NoError(t, err)
+			require.Error(t, topologySchemaValidationError(t, payloadBytes))
+
+			var decoded any
+			require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+
+			err = ValidateDecodedResponse(decoded)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestValidateDecodedResponseRejectsInvalidModalPresentationSemantics(t *testing.T) {
+	basePayload := func(actorPresentation map[string]any) map[string]any {
+		return map[string]any{
+			"status": float64(200),
+			"type":   "topology",
+			"data": map[string]any{
+				"schema_version": SchemaVersion,
+				"dictionaries":   map[string]any{},
+				"types": map[string]any{
+					"actor_types": map[string]any{
+						"node": map[string]any{
+							"layer":        "node",
+							"identity":     []any{"id"},
+							"presentation": actorPresentation,
+						},
+					},
+					"link_types": map[string]any{
+						"dependency": map[string]any{
+							"orientation":    "directed",
+							"direction_role": "dependency",
+							"aggregation":    map[string]any{"direction": "preserve"},
+						},
+					},
+					"port_types":  map[string]any{},
+					"table_types": map[string]any{},
+				},
+				"actors": map[string]any{
+					"rows": float64(1),
+					"columns": []any{
+						map[string]any{"id": "id", "type": "string", "role": "identity"},
+						map[string]any{"id": "type", "type": "string"},
+					},
+					"values": []any{
+						map[string]any{"codec": "const", "value": "node-a"},
+						map[string]any{"codec": "const", "value": "node"},
+					},
+				},
+				"links": map[string]any{
+					"rows": float64(1),
+					"columns": []any{
+						map[string]any{"id": "src", "type": "actor_ref"},
+						map[string]any{"id": "dst", "type": "actor_ref"},
+						map[string]any{"id": "type", "type": "string"},
+					},
+					"values": []any{
+						map[string]any{"codec": "const", "value": float64(0)},
+						map[string]any{"codec": "const", "value": float64(0)},
+						map[string]any{"codec": "const", "value": "dependency"},
+					},
+				},
+			},
+		}
+	}
+	validSection := func() map[string]any {
+		return map[string]any{
+			"id":     "links",
+			"label":  "Links",
+			"source": map[string]any{"kind": "links"},
+			"columns": []any{
+				map[string]any{
+					"id":         "type",
+					"label":      "Type",
+					"projection": map[string]any{"kind": "direct", "column": "type"},
+				},
+			},
+		}
+	}
+
+	cases := map[string]struct {
+		presentation map[string]any
+		want         string
+	}{
+		"empty actor type label": {
+			presentation: map[string]any{"label": ""},
+			want:         "presentation.label is required",
+		},
+		"mini topology non-integer depth": {
+			presentation: map[string]any{
+				"modal": map[string]any{
+					"mini_topology": map[string]any{"depth": "1"},
+				},
+			},
+			want: "mini_topology.depth is not an integer",
+		},
+		"modal is not an object": {
+			presentation: map[string]any{
+				"modal": "invalid",
+			},
+			want: "modal is not an object",
+		},
+		"missing modal columns": {
+			presentation: map[string]any{
+				"modal": map[string]any{
+					"sections": []any{
+						map[string]any{
+							"id":     "links",
+							"label":  "Links",
+							"source": map[string]any{"kind": "links"},
+						},
+					},
+				},
+			},
+			want: "columns is not an array",
+		},
+		"empty modal columns": {
+			presentation: map[string]any{
+				"modal": map[string]any{
+					"sections": []any{
+						map[string]any{
+							"id":      "links",
+							"label":   "Links",
+							"source":  map[string]any{"kind": "links"},
+							"columns": []any{},
+						},
+					},
+				},
+			},
+			want: "columns must not be empty",
+		},
+		"duplicate modal section id": {
+			presentation: map[string]any{
+				"modal": map[string]any{
+					"sections": []any{
+						validSection(),
+						validSection(),
+					},
+				},
+			},
+			want: "duplicates modal section id",
+		},
+		"duplicate modal column id": {
+			presentation: map[string]any{
+				"modal": map[string]any{
+					"sections": []any{
+						func() map[string]any {
+							section := validSection()
+							section["columns"] = []any{
+								map[string]any{
+									"id":         "type",
+									"label":      "Type",
+									"projection": map[string]any{"kind": "direct", "column": "type"},
+								},
+								map[string]any{
+									"id":         "type",
+									"label":      "Type again",
+									"projection": map[string]any{"kind": "direct", "column": "type"},
+								},
+							}
+							return section
+						}(),
+					},
+				},
+			},
+			want: "duplicates modal column id",
+		},
+		"sort references unknown modal column": {
+			presentation: map[string]any{
+				"modal": map[string]any{
+					"sections": []any{
+						func() map[string]any {
+							section := validSection()
+							section["sort"] = map[string]any{"column": "missing"}
+							return section
+						}(),
+					},
+				},
+			},
+			want: "sort.column references unknown modal column",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateDecodedResponse(basePayload(tc.presentation))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestValidateDecodedResponseRejectsEmptyPresentationLabels(t *testing.T) {
+	basePayload := func(types map[string]any) map[string]any {
+		return map[string]any{
+			"status": float64(200),
+			"type":   "topology",
+			"data": map[string]any{
+				"schema_version": SchemaVersion,
+				"dictionaries":   map[string]any{},
+				"types":          types,
+				"actors": map[string]any{
+					"rows": float64(1),
+					"columns": []any{
+						map[string]any{"id": "id", "type": "string", "role": "identity"},
+						map[string]any{"id": "type", "type": "string"},
+					},
+					"values": []any{
+						map[string]any{"codec": "const", "value": "node-a"},
+						map[string]any{"codec": "const", "value": "node"},
+					},
+				},
+				"links": map[string]any{
+					"rows": float64(0),
+					"columns": []any{
+						map[string]any{"id": "type", "type": "string"},
+					},
+					"values": []any{
+						map[string]any{"codec": "const", "value": "dependency"},
+					},
+				},
+			},
+		}
+	}
+	defaultTypes := func() map[string]any {
+		return map[string]any{
+			"actor_types": map[string]any{
+				"node": map[string]any{"layer": "node", "identity": []any{"id"}},
+			},
+			"link_types": map[string]any{
+				"dependency": map[string]any{
+					"orientation":    "directed",
+					"direction_role": "dependency",
+					"aggregation":    map[string]any{"direction": "preserve"},
+				},
+			},
+			"port_types": map[string]any{},
+			"table_types": map[string]any{
+				"actor_labels": map[string]any{
+					"role":        "actor_inventory",
+					"owner":       "actor",
+					"aggregation": "set",
+					"columns": []any{
+						map[string]any{"id": "actor", "type": "actor_ref"},
+					},
+				},
+			},
+		}
+	}
+
+	cases := map[string]func(map[string]any){
+		"actor type label": func(types map[string]any) {
+			types["actor_types"].(map[string]any)["node"].(map[string]any)["presentation"] = map[string]any{"label": ""}
+		},
+		"link type label": func(types map[string]any) {
+			types["link_types"].(map[string]any)["dependency"].(map[string]any)["presentation"] = map[string]any{"label": ""}
+		},
+		"port type label": func(types map[string]any) {
+			types["port_types"].(map[string]any)["port"] = map[string]any{"presentation": map[string]any{"label": ""}}
+		},
+		"table type label": func(types map[string]any) {
+			types["table_types"].(map[string]any)["actor_labels"].(map[string]any)["presentation"] = map[string]any{"label": ""}
+		},
+	}
+
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			types := defaultTypes()
+			mutate(types)
+
+			err := ValidateDecodedResponse(basePayload(types))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "label is required")
+		})
+	}
+}
+
+func TestValidateDecodedResponseRejectsMalformedResponseEnvelope(t *testing.T) {
+	cases := map[string]struct {
+		payload any
+		want    string
+	}{
+		"not object": {
+			payload: []any{},
+			want:    "response is not an object",
+		},
+		"missing data": {
+			payload: map[string]any{"status": float64(200), "type": "topology"},
+			want:    "response.data is not an object",
+		},
+		"wrong schema": {
+			payload: map[string]any{
+				"status": float64(200),
+				"type":   "topology",
+				"data":   map[string]any{"schema_version": "old"},
+			},
+			want: "response.data.schema_version is not",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateDecodedResponse(tc.payload)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestValidateDecodedResponseRejectsInvalidCompactTableColumns(t *testing.T) {
+	basePayload := func(columns []any, values []any) map[string]any {
+		return map[string]any{
+			"status": float64(200),
+			"type":   "topology",
+			"data": map[string]any{
+				"schema_version": SchemaVersion,
+				"dictionaries":   map[string]any{},
+				"types": map[string]any{
+					"actor_types": map[string]any{
+						"node": map[string]any{"layer": "node", "identity": []any{"id"}},
+					},
+					"link_types": map[string]any{
+						"dependency": map[string]any{
+							"orientation":    "directed",
+							"direction_role": "dependency",
+							"aggregation":    map[string]any{"direction": "preserve"},
+						},
+					},
+					"port_types":  map[string]any{},
+					"table_types": map[string]any{},
+				},
+				"actors": map[string]any{
+					"rows": float64(1),
+					"columns": []any{
+						map[string]any{"id": "id", "type": "string", "role": "identity"},
+						map[string]any{"id": "type", "type": "string"},
+					},
+					"values": []any{
+						map[string]any{"codec": "const", "value": "node-a"},
+						map[string]any{"codec": "const", "value": "node"},
+					},
+				},
+				"links": map[string]any{
+					"rows":    float64(1),
+					"columns": columns,
+					"values":  values,
+				},
+			},
+		}
+	}
+
+	cases := map[string]struct {
+		columns []any
+		values  []any
+		want    string
+	}{
+		"empty id": {
+			columns: []any{
+				map[string]any{"id": "", "type": "string"},
+			},
+			values: []any{
+				map[string]any{"codec": "const", "value": "dependency"},
+			},
+			want: "columns[0].id is required",
+		},
+		"duplicate id": {
+			columns: []any{
+				map[string]any{"id": "type", "type": "string"},
+				map[string]any{"id": "type", "type": "string"},
+			},
+			values: []any{
+				map[string]any{"codec": "const", "value": "dependency"},
+				map[string]any{"codec": "const", "value": "dependency"},
+			},
+			want: "duplicates column",
+		},
+		"wrong uint value type": {
+			columns: []any{
+				map[string]any{"id": "type", "type": "string"},
+				map[string]any{"id": "socket_count", "type": "uint"},
+			},
+			values: []any{
+				map[string]any{"codec": "const", "value": "dependency"},
+				map[string]any{"codec": "const", "value": "not-a-number"},
+			},
+			want: "is not a non-negative integer",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateDecodedResponse(basePayload(tc.columns, tc.values))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestValidateDecodedResponseValidatesExplicitModalLabelColumns(t *testing.T) {
+	baseData := func(labels *ModalLabelsPresentation) Data {
+		return Data{
+			Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
+			CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
+			Dictionaries: Dictionaries{"strings": StringValues("node-a")},
+			Types: TypeRegistry{
+				ActorTypes: map[string]ActorType{
+					"node": {
+						Layer:    "node",
+						Identity: []string{"id"},
+						Presentation: &ActorPresentation{
+							Modal: &ModalPresentation{
+								Labels: labels,
+							},
+						},
+					},
+				},
+				LinkTypes: map[string]LinkType{},
+				PortTypes: map[string]PortType{},
+				TableTypes: map[string]TableType{
+					"actor_labels": {
+						Role:        "actor_inventory",
+						Owner:       "actor",
+						Aggregation: "set",
+						Columns: []Column{
+							NewColumn("actor", "actor_ref"),
+							NewColumn("key", "string"),
+							NewColumn("value", "string"),
+						},
+					},
+				},
+			},
+			Actors: MustTable(1,
+				[]Column{
+					NewColumn("id", "string", WithRole("identity")),
+					NewColumn("type", "string"),
+				},
+				[]ColumnEncoding{
+					Values("node-a"),
+					Const("node"),
+				},
+			),
+			Links: MustTable(0,
+				[]Column{NewColumn("type", "string")},
+				[]ColumnEncoding{Const("none")},
+			),
+		}
+	}
+
+	t.Run("omitted optional columns are allowed", func(t *testing.T) {
+		payload := NewResponse(baseData(&ModalLabelsPresentation{Table: "actor_labels"}))
+		payloadBytes, err := json.Marshal(payload)
+		require.NoError(t, err)
+		require.NoError(t, topologySchemaValidationError(t, payloadBytes))
+
+		var decoded any
+		require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+		require.NoError(t, ValidateDecodedResponse(decoded))
+	})
+
+	t.Run("identification fields are accepted", func(t *testing.T) {
+		payload := NewResponse(baseData(&ModalLabelsPresentation{
+			Table: "actor_labels",
+			Identification: &ModalLabelIdentificationPresentation{
+				Fields: []ModalLabelIdentificationField{
+					{Key: "display_name", Label: "Name", MaxValues: 1},
+					{Key: "role", Label: "Role", MaxValues: 2},
+				},
+			},
+		}))
+		payloadBytes, err := json.Marshal(payload)
+		require.NoError(t, err)
+		require.NoError(t, topologySchemaValidationError(t, payloadBytes))
+
+		var decoded any
+		require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+		require.NoError(t, ValidateDecodedResponse(decoded))
+	})
+
+	t.Run("invalid identification max values is rejected", func(t *testing.T) {
+		payload := NewResponse(baseData(&ModalLabelsPresentation{Table: "actor_labels"}))
+		payloadBytes, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		var decoded any
+		require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+		data := decoded.(map[string]any)["data"].(map[string]any)
+		actorType := data["types"].(map[string]any)["actor_types"].(map[string]any)["node"].(map[string]any)
+		modal := actorType["presentation"].(map[string]any)["modal"].(map[string]any)
+		labels := modal["labels"].(map[string]any)
+		labels["identification"] = map[string]any{
+			"fields": []any{
+				map[string]any{"key": "display_name", "label": "Name", "max_values": float64(0)},
+			},
+		}
+
+		err = ValidateDecodedResponse(decoded)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "labels.identification.fields[0].max_values must be a positive integer")
+	})
+
+	t.Run("explicit missing optional column is rejected", func(t *testing.T) {
+		payload := NewResponse(baseData(&ModalLabelsPresentation{Table: "actor_labels", SourceColumn: "missing"}))
+		payloadBytes, err := json.Marshal(payload)
+		require.NoError(t, err)
+		require.NoError(t, topologySchemaValidationError(t, payloadBytes))
+
+		var decoded any
+		require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+
+		err = ValidateDecodedResponse(decoded)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "labels.source_column references unknown column \"missing\"")
+	})
+}
+
+func TestValidateDecodedResponseRejectsInvalidModalSectionsShape(t *testing.T) {
+	payload := map[string]any{
+		"status": float64(200),
+		"type":   "topology",
+		"data": map[string]any{
+			"schema_version": SchemaVersion,
+			"dictionaries":   map[string]any{},
+			"types": map[string]any{
+				"actor_types": map[string]any{
+					"node": map[string]any{
+						"layer":    "node",
+						"identity": []any{"id"},
+						"presentation": map[string]any{
+							"modal": map[string]any{
+								"sections": map[string]any{"not": "an-array"},
+							},
+						},
+					},
+				},
+				"link_types":  map[string]any{},
+				"port_types":  map[string]any{},
+				"table_types": map[string]any{},
+			},
+			"actors": map[string]any{
+				"rows": float64(1),
+				"columns": []any{
+					map[string]any{"id": "id", "type": "string", "role": "identity"},
+					map[string]any{"id": "type", "type": "string"},
+				},
+				"values": []any{
+					map[string]any{"codec": "values", "values": []any{"node-a"}},
+					map[string]any{"codec": "const", "value": "node"},
+				},
+			},
+			"links": map[string]any{
+				"rows": float64(0),
+				"columns": []any{
+					map[string]any{"id": "type", "type": "string"},
+				},
+				"values": []any{
+					map[string]any{"codec": "const", "value": "none"},
+				},
+			},
+		},
+	}
+
+	err := ValidateDecodedResponse(payload)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "modal.sections is not an array")
+}
+
+func TestValidateDecodedResponseRejectsInvalidModalRowFilters(t *testing.T) {
+	cases := map[string]struct {
+		filter ModalRowFilter
+		want   string
+	}{
+		"eq missing value": {
+			filter: ModalRowFilter{Column: "type", Op: "eq"},
+			want:   "value is required when op is eq",
+		},
+		"in missing values": {
+			filter: ModalRowFilter{Column: "type", Op: "in"},
+			want:   "values is required when op is in",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			payload := NewResponse(Data{
+				Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
+				CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
+				Dictionaries: Dictionaries{"strings": StringValues("node-a")},
+				Types: TypeRegistry{
+					ActorTypes: map[string]ActorType{
+						"node": {
+							Layer:    "node",
+							Identity: []string{"id"},
+							Presentation: &ActorPresentation{
+								Modal: &ModalPresentation{
+									Sections: []ModalSection{
+										{
+											ID:         "links",
+											Label:      "Links",
+											Source:     ModalSource{Kind: "links"},
+											RowFilters: []ModalRowFilter{tc.filter},
+											Columns: []ModalColumn{
+												{
+													ID:    "type",
+													Label: "Type",
+													Projection: ModalProjection{
+														Kind:   "direct",
+														Column: "type",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					LinkTypes: map[string]LinkType{
+						"dependency": {
+							Orientation:   "directed",
+							DirectionRole: "dependency",
+							Aggregation:   LinkAggregation{Direction: "preserve"},
+						},
+					},
+				},
+				Actors: MustTable(1,
+					[]Column{
+						NewColumn("id", "string", WithRole("identity")),
+						NewColumn("type", "string"),
+					},
+					[]ColumnEncoding{
+						Values("node-a"),
+						Const("node"),
+					},
+				),
+				Links: MustTable(1,
+					[]Column{
+						NewColumn("src", "actor_ref"),
+						NewColumn("dst", "actor_ref"),
+						NewColumn("type", "string"),
+					},
+					[]ColumnEncoding{
+						Const(0),
+						Const(0),
+						Const("dependency"),
+					},
+				),
+			})
+
+			payloadBytes, err := json.Marshal(payload)
+			require.NoError(t, err)
+			require.Error(t, topologySchemaValidationError(t, payloadBytes))
+
+			var decoded any
+			require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+
+			err = ValidateDecodedResponse(decoded)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
 func TestValidateDecodedResponseRejectsCorrelationMissingKeyColumn(t *testing.T) {
 	payload := NewResponse(Data{
 		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
@@ -655,7 +1643,42 @@ func TestValidateDecodedResponseRejectsInvalidActorReference(t *testing.T) {
 	assert.Contains(t, err.Error(), "actor reference out of bounds")
 }
 
+func TestValidateDecodedResponseRejectsInvalidEvidenceSectionShape(t *testing.T) {
+	payload := map[string]any{
+		"status": float64(200),
+		"type":   "topology",
+		"data": map[string]any{
+			"schema_version": SchemaVersion,
+			"dictionaries":   map[string]any{},
+			"types":          map[string]any{},
+			"actors": map[string]any{
+				"rows":    float64(0),
+				"columns": []any{},
+				"values":  []any{},
+			},
+			"links": map[string]any{
+				"rows":    float64(0),
+				"columns": []any{},
+				"values":  []any{},
+			},
+			"evidence": map[string]any{
+				"socket": "not-an-object",
+			},
+		},
+	}
+
+	err := ValidateDecodedResponse(payload)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "data.evidence.socket is not an object")
+}
+
 func validateAgainstTopologySchema(t *testing.T, payload []byte) {
+	t.Helper()
+
+	require.NoError(t, topologySchemaValidationError(t, payload))
+}
+
+func topologySchemaValidationError(t *testing.T, payload []byte) error {
 	t.Helper()
 
 	schemaDoc := loadTopologySchema(t)
@@ -667,7 +1690,7 @@ func validateAgainstTopologySchema(t *testing.T, payload []byte) {
 
 	var decoded any
 	require.NoError(t, json.Unmarshal(payload, &decoded))
-	require.NoError(t, schema.Validate(decoded))
+	return schema.Validate(decoded)
 }
 
 func loadTopologySchema(t *testing.T) map[string]any {

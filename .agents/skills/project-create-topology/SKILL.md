@@ -23,6 +23,7 @@ Read these before designing or changing topology payloads:
 | `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | Human-readable topology schema contract and producer guidance |
 | `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` | Backend/frontend/aggregator migration scope |
 | `.agents/sow/specs/topology-function-schema.md` | Durable project spec for topology semantics |
+| `.agents/sow/specs/topology-modes-correlation-aggregation.md` | Mode, correlation, aggregation, and actor modal identification contract |
 | `.agents/skills/project-writing-collectors/SKILL.md` | Collector quality, Function, validation, and cardinality rules |
 
 For transport-level Function behavior, also read:
@@ -85,6 +86,13 @@ developer-facing and must stay in this project skill, not under
    - `relationship_summary`: derived summaries.
    - Use `json` columns only for custom actor/detail cells that must preserve
      nested producer-owned values; avoid them for high-cardinality evidence.
+   - Use a compact actor-owned `actor_labels` table for modal labels:
+     `actor`, `key`, `value`, optional `source`, optional `kind`, and optional
+     `value_index`.
+   - Expose complete host/node labels when available.
+   - Expose useful non-node actor labels and metadata, while keeping identity,
+     correlation, grouping, sorting, filtering, and aggregation facts as typed
+     canonical columns.
 
 6. Define telemetry overlays.
    - Use overlay templates once per payload or type.
@@ -92,17 +100,27 @@ developer-facing and must stay in this project skill, not under
    - Do not put full metric query payloads on every row.
 
 7. Define correlation semantics when actors can be resolved across payloads.
-   - Emit pure correlation actors for unresolved peers; do not hide correlation
-     state as flags on real actors.
+   - Declare whether the topology needs loose-side resolution, actor
+     replacement, actor enrichment, or visible correlation actors.
+   - Do not hide correlation state as flags on real actors.
    - Define `data.correlation.rules` with declarative key templates,
-     priorities, `absorb` or `link` actions, point actor types, optional claim
-     actor types, correlation link types, and output link types.
-   - Emit compact `data.correlation.points` rows for correlation actors and
-     `data.correlation.claims` rows for real actors that can satisfy keys.
+     priorities, `class`, `absorb` or `link` actions, point actor types when
+     visible correlation actors exist, optional claim actor types, correlation
+     link types, and output link types.
+   - Emit compact `data.correlation.points` rows for visible correlation actors
+     when the input graph has them, and `data.correlation.claims` rows for real
+     actors that can satisfy keys.
+   - For high-cardinality exact observations, prefer loose relationship-side
+     facts plus declared materialization policy over creating one actor per
+     ephemeral endpoint.
    - Use `absorb` only for exact matches that should remove correlation actors
-     from the aggregated output.
+     or loose-side placeholders from the aggregated output.
    - Use `link` for broader or partial matches that should keep the correlation
-     actor visible.
+     actor or materialized partial actor visible.
+   - Use `replace_actor` semantics for weaker placeholder actors that should be
+     replaced by stronger managed actors.
+   - Use `merge_enrich_actor` semantics when multiple payloads provide
+     complementary facts for the same actor identity.
    - Keep NAT or alias information as additional point/claim rows, not as
      mutation of the original observation.
 
@@ -112,6 +130,9 @@ developer-facing and must stay in this project skill, not under
    - Put graph port-bullet presentation in `types.port_types.<id>.presentation`.
    - Put legend, actor-click highlight behavior, port fields, and scale keys in
      `data.presentation`.
+   - Use `__topology_mode` for detailed vs aggregated topology requests when a
+     producer has a real mode difference. Do not expose a mode selector for
+     mode-invariant topologies.
    - Use UI-owned color/icon/line/width/opacity/layout tokens only.
    - Define `label_policy.columns` with safe scalar display columns; never let
      canonical identity arrays become actor names.
@@ -128,7 +149,37 @@ developer-facing and must stay in this project skill, not under
      `closest`, `closer`, `normal`, `farther`, `farthest`; do not emit numeric
      force values.
 
-9. Encode large sections as compact tables.
+9. Define modal/table composition.
+   - Put actor modal recipes in
+     `types.actor_types.<id>.presentation.modal`.
+   - Put link modal recipes in `types.link_types.<id>.presentation.modal`.
+   - Put reusable table defaults in `types.table_types.<id>.presentation`.
+   - Use `modal.labels.identification.fields[]` to choose the small set of
+     actor labels that should appear in the actor modal identification/header
+     area. The full `actor_labels` table remains the Labels tab.
+   - Modal sections must select from existing `actors`, `links`, `evidence`,
+     `actor_table`, or `relationship_table` sources.
+   - Do not duplicate evidence or actor metadata only to populate a modal.
+   - Use projections for display: direct column, actor-ref label, opposite
+     actor, formatted endpoint, selected-side endpoint, label lookup,
+     coalesce, const, or explicit scalar JSON path.
+   - For `selected_side_endpoint`, include source/destination actor-ref
+     columns and both endpoint sides in the projection so the UI can choose the
+     side from the selected actor without hardcoded table knowledge.
+   - For `label_lookup`, provide `label_key`; provide `actor_column` only when
+     the lookup should read labels for an actor referenced by the source row
+     instead of the selected modal actor.
+   - For `json_path`, provide both the JSON `column` and scalar `path`.
+   - Use cell types: text, number, badge, actor_link, timestamp, duration,
+     endpoint, array_count, or debug_json.
+   - Use visibility values: table, expanded, hidden, or debug.
+   - Raw `json` is debug-only unless a schema-declared scalar projection gives
+     the UI/aggregator semantics.
+   - Treat Function `info` responses as metadata only. Validate full topology
+     responses against `FUNCTION_TOPOLOGY_SCHEMA.json`; do not require
+     metadata-only `info` responses to carry `data`.
+
+10. Encode large sections as compact tables.
    - Use `const` for constant columns.
    - Use `dict` for low/medium-cardinality repeated values.
    - Use `values` only when values are high-cardinality.
@@ -136,7 +187,7 @@ developer-facing and must stay in this project skill, not under
    - For Go producers, use `src/go/pkg/topology/v1` compact-table helpers
      instead of hand-building table JSON.
 
-10. Validate and measure.
+11. Validate and measure.
    - Validate JSON with `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
    - Add semantic validation fixtures.
    - Measure raw and gzip size on realistic data.
@@ -160,8 +211,8 @@ Network-connections uses three graph-link families:
 
 - node-to-process ownership links;
 - local/resolved process-to-process socket links;
-- process-to-correlation-endpoint links for unresolved or cross-node remote
-  socket endpoints.
+- process-to-endpoint or loose-side socket relationships for unresolved or
+  cross-node remote socket endpoints.
 
 Use distinct presentation for each family:
 
@@ -182,8 +233,12 @@ actors with `size.mode: "metric"` over actor row `socket_count`.
 For socket correlation:
 
 - process actors emit claim rows for locally owned socket tuples;
-- endpoint actors emit point rows for remote tuples;
-- the `socket_exact` rule uses `action: absorb`;
+- visible endpoint/correlation actors emit point rows when the producer
+  materializes them;
+- detailed evidence may also preserve loose remote tuple facts that the
+  aggregator or UI can materialize according to schema-declared policy;
+- the `socket_exact` rule uses `class: resolve_loose_side` and
+  `action: absorb`;
 - the key is declarative, typically protocol + address space + IP + port;
 - `endpoint_socket` links are weak/normal-distance visible links before
   aggregation;
@@ -200,6 +255,19 @@ For socket correlation:
   are documented and tested when cross-payload resolution applies.
 - Evidence rows can reproduce required drilldown tables.
 - Custom actor tables have correct roles and aggregation policy.
+- Actor labels are emitted through `actor_labels` when the producer has labels
+  or actor metadata to show.
+- `actor_labels.key`, `actor_labels.value`, `actor_labels.source`, and
+  `actor_labels.kind` are logical string fields. Accept `string` and
+  `string_ref` encodings as equivalent when validating, aggregating, or
+  rendering topology payloads.
+- Treat `actor_labels` as sensitive topology Function data. Preserve the source
+  Function's access-control assumptions when forwarding, aggregating, testing,
+  or documenting labels.
+- Modal sections are recipes over existing facts and do not duplicate
+  high-cardinality evidence rows.
+- Raw JSON columns are hidden/debug-only unless a schema-declared projection
+  renders a scalar value.
 - Payload size is measured on realistic or captured data.
 - Raw sensitive captures remain under `.local/`.
 

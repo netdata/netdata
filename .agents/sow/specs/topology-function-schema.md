@@ -27,17 +27,33 @@ Topology payloads separate these planes:
 - graph links: renderable relationship groups between actors;
 - evidence: canonical relationship facts behind graph links;
 - detail tables: actor-owned or relationship-owned drilldown data;
+- actor labels: actor-owned key/value rows for modal labels and filters, not a
+  replacement for canonical identity or grouping columns;
 - presentation: backend-selected UI-token composition for labels, colors,
   icons, legends, highlighting, link styles, scale keys, and graph port
   bullets;
-- correlation: producer-visible rules, pure correlation actors, points, and
-  claims used by an aggregator to correlate independently produced topology
-  maps without exposing aggregator internal states;
+- modal composition: actor/link modal recipes over existing actors, links,
+  evidence, labels, and detail tables;
+- correlation: producer-visible rules, loose-side resolution, replacement,
+  enrichment, visible correlation points, and claims used by an aggregator to
+  correlate independently produced topology maps without exposing aggregator
+  internal states;
 - overlay refs: compact references for refreshable metrics or Function-backed
   snapshots.
 
 Graph links are projections. Evidence rows are the facts used by Cloud
 aggregation, matching, and detailed drilldowns.
+
+## Mode Requests
+
+Mode requests use `__topology_mode` when a producer has a real detailed vs
+aggregated output difference. Valid values are `detailed` and `aggregated`.
+Mode-invariant topologies should not expose a selector only to return identical
+payloads. Mode-capable producers declare `data.view.supported_modes`; absent
+or single-value `supported_modes` means the topology is mode-invariant for UI
+control purposes. The Cloud topology aggregator consumes detailed payloads for
+mode-capable producers before returning an aggregated view, so producers must
+preserve correlation-grade evidence in detailed mode.
 
 ## Compact Tables
 
@@ -84,8 +100,10 @@ Link types declare:
 - optional `presentation` with UI-owned color, line style, width, curve, arrow,
   tokenized layout strength/distance, and one variable visual channel.
 
-Port types are optional and declare graph port-bullet presentation only. Full
-modal/table composition is separate from this graph presentation contract.
+Port types are optional and declare graph port-bullet presentation only.
+Actor/link modal composition is declared separately under actor/link type
+presentation and table type presentation. Modal recipes are selectors and
+projections over existing facts; they are not duplicate row stores.
 
 Cloud aggregation may only canonicalize endpoint order when link type policy
 explicitly allows unordered aggregation. Direction-significant links must
@@ -104,10 +122,46 @@ Production payloads must not duplicate the same evidence under every actor only
 to populate drilldown modals. The UI and aggregator derive drilldown views from
 shared evidence and typed table references.
 
+Actor labels use a compact actor-owned table, normally
+`tables.actor.actor_labels`, with rows shaped as:
+
+```text
+actor, key, value, source?, kind?, value_index?
+```
+
+`key`, `value`, `source`, and `kind` are logical strings and may be encoded as
+`string` or `string_ref`. Producers should prefer `string_ref` when they already
+maintain a local dictionary; aggregators and UI adapters must normalize both
+encodings as equivalent label strings.
+
+Host/node actors should expose the complete host label set when available.
+Non-node actors should expose useful producer-known labels and metadata, such
+as process command line, user, group, namespace, interface role, or
+virtualization object properties. Repeated values are repeated rows ordered by
+`value_index`, not JSON arrays. Facts needed for identity, correlation,
+grouping, sorting, filtering, or aggregation must remain typed canonical
+columns too.
+
+`actor_labels` inherits the topology Function sensitive-data classification.
+Consumers must preserve the same access-control assumptions as the source
+Function because labels may include command lines, users, host labels, system
+contact/location fields, or other operator-controlled metadata.
+
+Actor modal identification is producer-selected through
+`presentation.modal.labels.identification.fields[]`. Each field references an
+existing `actor_labels.key`, provides the label to render near the actor title,
+and may limit the number of displayed values with `max_values`. The full Labels
+tab remains complete; identification is a curated header projection, not a
+second table.
+
 ## Presentation
 
 Presentation belongs in the production `netdata.topology.v1` payload, not in
 Function `info`, except for old-schema compatibility during rollout.
+
+Function `info` responses are metadata responses. They may omit `data` and
+advertise only parameters, help text, and timing. The topology JSON schema
+applies to full topology responses, not metadata-only `info` responses.
 
 Type definitions carry type-local presentation:
 
@@ -117,6 +171,30 @@ Type definitions carry type-local presentation:
 
 Graph-level `data.presentation` carries legend order, actor-click highlight
 behavior, port tooltip field labels, and scale-key definitions.
+
+Actor and link type presentation may also carry modal composition:
+
+- `presentation.modal.labels` describes the actor label table, usually
+  `actor_labels`;
+- `presentation.modal.mini_topology` describes a depth-1 modal graph preview
+  built from incident links and opposite actors;
+- `presentation.modal.sections[]` describes table sections over existing
+  actors, links, evidence, actor detail tables, or relationship tables.
+
+Table types may carry `presentation` defaults for table label, order, default
+visibility, and column display metadata. Table type presentation does not
+replace actor/link modal sections; it gives reusable defaults for existing
+table rows.
+
+Modal sections require non-empty `id`, non-empty `label`, a source, and at
+least one column. `empty_label` is section-only empty-state text. Modal columns
+require non-empty `id`, non-empty `label`, and a projection. `badge_map`,
+`align`, and `sortable` are presentation hints over projected values and must
+not introduce new facts.
+
+`label_lookup` uses `label_key` and optionally an `actor_column`; omitted
+`actor_column` means the selected modal actor. `json_path` always requires both
+the JSON `column` and the scalar `path` to extract.
 
 Presentation uses closed UI-owned tokens. Producers must not emit raw SVG, raw
 CSS, coordinates, component names, raw force-layout physics, or viewport state.
@@ -176,6 +254,19 @@ column. When present, the UI sums values for matching bullet keys and uses the
 sum for bullet multiplicity, overflow, and sizing. Aggregated producers should
 use this instead of sending repeated rows only to drive presentation.
 
+Modal/table composition uses closed source, projection, cell, and visibility
+tokens. Supported source kinds are `actors`, `links`, `evidence`,
+`actor_table`, and `relationship_table`. Supported projections include direct
+column values, actor-ref labels, opposite actor labels, formatted endpoints,
+selected-side endpoints, label-table lookups, coalesced columns, constants,
+and explicitly declared scalar JSON paths. Supported cell types include text,
+number, badge, actor link, timestamp, duration, endpoint, array count, and
+debug JSON. Raw JSON belongs behind `debug` visibility or an explicit scalar
+projection; it must not be the default polished actor modal rendering.
+Selected-side endpoint projections must be self-contained: the projection
+names source and destination actor-ref columns, plus at least one source-side
+endpoint column and one destination-side endpoint column.
+
 `selection.actor_click.mode: highlight_path` requires `path_table`,
 `path_actor_column`, and `path_order_column`. `path_actor_column` identifies
 path members. When one table contains different paths for different clicked
@@ -197,29 +288,44 @@ Presentation conflict policy:
 
 ## Correlation Contract
 
-Correlation points are pure topology actors. Producers must not encode
-correlation as hidden flags on real actors, and must not expose aggregator
-internal states such as absorbed, candidate, equivalence class, or rewrite plan.
-The final aggregated output is always a normal topology payload.
+Correlation is producer-visible graph semantics, not aggregator state.
+Producers must not encode correlation as hidden flags on real actors, and must
+not expose aggregator internal states such as absorbed, candidate, equivalence
+class, or rewrite plan. The final aggregated output is always a normal topology
+payload.
+
+Correlation can resolve several shapes:
+
+- loose relationship sides, where one side of a detailed row has endpoint facts
+  but no known actor;
+- visible correlation actors, where the input graph intentionally materializes
+  unresolved peers;
+- weaker placeholder actors that should be replaced by stronger managed actors;
+- equivalent actors that should be merged and enriched with facts from multiple
+  payloads.
 
 `data.correlation.rules` defines how independent payloads of the same topology
 kind can be correlated. Each rule defines:
 
-- `action`: `absorb` for exact matches that remove correlation actors and
-  rewrite incident correlation links, or `link` for partial/broader matches
-  that keep the correlation actor visible and add a weak correlation link;
+- optional `class`: `resolve_loose_side`, `replace_actor`, or
+  `merge_enrich_actor`;
+- `action`: `absorb` for exact matches that remove visible correlation actors
+  or consume loose-side placeholders and rewrite incident correlation
+  relationships, or `link` for partial/broader matches that keep the visible
+  correlation/materialized actor and add a weak correlation link;
 - `priority`: lower numbers run first;
 - `key_space`: namespace for exact string-key matching;
 - `key`: a declarative template built from point/claim table columns and
   literals;
-- `point_actor_types`: actor types that are pure correlation points;
+- `point_actor_types`: actor types that are visible correlation points when the
+  input graph materializes points;
 - optional `claim_actor_types`: actor types that may satisfy the point;
 - optional `correlation_link_types`: link types that connect real actors to
   correlation actors and may be consumed/replaced by the rule;
 - `output_link_type`: link type emitted for rewritten absorb links or visible
   partial correlation links.
 
-`data.correlation.points` is a compact table of correlation actors and keys.
+`data.correlation.points` is a compact table of visible correlation actors and keys.
 `data.correlation.claims` is a compact table of real actors and keys they can
 satisfy. Both tables require `actor`, `rule`, and the key columns referenced by
 their rules.
@@ -229,15 +335,16 @@ declared columns and literals, applies rule priority, and handles ambiguity
 conservatively. It must not need new code to understand every future IP, port,
 MAC, chassis id, object id, label, or topology-domain key.
 
-No match keeps the correlation actor visible. Ambiguous matches remain
-unresolved and produce diagnostics. NAT or other alias evidence can be modeled
-by adding extra point/claim rows for the same actor and rule; aliases add facts
-without mutating the original observation.
+No match keeps the visible correlation actor or loose-side materialization
+visible. Ambiguous matches remain unresolved and produce diagnostics. NAT or
+other alias evidence can be modeled by adding extra point/claim rows for the
+same actor and rule; aliases add facts without mutating the original
+observation.
 
 Correlation links must be semantic link types even for single-node payloads.
-The legend must include correlation actors and links when they are visible, so
-users can distinguish unresolved, partial, inferred, and resolved graph
-relationships.
+The legend must include visible correlation actors and links when they are
+visible, so users can distinguish unresolved, partial, inferred, and resolved
+graph relationships.
 
 ## Telemetry Overlays
 
@@ -293,11 +400,24 @@ single-node maps zoom out unnecessarily. `correlated_socket` is the output link
 type after exact endpoint absorption by an aggregator and may use farthest
 distance to keep independent topology clusters from blending.
 
+The remaining modal-composition migration for network-connections is to emit
+`actor_labels`, process `username`, process `cmdline`, and either a self actor
+`local_ip_count` metric/label or a deliberate removal of that old summary
+field. Process socket modals should derive from `evidence.socket` in detailed
+mode and from graph links plus `socket_ports` in aggregated mode.
+
 `topology:snmp` now emits `netdata.topology.v1` from the Function handler
 through an adapter over the existing SNMP topology engine output. The adapter
 preserves actors, links, L2 observation evidence, actor metadata, and actor
 custom detail tables. Remaining SNMP refinement is to promote interface metric
 lookup fragments into first-class overlay templates/refs.
+
+SNMP modal composition must not depend on raw `actor_metadata` and endpoint JSON
+for polished UI. Important scalar/count summary values live in typed actor or
+actor-detail columns and are also available through `actor_labels`. Port
+inventory uses stable typed columns for normal table display. Nested neighbors,
+VLANs, unknown custom port attributes, and endpoint objects stay in expanded or
+debug sections unless a structured child table is defined.
 
 `topology:streaming` now emits `netdata.topology.v1` directly from the C
 Function. It models streaming agents as compact actor rows, streaming/virtual/
@@ -307,3 +427,9 @@ actor-detail or relationship-summary tables. Streaming also emits graph
 presentation metadata for highlight-path behavior, legend, link styles, and
 port bullets. Streaming hops remain signed so stale path values are not
 corrupted.
+
+Streaming modal composition emits `actor_labels`, complete host labels where
+available, host/system metadata labels needed by old summaries, and typed
+OS/architecture/CPU columns. Existing `stream_path`, `retention`, `inbound`, and
+`outbound` tables have the right actor-ref shape for recipe-based table
+rendering.

@@ -30,14 +30,20 @@ type topologyShape struct {
 	scaleKeys          map[string]struct{}
 }
 
+// ValidateDecodedResponse validates a full topology v1 Function response.
+// Metadata-only Function info responses intentionally omit data and must not be
+// passed here.
 func ValidateDecodedResponse(payload any) error {
 	obj, ok := payload.(map[string]any)
 	if !ok {
-		return nil
+		return fmt.Errorf("response is not an object")
 	}
 	data, ok := obj["data"].(map[string]any)
-	if !ok || data["schema_version"] != SchemaVersion {
-		return nil
+	if !ok {
+		return fmt.Errorf("response.data is not an object")
+	}
+	if data["schema_version"] != SchemaVersion {
+		return fmt.Errorf("response.data.schema_version is not %q", SchemaVersion)
 	}
 
 	return ValidateDecodedData(data)
@@ -181,7 +187,10 @@ func validateEvidenceSections(raw any, ctx validationContext) error {
 		return fmt.Errorf("data.evidence is not an object")
 	}
 	for name, rawSection := range sections {
-		section := rawSection.(map[string]any)
+		section, ok := rawSection.(map[string]any)
+		if !ok {
+			return fmt.Errorf("data.evidence.%s is not an object", name)
+		}
 		if _, err := validateCompactTable("data.evidence."+name+".table", section["table"], ctx); err != nil {
 			return err
 		}
@@ -267,13 +276,24 @@ func validateCompactTable(path string, raw any, ctx validationContext) (int, err
 		return 0, fmt.Errorf("%s columns/values length mismatch: %d columns, %d values", path, len(columns), len(values))
 	}
 
+	seenColumns := make(map[string]struct{}, len(columns))
 	for i := range columns {
 		column, ok := columns[i].(map[string]any)
 		if !ok {
 			return 0, fmt.Errorf("%s.columns[%d] is not an object", path, i)
 		}
 		columnID, _ := column["id"].(string)
+		if columnID == "" {
+			return 0, fmt.Errorf("%s.columns[%d].id is required", path, i)
+		}
+		if _, ok := seenColumns[columnID]; ok {
+			return 0, fmt.Errorf("%s.columns[%d].id duplicates column %q", path, i, columnID)
+		}
+		seenColumns[columnID] = struct{}{}
 		columnType, _ := column["type"].(string)
+		if columnType == "" {
+			return 0, fmt.Errorf("%s.columns[%d].type is required", path, i)
+		}
 		decoded, err := decodeColumn(path, i, rows, values[i])
 		if err != nil {
 			return 0, err
@@ -388,6 +408,31 @@ func validateColumnValues(path string, column map[string]any, columnType string,
 			if _, ok := value.([]any); !ok {
 				return fmt.Errorf("%s[%d] is not an array", path, i)
 			}
+		case "bool":
+			if _, ok := value.(bool); !ok {
+				return fmt.Errorf("%s[%d] is not a bool", path, i)
+			}
+		case "int":
+			if _, ok := integerValue(value); !ok {
+				return fmt.Errorf("%s[%d] is not an integer", path, i)
+			}
+		case "uint":
+			n, ok := integerValue(value)
+			if !ok || n < 0 {
+				return fmt.Errorf("%s[%d] is not a non-negative integer", path, i)
+			}
+		case "float", "duration":
+			if _, ok := numberValue(value); !ok {
+				return fmt.Errorf("%s[%d] is not a number", path, i)
+			}
+		case "string", "ip", "mac", "timestamp":
+			if _, ok := value.(string); !ok {
+				return fmt.Errorf("%s[%d] is not a string", path, i)
+			}
+		case "json":
+			// Any decoded JSON value is valid for a json column.
+		default:
+			return fmt.Errorf("%s has unsupported column type %q", path, columnType)
 		}
 	}
 	return nil
@@ -599,6 +644,9 @@ func validatePresentation(data map[string]any, shape topologyShape) error {
 	if err := validatePortTypePresentation(types["port_types"]); err != nil {
 		return err
 	}
+	if err := validateTableTypePresentation(types["table_types"], shape); err != nil {
+		return err
+	}
 	if err := validateGraphPresentation(data["presentation"], shape); err != nil {
 		return err
 	}
@@ -620,6 +668,11 @@ func validateActorTypePresentation(raw any, shape topologyShape) error {
 			continue
 		}
 		path := "data.types.actor_types." + typeID + ".presentation"
+		if _, ok := presentation["label"]; ok {
+			if err := validateRequiredString(path+".label", presentation["label"]); err != nil {
+				return err
+			}
+		}
 		if err := optionalEnum(path+".role", presentation["role"], "actor", "endpoint", "group"); err != nil {
 			return err
 		}
@@ -650,6 +703,9 @@ func validateActorTypePresentation(raw any, shape topologyShape) error {
 		if err := validateHoverPresentation(path+".hover", presentation["hover"], shape.actorColumns); err != nil {
 			return err
 		}
+		if err := validateModalPresentation(path+".modal", presentation["modal"], shape); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -669,6 +725,11 @@ func validateLinkTypePresentation(raw any, shape topologyShape) error {
 			continue
 		}
 		path := "data.types.link_types." + typeID + ".presentation"
+		if _, ok := presentation["label"]; ok {
+			if err := validateRequiredString(path+".label", presentation["label"]); err != nil {
+				return err
+			}
+		}
 		if err := optionalEnum(path+".color_slot", presentation["color_slot"], colorSlotTokens...); err != nil {
 			return err
 		}
@@ -694,6 +755,9 @@ func validateLinkTypePresentation(raw any, shape topologyShape) error {
 			return err
 		}
 		if err := validateLinkLayoutPresentation(path+".layout", presentation["layout"]); err != nil {
+			return err
+		}
+		if err := validateModalPresentation(path+".modal", presentation["modal"], shape); err != nil {
 			return err
 		}
 	}
@@ -732,12 +796,578 @@ func validatePortTypePresentation(raw any) error {
 			continue
 		}
 		path := "data.types.port_types." + typeID + ".presentation"
+		if _, ok := presentation["label"]; ok {
+			if err := validateRequiredString(path+".label", presentation["label"]); err != nil {
+				return err
+			}
+		}
 		if err := optionalEnum(path+".color_slot", presentation["color_slot"], colorSlotTokens...); err != nil {
 			return err
 		}
 		if err := optionalEnum(path+".opacity", presentation["opacity"], opacityTokens...); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateTableTypePresentation(raw any, shape topologyShape) error {
+	if raw == nil {
+		return nil
+	}
+	tableTypes, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("data.types.table_types is not an object")
+	}
+	for typeID, rawType := range tableTypes {
+		tableType, ok := rawType.(map[string]any)
+		if !ok {
+			return fmt.Errorf("data.types.table_types.%s is not an object", typeID)
+		}
+		presentation, ok := tableType["presentation"].(map[string]any)
+		if !ok {
+			continue
+		}
+		path := "data.types.table_types." + typeID + ".presentation"
+		if _, ok := presentation["label"]; ok {
+			if err := validateRequiredString(path+".label", presentation["label"]); err != nil {
+				return err
+			}
+		}
+		if err := optionalEnum(path+".default_visibility", presentation["default_visibility"], "table", "expanded", "hidden", "debug"); err != nil {
+			return err
+		}
+		columns := shape.tableTypes[typeID]
+		if err := validateModalColumns(path+".columns", presentation["columns"], columns); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateModalPresentation(path string, raw any, shape topologyShape) error {
+	if raw == nil {
+		return nil
+	}
+	modal, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	if err := validateModalLabelsPresentation(path+".labels", modal["labels"], shape); err != nil {
+		return err
+	}
+	if err := validateModalMiniTopologyPresentation(path+".mini_topology", modal["mini_topology"], shape); err != nil {
+		return err
+	}
+	rawSections, hasSections := modal["sections"]
+	if !hasSections || rawSections == nil {
+		return nil
+	}
+	sections, ok := rawSections.([]any)
+	if !ok {
+		return fmt.Errorf("%s.sections is not an array", path)
+	}
+	seenIDs := make(map[string]struct{}, len(sections))
+	for i, rawSection := range sections {
+		section, ok := rawSection.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%s.sections[%d] is not an object", path, i)
+		}
+		id, _ := section["id"].(string)
+		if id != "" {
+			if _, ok := seenIDs[id]; ok {
+				return fmt.Errorf("%s.sections[%d].id duplicates modal section id %q", path, i, id)
+			}
+			seenIDs[id] = struct{}{}
+		}
+		if err := validateModalSection(fmt.Sprintf("%s.sections[%d]", path, i), section, shape); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateModalLabelsPresentation(path string, raw any, shape topologyShape) error {
+	if raw == nil {
+		return nil
+	}
+	labels, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	table, _ := labels["table"].(string)
+	if table == "" {
+		table = "actor_labels"
+	}
+	columns := shape.actorTables[table]
+	if columns == nil {
+		columns = shape.tableTypes[table]
+	}
+	if columns == nil {
+		return fmt.Errorf("%s.table references unknown actor labels table %q", path, table)
+	}
+	for field, defaultColumn := range map[string]string{
+		"actor_column":       "actor",
+		"key_column":         "key",
+		"value_column":       "value",
+		"source_column":      "source",
+		"kind_column":        "kind",
+		"value_index_column": "value_index",
+	} {
+		_, hasField := labels[field]
+		column, _ := labels[field].(string)
+		if column == "" {
+			column = defaultColumn
+		}
+		columnType, ok := columns[column]
+		if !ok {
+			if (field == "source_column" || field == "kind_column" || field == "value_index_column") && !hasField {
+				continue
+			}
+			return fmt.Errorf("%s.%s references unknown column %q", path, field, column)
+		}
+		if field == "actor_column" && columnType != "actor_ref" {
+			return fmt.Errorf("%s.%s references non-actor_ref column %q (%s)", path, field, column, columnType)
+		}
+	}
+	if err := validateModalLabelIdentification(path+".identification", labels["identification"]); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateModalLabelIdentification(path string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	identification, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	if rawFields := identification["fields"]; rawFields != nil {
+		fields, ok := rawFields.([]any)
+		if !ok {
+			return fmt.Errorf("%s.fields is not an array", path)
+		}
+		for i, rawField := range fields {
+			field, ok := rawField.(map[string]any)
+			if !ok {
+				return fmt.Errorf("%s.fields[%d] is not an object", path, i)
+			}
+			key, ok := field["key"].(string)
+			if !ok || key == "" {
+				return fmt.Errorf("%s.fields[%d].key is required", path, i)
+			}
+			label, ok := field["label"].(string)
+			if !ok || label == "" {
+				return fmt.Errorf("%s.fields[%d].label is required", path, i)
+			}
+			if rawMaxValues, ok := field["max_values"]; ok {
+				maxValues, ok := integerValue(rawMaxValues)
+				if !ok || maxValues < 1 {
+					return fmt.Errorf("%s.fields[%d].max_values must be a positive integer", path, i)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateModalMiniTopologyPresentation(path string, raw any, shape topologyShape) error {
+	if raw == nil {
+		return nil
+	}
+	mini, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	if _, present := mini["depth"]; present {
+		depth, ok := integerValue(mini["depth"])
+		if !ok {
+			return fmt.Errorf("%s.depth is not an integer", path)
+		}
+		if depth != 1 {
+			return fmt.Errorf("%s.depth must be 1", path)
+		}
+	}
+	if err := validateKnownLinkTypeList(path+".include_link_types", mini["include_link_types"], shape); err != nil {
+		return err
+	}
+	return validateKnownLinkTypeList(path+".exclude_link_types", mini["exclude_link_types"], shape)
+}
+
+func validateKnownLinkTypeList(path string, raw any, shape topologyShape) error {
+	if raw == nil {
+		return nil
+	}
+	values, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("%s is not an array", path)
+	}
+	for i, rawValue := range values {
+		value, ok := rawValue.(string)
+		if !ok || value == "" {
+			return fmt.Errorf("%s[%d] is not a non-empty string", path, i)
+		}
+		if _, ok := shape.linkTypes[value]; !ok {
+			return fmt.Errorf("%s[%d] references unknown link type %q", path, i, value)
+		}
+	}
+	return nil
+}
+
+func validateModalSection(path string, section map[string]any, shape topologyShape) error {
+	if err := validateRequiredString(path+".id", section["id"]); err != nil {
+		return err
+	}
+	if err := validateRequiredString(path+".label", section["label"]); err != nil {
+		return err
+	}
+	columns, err := validateModalSource(path+".source", section["source"], shape)
+	if err != nil {
+		return err
+	}
+	if err := validateModalOwnerFilter(path+".owner_filter", section["owner_filter"], columns); err != nil {
+		return err
+	}
+	if err := validateModalRowFilters(path+".row_filters", section["row_filters"], columns); err != nil {
+		return err
+	}
+	rawColumns, ok := section["columns"].([]any)
+	if !ok {
+		return fmt.Errorf("%s.columns is not an array", path)
+	}
+	if len(rawColumns) == 0 {
+		return fmt.Errorf("%s.columns must not be empty", path)
+	}
+	if err := validateModalColumns(path+".columns", section["columns"], columns); err != nil {
+		return err
+	}
+	return validateModalSort(path+".sort", section["sort"], section["columns"])
+}
+
+func validateModalSource(path string, raw any, shape topologyShape) (map[string]string, error) {
+	source, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("%s is not an object", path)
+	}
+	kind, err := requiredEnum(path+".kind", source["kind"], "actors", "links", "evidence", "actor_table", "relationship_table")
+	if err != nil {
+		return nil, err
+	}
+	switch kind {
+	case "actors":
+		return shape.actorColumns, nil
+	case "links":
+		return shape.linkColumns, nil
+	case "evidence":
+		evidence, _ := source["evidence"].(string)
+		if evidence == "" {
+			return nil, fmt.Errorf("%s.evidence is required when kind is evidence", path)
+		}
+		columns := shape.evidenceTypes[evidence]
+		if columns == nil {
+			return nil, fmt.Errorf("%s.evidence references unknown evidence type %q", path, evidence)
+		}
+		return columns, nil
+	case "actor_table":
+		table, _ := source["table"].(string)
+		if table == "" {
+			return nil, fmt.Errorf("%s.table is required when kind is actor_table", path)
+		}
+		columns := shape.actorTables[table]
+		if columns == nil {
+			columns = shape.tableTypes[table]
+		}
+		if columns == nil {
+			return nil, fmt.Errorf("%s.table references unknown actor table %q", path, table)
+		}
+		return columns, nil
+	case "relationship_table":
+		table, _ := source["table"].(string)
+		if table == "" {
+			return nil, fmt.Errorf("%s.table is required when kind is relationship_table", path)
+		}
+		columns := shape.relationshipTables[table]
+		if columns == nil {
+			columns = shape.tableTypes[table]
+		}
+		if columns == nil {
+			return nil, fmt.Errorf("%s.table references unknown relationship table %q", path, table)
+		}
+		return columns, nil
+	default:
+		return nil, fmt.Errorf("%s.kind has unsupported value %q", path, kind)
+	}
+}
+
+func validateModalOwnerFilter(path string, raw any, columns map[string]string) error {
+	if raw == nil {
+		return nil
+	}
+	filter, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	mode, err := requiredEnum(path+".mode", filter["mode"], "none", "actor_column", "link_column", "incident_link", "incident_evidence", "selected_link")
+	if err != nil {
+		return err
+	}
+	switch mode {
+	case "actor_column":
+		return validateModalColumnRef(path+".actor_column", filter["actor_column"], columns, "actor_ref", false)
+	case "link_column", "selected_link":
+		return validateModalColumnRef(path+".link_column", filter["link_column"], columns, "link_ref", false)
+	case "incident_link", "incident_evidence":
+		if err := validateModalColumnRef(path+".src_actor_column", filter["src_actor_column"], columns, "actor_ref", false); err != nil {
+			return err
+		}
+		return validateModalColumnRef(path+".dst_actor_column", filter["dst_actor_column"], columns, "actor_ref", false)
+	default:
+		return nil
+	}
+}
+
+func validateModalRowFilters(path string, raw any, columns map[string]string) error {
+	if raw == nil {
+		return nil
+	}
+	filters, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("%s is not an array", path)
+	}
+	for i, rawFilter := range filters {
+		filter, ok := rawFilter.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%s[%d] is not an object", path, i)
+		}
+		filterPath := fmt.Sprintf("%s[%d]", path, i)
+		if err := validateModalColumnRef(filterPath+".column", filter["column"], columns, "", false); err != nil {
+			return err
+		}
+		op, err := requiredEnum(filterPath+".op", filter["op"], "eq", "ne", "in", "not_in", "exists", "missing")
+		if err != nil {
+			return err
+		}
+		switch op {
+		case "eq", "ne":
+			if _, ok := filter["value"]; !ok {
+				return fmt.Errorf("%s.value is required when op is %s", filterPath, op)
+			}
+		case "in", "not_in":
+			values, ok := filter["values"].([]any)
+			if !ok {
+				return fmt.Errorf("%s.values is required when op is %s", filterPath, op)
+			}
+			if len(values) == 0 {
+				return fmt.Errorf("%s.values must not be empty when op is %s", filterPath, op)
+			}
+		}
+	}
+	return nil
+}
+
+func validateModalColumns(path string, raw any, sourceColumns map[string]string) error {
+	if raw == nil {
+		return nil
+	}
+	columns, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("%s is not an array", path)
+	}
+	seenIDs := make(map[string]struct{}, len(columns))
+	for i, rawColumn := range columns {
+		column, ok := rawColumn.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%s[%d] is not an object", path, i)
+		}
+		columnPath := fmt.Sprintf("%s[%d]", path, i)
+		if err := validateRequiredString(columnPath+".id", column["id"]); err != nil {
+			return err
+		}
+		id := column["id"].(string)
+		if _, ok := seenIDs[id]; ok {
+			return fmt.Errorf("%s[%d].id duplicates modal column id %q", path, i, id)
+		}
+		seenIDs[id] = struct{}{}
+		if err := validateRequiredString(columnPath+".label", column["label"]); err != nil {
+			return err
+		}
+		if err := optionalEnum(columnPath+".cell", column["cell"], "text", "number", "badge", "actor_link", "timestamp", "duration", "endpoint", "array_count", "debug_json"); err != nil {
+			return err
+		}
+		if err := optionalEnum(columnPath+".visibility", column["visibility"], "table", "expanded", "hidden", "debug"); err != nil {
+			return err
+		}
+		if err := optionalEnum(columnPath+".align", column["align"], "left", "center", "right"); err != nil {
+			return err
+		}
+		if err := validateModalProjection(columnPath+".projection", column["projection"], sourceColumns); err != nil {
+			return err
+		}
+		if err := validateModalBadgeMap(columnPath+".badge_map", column["badge_map"]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateModalProjection(path string, raw any, columns map[string]string) error {
+	projection, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	kind, err := requiredEnum(path+".kind", projection["kind"],
+		"direct", "actor_ref_label", "opposite_actor", "formatted_endpoint", "label_lookup",
+		"json_path", "const", "coalesce", "selected_side_endpoint")
+	if err != nil {
+		return err
+	}
+	switch kind {
+	case "direct":
+		return validateModalColumnRef(path+".column", projection["column"], columns, "", false)
+	case "actor_ref_label":
+		return validateModalColumnRef(path+".actor_column", projection["actor_column"], columns, "actor_ref", false)
+	case "opposite_actor":
+		if err := validateModalColumnRef(path+".src_actor_column", projection["src_actor_column"], columns, "actor_ref", false); err != nil {
+			return err
+		}
+		return validateModalColumnRef(path+".dst_actor_column", projection["dst_actor_column"], columns, "actor_ref", false)
+	case "formatted_endpoint":
+		if stringValue(projection["ip_column"]) == "" && stringValue(projection["port_column"]) == "" {
+			return fmt.Errorf("%s requires ip_column or port_column when kind is formatted_endpoint", path)
+		}
+		if err := validateModalColumnRef(path+".ip_column", projection["ip_column"], columns, "", true); err != nil {
+			return err
+		}
+		if err := validateModalColumnRef(path+".port_column", projection["port_column"], columns, "", true); err != nil {
+			return err
+		}
+		return validateModalColumnRef(path+".protocol_column", projection["protocol_column"], columns, "", true)
+	case "label_lookup":
+		if err := validateModalColumnRef(path+".actor_column", projection["actor_column"], columns, "actor_ref", true); err != nil {
+			return err
+		}
+		labelKey, _ := projection["label_key"].(string)
+		if labelKey == "" {
+			return fmt.Errorf("%s.label_key is required when kind is label_lookup", path)
+		}
+		return nil
+	case "json_path":
+		if err := validateModalColumnRef(path+".column", projection["column"], columns, "json", false); err != nil {
+			return err
+		}
+		pathValue, _ := projection["path"].(string)
+		if pathValue == "" {
+			return fmt.Errorf("%s.path is required when kind is json_path", path)
+		}
+		return nil
+	case "const":
+		if _, ok := projection["value"]; !ok {
+			return fmt.Errorf("%s.value is required when kind is const", path)
+		}
+		return nil
+	case "coalesce":
+		rawColumns, ok := projection["columns"].([]any)
+		if !ok || len(rawColumns) == 0 {
+			return fmt.Errorf("%s.columns is required when kind is coalesce", path)
+		}
+		for i, rawColumn := range rawColumns {
+			if err := validateModalColumnRef(fmt.Sprintf("%s.columns[%d]", path, i), rawColumn, columns, "", false); err != nil {
+				return err
+			}
+		}
+		return nil
+	case "selected_side_endpoint":
+		if err := validateModalColumnRef(path+".src_actor_column", projection["src_actor_column"], columns, "actor_ref", false); err != nil {
+			return err
+		}
+		if err := validateModalColumnRef(path+".dst_actor_column", projection["dst_actor_column"], columns, "actor_ref", false); err != nil {
+			return err
+		}
+		if stringValue(projection["local_ip_column"]) == "" && stringValue(projection["local_port_column"]) == "" {
+			return fmt.Errorf("%s requires local_ip_column or local_port_column when kind is selected_side_endpoint", path)
+		}
+		if stringValue(projection["remote_ip_column"]) == "" && stringValue(projection["remote_port_column"]) == "" {
+			return fmt.Errorf("%s requires remote_ip_column or remote_port_column when kind is selected_side_endpoint", path)
+		}
+		for _, field := range []string{"local_ip_column", "local_port_column", "remote_ip_column", "remote_port_column", "protocol_column"} {
+			if err := validateModalColumnRef(path+"."+field, projection[field], columns, "", true); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("%s.kind has unsupported value %q", path, kind)
+	}
+}
+
+func validateModalBadgeMap(path string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	badgeMap, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	for key, rawBadge := range badgeMap {
+		badge, ok := rawBadge.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%s.%s is not an object", path, key)
+		}
+		if err := optionalEnum(path+"."+key+".color_slot", badge["color_slot"], colorSlotTokens...); err != nil {
+			return err
+		}
+		if err := optionalEnum(path+"."+key+".opacity", badge["opacity"], opacityTokens...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateModalSort(path string, raw any, rawColumns any) error {
+	if raw == nil {
+		return nil
+	}
+	sortSpec, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	column, _ := sortSpec["column"].(string)
+	if column == "" {
+		return fmt.Errorf("%s.column is empty", path)
+	}
+	if err := optionalEnum(path+".direction", sortSpec["direction"], "asc", "desc"); err != nil {
+		return err
+	}
+	columns, _ := rawColumns.([]any)
+	for _, rawColumn := range columns {
+		columnSpec, ok := rawColumn.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := columnSpec["id"].(string)
+		if id == column {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s.column references unknown modal column %q", path, column)
+}
+
+func validateModalColumnRef(path string, raw any, columns map[string]string, expectedType string, optional bool) error {
+	column, _ := raw.(string)
+	if column == "" {
+		if optional {
+			return nil
+		}
+		return fmt.Errorf("%s is required", path)
+	}
+	columnType, ok := columns[column]
+	if !ok {
+		return fmt.Errorf("%s references unknown source column %q", path, column)
+	}
+	if expectedType != "" && columnType != expectedType {
+		return fmt.Errorf("%s references non-%s source column %q (%s)", path, expectedType, column, columnType)
 	}
 	return nil
 }
@@ -1054,6 +1684,9 @@ func validateCorrelation(raw any, shape topologyShape, ctx validationContext) er
 			return fmt.Errorf("data.correlation.rules.%s is not an object", ruleID)
 		}
 		if _, err := requiredEnum("data.correlation.rules."+ruleID+".action", rule["action"], "absorb", "link"); err != nil {
+			return err
+		}
+		if err := optionalEnum("data.correlation.rules."+ruleID+".class", rule["class"], "resolve_loose_side", "replace_actor", "merge_enrich_actor"); err != nil {
 			return err
 		}
 		if _, ok := integerValue(rule["priority"]); !ok {
@@ -1470,6 +2103,19 @@ func optionalEnum(path string, raw any, allowed ...string) error {
 	return nil
 }
 
+func stringValue(raw any) string {
+	value, _ := raw.(string)
+	return value
+}
+
+func validateRequiredString(path string, raw any) error {
+	value, ok := raw.(string)
+	if !ok || value == "" {
+		return fmt.Errorf("%s is required", path)
+	}
+	return nil
+}
+
 func stringInSet(value string, allowed []string) bool {
 	for _, item := range allowed {
 		if value == item {
@@ -1527,6 +2173,13 @@ func integerValue(raw any) (int, bool) {
 	switch value := raw.(type) {
 	case int:
 		return value, true
+	case int64:
+		return int(value), true
+	case uint64:
+		if value > uint64(maxInt()) {
+			return 0, false
+		}
+		return int(value), true
 	case float64:
 		if math.Trunc(value) != value {
 			return 0, false
@@ -1541,4 +2194,29 @@ func integerValue(raw any) (int, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func numberValue(raw any) (float64, bool) {
+	switch value := raw.(type) {
+	case int:
+		return float64(value), true
+	case int64:
+		return float64(value), true
+	case uint64:
+		return float64(value), true
+	case float64:
+		return value, true
+	case json.Number:
+		n, err := value.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return n, true
+	default:
+		return 0, false
+	}
+}
+
+func maxInt() int {
+	return int(^uint(0) >> 1)
 }

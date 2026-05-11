@@ -63,10 +63,11 @@ type Producer struct {
 }
 
 type View struct {
-	ID      string   `json:"id,omitempty"`
-	Scope   string   `json:"scope,omitempty"`
-	Mode    string   `json:"mode,omitempty"`
-	GroupBy []string `json:"group_by,omitempty"`
+	ID             string   `json:"id,omitempty"`
+	Scope          string   `json:"scope,omitempty"`
+	Mode           string   `json:"mode,omitempty"`
+	SupportedModes []string `json:"supported_modes,omitempty"`
+	GroupBy        []string `json:"group_by,omitempty"`
 }
 
 type Dictionaries map[string][]any
@@ -156,6 +157,7 @@ type ActorPresentation struct {
 	LabelPolicy *LabelPolicy            `json:"label_policy,omitempty"`
 	Ports       *ActorPortsPresentation `json:"ports,omitempty"`
 	Hover       *HoverPresentation      `json:"hover,omitempty"`
+	Modal       *ModalPresentation      `json:"modal,omitempty"`
 }
 
 type LinkPresentation struct {
@@ -169,6 +171,7 @@ type LinkPresentation struct {
 	Variable  *LinkVariablePresentation `json:"variable,omitempty"`
 	Hover     *HoverPresentation        `json:"hover,omitempty"`
 	Layout    *LinkLayoutPresentation   `json:"layout,omitempty"`
+	Modal     *ModalPresentation        `json:"modal,omitempty"`
 }
 
 type LinkLayoutPresentation struct {
@@ -237,6 +240,118 @@ type LinkVariablePresentation struct {
 	Max         string `json:"max,omitempty"`
 }
 
+type ModalPresentation struct {
+	Enabled      *bool                          `json:"enabled,omitempty"`
+	Labels       *ModalLabelsPresentation       `json:"labels,omitempty"`
+	MiniTopology *ModalMiniTopologyPresentation `json:"mini_topology,omitempty"`
+	Sections     []ModalSection                 `json:"sections,omitempty"`
+}
+
+type ModalLabelsPresentation struct {
+	Enabled          *bool                                 `json:"enabled,omitempty"`
+	Table            string                                `json:"table,omitempty"`
+	ActorColumn      string                                `json:"actor_column,omitempty"`
+	KeyColumn        string                                `json:"key_column,omitempty"`
+	ValueColumn      string                                `json:"value_column,omitempty"`
+	SourceColumn     string                                `json:"source_column,omitempty"`
+	KindColumn       string                                `json:"kind_column,omitempty"`
+	ValueIndexColumn string                                `json:"value_index_column,omitempty"`
+	Identification   *ModalLabelIdentificationPresentation `json:"identification,omitempty"`
+}
+
+type ModalLabelIdentificationPresentation struct {
+	Enabled *bool                           `json:"enabled,omitempty"`
+	Fields  []ModalLabelIdentificationField `json:"fields,omitempty"`
+}
+
+type ModalLabelIdentificationField struct {
+	Key       string `json:"key"`
+	Label     string `json:"label"`
+	MaxValues int    `json:"max_values,omitempty"`
+}
+
+type ModalMiniTopologyPresentation struct {
+	Enabled          *bool    `json:"enabled,omitempty"`
+	Depth            int      `json:"depth,omitempty"`
+	IncludeLinkTypes []string `json:"include_link_types,omitempty"`
+	ExcludeLinkTypes []string `json:"exclude_link_types,omitempty"`
+}
+
+type ModalSection struct {
+	ID          string            `json:"id"`
+	Label       string            `json:"label"`
+	Order       int               `json:"order,omitempty"`
+	Source      ModalSource       `json:"source"`
+	OwnerFilter *ModalOwnerFilter `json:"owner_filter,omitempty"`
+	RowFilters  []ModalRowFilter  `json:"row_filters,omitempty"`
+	Columns     []ModalColumn     `json:"columns"`
+	Sort        *ModalSort        `json:"sort,omitempty"`
+	EmptyLabel  string            `json:"empty_label,omitempty"`
+}
+
+type ModalSource struct {
+	Kind     string `json:"kind"`
+	Table    string `json:"table,omitempty"`
+	Evidence string `json:"evidence,omitempty"`
+}
+
+type ModalOwnerFilter struct {
+	Mode           string `json:"mode"`
+	ActorColumn    string `json:"actor_column,omitempty"`
+	LinkColumn     string `json:"link_column,omitempty"`
+	SrcActorColumn string `json:"src_actor_column,omitempty"`
+	DstActorColumn string `json:"dst_actor_column,omitempty"`
+}
+
+type ModalRowFilter struct {
+	Column string `json:"column"`
+	Op     string `json:"op"`
+	Value  any    `json:"value,omitempty"`
+	Values []any  `json:"values,omitempty"`
+}
+
+type ModalColumn struct {
+	ID         string                            `json:"id"`
+	Label      string                            `json:"label"`
+	Projection ModalProjection                   `json:"projection"`
+	Cell       string                            `json:"cell,omitempty"`
+	Visibility string                            `json:"visibility,omitempty"`
+	Align      string                            `json:"align,omitempty"`
+	Sortable   *bool                             `json:"sortable,omitempty"`
+	BadgeMap   map[string]ModalBadgePresentation `json:"badge_map,omitempty"`
+}
+
+type ModalProjection struct {
+	Kind             string   `json:"kind"`
+	Column           string   `json:"column,omitempty"`
+	Columns          []string `json:"columns,omitempty"`
+	Value            any      `json:"value,omitempty"`
+	ActorColumn      string   `json:"actor_column,omitempty"`
+	SrcActorColumn   string   `json:"src_actor_column,omitempty"`
+	DstActorColumn   string   `json:"dst_actor_column,omitempty"`
+	IPColumn         string   `json:"ip_column,omitempty"`
+	PortColumn       string   `json:"port_column,omitempty"`
+	ProtocolColumn   string   `json:"protocol_column,omitempty"`
+	LocalIPColumn    string   `json:"local_ip_column,omitempty"`
+	LocalPortColumn  string   `json:"local_port_column,omitempty"`
+	RemoteIPColumn   string   `json:"remote_ip_column,omitempty"`
+	RemotePortColumn string   `json:"remote_port_column,omitempty"`
+	LabelKey         string   `json:"label_key,omitempty"`
+	Path             string   `json:"path,omitempty"`
+	Fallback         any      `json:"fallback,omitempty"`
+}
+
+type ModalBadgePresentation struct {
+	Label     string `json:"label,omitempty"`
+	ColorSlot string `json:"color_slot,omitempty"`
+	Opacity   string `json:"opacity,omitempty"`
+}
+
+type ModalSort struct {
+	Column    string `json:"column"`
+	Direction string `json:"direction,omitempty"`
+}
+
 type LinkAggregation struct {
 	Direction string            `json:"direction"`
 	Evidence  string            `json:"evidence,omitempty"`
@@ -251,6 +366,7 @@ type Correlation struct {
 
 type CorrelationRule struct {
 	Action               string               `json:"action"`
+	Class                string               `json:"class,omitempty"`
 	Priority             int                  `json:"priority"`
 	KeySpace             string               `json:"key_space"`
 	Key                  []CorrelationKeyPart `json:"key"`
@@ -273,11 +389,19 @@ type EvidenceType struct {
 }
 
 type TableType struct {
-	Role           string   `json:"role"`
-	Owner          string   `json:"owner"`
-	Aggregation    string   `json:"aggregation"`
-	SourceEvidence string   `json:"source_evidence,omitempty"`
-	Columns        []Column `json:"columns"`
+	Role           string                 `json:"role"`
+	Owner          string                 `json:"owner"`
+	Aggregation    string                 `json:"aggregation"`
+	SourceEvidence string                 `json:"source_evidence,omitempty"`
+	Columns        []Column               `json:"columns"`
+	Presentation   *TableTypePresentation `json:"presentation,omitempty"`
+}
+
+type TableTypePresentation struct {
+	Label             string        `json:"label,omitempty"`
+	Order             int           `json:"order,omitempty"`
+	DefaultVisibility string        `json:"default_visibility,omitempty"`
+	Columns           []ModalColumn `json:"columns,omitempty"`
 }
 
 type OverlayTemplate struct {

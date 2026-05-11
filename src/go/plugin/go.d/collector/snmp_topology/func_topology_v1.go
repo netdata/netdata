@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -72,6 +73,7 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 						},
 					},
 				},
+				Modal: snmpTopologyV1DeviceModal(),
 			},
 		}
 	}
@@ -106,6 +108,7 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 				MaxLength: 80,
 				Array:     "reject",
 			},
+			Modal: snmpTopologyV1EndpointModal(),
 		},
 	}
 	types[snmpTopologyV1ActorSegment] = topologyv1.ActorType{
@@ -125,6 +128,7 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 				MaxLength: 80,
 				Array:     "reject",
 			},
+			Modal: snmpTopologyV1EndpointModal(),
 		},
 	}
 	types["custom"] = topologyv1.ActorType{
@@ -143,9 +147,100 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 				MaxLength: 80,
 				Array:     "reject",
 			},
+			Modal: snmpTopologyV1EndpointModal(),
 		},
 	}
 	return types
+}
+
+func snmpTopologyV1DeviceModal() *topologyv1.ModalPresentation {
+	return &topologyv1.ModalPresentation{
+		Labels:       &topologyv1.ModalLabelsPresentation{Table: "actor_labels"},
+		MiniTopology: &topologyv1.ModalMiniTopologyPresentation{Depth: 1},
+		Sections: []topologyv1.ModalSection{
+			{
+				ID:    "ports",
+				Label: "Ports",
+				Order: 1,
+				Source: topologyv1.ModalSource{
+					Kind:  "actor_table",
+					Table: "actor_ports",
+				},
+				OwnerFilter: &topologyv1.ModalOwnerFilter{
+					Mode:        "actor_column",
+					ActorColumn: "actor",
+				},
+				Columns: snmpTopologyV1PortModalColumns(),
+			},
+			snmpTopologyV1LinksSection(2),
+		},
+	}
+}
+
+func snmpTopologyV1EndpointModal() *topologyv1.ModalPresentation {
+	return &topologyv1.ModalPresentation{
+		Labels:       &topologyv1.ModalLabelsPresentation{Table: "actor_labels"},
+		MiniTopology: &topologyv1.ModalMiniTopologyPresentation{Depth: 1},
+		Sections:     []topologyv1.ModalSection{snmpTopologyV1LinksSection(1)},
+	}
+}
+
+func snmpTopologyV1LinksSection(order int) topologyv1.ModalSection {
+	return topologyv1.ModalSection{
+		ID:    "links",
+		Label: "Links",
+		Order: order,
+		Source: topologyv1.ModalSource{
+			Kind: "links",
+		},
+		OwnerFilter: &topologyv1.ModalOwnerFilter{
+			Mode:           "incident_link",
+			SrcActorColumn: "src_actor",
+			DstActorColumn: "dst_actor",
+		},
+		Columns: []topologyv1.ModalColumn{
+			{
+				ID:    "remote",
+				Label: "Remote Actor",
+				Projection: topologyv1.ModalProjection{
+					Kind:           "opposite_actor",
+					SrcActorColumn: "src_actor",
+					DstActorColumn: "dst_actor",
+				},
+				Cell: "actor_link",
+			},
+			modalSelectedSidePortColumn("local_port", "Local Port", "src_port_name", "dst_port_name"),
+			modalSelectedSidePortColumn("remote_port", "Remote Port", "dst_port_name", "src_port_name"),
+			modalDirectColumn("protocol", "Protocol", "protocol", "badge"),
+			modalDirectColumn("direction", "Direction", "direction", "text"),
+			modalDirectColumn("state", "State", "state", "badge"),
+			modalDirectColumn("evidence_count", "Evidence", "evidence_count", "number"),
+		},
+	}
+}
+
+func modalSelectedSidePortColumn(id, label, selectedSrcPortColumn, selectedDstPortColumn string) topologyv1.ModalColumn {
+	return topologyv1.ModalColumn{
+		ID:    id,
+		Label: label,
+		Projection: topologyv1.ModalProjection{
+			Kind:             "selected_side_endpoint",
+			SrcActorColumn:   "src_actor",
+			DstActorColumn:   "dst_actor",
+			LocalPortColumn:  selectedSrcPortColumn,
+			RemotePortColumn: selectedDstPortColumn,
+		},
+		Cell: "text",
+	}
+}
+
+func modalDirectColumn(id, label, sourceColumn, cell string) topologyv1.ModalColumn {
+	return topologyv1.ModalColumn{
+		ID:         id,
+		Label:      label,
+		Projection: topologyv1.ModalProjection{Kind: "direct", Column: sourceColumn},
+		Cell:       cell,
+	}
 }
 
 func snmpTopologyV1PortTypes() map[string]topologyv1.PortType {
@@ -299,6 +394,9 @@ func snmpTopologyToV1(data topologyData) (topologyv1.Data, error) {
 	if tableTypes == nil {
 		tableTypes = make(map[string]topologyv1.TableType)
 	}
+	if _, ok := tableTypes["actor_labels"]; !ok {
+		tableTypes["actor_labels"] = snmpTopologyV1ActorLabelsTableType()
+	}
 	if _, ok := tableTypes["actor_ports"]; !ok {
 		tableTypes["actor_ports"] = snmpTopologyV1ActorPortsTableType()
 	}
@@ -378,13 +476,78 @@ func snmpTopologyV1ActorPortsTableType() topologyv1.TableType {
 		Role:        "actor_detail",
 		Owner:       "actor",
 		Aggregation: "append",
+		Columns:     snmpTopologyV1ActorPortsColumns(),
+		Presentation: &topologyv1.TableTypePresentation{
+			Label:   "Ports",
+			Order:   1,
+			Columns: snmpTopologyV1PortModalColumns(),
+		},
+	}
+}
+
+func snmpTopologyV1PortModalColumns() []topologyv1.ModalColumn {
+	extra := modalDirectColumn("extra", "Extra", "extra", "debug_json")
+	extra.Visibility = "debug"
+
+	return []topologyv1.ModalColumn{
+		modalDirectColumn("name", "Port", "name", "text"),
+		modalDirectColumn("oper_status", "Status", "oper_status", "badge"),
+		modalDirectColumn("admin_status", "Admin", "admin_status", "badge"),
+		modalDirectColumn("port_type", "Type", "port_type", "badge"),
+		modalDirectColumn("link_mode", "Mode", "link_mode", "badge"),
+		modalDirectColumn("topology_role", "Role", "topology_role", "badge"),
+		modalDirectColumn("stp_state", "STP", "stp_state", "badge"),
+		modalDirectColumn("vlan_ids", "VLANs", "vlan_ids", "array_count"),
+		modalDirectColumn("fdb_mac_count", "FDB", "fdb_mac_count", "number"),
+		modalDirectColumn("link_count", "Links", "link_count", "number"),
+		modalDirectColumn("neighbor_count", "Neighbors", "neighbor_count", "number"),
+		extra,
+	}
+}
+
+func snmpTopologyV1ActorLabelsTableType() topologyv1.TableType {
+	return topologyv1.TableType{
+		Role:        "actor_inventory",
+		Owner:       "actor",
+		Aggregation: "set",
 		Columns: []topologyv1.Column{
 			topologyv1.NewColumn("actor", "actor_ref", topologyv1.WithRole("reference")),
-			topologyv1.NewColumn("name", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
-			topologyv1.NewColumn("topology_role", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
-			topologyv1.NewColumn("oper_status", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
-			topologyv1.NewColumn("link_mode", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+			topologyv1.NewColumn("key", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("attribute")),
+			topologyv1.NewColumn("value", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("attribute")),
+			topologyv1.NewColumn("source", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable(), topologyv1.WithRole("attribute")),
+			topologyv1.NewColumn("kind", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable(), topologyv1.WithRole("attribute")),
+			topologyv1.NewColumn("value_index", "uint", topologyv1.WithNullable(), topologyv1.WithRole("attribute")),
 		},
+		Presentation: &topologyv1.TableTypePresentation{
+			Label: "Labels",
+			Order: 0,
+			Columns: []topologyv1.ModalColumn{
+				modalDirectColumn("key", "Label", "key", "text"),
+				modalDirectColumn("value", "Value", "value", "text"),
+				modalDirectColumn("source", "Source", "source", "badge"),
+				modalDirectColumn("kind", "Kind", "kind", "badge"),
+			},
+		},
+	}
+}
+
+func snmpTopologyV1ActorPortsColumns() []topologyv1.Column {
+	return []topologyv1.Column{
+		topologyv1.NewColumn("actor", "actor_ref", topologyv1.WithRole("reference")),
+		topologyv1.NewColumn("name", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("topology_role", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("oper_status", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("admin_status", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("port_type", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("link_mode", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("stp_state", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("vlan_ids", "array", topologyv1.WithNullable()),
+		topologyv1.NewColumn("fdb_mac_count", "uint", topologyv1.WithNullable()),
+		topologyv1.NewColumn("link_count", "uint", topologyv1.WithNullable()),
+		topologyv1.NewColumn("neighbor_count", "uint", topologyv1.WithNullable()),
+		topologyv1.NewColumn("neighbors", "json", topologyv1.WithNullable()),
+		topologyv1.NewColumn("vlans", "json", topologyv1.WithNullable()),
+		topologyv1.NewColumn("extra", "json", topologyv1.WithNullable()),
 	}
 }
 
@@ -403,6 +566,22 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 	sysObjectIDs := make([]any, len(actors))
 	sysNames := make([]any, len(actors))
 	parentDevices := make([]any, len(actors))
+	vendors := make([]any, len(actors))
+	models := make([]any, len(actors))
+	sysDescrs := make([]any, len(actors))
+	sysLocations := make([]any, len(actors))
+	sysContacts := make([]any, len(actors))
+	managementIPs := make([]any, len(actors))
+	protocols := make([]any, len(actors))
+	capabilities := make([]any, len(actors))
+	portsTotal := make([]any, len(actors))
+	vlanCounts := make([]any, len(actors))
+	fdbTotalMACs := make([]any, len(actors))
+	lldpNeighborCounts := make([]any, len(actors))
+	cdpNeighborCounts := make([]any, len(actors))
+	endpointsTotal := make([]any, len(actors))
+	chartIDPrefixes := make([]any, len(actors))
+	netdataHostIDs := make([]any, len(actors))
 
 	for i, actor := range actors {
 		actorID := strings.TrimSpace(actor.ActorID)
@@ -423,6 +602,32 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 		sysObjectIDs[i] = stringsDict.Ref(actor.Match.SysObjectID)
 		sysNames[i] = stringsDict.Ref(actor.Match.SysName)
 		parentDevices[i] = stringArrayCell(anyStringSlice(actor.Attributes["parent_devices"]))
+		vendors[i] = nullableStringRef(stringsDict, firstNonEmptyString(anyStringValue(actor.Attributes["vendor"]), anyStringValue(actor.Attributes["vendor_derived"])))
+		models[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["model"]))
+		sysDescrs[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["sys_descr"]))
+		sysLocations[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["sys_location"]))
+		sysContacts[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["sys_contact"]))
+		managementIPs[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["management_ip"]))
+		protocols[i] = stringArrayCell(anyStringSlice(actor.Attributes["protocols"]))
+		if isEmptyArrayCell(protocols[i]) {
+			// Older SNMP topology payloads used learned_sources for discovered protocols.
+			protocols[i] = stringArrayCell(anyStringSlice(actor.Attributes["learned_sources"]))
+		}
+		if isEmptyArrayCell(protocols[i]) {
+			protocols[i] = nil
+		}
+		capabilities[i] = stringArrayCell(anyStringSlice(actor.Attributes["capabilities"]))
+		if isEmptyArrayCell(capabilities[i]) {
+			capabilities[i] = nil
+		}
+		portsTotal[i] = nullableUintValue(actor.Attributes["ports_total"])
+		vlanCounts[i] = nullableUintValue(actor.Attributes["vlan_count"])
+		fdbTotalMACs[i] = nullableUintValue(actor.Attributes["fdb_total_macs"])
+		lldpNeighborCounts[i] = nullableUintValue(actor.Attributes["lldp_neighbor_count"])
+		cdpNeighborCounts[i] = nullableUintValue(actor.Attributes["cdp_neighbor_count"])
+		endpointsTotal[i] = nullableUintValue(actor.Attributes["endpoints_total"])
+		chartIDPrefixes[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["chart_id_prefix"]))
+		netdataHostIDs[i] = nullableStringRef(stringsDict, anyStringValue(actor.Attributes["netdata_host_id"]))
 	}
 
 	return topologyv1.MustTable(len(actors),
@@ -440,6 +645,22 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 			topologyv1.NewColumn("sys_object_id", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("merge_identity")),
 			topologyv1.NewColumn("sys_name", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("merge_identity")),
 			topologyv1.NewColumn("parent_devices", "array", topologyv1.WithRole("parent_identity")),
+			topologyv1.NewColumn("vendor", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			topologyv1.NewColumn("model", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			topologyv1.NewColumn("sys_descr", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			topologyv1.NewColumn("sys_location", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			topologyv1.NewColumn("sys_contact", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			topologyv1.NewColumn("management_ip", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			topologyv1.NewColumn("protocols", "array", topologyv1.WithNullable()),
+			topologyv1.NewColumn("capabilities", "array", topologyv1.WithNullable()),
+			topologyv1.NewColumn("ports_total", "uint", topologyv1.WithNullable()),
+			topologyv1.NewColumn("vlan_count", "uint", topologyv1.WithNullable()),
+			topologyv1.NewColumn("fdb_total_macs", "uint", topologyv1.WithNullable()),
+			topologyv1.NewColumn("lldp_neighbor_count", "uint", topologyv1.WithNullable()),
+			topologyv1.NewColumn("cdp_neighbor_count", "uint", topologyv1.WithNullable()),
+			topologyv1.NewColumn("endpoints_total", "uint", topologyv1.WithNullable()),
+			topologyv1.NewColumn("chart_id_prefix", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			topologyv1.NewColumn("netdata_host_id", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
 		},
 		[]topologyv1.ColumnEncoding{
 			topologyv1.Values(ids...),
@@ -455,6 +676,22 @@ func buildSNMPTopologyV1Actors(actors []topologyActor, stringsDict *topologyv1.S
 			topologyv1.Values(sysObjectIDs...),
 			topologyv1.Values(sysNames...),
 			topologyv1.Values(parentDevices...),
+			topologyv1.Values(vendors...),
+			topologyv1.Values(models...),
+			topologyv1.Values(sysDescrs...),
+			topologyv1.Values(sysLocations...),
+			topologyv1.Values(sysContacts...),
+			topologyv1.Values(managementIPs...),
+			topologyv1.Values(protocols...),
+			topologyv1.Values(capabilities...),
+			topologyv1.Values(portsTotal...),
+			topologyv1.Values(vlanCounts...),
+			topologyv1.Values(fdbTotalMACs...),
+			topologyv1.Values(lldpNeighborCounts...),
+			topologyv1.Values(cdpNeighborCounts...),
+			topologyv1.Values(endpointsTotal...),
+			topologyv1.Values(chartIDPrefixes...),
+			topologyv1.Values(netdataHostIDs...),
 		},
 	), actorIndex
 }
@@ -470,6 +707,8 @@ func buildSNMPTopologyV1Links(
 	protocols := make([]any, len(links))
 	directions := make([]any, len(links))
 	states := make([]any, len(links))
+	srcPortNames := make([]any, len(links))
+	dstPortNames := make([]any, len(links))
 	evidenceCounts := make([]any, len(links))
 	discoveredAt := make([]any, len(links))
 	lastSeen := make([]any, len(links))
@@ -492,6 +731,8 @@ func buildSNMPTopologyV1Links(
 		protocols[i] = stringsDict.Ref(protocol)
 		directions[i] = stringsDict.Ref(firstNonEmptyString(link.Direction, "observed"))
 		states[i] = nullableStringRef(stringsDict, link.State)
+		srcPortNames[i] = nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Src))
+		dstPortNames[i] = nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Dst))
 		evidenceCounts[i] = 1
 		discoveredAt[i] = nullableTime(link.DiscoveredAt)
 		lastSeen[i] = nullableTime(link.LastSeen)
@@ -510,6 +751,15 @@ func buildSNMPTopologyV1Links(
 		evidenceRows.protocols = append(evidenceRows.protocols, stringsDict.Ref(protocol))
 		evidenceRows.directions = append(evidenceRows.directions, stringsDict.Ref(firstNonEmptyString(link.Direction, "observed")))
 		evidenceRows.states = append(evidenceRows.states, nullableStringRef(stringsDict, link.State))
+		evidenceRows.srcPortNames = append(evidenceRows.srcPortNames, nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Src)))
+		evidenceRows.dstPortNames = append(evidenceRows.dstPortNames, nullableStringRef(stringsDict, topologyV1EndpointPortName(link.Dst)))
+		evidenceRows.srcIfIndexes = append(evidenceRows.srcIfIndexes, nullableUintValue(link.Src.Attributes["if_index"]))
+		evidenceRows.dstIfIndexes = append(evidenceRows.dstIfIndexes, nullableUintValue(link.Dst.Attributes["if_index"]))
+		evidenceRows.srcManagementIPs = append(evidenceRows.srcManagementIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Src, "management_ip")))
+		evidenceRows.dstManagementIPs = append(evidenceRows.dstManagementIPs, nullableStringRef(stringsDict, topologyV1EndpointString(link.Dst, "management_ip")))
+		evidenceRows.confidences = append(evidenceRows.confidences, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "confidence")))
+		evidenceRows.inferences = append(evidenceRows.inferences, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "inference")))
+		evidenceRows.attachmentModes = append(evidenceRows.attachmentModes, nullableStringRef(stringsDict, topologyMetricValueString(link.Metrics, "attachment_mode")))
 		evidenceRows.srcEndpoints = append(evidenceRows.srcEndpoints, srcEndpoint)
 		evidenceRows.dstEndpoints = append(evidenceRows.dstEndpoints, dstEndpoint)
 		evidenceRows.metrics = append(evidenceRows.metrics, metrics)
@@ -523,6 +773,8 @@ func buildSNMPTopologyV1Links(
 			topologyv1.NewColumn("protocol", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("group_key")),
 			topologyv1.NewColumn("direction", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("group_key")),
 			topologyv1.NewColumn("state", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			topologyv1.NewColumn("src_port_name", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+			topologyv1.NewColumn("dst_port_name", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
 			topologyv1.NewColumn("evidence_count", "uint", topologyv1.WithAggregation("sum")),
 			topologyv1.NewColumn("discovered_at", "timestamp", topologyv1.WithNullable(), topologyv1.WithRole("timestamp")),
 			topologyv1.NewColumn("last_seen", "timestamp", topologyv1.WithNullable(), topologyv1.WithRole("timestamp")),
@@ -534,6 +786,8 @@ func buildSNMPTopologyV1Links(
 			topologyv1.Values(protocols...),
 			topologyv1.Values(directions...),
 			topologyv1.Values(states...),
+			topologyv1.Values(srcPortNames...),
+			topologyv1.Values(dstPortNames...),
 			topologyv1.Values(evidenceCounts...),
 			topologyv1.Values(discoveredAt...),
 			topologyv1.Values(lastSeen...),
@@ -552,15 +806,24 @@ func buildSNMPTopologyV1Links(
 }
 
 type snmpTopologyV1EvidenceRows struct {
-	linkRefs     []any
-	srcActors    []any
-	dstActors    []any
-	protocols    []any
-	directions   []any
-	states       []any
-	srcEndpoints []any
-	dstEndpoints []any
-	metrics      []any
+	linkRefs         []any
+	srcActors        []any
+	dstActors        []any
+	protocols        []any
+	directions       []any
+	states           []any
+	srcPortNames     []any
+	dstPortNames     []any
+	srcIfIndexes     []any
+	dstIfIndexes     []any
+	srcManagementIPs []any
+	dstManagementIPs []any
+	confidences      []any
+	inferences       []any
+	attachmentModes  []any
+	srcEndpoints     []any
+	dstEndpoints     []any
+	metrics          []any
 }
 
 func (rows *snmpTopologyV1EvidenceRows) table() topologyv1.Table {
@@ -573,6 +836,15 @@ func (rows *snmpTopologyV1EvidenceRows) table() topologyv1.Table {
 			topologyv1.Values(rows.protocols...),
 			topologyv1.Values(rows.directions...),
 			topologyv1.Values(rows.states...),
+			topologyv1.Values(rows.srcPortNames...),
+			topologyv1.Values(rows.dstPortNames...),
+			topologyv1.Values(rows.srcIfIndexes...),
+			topologyv1.Values(rows.dstIfIndexes...),
+			topologyv1.Values(rows.srcManagementIPs...),
+			topologyv1.Values(rows.dstManagementIPs...),
+			topologyv1.Values(rows.confidences...),
+			topologyv1.Values(rows.inferences...),
+			topologyv1.Values(rows.attachmentModes...),
 			topologyv1.Values(rows.srcEndpoints...),
 			topologyv1.Values(rows.dstEndpoints...),
 			topologyv1.Values(rows.metrics...),
@@ -588,6 +860,15 @@ func snmpTopologyV1EvidenceColumns() []topologyv1.Column {
 		topologyv1.NewColumn("protocol", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("group_key")),
 		topologyv1.NewColumn("direction", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithRole("group_key")),
 		topologyv1.NewColumn("state", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+		topologyv1.NewColumn("src_port_name", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+		topologyv1.NewColumn("dst_port_name", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+		topologyv1.NewColumn("src_if_index", "uint", topologyv1.WithNullable()),
+		topologyv1.NewColumn("dst_if_index", "uint", topologyv1.WithNullable()),
+		topologyv1.NewColumn("src_management_ip", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+		topologyv1.NewColumn("dst_management_ip", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+		topologyv1.NewColumn("confidence", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+		topologyv1.NewColumn("inference", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
+		topologyv1.NewColumn("attachment_mode", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable()),
 		topologyv1.NewColumn("src_endpoint", "json", topologyv1.WithNullable()),
 		topologyv1.NewColumn("dst_endpoint", "json", topologyv1.WithNullable()),
 		topologyv1.NewColumn("metrics", "json", topologyv1.WithNullable()),
@@ -639,6 +920,16 @@ func buildSNMPTopologyV1ActorDetails(
 	details := make(map[string]topologyv1.DetailTable)
 	tableTypes := make(map[string]topologyv1.TableType)
 
+	labelsTable := buildSNMPTopologyV1ActorLabelsTable(actors, stringsDict)
+	details["actor_labels"] = topologyv1.DetailTable{
+		Type:  "actor_labels",
+		Table: labelsTable,
+	}
+	tableTypes["actor_labels"] = snmpTopologyV1ActorLabelsTableType()
+	usedTableIDs := map[string]struct{}{
+		"actor_labels": {},
+	}
+
 	metadataTable := buildSNMPTopologyV1ActorMetadataTable(actors)
 	if metadataTable.Rows > 0 {
 		tableID := "actor_metadata"
@@ -651,18 +942,34 @@ func buildSNMPTopologyV1ActorDetails(
 			Owner:       "actor",
 			Aggregation: "append",
 			Columns:     metadataTable.Columns,
+			Presentation: &topologyv1.TableTypePresentation{
+				Label:             "Debug metadata",
+				DefaultVisibility: "debug",
+				Columns: []topologyv1.ModalColumn{
+					modalDirectColumn("attributes", "Attributes", "attributes", "debug_json"),
+					modalDirectColumn("labels", "Labels", "labels", "debug_json"),
+				},
+			},
 		}
+		usedTableIDs[tableID] = struct{}{}
 	}
 
 	tableRowsByName := collectSNMPTopologyV1ActorTableRows(actors)
 	tableNames := sortedMapKeys(tableRowsByName)
+	reservedCustomTableIDs := snmpTopologyV1ReservedCustomTableIDs(tableNames)
 	for _, tableName := range tableNames {
 		rows := tableRowsByName[tableName]
 		if len(rows) == 0 {
 			continue
 		}
-		tableID := topologyID("actor_"+tableName, "actor_detail")
-		table, err := buildSNMPTopologyV1DynamicTable(rows, stringsDict)
+		tableID := snmpTopologyV1ActorDetailTableID(tableName, usedTableIDs, reservedCustomTableIDs)
+		var table topologyv1.Table
+		var err error
+		if tableID == "actor_ports" {
+			table = buildSNMPTopologyV1ActorPortsTable(rows, stringsDict)
+		} else {
+			table, err = buildSNMPTopologyV1DynamicTable(rows, stringsDict)
+		}
 		if err != nil {
 			return nil, nil, fmt.Errorf("build actor detail table %q: %w", tableName, err)
 		}
@@ -670,18 +977,56 @@ func buildSNMPTopologyV1ActorDetails(
 			Type:  tableID,
 			Table: table,
 		}
-		tableTypes[tableID] = topologyv1.TableType{
-			Role:        "actor_detail",
-			Owner:       "actor",
-			Aggregation: "append",
-			Columns:     table.Columns,
+		if tableID == "actor_ports" {
+			tableTypes[tableID] = snmpTopologyV1ActorPortsTableType()
+		} else {
+			tableTypes[tableID] = topologyv1.TableType{
+				Role:        "actor_detail",
+				Owner:       "actor",
+				Aggregation: "append",
+				Columns:     table.Columns,
+			}
 		}
-	}
-
-	if len(details) == 0 {
-		return nil, nil, nil
+		usedTableIDs[tableID] = struct{}{}
 	}
 	return details, tableTypes, nil
+}
+
+func snmpTopologyV1ReservedCustomTableIDs(tableNames []string) map[string]struct{} {
+	reserved := make(map[string]struct{})
+	for _, tableName := range tableNames {
+		tableID := topologyID("actor_"+tableName, "actor_detail")
+		switch tableID {
+		case "actor_labels", "actor_metadata":
+			reserved[topologyID("actor_custom_"+tableName, "actor_detail")] = struct{}{}
+		}
+	}
+	return reserved
+}
+
+func snmpTopologyV1ActorDetailTableID(tableName string, usedTableIDs, reservedCustomTableIDs map[string]struct{}) string {
+	tableID := topologyID("actor_"+tableName, "actor_detail")
+	switch tableID {
+	case "actor_labels", "actor_metadata":
+		return snmpTopologyV1UniqueActorDetailTableID(topologyID("actor_custom_"+tableName, "actor_detail"), usedTableIDs)
+	default:
+		if _, reserved := reservedCustomTableIDs[tableID]; reserved {
+			return snmpTopologyV1UniqueActorDetailTableID(topologyID("actor_detail_"+tableName, "actor_detail"), usedTableIDs)
+		}
+		return snmpTopologyV1UniqueActorDetailTableID(tableID, usedTableIDs)
+	}
+}
+
+func snmpTopologyV1UniqueActorDetailTableID(tableID string, usedTableIDs map[string]struct{}) string {
+	if _, ok := usedTableIDs[tableID]; !ok {
+		return tableID
+	}
+	for suffix := 2; ; suffix++ {
+		candidate := fmt.Sprintf("%s_%d", tableID, suffix)
+		if _, ok := usedTableIDs[candidate]; !ok {
+			return candidate
+		}
+	}
 }
 
 func buildSNMPTopologyV1ActorMetadataTable(actors []topologyActor) topologyv1.Table {
@@ -713,6 +1058,110 @@ func buildSNMPTopologyV1ActorMetadataTable(actors []topologyActor) topologyv1.Ta
 	)
 }
 
+func buildSNMPTopologyV1ActorLabelsTable(
+	actors []topologyActor,
+	stringsDict *topologyv1.StringDictionary,
+) topologyv1.Table {
+	type labelRow struct {
+		actor      int
+		key        string
+		value      string
+		source     string
+		kind       string
+		valueIndex any
+	}
+
+	rows := make([]labelRow, 0, len(actors)*8)
+	add := func(actor int, key, value, source, kind string, valueIndex any) {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			return
+		}
+		rows = append(rows, labelRow{
+			actor:      actor,
+			key:        key,
+			value:      value,
+			source:     source,
+			kind:       kind,
+			valueIndex: valueIndex,
+		})
+	}
+	addSlice := func(actor int, key string, values []string, source, kind string) {
+		index := 0
+		for _, value := range values {
+			value = strings.TrimSpace(value)
+			if value == "" {
+				continue
+			}
+			add(actor, key, value, source, kind, index)
+			index++
+		}
+	}
+
+	scalarAttributeKeys := []string{
+		"vendor", "vendor_derived", "model", "sys_descr", "sys_location", "sys_contact",
+		"management_ip", "display_name", "display_source", "chart_id_prefix", "chart_context_prefix",
+		"netdata_host_id", "ports_total", "ports_up", "ports_down", "vlan_count", "fdb_total_macs",
+		"lldp_neighbor_count", "cdp_neighbor_count", "endpoints_total", "if_admin_status_counts",
+		"if_oper_status_counts", "if_link_mode_counts", "if_topology_role_counts",
+	}
+	arrayAttributeKeys := []string{
+		"protocols", "protocols_collected", "learned_sources", "capabilities",
+		"capabilities_supported", "capabilities_enabled", "if_names", "if_indexes",
+	}
+
+	for actorIndex, actor := range actors {
+		add(actorIndex, "actor_type", snmpTopologyV1ActorType(actor.ActorType), snmpTopologyV1ProducerSource, "identity", nil)
+		add(actorIndex, "layer", snmpTopologyV1ActorLayer(actor), snmpTopologyV1ProducerSource, "identity", nil)
+		add(actorIndex, "source", firstNonEmptyString(actor.Source, snmpTopologyV1ProducerSource), snmpTopologyV1ProducerSource, "identity", nil)
+		add(actorIndex, "display_name", snmpTopologyV1DisplayName(actor), snmpTopologyV1ProducerSource, "attribute", nil)
+		add(actorIndex, "sys_name", actor.Match.SysName, snmpTopologyV1ProducerSource, "match", nil)
+		add(actorIndex, "sys_object_id", actor.Match.SysObjectID, snmpTopologyV1ProducerSource, "match", nil)
+		addSlice(actorIndex, "chassis_id", actor.Match.ChassisIDs, snmpTopologyV1ProducerSource, "match")
+		addSlice(actorIndex, "mac_address", actor.Match.MacAddresses, snmpTopologyV1ProducerSource, "match")
+		addSlice(actorIndex, "ip_address", actor.Match.IPAddresses, snmpTopologyV1ProducerSource, "match")
+		addSlice(actorIndex, "hostname", actor.Match.Hostnames, snmpTopologyV1ProducerSource, "match")
+		addSlice(actorIndex, "dns_name", actor.Match.DNSNames, snmpTopologyV1ProducerSource, "match")
+
+		for key, value := range actor.Labels {
+			add(actorIndex, key, value, "producer_label", "label", nil)
+		}
+		for _, key := range scalarAttributeKeys {
+			if value := topologyV1ScalarLabelValue(actor.Attributes[key]); value != "" {
+				add(actorIndex, key, value, snmpTopologyV1ProducerSource, "attribute", nil)
+			}
+		}
+		for _, key := range arrayAttributeKeys {
+			addSlice(actorIndex, key, anyStringSlice(actor.Attributes[key]), snmpTopologyV1ProducerSource, "attribute")
+		}
+	}
+
+	actorRefs := make([]any, len(rows))
+	keys := make([]any, len(rows))
+	values := make([]any, len(rows))
+	sources := make([]any, len(rows))
+	kinds := make([]any, len(rows))
+	valueIndexes := make([]any, len(rows))
+	for i, row := range rows {
+		actorRefs[i] = row.actor
+		keys[i] = stringsDict.Ref(row.key)
+		values[i] = stringsDict.Ref(row.value)
+		sources[i] = nullableStringRef(stringsDict, row.source)
+		kinds[i] = nullableStringRef(stringsDict, row.kind)
+		valueIndexes[i] = row.valueIndex
+	}
+
+	return topologyv1.MustTable(len(rows), snmpTopologyV1ActorLabelsTableType().Columns, []topologyv1.ColumnEncoding{
+		topologyv1.Values(actorRefs...),
+		topologyv1.Values(keys...),
+		topologyv1.Values(values...),
+		topologyv1.Values(sources...),
+		topologyv1.Values(kinds...),
+		topologyv1.Values(valueIndexes...),
+	})
+}
+
 type topologyV1DynamicRow struct {
 	actorRef int
 	values   map[string]any
@@ -738,6 +1187,125 @@ func collectSNMPTopologyV1ActorTableRows(actors []topologyActor) map[string][]to
 		}
 	}
 	return tables
+}
+
+func buildSNMPTopologyV1ActorPortsTable(
+	rows []topologyV1DynamicRow,
+	stringsDict *topologyv1.StringDictionary,
+) topologyv1.Table {
+	actorRefs := make([]any, len(rows))
+	names := make([]any, len(rows))
+	topologyRoles := make([]any, len(rows))
+	operStatuses := make([]any, len(rows))
+	adminStatuses := make([]any, len(rows))
+	portTypes := make([]any, len(rows))
+	linkModes := make([]any, len(rows))
+	stpStates := make([]any, len(rows))
+	vlanIDs := make([]any, len(rows))
+	fdbMACCounts := make([]any, len(rows))
+	linkCounts := make([]any, len(rows))
+	neighborCounts := make([]any, len(rows))
+	neighbors := make([]any, len(rows))
+	vlans := make([]any, len(rows))
+	extra := make([]any, len(rows))
+
+	for i, row := range rows {
+		actorRefs[i] = row.actorRef
+		names[i] = nullableStringRef(stringsDict, firstNonEmptyString(
+			topologyV1ScalarLabelValue(row.values["name"]),
+			topologyV1ScalarLabelValue(row.values["if_name"]),
+			topologyV1ScalarLabelValue(row.values["port_name"]),
+			topologyV1ScalarLabelValue(row.values["port_id"]),
+		))
+		topologyRoles[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["topology_role"]))
+		operStatuses[i] = nullableStringRef(stringsDict, firstNonEmptyString(
+			topologyV1ScalarLabelValue(row.values["oper_status"]),
+			topologyV1ScalarLabelValue(row.values["if_oper_status"]),
+		))
+		adminStatuses[i] = nullableStringRef(stringsDict, firstNonEmptyString(
+			topologyV1ScalarLabelValue(row.values["admin_status"]),
+			topologyV1ScalarLabelValue(row.values["if_admin_status"]),
+		))
+		portTypes[i] = nullableStringRef(stringsDict, firstNonEmptyString(
+			topologyV1ScalarLabelValue(row.values["port_type"]),
+			topologyV1ScalarLabelValue(row.values["if_type"]),
+		))
+		linkModes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["link_mode"]))
+		stpStates[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["stp_state"]))
+		vlanIDs[i] = stringArrayCell(anyStringSlice(row.values["vlan_ids"]))
+		if isEmptyArrayCell(vlanIDs[i]) {
+			vlanIDs[i] = nil
+		}
+		fdbMACCounts[i] = nullableUintValue(row.values["fdb_mac_count"])
+		linkCounts[i] = nullableUintValue(row.values["link_count"])
+		neighborCounts[i] = nullableUintValue(row.values["neighbor_count"])
+		if neighborCounts[i] == nil {
+			if values, ok := anyMapSlice(row.values["neighbors"]); ok {
+				neighborCounts[i] = uint64(len(values))
+			}
+		}
+		neighbors[i] = nullableJSON(row.values["neighbors"])
+		vlans[i] = nullableJSON(row.values["vlans"])
+		extra[i] = nullableJSON(snmpTopologyV1ExtraPortValues(row.values))
+	}
+
+	return topologyv1.MustTable(len(rows), snmpTopologyV1ActorPortsColumns(), []topologyv1.ColumnEncoding{
+		topologyv1.Values(actorRefs...),
+		topologyv1.Values(names...),
+		topologyv1.Values(topologyRoles...),
+		topologyv1.Values(operStatuses...),
+		topologyv1.Values(adminStatuses...),
+		topologyv1.Values(portTypes...),
+		topologyv1.Values(linkModes...),
+		topologyv1.Values(stpStates...),
+		topologyv1.Values(vlanIDs...),
+		topologyv1.Values(fdbMACCounts...),
+		topologyv1.Values(linkCounts...),
+		topologyv1.Values(neighborCounts...),
+		topologyv1.Values(neighbors...),
+		topologyv1.Values(vlans...),
+		topologyv1.Values(extra...),
+	})
+}
+
+var snmpTopologyV1ActorPortCanonicalKeys = map[string]struct{}{
+	"admin_status":    {},
+	"fdb_mac_count":   {},
+	"if_admin_status": {},
+	"if_name":         {},
+	"if_oper_status":  {},
+	"if_type":         {},
+	"link_count":      {},
+	"link_mode":       {},
+	"name":            {},
+	"neighbor_count":  {},
+	"neighbors":       {},
+	"oper_status":     {},
+	"port_id":         {},
+	"port_name":       {},
+	"port_type":       {},
+	"stp_state":       {},
+	"topology_role":   {},
+	"vlan_ids":        {},
+	"vlans":           {},
+}
+
+func snmpTopologyV1ExtraPortValues(values map[string]any) map[string]any {
+	extra := make(map[string]any)
+	for key, value := range values {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if _, ok := snmpTopologyV1ActorPortCanonicalKeys[key]; ok {
+			continue
+		}
+		extra[key] = value
+	}
+	if len(extra) == 0 {
+		return nil
+	}
+	return extra
 }
 
 func buildSNMPTopologyV1DynamicTable(rows []topologyV1DynamicRow, stringsDict *topologyv1.StringDictionary) (topologyv1.Table, error) {
@@ -896,6 +1464,107 @@ func anyStringValue(value any) string {
 	switch typed := value.(type) {
 	case string:
 		return strings.TrimSpace(typed)
+	case fmt.Stringer:
+		return strings.TrimSpace(typed.String())
+	default:
+		return ""
+	}
+}
+
+func topologyV1ScalarLabelValue(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return strings.TrimSpace(typed)
+	case bool:
+		if typed {
+			return "true"
+		}
+		return "false"
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		return strings.TrimSpace(fmt.Sprint(typed))
+	default:
+		return ""
+	}
+}
+
+func nullableUintValue(value any) any {
+	out, ok := uintValue(value)
+	if !ok {
+		return nil
+	}
+	return out
+}
+
+func uintValue(value any) (uint64, bool) {
+	switch typed := value.(type) {
+	case int:
+		if typed >= 0 {
+			return uint64(typed), true
+		}
+	case int8:
+		if typed >= 0 {
+			return uint64(typed), true
+		}
+	case int16:
+		if typed >= 0 {
+			return uint64(typed), true
+		}
+	case int32:
+		if typed >= 0 {
+			return uint64(typed), true
+		}
+	case int64:
+		if typed >= 0 {
+			return uint64(typed), true
+		}
+	case uint:
+		return uint64(typed), true
+	case uint8:
+		return uint64(typed), true
+	case uint16:
+		return uint64(typed), true
+	case uint32:
+		return uint64(typed), true
+	case uint64:
+		return typed, true
+	case float32:
+		if typed >= 0 && math.Trunc(float64(typed)) == float64(typed) {
+			return uint64(typed), true
+		}
+	case float64:
+		if typed >= 0 && math.Trunc(typed) == typed {
+			return uint64(typed), true
+		}
+	}
+	return 0, false
+}
+
+func topologyV1EndpointString(endpoint topologyLinkEndpoint, key string) string {
+	return firstNonEmptyString(
+		anyStringValue(endpoint.Attributes[key]),
+		topologyV1MatchString(endpoint.Match, key),
+	)
+}
+
+func topologyV1EndpointPortName(endpoint topologyLinkEndpoint) string {
+	return firstNonEmptyString(
+		topologyV1EndpointString(endpoint, "port_name"),
+		topologyV1EndpointString(endpoint, "if_name"),
+		topologyV1EndpointString(endpoint, "if_descr"),
+		topologyV1EndpointString(endpoint, "port_id"),
+		topologyV1EndpointString(endpoint, "display_name"),
+		topologyV1EndpointString(endpoint, "sys_name"),
+	)
+}
+
+func topologyV1MatchString(match topologyMatch, key string) string {
+	switch key {
+	case "sys_name":
+		return match.SysName
+	case "sys_object_id":
+		return match.SysObjectID
 	default:
 		return ""
 	}
@@ -941,6 +1610,10 @@ func nullableJSON(value any) any {
 		if len(typed) == 0 {
 			return nil
 		}
+	case []map[string]any:
+		if len(typed) == 0 {
+			return nil
+		}
 	}
 	return value
 }
@@ -956,6 +1629,11 @@ func stringArrayCell(values []string) []any {
 	return out
 }
 
+func isEmptyArrayCell(value any) bool {
+	values, ok := value.([]any)
+	return ok && len(values) == 0
+}
+
 func anyStringSlice(value any) []string {
 	switch typed := value.(type) {
 	case []string:
@@ -969,7 +1647,36 @@ func anyStringSlice(value any) []string {
 		}
 		return out
 	default:
-		return nil
+		rv := reflect.ValueOf(value)
+		if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+			return nil
+		}
+		out := make([]string, 0, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			if s := topologyV1ScalarLabelValue(rv.Index(i).Interface()); s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+}
+
+func anyMapSlice(value any) ([]map[string]any, bool) {
+	switch typed := value.(type) {
+	case []map[string]any:
+		return typed, true
+	case []any:
+		out := make([]map[string]any, 0, len(typed))
+		for _, item := range typed {
+			row, ok := item.(map[string]any)
+			if !ok {
+				return nil, false
+			}
+			out = append(out, row)
+		}
+		return out, true
+	default:
+		return nil, false
 	}
 }
 

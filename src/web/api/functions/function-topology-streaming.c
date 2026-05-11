@@ -249,6 +249,21 @@ static int streaming_topology_return_error(BUFFER *wb, char *function_copy, int 
     return status;
 }
 
+static void streaming_topology_v1_emit_response_metadata(BUFFER *wb) {
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "topology");
+    buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_TOPOLOGY_HELP);
+    buffer_json_member_add_array(wb, "accepted_params");
+    {
+        buffer_json_add_array_item_string(wb, "info");
+    }
+    buffer_json_array_close(wb);
+    buffer_json_member_add_array(wb, "required_params");
+    buffer_json_array_close(wb);
+}
+
 typedef struct streaming_topology_v1_actor {
     char actor_id[256];
     char type[32];
@@ -264,6 +279,9 @@ typedef struct streaming_topology_v1_actor {
     char agent_name[128];
     char agent_version[128];
     char health_status[64];
+    char os_name[128];
+    char architecture[64];
+    char cpu_count[32];
     uint64_t child_count;
     uint64_t health_critical;
     uint64_t health_warning;
@@ -271,6 +289,16 @@ typedef struct streaming_topology_v1_actor {
     RRDHOST *host;
     bool synthetic;
 } STREAMING_TOPOLOGY_V1_ACTOR;
+
+typedef struct streaming_topology_v1_actor_label {
+    uint64_t actor;
+    char key[RRDLABELS_MAX_NAME_LENGTH + 1];
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    char source[32];
+    char kind[32];
+    bool has_value_index;
+    uint64_t value_index;
+} STREAMING_TOPOLOGY_V1_ACTOR_LABEL;
 
 typedef struct streaming_topology_v1_link {
     uint64_t src_actor;
@@ -355,6 +383,10 @@ typedef struct streaming_topology_v1_payload {
     size_t links_used;
     size_t links_size;
 
+    STREAMING_TOPOLOGY_V1_ACTOR_LABEL *labels;
+    size_t labels_used;
+    size_t labels_size;
+
     STREAMING_TOPOLOGY_V1_STREAM_PATH_ROW *stream_path_rows;
     size_t stream_path_used;
     size_t stream_path_size;
@@ -432,6 +464,125 @@ static STREAMING_TOPOLOGY_V1_LINK *streaming_topology_v1_add_link(STREAMING_TOPO
     return link;
 }
 
+static const char *streaming_topology_v1_label_source(RRDLABEL_SRC source) {
+    if(source & RRDLABEL_SRC_K8S)
+        return "k8s";
+
+    if(source & RRDLABEL_SRC_ACLK)
+        return "aclk";
+
+    if(source & RRDLABEL_SRC_CONFIG)
+        return "config";
+
+    if(source & RRDLABEL_SRC_AUTO)
+        return "auto";
+
+    return "unknown";
+}
+
+static void streaming_topology_v1_add_actor_label_ex(
+    STREAMING_TOPOLOGY_V1_PAYLOAD *payload,
+    uint64_t actor,
+    const char *key,
+    const char *value,
+    const char *source,
+    const char *kind,
+    bool has_value_index,
+    uint64_t value_index) {
+    if(!payload || !key || !*key || !value || !*value)
+        return;
+
+    if(payload->labels_used == payload->labels_size) {
+        size_t new_size = payload->labels_size ? payload->labels_size * 2 : 64;
+        payload->labels = reallocz(payload->labels, new_size * sizeof(*payload->labels));
+        payload->labels_size = new_size;
+    }
+
+    STREAMING_TOPOLOGY_V1_ACTOR_LABEL *row = &payload->labels[payload->labels_used++];
+    *row = (STREAMING_TOPOLOGY_V1_ACTOR_LABEL){ 0 };
+    row->actor = actor;
+    streaming_topology_v1_strncpy(row->key, sizeof(row->key), key);
+    streaming_topology_v1_strncpy(row->value, sizeof(row->value), value);
+    streaming_topology_v1_strncpy(row->source, sizeof(row->source), source ? source : "producer");
+    streaming_topology_v1_strncpy(row->kind, sizeof(row->kind), kind ? kind : "metadata");
+    row->has_value_index = has_value_index;
+    row->value_index = value_index;
+}
+
+static void streaming_topology_v1_add_actor_label(
+    STREAMING_TOPOLOGY_V1_PAYLOAD *payload,
+    uint64_t actor,
+    const char *key,
+    const char *value,
+    const char *kind) {
+    streaming_topology_v1_add_actor_label_ex(payload, actor, key, value, "producer", kind, false, 0);
+}
+
+static void streaming_topology_v1_add_actor_label_uint(
+    STREAMING_TOPOLOGY_V1_PAYLOAD *payload,
+    uint64_t actor,
+    const char *key,
+    uint64_t value,
+    const char *kind) {
+    char text[32];
+    snprintfz(text, sizeof(text), "%"PRIu64, value);
+    streaming_topology_v1_add_actor_label(payload, actor, key, text, kind);
+}
+
+struct streaming_topology_v1_host_label_ctx {
+    STREAMING_TOPOLOGY_V1_PAYLOAD *payload;
+    uint64_t actor;
+};
+
+static int streaming_topology_v1_collect_host_label(
+    const char *name,
+    const char *value,
+    RRDLABEL_SRC source,
+    void *data) {
+    struct streaming_topology_v1_host_label_ctx *ctx = data;
+    streaming_topology_v1_add_actor_label_ex(
+        ctx->payload, ctx->actor, name, value,
+        streaming_topology_v1_label_source(source), "host_label", false, 0);
+    return 0;
+}
+
+static void streaming_topology_v1_collect_actor_labels(
+    STREAMING_TOPOLOGY_V1_PAYLOAD *payload,
+    uint64_t actor_index,
+    STREAMING_TOPOLOGY_V1_ACTOR *actor) {
+    if(!payload || !actor)
+        return;
+
+    streaming_topology_v1_add_actor_label(payload, actor_index, "display_name", actor->display_name, "identity");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "hostname", actor->hostname, "identity");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "machine_guid", actor->machine_guid, "identity");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "node_id", actor->node_id, "identity");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "type", actor->type, "metadata");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "severity", actor->severity, "status");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "ephemerality", actor->ephemerality, "metadata");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "ingest_status", actor->ingest_status, "status");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "stream_status", actor->stream_status, "status");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "ml_status", actor->ml_status, "status");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "agent_name", actor->agent_name, "metadata");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "agent_version", actor->agent_version, "metadata");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "health_status", actor->health_status, "status");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "os_name", actor->os_name, "system");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "architecture", actor->architecture, "system");
+    streaming_topology_v1_add_actor_label(payload, actor_index, "cpu_count", actor->cpu_count, "system");
+    streaming_topology_v1_add_actor_label_uint(payload, actor_index, "child_count", actor->child_count, "metric");
+    streaming_topology_v1_add_actor_label_uint(payload, actor_index, "health_critical", actor->health_critical, "metric");
+    streaming_topology_v1_add_actor_label_uint(payload, actor_index, "health_warning", actor->health_warning, "metric");
+    streaming_topology_v1_add_actor_label_uint(payload, actor_index, "health_clear", actor->health_clear, "metric");
+
+    if(actor->host && actor->host->rrdlabels) {
+        struct streaming_topology_v1_host_label_ctx ctx = {
+            .payload = payload,
+            .actor = actor_index,
+        };
+        rrdlabels_walkthrough_read(actor->host->rrdlabels, streaming_topology_v1_collect_host_label, &ctx);
+    }
+}
+
 static STREAMING_TOPOLOGY_V1_STREAM_PATH_ROW *streaming_topology_v1_add_stream_path_row(
     STREAMING_TOPOLOGY_V1_PAYLOAD *payload) {
     if(payload->stream_path_used == payload->stream_path_size) {
@@ -501,6 +652,7 @@ static void streaming_topology_v1_free(STREAMING_TOPOLOGY_V1_PAYLOAD *payload) {
 
     freez(payload->actors);
     freez(payload->links);
+    freez(payload->labels);
     freez(payload->stream_path_rows);
     freez(payload->retention_rows);
     freez(payload->inbound_rows);
@@ -636,6 +788,7 @@ static bool streaming_topology_v1_collect_synth_actor(
     streaming_topology_v1_strncpy(actor->stream_status, sizeof(actor->stream_status), "unknown");
     streaming_topology_v1_strncpy(actor->ml_status, sizeof(actor->ml_status), "unknown");
     streaming_topology_v1_strncpy(actor->health_status, sizeof(actor->health_status), "unknown");
+    streaming_topology_v1_collect_actor_labels(ctx->payload, ctx->payload->actors_used - 1, actor);
     return true;
 }
 
@@ -673,6 +826,9 @@ static void streaming_topology_v1_collect_actors(
         streaming_topology_v1_strncpy(actor->agent_version, sizeof(actor->agent_version), rrdhost_program_version(host));
         streaming_topology_v1_strncpy(actor->health_status, sizeof(actor->health_status),
             rrdhost_health_status_to_string(status.health.status));
+        rrdlabels_get_value_strcpyz(host->rrdlabels, actor->os_name, sizeof(actor->os_name), "_os_name");
+        rrdlabels_get_value_strcpyz(host->rrdlabels, actor->architecture, sizeof(actor->architecture), "_architecture");
+        rrdlabels_get_value_strcpyz(host->rrdlabels, actor->cpu_count, sizeof(actor->cpu_count), "_system_cores");
 
         uint32_t *cc = streaming_topology_parent_child_count_get(parent_child_count, host);
         actor->child_count = cc ? *cc : 0;
@@ -681,6 +837,8 @@ static void streaming_topology_v1_collect_actors(
             actor->health_warning = status.health.alerts.warning;
             actor->health_clear = status.health.alerts.clear;
         }
+
+        streaming_topology_v1_collect_actor_labels(payload, payload->actors_used - 1, actor);
     }
     dfe_done(host);
 
@@ -1081,6 +1239,9 @@ static void streaming_topology_v1_emit_actor_columns(BUFFER *wb) {
     streaming_topology_v1_emit_column(wb, "agent_name", "string", "attribute", true, NULL);
     streaming_topology_v1_emit_column(wb, "agent_version", "string", "attribute", true, NULL);
     streaming_topology_v1_emit_column(wb, "health_status", "string", "attribute", true, NULL);
+    streaming_topology_v1_emit_column(wb, "os_name", "string", "attribute", true, NULL);
+    streaming_topology_v1_emit_column(wb, "architecture", "string", "attribute", true, NULL);
+    streaming_topology_v1_emit_column(wb, "cpu_count", "string", "attribute", true, NULL);
     streaming_topology_v1_emit_column(wb, "child_count", "uint", "metric", false, "sum");
     streaming_topology_v1_emit_column(wb, "health_critical", "uint", "metric", false, "sum");
     streaming_topology_v1_emit_column(wb, "health_warning", "uint", "metric", false, "sum");
@@ -1092,10 +1253,26 @@ static void streaming_topology_v1_emit_link_columns(BUFFER *wb) {
     streaming_topology_v1_emit_column(wb, "dst_actor", "actor_ref", "reference", false, NULL);
     streaming_topology_v1_emit_column(wb, "type", "string", "group_key", false, NULL);
     streaming_topology_v1_emit_column(wb, "state", "string", "attribute", true, NULL);
+    streaming_topology_v1_emit_column(wb, "port_name", "string", "attribute", true, NULL);
     streaming_topology_v1_emit_column(wb, "discovered_at", "timestamp", "timestamp", true, NULL);
     streaming_topology_v1_emit_column(wb, "last_seen", "timestamp", "timestamp", true, NULL);
     streaming_topology_v1_emit_column(wb, "hops", "int", "metric", false, "max");
     streaming_topology_v1_emit_column(wb, "evidence_count", "uint", "metric", false, "sum");
+    streaming_topology_v1_emit_column(wb, "connections", "uint", "metric", false, "sum");
+    streaming_topology_v1_emit_column(wb, "replication_instances", "uint", "metric", false, "sum");
+    streaming_topology_v1_emit_column(wb, "replication_completion", "float", "metric", false, "avg");
+    streaming_topology_v1_emit_column(wb, "collected_metrics", "uint", "metric", false, "sum");
+    streaming_topology_v1_emit_column(wb, "collected_instances", "uint", "metric", false, "sum");
+    streaming_topology_v1_emit_column(wb, "collected_contexts", "uint", "metric", false, "sum");
+}
+
+static void streaming_topology_v1_emit_actor_label_columns(BUFFER *wb) {
+    streaming_topology_v1_emit_column(wb, "actor", "actor_ref", "reference", false, NULL);
+    streaming_topology_v1_emit_column(wb, "key", "string", "attribute", false, NULL);
+    streaming_topology_v1_emit_column(wb, "value", "string", "attribute", false, NULL);
+    streaming_topology_v1_emit_column(wb, "source", "string", "attribute", true, NULL);
+    streaming_topology_v1_emit_column(wb, "kind", "string", "attribute", true, NULL);
+    streaming_topology_v1_emit_column(wb, "value_index", "uint", "attribute", true, NULL);
 }
 
 static void streaming_topology_v1_emit_evidence_columns(BUFFER *wb) {
@@ -1171,6 +1348,244 @@ static void streaming_topology_v1_emit_outbound_columns(BUFFER *wb) {
     streaming_topology_v1_emit_column(wb, "compression", "string", "attribute", true, NULL);
 }
 
+static void streaming_topology_v1_emit_modal_direct_column(
+    BUFFER *wb,
+    const char *id,
+    const char *label,
+    const char *column,
+    const char *cell) {
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_string(wb, "id", id);
+        buffer_json_member_add_string(wb, "label", label);
+        buffer_json_member_add_object(wb, "projection");
+        {
+            buffer_json_member_add_string(wb, "kind", "direct");
+            buffer_json_member_add_string(wb, "column", column);
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_string(wb, "cell", cell);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void streaming_topology_v1_emit_modal_actor_ref_column(
+    BUFFER *wb,
+    const char *id,
+    const char *label,
+    const char *actor_column) {
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_string(wb, "id", id);
+        buffer_json_member_add_string(wb, "label", label);
+        buffer_json_member_add_object(wb, "projection");
+        {
+            buffer_json_member_add_string(wb, "kind", "actor_ref_label");
+            buffer_json_member_add_string(wb, "actor_column", actor_column);
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_string(wb, "cell", "actor_link");
+    }
+    buffer_json_object_close(wb);
+}
+
+static void streaming_topology_v1_emit_modal_label_lookup_column(
+    BUFFER *wb,
+    const char *id,
+    const char *label,
+    const char *actor_column,
+    const char *label_key,
+    const char *cell) {
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_string(wb, "id", id);
+        buffer_json_member_add_string(wb, "label", label);
+        buffer_json_member_add_object(wb, "projection");
+        {
+            buffer_json_member_add_string(wb, "kind", "label_lookup");
+            if(actor_column)
+                buffer_json_member_add_string(wb, "actor_column", actor_column);
+            buffer_json_member_add_string(wb, "label_key", label_key);
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_string(wb, "cell", cell);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void streaming_topology_v1_emit_modal_actor_table_source(BUFFER *wb, const char *table) {
+    buffer_json_member_add_object(wb, "source");
+    {
+        buffer_json_member_add_string(wb, "kind", "actor_table");
+        buffer_json_member_add_string(wb, "table", table);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void streaming_topology_v1_emit_modal_actor_owner_filter(BUFFER *wb, const char *actor_column) {
+    buffer_json_member_add_object(wb, "owner_filter");
+    {
+        buffer_json_member_add_string(wb, "mode", "actor_column");
+        buffer_json_member_add_string(wb, "actor_column", actor_column);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void streaming_topology_v1_emit_modal_sort(BUFFER *wb, const char *column, const char *direction) {
+    buffer_json_member_add_object(wb, "sort");
+    {
+        buffer_json_member_add_string(wb, "column", column);
+        buffer_json_member_add_string(wb, "direction", direction);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void streaming_topology_v1_emit_modal_identification_field(BUFFER *wb, const char *key, const char *label) {
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_string(wb, "key", key);
+        buffer_json_member_add_string(wb, "label", label);
+        buffer_json_member_add_uint64(wb, "max_values", 1);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void streaming_topology_v1_emit_modal_label_identification(BUFFER *wb) {
+    buffer_json_member_add_object(wb, "identification");
+    {
+        buffer_json_member_add_boolean(wb, "enabled", true);
+        buffer_json_member_add_array(wb, "fields");
+        {
+            streaming_topology_v1_emit_modal_identification_field(wb, "hostname", "Hostname");
+            streaming_topology_v1_emit_modal_identification_field(wb, "type", "Node Type");
+            streaming_topology_v1_emit_modal_identification_field(wb, "stream_status", "Stream");
+            streaming_topology_v1_emit_modal_identification_field(wb, "ingest_status", "Ingest");
+            streaming_topology_v1_emit_modal_identification_field(wb, "machine_guid", "Machine GUID");
+            streaming_topology_v1_emit_modal_identification_field(wb, "agent_version", "Agent");
+        }
+        buffer_json_array_close(wb);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void streaming_topology_v1_emit_actor_modal(BUFFER *wb) {
+    buffer_json_member_add_object(wb, "modal");
+    {
+        buffer_json_member_add_boolean(wb, "enabled", true);
+        buffer_json_member_add_object(wb, "labels");
+        {
+            buffer_json_member_add_boolean(wb, "enabled", true);
+            buffer_json_member_add_string(wb, "table", "actor_labels");
+            streaming_topology_v1_emit_modal_label_identification(wb);
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_object(wb, "mini_topology");
+        {
+            buffer_json_member_add_boolean(wb, "enabled", true);
+            buffer_json_member_add_uint64(wb, "depth", 1);
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_array(wb, "sections");
+        {
+            buffer_json_add_array_item_object(wb);
+            {
+                buffer_json_member_add_string(wb, "id", "stream_path");
+                buffer_json_member_add_string(wb, "label", "Stream path");
+                buffer_json_member_add_uint64(wb, "order", 1);
+                streaming_topology_v1_emit_modal_actor_table_source(wb, "stream_path");
+                streaming_topology_v1_emit_modal_actor_owner_filter(wb, "actor");
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    streaming_topology_v1_emit_modal_direct_column(wb, "path_index", "Hop", "path_index", "number");
+                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "path_actor", "Node", "path_actor");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "hostname", "Hostname", "hostname", "text");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "hops", "Hops", "hops", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "since", "Since", "since", "timestamp");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "first_time", "First seen", "first_time", "timestamp");
+                }
+                buffer_json_array_close(wb);
+                streaming_topology_v1_emit_modal_sort(wb, "path_index", "asc");
+                buffer_json_member_add_string(wb, "empty_label", "No stream path rows");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_add_array_item_object(wb);
+            {
+                buffer_json_member_add_string(wb, "id", "retention");
+                buffer_json_member_add_string(wb, "label", "Retention");
+                buffer_json_member_add_uint64(wb, "order", 2);
+                streaming_topology_v1_emit_modal_actor_table_source(wb, "retention");
+                streaming_topology_v1_emit_modal_actor_owner_filter(wb, "actor");
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_status", "Status", "db_status", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_from", "From", "db_from", "timestamp");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_to", "To", "db_to", "timestamp");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_duration", "Duration", "db_duration", "duration");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_metrics", "Metrics", "db_metrics", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_contexts", "Contexts", "db_contexts", "number");
+                }
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "empty_label", "No retention rows");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_add_array_item_object(wb);
+            {
+                buffer_json_member_add_string(wb, "id", "inbound");
+                buffer_json_member_add_string(wb, "label", "Inbound children");
+                buffer_json_member_add_uint64(wb, "order", 3);
+                streaming_topology_v1_emit_modal_actor_table_source(wb, "inbound");
+                streaming_topology_v1_emit_modal_actor_owner_filter(wb, "parent_actor");
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "child", "Child", "child_actor");
+                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "source", "Received from", "source_actor");
+                    streaming_topology_v1_emit_modal_label_lookup_column(wb, "child_type", "Node type", "child_actor", "type", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "received_type", "Type", "received_type", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "ingest_status", "Ingest", "ingest_status", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "hops", "Hops", "hops", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "collected_metrics", "Metrics", "collected_metrics", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "collected_instances", "Instances", "collected_instances", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "collected_contexts", "Contexts", "collected_contexts", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "replication_completion", "Replication", "replication_completion", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "ingest_age", "Age", "ingest_age", "duration");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "ssl", "TLS", "ssl", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "alerts_critical", "Critical", "alerts_critical", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "alerts_warning", "Warning", "alerts_warning", "number");
+                }
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "empty_label", "No inbound children");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_add_array_item_object(wb);
+            {
+                buffer_json_member_add_string(wb, "id", "outbound");
+                buffer_json_member_add_string(wb, "label", "Outbound stream");
+                buffer_json_member_add_uint64(wb, "order", 4);
+                streaming_topology_v1_emit_modal_actor_table_source(wb, "outbound");
+                streaming_topology_v1_emit_modal_actor_owner_filter(wb, "actor");
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "actor", "Node", "actor");
+                    streaming_topology_v1_emit_modal_label_lookup_column(wb, "actor_type", "Node type", "actor", "type", "badge");
+                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "destination", "Destination", "destination_actor");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "stream_status", "Status", "stream_status", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "hops", "Hops", "hops", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "ssl", "TLS", "ssl", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "compression", "Compression", "compression", "badge");
+                }
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "empty_label", "No outbound stream row");
+            }
+            buffer_json_object_close(wb);
+        }
+        buffer_json_array_close(wb);
+    }
+    buffer_json_object_close(wb);
+}
+
 static void streaming_topology_v1_emit_actor_type(
     BUFFER *wb,
     const char *id,
@@ -1239,6 +1654,7 @@ static void streaming_topology_v1_emit_actor_type(
                 }
             }
             buffer_json_object_close(wb);
+            streaming_topology_v1_emit_actor_modal(wb);
         }
         buffer_json_object_close(wb);
     }
@@ -1269,6 +1685,7 @@ static void streaming_topology_v1_emit_link_type(
                 buffer_json_member_add_string(wb, "evidence_count", "sum");
                 buffer_json_member_add_string(wb, "connections", "sum");
                 buffer_json_member_add_string(wb, "replication_instances", "sum");
+                buffer_json_member_add_string(wb, "replication_completion", "avg");
                 buffer_json_member_add_string(wb, "collected_metrics", "sum");
                 buffer_json_member_add_string(wb, "collected_instances", "sum");
                 buffer_json_member_add_string(wb, "collected_contexts", "sum");
@@ -1406,6 +1823,8 @@ static void streaming_topology_v1_emit_type_registry(BUFFER *wb) {
 
         buffer_json_member_add_object(wb, "table_types");
         {
+            streaming_topology_v1_emit_table_type(wb, "actor_labels", "actor_inventory", "actor", "set",
+                streaming_topology_v1_emit_actor_label_columns);
             streaming_topology_v1_emit_table_type(wb, "stream_path", "actor_detail", "actor", "append",
                 streaming_topology_v1_emit_stream_path_columns);
             streaming_topology_v1_emit_table_type(wb, "retention", "actor_detail", "actor", "append",
@@ -1564,6 +1983,9 @@ static void streaming_topology_v1_emit_actor_table(BUFFER *wb, STREAMING_TOPOLOG
         STREAMING_TOPOLOGY_ACTOR_STRING_VALUES(agent_name);
         STREAMING_TOPOLOGY_ACTOR_STRING_VALUES(agent_version);
         STREAMING_TOPOLOGY_ACTOR_STRING_VALUES(health_status);
+        STREAMING_TOPOLOGY_ACTOR_STRING_VALUES(os_name);
+        STREAMING_TOPOLOGY_ACTOR_STRING_VALUES(architecture);
+        STREAMING_TOPOLOGY_ACTOR_STRING_VALUES(cpu_count);
 
 #undef STREAMING_TOPOLOGY_ACTOR_STRING_VALUES
 #define STREAMING_TOPOLOGY_ACTOR_UINT_VALUES(member) do { \
@@ -1615,6 +2037,11 @@ static void streaming_topology_v1_emit_link_table(BUFFER *wb, STREAMING_TOPOLOGY
 
         streaming_topology_v1_emit_values_start(wb);
         for(size_t i = 0; i < payload->links_used; i++)
+            buffer_json_add_array_item_string(wb, payload->links[i].port_name[0] ? payload->links[i].port_name : NULL);
+        streaming_topology_v1_emit_values_end(wb);
+
+        streaming_topology_v1_emit_values_start(wb);
+        for(size_t i = 0; i < payload->links_used; i++)
             streaming_topology_v1_add_timestamp(wb, payload->links[i].discovered_at_ut);
         streaming_topology_v1_emit_values_end(wb);
 
@@ -1631,6 +2058,36 @@ static void streaming_topology_v1_emit_link_table(BUFFER *wb, STREAMING_TOPOLOGY
         streaming_topology_v1_emit_values_start(wb);
         for(size_t i = 0; i < payload->links_used; i++)
             buffer_json_add_array_item_uint64(wb, 1);
+        streaming_topology_v1_emit_values_end(wb);
+
+        streaming_topology_v1_emit_values_start(wb);
+        for(size_t i = 0; i < payload->links_used; i++)
+            buffer_json_add_array_item_uint64(wb, payload->links[i].connections);
+        streaming_topology_v1_emit_values_end(wb);
+
+        streaming_topology_v1_emit_values_start(wb);
+        for(size_t i = 0; i < payload->links_used; i++)
+            buffer_json_add_array_item_uint64(wb, payload->links[i].replication_instances);
+        streaming_topology_v1_emit_values_end(wb);
+
+        streaming_topology_v1_emit_values_start(wb);
+        for(size_t i = 0; i < payload->links_used; i++)
+            buffer_json_add_array_item_double(wb, payload->links[i].replication_completion);
+        streaming_topology_v1_emit_values_end(wb);
+
+        streaming_topology_v1_emit_values_start(wb);
+        for(size_t i = 0; i < payload->links_used; i++)
+            buffer_json_add_array_item_uint64(wb, payload->links[i].collected_metrics);
+        streaming_topology_v1_emit_values_end(wb);
+
+        streaming_topology_v1_emit_values_start(wb);
+        for(size_t i = 0; i < payload->links_used; i++)
+            buffer_json_add_array_item_uint64(wb, payload->links[i].collected_instances);
+        streaming_topology_v1_emit_values_end(wb);
+
+        streaming_topology_v1_emit_values_start(wb);
+        for(size_t i = 0; i < payload->links_used; i++)
+            buffer_json_add_array_item_uint64(wb, payload->links[i].collected_contexts);
         streaming_topology_v1_emit_values_end(wb);
 
         buffer_json_array_close(wb);
@@ -1770,6 +2227,52 @@ static void streaming_topology_v1_emit_evidence_table(BUFFER *wb, STREAMING_TOPO
         streaming_topology_v1_emit_evidence_section(wb, payload, "streaming_link", "streaming");
         streaming_topology_v1_emit_evidence_section(wb, payload, "virtual_link", "virtual");
         streaming_topology_v1_emit_evidence_section(wb, payload, "stale_link", "stale");
+    }
+    buffer_json_object_close(wb);
+}
+
+static void streaming_topology_v1_emit_actor_labels_table(BUFFER *wb, STREAMING_TOPOLOGY_V1_PAYLOAD *payload) {
+    buffer_json_member_add_object(wb, "actor_labels");
+    {
+        buffer_json_member_add_string(wb, "type", "actor_labels");
+        buffer_json_member_add_object(wb, "table");
+        {
+            buffer_json_member_add_uint64(wb, "rows", payload->labels_used);
+            buffer_json_member_add_array(wb, "columns");
+            streaming_topology_v1_emit_actor_label_columns(wb);
+            buffer_json_array_close(wb);
+            buffer_json_member_add_array(wb, "values");
+
+#define STREAMING_TOPOLOGY_LABEL_UINT_VALUES(member) do { \
+                streaming_topology_v1_emit_values_start(wb); \
+                for(size_t i = 0; i < payload->labels_used; i++) \
+                    buffer_json_add_array_item_uint64(wb, payload->labels[i].member); \
+                streaming_topology_v1_emit_values_end(wb); \
+            } while(0)
+#define STREAMING_TOPOLOGY_LABEL_STRING_VALUES(member) do { \
+                streaming_topology_v1_emit_values_start(wb); \
+                for(size_t i = 0; i < payload->labels_used; i++) \
+                    buffer_json_add_array_item_string(wb, payload->labels[i].member[0] ? payload->labels[i].member : NULL); \
+                streaming_topology_v1_emit_values_end(wb); \
+            } while(0)
+
+            STREAMING_TOPOLOGY_LABEL_UINT_VALUES(actor);
+            STREAMING_TOPOLOGY_LABEL_STRING_VALUES(key);
+            STREAMING_TOPOLOGY_LABEL_STRING_VALUES(value);
+            STREAMING_TOPOLOGY_LABEL_STRING_VALUES(source);
+            STREAMING_TOPOLOGY_LABEL_STRING_VALUES(kind);
+
+            streaming_topology_v1_emit_values_start(wb);
+            for(size_t i = 0; i < payload->labels_used; i++)
+                streaming_topology_v1_add_nullable_uint(wb, payload->labels[i].has_value_index, payload->labels[i].value_index);
+            streaming_topology_v1_emit_values_end(wb);
+
+#undef STREAMING_TOPOLOGY_LABEL_UINT_VALUES
+#undef STREAMING_TOPOLOGY_LABEL_STRING_VALUES
+
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
 }
@@ -2011,6 +2514,7 @@ static void streaming_topology_v1_emit_detail_tables(BUFFER *wb, STREAMING_TOPOL
     {
         buffer_json_member_add_object(wb, "actor");
         {
+            streaming_topology_v1_emit_actor_labels_table(wb, payload);
             streaming_topology_v1_emit_stream_path_table(wb, payload);
             streaming_topology_v1_emit_retention_table(wb, payload);
             streaming_topology_v1_emit_inbound_table(wb, payload);
@@ -2028,6 +2532,17 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
     struct streaming_topology_options options = { 0 };
     streaming_topology_parse_options(function, &options);
     char *function_copy = options.function_copy;
+
+    if(options.info_only) {
+        buffer_flush(wb);
+        wb->content_type = CT_APPLICATION_JSON;
+        buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+        streaming_topology_v1_emit_response_metadata(wb);
+        buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + STREAMING_FUNCTION_UPDATE_EVERY);
+        buffer_json_finalize(wb);
+        freez(function_copy);
+        return HTTP_RESP_OK;
+    }
 
     DICTIONARY *parent_child_count = dictionary_create_advanced(
         DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
@@ -2148,18 +2663,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
-    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
-    buffer_json_member_add_string(wb, "type", "topology");
-    buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
-    buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_TOPOLOGY_HELP);
-    buffer_json_member_add_array(wb, "accepted_params");
-    {
-        buffer_json_add_array_item_string(wb, "info");
-    }
-    buffer_json_array_close(wb);
-    buffer_json_member_add_array(wb, "required_params");
-    buffer_json_array_close(wb);
+    streaming_topology_v1_emit_response_metadata(wb);
 
     buffer_json_member_add_object(wb, "data");
     {

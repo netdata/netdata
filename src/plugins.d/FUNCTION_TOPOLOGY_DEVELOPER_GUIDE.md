@@ -120,6 +120,30 @@ Topology Functions return a normal Function envelope with `type: "topology"`:
 version. Producers may expose their own version in `producer.agent_version`,
 `producer.plugin`, or `producer.capabilities`.
 
+Function `info` responses are response metadata, not topology payloads. They
+may advertise `accepted_params`, `required_params`, and help text without a
+`data` object. Validate only full topology responses against
+`FUNCTION_TOPOLOGY_SCHEMA.json`.
+
+## Mode Requests
+
+Use the request parameter `__topology_mode` when a topology producer has a real
+detailed vs aggregated output difference. Supported values are `detailed` and
+`aggregated`.
+
+Do not expose a detailed/aggregated selector for mode-invariant topologies.
+SNMP/L2 and streaming currently emit the same topology grain for both use cases
+and should not advertise a mode option until a real difference exists.
+
+When a producer has a real mode split, set `data.view.supported_modes` to the
+available modes. When the field is absent or contains a single value, consumers
+must treat the topology as mode-invariant and avoid showing a mode toggle.
+
+The Cloud topology aggregator consumes detailed payloads when a producer
+supports the mode, even when the user asked Cloud for aggregated output. The
+aggregator correlates first, then aggregates the returned graph. Producers must
+therefore keep detailed mode lossless enough for cross-node matching.
+
 ## Compact Tables
 
 All large arrays use the same compact table shape:
@@ -458,8 +482,9 @@ evidence references, arrays, or JSON cells. For evidence sources, `evidence`
 names an evidence type id.
 
 `hover.fields` is intentionally lightweight graph hover metadata. Full modal
-and table composition, column hiding, nested JSON rendering, and richer
-formatting belong to the table-composition contract.
+and table composition lives in `types.actor_types.<id>.presentation.modal`,
+`types.link_types.<id>.presentation.modal`, and optional
+`types.table_types.<id>.presentation`.
 
 `annotation` is a small actor marker such as a ring or dot. It must use closed
 color slots and style tokens; it is not a free-form badge or CSS hook.
@@ -583,6 +608,226 @@ Do not duplicate evidence in actor-owned tables. If a modal needs a socket list
 for an actor, derive it from socket evidence by filtering evidence rows whose
 link touches that actor.
 
+## Actor Labels And Modal Composition
+
+Actor modals are composed from existing topology facts. They do not get a
+second copy of actor attributes, socket rows, SNMP endpoint objects, or
+relationship evidence only for display.
+
+Every actor modal has four top-level entities:
+
+- actor name from the actor row through `presentation.label_policy`;
+- actor labels from an actor-owned `actor_labels` table when labels exist;
+- a depth-1 topology miniature built from existing incident links and opposite
+  actors;
+- one or more table sections built from actors, links, evidence, or detail
+  tables.
+
+Use a compact actor-owned label table for display labels and metadata:
+
+```json
+{
+  "types": {
+    "table_types": {
+      "actor_labels": {
+        "role": "actor_inventory",
+        "owner": "actor",
+        "aggregation": "set",
+        "columns": [
+          {"id": "actor", "type": "actor_ref", "role": "reference"},
+          {"id": "key", "type": "string_ref", "dictionary": "strings"},
+          {"id": "value", "type": "string_ref", "dictionary": "strings"},
+          {"id": "source", "type": "string_ref", "dictionary": "strings", "nullable": true},
+          {"id": "kind", "type": "string_ref", "dictionary": "strings", "nullable": true},
+          {"id": "value_index", "type": "uint", "nullable": true}
+        ]
+      }
+    }
+  },
+  "tables": {
+    "actor": {
+      "actor_labels": {
+        "type": "actor_labels",
+        "table": {"rows": 0, "columns": [], "values": []}
+      }
+    }
+  }
+}
+```
+
+The `key`, `value`, `source`, and `kind` columns may use either `string` or
+`string_ref` encoding. Producers should prefer `string_ref` when a local
+dictionary is already used, but aggregators and UI adapters must treat both
+encodings as the same logical label fields.
+
+Host/node actors should expose the complete host label set when available.
+Non-node actors should expose all useful producer-known labels and metadata,
+such as process command line, user, group, namespace, interface role, or
+virtualization object properties. If a fact is needed for identity,
+correlation, grouping, sorting, filtering, or aggregation, keep it as a typed
+canonical actor/evidence/detail column too; `actor_labels` is not a replacement
+for canonical data.
+
+Repeated label values are repeated rows with the same `actor` and `key`,
+ordered by `value_index`. Do not encode repeated labels as raw JSON arrays for
+normal modal display.
+
+`actor_labels` inherits the topology Function sensitive-data classification.
+Labels may include command lines, users, host labels, system contact/location
+fields, or other operator-controlled metadata. Cloud services, aggregators, and
+UI adapters that consume topology payloads must apply the same access-control
+assumptions as the source Function.
+
+Use `modal.labels.identification.fields[]` to select the small ordered subset
+of label keys that belongs in the actor modal identification/header area. This
+selection references the existing `actor_labels` table; it must not duplicate
+values into a separate modal-only table. Missing selected keys are skipped, and
+the full Labels tab remains complete.
+
+Modal sections are recipes over existing tables:
+
+```json
+{
+  "types": {
+    "actor_types": {
+      "process": {
+        "layer": "process",
+        "identity": ["node_id", "process_name"],
+        "presentation": {
+          "label": "Process",
+          "label_policy": {
+            "columns": ["display_name", "process_name"],
+            "fallback": "type_label",
+            "array": "reject"
+          },
+          "modal": {
+            "labels": {
+              "enabled": true,
+              "table": "actor_labels",
+              "identification": {
+                "fields": [
+                  {"key": "process", "label": "Process", "max_values": 1},
+                  {"key": "username", "label": "User", "max_values": 1}
+                ]
+              }
+            },
+            "mini_topology": {
+              "enabled": true,
+              "depth": 1,
+              "exclude_link_types": ["ownership"]
+            },
+            "sections": [
+              {
+                "id": "connections",
+                "label": "Connections",
+                "source": {"kind": "links"},
+                "owner_filter": {
+                  "mode": "incident_link",
+                  "src_actor_column": "src_actor",
+                  "dst_actor_column": "dst_actor"
+                },
+                "row_filters": [
+                  {"column": "type", "op": "not_in", "values": ["ownership"]}
+                ],
+                "columns": [
+                  {
+                    "id": "remote",
+                    "label": "Remote",
+                    "projection": {
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor",
+                      "dst_actor_column": "dst_actor"
+                    },
+                    "cell": "actor_link"
+                  },
+                  {
+                    "id": "protocol",
+                    "label": "Protocol",
+                    "projection": {"kind": "direct", "column": "protocol"},
+                    "cell": "badge"
+                  },
+                  {
+                    "id": "sockets",
+                    "label": "Sockets",
+                    "projection": {"kind": "direct", "column": "socket_count"},
+                    "cell": "number"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Table recipes must support these source kinds:
+
+- `actors`;
+- `links`;
+- `evidence` with an `evidence` id;
+- `actor_table` with a `table` id;
+- `relationship_table` with a `table` id.
+
+Use `owner_filter` to bind rows to the selected actor or link. Common filters
+are `actor_column`, `link_column`, `incident_link`, `incident_evidence`, and
+`selected_link`.
+
+Use projections instead of duplicated display fields:
+
+- `direct`: read a column from the source row;
+- `actor_ref_label`: render an actor-ref column through actor label policy;
+- `opposite_actor`: render the opposite endpoint of a link row;
+- `formatted_endpoint`: combine IP, port, and optional protocol columns;
+- `selected_side_endpoint`: choose local or remote endpoint fields based on
+  whether the selected actor matches the source or destination actor columns;
+  producers must provide `src_actor_column` and `dst_actor_column` plus at
+  least one local endpoint column and one remote endpoint column;
+- `label_lookup`: read a value from `actor_labels` by `label_key`; omit
+  `actor_column` to look up labels for the selected modal actor, or provide an
+  actor-ref source column when the lookup belongs to another actor in the row;
+- `coalesce`: choose the first non-empty column;
+- `json_path`: extract a declared scalar `path` from a declared JSON `column`;
+- `const`: emit a fixed value.
+
+Use cell types to keep rendering generic and polished:
+
+- `text`;
+- `number`;
+- `badge`;
+- `actor_link`;
+- `timestamp`;
+- `duration`;
+- `endpoint`;
+- `array_count`;
+- `debug_json`.
+
+Use visibility annotations instead of duplicating rows:
+
+- `table`: shown in the normal table;
+- `expanded`: hidden from the main grid but shown when the row expands;
+- `hidden`: available for joins, sorting, or future use, not displayed;
+- `debug`: diagnostic-only. Raw JSON belongs here unless a curated scalar
+  projection exists.
+
+`json` columns are allowed only when they preserve nested producer-owned facts
+that the UI or aggregator understands through declared projections, or when
+they are explicitly marked as `debug_json`. They are not acceptable as the
+normal user-facing rendering for labels, endpoint objects, neighbor arrays, or
+actor attributes.
+
+Use `empty_label` for the section-level empty-state label. Use column
+`badge_map` only for explicit value-to-token mapping, and keep `align` and
+`sortable` as presentation hints over already-projected columns. These fields
+must not add new data or embed UI components.
+
+The Cloud aggregator should preserve and merge modal/table definitions by the
+same namespace/deduplicate rules used for type presentation. It should not
+materialize modal rows during aggregation unless it is already merging the
+underlying canonical table.
+
 ## Telemetry Overlays
 
 Topology should be refreshable without recomputing topology. Overlay templates
@@ -654,19 +899,27 @@ attached to their owner. Do not silently drop rows.
 ## Correlation Plane
 
 Correlation is producer-visible graph semantics, not aggregator state. Producers
-emit pure correlation actors when a real peer is unknown or must be resolved
-against another independently produced topology map. Correlation actors are real
-actors in the input graph, with their own actor type and presentation. Internal
-aggregator states such as candidate, absorbed, rewrite plan, or equivalence
-class must not be emitted in the final payload.
+declare how independently produced topology maps can be correlated by keys, but
+they do not expose internal aggregator states such as candidate, absorbed,
+rewrite plan, or equivalence class in final payloads.
+
+Correlation can resolve several shapes:
+
+- loose relationship sides, where one side of a detailed row has endpoint facts
+  but no known actor;
+- visible correlation actors, where the input graph intentionally materializes
+  unresolved peers;
+- weaker placeholder actors that should be replaced by stronger managed actors;
+- equivalent actors that should be merged and enriched with facts from multiple
+  payloads.
 
 Use `data.correlation` when a topology can resolve correlation actors across
 payloads:
 
 - `rules` defines named correlation rules, priority, key space, key template,
-  action, point actor types, optional claim actor types, correlation link types,
-  and the final output link type;
-- `points` is a compact table of pure correlation actors and their keys;
+  rule class, action, point actor types when visible points exist, optional
+  claim actor types, correlation link types, and the final output link type;
+- `points` is a compact table of visible correlation actors and their keys;
 - `claims` is a compact table of real actors and the keys they satisfy.
 
 Correlation keys are declarative. A key is built from table columns and string
@@ -674,14 +927,24 @@ literals. The aggregator normalizes values by column type and concatenates the
 parts; it does not execute code and does not need to know what IP, port, MAC,
 chassis id, vSphere MOID, or another domain value means.
 
-Supported rule actions:
+Supported rule classes:
+
+- `resolve_loose_side`: resolve a loose relationship side or visible
+  correlation actor to a claim actor when the key is unambiguous;
+- `replace_actor`: remove weaker placeholder actors and rewire incident
+  relationships to stronger managed actors;
+- `merge_enrich_actor`: merge actors with the same declared identity and merge
+  their labels, attributes, evidence, and detail tables by table policy.
+
+Supported rule actions remain the visible output behavior:
 
 - `absorb`: on an exact unambiguous match, matching correlation actors are
-  removed from the aggregated output and incident correlation links are rewired
-  to the matched real actor using `output_link_type`;
+  removed from the aggregated output, or loose-side placeholders are consumed,
+  and incident correlation relationships are rewired to the matched real actor
+  using `output_link_type`;
 - `link`: on an unambiguous broader/partial match, the correlation actor remains
-  visible and a weak correlation link to the matched actor is emitted using
-  `output_link_type`.
+  visible, or a materialized partial actor remains visible, and a weak
+  correlation link to the matched actor is emitted using `output_link_type`.
 
 No match keeps the correlation actor visible. Ambiguous matches must stay
 unresolved and produce diagnostics in the aggregator; producers must not encode
@@ -691,11 +954,11 @@ NAT or other alias evidence can be represented by adding more point or claim
 rows for the same actor and rule. The original key remains intact; aliases are
 additional facts, not mutations of the source observation.
 
-Links between real actors and correlation actors must use semantic correlation
-link types even in a single-node topology. The UI and aggregator must not infer
-correlation behavior from actor type names or topology kind. The legend should
-include correlation actor and link types so users can distinguish unresolved,
-partial, inferred, and resolved relationships.
+Links between real actors and visible correlation actors must use semantic
+correlation link types even in a single-node topology. The UI and aggregator
+must not infer correlation behavior from actor type names or topology kind. The
+legend should include visible correlation actor and link types so users can
+distinguish unresolved, partial, inferred, and resolved relationships.
 
 ## Network Connections Shape
 
@@ -841,12 +1104,21 @@ Before shipping a topology producer:
 - mark direction semantics explicitly in link types;
 - classify custom tables as actor detail, actor inventory,
   relationship evidence, or relationship summary;
+- expose host/node labels in an actor-owned `actor_labels` table when
+  available;
+- expose useful non-node actor labels and metadata in `actor_labels`, while
+  keeping identity, correlation, grouping, sorting, filtering, and aggregation
+  facts as typed canonical columns;
+- define actor/link modal sections as recipes over existing actors, links,
+  evidence, and detail tables;
 - migrate old `show_port_bullets` to
   `types.actor_types.<id>.presentation.ports.show_bullets` and define
   `ports.sources[]` so bullet data is not implicit;
 - use compact tables for high-cardinality sections;
 - use `src/go/pkg/topology/v1` helpers for Go producers;
 - avoid per-row display strings and duplicate labels;
+- keep raw JSON out of normal user-facing modal tables unless a section marks
+  it as explicit debug output;
 - include only canonical facts and optional metrics the producer really has;
 - validate with [FUNCTION_TOPOLOGY_SCHEMA.json](/src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json);
 - run payload-size measurements on realistic or captured fixtures;

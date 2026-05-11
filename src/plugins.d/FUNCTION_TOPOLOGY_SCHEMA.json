@@ -193,6 +193,19 @@
             "detailed"
           ]
         },
+        "supported_modes": {
+          "type": "array",
+          "description": "Modes this producer can return with different semantics. Omit or provide one value for mode-invariant topologies so UIs do not show a misleading mode selector.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "aggregated",
+              "detailed"
+            ]
+          },
+          "uniqueItems": true,
+          "default": []
+        },
         "group_by": {
           "type": "array",
           "items": {
@@ -468,7 +481,7 @@
     },
     "topology_correlation": {
       "type": "object",
-      "description": "Producer-visible correlation contract used by aggregators to resolve pure correlation actors across independently produced topology maps. This is not an aggregator state dump; final aggregated payloads remain normal topology graphs.",
+      "description": "Producer-visible correlation contract used by aggregators to resolve loose relationship sides, replace weaker actors, merge/enrich equivalent actors, or resolve visible correlation actors across independently produced topology maps. This is not an aggregator state dump; final aggregated payloads remain normal topology graphs.",
       "additionalProperties": false,
       "required": [
         "rules"
@@ -486,7 +499,7 @@
           "minProperties": 1
         },
         "points": {
-          "description": "Compact table of pure correlation actors and their match keys. Required columns are actor, rule, and every column referenced by each referenced rule key.",
+          "description": "Compact table of visible correlation actors and their match keys when the input graph materializes correlation points. Required columns are actor, rule, and every column referenced by each referenced rule key.",
           "$ref": "#/$defs/table"
         },
         "claims": {
@@ -515,6 +528,15 @@
             "link"
           ]
         },
+        "class": {
+          "type": "string",
+          "description": "Topology-agnostic correlation outcome class. Older payloads may omit this and rely on action only.",
+          "enum": [
+            "resolve_loose_side",
+            "replace_actor",
+            "merge_enrich_actor"
+          ]
+        },
         "priority": {
           "type": "integer",
           "description": "Lower numbers run first. Exact rules should use higher priority than partial/broader rules.",
@@ -533,7 +555,7 @@
         },
         "point_actor_types": {
           "type": "array",
-          "description": "Actor type ids that represent pure correlation points for this rule.",
+          "description": "Actor type ids that represent visible correlation points for this rule. Rules that operate only on loose relationship-side facts may leave this empty in a future schema revision, but current payloads must provide at least one id when points are emitted.",
           "items": {
             "$ref": "#/$defs/id"
           },
@@ -599,7 +621,8 @@
       "additionalProperties": false,
       "properties": {
         "label": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "role": {
           "type": "string",
@@ -635,6 +658,9 @@
         },
         "hover": {
           "$ref": "#/$defs/hover_presentation"
+        },
+        "modal": {
+          "$ref": "#/$defs/modal_presentation"
         }
       }
     },
@@ -643,7 +669,8 @@
       "additionalProperties": false,
       "properties": {
         "label": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "color_slot": {
           "$ref": "#/$defs/color_slot"
@@ -689,6 +716,9 @@
         },
         "layout": {
           "$ref": "#/$defs/link_layout_presentation"
+        },
+        "modal": {
+          "$ref": "#/$defs/modal_presentation"
         }
       }
     },
@@ -710,7 +740,8 @@
       "additionalProperties": false,
       "properties": {
         "label": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "color_slot": {
           "$ref": "#/$defs/color_slot"
@@ -817,7 +848,8 @@
           "$ref": "#/$defs/id"
         },
         "label": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -845,7 +877,8 @@
       ],
       "properties": {
         "label": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "unit": {
           "type": "string"
@@ -1059,6 +1092,822 @@
         }
       }
     },
+    "modal_presentation": {
+      "type": "object",
+      "description": "Actor/link modal composition. Modal sections are recipes over existing topology tables; they must not duplicate high-cardinality facts only for UI display.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "labels": {
+          "$ref": "#/$defs/modal_labels_presentation"
+        },
+        "mini_topology": {
+          "$ref": "#/$defs/modal_mini_topology_presentation"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/modal_section"
+          },
+          "default": []
+        }
+      }
+    },
+    "modal_labels_presentation": {
+      "type": "object",
+      "description": "How to render actor labels in the actor modal. The default source is an actor-owned actor_labels table with one row per label value.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "table": {
+          "$ref": "#/$defs/id",
+          "default": "actor_labels"
+        },
+        "actor_column": {
+          "$ref": "#/$defs/id",
+          "default": "actor"
+        },
+        "key_column": {
+          "$ref": "#/$defs/id",
+          "default": "key"
+        },
+        "value_column": {
+          "$ref": "#/$defs/id",
+          "default": "value"
+        },
+        "source_column": {
+          "$ref": "#/$defs/id",
+          "default": "source"
+        },
+        "kind_column": {
+          "$ref": "#/$defs/id",
+          "default": "kind"
+        },
+        "value_index_column": {
+          "$ref": "#/$defs/id",
+          "default": "value_index"
+        },
+        "identification": {
+          "$ref": "#/$defs/modal_label_identification_presentation"
+        }
+      }
+    },
+    "modal_label_identification_presentation": {
+      "type": "object",
+      "description": "Producer-selected actor label keys that the UI should render in the actor modal identification/header area. The full label table remains available separately.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/modal_label_identification_field"
+          },
+          "default": []
+        }
+      }
+    },
+    "modal_label_identification_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "max_values": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      }
+    },
+    "modal_mini_topology_presentation": {
+      "type": "object",
+      "description": "Depth-1 modal topology preview built from existing actors and graph links.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "depth": {
+          "type": "integer",
+          "const": 1,
+          "default": 1
+        },
+        "include_link_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "exclude_link_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
+    "modal_section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "source",
+        "columns"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "order": {
+          "type": "integer",
+          "default": 0
+        },
+        "source": {
+          "$ref": "#/$defs/modal_source"
+        },
+        "owner_filter": {
+          "$ref": "#/$defs/modal_owner_filter"
+        },
+        "row_filters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/modal_row_filter"
+          },
+          "default": []
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/modal_column"
+          },
+          "minItems": 1
+        },
+        "sort": {
+          "$ref": "#/$defs/modal_sort"
+        },
+        "empty_label": {
+          "type": "string"
+        }
+      }
+    },
+    "modal_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "actors",
+            "links",
+            "evidence",
+            "actor_table",
+            "relationship_table"
+          ]
+        },
+        "table": {
+          "$ref": "#/$defs/id",
+          "description": "Detail table id when kind is actor_table or relationship_table."
+        },
+        "evidence": {
+          "$ref": "#/$defs/id",
+          "description": "Evidence section id when kind is evidence."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "evidence"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "evidence"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "actor_table",
+                  "relationship_table"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "table"
+            ]
+          }
+        }
+      ]
+    },
+    "modal_owner_filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "actor_column",
+            "link_column",
+            "incident_link",
+            "incident_evidence",
+            "selected_link"
+          ]
+        },
+        "actor_column": {
+          "$ref": "#/$defs/id"
+        },
+        "link_column": {
+          "$ref": "#/$defs/id"
+        },
+        "src_actor_column": {
+          "$ref": "#/$defs/id"
+        },
+        "dst_actor_column": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "mode"
+            ],
+            "properties": {
+              "mode": {
+                "const": "actor_column"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actor_column"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "mode"
+            ],
+            "properties": {
+              "mode": {
+                "enum": [
+                  "link_column",
+                  "selected_link"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "link_column"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "mode"
+            ],
+            "properties": {
+              "mode": {
+                "enum": [
+                  "incident_link",
+                  "incident_evidence"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "src_actor_column",
+              "dst_actor_column"
+            ]
+          }
+        }
+      ]
+    },
+    "modal_row_filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "op"
+      ],
+      "properties": {
+        "column": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "ne",
+            "in",
+            "not_in",
+            "exists",
+            "missing"
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/cell_value"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cell_value"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "enum": [
+                  "eq",
+                  "ne"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "enum": [
+                  "in",
+                  "not_in"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "values"
+            ],
+            "properties": {
+              "values": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "modal_column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "projection"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projection": {
+          "$ref": "#/$defs/modal_projection"
+        },
+        "cell": {
+          "$ref": "#/$defs/modal_cell_type"
+        },
+        "visibility": {
+          "$ref": "#/$defs/modal_visibility"
+        },
+        "align": {
+          "type": "string",
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ],
+          "default": "left"
+        },
+        "sortable": {
+          "type": "boolean",
+          "default": true
+        },
+        "badge_map": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/modal_badge_presentation"
+          },
+          "default": {}
+        }
+      }
+    },
+    "modal_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "direct",
+            "actor_ref_label",
+            "opposite_actor",
+            "formatted_endpoint",
+            "label_lookup",
+            "json_path",
+            "const",
+            "coalesce",
+            "selected_side_endpoint"
+          ]
+        },
+        "column": {
+          "$ref": "#/$defs/id"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "default": []
+        },
+        "value": {
+          "$ref": "#/$defs/cell_value"
+        },
+        "actor_column": {
+          "$ref": "#/$defs/id"
+        },
+        "src_actor_column": {
+          "$ref": "#/$defs/id"
+        },
+        "dst_actor_column": {
+          "$ref": "#/$defs/id"
+        },
+        "ip_column": {
+          "$ref": "#/$defs/id"
+        },
+        "port_column": {
+          "$ref": "#/$defs/id"
+        },
+        "protocol_column": {
+          "$ref": "#/$defs/id"
+        },
+        "local_ip_column": {
+          "$ref": "#/$defs/id"
+        },
+        "local_port_column": {
+          "$ref": "#/$defs/id"
+        },
+        "remote_ip_column": {
+          "$ref": "#/$defs/id"
+        },
+        "remote_port_column": {
+          "$ref": "#/$defs/id"
+        },
+        "label_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "JSON path for explicit scalar extraction from a json column. Use only for curated compatibility with producer-owned nested facts."
+        },
+        "fallback": {
+          "$ref": "#/$defs/cell_value"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "direct"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "column"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "actor_ref_label"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actor_column"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "opposite_actor"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "src_actor_column",
+              "dst_actor_column"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "const"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "formatted_endpoint"
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "ip_column"
+                ]
+              },
+              {
+                "required": [
+                  "port_column"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "label_lookup"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "label_key"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "json_path"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "column",
+              "path"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "coalesce"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "columns"
+            ],
+            "properties": {
+              "columns": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "selected_side_endpoint"
+              }
+            }
+          },
+          "then": {
+            "allOf": [
+              {
+                "required": [
+                  "src_actor_column",
+                  "dst_actor_column"
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "local_ip_column"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "local_port_column"
+                    ]
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "remote_ip_column"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "remote_port_column"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "modal_cell_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "number",
+        "badge",
+        "actor_link",
+        "timestamp",
+        "duration",
+        "endpoint",
+        "array_count",
+        "debug_json"
+      ]
+    },
+    "modal_visibility": {
+      "type": "string",
+      "enum": [
+        "table",
+        "expanded",
+        "hidden",
+        "debug"
+      ],
+      "default": "table"
+    },
+    "modal_badge_presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "color_slot": {
+          "$ref": "#/$defs/color_slot"
+        },
+        "opacity": {
+          "$ref": "#/$defs/opacity_token"
+        }
+      }
+    },
+    "modal_sort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "column"
+      ],
+      "properties": {
+        "column": {
+          "$ref": "#/$defs/id"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "default": "asc"
+        }
+      }
+    },
     "link_variable_presentation": {
       "type": "object",
       "additionalProperties": false,
@@ -1241,12 +2090,17 @@
           "enum": [
             "none",
             "append",
+            "deduplicate",
             "set",
+            "set_union",
+            "merge_metrics",
+            "preserve",
             "sum",
             "min",
             "max",
             "last",
-            "first"
+            "first",
+            "latest"
           ]
         },
         "source_evidence": {
@@ -1258,6 +2112,34 @@
             "$ref": "#/$defs/column"
           },
           "minItems": 1
+        },
+        "presentation": {
+          "$ref": "#/$defs/table_type_presentation"
+        }
+      }
+    },
+    "table_type_presentation": {
+      "type": "object",
+      "description": "Default table display metadata. Full modal sections live on actor/link type presentation and select from these table rows.",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "order": {
+          "type": "integer",
+          "default": 0
+        },
+        "default_visibility": {
+          "$ref": "#/$defs/modal_visibility"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/modal_column"
+          },
+          "default": []
         }
       }
     },
