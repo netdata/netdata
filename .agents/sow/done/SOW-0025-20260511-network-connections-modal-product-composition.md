@@ -2,12 +2,10 @@
 
 ## Status
 
-Status: paused
+Status: completed
 
-Sub-state: paused by SOW-0028. The network-connections modal work exposed a
-larger topology mode, correlation, aggregation, and modal-identification
-contract gap that must be specified and implemented before this narrower modal
-composition SOW can resume.
+Sub-state: completed after backend producer repair, schema/developer
+documentation updates, protocol validation, schema validation, and SOW audit.
 
 ## Requirements
 
@@ -161,7 +159,7 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: needs-user-decision
+Status: ready
 
 Problem / root-cause model:
 
@@ -237,9 +235,11 @@ Open-source reference evidence:
 
 Open decisions:
 
-- Decide how the producer tells the UI which actor labels belong in the modal identification/header area.
-- Decide whether to add a relationship-summary table for aggregated network-connections drilldown rows.
-- Decide whether detailed socket evidence should be the primary process/endpoint table in detailed mode, or remain a separate secondary tab.
+- Resolved by SOW-0028 and the SOW-0025 decisions below:
+  - modal identification uses `modal.labels.identification.fields[]`;
+  - aggregated network-connections uses `data.tables.relationship.connections`;
+  - detailed network-connections uses exact socket evidence as the primary
+    modal table.
 
 ## Implications And Decisions
 
@@ -354,28 +354,78 @@ Duplication policy:
 - Paused this SOW because SOW-0028 owns the broader cross-repo topology mode,
   correlation, aggregation, and actor-identification contract that this SOW now
   depends on.
+- Resumed after SOW-0028 completed and was committed. The next step is to
+  validate the installed aggregated/detailed network-connections modal recipes
+  and repair any remaining backend producer gaps.
+- Validated the rebuilt producer output and found one remaining mismatch: the
+  self/root actor still needed a process summary instead of socket rows.
+- Updated `network-viewer.c` so self actors use a `Processes` section over
+  `ownership` links, process actors use `Connections` or `Sockets` depending on
+  mode, endpoint actors use `Processes`, and secondary socket metrics are
+  expanded columns instead of separate duplicate sections.
+- Updated the durable topology spec, developer guide, and project topology skill
+  so future topology producers do not reintroduce `socket_ports` as a normal
+  network-connections modal tab.
 
 ## Validation
 
 Acceptance criteria evidence:
 
-- Pending.
+- Complete inventory and mapping are recorded above under `Field inventory and
+  mapping`.
+- Self/node modal shape is explicit: `Processes` from `links`, filtered to
+  `type == ownership`, with process actor, socket count, and expanded evidence
+  count.
+- Process modal shape is explicit:
+  - aggregated mode: `Connections` from `tables.relationship.connections`;
+  - detailed mode: `Sockets` from `evidence.socket`.
+- Endpoint modal shape is explicit: `Processes` from the same mode-specific
+  relationship/evidence source.
+- Actor identification source is `modal.labels.identification.fields[]` over
+  `actor_labels`.
+- `socket_ports` remains graph port-bullet inventory only; it is not emitted as
+  a normal network-connections modal section.
 
 Tests or equivalent validation:
 
-- Pending.
+- `git diff --check`: passed.
+- `sudo -n cmake --build build --target network-viewer.plugin -- -j2`: passed.
+- Plugin protocol validation against the rebuilt binary:
+  - aggregated: status 200, mode `aggregated`, 110 actors, 147 links, 244
+    relationship rows, 730 actor labels, 192 port rows, 0 socket evidence rows;
+  - detailed: status 200, mode `detailed`, 111 actors, 147 links, 0 relationship
+    rows, 735 actor labels, 192 port rows, 244 socket evidence rows.
+- `go run ./tools/functions-validation/validate --schema ../plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json --input ../../.local/audits/topology-sow-0025/network-connections-aggregated-protocol.json --min-rows 1`: passed.
+- `go run ./tools/functions-validation/validate --schema ../plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json --input ../../.local/audits/topology-sow-0025/network-connections-detailed-protocol.json --min-rows 1`: passed.
+- `go test ./pkg/topology/v1 ./tools/functions-validation/validate`: passed.
 
 Real-use evidence:
 
-- Pending.
+- Rebuilt and installed only `/usr/libexec/netdata/plugins.d/network-viewer.plugin`
+  with the same owner/group/mode as the previous installed binary.
+- Direct HTTP validation through `localhost:19999` remained blocked by SSO
+  authorization returning HTTP 412, including through the token-safe minted
+  bearer helper. The rebuilt plugin was therefore validated through the normal
+  plugins.d `FUNCTION` stdin protocol, which exercises the same producer code
+  path without changing Agent authentication settings.
+- `.local/audits/topology-sow-0025/network-connections-aggregated-protocol.json`
+  and `.local/audits/topology-sow-0025/network-connections-detailed-protocol.json`
+  contain the validation payloads and are intentionally gitignored local
+  artifacts.
 
 Reviewer findings:
 
-- Pending.
+- No external AI reviewer was requested for this narrow backend repair. The
+  broader topology modal/correlation contract was reviewed during the preceding
+  SOW-0028 work; this SOW validated the concrete producer output with schema and
+  semantic checks.
 
 Same-failure scan:
 
-- Pending.
+- Searched the durable topology spec, developer guide, project topology skill,
+  and this SOW for stale `graph links plus socket_ports`, duplicate modal, and
+  `Socket Evidence` language. Historical problem statements remain in this SOW;
+  durable current-contract docs were updated.
 
 Sensitive data gate:
 
@@ -383,43 +433,65 @@ Sensitive data gate:
 
 Artifact maintenance gate:
 
-- Pending.
+- `AGENTS.md`: unchanged; no workflow or guardrail changed.
+- Runtime project skills: updated
+  `.agents/skills/project-create-topology/SKILL.md` with the
+  network-connections modal recipe.
+- Specs: updated `.agents/sow/specs/topology-function-schema.md` with the
+  current network-connections modal composition.
+- Developer docs: updated `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`.
+- End-user/operator docs: unchanged; this changes developer topology payload
+  composition, not operator instructions.
+- End-user/operator skills: unchanged; no public operator workflow changed.
+- SOW lifecycle: this SOW is ready to move from `current/` to `done/` with
+  `Status: completed`.
 
 Specs update:
 
-- Pending.
+- Updated `.agents/sow/specs/topology-function-schema.md`.
 
 Project skills update:
 
-- Pending.
+- Updated `.agents/skills/project-create-topology/SKILL.md`.
 
 End-user/operator docs update:
 
-- Pending.
+- Not affected. The user-facing Function remains the same; only v1 topology
+  modal presentation metadata changed.
 
 End-user/operator skills update:
 
-- Pending.
+- Not affected. No public/operator skill behavior or examples changed.
 
 Lessons:
 
-- Pending.
+- Network-connections modal tabs must describe user tasks, not storage tables.
+  `socket_ports` is useful for graph bullets but misleading as a peer modal tab.
+- The plugin stdin protocol is useful for validating producer output when local
+  Agent HTTP access is blocked by SSO.
 
 Follow-up mapping:
 
-- Pending.
+- SOW-0029 tracks the separate detailed loose-side/network-connections model
+  work. No additional SOW-0025 follow-up remains.
 
 ## Outcome
 
-Pending.
+Completed. The network-connections producer emits task-oriented actor modal
+recipes for self, process, and endpoint actors in both aggregated and detailed
+modes, without adding duplicated modal-only socket rows.
 
 ## Lessons Extracted
 
-Pending.
+- Keep modal composition tied to user troubleshooting questions. Internal tables
+  can remain in the payload for graph affordances or aggregation, but they should
+  not automatically become top-level modal tabs.
+- Validate topology producer changes through plugins.d protocol output when HTTP
+  auth prevents local Function calls.
 
 ## Followup
 
-None yet.
+- SOW-0029 covers the next network-connections detailed loose-side model work.
 
 ## Regression Log
 

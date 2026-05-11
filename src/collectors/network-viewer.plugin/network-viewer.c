@@ -2559,12 +2559,30 @@ static void topology_v1_emit_actor_label_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "value_index", "uint", "attribute", true, NULL);
 }
 
+static void topology_v1_emit_modal_direct_column_with_visibility(
+    BUFFER *wb,
+    const char *id,
+    const char *label,
+    const char *column,
+    const char *cell,
+    const char *visibility);
+
 static void topology_v1_emit_modal_direct_column(
     BUFFER *wb,
     const char *id,
     const char *label,
     const char *column,
     const char *cell) {
+    topology_v1_emit_modal_direct_column_with_visibility(wb, id, label, column, cell, NULL);
+}
+
+static void topology_v1_emit_modal_direct_column_with_visibility(
+    BUFFER *wb,
+    const char *id,
+    const char *label,
+    const char *column,
+    const char *cell,
+    const char *visibility) {
     buffer_json_add_array_item_object(wb);
     {
         buffer_json_member_add_string(wb, "id", id);
@@ -2576,15 +2594,17 @@ static void topology_v1_emit_modal_direct_column(
         }
         buffer_json_object_close(wb);
         buffer_json_member_add_string(wb, "cell", cell);
+        if(visibility)
+            buffer_json_member_add_string(wb, "visibility", visibility);
     }
     buffer_json_object_close(wb);
 }
 
-static void topology_v1_emit_modal_opposite_actor_column(BUFFER *wb) {
+static void topology_v1_emit_modal_opposite_actor_column_labeled(BUFFER *wb, const char *id, const char *label) {
     buffer_json_add_array_item_object(wb);
     {
-        buffer_json_member_add_string(wb, "id", "remote");
-        buffer_json_member_add_string(wb, "label", "Remote");
+        buffer_json_member_add_string(wb, "id", id);
+        buffer_json_member_add_string(wb, "label", label);
         buffer_json_member_add_object(wb, "projection");
         {
             buffer_json_member_add_string(wb, "kind", "opposite_actor");
@@ -2677,6 +2697,9 @@ static void topology_v1_emit_actor_type(
     bool detailed,
     const char *label_column_a,
     const char *label_column_b) {
+    bool is_self = strcmp(id, "self") == 0;
+    bool is_endpoint = strcmp(id, "endpoint") == 0;
+
     buffer_json_member_add_object(wb, id);
     {
         buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
@@ -2754,7 +2777,8 @@ static void topology_v1_emit_actor_type(
                 {
                     buffer_json_member_add_uint64(wb, "depth", 1);
                     buffer_json_member_add_array(wb, "exclude_link_types");
-                    buffer_json_add_array_item_string(wb, "ownership");
+                    if(!is_self)
+                        buffer_json_add_array_item_string(wb, "ownership");
                     buffer_json_array_close(wb);
                 }
                 buffer_json_object_close(wb);
@@ -2762,34 +2786,78 @@ static void topology_v1_emit_actor_type(
                 {
                     buffer_json_add_array_item_object(wb);
                     {
-                        buffer_json_member_add_string(wb, "id", detailed ? "sockets" : "connections");
-                        buffer_json_member_add_string(wb, "label", detailed ? "Sockets" : "Connections");
+                        if(is_self) {
+                            buffer_json_member_add_string(wb, "id", "processes");
+                            buffer_json_member_add_string(wb, "label", "Processes");
+                        }
+                        else if(is_endpoint) {
+                            buffer_json_member_add_string(wb, "id", "processes");
+                            buffer_json_member_add_string(wb, "label", "Processes");
+                        }
+                        else {
+                            buffer_json_member_add_string(wb, "id", detailed ? "sockets" : "connections");
+                            buffer_json_member_add_string(wb, "label", detailed ? "Sockets" : "Connections");
+                        }
                         buffer_json_member_add_uint64(wb, "order", 1);
                         buffer_json_member_add_object(wb, "source");
                         {
-                            buffer_json_member_add_string(wb, "kind", detailed ? "evidence" : "relationship_table");
-                            if(detailed)
-                                buffer_json_member_add_string(wb, "evidence", "socket");
+                            if(is_self)
+                                buffer_json_member_add_string(wb, "kind", "links");
                             else
+                                buffer_json_member_add_string(wb, "kind", detailed ? "evidence" : "relationship_table");
+
+                            if(!is_self && detailed)
+                                buffer_json_member_add_string(wb, "evidence", "socket");
+                            else if(!is_self)
                                 buffer_json_member_add_string(wb, "table", "connections");
                         }
                         buffer_json_object_close(wb);
                         buffer_json_member_add_object(wb, "owner_filter");
                         {
-                            buffer_json_member_add_string(wb, "mode", detailed ? "incident_evidence" : "incident_link");
+                            buffer_json_member_add_string(wb, "mode", (!is_self && detailed) ? "incident_evidence" : "incident_link");
                             buffer_json_member_add_string(wb, "src_actor_column", "src_actor");
                             buffer_json_member_add_string(wb, "dst_actor_column", "dst_actor");
                         }
                         buffer_json_object_close(wb);
+                        if(is_self) {
+                            buffer_json_member_add_array(wb, "row_filters");
+                            {
+                                buffer_json_add_array_item_object(wb);
+                                {
+                                    buffer_json_member_add_string(wb, "column", "type");
+                                    buffer_json_member_add_string(wb, "op", "eq");
+                                    buffer_json_member_add_string(wb, "value", "ownership");
+                                }
+                                buffer_json_object_close(wb);
+                            }
+                            buffer_json_array_close(wb);
+                        }
                         buffer_json_member_add_array(wb, "columns");
                         {
-                            topology_v1_emit_modal_opposite_actor_column(wb);
-                            topology_v1_emit_modal_selected_socket_endpoint_column(wb);
-                            topology_v1_emit_modal_direct_column(wb, "protocol", "Protocol", "protocol", "badge");
-                            topology_v1_emit_modal_direct_column(wb, "direction", "Direction", "direction", "badge");
-                            topology_v1_emit_modal_direct_column(wb, "state", "State", "state", "badge");
+                            if(is_self) {
+                                topology_v1_emit_modal_opposite_actor_column_labeled(wb, "process", "Process");
+                            }
+                            else {
+                                topology_v1_emit_modal_opposite_actor_column_labeled(
+                                    wb, is_endpoint ? "process" : "remote", is_endpoint ? "Process" : "Remote");
+                                topology_v1_emit_modal_selected_socket_endpoint_column(wb);
+                                if(!detailed)
+                                    topology_v1_emit_modal_direct_column(wb, "service", "Service", "service", "text");
+                                topology_v1_emit_modal_direct_column(wb, "protocol", "Protocol", "protocol", "badge");
+                                topology_v1_emit_modal_direct_column(wb, "direction", "Direction", "direction", "badge");
+                                topology_v1_emit_modal_direct_column(wb, "state", "State", "state", "badge");
+                            }
                             topology_v1_emit_modal_direct_column(wb, "sockets", "Sockets", "socket_count", "number");
-                            topology_v1_emit_modal_direct_column(wb, "rtt", "RTT max", "rtt_ms_max", "number");
+                            if(is_self)
+                                topology_v1_emit_modal_direct_column_with_visibility(
+                                    wb, "evidence", "Evidence", "evidence_count", "number", "expanded");
+                            else {
+                                topology_v1_emit_modal_direct_column_with_visibility(
+                                    wb, "retransmissions", "Retransmissions", "retransmissions", "number", "expanded");
+                                topology_v1_emit_modal_direct_column(wb, "rtt", "RTT max", "rtt_ms_max", "number");
+                                topology_v1_emit_modal_direct_column_with_visibility(
+                                    wb, "recv_rtt", "Receiver RTT max", "recv_rtt_ms_max", "number", "expanded");
+                            }
                         }
                         buffer_json_array_close(wb);
                     }

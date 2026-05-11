@@ -1029,6 +1029,21 @@ process actor type's `presentation.ports.sources[]` at that actor table with
 `value_column: "socket_count"`. Size process actors with
 `presentation.size: {"mode": "metric", "metric_column": "socket_count"}`.
 
+Network-connections actor modals should expose one primary troubleshooting
+section per actor type, not every internal table as a peer tab:
+
+- self/node actors: `Processes` over `links`, filtered to `type == ownership`;
+- process actors in aggregated mode: `Connections` over
+  `tables.relationship.connections`;
+- process actors in detailed mode: `Sockets` over `evidence.socket`;
+- endpoint actors: `Processes` over the same aggregated relationship table or
+  detailed evidence source for the active mode.
+
+Do not show `socket_ports` as a normal network-connections modal section. It is
+only the graph port-bullet inventory. Put less common per-connection fields such
+as retransmissions or receiver RTT behind `visibility: "expanded"` instead of
+creating another duplicate tab.
+
 ## Streaming Shape
 
 For streaming:

@@ -230,6 +230,19 @@ evidence. Emit a compact actor inventory table such as `socket_ports` with
 `ports.sources[]` at it with `value_column: "socket_count"`, and size process
 actors with `size.mode: "metric"` over actor row `socket_count`.
 
+For network-connections actor modals:
+
+- self/node actors show a `Processes` section from `links` filtered to
+  `type == ownership`;
+- process actors show one primary section: aggregated mode uses
+  `tables.relationship.connections`, detailed mode uses `evidence.socket`;
+- endpoint actors show a `Processes` section over the same mode-specific
+  relationship/evidence source;
+- `socket_ports` stays an actor inventory for graph port bullets, not a normal
+  modal tab;
+- secondary socket metrics belong in `visibility: "expanded"` columns instead
+  of separate duplicate sections.
+
 For socket correlation:
 
 - process actors emit claim rows for locally owned socket tuples;

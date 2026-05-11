@@ -400,11 +400,14 @@ single-node maps zoom out unnecessarily. `correlated_socket` is the output link
 type after exact endpoint absorption by an aggregator and may use farthest
 distance to keep independent topology clusters from blending.
 
-The remaining modal-composition migration for network-connections is to emit
-`actor_labels`, process `username`, process `cmdline`, and either a self actor
-`local_ip_count` metric/label or a deliberate removal of that old summary
-field. Process socket modals should derive from `evidence.socket` in detailed
-mode and from graph links plus `socket_ports` in aggregated mode.
+Network-connections modal composition is producer-declared. Self/node actors use
+a `Processes` section over `ownership` graph links filtered by link type. Process
+actors use a single primary section: `Connections` from
+`tables.relationship.connections` in aggregated mode and `Sockets` from
+`evidence.socket` in detailed mode. Endpoint actors use a `Processes` section
+from the same mode-specific relationship/evidence source. `socket_ports` is an
+actor inventory for process port bullets only; it is not a standalone modal tab
+for network-connections.
 
 `topology:snmp` now emits `netdata.topology.v1` from the Function handler
 through an adapter over the existing SNMP topology engine output. The adapter
