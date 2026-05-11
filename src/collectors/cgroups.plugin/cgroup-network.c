@@ -199,7 +199,7 @@ static void continue_as_child(void) {
     exit(EXIT_FAILURE);
 }
 
-int proc_pid_fd(const char *prefix, const char *ns, pid_t pid, ND_LOG_PRIORITY priority) {
+int proc_pid_fd(const char *prefix, const char *ns, pid_t pid, ND_LOG_FIELD_PRIORITY priority) {
     if(!prefix) prefix = "";
 
     char filename[FILENAME_MAX + 1];
@@ -239,7 +239,7 @@ static int switch_namespace(const char *prefix, pid_t pid) {
 
     for(i = 0; all_ns[i].name ; i++) {
         // Only network namespace is mandatory; optional namespaces log warnings
-        ND_LOG_PRIORITY prio = (all_ns[i].nstype == CLONE_NEWNET) ? NDLP_ERR : NDLP_WARNING;
+        ND_LOG_FIELD_PRIORITY prio = (all_ns[i].nstype == CLONE_NEWNET) ? NDLP_ERR : NDLP_WARNING;
         all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid, prio);
     }
 
