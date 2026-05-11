@@ -292,11 +292,9 @@ extern const char *btf_path;
 // Common functions
 void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
 
 // BPF teardown callbacks — called by main thread after all module threads have been joined
 void ebpf_unload_legacy_bpf(ebpf_module_t *em); // legacy-only modules: process, disk, softirq, oomkill, mdflush
-void ebpf_cachestat_unload_bpf(ebpf_module_t *em);
 void ebpf_dcstat_unload_bpf(ebpf_module_t *em);
 void ebpf_swap_unload_bpf(ebpf_module_t *em);
 void ebpf_vfs_unload_bpf(ebpf_module_t *em);

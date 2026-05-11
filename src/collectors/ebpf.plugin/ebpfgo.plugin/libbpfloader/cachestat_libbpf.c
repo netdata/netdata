@@ -55,6 +55,22 @@ struct netdata_ebpf_cachestat_snapshot {
     uint64_t account_page_dirtied;
 };
 
+struct netdata_ebpf_cachestat_pid_snapshot {
+    uint32_t pid;
+    uint32_t ppid;
+    uint64_t ct;
+    char comm[96];
+    uint32_t add_to_page_cache_lru;
+    uint32_t mark_page_accessed;
+    uint32_t account_page_dirtied;
+    uint32_t mark_buffer_dirty;
+};
+
+struct netdata_ebpf_cachestat_pid_snapshot_list {
+    struct netdata_ebpf_cachestat_pid_snapshot *items;
+    size_t count;
+};
+
 static const char *cachestat_account_program_name(const char *account_function, int flavor)
 {
     if (flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
@@ -154,6 +170,18 @@ static uint64_t cachestat_sum_percpu_values(const uint64_t *values, int count)
         total += values[i];
     return total;
 }
+
+struct netdata_ebpf_cachestat_pid_entry {
+    uint64_t ct;
+    uint32_t tgid;
+    uint32_t uid;
+    uint32_t gid;
+    char name[16];
+    uint32_t add_to_page_cache_lru;
+    uint32_t mark_page_accessed;
+    uint32_t account_page_dirtied;
+    uint32_t mark_buffer_dirty;
+};
 
 static void cachestat_destroy_links(struct netdata_ebpf_cachestat_runtime *rt)
 {
@@ -393,6 +421,96 @@ int netdata_cachestat_runtime_snapshot(
 
     free(values);
     return 0;
+}
+
+int netdata_cachestat_runtime_snapshot_apps(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    int maps_per_core,
+    struct netdata_ebpf_cachestat_pid_snapshot_list *out)
+{
+    if (!rt || !out)
+        return -1;
+
+    struct bpf_object *obj = cachestat_runtime_object(rt);
+    if (!obj)
+        return -1;
+
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, "cstat_pid");
+    if (!map)
+        return -1;
+
+    int fd = bpf_map__fd(map);
+    if (fd < 0)
+        return -1;
+
+    int count = maps_per_core ? libbpf_num_possible_cpus() : 1;
+    if (count < 1)
+        count = 1;
+
+    size_t max_entries = bpf_map__max_entries(map);
+    if (max_entries == 0)
+        max_entries = 1;
+
+    struct netdata_ebpf_cachestat_pid_entry *values = calloc((size_t)count, sizeof(*values));
+    if (!values)
+        return -1;
+
+    struct netdata_ebpf_cachestat_pid_snapshot *items = calloc(max_entries, sizeof(*items));
+    if (!items) {
+        free(values);
+        return -1;
+    }
+
+    size_t out_count = 0;
+    uint32_t key = 0, next_key = 0;
+
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        if (bpf_map_lookup_elem(fd, &key, values)) {
+            key = next_key;
+            memset(values, 0, (size_t)count * sizeof(*values));
+            continue;
+        }
+
+        struct netdata_ebpf_cachestat_pid_snapshot *dst = &items[out_count];
+        dst->pid = key;
+        dst->ppid = 0;
+
+        for (int i = 0; i < count; i++) {
+            if (values[i].ct > dst->ct)
+                dst->ct = values[i].ct;
+            dst->add_to_page_cache_lru += values[i].add_to_page_cache_lru;
+            dst->mark_page_accessed += values[i].mark_page_accessed;
+            dst->account_page_dirtied += values[i].account_page_dirtied;
+            dst->mark_buffer_dirty += values[i].mark_buffer_dirty;
+            if (!dst->comm[0] && values[i].name[0]) {
+                strncpy(dst->comm, values[i].name, sizeof(dst->comm) - 1);
+                dst->comm[sizeof(dst->comm) - 1] = '\0';
+            }
+        }
+
+        out_count++;
+        if (out_count >= max_entries)
+            break;
+
+        key = next_key;
+        memset(values, 0, (size_t)count * sizeof(*values));
+    }
+
+    free(values);
+
+    out->items = items;
+    out->count = out_count;
+    return 0;
+}
+
+void netdata_cachestat_runtime_free_apps_snapshot(struct netdata_ebpf_cachestat_pid_snapshot_list *out)
+{
+    if (!out)
+        return;
+
+    free(out->items);
+    out->items = NULL;
+    out->count = 0;
 }
 
 void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)

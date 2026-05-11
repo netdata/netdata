@@ -2962,8 +2962,6 @@ if(ENABLE_PLUGIN_EBPF)
     set(EBPF_PLUGIN_FILES
             src/collectors/ebpf.plugin/ebpf.c
             src/collectors/ebpf.plugin/ebpf.h
-            src/collectors/ebpf.plugin/ebpf_cachestat.c
-            src/collectors/ebpf.plugin/ebpf_cachestat.h
             src/collectors/ebpf.plugin/ebpf_dcstat.c
             src/collectors/ebpf.plugin/ebpf_dcstat.h
             src/collectors/ebpf.plugin/ebpf_disk.c
