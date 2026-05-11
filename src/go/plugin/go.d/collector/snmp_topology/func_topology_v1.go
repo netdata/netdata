@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -578,7 +577,7 @@ func snmpTopologyV1ActorPortsTableType() topologyv1.TableType {
 
 func snmpTopologyV1PortModalColumns() []topologyv1.ModalColumn {
 	return []topologyv1.ModalColumn{
-		modalDirectColumn("port_number", "Port #", "port_number", "number"),
+		modalDirectColumn("if_index", "Port ID", "if_index", "number"),
 		modalDirectColumn("name", "Port", "name", "text"),
 		modalDirectColumn("oper_status", "Status", "oper_status", "badge"),
 		modalDirectColumn("admin_status", "Admin", "admin_status", "badge"),
@@ -591,7 +590,6 @@ func snmpTopologyV1PortModalColumns() []topologyv1.ModalColumn {
 		modalDirectColumn("neighbor_count", "Neighbors", "neighbor_count", "number"),
 		modalActorRefColumnWithVisibility("neighbor_actor", "Neighbor", "neighbor_actor", "expanded"),
 		modalDirectColumnWithVisibility("neighbor_port_name", "Neighbor Port", "neighbor_port_name", "text", "expanded"),
-		modalDirectColumnWithVisibility("if_index", "SNMP ifIndex", "if_index", "number", "expanded"),
 		modalDirectColumnWithVisibility("if_name", "ifName", "if_name", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_descr", "ifDescr", "if_descr", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_alias", "Alias", "if_alias", "text", "expanded"),
@@ -669,7 +667,6 @@ func snmpTopologyV1ActorLabelsTableType() topologyv1.TableType {
 func snmpTopologyV1ActorPortsColumns() []topologyv1.Column {
 	return []topologyv1.Column{
 		topologyv1.NewColumn("actor", "actor_ref", topologyv1.WithRole("reference")),
-		topologyv1.NewColumn("port_number", "uint", topologyv1.WithNullable()),
 		topologyv1.NewColumn("if_index", "uint", topologyv1.WithNullable()),
 		topologyv1.NewColumn("port_id", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("name", "string_ref", topologyv1.WithNullable(), topologyv1.WithDictionary("strings")),
@@ -1462,7 +1459,6 @@ func buildSNMPTopologyV1ActorPortsTable(
 	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
 ) topologyv1.Table {
 	actorRefs := make([]any, len(rows))
-	portNumbers := make([]any, len(rows))
 	ifIndexes := make([]any, len(rows))
 	portIDs := make([]any, len(rows))
 	names := make([]any, len(rows))
@@ -1489,7 +1485,6 @@ func buildSNMPTopologyV1ActorPortsTable(
 
 	for i, row := range rows {
 		actorRefs[i] = row.actorRef
-		portNumbers[i] = nullableSNMPTopologyV1PortNumber(row.values)
 		ifIndexes[i] = nullableUintValue(row.values["if_index"])
 		portIDs[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["port_id"]))
 		portName := firstNonEmptyString(
@@ -1542,7 +1537,6 @@ func buildSNMPTopologyV1ActorPortsTable(
 
 	return topologyv1.MustTable(len(rows), snmpTopologyV1ActorPortsColumns(), []topologyv1.ColumnEncoding{
 		topologyv1.Values(actorRefs...),
-		topologyv1.Values(portNumbers...),
 		topologyv1.Values(ifIndexes...),
 		topologyv1.Values(portIDs...),
 		topologyv1.Values(names...),
@@ -1688,7 +1682,6 @@ var snmpTopologyV1ActorPortCanonicalKeys = map[string]struct{}{
 	"oper_status":        {},
 	"port_id":            {},
 	"port_name":          {},
-	"port_number":        {},
 	"port_type":          {},
 	"speed":              {},
 	"stp_state":          {},
@@ -1902,21 +1895,6 @@ func nullableUintValue(value any) any {
 		return nil
 	}
 	return out
-}
-
-func nullableSNMPTopologyV1PortNumber(values map[string]any) any {
-	if value, ok := uintValue(values["port_number"]); ok {
-		return value
-	}
-	portID := strings.TrimSpace(topologyV1ScalarLabelValue(values["port_id"]))
-	if portID == "" {
-		return nil
-	}
-	value, err := strconv.ParseUint(portID, 10, 64)
-	if err != nil {
-		return nil
-	}
-	return value
 }
 
 func uintValue(value any) (uint64, bool) {

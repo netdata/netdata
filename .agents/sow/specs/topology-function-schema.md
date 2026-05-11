@@ -422,12 +422,11 @@ primary `Ports` section over `actor_ports`, and a `Port Neighbors` section over
 endpoint, segment, or custom actors that do not own port inventory.
 
 SNMP `actor_ports` exposes real port identity and status as typed columns:
-nullable `port_number` when a real numeric source port is known, SNMP
-`if_index`, source `port_id`, display `name`, `if_name`, `if_descr`,
-`if_alias`, MAC, speed, status, mode, role, VLAN, FDB, link, and neighbor
-counts. It must never fabricate numeric port IDs; row order and SNMP `if_index`
-must not be used as `port_number`. `if_index` is SNMP technical metadata and
-must be labelled as such in modal presentation.
+SNMP `if_index` as the visible numeric port ID when known, source `port_id`,
+display `name`, `if_name`, `if_descr`, `if_alias`, MAC, speed, status, mode,
+role, VLAN, FDB, link, and neighbor counts. It must never fabricate numeric
+port IDs; row order and generated sequences must not be used. `if_index` must
+come from the device/SNMP facts and must align with `actor_port_links.if_index`.
 
 SNMP `actor_ports` may also carry compact expanded-row neighbor columns such as
 nullable `neighbor_actor` and `neighbor_port_name`, derived from graph-link

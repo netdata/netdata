@@ -550,9 +550,8 @@ Device modals should remain port-centric:
 - actor identification: device name, management IP, vendor, model, role, and
   other selected labels;
 - full labels tab: all labels;
-- ports table: one row per known interface/port, with nullable real numeric
-  `port_number` only when the producer has one, SNMP `if_index` as expanded
-  technical metadata, and the port name;
+- ports table: one row per known interface/port, with SNMP `if_index` as the
+  visible real numeric port ID when known, and the port name;
 - expanded port rows: show a clickable neighbor actor and neighbor port name
   when graph-link facts can align the port to a remote actor;
 - links/neighbor information: derived from the same port rows or aligned

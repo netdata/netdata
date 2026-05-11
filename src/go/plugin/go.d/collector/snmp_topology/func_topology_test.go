@@ -359,7 +359,7 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 
 	portTable := payload.Tables.Actor["actor_ports"].Table
 	assert.Equal(t, 1, portTable.Rows)
-	assert.Equal(t, "uint", topologyV1ColumnType(portTable, "port_number"))
+	assert.Empty(t, topologyV1ColumnType(portTable, "port_number"))
 	assert.Equal(t, "uint", topologyV1ColumnType(portTable, "if_index"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "port_id"))
 	assert.Equal(t, "string_ref", topologyV1ColumnType(portTable, "if_name"))
@@ -375,7 +375,6 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, []any{uint64(0), nil}, topologyV1ColumnValues(t, payload.Actors, "ports_total"))
 	assert.Equal(t, []any{nil, []any{"arp"}}, topologyV1ColumnValues(t, payload.Actors, "protocols"))
 	assert.Equal(t, []any{nil, nil}, topologyV1ColumnValues(t, payload.Actors, "capabilities"))
-	assert.Equal(t, []any{uint64(1)}, topologyV1ColumnValues(t, portTable, "port_number"))
 	assert.Equal(t, []any{uint64(1)}, topologyV1ColumnValues(t, portTable, "if_index"))
 	assert.Equal(t, []string{"1"}, topologyV1StringColumnValues(t, payload, portTable, "port_id"))
 	assert.Equal(t, []string{"Gi0/1"}, topologyV1StringColumnValues(t, payload, portTable, "if_name"))
@@ -431,14 +430,11 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, "management_ip", deviceType.Presentation.Modal.Labels.Identification.Fields[1].Key)
 	require.Len(t, deviceType.Presentation.Modal.Sections, 2)
 	assert.Equal(t, "ports", deviceType.Presentation.Modal.Sections[0].ID)
-	assert.Equal(t, "port_number", deviceType.Presentation.Modal.Sections[0].Columns[0].ID)
-	assert.Equal(t, "Port #", deviceType.Presentation.Modal.Sections[0].Columns[0].Label)
+	assert.Equal(t, "if_index", deviceType.Presentation.Modal.Sections[0].Columns[0].ID)
+	assert.Equal(t, "Port ID", deviceType.Presentation.Modal.Sections[0].Columns[0].Label)
 	assert.Equal(t, "neighbor_actor", deviceType.Presentation.Modal.Sections[0].Columns[11].ID)
 	assert.Equal(t, "actor_link", deviceType.Presentation.Modal.Sections[0].Columns[11].Cell)
 	assert.Equal(t, "expanded", deviceType.Presentation.Modal.Sections[0].Columns[11].Visibility)
-	assert.Equal(t, "if_index", deviceType.Presentation.Modal.Sections[0].Columns[13].ID)
-	assert.Equal(t, "SNMP ifIndex", deviceType.Presentation.Modal.Sections[0].Columns[13].Label)
-	assert.Equal(t, "expanded", deviceType.Presentation.Modal.Sections[0].Columns[13].Visibility)
 	assert.Equal(t, "port_neighbors", deviceType.Presentation.Modal.Sections[1].ID)
 	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[1].Source.Kind)
 	assert.Equal(t, "actor_port_links", deviceType.Presentation.Modal.Sections[1].Source.Table)
@@ -451,7 +447,7 @@ func TestSNMPTopologyToV1_PreservesActorCustomTables(t *testing.T) {
 	assert.Equal(t, "selected_side_endpoint", endpointType.Presentation.Modal.Sections[0].Columns[1].Projection.Kind)
 }
 
-func TestSNMPTopologyToV1_DoesNotUseIfIndexAsPortNumber(t *testing.T) {
+func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 	data := topologyData{
 		AgentID: "agent-test",
 		View:    "summary",
@@ -501,8 +497,15 @@ func TestSNMPTopologyToV1_DoesNotUseIfIndexAsPortNumber(t *testing.T) {
 	require.NotNil(t, payload.Tables)
 
 	portTable := payload.Tables.Actor["actor_ports"].Table
-	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, portTable, "port_number"))
+	assert.Empty(t, topologyV1ColumnType(portTable, "port_number"))
 	assert.Equal(t, []any{uint64(42)}, topologyV1ColumnValues(t, portTable, "if_index"))
+
+	deviceType := payload.Types.ActorTypes["device"]
+	require.NotNil(t, deviceType.Presentation)
+	require.NotNil(t, deviceType.Presentation.Modal)
+	require.NotEmpty(t, deviceType.Presentation.Modal.Sections)
+	assert.Equal(t, "if_index", deviceType.Presentation.Modal.Sections[0].Columns[0].ID)
+	assert.Equal(t, "Port ID", deviceType.Presentation.Modal.Sections[0].Columns[0].Label)
 }
 
 func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {

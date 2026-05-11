@@ -291,12 +291,12 @@ For SNMP/L2 managed device actor modals:
 - Put important device facts in `modal.labels.identification.fields[]`, backed
   by `actor_labels`. Typical keys are display name, management IP, vendor,
   model, port counts, and LLDP/CDP neighbor counts.
-- Expose real port identity as typed `actor_ports` columns: nullable
-  `port_number` only when a real numeric source port is known, SNMP `if_index`,
-  source `port_id`, display `name`, `if_name`, `if_descr`, `if_alias`, MAC,
-  speed, status, mode, role, VLAN, FDB, link, and neighbor counts.
-- Do not fabricate numeric port IDs. Do not derive `port_number` from row order
-  or SNMP `if_index`; label `if_index` as SNMP technical metadata.
+- Expose real port identity as typed `actor_ports` columns: SNMP `if_index` as
+  the visible numeric port ID when known, source `port_id`, display `name`,
+  `if_name`, `if_descr`, `if_alias`, MAC, speed, status, mode, role, VLAN, FDB,
+  link, and neighbor counts.
+- Do not fabricate numeric port IDs. Do not derive port identity from row order
+  or any generated sequence; `if_index` must come from device/SNMP facts.
 - Include compact expanded-row neighbor columns such as nullable
   `neighbor_actor` and `neighbor_port_name` when graph-link facts can align the
   port to a remote actor.

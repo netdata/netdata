@@ -4,7 +4,8 @@
 
 Status: completed
 
-Sub-state: regression repair, documentation updates, and validation completed on 2026-05-11.
+Sub-state: second regression repair, documentation updates, validation, and
+local build completed on 2026-05-11.
 
 ## Requirements
 
@@ -550,3 +551,89 @@ Follow-up mapping:
 Completed. SNMP Ports no longer display SNMP `ifIndex` as a synthetic-looking
 port number, expanded port rows can expose a clickable neighbor actor when link
 facts allow it, and frontend v1 actor-link cells navigate again.
+
+## Regression - 2026-05-11 - SNMP Port Identity Alignment
+
+### What Broke
+
+- The previous regression repair introduced `actor_ports.port_number` and made
+  it the visible `Ports` table identity.
+- The live SNMP payload has the real numeric device port identity in
+  `actor_ports.if_index` and `actor_port_links.if_index`; it does not
+  necessarily have a separate numeric `port_number` or numeric `port_id`.
+- Result: `Ports` showed empty port IDs while `Port Neighbors` showed correct
+  non-empty port IDs.
+
+### Evidence
+
+- `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go` currently
+  emits `port_number` as the first `Ports` modal column.
+- `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go` currently
+  emits `if_index` as the first `Port Neighbors` modal column.
+- The user verified in the local UI that the `Ports` values are empty for the
+  managed SNMP device, while `Port Neighbors` values are correct and non-empty.
+
+### Root Cause
+
+- The producer accidentally split one SNMP concept into two modal identities:
+  `port_number` for `Ports`, and `if_index` for `Port Neighbors`.
+- For SNMP/L2, `ifIndex` is the device-provided numeric interface identifier
+  and is the value the UI should show as the port ID. It is not a row-order
+  autoincrement invented by Netdata.
+
+### Repair Plan
+
+- Remove the `actor_ports.port_number` column and helper logic.
+- Use `actor_ports.if_index` as the visible `Ports` `Port ID` column, matching
+  `actor_port_links.if_index`.
+- Keep the no-synthetic-number rule: never derive port IDs from row order.
+- Update specs, developer guide, project skill, and tests to describe SNMP
+  `if_index` as the visible real numeric port identity.
+
+### Implementation
+
+- Removed the `actor_ports.port_number` column and helper logic.
+- Restored `actor_ports.if_index` as the visible `Ports` `Port ID` column.
+- Kept `actor_port_links.if_index` unchanged, so `Ports` and `Port Neighbors`
+  now use the same real SNMP numeric port identity.
+- Updated tests, topology specs, topology developer guide, and project topology
+  skill to define `if_index` as the visible SNMP port ID when known.
+
+### Validation
+
+Acceptance criteria evidence:
+
+- `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go` emits
+  `if_index` as the first `Ports` modal column and as the first
+  `Port Neighbors` modal column.
+- `src/go/plugin/go.d/collector/snmp_topology/func_topology_test.go` verifies
+  `actor_ports` has no `port_number` column and still exposes `if_index`.
+
+Tests or equivalent validation:
+
+- `cd src/go && go test -count=1 ./plugin/go.d/collector/snmp_topology ./pkg/topology/v1 ./tools/functions-validation/validate`
+- `sudo -n cmake --build build --target go.d.plugin -- -j2`
+
+Artifact maintenance gate:
+
+- `AGENTS.md`: unchanged. No project-wide workflow rule changed.
+- Runtime project skills: updated `.agents/skills/project-create-topology/SKILL.md`
+  with SNMP `if_index` as the visible port ID and the no-generated-sequence rule.
+- Specs: updated `.agents/sow/specs/topology-function-schema.md` and
+  `.agents/sow/specs/topology-modes-correlation-aggregation.md`.
+- End-user/operator docs: unchanged. This remains developer-facing topology
+  payload composition, not an operator workflow.
+- End-user/operator skills: unchanged. No public/operator skill semantics
+  changed.
+- SOW lifecycle: reopened from `done/`, repaired, then returned to `done/` with
+  `Status: completed`.
+
+Follow-up mapping:
+
+- No new deferred implementation work remains in this SOW.
+
+### Regression Outcome
+
+Completed. SNMP `Ports` and `Port Neighbors` now use the same real
+device-provided `if_index` value for the visible port ID, without any synthetic
+numbering.
