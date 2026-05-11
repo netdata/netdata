@@ -323,7 +323,6 @@ static int switch_namespace(const char *prefix, pid_t pid) {
         }
 
         close(root_fd);
-        root_fd = -1;
     }
 
     int do_fork = 0;
