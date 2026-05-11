@@ -98,12 +98,21 @@ void ml_host_delete(RRDHOST *rh)
 
 void ml_host_start(RRDHOST *rh) {
     ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if (!host || host->ml_running)
+    if (!host)
         return;
 
-    host->ml_running = true;
-
+    // Set ml_running and run the sweep under host->mutex so concurrent
+    // ml_host_start() calls are serialized and the visibility window of the
+    // flag flip is bounded by the same critical section that performs the
+    // sweep.
     netdata_mutex_lock(&host->mutex);
+
+    if (host->ml_running) {
+        netdata_mutex_unlock(&host->mutex);
+        return;
+    }
+
+    host->ml_running = true;
 
     void *rsp = NULL;
     rrdset_foreach_read(rsp, host->rh) {
@@ -355,7 +364,13 @@ void ml_dimension_new(RRDDIM *rd)
 
     metaqueue_ml_load_models(rd);
 
-    ml_dimension_enqueue_create_model(rd->rrdset->rrdhost, rd);
+    // Only enqueue once ml is running for this host. Otherwise, ml_host_start()
+    // will sweep all untrained dimensions and enqueue them when it runs.
+    // This avoids double-enqueueing the same dim from both paths.
+    RRDHOST *rh = rd->rrdset->rrdhost;
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (host && host->ml_running)
+        ml_dimension_enqueue_create_model(rh, rd);
 }
 
 void ml_dimension_delete(RRDDIM *rd)

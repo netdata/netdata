@@ -714,7 +714,7 @@ bool ml_should_publish_model_update(bool host_running,
     return true;
 }
 
-static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation)
+static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
@@ -728,6 +728,12 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
         spinlock_unlock(&dim->slock);
         return;
     }
+
+    // Mark the dim as downstream-supplied only after the publish-check passes
+    // and under the same slock as the install. Setting it earlier would risk
+    // suppressing local training if the install was cancelled.
+    if (from_downstream)
+        dim->has_received_downstream_model = true;
 
     if (dim->km_contexts.size() < Cfg.num_models_to_use) {
         dim->km_contexts.emplace_back(dim->kmeans);
@@ -845,7 +851,7 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
     }
 
     // update models
-    ml_dimension_update_models(worker, dim, generation);
+    ml_dimension_update_models(worker, dim, generation, /*from_downstream=*/false);
 
     return worker_result;
 }
@@ -1308,15 +1314,15 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         return ML_WORKER_RESULT_OK;
     }
 
-    // The model survived all checks and will be installed — mark this dimension
-    // as supplied by downstream. Only set the flag here so that rejected models
-    // (duplicates, stale, or concurrent-training) do not permanently suppress
-    // local retraining.
-    Dim->has_received_downstream_model = true;
+    // Stage the incoming kmeans into the dim's working buffer; the actual
+    // install into km_contexts and the has_received_downstream_model flag-set
+    // happen inside ml_dimension_update_models() under the same slock as the
+    // publish-check, so a concurrent ml_host_stop() either commits both or
+    // cancels both.
     Dim->kmeans = req.inlined_km;
     uint32_t generation = Dim->reset_generation;
     spinlock_unlock(&Dim->slock);
-    ml_dimension_update_models(worker, Dim, generation);
+    ml_dimension_update_models(worker, Dim, generation, /*from_downstream=*/true);
 
     pulse_ml_models_received();
     return ML_WORKER_RESULT_OK;
