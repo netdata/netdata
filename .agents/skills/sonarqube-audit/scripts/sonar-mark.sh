@@ -22,6 +22,7 @@
 # FAMILY MODE (acts on every open finding for a rule):
 #   sonar-mark.sh family-fp   <RULE_ID>   <COMMENT>  # e.g. go:S2077
 #   sonar-mark.sh family-safe <RULE_ID>   <COMMENT>  # e.g. c:S5443
+#   sonar-mark.sh family-ack  <RULE_ID>   <COMMENT>  # e.g. c:S5443
 #
 #   Family mode prints the matched keys and prompts before acting unless
 #   SONAR_MARK_YES=1 is set in the environment.
