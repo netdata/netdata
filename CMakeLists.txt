@@ -3100,7 +3100,6 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         endif()
         if(OS_WINDOWS)
                 list(APPEND NETWORK_VIEWER_FILES
-                        src/collectors/network-viewer.plugin/perflib-udp.c
                         src/collectors/network-viewer.plugin/perflib-tcp.c
                 )
         endif()
