@@ -175,9 +175,13 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if(rrdhost_receiver_replicating_charts(host) || rrdhost_sender_replicating_charts(host))
-            continue;
-
+        // Per-chart correctness gate is rrdset_is_replicating(st) inside
+        // svc_rrdhost_cleanup_charts_marked_obsolete. The previous host-level
+        // gate here (rrdhost_*_replicating_charts(host) > 0) was a defensive
+        // holdover from before the sender replication counter was accurate;
+        // on streaming children with continuous chart churn it permanently
+        // tripped and blocked all obsolete-chart cleanup on the host, piling
+        // up obsolete-but-still-live charts and their RAM-mode dim mmaps.
         archived += svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
         if (rrdhost_is_local(host) || IS_VIRTUAL_HOST_OS(host))
