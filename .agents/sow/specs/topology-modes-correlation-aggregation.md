@@ -638,9 +638,14 @@ complete.
 Tables:
 
 - stream path: deduplicated path rows;
-- retention: all retaining sources relevant to the selected actor;
-- inbound: children and incoming relationships relevant to the selected actor;
-- outbound: parents and outgoing relationships relevant to the selected actor.
+- retention for node: all retaining sources relevant to the selected actor,
+  including the retaining `observer_actor`;
+- retained nodes: all nodes whose data is maintained by the selected actor,
+  using the same retention table filtered by `observer_actor`;
+- received nodes: children, virtual nodes, stale nodes, and descendants
+  received or transiting through the selected parent;
+- upstream stream: the selected actor's own outgoing stream destination and
+  stream attributes.
 
 Highlight path must use the deduplicated stream-path table, not direct sibling
 selection only.

@@ -257,6 +257,31 @@ For socket correlation:
   aggregation;
 - `correlated_socket` is the farthest output link type after exact absorption.
 
+## Streaming Modal Rules
+
+For `topology:streaming` actor modals:
+
+- Keep `actor_labels`, `stream_path`, `retention`, `inbound`, and `outbound`
+  as the single source of truth. Do not duplicate rows only to populate modal
+  sections.
+- Put important node identity/status facts in
+  `modal.labels.identification.fields[]`, backed by `actor_labels`. Typical
+  keys are hostname, node type, stream status, ingest status, health status,
+  child count, machine GUID, and Agent version.
+- Show `Stream path` from `stream_path` filtered by `actor`, ordered by
+  `path_index`.
+- Show `Retention for node` from `retention` filtered by `actor`; include
+  `observer_actor` so multi-parent/cloud views show who maintains each
+  retention row.
+- Show `Retained nodes` from the same `retention` table filtered by
+  `observer_actor`; this answers which nodes' data the selected actor
+  maintains.
+- Show `Received nodes` from `inbound` filtered by `parent_actor`; this table
+  represents children, virtual nodes, stale nodes, and descendants received or
+  transiting through the selected parent.
+- Show `Upstream stream` from `outbound` filtered by `actor`; this table is the
+  selected actor's own upstream stream, not a duplicate list of descendants.
+
 ## SNMP/L2 Modal Rules
 
 For SNMP/L2 managed device actor modals:

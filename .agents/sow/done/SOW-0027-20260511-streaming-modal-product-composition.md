@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: open
+Status: completed
 
-Sub-state: pending product analysis and implementation. This SOW is intentionally separate from network-connections and SNMP modal work.
+Sub-state: producer modal composition implemented and validated. This SOW is intentionally separate from network-connections and SNMP modal work.
 
 ## Requirements
 
@@ -118,12 +118,13 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: needs-user-decision
+Status: ready for implementation
 
 Problem / root-cause model:
 
 - The current streaming modal recipes expose local source tables but do not encode the operational roles of a selected actor.
 - The retention table has the key `observer_actor` fact but the current modal recipe neither filters by it nor displays it, so parent responsibility is hidden.
+- The inbound table already models descendants received through a parent; the current modal label `Inbound children` under-describes transit/descendant responsibility and makes the table look incomplete.
 
 Evidence reviewed:
 
@@ -131,6 +132,8 @@ Evidence reviewed:
 - The modal retention section currently filters by `actor` in `src/web/api/functions/function-topology-streaming.c:1484-1495`.
 - Inbound rows include `parent_actor`, `child_actor`, and `source_actor` in `src/web/api/functions/function-topology-streaming.c:1325-1340`.
 - Outbound rows include only `actor` and `destination_actor` plus stream attributes in `src/web/api/functions/function-topology-streaming.c:1342-1349`.
+- Descendant rows are populated into `parent_descendants` in `src/web/api/functions/function-topology-streaming.c:2546-2604` and then emitted as inbound rows in `src/web/api/functions/function-topology-streaming.c:1145-1192`.
+- Actor labels already include display name, hostname, machine GUID, node ID, type, stream/ingest/health status, agent fields, system fields, child count, alert counts, and full host labels where available in `src/web/api/functions/function-topology-streaming.c:549-589`.
 
 Affected contracts and surfaces:
 
@@ -161,21 +164,17 @@ Sensitive data handling plan:
 
 Implementation plan:
 
-1. Inventory current streaming rows and old modal behavior by actor role.
-2. Define role-specific modal views:
-   - child/vnode view;
-   - parent view;
-   - stale view;
-   - self/local node view if different.
-3. Add modal sections for:
+1. Keep one streaming modal recipe for all streaming actor types because the existing tables already use actor-ref owner filters and empty sections naturally disappear or show meaningful empty states per role.
+2. Make the recipe role-aware through section labels and owner filters, not by duplicating table data.
+3. Add or adjust modal sections for:
    - retention for selected node (`actor`);
    - retention maintained by selected node (`observer_actor`);
-   - inbound direct children (`parent_actor`);
-   - transit/descendant rows if current data supports them;
-   - outbound stream from selected node (`actor`).
-4. Add missing columns/rows only if current canonical tables cannot answer the required operational questions.
-5. Update aggregator and frontend handoffs if section filtering or role-specific actor modals need support beyond current schema.
-6. Validate with local and multi-parent/cloud payloads where possible.
+   - received/transit descendants (`parent_actor`);
+   - upstream stream from selected node (`actor`).
+4. Display `observer_actor` in the selected-node retention view and `actor` in the maintained-retention view.
+5. Add important actor identification/header fields backed by `actor_labels`: health status and child count, while keeping full labels in the Labels tab.
+6. Add missing columns/rows only if current canonical tables cannot answer the required operational questions.
+7. Validate with local payload/schema checks and mark cloud/multi-parent validation as external if no aggregated streaming fixture is available in this repository.
 
 Validation plan:
 
@@ -199,16 +198,25 @@ Artifact impact plan:
 
 Open-source reference evidence:
 
-- Not checked yet. This is Netdata-specific streaming semantics; external references are unlikely to help except for general tree/path modal UX.
+- External open-source topology references were not used for implementation authority. This SOW changes Netdata-specific streaming semantics defined by local producer code and topology specs; local Netdata code is the authoritative source.
 
 Open decisions:
 
-- Decide whether streaming actor types need distinct modal recipes by role, or whether one recipe with multiple well-labeled sections is enough.
-- Decide what section names make the operational meaning clear, especially for retention and transit/forwarded children.
+- Resolved for this SOW: use one recipe with multiple well-labeled sections and owner filters. This avoids repeating modal metadata across actor types while preserving role-specific behavior through table filters.
+- Resolved for this SOW: use concise operator-facing section names: `Stream path`, `Retention for node`, `Retained nodes`, `Received nodes`, and `Upstream stream`.
 
 ## Implications And Decisions
 
-Pending. User decision is required after the field inventory and proposed modal layout are written.
+Decision recorded after the user asked to proceed to SOW-0027:
+
+- Keep the payload single-source-of-truth: reuse existing `actor_labels`, `stream_path`, `retention`, `inbound`, and `outbound` tables.
+- Do not create modal-only duplicate rows.
+- Keep one shared streaming actor modal recipe unless implementation proves role-specific recipes are necessary.
+- Rename/recompose sections so the modal answers operator questions directly:
+  - `Retention for node`: who retains the selected node and for what range.
+  - `Retained nodes`: which nodes' data the selected actor maintains.
+  - `Received nodes`: which children/vnodes/stale descendants are received through the selected parent.
+  - `Upstream stream`: where the selected actor itself sends data.
 
 ## Plan
 
@@ -224,28 +232,43 @@ Pending. User decision is required after the field inventory and proposed modal 
 ### 2026-05-11
 
 - Created SOW from user-reported streaming modal regressions and current code evidence.
+- Promoted SOW to current and recorded the implementation decision to keep one shared streaming actor modal recipe with role-aware sections over existing tables.
+- Updated `topology:streaming` modal identification fields to include health status and child count.
+- Split retention presentation into `Retention for node` and `Retained nodes` using the existing `retention` table and different owner filters.
+- Renamed/recomposed relationship sections as `Received nodes` and `Upstream stream` so they match the underlying `inbound` and `outbound` table semantics.
+- Updated topology specs and the project topology skill with streaming modal rules.
 
 ## Validation
 
 Acceptance criteria evidence:
 
-- Pending.
+- Complete fact inventory recorded in `## Analysis` and `## Pre-Implementation Gate`.
+- Actor role expectations recorded under `Target audience and questions`.
+- `Retention for node` now filters `retention` rows by `actor` and displays `observer_actor`.
+- `Retained nodes` now filters the same `retention` table by `observer_actor`, without duplicating retention rows.
+- `Received nodes` now explains the existing `inbound` rows as children, virtual nodes, stale nodes, and descendants received through a parent.
+- Actor modal identification now includes hostname, node type, stream status, ingest status, health status, child count, machine GUID, and Agent version.
+- No missing producer rows were found for this SOW's modal fix. Aggregator preservation of multi-parent retention rows is already specified in `.agents/sow/specs/topology-modes-correlation-aggregation.md`.
 
 Tests or equivalent validation:
 
-- Pending.
+- `git diff --check` passed.
+- `(cd src/go && go test -count=1 ./pkg/topology/v1 ./tools/functions-validation/validate)` passed.
+- `sudo -n cmake --build build --target netdata -- -j2` passed. The build emitted unrelated protobuf/stringop warnings during link, not streaming topology compile errors.
+- `.agents/sow/audit.sh` passed with the pre-existing non-project skill classification warning.
 
 Real-use evidence:
 
-- Pending.
+- Not performed against the live Agent in this SOW because the built binary was not installed/restarted. A live UI check before install would validate a different binary. The code path was validated by compiling the `netdata` target and by schema/fixture tests for the topology v1 contract.
 
 Reviewer findings:
 
-- Pending.
+- No external reviewer run was requested for SOW-0027. The change is scoped to producer modal metadata and documentation/spec alignment.
 
 Same-failure scan:
 
-- Pending.
+- `rg -n "Inbound children|Outbound stream|\"Retention\"|No inbound children|No outbound stream" src/web/api/functions .agents/sow/specs .agents/skills/project-create-topology/SKILL.md` found no remaining stale streaming modal labels.
+- `rg -n "retention|observer_actor|retained_nodes|Received nodes|Upstream stream|child_count" ...` confirmed the new contract is present in the producer, specs, and project topology skill.
 
 Sensitive data gate:
 
@@ -253,43 +276,57 @@ Sensitive data gate:
 
 Artifact maintenance gate:
 
-- Pending.
+- AGENTS.md: unchanged. This SOW did not change project-wide workflow or guardrails.
+- Runtime project skills: updated `.agents/skills/project-create-topology/SKILL.md` with streaming modal composition rules.
+- Specs: updated `.agents/sow/specs/topology-function-schema.md` and `.agents/sow/specs/topology-modes-correlation-aggregation.md`.
+- End-user/operator docs: unchanged. This is internal topology payload/modal composition, not a public user command or operator workflow.
+- End-user/operator skills: unchanged. No public/operator skill behavior changed.
+- SOW lifecycle: SOW promoted to current, completed, and will be moved to done with implementation in the same commit.
 
 Specs update:
 
-- Pending.
+- Updated `.agents/sow/specs/topology-function-schema.md` with required streaming modal sections and identification labels.
+- Updated `.agents/sow/specs/topology-modes-correlation-aggregation.md` with the streaming UI table semantics.
 
 Project skills update:
 
-- Pending.
+- Updated `.agents/skills/project-create-topology/SKILL.md` with streaming modal rules for future topology producers.
 
 End-user/operator docs update:
 
-- Pending.
+- Not needed. The Function remains sensitive/internal topology data; no public operator command, UI label documentation, or configuration guide changed.
 
 End-user/operator skills update:
 
-- Pending.
+- Not needed. Public skills under `docs/netdata-ai/skills/` are for querying/operator workflows, not developer topology modal contracts.
 
 Lessons:
 
-- Pending.
+- Streaming already had the canonical facts needed for the modal fix. The root problem was recipe composition and labels, not missing table data.
 
 Follow-up mapping:
 
-- Pending.
+- No new follow-up SOW is required from this change. Live UI validation after installing the rebuilt Agent remains an execution check, not a new product requirement.
 
 ## Outcome
 
-Pending.
+Implemented.
+
+- `topology:streaming` actor modals now expose operator-relevant identity in the modal header.
+- Retention is shown in both directions:
+  - who maintains the selected node;
+  - which nodes the selected actor maintains.
+- Parent responsibility is clearer through `Received nodes`, backed by existing descendant rows.
+- `Upstream stream` now clearly means the selected actor's own outbound stream.
 
 ## Lessons Extracted
 
-Pending.
+- Reusing the same canonical table through different owner filters is the right pattern for modal composition when the relationship has two actor-ref sides.
+- Section names must describe the selected actor's perspective; otherwise correct rows can still appear wrong to operators.
 
 ## Followup
 
-None yet.
+None.
 
 ## Regression Log
 

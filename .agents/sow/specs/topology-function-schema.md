@@ -454,6 +454,26 @@ corrupted.
 
 Streaming modal composition emits `actor_labels`, complete host labels where
 available, host/system metadata labels needed by old summaries, and typed
-OS/architecture/CPU columns. Existing `stream_path`, `retention`, `inbound`, and
-`outbound` tables have the right actor-ref shape for recipe-based table
-rendering.
+OS/architecture/CPU columns. The actor modal header must select important
+identity/status labels from `actor_labels`, including hostname, node type,
+stream status, ingest status, health status, child count, machine GUID, and
+Agent version. Existing `stream_path`, `retention`, `inbound`, and `outbound`
+tables have the right actor-ref shape for recipe-based table rendering.
+
+Streaming actor modals must keep those tables as the single source of truth and
+must not duplicate rows only for modal display. Required sections are:
+
+- `Stream path`: rows from `stream_path` filtered by `actor`, ordered by
+  `path_index`.
+- `Retention for node`: rows from `retention` filtered by `actor`; this view
+  must show `observer_actor` as the actor maintaining the selected node's
+  retention, plus retention status, time range, duration, metrics, instances,
+  and contexts.
+- `Retained nodes`: rows from the same `retention` table filtered by
+  `observer_actor`; this view answers which nodes' data the selected actor
+  maintains.
+- `Received nodes`: rows from `inbound` filtered by `parent_actor`; this view
+  represents children, virtual nodes, stale nodes, and descendants received or
+  transiting through the selected parent.
+- `Upstream stream`: rows from `outbound` filtered by `actor`; this view
+  describes where the selected actor itself streams upstream.

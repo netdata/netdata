@@ -1460,6 +1460,8 @@ static void streaming_topology_v1_emit_modal_label_identification(BUFFER *wb) {
             streaming_topology_v1_emit_modal_identification_field(wb, "type", "Node Type");
             streaming_topology_v1_emit_modal_identification_field(wb, "stream_status", "Stream");
             streaming_topology_v1_emit_modal_identification_field(wb, "ingest_status", "Ingest");
+            streaming_topology_v1_emit_modal_identification_field(wb, "health_status", "Health");
+            streaming_topology_v1_emit_modal_identification_field(wb, "child_count", "Children");
             streaming_topology_v1_emit_modal_identification_field(wb, "machine_guid", "Machine GUID");
             streaming_topology_v1_emit_modal_identification_field(wb, "agent_version", "Agent");
         }
@@ -1512,64 +1514,91 @@ static void streaming_topology_v1_emit_actor_modal(BUFFER *wb) {
             buffer_json_add_array_item_object(wb);
             {
                 buffer_json_member_add_string(wb, "id", "retention");
-                buffer_json_member_add_string(wb, "label", "Retention");
+                buffer_json_member_add_string(wb, "label", "Retention for node");
                 buffer_json_member_add_uint64(wb, "order", 2);
                 streaming_topology_v1_emit_modal_actor_table_source(wb, "retention");
                 streaming_topology_v1_emit_modal_actor_owner_filter(wb, "actor");
                 buffer_json_member_add_array(wb, "columns");
                 {
+                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "observer", "Maintained by", "observer_actor");
+                    streaming_topology_v1_emit_modal_label_lookup_column(wb, "observer_type", "Maintainer type", "observer_actor", "type", "badge");
                     streaming_topology_v1_emit_modal_direct_column(wb, "db_status", "Status", "db_status", "badge");
                     streaming_topology_v1_emit_modal_direct_column(wb, "db_from", "From", "db_from", "timestamp");
                     streaming_topology_v1_emit_modal_direct_column(wb, "db_to", "To", "db_to", "timestamp");
                     streaming_topology_v1_emit_modal_direct_column(wb, "db_duration", "Duration", "db_duration", "duration");
                     streaming_topology_v1_emit_modal_direct_column(wb, "db_metrics", "Metrics", "db_metrics", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_instances", "Instances", "db_instances", "number");
                     streaming_topology_v1_emit_modal_direct_column(wb, "db_contexts", "Contexts", "db_contexts", "number");
                 }
                 buffer_json_array_close(wb);
-                buffer_json_member_add_string(wb, "empty_label", "No retention rows");
+                streaming_topology_v1_emit_modal_sort(wb, "db_duration", "desc");
+                buffer_json_member_add_string(wb, "empty_label", "No retention rows for this node");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_add_array_item_object(wb);
+            {
+                buffer_json_member_add_string(wb, "id", "retained_nodes");
+                buffer_json_member_add_string(wb, "label", "Retained nodes");
+                buffer_json_member_add_uint64(wb, "order", 3);
+                streaming_topology_v1_emit_modal_actor_table_source(wb, "retention");
+                streaming_topology_v1_emit_modal_actor_owner_filter(wb, "observer_actor");
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "actor", "Node", "actor");
+                    streaming_topology_v1_emit_modal_label_lookup_column(wb, "actor_type", "Node type", "actor", "type", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_status", "Status", "db_status", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_from", "From", "db_from", "timestamp");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_to", "To", "db_to", "timestamp");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_duration", "Duration", "db_duration", "duration");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_metrics", "Metrics", "db_metrics", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_instances", "Instances", "db_instances", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "db_contexts", "Contexts", "db_contexts", "number");
+                }
+                buffer_json_array_close(wb);
+                streaming_topology_v1_emit_modal_sort(wb, "db_duration", "desc");
+                buffer_json_member_add_string(wb, "empty_label", "No retained nodes");
             }
             buffer_json_object_close(wb);
 
             buffer_json_add_array_item_object(wb);
             {
                 buffer_json_member_add_string(wb, "id", "inbound");
-                buffer_json_member_add_string(wb, "label", "Inbound children");
-                buffer_json_member_add_uint64(wb, "order", 3);
+                buffer_json_member_add_string(wb, "label", "Received nodes");
+                buffer_json_member_add_uint64(wb, "order", 4);
                 streaming_topology_v1_emit_modal_actor_table_source(wb, "inbound");
                 streaming_topology_v1_emit_modal_actor_owner_filter(wb, "parent_actor");
                 buffer_json_member_add_array(wb, "columns");
                 {
-                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "child", "Child", "child_actor");
+                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "child", "Node", "child_actor");
                     streaming_topology_v1_emit_modal_actor_ref_column(wb, "source", "Received from", "source_actor");
                     streaming_topology_v1_emit_modal_label_lookup_column(wb, "child_type", "Node type", "child_actor", "type", "badge");
-                    streaming_topology_v1_emit_modal_direct_column(wb, "received_type", "Type", "received_type", "badge");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "received_type", "Received as", "received_type", "badge");
                     streaming_topology_v1_emit_modal_direct_column(wb, "ingest_status", "Ingest", "ingest_status", "badge");
                     streaming_topology_v1_emit_modal_direct_column(wb, "hops", "Hops", "hops", "number");
                     streaming_topology_v1_emit_modal_direct_column(wb, "collected_metrics", "Metrics", "collected_metrics", "number");
                     streaming_topology_v1_emit_modal_direct_column(wb, "collected_instances", "Instances", "collected_instances", "number");
                     streaming_topology_v1_emit_modal_direct_column(wb, "collected_contexts", "Contexts", "collected_contexts", "number");
-                    streaming_topology_v1_emit_modal_direct_column(wb, "replication_completion", "Replication", "replication_completion", "number");
+                    streaming_topology_v1_emit_modal_direct_column(wb, "replication_completion", "Replication %", "replication_completion", "number");
                     streaming_topology_v1_emit_modal_direct_column(wb, "ingest_age", "Age", "ingest_age", "duration");
                     streaming_topology_v1_emit_modal_direct_column(wb, "ssl", "TLS", "ssl", "badge");
                     streaming_topology_v1_emit_modal_direct_column(wb, "alerts_critical", "Critical", "alerts_critical", "number");
                     streaming_topology_v1_emit_modal_direct_column(wb, "alerts_warning", "Warning", "alerts_warning", "number");
                 }
                 buffer_json_array_close(wb);
-                buffer_json_member_add_string(wb, "empty_label", "No inbound children");
+                buffer_json_member_add_string(wb, "empty_label", "No received nodes");
             }
             buffer_json_object_close(wb);
 
             buffer_json_add_array_item_object(wb);
             {
                 buffer_json_member_add_string(wb, "id", "outbound");
-                buffer_json_member_add_string(wb, "label", "Outbound stream");
-                buffer_json_member_add_uint64(wb, "order", 4);
+                buffer_json_member_add_string(wb, "label", "Upstream stream");
+                buffer_json_member_add_uint64(wb, "order", 5);
                 streaming_topology_v1_emit_modal_actor_table_source(wb, "outbound");
                 streaming_topology_v1_emit_modal_actor_owner_filter(wb, "actor");
                 buffer_json_member_add_array(wb, "columns");
                 {
-                    streaming_topology_v1_emit_modal_actor_ref_column(wb, "actor", "Node", "actor");
-                    streaming_topology_v1_emit_modal_label_lookup_column(wb, "actor_type", "Node type", "actor", "type", "badge");
                     streaming_topology_v1_emit_modal_actor_ref_column(wb, "destination", "Destination", "destination_actor");
                     streaming_topology_v1_emit_modal_direct_column(wb, "stream_status", "Status", "stream_status", "badge");
                     streaming_topology_v1_emit_modal_direct_column(wb, "hops", "Hops", "hops", "number");
@@ -1577,7 +1606,7 @@ static void streaming_topology_v1_emit_actor_modal(BUFFER *wb) {
                     streaming_topology_v1_emit_modal_direct_column(wb, "compression", "Compression", "compression", "badge");
                 }
                 buffer_json_array_close(wb);
-                buffer_json_member_add_string(wb, "empty_label", "No outbound stream row");
+                buffer_json_member_add_string(wb, "empty_label", "No upstream stream row");
             }
             buffer_json_object_close(wb);
         }
