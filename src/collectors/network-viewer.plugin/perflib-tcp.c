@@ -459,15 +459,14 @@ int main(int argc, char **argv)
     }
     (void)update_every;
 
-    // Announce functions before starting the evloop (matches Linux network-viewer pattern)
     fprintf(stdout,
             PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
-            NV_WIN_FUNCTION_TCP, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NV_WIN_FUNCTION_TCP_HELP,
+            NV_WIN_FUNCTION_TCP, 60, NV_WIN_FUNCTION_TCP_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
             NV_WIN_FUNCTION_PRIORITY);
     fprintf(stdout,
             PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
-            NV_WIN_FUNCTION_UDP, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NV_WIN_FUNCTION_UDP_HELP,
+            NV_WIN_FUNCTION_UDP, 60, NV_WIN_FUNCTION_UDP_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
             NV_WIN_FUNCTION_PRIORITY);
     fflush(stdout);
