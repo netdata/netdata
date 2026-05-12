@@ -174,7 +174,7 @@ def static_build_bash(client: dagger.Client, ctr: dagger.Container) -> dagger.Co
 def static_build_curl(client: dagger.Client, ctr: dagger.Container) -> dagger.Container:
     tree = (
         client.git(url="https://github.com/curl/curl", keep_git_dir=True)
-        .tag("curl-8_4_0")
+        .tag("curl-8_20_0")
         .tree()
     )
 
