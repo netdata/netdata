@@ -48,6 +48,26 @@ static void nv_table_begin(BUFFER *wb, const char *help)
     buffer_json_member_add_string(wb, "help", help);
 }
 
+// Add the standard "Protocol" key column (identical in every table).
+static void nv_add_protocol_field(BUFFER *wb, size_t *field_id)
+{
+    buffer_rrdf_table_add_field(wb, (*field_id)++, "Protocol", "IP Protocol Family",
+        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+        RRDF_FIELD_FILTER_MULTISELECT,
+        RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+}
+
+// Add a standard integer counter column (all counter columns share the same display/filter flags).
+static void nv_add_int_field(BUFFER *wb, size_t *field_id,
+                              const char *id, const char *label, const char *unit)
+{
+    buffer_rrdf_table_add_field(wb, (*field_id)++, id, label,
+        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+        0, unit, NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+        RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
+}
+
 // Finalize the JSON, then send it to pluginsd under the stdout mutex.
 static void nv_send_result(const char *transaction, BUFFER *wb, time_t now_s)
 {
@@ -201,116 +221,28 @@ void function_tcp_stats(
     size_t field_id = 0;
     buffer_json_member_add_object(wb, "columns");
     {
-        buffer_rrdf_table_add_field(wb, field_id++, "Protocol", "IP Protocol Family",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "ConnFailures", "Connection Failures",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "ConnActive", "Active Connections Opened",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "ConnEstablished", "Currently Established Connections",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "ConnPassive", "Passive Connections Opened",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "ConnReset", "Reset Connections",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "SegsTotal", "Total Segments",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "segments", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "SegsReceived", "Received Segments",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "segments", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "SegsRetransmitted", "Retransmitted Segments",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "segments", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "SegsSent", "Sent Segments",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "segments", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateClosed", "Connections in CLOSED state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateListening", "Connections in LISTENING state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateSynSent", "Connections in SYN_SENT state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateSynReceived", "Connections in SYN_RECEIVED state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateEstablished", "Connections in ESTABLISHED state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateFinWait1", "Connections in FIN_WAIT1 state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateFinWait2", "Connections in FIN_WAIT2 state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateCloseWait", "Connections in CLOSE_WAIT state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateClosing", "Connections in CLOSING state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateLastAck", "Connections in LAST_ACK state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateTimeWait", "Connections in TIME_WAIT state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "StateDeleteTcb", "Connections in DELETE_TCB state",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
+        nv_add_protocol_field(wb, &field_id);
+        nv_add_int_field(wb, &field_id, "ConnFailures",    "Connection Failures",               "connections");
+        nv_add_int_field(wb, &field_id, "ConnActive",      "Active Connections Opened",          "connections");
+        nv_add_int_field(wb, &field_id, "ConnEstablished", "Currently Established Connections",  "connections");
+        nv_add_int_field(wb, &field_id, "ConnPassive",     "Passive Connections Opened",         "connections");
+        nv_add_int_field(wb, &field_id, "ConnReset",       "Reset Connections",                  "connections");
+        nv_add_int_field(wb, &field_id, "SegsTotal",       "Total Segments",                     "segments");
+        nv_add_int_field(wb, &field_id, "SegsReceived",    "Received Segments",                  "segments");
+        nv_add_int_field(wb, &field_id, "SegsRetransmitted","Retransmitted Segments",            "segments");
+        nv_add_int_field(wb, &field_id, "SegsSent",        "Sent Segments",                      "segments");
+        nv_add_int_field(wb, &field_id, "StateClosed",     "Connections in CLOSED state",        "connections");
+        nv_add_int_field(wb, &field_id, "StateListening",  "Connections in LISTENING state",     "connections");
+        nv_add_int_field(wb, &field_id, "StateSynSent",    "Connections in SYN_SENT state",      "connections");
+        nv_add_int_field(wb, &field_id, "StateSynReceived","Connections in SYN_RECEIVED state",  "connections");
+        nv_add_int_field(wb, &field_id, "StateEstablished","Connections in ESTABLISHED state",   "connections");
+        nv_add_int_field(wb, &field_id, "StateFinWait1",   "Connections in FIN_WAIT1 state",     "connections");
+        nv_add_int_field(wb, &field_id, "StateFinWait2",   "Connections in FIN_WAIT2 state",     "connections");
+        nv_add_int_field(wb, &field_id, "StateCloseWait",  "Connections in CLOSE_WAIT state",    "connections");
+        nv_add_int_field(wb, &field_id, "StateClosing",    "Connections in CLOSING state",       "connections");
+        nv_add_int_field(wb, &field_id, "StateLastAck",    "Connections in LAST_ACK state",      "connections");
+        nv_add_int_field(wb, &field_id, "StateTimeWait",   "Connections in TIME_WAIT state",     "connections");
+        nv_add_int_field(wb, &field_id, "StateDeleteTcb",  "Connections in DELETE_TCB state",    "connections");
     }
     buffer_json_object_close(wb); // columns
 
@@ -413,31 +345,11 @@ void function_udp_stats(
     size_t field_id = 0;
     buffer_json_member_add_object(wb, "columns");
     {
-        buffer_rrdf_table_add_field(wb, field_id++, "Protocol", "IP Protocol Family",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "DatagramsNoPort", "Datagrams with No Port",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "datagrams", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "DatagramsErrors", "Datagrams Received with Errors",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "datagrams", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "DatagramsReceived", "Received Datagrams",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "datagrams", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "DatagramsSent", "Sent Datagrams",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-            0, "datagrams", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
+        nv_add_protocol_field(wb, &field_id);
+        nv_add_int_field(wb, &field_id, "DatagramsNoPort",   "Datagrams with No Port",             "datagrams");
+        nv_add_int_field(wb, &field_id, "DatagramsErrors",   "Datagrams Received with Errors",      "datagrams");
+        nv_add_int_field(wb, &field_id, "DatagramsReceived", "Received Datagrams",                  "datagrams");
+        nv_add_int_field(wb, &field_id, "DatagramsSent",     "Sent Datagrams",                      "datagrams");
     }
     buffer_json_object_close(wb); // columns
 
