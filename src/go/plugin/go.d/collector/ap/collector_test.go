@@ -22,19 +22,19 @@ var (
 
 	dataIwDevManaged, _ = os.ReadFile("testdata/iw_dev_managed.txt")
 
-	dataIwDevAP,              _ = os.ReadFile("testdata/iw_dev_ap.txt")
+	dataIwDevAP, _               = os.ReadFile("testdata/iw_dev_ap.txt")
 	dataIwDevAPSsidWithSpaces, _ = os.ReadFile("testdata/iw_dev_ap_ssid_with_spaces.txt")
-	dataIwStationDump, _        = os.ReadFile("testdata/station_dump.txt")
+	dataIwStationDump, _         = os.ReadFile("testdata/station_dump.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON":              dataConfigJSON,
-		"dataConfigYAML":              dataConfigYAML,
-		"dataIwDevManaged":            dataIwDevManaged,
-		"dataIwDevAP":                 dataIwDevAP,
-		"dataIwDevAPSsidWithSpaces":   dataIwDevAPSsidWithSpaces,
-		"dataIwStationDump":           dataIwStationDump,
+		"dataConfigJSON":            dataConfigJSON,
+		"dataConfigYAML":            dataConfigYAML,
+		"dataIwDevManaged":          dataIwDevManaged,
+		"dataIwDevAP":               dataIwDevAP,
+		"dataIwDevAPSsidWithSpaces": dataIwDevAPSsidWithSpaces,
+		"dataIwStationDump":         dataIwStationDump,
 	} {
 		require.NotNil(t, data, name)
 	}
