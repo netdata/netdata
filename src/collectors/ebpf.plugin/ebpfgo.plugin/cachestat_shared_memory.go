@@ -137,7 +137,12 @@ func runCachestatSharedMemoryCollector(handle *CachestatLegacyHandle, stop <-cha
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(cachestatGlobalUpdateSec) * time.Second)
+	updateEvery := handle.UpdateEvery
+	if updateEvery <= 0 {
+		updateEvery = cachestatDefaultUpdateEvery
+	}
+
+	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
 
 	for {

@@ -28,8 +28,9 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 	}
 
 	return &CachestatLegacyHandle{
-		Plan:    plan,
-		Runtime: rt,
+		Plan:        plan,
+		Runtime:     rt,
+		UpdateEvery: cfg.UpdateEvery,
 	}, nil
 }
 

@@ -10,10 +10,9 @@ import (
 )
 
 const (
-	cachestatGlobalGroup     = "mem"
-	cachestatGlobalFamily    = "page_cache"
-	cachestatGlobalModule    = "cachestat"
-	cachestatGlobalUpdateSec = 10
+	cachestatGlobalGroup  = "mem"
+	cachestatGlobalFamily = "page_cache"
+	cachestatGlobalModule = "cachestat"
 )
 
 type cachestatGlobalCounters struct {
@@ -173,14 +172,18 @@ func (p cachestatGlobalPublish) write() {
 	}
 }
 
-func runCachestatGlobalCollector(handle *CachestatLegacyHandle, stop <-chan struct{}) {
+func runCachestatGlobalCollector(handle *CachestatLegacyHandle, stop <-chan struct{}, updateEvery int) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
 
-	createCachestatGlobalCharts(cachestatGlobalUpdateSec)
+	if updateEvery <= 0 {
+		updateEvery = cachestatDefaultUpdateEvery
+	}
 
-	ticker := time.NewTicker(time.Duration(cachestatGlobalUpdateSec) * time.Second)
+	createCachestatGlobalCharts(updateEvery)
+
+	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
 
 	state := &cachestatGlobalState{}

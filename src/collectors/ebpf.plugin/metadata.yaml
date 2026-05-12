@@ -813,34 +813,6 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: "These metrics show total number of calls to functions inside kernel."
-          labels: []
-          metrics:
-            - name: mem.cachestat_ratio
-              description: Hit ratio
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: ratio
-            - name: mem.cachestat_dirties
-              description: Number of dirty pages
-              unit: "page/s"
-              chart_type: line
-              dimensions:
-                - name: dirty
-            - name: mem.cachestat_hits
-              description: Number of accessed files
-              unit: "hits/s"
-              chart_type: line
-              dimensions:
-                - name: hit
-            - name: mem.cachestat_misses
-              description: Files out of page cache
-              unit: "misses/s"
-              chart_type: line
-              dimensions:
-                - name: miss
         - name: apps
           description: "These Metrics show grouped information per apps group."
           labels:

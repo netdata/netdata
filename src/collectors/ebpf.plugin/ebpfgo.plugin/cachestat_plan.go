@@ -11,7 +11,6 @@ import (
 
 const cachestatKernelMask uint32 = (1 << 12) - 1
 const cachestatDefaultPIDTableSize uint32 = 32768
-const cachestatDefaultBTFPath = "/sys/kernel/btf"
 const cachestatDefaultBTFFile = "vmlinux"
 
 type CachestatLegacyConfig struct {
@@ -21,14 +20,17 @@ type CachestatLegacyConfig struct {
 	KernelVersion   uint32
 	IsDebian        bool
 	HasBTF          bool
+	BTFPath         string
+	UpdateEvery     int
 	PidTableSize    uint32
 	MapsPerCore     bool
 	AccountFunction string
 }
 
 type CachestatLegacyHandle struct {
-	Plan    LoadPlan
-	Runtime *libbpfloader.CachestatRuntime
+	Plan        LoadPlan
+	Runtime     *libbpfloader.CachestatRuntime
+	UpdateEvery int
 }
 
 func (h *CachestatLegacyHandle) Close() {
@@ -54,7 +56,9 @@ func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 		Kernels:         cachestatKernelMask,
 		IsRHF:           -1,
 		IsDebian:        IsDebianFlavor(),
-		HasBTF:          kernelBTFSupported(),
+		BTFPath:         cachestatDefaultBTFPath,
+		UpdateEvery:     cachestatDefaultUpdateEvery,
+		HasBTF:          kernelBTFSupported(cachestatDefaultBTFPath),
 		PidTableSize:    cachestatDefaultPIDTableSize,
 		MapsPerCore:     true,
 		AccountFunction: selectCachestatDirtyAccountFunction(),
@@ -63,6 +67,28 @@ func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 
 func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	cfg := defaultCachestatLegacyConfig()
+
+	fileCfg, err := loadCachestatConfigFiles()
+	if err != nil {
+		return CachestatLegacyConfig{}, err
+	}
+	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
+		cfg.UpdateEvery = *fileCfg.UpdateEvery
+	}
+	if fileCfg.PidTable != nil && *fileCfg.PidTable > 0 {
+		cfg.PidTableSize = *fileCfg.PidTable
+	}
+	if fileCfg.MapsPerCore != nil {
+		cfg.MapsPerCore = *fileCfg.MapsPerCore
+	}
+	if fileCfg.BTFPath != nil && *fileCfg.BTFPath != "" {
+		cfg.BTFPath = *fileCfg.BTFPath
+		cfg.HasBTF = kernelBTFSupported(cfg.BTFPath)
+	}
+	if fileCfg.Lifetime != nil && *fileCfg.Lifetime > 0 {
+		// Keep the legacy lifetime value available for future runtime wiring.
+		// The current cachestat migration does not consume it yet.
+	}
 
 	kver, err := KernelVersion()
 	if err != nil {
@@ -98,8 +124,8 @@ func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
 	)
 }
 
-func kernelBTFSupported() bool {
-	_, err := os.Stat(filepath.Join(cachestatDefaultBTFPath, cachestatDefaultBTFFile))
+func kernelBTFSupported(btfPath string) bool {
+	_, err := os.Stat(filepath.Join(btfPath, cachestatDefaultBTFFile))
 	return err == nil
 }
 
