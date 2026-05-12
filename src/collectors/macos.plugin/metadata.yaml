@@ -22,26 +22,27 @@ modules:
       data_collection:
         metrics_description: "Monitor macOS metrics for efficient operating system performance, power sources, thermal pressure, sensors, fans, storage, and networking."
         method_description: |
-          The plugin uses five different methods to collect data:
+          The plugin uses six different methods to collect data:
             - The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
             - The function `host_statistics` is called to collect CPU and virtual memory data.
             - The function `IOServiceGetMatchingServices` is called to collect storage information.
             - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
             - The native Apple `powermetrics` command is sampled in the background to collect thermal pressure, SMC temperatures, and fan speed when available.
+            - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes SMART-capable NVMe services.
       supported_platforms:
         include:
           - macOS
         exclude: []
       multi_instance: false
       additional_permissions:
-        description: "Battery and UPS power-source metrics use public IOKit APIs and do not require extra permissions. Exact thermal and fan readings use the native Apple `powermetrics` command, which requires `netdata` to run with sufficient macOS privileges; without those privileges, the thermal/fan sampler disables itself after repeated failures."
+        description: "Battery, UPS power-source, and native NVMe SMART metrics use public IOKit APIs and do not require external tools. Exact thermal and fan readings use the native Apple `powermetrics` command, which requires `netdata` to run with sufficient macOS privileges; without those privileges, the thermal/fan sampler disables itself after repeated failures."
       default_behavior:
         auto_detection:
-          description: "The collector auto-detects macOS power sources and only creates charts for values exposed by the hardware and operating system."
+          description: "The collector auto-detects macOS power sources and NVMe SMART-capable services, and only creates charts for values exposed by the hardware and operating system."
         limits:
-          description: "Power-source enumeration is capped internally to avoid unexpected chart cardinality. The `powermetrics` sampler is rate-limited and cached so it does not run in the one-second collection hot path."
+          description: "Power-source and NVMe SMART enumeration are capped internally to avoid unexpected chart cardinality. The `powermetrics` sampler is rate-limited and cached so it does not run in the one-second collection hot path."
         performance_impact:
-          description: "Power-source collection is lightweight. Thermal and fan collection runs `powermetrics` at a configurable interval, defaulting to once per minute with a one-second sample window."
+          description: "Power-source collection is lightweight. Native NVMe SMART reads default to the same ten-second cadence as the existing NVMe collector, while device discovery is rate-limited. Thermal and fan collection runs `powermetrics` at a configurable interval, defaulting to once per minute with a one-second sample window."
     setup:
       prerequisites:
         list: []
@@ -51,13 +52,14 @@ modules:
           description: "The netdata main configuration file."
         options:
           description: |
-            There are five sections in the file which you can configure:
+            There are six sections in the file which you can configure:
 
             - `[plugin:macos:sysctl]` - Enable or disable monitoring for network, swap, loadavg, and boot time.
             - `[plugin:macos:mach_smi]` - Enable or disable monitoring for CPU and Virtual memory.
             - `[plugin:macos:iokit]` - Enable or disable monitoring for storage device.
             - `[plugin:macos:power_sources]` - Enable or disable battery and UPS power-source metrics.
             - `[plugin:macos:powermetrics]` - Configure thermal and fan sampling through native Apple `powermetrics`.
+            - `[plugin:macos:nvme_smart]` - Configure native IOKit NVMe SMART sampling.
           folding:
             title: "Config options"
             enabled: true
@@ -322,6 +324,16 @@ modules:
               description: Enable or disable monitoring of SMC processor-hot assertion flags when available.
               default_value: yes
               required: false
+            - name: sample every
+              section_name: plugin:macos:nvme_smart
+              description: How often to read native NVMe SMART data through IOKit.
+              default_value: 10s
+              required: false
+            - name: discovery every
+              section_name: plugin:macos:nvme_smart
+              description: How often to rescan IORegistry for NVMe SMART-capable services.
+              default_value: 300s
+              required: false
         examples:
           folding:
             enabled: false
@@ -354,6 +366,13 @@ modules:
               config: |
                 [plugin:macos]
                   powermetrics = no
+            - name: Disable native NVMe SMART sampling.
+              folding:
+                enabled: true
+              description: Disable native IOKit NVMe SMART health monitoring while keeping generic disk I/O monitoring enabled.
+              config: |
+                [plugin:macos]
+                  nvme smart = no
     troubleshooting:
       problems:
         list:
@@ -362,6 +381,11 @@ modules:
               The thermal and fan charts depend on the native Apple `powermetrics` command. On macOS, `powermetrics` requires sufficient privileges; if `netdata` cannot run it, the sampler disables itself after repeated failures to avoid log noise.
 
               Battery and UPS power-source charts do not depend on `powermetrics` and should still appear when macOS exposes power-source data.
+          - name: NVMe health charts are missing
+            description: |
+              Native NVMe health charts appear only when macOS exposes NVMe SMART-capable services through IOKit. The collector does not use `nvme-cli` or any external NVMe tool on macOS.
+
+              If generic disk I/O charts are present but NVMe health charts are absent, the device, controller, or macOS driver may not expose the native NVMe SMART user client.
     alerts:
       - name: interface_speed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
@@ -780,6 +804,83 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
+        - name: nvme device
+          description: |
+            These metrics refer to native macOS NVMe SMART-capable devices.
+          labels:
+            - name: device
+              description: Sanitized NVMe device name
+            - name: model_number
+              description: NVMe model number
+            - name: source
+              description: Data source
+          metrics:
+            - name: nvme.device_estimated_endurance_perc
+              description: Estimated endurance used
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: nvme.device_available_spare_perc
+              description: Remaining spare capacity
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: spare
+            - name: nvme.device_composite_temperature
+              description: Composite temperature
+              unit: "celsius"
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: nvme.device_io_transferred_count
+              description: Amount of data transferred to and from device
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+            - name: nvme.device_power_cycles_count
+              description: Power cycles
+              unit: "cycles"
+              chart_type: line
+              dimensions:
+                - name: power
+            - name: nvme.device_power_on_time
+              description: Power-on time
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: power-on
+            - name: nvme.device_unsafe_shutdowns_count
+              description: Unsafe shutdowns
+              unit: "shutdowns"
+              chart_type: line
+              dimensions:
+                - name: unsafe
+            - name: nvme.device_critical_warnings_state
+              description: Critical warnings state
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: available_spare
+                - name: temp_threshold
+                - name: nvm_subsystem_reliability
+                - name: read_only
+                - name: volatile_mem_backup_failed
+                - name: persistent_memory_read_only
+            - name: nvme.device_media_errors_rate
+              description: Media and data integrity errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: media
+            - name: nvme.device_error_log_entries_rate
+              description: Error log entries
+              unit: "entries/s"
+              chart_type: line
+              dimensions:
+                - name: error_log
         - name: disk
           description: ""
           labels: []

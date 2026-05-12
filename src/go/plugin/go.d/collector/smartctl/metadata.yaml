@@ -24,7 +24,7 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors the health status of storage devices by analyzing S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) counters.
-          It relies on the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool but avoids directly executing the binary.
+          It relies on the `smartctl` CLI tool from smartmontools but avoids directly executing the binary.
           Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
           This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
 
@@ -33,7 +33,7 @@ modules:
           -  `smartctl --json --all {deviceName} --device {deviceType} --nocheck {powerMode}`
         method_description: ""
       supported_platforms:
-        include: [Linux, BSD]
+        include: [Linux, BSD, macOS]
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -50,7 +50,9 @@ modules:
         list:
           - title: Install smartmontools (v7.0+)
             description: |
-              Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+              Install `smartmontools` version 7.0 or later using your operating system's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+
+              On macOS, install `smartmontools` with your preferred package manager, such as Homebrew or MacPorts.
           - title: For Netdata running in a Docker container
             description: |
               **Provide access to storage devices**.
@@ -78,7 +80,7 @@ modules:
 
               > **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
 
-              > **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvme#readme) to monitor NVMe devices.
+              > **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvme#readme) to monitor NVMe devices on Linux/BSD. On macOS, `macos.plugin` provides native NVMe health metrics when IOKit exposes SMART-capable NVMe services.
       configuration:
         file:
           name: go.d/smartctl.conf

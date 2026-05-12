@@ -22,7 +22,7 @@ Module: smartctl
 ## Overview
 
 This collector monitors the health status of storage devices by analyzing S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) counters.
-It relies on the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool but avoids directly executing the binary.
+It relies on the `smartctl` CLI tool from smartmontools but avoids directly executing the binary.
 Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
 This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
 
@@ -37,6 +37,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 - BSD
+- macOS
 
 This collector only supports collecting metrics from a single instance of this integration.
 
@@ -76,7 +77,9 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Install smartmontools (v7.0+)
 
-Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+Install `smartmontools` version 7.0 or later using your operating system's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+
+On macOS, install `smartmontools` with your preferred package manager, such as Homebrew or MacPorts.
 
 
 #### For Netdata running in a Docker container
