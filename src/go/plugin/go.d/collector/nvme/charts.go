@@ -226,7 +226,7 @@ var (
 	}
 	deviceThmTemp2TimeChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_thm_temp2_time",
-		Title:    "Thermal management temp1 time",
+		Title:    "Thermal management temp2 time",
 		Units:    "seconds",
 		Fam:      "thermal mgmt time",
 		Ctx:      "nvme.device_thermal_mgmt_temp2_time",

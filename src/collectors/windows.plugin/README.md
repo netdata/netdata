@@ -16,6 +16,10 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
 [plugin:windows]
         # GetSystemUptime = yes
         # GetSystemRAM = yes
+        # GetPowerSupply = yes
+        # GetFans = yes
+        # GetSensors = yes
+        # GetHardwareInfo = yes
         # PerflibProcesses = yes
         # PerflibProcessor = yes
         # PerflibMemory = yes
@@ -42,7 +46,7 @@ to avoid overloading the host, Netdata uses different `update every` intervals f
 | Period (seconds) | Threads                                                                          |
 |------------------|----------------------------------------------------------------------------------|
 | 5                | `PerflibHyperV`, `PerflibThermalZone`                                            |
-| 10               | `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
+| 10               | `GetFans`, `GetHardwareInfo`, `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
 | 30               | `PerflibServices`                                                                |
 
 To customize the update interval for a specific thread, you can set the update every value within the corresponding
@@ -56,3 +60,7 @@ and `HyperV` threads:
 [plugin:windows:PerflibHyperV]
         #update every = 15s
 ```
+
+## Fan monitoring
+
+`GetFans` queries the Windows `Win32_Fan` WMI class. When firmware and drivers expose fan objects, Netdata charts the requested fan speed from `DesiredSpeed` and basic state flags. Windows does not provide a universal standard API for actual tachometer RPM, so these charts are best-effort and may be absent on systems that do not expose `Win32_Fan`.

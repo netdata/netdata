@@ -79,12 +79,16 @@ func newDirectSmartctlCli(smartctlPath string, timeout time.Duration, log *logge
 	}
 }
 
-func (e *directSmartctlCli) scan(open bool) (*gjson.Result, error) {
+func directSmartctlScanArgs(open bool) []string {
 	args := []string{"--json", "--scan"}
 	if open {
-		args = append(args, "--scan-open")
+		args[1] = "--scan-open"
 	}
-	return e.execute(args...)
+	return args
+}
+
+func (e *directSmartctlCli) scan(open bool) (*gjson.Result, error) {
+	return e.execute(directSmartctlScanArgs(open)...)
 }
 
 func (e *directSmartctlCli) deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error) {

@@ -13,7 +13,7 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Timeout for executing the `nvme`, specified in seconds.",
+        "description": "Timeout for executing the `nvme` binary, specified in seconds. Applies to the Linux/BSD `ndsudo` path and the optional Windows CLI fallback.",
         "type": "number",
         "minimum": 0.5,
         "default": 2

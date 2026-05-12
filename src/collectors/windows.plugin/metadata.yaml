@@ -1354,6 +1354,106 @@ modules:
                 - name: now
   - meta:
       plugin_name: windows.plugin
+      module_name: GetFans
+      monitored_instance:
+        name: Fans (Win)
+        link: "https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-fan"
+        categories:
+          - data-collection.hardware-and-sensors
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - fan
+        - cooling
+        - Windows
+        - WMI
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors fan information exposed by Windows WMI.
+          It reports requested fan speed and fan state when the platform firmware exposes `Win32_Fan` data.
+        method_description: |
+          It queries the `Win32_Fan` WMI class. Requested speed is reported from `DesiredSpeed`; this is platform-provided requested speed and is not guaranteed to be an actual tachometer RPM reading on every system.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects fan objects exposed by Windows WMI. Many systems do not expose `Win32_Fan` instances; in that case, no fan charts are created.
+        limits:
+          description: |
+            Windows does not provide a universal standard API for actual fan tachometer RPM. This collector reports only the WMI fan data exposed by the host firmware/drivers.
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          section_name: "[plugin:windows:GetFans]"
+          name: "netdata.conf"
+          description: "The Netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config Option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+        examples:
+          folding:
+            enabled: false
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list:
+          - name: No fan charts appear
+            description: |
+              The host firmware or drivers may not expose `Win32_Fan` instances through WMI. This is common on consumer Windows systems and does not necessarily mean the fans are missing or stopped.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Fan
+          description: "These metrics refer to WMI fan devices."
+          labels:
+            - name: fan
+              description: Fan name.
+            - name: device_id
+              description: WMI fan device identifier.
+          metrics:
+            - name: system.fan_requested_speed
+              description: Fan requested speed
+              unit: "RPM"
+              chart_type: line
+              dimensions:
+                - name: requested
+            - name: system.fan_state
+              description: Fan state
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: active_cooling
+                - name: variable_speed
+                - name: online
+  - meta:
+      plugin_name: windows.plugin
       module_name: GetSensors
       monitored_instance:
         name: Sensors

@@ -79,6 +79,57 @@ func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
+func TestExtractControllerPathFromDevicePath(t *testing.T) {
+	tests := map[string]struct {
+		input string
+		want  string
+	}{
+		"linux namespace": {
+			input: "/dev/nvme0n1",
+			want:  "/dev/nvme0",
+		},
+		"linux controller": {
+			input: "/dev/nvme10",
+			want:  "/dev/nvme10",
+		},
+		"windows physical drive": {
+			input: `\\.\PhysicalDrive3`,
+			want:  `\\.\PhysicalDrive3`,
+		},
+		"non NVMe": {
+			input: "/dev/sda",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, extractControllerPathFromDevicePath(test.input))
+		})
+	}
+}
+
+func TestExtractDeviceFromPath(t *testing.T) {
+	tests := map[string]struct {
+		input string
+		want  string
+	}{
+		"linux": {
+			input: "/dev/nvme0",
+			want:  "nvme0",
+		},
+		"windows": {
+			input: `\\.\PhysicalDrive3`,
+			want:  "PhysicalDrive3",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, extractDeviceFromPath(test.input))
+		})
+	}
+}
+
 func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }

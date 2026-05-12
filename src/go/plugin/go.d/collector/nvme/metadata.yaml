@@ -12,6 +12,8 @@ modules:
           - data-collection.storage
       keywords:
         - nvme
+        - Windows
+        - thermal throttling
       related_resources:
         integrations:
           list: []
@@ -21,19 +23,20 @@ modules:
       data_collection:
         metrics_description: >
           This collector monitors the health of NVMe devices.
-          It relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli) CLI tool but avoids directly executing the binary.
-          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
-          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+          On Linux and BSD, it relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli) CLI tool through `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          On Windows, it queries locally attached NVMe devices through the native Windows storage protocol API and uses an installed `nvme.exe` only as a fallback when available.
+          The collector reports NVMe health, composite temperature, critical warnings, warning/critical temperature time, and thermal-management transition/time counters.
         method_description: ""
       supported_platforms:
-        include: [Linux, BSD]
+        include: [Linux, BSD, Windows]
         exclude: []
       multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
         auto_detection:
-          description: ""
+          description: |
+            The collector discovers locally attached NVMe devices automatically.
         limits:
           description: ""
         performance_impact:
@@ -43,7 +46,9 @@ modules:
         list:
           - title: Install nvme-cli
             description: |
-              See [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support). Install `nvme-cli` using your distribution's package manager.
+              On Linux and BSD, see [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support) and install `nvme-cli` using your distribution's package manager.
+
+              On Windows, `nvme-cli` is not required for the native backend. If the native backend cannot discover a device, Netdata can fall back to an installed `nvme.exe` when it is available in `PATH` or under `Program Files\nvme-cli\nvme.exe`.
           - title: "For Netdata running in a Docker container: grant NVMe device access"
             description: |
               Your NVMe devices need to be accessible within the Docker container for Netdata to monitor them.
@@ -85,7 +90,7 @@ modules:
               default_value: 0
               required: false
             - name: timeout
-              description: nvme binary execution timeout.
+              description: nvme binary execution timeout. This applies to the Linux/BSD `ndsudo` path and the optional Windows CLI fallback.
               default_value: 2
               required: false
         examples:
