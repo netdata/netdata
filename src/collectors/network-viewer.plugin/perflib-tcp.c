@@ -17,6 +17,51 @@ netdata_mutex_t stdout_mutex;
 static bool plugin_should_exit = false;
 
 // ============================================================
+// Shared helpers
+// ============================================================
+
+// Resolve a perflib object by name; returns true and sets both out-pointers on success.
+static bool perflib_get_object(const char *object_name,
+                               PERF_DATA_BLOCK **pDataBlock_out,
+                               PERF_OBJECT_TYPE **pObjectType_out)
+{
+    DWORD id = RegistryFindIDByName(object_name);
+    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
+        return false;
+
+    *pDataBlock_out = perflibGetPerformanceData(id);
+    if (!*pDataBlock_out)
+        return false;
+
+    *pObjectType_out = perflibFindObjectTypeByName(*pDataBlock_out, object_name);
+    return *pObjectType_out != NULL;
+}
+
+// Write the common JSON table response header fields into an already-created buffer.
+static void nv_table_begin(BUFFER *wb, const char *help)
+{
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", NV_WIN_FUNCTION_UPDATE_EVERY);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", help);
+}
+
+// Finalize the JSON, then send it to pluginsd under the stdout mutex.
+static void nv_send_result(const char *transaction, BUFFER *wb, time_t now_s)
+{
+    buffer_json_member_add_time_t(wb, "expires", now_s + NV_WIN_FUNCTION_UPDATE_EVERY);
+    buffer_json_finalize(wb);
+    netdata_mutex_lock(&stdout_mutex);
+    wb->response_code = HTTP_RESP_OK;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_s + NV_WIN_FUNCTION_UPDATE_EVERY;
+    pluginsd_function_result_to_stdout(transaction, wb);
+    netdata_mutex_unlock(&stdout_mutex);
+}
+
+// ============================================================
 // TCP
 // ============================================================
 
@@ -69,16 +114,9 @@ static void tcp_initialize(void)
 
 static bool tcp_collect_family(TCP_FAMILY *tcp)
 {
-    DWORD id = RegistryFindIDByName(tcp->object_name);
-    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
-        return false;
-
-    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-    if (!pDataBlock)
-        return false;
-
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, tcp->object_name);
-    if (!pObjectType)
+    PERF_DATA_BLOCK *pDataBlock;
+    PERF_OBJECT_TYPE *pObjectType;
+    if (!perflib_get_object(tcp->object_name, &pDataBlock, &pObjectType))
         return false;
 
     bool have_any = false;
@@ -146,18 +184,12 @@ void function_tcp_stats(
         initialized = true;
     }
 
-    bool ok4 = tcp_collect_family(&tcp_ipv4);
-    bool ok6 = tcp_collect_family(&tcp_ipv6);
+    tcp_collect_family(&tcp_ipv4);
+    tcp_collect_family(&tcp_ipv6);
 
     time_t now_s = now_realtime_sec();
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-
-    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
-    buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_time_t(wb, "update_every", NV_WIN_FUNCTION_UPDATE_EVERY);
-    buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", NV_WIN_FUNCTION_TCP_HELP);
+    nv_table_begin(wb, NV_WIN_FUNCTION_TCP_HELP);
 
     buffer_json_member_add_array(wb, "data");
     {
@@ -282,15 +314,7 @@ void function_tcp_stats(
     }
     buffer_json_object_close(wb); // columns
 
-    buffer_json_member_add_time_t(wb, "expires", now_s + NV_WIN_FUNCTION_UPDATE_EVERY);
-    buffer_json_finalize(wb);
-
-    netdata_mutex_lock(&stdout_mutex);
-    wb->response_code = HTTP_RESP_OK;
-    wb->content_type = CT_APPLICATION_JSON;
-    wb->expires = now_s + NV_WIN_FUNCTION_UPDATE_EVERY;
-    pluginsd_function_result_to_stdout(transaction, wb);
-    netdata_mutex_unlock(&stdout_mutex);
+    nv_send_result(transaction, wb, now_s);
 }
 
 // ============================================================
@@ -333,16 +357,9 @@ static void udp_initialize(void)
 
 static bool udp_collect_family(UDP_FAMILY *udp)
 {
-    DWORD id = RegistryFindIDByName(udp->object_name);
-    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
-        return false;
-
-    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-    if (!pDataBlock)
-        return false;
-
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, udp->object_name);
-    if (!pObjectType)
+    PERF_DATA_BLOCK *pDataBlock;
+    PERF_OBJECT_TYPE *pObjectType;
+    if (!perflib_get_object(udp->object_name, &pDataBlock, &pObjectType))
         return false;
 
     bool have_any = false;
@@ -379,18 +396,12 @@ void function_udp_stats(
         initialized = true;
     }
 
-    bool ok4 = udp_collect_family(&udp_ipv4);
-    bool ok6 = udp_collect_family(&udp_ipv6);
+    udp_collect_family(&udp_ipv4);
+    udp_collect_family(&udp_ipv6);
 
     time_t now_s = now_realtime_sec();
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-
-    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
-    buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_time_t(wb, "update_every", NV_WIN_FUNCTION_UPDATE_EVERY);
-    buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", NV_WIN_FUNCTION_UDP_HELP);
+    nv_table_begin(wb, NV_WIN_FUNCTION_UDP_HELP);
 
     buffer_json_member_add_array(wb, "data");
     {
@@ -430,15 +441,7 @@ void function_udp_stats(
     }
     buffer_json_object_close(wb); // columns
 
-    buffer_json_member_add_time_t(wb, "expires", now_s + NV_WIN_FUNCTION_UPDATE_EVERY);
-    buffer_json_finalize(wb);
-
-    netdata_mutex_lock(&stdout_mutex);
-    wb->response_code = HTTP_RESP_OK;
-    wb->content_type = CT_APPLICATION_JSON;
-    wb->expires = now_s + NV_WIN_FUNCTION_UPDATE_EVERY;
-    pluginsd_function_result_to_stdout(transaction, wb);
-    netdata_mutex_unlock(&stdout_mutex);
+    nv_send_result(transaction, wb, now_s);
 }
 
 // ============================================================
