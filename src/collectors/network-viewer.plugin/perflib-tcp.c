@@ -146,8 +146,8 @@ void function_tcp_stats(
         initialized = true;
     }
 
-    tcp_collect_family(&tcp_ipv4);
-    tcp_collect_family(&tcp_ipv6);
+    bool ok4 = tcp_collect_family(&tcp_ipv4);
+    bool ok6 = tcp_collect_family(&tcp_ipv6);
 
     time_t now_s = now_realtime_sec();
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -379,8 +379,8 @@ void function_udp_stats(
         initialized = true;
     }
 
-    udp_collect_family(&udp_ipv4);
-    udp_collect_family(&udp_ipv6);
+    bool ok4 = udp_collect_family(&udp_ipv4);
+    bool ok6 = udp_collect_family(&udp_ipv6);
 
     time_t now_s = now_realtime_sec();
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -451,6 +451,8 @@ int main(int argc, char **argv)
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
     netdata_threads_init_for_external_plugins(0);
 
+    PerflibNamesRegistryInitialize();
+
     int update_every = 1;
     if (argc >= 2) {
         update_every = atoi(argv[1]);
@@ -493,7 +495,11 @@ int main(int argc, char **argv)
             send_newline_and_flush(&stdout_mutex);
             send_newline_ut = 0;
         }
+
+        PerflibNamesRegistryUpdate();
     }
+
+    PerflibNamesRegistryCleanup();
 
     return 0;
 }
