@@ -361,6 +361,44 @@ int sock_set_tcp_defer_accept(int fd __maybe_unused, bool defer __maybe_unused) 
 inline int wait_on_socket_or_cancel_with_timeout(
     NETDATA_SSL *ssl,
     int fd, int timeout_ms, short int poll_events, short int *revents) {
+
+#if defined(OS_WINDOWS)
+    // WSAPoll() (used internally by MinGW poll()) only works for sockets.
+    // For pipe file descriptors (e.g. stdin when launched as a subprocess),
+    // poll() fails and kills the reader thread. Use PeekNamedPipe instead.
+    if(poll_events & POLLIN) {
+        HANDLE h = (HANDLE)_get_osfhandle(fd);
+        if(h != INVALID_HANDLE_VALUE && GetFileType(h) == FILE_TYPE_PIPE) {
+            bool forever = (timeout_ms <= 0);
+            while(timeout_ms > 0 || forever) {
+                if(nd_thread_signaled_to_cancel()) {
+                    errno = ECANCELED;
+                    return -1;
+                }
+
+                DWORD available = 0;
+                if(!PeekNamedPipe(h, NULL, 0, NULL, &available, NULL)) {
+                    if(revents) *revents = POLLHUP;
+                    return 2;
+                }
+
+                if(available > 0) {
+                    if(revents) *revents = POLLIN;
+                    return 0;
+                }
+
+                const int sleep_ms = (timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
+                                     ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms;
+                Sleep(sleep_ms);
+                if(!forever)
+                    timeout_ms -= sleep_ms;
+            }
+            errno = ETIMEDOUT;
+            return 1;
+        }
+    }
+#endif
+
     struct pollfd pfd = {
         .fd = fd,
         .events = poll_events,
