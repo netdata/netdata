@@ -13,6 +13,7 @@ const (
 	cachestatGlobalGroup  = "mem"
 	cachestatGlobalFamily = "page_cache"
 	cachestatGlobalModule = "cachestat"
+	cachestatGlobalPlugin = "ebpf-go.plugin"
 )
 
 type cachestatGlobalCounters struct {
@@ -80,14 +81,9 @@ var cachestatGlobalCharts = []cachestatGlobalChart{
 }
 
 var cachestatGlobalChartsOnce sync.Once
+var cachestatStdoutMutex sync.Mutex
 
 func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachestatGlobalPublish, bool) {
-	if !s.initialized {
-		s.prev = current
-		s.initialized = true
-		return cachestatGlobalPublish{}, false
-	}
-
 	mpa := diffCounters(current.MarkPageAccessed, s.prev.MarkPageAccessed)
 	mbd := diffCounters(current.MarkBufferDirty, s.prev.MarkBufferDirty)
 	apcl := diffCounters(current.AddToPageCacheLru, s.prev.AddToPageCacheLru)
@@ -122,6 +118,7 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 	publish.Hit = hits
 	publish.Miss = misses
 	s.prev = current
+	s.initialized = true
 
 	return publish, true
 }
@@ -136,26 +133,39 @@ func diffCounters(current, previous uint64) int64 {
 
 func createCachestatGlobalCharts(updateEvery int) {
 	cachestatGlobalChartsOnce.Do(func() {
+		cachestatStdoutMutex.Lock()
+		defer cachestatStdoutMutex.Unlock()
+
 		for _, chart := range cachestatGlobalCharts {
-			fmt.Printf(
-				"CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin' '%s'\n",
-				cachestatGlobalGroup,
-				chart.id,
-				chart.title,
-				chart.units,
-				cachestatGlobalFamily,
-				chart.context,
-				"line",
-				chart.order,
-				updateEvery,
-				cachestatGlobalModule,
-			)
-			fmt.Printf("DIMENSION %s %s %s 1 1\n", chart.dim, chart.dim, "absolute")
+			fmt.Print(formatCachestatGlobalChart(chart, updateEvery))
 		}
 	})
 }
 
+func formatCachestatGlobalChart(chart cachestatGlobalChart, updateEvery int) string {
+	return fmt.Sprintf(
+		"CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' '%s' '%s'\nDIMENSION %s %s %s 1 1\n",
+		cachestatGlobalGroup,
+		chart.id,
+		chart.title,
+		chart.units,
+		cachestatGlobalFamily,
+		chart.context,
+		"line",
+		chart.order,
+		updateEvery,
+		cachestatGlobalPlugin,
+		cachestatGlobalModule,
+		chart.dim,
+		chart.dim,
+		"absolute",
+	)
+}
+
 func (p cachestatGlobalPublish) write() {
+	cachestatStdoutMutex.Lock()
+	defer cachestatStdoutMutex.Unlock()
+
 	for _, item := range []struct {
 		chart string
 		dim   string
@@ -183,15 +193,12 @@ func runCachestatGlobalCollector(handle *CachestatLegacyHandle, stop <-chan stru
 
 	createCachestatGlobalCharts(updateEvery)
 
-	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
-	defer ticker.Stop()
-
 	state := &cachestatGlobalState{}
 	for {
 		select {
 		case <-stop:
 			return
-		case <-ticker.C:
+		case <-time.After(time.Duration(updateEvery) * time.Second):
 		}
 
 		snapshot, err := handle.Runtime.Snapshot(true)
@@ -215,6 +222,16 @@ func runCachestatGlobalCollector(handle *CachestatLegacyHandle, stop <-chan stru
 }
 
 func runCachestatPlugin(handle *CachestatLegacyHandle) {
+	if handle == nil || handle.Runtime == nil {
+		return
+	}
+
+	updateEvery := cachestatDefaultUpdateEvery
+	if handle.UpdateEvery > 0 {
+		updateEvery = handle.UpdateEvery
+	}
+	createCachestatGlobalCharts(updateEvery)
+
 	store := NewCachestatSharedMemoryStore()
 	service := NewSharedSnapshotService(
 		"/var/run/netdata",
@@ -234,26 +251,26 @@ func runCachestatPlugin(handle *CachestatLegacyHandle) {
 		_ = service.Run()
 	}()
 
-	doneCollector := make(chan struct{})
-	if handle != nil && handle.Runtime != nil {
-		go func() {
-			defer close(doneCollector)
-			runCachestatSharedMemoryCollector(handle, stop, store)
-		}()
-	} else {
-		close(doneCollector)
-	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runCachestatSharedMemoryCollector(handle, stop, store)
+	}()
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
-	signal.Stop(sigCh)
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		<-sigCh
+		signal.Stop(sigCh)
 
-	close(stop)
-	service.Stop()
-	<-doneCollector
-	if handle != nil {
-		handle.Close()
-	}
+		close(stop)
+		service.Stop()
+	}()
+
+	runCachestatGlobalCollector(handle, stop, updateEvery)
+
+	wg.Wait()
+	handle.Close()
 	<-doneService
 }

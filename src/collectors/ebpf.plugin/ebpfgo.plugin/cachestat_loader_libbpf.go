@@ -12,7 +12,7 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 		return nil, err
 	}
 
-	if err := rt.Prepare(cfg.PidTableSize, cfg.MapsPerCore); err != nil {
+	if err := rt.Prepare(cfg.PidTableSize, cfg.MapsPerCore, cfg.AccountFunction); err != nil {
 		rt.Close()
 		return nil, err
 	}

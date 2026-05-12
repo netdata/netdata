@@ -30,7 +30,11 @@ struct netdata_ebpf_cachestat_pid_snapshot_list {
 };
 
 struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const char *path, int use_core);
-int netdata_cachestat_runtime_prepare(struct netdata_ebpf_cachestat_runtime *rt, unsigned int pid_table_size, int maps_per_core);
+int netdata_cachestat_runtime_prepare(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    unsigned int pid_table_size,
+    int maps_per_core,
+    const char *account_function);
 int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt);
 int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *account_function);
 int netdata_cachestat_runtime_snapshot(
@@ -78,7 +82,7 @@ func NewCachestatRuntime(path string, useCore bool) (*CachestatRuntime, error) {
 	return &CachestatRuntime{ptr: rt}, nil
 }
 
-func (r *CachestatRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error {
+func (r *CachestatRuntime) Prepare(pidTableSize uint32, mapsPerCore bool, accountFunction string) error {
 	if r == nil || r.ptr == nil {
 		return ErrDisabled
 	}
@@ -88,7 +92,10 @@ func (r *CachestatRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error 
 		cMapsPerCore = 1
 	}
 
-	if ret := C.netdata_cachestat_runtime_prepare(r.ptr, C.uint(pidTableSize), cMapsPerCore); ret != 0 {
+	cfn := C.CString(accountFunction)
+	defer C.free(unsafe.Pointer(cfn))
+
+	if ret := C.netdata_cachestat_runtime_prepare(r.ptr, C.uint(pidTableSize), cMapsPerCore, cfn); ret != 0 {
 		return fmt.Errorf("prepare cachestat runtime failed: %d", int(ret))
 	}
 

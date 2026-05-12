@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCachestatGlobalStateUpdate(t *testing.T) {
 	tests := map[string]struct {
@@ -17,7 +20,13 @@ func TestCachestatGlobalStateUpdate(t *testing.T) {
 					AccountPageDirtied: 10,
 				},
 			},
-			wantValid: false,
+			wantValid: true,
+			want: cachestatGlobalPublish{
+				Ratio: 12,
+				Dirty: 20,
+				Hit:   10,
+				Miss:  70,
+			},
 		},
 		"calculates deltas on second sample": {
 			updates: []cachestatGlobalCounters{
@@ -64,5 +73,19 @@ func TestCachestatGlobalStateUpdate(t *testing.T) {
 				t.Fatalf("Update = %+v, want %+v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestFormatCachestatGlobalChart(t *testing.T) {
+	got := formatCachestatGlobalChart(cachestatGlobalCharts[0], 10)
+
+	if !strings.Contains(got, "CHART mem.cachestat_ratio") {
+		t.Fatalf("chart header missing expected chart name: %q", got)
+	}
+	if !strings.Contains(got, "'ebpf-go.plugin' 'cachestat'") {
+		t.Fatalf("chart header missing expected plugin/module names: %q", got)
+	}
+	if !strings.Contains(got, "DIMENSION percentage percentage absolute 1 1") {
+		t.Fatalf("chart header missing expected dimension line: %q", got)
 	}
 }
