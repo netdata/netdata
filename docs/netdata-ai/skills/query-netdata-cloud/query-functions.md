@@ -53,7 +53,7 @@ in the `info` response:
 | Class | `has_history` | Frontend behavior | Examples |
 |---|---|---|---|
 | **Simple Table** | `false` | Backend returns the whole current dataset; frontend filters/sorts/searches in-memory | `processes`, `network-connections`, `network-interfaces`, `network-sockets-tracing`, `block-devices`, `mount-points`, `containers-vms`, `systemd-services`, `netdata-streaming`, `netdata-api-calls`, `netdata-metrics-cardinality`, `<db>:top-queries`, `<db>:running-queries`, `<db>:deadlock-info`, `<db>:error-info` |
-| **Log Explorer** | `true` | Backend filters / facets / histograms before sending; supports infinite scroll, anchor pagination, delta and PLAY modes | `systemd-journal`, `windows-events`, `otel-logs` |
+| **Log Explorer** | `true` | Backend filters / facets / histograms before sending; supports infinite scroll, anchor pagination, delta and PLAY modes | `systemd-journal`, `windows-events`, `macos-logs`, `otel-logs` |
 
 Two additional `type` values are used by purpose-built Functions
 that build on the same envelope but emit non-tabular `data`:
@@ -254,6 +254,7 @@ stock Linux Netdata install (verified live):
 | `netdata-metrics-cardinality` | table | Cardinality stats (instances, time-series per context/node) |
 | `systemd-journal` | logs | systemd journal entries -- see [query-logs.md](./query-logs.md) |
 | `windows-events` | logs | Windows event log channels (Windows nodes only) |
+| `macos-logs` | logs | macOS unified log entries (macOS nodes only) |
 | `otel-logs` | logs | OpenTelemetry log entries (when the OTEL log receiver is enabled) |
 | `topology:snmp` | topology | LLDP/CDP/FDB/STP-derived L2 topology -- see [query-topology.md](./query-topology.md) |
 | `flows:netflow` | flows | NetFlow / sFlow / IPFIX records -- see [query-flows.md](./query-flows.md) |

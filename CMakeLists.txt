@@ -92,6 +92,13 @@ set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 include(NetdataPlatform)
 include(NetdataCompilerFlags)
 
+if(OS_MACOS)
+  enable_language(OBJC)
+  if(OSLOG)
+    add_compile_definitions(HAVE_OSLOG)
+  endif()
+endif()
+
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
@@ -2017,6 +2024,12 @@ set(MACOS_PLUGIN_FILES
         src/collectors/macos.plugin/macos_fw.c
 )
 
+set(MACOS_LOGS_PLUGIN_FILES
+        src/collectors/macos-logs.plugin/macos-logs.c
+        src/collectors/macos-logs.plugin/macos-logs.h
+        src/collectors/macos-logs.plugin/macos-logs-oslog.m
+)
+
 set(FREEBSD_PLUGIN_FILES
         src/collectors/freebsd.plugin/plugin_freebsd.c
         src/collectors/freebsd.plugin/plugin_freebsd.h
@@ -2955,6 +2968,16 @@ if(OS_WINDOWS)
 
         install(TARGETS windows-events.plugin
                 COMPONENT plugin-windows-events
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+if(OS_MACOS AND OSLOG AND FOUNDATION)
+        add_executable(macos-logs.plugin ${MACOS_LOGS_PLUGIN_FILES})
+        target_compile_options(macos-logs.plugin PRIVATE "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
+        target_link_libraries(macos-logs.plugin libnetdata ${FOUNDATION} ${OSLOG})
+
+        install(TARGETS macos-logs.plugin
+                COMPONENT plugin-macos-logs
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
