@@ -21,12 +21,14 @@ Module: mach_smi
 
 ## Overview
 
-Monitor macOS metrics for efficient operating system performance.
+Monitor macOS metrics for efficient operating system performance, power sources, thermal pressure, sensors, fans, storage, and networking.
 
-The plugin uses three different methods to collect data:
+The plugin uses five different methods to collect data:
   - The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
-  - The functtion `host_statistic` is called to collect CPU and Virtual memory data;
-  - The function `IOServiceGetMatchingServices` to collect storage information.
+  - The function `host_statistics` is called to collect CPU and virtual memory data.
+  - The function `IOServiceGetMatchingServices` is called to collect storage information.
+  - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
+  - The native Apple `powermetrics` command is sampled in the background to collect thermal pressure, SMC temperatures, and fan speed when available.
 
 
 This collector is only supported on the following platforms:
@@ -35,20 +37,21 @@ This collector is only supported on the following platforms:
 
 This collector only supports collecting metrics from a single instance of this integration.
 
+Battery and UPS power-source metrics use public IOKit APIs and do not require extra permissions. Exact thermal and fan readings use the native Apple `powermetrics` command, which requires `netdata` to run with sufficient macOS privileges; without those privileges, the thermal/fan sampler disables itself after repeated failures.
 
 ### Default Behavior
 
 #### Auto-Detection
 
-This integration doesn't support auto-detection.
+The collector auto-detects macOS power sources and only creates charts for values exposed by the hardware and operating system.
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+Power-source enumeration is capped internally to avoid unexpected chart cardinality. The `powermetrics` sampler is rate-limited and cached so it does not run in the one-second collection hot path.
 
 #### Performance Impact
 
-The default configuration for this integration is not expected to impose a significant performance impact on the system.
+Power-source collection is lightweight. Thermal and fan collection runs `powermetrics` at a configurable interval, defaulting to once per minute with a one-second sample window.
 
 ## Setup
 
@@ -61,11 +64,13 @@ No action required.
 
 #### Options
 
-There are three sections in the file which you can configure:
+There are five sections in the file which you can configure:
 
 - `[plugin:macos:sysctl]` - Enable or disable monitoring for network, swap, loadavg, and boot time.
 - `[plugin:macos:mach_smi]` - Enable or disable monitoring for CPU and Virtual memory.
 - `[plugin:macos:iokit]` - Enable or disable monitoring for storage device.
+- `[plugin:macos:power_sources]` - Enable or disable battery and UPS power-source metrics.
+- `[plugin:macos:powermetrics]` - Configure thermal and fan sampling through native Apple `powermetrics`.
 
 
 <details open><summary>Config options</summary>
@@ -112,6 +117,20 @@ There are three sections in the file which you can configure:
 | swap i/o | Enable or disable monitoring of SWAP I/O metrics (I/O Swap). | yes | no |
 | memory page faults | Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge). | yes | no |
 | disk i/o | Enable or disable monitoring of disk I/O metrics (In, Out). | yes | no |
+| battery capacity | Enable or disable monitoring of battery capacity metrics. | yes | no |
+| power supply voltage | Enable or disable monitoring of battery and UPS voltage metrics. | yes | no |
+| power supply current | Enable or disable monitoring of battery and UPS current metrics. | yes | no |
+| battery temperature | Enable or disable monitoring of battery temperature metrics when exposed by macOS. | yes | no |
+| battery cycle count | Enable or disable monitoring of battery cycle count metrics when exposed by macOS. | yes | no |
+| sample every | How often to run the native `powermetrics` thermal and fan sampler. | 60s | no |
+| sample window | Sampling window passed to `powermetrics`. | 1000ms | no |
+| command timeout | Maximum time to wait for one `powermetrics` sample before terminating it. | 5000ms | no |
+| command path | Path to the native Apple `powermetrics` command. | /usr/bin/powermetrics | no |
+| thermal pressure | Enable or disable monitoring of macOS thermal pressure state. | yes | no |
+| SMC fan speed | Enable or disable monitoring of SMC fan speed when available. | yes | no |
+| SMC temperatures | Enable or disable monitoring of SMC CPU and GPU die temperatures when available. | yes | no |
+| SMC thermal levels | Enable or disable monitoring of SMC thermal levels when available. | yes | no |
+| SMC prochot | Enable or disable monitoring of SMC processor-hot assertion flags when available. | yes | no |
 
 
 </details>
@@ -170,6 +189,19 @@ A basic example that discards swap monitoring
   swap i/o = no
   memory page faults = no
   disk i/o = no
+
+```
+</details>
+
+###### Disable thermal and fan sampling.
+
+Disable the privileged `powermetrics` sampler while keeping the rest of `macos.plugin` enabled.
+
+<details open><summary>Config</summary>
+
+```yaml
+[plugin:macos]
+  powermetrics = no
 
 ```
 </details>
@@ -241,6 +273,50 @@ Metrics:
 | ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
 | system.uptime | uptime | seconds |
 | system.io | in, out | KiB/s |
+| macos.thermal_pressure | nominal, moderate, heavy, sleeping, trapping, undefined | state |
+| macos.smc_thermal_level | cpu, gpu, io | level |
+| macos.smc_prochot | cpu, smc | status |
+
+### Per power source
+
+These metrics refer to macOS battery and UPS power sources.
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device | Sanitized power-source name |
+| source | Data source |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powersupply.capacity | capacity | percentage |
+| powersupply.voltage | voltage | V |
+| powersupply.current | current | A |
+| powersupply.cycles | cycles | cycles |
+
+### Per sensor
+
+These metrics refer to macOS battery, thermal, and fan sensors.
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| source | Data source |
+| sensor | Sensor name |
+| device | Sanitized device name when available |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.hw.sensor.temperature.input | input | degrees Celsius |
+| system.hw.sensor.fan.input | input | rotations per minute |
 
 ### Per disk
 
@@ -290,3 +366,11 @@ Metrics:
 | net.events | frames, collisions, carrier | events/s |
 
 
+
+## Troubleshooting
+
+### Thermal and fan charts are missing
+
+The thermal and fan charts depend on the native Apple `powermetrics` command. On macOS, `powermetrics` requires sufficient privileges; if `netdata` cannot run it, the sampler disables itself after repeated failures to avoid log noise.
+
+Battery and UPS power-source charts do not depend on `powermetrics` and should still appear when macOS exposes power-source data.
