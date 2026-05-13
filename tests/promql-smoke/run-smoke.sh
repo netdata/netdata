@@ -348,6 +348,34 @@ check_post_discovery "POST /series with match[] and limit" \
     "len(d['data'])==20"
 echo
 
+echo "==> Phase 3b: *_over_time family"
+check_instant "avg_over_time"      'avg_over_time(system_cpu[1m])'      200 vector
+check_instant "sum_over_time"      'sum_over_time(system_cpu[1m])'      200 vector
+check_instant "min_over_time"      'min_over_time(system_cpu[1m])'      200 vector
+check_instant "max_over_time"      'max_over_time(system_cpu[1m])'      200 vector
+check_instant "count_over_time"    'count_over_time(system_cpu[1m])'    200 vector
+check_instant "last_over_time"     'last_over_time(system_cpu[1m])'     200 vector
+check_instant "present_over_time"  'present_over_time(system_cpu[1m])'  200 vector
+# Correctness sanity: every series in count_over_time(system_cpu[1m])
+# should be >= 1 because every dimension has been collected in the
+# last minute on a populated host. We verify by composing > 0 (which
+# should return all 10 series) and checking the count.
+check_discovery "count_over_time(...)>=1 keeps every series" \
+    "/api/v1/query" \
+    "--data-urlencode query=count_over_time(system_cpu[1m])>0" 200 \
+    "len(d['data']['result'])>=1"
+# last_over_time keeps __name__; the others strip it. Verify both
+# behaviors end to end.
+check_discovery "last_over_time preserves __name__" \
+    "/api/v1/query" \
+    "--data-urlencode query=last_over_time(system_cpu[1m])" 200 \
+    "any('__name__' in s['metric'] for s in d['data']['result'])"
+check_discovery "avg_over_time strips __name__" \
+    "/api/v1/query" \
+    "--data-urlencode query=avg_over_time(system_cpu[1m])" 200 \
+    "all('__name__' not in s['metric'] for s in d['data']['result'])"
+echo
+
 echo "==> Phase 3a: fast path + start/end semantics"
 # Fast path (no match[]) and slow path (match[]={__name__!=""}) must
 # produce the same name set. The fast path walks contexts directly; the

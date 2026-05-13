@@ -16,13 +16,19 @@ the build in that case.
 
 ## Supported function set
 
-Phase 1 covers the function set needed for the most common Grafana
-panels and Prometheus alerting rules:
+The current function set covers the most common Grafana panels and
+Prometheus alerting rules:
 
 * Vector selectors with label matchers (`=`, `!=`, `=~`, `!~`) and
   `offset` modifier.
 * Matrix selectors with range and `offset`.
 * Counter family: `rate`, `irate`, `increase`, `delta`.
+* Windowed aggregates (`*_over_time`): `avg_over_time`,
+  `sum_over_time`, `min_over_time`, `max_over_time`,
+  `count_over_time`, `last_over_time`, `present_over_time`. NaN
+  samples are skipped; empty windows drop the series. `__name__`
+  is preserved for `last_over_time` and stripped for the other
+  six (Prometheus convention). Added in Phase 3b (SOW-0020).
 * Aggregations: `sum`, `avg`, `min`, `max`, `count`, each with optional
   `by` or `without` grouping.
 * Arithmetic: `+`, `-`, `*`, `/`, `%`, `^` across scalar / vector
@@ -32,17 +38,17 @@ panels and Prometheus alerting rules:
 * Unary minus.
 * `histogram_quantile(phi, vector)` with `le`-labeled cumulative buckets.
 
-The following are explicitly out of scope for Phase 1 and reject at
-lowering time with a clear error:
+The following are explicitly out of scope and reject at lowering or
+evaluation time with a clear error:
 
 * Subqueries (`metric[1h:5m]`).
 * Vector matching with `on`, `ignoring`, `group_left`, `group_right`.
 * Set operators (`and`, `or`, `unless`).
 * `topk`, `bottomk`, `quantile`, `count_values`.
-* The full `*_over_time` family (`avg_over_time`, `sum_over_time`,
-  `max_over_time`, `min_over_time`, `count_over_time`,
-  `last_over_time`). These names are recognized by the parser and the
-  lowering pass but the evaluator returns "not yet implemented".
+* `stddev_over_time`, `stdvar_over_time`, `quantile_over_time` --
+  the three `*_over_time` siblings not covered by SOW-0020. The
+  lowering rejects these with `bad_data: unknown function` until
+  a future SOW lights them up.
 * The `@` modifier.
 
 ## Naming: metric names and labels

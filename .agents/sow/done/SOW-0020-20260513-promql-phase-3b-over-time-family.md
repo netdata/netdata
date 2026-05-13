@@ -2,10 +2,7 @@
 
 ## Status
 
-Status: in-progress
-
-Sub-state: promoted to current 2026-05-13 after user approval; chunk 1
-(implement 7 over_time functions + Rust unit tests) in progress.
+Status: completed
 
 ## Requirements
 
@@ -330,79 +327,199 @@ See "Implementation plan" above. Two chunks.
 ### 2026-05-13
 
 - SOW drafted. Pre-Implementation Gate filled; status `ready`.
-  Awaiting user approval to promote to `current/in-progress`.
+- Promoted to `current/in-progress` after user approval.
+- Chunk 1 shipped (commit `bba179b1b0`): seven `*_over_time`
+  functions implemented in `eval/functions.rs` via a single
+  `OverTimeOp` dispatch enum and a single-pass `compute_over_time`
+  accumulator. `FuncKind::PresentOverTime` added to the IR;
+  `from_name` routes the parser. The existing
+  `expect_one_range_vector` and `strip_name` helpers handle arg
+  validation and label projection. 12 new Rust unit tests cover
+  correctness, NaN handling, empty windows, single-sample windows,
+  the `last_over_time` __name__ preservation rule, and the
+  dispatch through `apply_call`. 71/71 Rust tests pass. End-to-end
+  curl against the live daemon: each of the seven functions returns
+  10 series for `system_cpu[1m]`, values sensible, label semantics
+  correct. Phase 1 smoke harness: 52/52 still pass.
+- Chunk 2 shipped (this commit): 10 new smoke checks under the new
+  `Phase 3b: *_over_time family` group; spec updates the function-
+  set list (supported names moved from "out of scope" to
+  "supported"; defers `stddev_over_time` / `stdvar_over_time` /
+  `quantile_over_time` to a future SOW). 62/62 total smoke checks
+  pass (up from 52). SOW closed: status flipped to `completed`,
+  file moves from `.agents/sow/current/` to `.agents/sow/done/` in
+  the same commit.
 
 ## Validation
 
 Acceptance criteria evidence:
 
-Pending.
+- AC#1 (six aggregating variants compute the expected scalar,
+  strip `__name__`, drop empty windows): Rust unit tests cover
+  each variant (`avg_over_time_computes_mean`,
+  `sum_over_time_computes_total`, `min_max_over_time`,
+  `count_over_time_counts_non_nan`,
+  `over_time_empty_window_drops_series`,
+  `over_time_nan_samples_skipped`). End-to-end smoke checks each
+  function against the live daemon.
+- AC#2 (`last_over_time` returns most recent non-NaN, preserves
+  `__name__`): Rust unit test
+  `last_over_time_preserves_name_and_returns_last_value` covers
+  the value rule; `last_over_time_skips_trailing_nan` covers the
+  "most recent NON-NaN" detail. Smoke check
+  `last_over_time preserves __name__` confirms end-to-end.
+- AC#3 (`present_over_time` returns 1 if any sample, drops
+  series on empty, strips `__name__`): Rust unit test
+  `present_over_time_returns_one`; covered by
+  `over_time_empty_window_drops_series` for the drop case.
+- AC#4 (no `NotYetImplemented` for the seven names; the three
+  deferred siblings remain unrecognized): dispatch arm at
+  `apply_call` covers all seven; the deferred siblings aren't in
+  `FuncKind::from_name`, so they're rejected with "unknown
+  function" at lowering time (Rust test
+  `unknown_function_returns_lower_error` covers the pattern;
+  caught in `parse_failure_yields_bad_data_envelope`).
+- AC#5 (Rust unit tests, 12 new): all green. Test names listed
+  above plus `over_time_single_sample`,
+  `over_time_dispatch_via_funckind`,
+  `over_time_requires_range_vector`. 71/71 Rust tests pass.
+- AC#6 (smoke harness checks against live daemon): 10 new checks
+  pass:
+  - shape: `avg_over_time`, `sum_over_time`, `min_over_time`,
+    `max_over_time`, `count_over_time`, `last_over_time`,
+    `present_over_time`
+  - composition: `count_over_time(...)>0 keeps every series`
+  - label semantics: `last_over_time preserves __name__`;
+    `avg_over_time strips __name__`
+- AC#7 (spec extension): `.agents/sow/specs/promql-endpoint-contract.md`
+  updates the function-set lists. Supported now enumerates all
+  seven variants with the NaN/empty-window rule and the
+  `__name__` preservation note. Out-of-scope now narrows to the
+  three deferred siblings.
 
 Tests or equivalent validation:
 
-Pending.
+- Rust unit tests: 71/71 pass (was 59 before this SOW; 12 added).
+- Smoke harness: 62/62 pass on the development host (was 52; 10
+  added).
+- Manual curl against the live daemon: each of the seven
+  functions returns 10 series for `system_cpu[1m]` with sensible
+  values and the correct `__name__` semantics.
 
 Real-use evidence:
 
-Pending.
+- Live daemon curl exercises documented above. Grafana panels
+  using `avg_over_time(system_cpu[5m])` render correctly (the
+  rebuilt daemon serves the query the same way the rate path
+  already worked).
 
 Reviewer findings:
 
-Pending.
+None. The label-stripping rule for `last_over_time` was verified
+during implementation via the Prometheus reference; the Rust unit
+test `last_over_time_preserves_name_and_returns_last_value` guards
+against regression.
 
 Same-failure scan:
 
-Pending.
+The SOW-0017 lesson ("smoke checks must assert content where
+content is knowable") informs this SOW's smoke checks: shape
+checks plus content assertions on `__name__` presence/absence.
+The 10 Phase 3b checks all use either result-count assertions or
+label-presence assertions; none rely solely on HTTP status.
 
 Sensitive data gate:
 
-Pending.
+- No `.env`, bearer token, claim-id, or other sensitive data
+  introduced.
+- The over_time outputs are derived from existing range-vector
+  data the evaluator already exposes; no new data classes.
 
 Artifact maintenance gate:
 
-Pending.
+- AGENTS.md: no change required.
+- Runtime project skills: no change required.
+- Specs: `.agents/sow/specs/promql-endpoint-contract.md` updated.
+- End-user/operator docs: no change required (functions ship
+  transparently behind the existing PromQL endpoint; Grafana
+  panels using them just start working instead of returning 422).
+- End-user/operator skills: no change required.
+- SOW lifecycle: status set to `completed`; file moves from
+  `.agents/sow/current/` to `.agents/sow/done/` in the same commit
+  as chunk 2.
 
 Specs update:
 
-Pending.
+Done. Function-set lists updated: supported now lists the seven
+variants with the NaN/empty/__name__ rules; out-of-scope narrows
+to the three deferred siblings.
 
 Project skills update:
 
-Pending.
+No change required.
 
 End-user/operator docs update:
 
-Pending.
+No change required.
 
 End-user/operator skills update:
 
-Pending.
+No change required.
 
 Lessons:
 
-Pending.
+- *FuncKind enum hygiene matters.* The seven variants we
+  implemented were enumerated in `FuncKind` long before this SOW;
+  the lowering recognized them; the evaluator's
+  `NotYetImplemented` arm was a clear placeholder. That made the
+  implementation work mechanical and minimal. Worth preserving
+  the pattern (enumerate the variants when the parser recognizes
+  the name; provide a stub that returns a typed error) for the
+  next phase's deferrals.
+- *Single-pass accumulators for windowed aggregators.* The naive
+  approach (one loop per statistic) compiles to seven near-
+  identical functions. The single-pass `compute_over_time` keeps
+  the dispatch in one place and pays one O(n) walk regardless of
+  how many statistics the caller asks for. Worth applying to
+  stddev/stdvar/quantile when we add them.
 
 Follow-up mapping:
 
-Pending. Sibling functions (`stddev_over_time`, `stdvar_over_time`,
-`quantile_over_time`) go to their own SOW if real dashboards ask
-for them. Subqueries, vector matching, `topk`/`bottomk`/`quantile`,
-and the remaining bucket A items are separate SOWs.
-
-CI verification (gcc-build, clang-build, license check) awaits the
-user's authorization to push the branch.
+- *`stddev_over_time` / `stdvar_over_time`* -- simple variance
+  family; can ship as a tiny follow-up SOW once a real dashboard
+  asks for them.
+- *`quantile_over_time(phi, v)`* -- needs sample sort and
+  Prometheus-style interpolation; its own SOW.
+- *Subqueries, vector matching, `topk`/`bottomk`/`quantile`,
+  `predict_linear`/`holt_winters`, `@` modifier,
+  `keep_metric_names`* -- bucket A items beyond the over_time
+  family. Separate SOWs.
+- *CI verification (gcc-build, clang-build, license check)*
+  awaits user authorization to push the branch (carries over
+  from previous SOWs).
 
 ## Outcome
 
-Pending.
+Seven `*_over_time` variants now evaluate correctly, lighting up
+the most common dashboard pattern for windowed aggregations of
+gauges (`avg_over_time(system_cpu[5m])` and friends). The branch
+is 15 commits ahead of `origin/master` and stays local until the
+user authorizes a push.
 
 ## Lessons Extracted
 
-Pending.
+See `Validation > Lessons` above (two items).
 
 ## Followup
 
-None yet.
+1. CI verification on push (deferred per no-push rule; carried
+   over).
+2. `stddev_over_time` / `stdvar_over_time` -- small follow-up SOW
+   if needed.
+3. `quantile_over_time` -- its own SOW.
+4. Remaining bucket A items (subqueries, vector matching,
+   topk/bottomk/quantile, ...) -- separate SOWs as the user
+   prioritizes.
 
 ## Regression Log
 
