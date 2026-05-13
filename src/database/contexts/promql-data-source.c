@@ -53,6 +53,10 @@ struct nd_pds_query {
     nd_pds_series_record *series;
     size_t series_count;
     size_t series_cap;
+    // True when resolution hit `max_series` and the result is a prefix of
+    // the candidate set. Callers decide whether to surface this as an
+    // error (query path) or a warning (discovery path).
+    bool truncated;
 };
 
 struct nd_pds_samples {
@@ -581,22 +585,24 @@ nd_pds_resolve(const char *host_machine_guid,
         }
     }
 
-    if (state.overflowed) {
-        set_err(err, err_len, "exceeded max_series; tighten the query or raise the cap");
+    q->truncated = state.overflowed;
+
+    if (q->series_count == 0 && !q->truncated) {
         nd_pds_free(q);
         return NULL;
     }
 
-    if (q->series_count == 0) {
-        nd_pds_free(q);
-        return NULL;
-    }
-
+    (void)err;
+    (void)err_len;
     return q;
 }
 
 size_t nd_pds_series_count(const nd_pds_query *q) {
     return q ? q->series_count : 0;
+}
+
+bool nd_pds_was_truncated(const nd_pds_query *q) {
+    return q ? q->truncated : false;
 }
 
 void nd_pds_series_metadata(const nd_pds_query *q, size_t i,
@@ -692,4 +698,181 @@ void nd_pds_free(nd_pds_query *q) {
         series_record_destroy(&q->series[i]);
     freez(q->series);
     freez(q);
+}
+
+// ---------------------------------------------------------------------------
+// Metadata enumeration (feeds /api/v1/metadata)
+// ---------------------------------------------------------------------------
+
+typedef struct meta_record {
+    char *metric_name;   // sanitized
+    char *type;          // "counter" / "gauge"
+    char *help;          // chart title (may be empty)
+    char *unit;          // empty for now
+} meta_record;
+
+struct nd_pds_metadata_set {
+    meta_record *items;
+    size_t count;
+    size_t cap;
+};
+
+typedef struct meta_walk_state {
+    nd_pds_metadata_set *out;
+    size_t max_entries;
+    const char *requested_metric;  // NULL means "all"
+    // Per-context scratch.
+    bool found_help;
+    bool found_type;
+    const char *current_help;
+    const char *current_type;
+} meta_walk_state;
+
+static bool meta_reserve(nd_pds_metadata_set *m) {
+    if (m->count < m->cap) return true;
+    size_t newcap = m->cap ? m->cap * 2 : 64;
+    void *r = reallocz(m->items, newcap * sizeof(m->items[0]));
+    if (!r) return false;
+    m->items = r;
+    m->cap = newcap;
+    return true;
+}
+
+// Called per chart in a context. We sample the first non-obsolete chart for
+// HELP (its title) and the first non-obsolete dimension for TYPE (its
+// algorithm). Subsequent charts in the same context are ignored once we
+// have both -- this matches the Prometheus convention of one metadata
+// entry per metric.
+static int meta_instance_cb(RRDSET *st, void *data) {
+    meta_walk_state *state = data;
+    if (rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)) return 0;
+    if (state->found_help && state->found_type) return 0;
+
+    if (!state->found_help) {
+        const char *title = rrdset_title(st);
+        if (title) {
+            state->current_help = title;
+            state->found_help = true;
+        }
+    }
+    if (!state->found_type) {
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            if (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
+            state->current_type =
+                (rd->algorithm == RRD_ALGORITHM_INCREMENTAL) ? "counter" : "gauge";
+            state->found_type = true;
+            break;
+        }
+        rrddim_foreach_done(rd);
+    }
+    return 0;
+}
+
+static void meta_collect_on_host(meta_walk_state *state, RRDHOST *host) {
+    if (!host || !host->rrdctx.contexts) return;
+
+    void *unused;
+    dfe_start_read(host->rrdctx.contexts, unused) {
+        (void)unused;
+        if (state->out->count >= state->max_entries) break;
+        const char *ctx_name = unused_dfe.name;
+        if (!ctx_name || !*ctx_name) continue;
+
+        char sanitized[ND_PDS_LABEL_NAME_MAX + 1];
+        if (sanitize_label_name(sanitized, ctx_name, sizeof(sanitized)) == 0)
+            continue;
+        if (state->requested_metric && strcmp(sanitized, state->requested_metric) != 0)
+            continue;
+
+        // Skip if we've already recorded this sanitized name (many-to-one
+        // sanitization can collapse multiple contexts; one entry is enough
+        // for /metadata).
+        bool duplicate = false;
+        for (size_t i = 0; i < state->out->count; i++) {
+            if (strcmp(state->out->items[i].metric_name, sanitized) == 0) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (duplicate) continue;
+
+        state->found_help = false;
+        state->found_type = false;
+        state->current_help = "";
+        state->current_type = "gauge";  // default
+
+        rrdcontext_foreach_instance_with_rrdset_in_context(host, ctx_name, meta_instance_cb, state);
+
+        if (!meta_reserve(state->out)) break;
+        meta_record *rec = &state->out->items[state->out->count];
+        rec->metric_name = strdupz(sanitized);
+        rec->type = strdupz(state->current_type);
+        rec->help = strdupz(state->current_help);
+        rec->unit = strdupz("");
+        state->out->count++;
+    }
+    dfe_done(unused);
+}
+
+nd_pds_metadata_set *
+nd_pds_metadata_collect(const char *host_machine_guid,
+                        const char *metric_filter,
+                        size_t max_entries) {
+    if (max_entries == 0) max_entries = 10000;
+
+    nd_pds_metadata_set *m = callocz(1, sizeof(*m));
+    meta_walk_state state = {
+        .out = m,
+        .max_entries = max_entries,
+        .requested_metric = (metric_filter && *metric_filter) ? metric_filter : NULL,
+        .found_help = false,
+        .found_type = false,
+    };
+
+    bool scan_all_hosts = (host_machine_guid && strcmp(host_machine_guid, "*") == 0);
+    if (scan_all_hosts) {
+        rrd_rdlock();
+        RRDHOST *host;
+        dfe_start_read(rrdhost_root_index, host) {
+            if (m->count >= max_entries) break;
+            meta_collect_on_host(&state, host);
+        }
+        dfe_done(host);
+        rrd_rdunlock();
+    } else {
+        // NULL or specific guid -> localhost for chunk 1 of Phase 2.
+        // Phase 2 chunk 2 lifts this restriction.
+        if (localhost) meta_collect_on_host(&state, localhost);
+    }
+    return m;
+}
+
+size_t nd_pds_metadata_count(const nd_pds_metadata_set *m) {
+    return m ? m->count : 0;
+}
+
+void nd_pds_metadata_get(const nd_pds_metadata_set *m, size_t i,
+                         nd_pds_metadata_entry *out) {
+    if (!m || !out || i >= m->count) {
+        if (out) memset(out, 0, sizeof(*out));
+        return;
+    }
+    const meta_record *rec = &m->items[i];
+    out->metric_name = rec->metric_name;
+    out->type = rec->type;
+    out->help = rec->help;
+    out->unit = rec->unit;
+}
+
+void nd_pds_metadata_free(nd_pds_metadata_set *m) {
+    if (!m) return;
+    for (size_t i = 0; i < m->count; i++) {
+        freez(m->items[i].metric_name);
+        freez(m->items[i].type);
+        freez(m->items[i].help);
+        freez(m->items[i].unit);
+    }
+    freez(m->items);
+    freez(m);
 }

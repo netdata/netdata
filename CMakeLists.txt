@@ -2016,7 +2016,9 @@ set(WEB_PLUGIN_FILES
 )
 
 if(ENABLE_PROMQL)
-    list(APPEND WEB_PLUGIN_FILES src/web/api/v3/api_v3_promql.c)
+    list(APPEND WEB_PLUGIN_FILES
+         src/web/api/v3/api_v3_promql.c
+         src/web/api/v3/api_v3_promql_discovery.c)
 endif()
 
 set(CLAIM_PLUGIN_FILES

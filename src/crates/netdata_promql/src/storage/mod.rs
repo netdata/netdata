@@ -14,7 +14,7 @@
 
 mod matchers;
 mod query;
-mod raw;
+pub(crate) mod raw;
 mod samples;
 
 #[cfg(test)]

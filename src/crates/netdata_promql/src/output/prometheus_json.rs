@@ -152,7 +152,7 @@ fn write_value(out: &mut String, v: f64) {
     }
 }
 
-fn write_escaped(out: &mut String, s: &str) {
+pub(crate) fn write_escaped(out: &mut String, s: &str) {
     for c in s.chars() {
         match c {
             '"' => out.push_str("\\\""),

@@ -251,6 +251,51 @@ static struct web_api_command api_commands_v1[] = {
         .callback = api_v3_promql,
         .allow_subpaths = 0
     },
+    // Discovery endpoints (SOW-0018 chunk 1). Grafana's Prometheus
+    // datasource probes these for metric browser, label autocomplete, and
+    // datasource health-check (heuristics classification). All five route
+    // through the same callback; the handler distinguishes by
+    // w->url_path_decoded.
+    {
+        .api = "labels",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "label",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 1     // /api/v1/label/<name>/values
+    },
+    {
+        .api = "series",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "metadata",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "status",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 1     // /api/v1/status/buildinfo
+    },
 #endif
 
     {

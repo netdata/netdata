@@ -65,6 +65,60 @@ int nd_promql_response_http_status(const struct NdPromqlResponse *r);
  */
 void nd_promql_response_free(struct NdPromqlResponse *r);
 
+/**
+ * FFI: `/api/v1/labels`. Returns the union of label names across the
+ * resolved series.
+ *
+ * # Safety
+ * `matchers` must be NULL or a pointer to `matchers_len` C strings. Each
+ * non-NULL string is borrowed for the duration of the call.
+ */
+struct NdPromqlResponse *nd_promql_labels(const char *host_machine_guid,
+                                          const char *const *matchers,
+                                          uintptr_t matchers_len,
+                                          int64_t _start_ms,
+                                          int64_t _end_ms,
+                                          uintptr_t limit);
+
+/**
+ * FFI: `/api/v1/label/<name>/values`.
+ *
+ * # Safety
+ * `label_name` and each non-null pointer in `matchers` must be valid
+ * NUL-terminated C strings for the duration of the call.
+ */
+struct NdPromqlResponse *nd_promql_label_values(const char *host_machine_guid,
+                                                const char *label_name,
+                                                const char *const *matchers,
+                                                uintptr_t matchers_len,
+                                                int64_t _start_ms,
+                                                int64_t _end_ms,
+                                                uintptr_t limit);
+
+/**
+ * FFI: `/api/v1/series`. Returns one label map per unique series.
+ *
+ * # Safety
+ * `matchers` must be NULL or a pointer to `matchers_len` C strings.
+ */
+struct NdPromqlResponse *nd_promql_series(const char *host_machine_guid,
+                                          const char *const *matchers,
+                                          uintptr_t matchers_len,
+                                          int64_t _start_ms,
+                                          int64_t _end_ms,
+                                          uintptr_t limit);
+
+/**
+ * FFI: `/api/v1/metadata`. Returns per-metric TYPE/HELP/unit, optionally
+ * filtered to a single metric name.
+ *
+ * # Safety
+ * `metric_filter` must be NULL or a valid NUL-terminated C string.
+ */
+struct NdPromqlResponse *nd_promql_metadata(const char *host_machine_guid,
+                                            const char *metric_filter,
+                                            uintptr_t limit);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

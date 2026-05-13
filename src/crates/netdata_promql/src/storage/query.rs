@@ -176,6 +176,14 @@ impl NdQuery {
         self.filter = Some(kept);
     }
 
+    /// True if the shim hit `max_series` during resolution and returned a
+    /// prefix of the candidate set. Phase 1's query path turns this into a
+    /// `bad_data` error; Phase 2's discovery path converts it to a
+    /// `warnings` envelope field.
+    pub fn was_truncated(&self) -> bool {
+        unsafe { raw::nd_pds_was_truncated(self.handle.as_ptr()) }
+    }
+
     /// Number of series after RE/NRE post-filter.
     pub fn len(&self) -> usize {
         match &self.filter {

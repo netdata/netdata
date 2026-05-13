@@ -12,6 +12,7 @@
 #ifndef ND_PROMQL_DATA_SOURCE_H
 #define ND_PROMQL_DATA_SOURCE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -81,6 +82,13 @@ nd_pds_resolve(const char *host_machine_guid,
 // Number of series resolved.
 size_t nd_pds_series_count(const nd_pds_query *q);
 
+// True if the resolve hit the `max_series` cap and returned only a prefix
+// of the candidate set. Callers that care about exact result correctness
+// (the query path) treat truncation as an error; callers that surface
+// discovery responses to Grafana convert it into a `warnings` envelope
+// field per Prometheus convention.
+bool nd_pds_was_truncated(const nd_pds_query *q);
+
 // Read-only access to the label set of one resolved series. Sets
 // `*labels_out` to a pointer into the query's owned storage and
 // `*labels_len_out` to the array length. `*signature_out` is a stable
@@ -122,6 +130,53 @@ void nd_pds_samples_close(nd_pds_samples *it);
 // Release a query handle and all resources it owns. Any open sample
 // iterators must be closed first. Safe to call on NULL.
 void nd_pds_free(nd_pds_query *q);
+
+// ---------------------------------------------------------------------------
+// Metadata enumeration (feeds `/api/v1/metadata`)
+// ---------------------------------------------------------------------------
+
+typedef struct nd_pds_metadata_set nd_pds_metadata_set;
+
+// One TYPE/HELP entry, keyed by sanitized metric name. The Prometheus
+// `/api/v1/metadata` response groups entries per metric; the C handler does
+// the grouping at JSON-serialization time. All pointers stay valid until
+// `nd_pds_metadata_free` is called.
+typedef struct nd_pds_metadata_entry {
+    const char *metric_name;     // sanitized context name (e.g. "system_cpu")
+    const char *type;            // "counter" or "gauge"
+    const char *help;            // chart title
+    const char *unit;            // empty for Phase 2
+} nd_pds_metadata_entry;
+
+// Walk every context on the requested host(s). For each context, take its
+// first non-obsolete instance and record its chart title as HELP and its
+// first dimension's algorithm as TYPE (INCREMENTAL -> counter, else gauge).
+//
+// host_machine_guid follows the same convention as `nd_pds_resolve`:
+//   NULL  -> localhost only
+//   "*"   -> localhost plus all known child hosts
+//   other -> the host whose machine_guid or hostname matches (Phase 2 chunk 2)
+//
+// `metric_filter` is optional: when non-NULL, only contexts whose sanitized
+// name equals `metric_filter` are returned (this mirrors Prometheus'
+// `?metric=` parameter).
+//
+// `max_entries` caps the result count. Returns NULL only on hard failure
+// (allocation, invalid host). An empty result returns an empty set, not
+// NULL.
+nd_pds_metadata_set *
+nd_pds_metadata_collect(const char *host_machine_guid,
+                        const char *metric_filter,
+                        size_t max_entries);
+
+size_t nd_pds_metadata_count(const nd_pds_metadata_set *m);
+
+// Copy the i-th entry into *out. Out-of-range indices are silent no-ops.
+void nd_pds_metadata_get(const nd_pds_metadata_set *m, size_t i,
+                         nd_pds_metadata_entry *out);
+
+// Release a metadata set. Safe to call on NULL.
+void nd_pds_metadata_free(nd_pds_metadata_set *m);
 
 #ifdef __cplusplus
 }

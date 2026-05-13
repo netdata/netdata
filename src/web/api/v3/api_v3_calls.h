@@ -13,5 +13,6 @@ int api_v3_me(RRDHOST *host, struct web_client *w, char *url);
 int api_v3_stream_info(RRDHOST *host __maybe_unused, struct web_client *w, char *url);
 int api_v3_stream_path(RRDHOST *host __maybe_unused, struct web_client *w, char *url);
 int api_v3_promql(RRDHOST *host __maybe_unused, struct web_client *w, char *url);
+int api_v1_promql_discovery(RRDHOST *host __maybe_unused, struct web_client *w, char *url);
 
 #endif //NETDATA_API_V3_CALLS_H

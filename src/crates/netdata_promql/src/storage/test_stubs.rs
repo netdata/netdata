@@ -67,3 +67,33 @@ pub extern "C" fn nd_pds_samples_close(_it: *mut super::raw::nd_pds_samples) {}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nd_pds_free(_q: *mut super::raw::nd_pds_query) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nd_pds_was_truncated(_q: *const super::raw::nd_pds_query) -> bool {
+    false
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nd_pds_metadata_collect(
+    _host: *const c_char,
+    _metric_filter: *const c_char,
+    _max_entries: usize,
+) -> *mut super::raw::nd_pds_metadata_set {
+    std::ptr::null_mut()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nd_pds_metadata_count(_m: *const super::raw::nd_pds_metadata_set) -> usize {
+    0
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nd_pds_metadata_get(
+    _m: *const super::raw::nd_pds_metadata_set,
+    _i: usize,
+    _out: *mut super::raw::nd_pds_metadata_entry,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nd_pds_metadata_free(_m: *mut super::raw::nd_pds_metadata_set) {}

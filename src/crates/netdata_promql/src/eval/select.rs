@@ -36,6 +36,12 @@ pub fn eval_vector_select(
         Err(e) => return Err(EvalError::Storage(e)),
     };
 
+    if q.was_truncated() {
+        return Err(EvalError::Other(
+            "exceeded max_series during resolution; tighten the query or raise the cap".into(),
+        ));
+    }
+
     let mut out = Vec::with_capacity(q.len());
     for i in 0..q.len() {
         let Some(view) = q.series(i) else { continue };
@@ -102,6 +108,12 @@ pub fn eval_matrix_select(
         }
         Err(e) => return Err(EvalError::Storage(e)),
     };
+
+    if q.was_truncated() {
+        return Err(EvalError::Other(
+            "exceeded max_series during resolution; tighten the query or raise the cap".into(),
+        ));
+    }
 
     let mut out = Vec::with_capacity(q.len());
     for i in 0..q.len() {

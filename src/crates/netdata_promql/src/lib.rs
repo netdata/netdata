@@ -15,6 +15,7 @@
 //! and `offset`. Counter functions (`rate`/`irate`/`increase`/`delta`) and
 //! `histogram_quantile` arrive in chunk 4.
 
+mod discovery;
 mod eval;
 mod output;
 mod plan;
@@ -44,7 +45,7 @@ pub struct NdPromqlResponse {
 }
 
 impl NdPromqlResponse {
-    fn ok(body: String) -> Self {
+    pub(crate) fn ok(body: String) -> Self {
         Self {
             body: CString::new(body).unwrap_or_else(|_| {
                 CString::new(r#"{"status":"error","errorType":"internal","error":"response contained NUL byte"}"#).unwrap()
@@ -53,7 +54,7 @@ impl NdPromqlResponse {
         }
     }
 
-    fn bad_data(msg: &str) -> Self {
+    pub(crate) fn bad_data(msg: &str) -> Self {
         Self::error(400, "bad_data", msg)
     }
 
