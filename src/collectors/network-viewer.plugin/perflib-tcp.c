@@ -79,6 +79,28 @@ static void nv_add_int_field(BUFFER *wb, size_t *field_id,
         RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
 }
 
+// Add one entry to the default_charts array: [chart_key, groupby_column].
+static void nv_add_default_chart(BUFFER *wb, const char *chart_key, const char *groupby)
+{
+    buffer_json_add_array_item_array(wb);
+    buffer_json_add_array_item_string(wb, chart_key);
+    buffer_json_add_array_item_string(wb, groupby);
+    buffer_json_array_close(wb);
+}
+
+// Add one entry to the group_by object: a single-column grouping keyed by name.
+static void nv_add_group_by(BUFFER *wb, const char *name)
+{
+    buffer_json_member_add_object(wb, name);
+    {
+        buffer_json_member_add_string(wb, "name", name);
+        buffer_json_member_add_array(wb, "columns");
+        buffer_json_add_array_item_string(wb, name);
+        buffer_json_array_close(wb);
+    }
+    buffer_json_object_close(wb);
+}
+
 // ============================================================
 // TCP
 // ============================================================
@@ -121,11 +143,6 @@ static void initialize_tcp_keys(TCP_FAMILY *tcp)
     tcp->segments_sent.key           = "Segments Sent/sec";
 }
 
-static void tcp_initialize(void)
-{
-    initialize_tcp_keys(&tcp_ipv4);
-    initialize_tcp_keys(&tcp_ipv6);
-}
 
 static bool tcp_collect_family(TCP_FAMILY *tcp)
 {
@@ -180,11 +197,6 @@ static void initialize_udp_keys(UDP_FAMILY *udp)
     udp->datagrams_sent.key            = "Datagrams Sent/sec";
 }
 
-static void udp_initialize(void)
-{
-    initialize_udp_keys(&udp_ipv4);
-    initialize_udp_keys(&udp_ipv6);
-}
 
 static bool udp_collect_family(UDP_FAMILY *udp)
 {
@@ -258,8 +270,10 @@ void function_network_protocols(
 {
     static bool initialized = false;
     if (unlikely(!initialized)) {
-        tcp_initialize();
-        udp_initialize();
+        initialize_tcp_keys(&tcp_ipv4);
+        initialize_tcp_keys(&tcp_ipv6);
+        initialize_udp_keys(&udp_ipv4);
+        initialize_udp_keys(&udp_ipv6);
         initialized = true;
     }
 
@@ -306,27 +320,16 @@ void function_network_protocols(
     buffer_json_object_close(wb); // columns
     buffer_json_member_add_string(wb, "default_sort_column", "Received");
 
-    // charts.columns = metric column(s) for the Y axis (NOT the groupby column)
+    // charts.columns = metric columns for the Y axis (NOT the groupby column)
     buffer_json_member_add_object(wb, "charts");
     {
-        buffer_json_member_add_object(wb, "Received");
+        buffer_json_member_add_object(wb, "Traffic");
         {
-            buffer_json_member_add_string(wb, "name", "Received");
+            buffer_json_member_add_string(wb, "name", "Traffic");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "Received");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "Sent");
-        {
-            buffer_json_member_add_string(wb, "name", "Sent");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
                 buffer_json_add_array_item_string(wb, "Sent");
             }
             buffer_json_array_close(wb);
@@ -335,50 +338,18 @@ void function_network_protocols(
     }
     buffer_json_object_close(wb); // charts
 
-    // default_charts: [chart_key, groupby_column]
+    // default_charts: [chart_key, groupby_column] — same chart, two grouping axes
     buffer_json_member_add_array(wb, "default_charts");
     {
-        buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "Received");
-        buffer_json_add_array_item_string(wb, "Transport");
-        buffer_json_array_close(wb);
-
-        buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "Sent");
-        buffer_json_add_array_item_string(wb, "Transport");
-        buffer_json_array_close(wb);
-
-        buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "Received");
-        buffer_json_add_array_item_string(wb, "Family");
-        buffer_json_array_close(wb);
-
-        buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "Sent");
-        buffer_json_add_array_item_string(wb, "Family");
-        buffer_json_array_close(wb);
+        nv_add_default_chart(wb, "Traffic", "Transport");
+        nv_add_default_chart(wb, "Traffic", "Family");
     }
     buffer_json_array_close(wb); // default_charts
 
     buffer_json_member_add_object(wb, "group_by");
     {
-        buffer_json_member_add_object(wb, "Transport");
-        {
-            buffer_json_member_add_string(wb, "name", "Transport");
-            buffer_json_member_add_array(wb, "columns");
-            buffer_json_add_array_item_string(wb, "Transport");
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "Family");
-        {
-            buffer_json_member_add_string(wb, "name", "Family");
-            buffer_json_member_add_array(wb, "columns");
-            buffer_json_add_array_item_string(wb, "Family");
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
+        nv_add_group_by(wb, "Transport");
+        nv_add_group_by(wb, "Family");
     }
     buffer_json_object_close(wb); // group_by
 
