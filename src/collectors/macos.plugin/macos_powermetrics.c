@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #define MACOS_POWERMETRICS_DEFAULT_COMMAND "/usr/bin/powermetrics"
+#define MACOS_POWERMETRICS_NDSUDO_COMMAND "powermetrics-thermal-smc"
 #define MACOS_POWERMETRICS_DEFAULT_SAMPLE_EVERY 60
 #define MACOS_POWERMETRICS_DEFAULT_SAMPLE_WINDOW_MS 1000
 #define MACOS_POWERMETRICS_DEFAULT_TIMEOUT_MS 5000
@@ -59,6 +60,7 @@ struct macos_powermetrics_state {
     bool logged_unavailable;
     int consecutive_failures;
 
+    bool use_ndsudo;
     int sample_every_s;
     int sample_window_ms;
     int command_timeout_ms;
@@ -369,7 +371,15 @@ static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *samp
     char interval_ms[32];
     snprintfz(interval_ms, sizeof(interval_ms), "%d", pm.sample_window_ms);
 
-    const char *argv[] = {
+    const char *argv_ndsudo[] = {
+        pm.command,
+        MACOS_POWERMETRICS_NDSUDO_COMMAND,
+        "--sampleWindowMs",
+        interval_ms,
+        NULL,
+    };
+
+    const char *argv_direct[] = {
         pm.command,
         "-n",
         "1",
@@ -381,6 +391,8 @@ static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *samp
         "plist",
         NULL,
     };
+
+    const char **argv = pm.use_ndsudo ? argv_ndsudo : argv_direct;
 
     POPEN_INSTANCE *pi = spawn_popen_run_argv(argv);
     if (!pi)
@@ -472,12 +484,21 @@ static void macos_powermetrics_init(void)
     if (pm.command_timeout_ms < pm.sample_window_ms + 1000)
         pm.command_timeout_ms = pm.sample_window_ms + 1000;
 
+    pm.use_ndsudo = inicfg_get_boolean(&netdata_config, "plugin:macos:powermetrics", "use ndsudo", 1);
+
     const char *command = inicfg_get(
         &netdata_config,
         "plugin:macos:powermetrics",
         "command path",
         MACOS_POWERMETRICS_DEFAULT_COMMAND);
-    snprintfz(pm.command, sizeof(pm.command), "%s", command && *command ? command : MACOS_POWERMETRICS_DEFAULT_COMMAND);
+
+    if (pm.use_ndsudo) {
+        if (netdata_configured_primary_plugins_dir && *netdata_configured_primary_plugins_dir)
+            snprintfz(pm.command, sizeof(pm.command), "%s/ndsudo", netdata_configured_primary_plugins_dir);
+        else
+            snprintfz(pm.command, sizeof(pm.command), "ndsudo");
+    } else
+        snprintfz(pm.command, sizeof(pm.command), "%s", command && *command ? command : MACOS_POWERMETRICS_DEFAULT_COMMAND);
 
     pm.thread = nd_thread_create("MACPWRMET", NETDATA_THREAD_OPTION_DEFAULT, macos_powermetrics_thread, NULL);
     if (!pm.thread) {

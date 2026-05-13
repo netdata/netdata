@@ -294,9 +294,14 @@ modules:
               description: Maximum time to wait for one `powermetrics` sample before terminating it.
               default_value: 5000ms
               required: false
+            - name: use ndsudo
+              section_name: plugin:macos:powermetrics
+              description: Run the native Apple `powermetrics` sampler through Netdata's setuid `ndsudo` helper.
+              default_value: yes
+              required: false
             - name: command path
               section_name: plugin:macos:powermetrics
-              description: Path to the native Apple `powermetrics` command.
+              description: Path to the native Apple `powermetrics` command when `use ndsudo` is disabled.
               default_value: /usr/bin/powermetrics
               required: false
             - name: thermal pressure
@@ -378,7 +383,7 @@ modules:
         list:
           - name: Thermal and fan charts are missing
             description: |
-              The thermal and fan charts depend on the native Apple `powermetrics` command. On macOS, `powermetrics` requires sufficient privileges; if `netdata` cannot run it, the sampler disables itself after repeated failures to avoid log noise.
+              The thermal and fan charts depend on the native Apple `powermetrics` command. On macOS, `powermetrics` requires superuser privileges, so the default installation runs it through Netdata's setuid `ndsudo` helper with a hard-coded allow-list. If `ndsudo` is missing, not setuid root, or the allow-list rejects the command, the sampler disables itself after repeated failures to avoid log noise.
 
               Battery and UPS power-source charts do not depend on `powermetrics` and should still appear when macOS exposes power-source data.
           - name: NVMe health charts are missing

@@ -127,7 +127,8 @@ There are six sections in the file which you can configure:
 | sample every | How often to run the native `powermetrics` thermal and fan sampler. | 60s | no |
 | sample window | Sampling window passed to `powermetrics`. | 1000ms | no |
 | command timeout | Maximum time to wait for one `powermetrics` sample before terminating it. | 5000ms | no |
-| command path | Path to the native Apple `powermetrics` command. | /usr/bin/powermetrics | no |
+| use ndsudo | Run the native Apple `powermetrics` sampler through Netdata's setuid `ndsudo` helper. | yes | no |
+| command path | Path to the native Apple `powermetrics` command when `use ndsudo` is disabled. | /usr/bin/powermetrics | no |
 | thermal pressure | Enable or disable monitoring of macOS thermal pressure state. | yes | no |
 | SMC fan speed | Enable or disable monitoring of SMC fan speed when available. | yes | no |
 | SMC temperatures | Enable or disable monitoring of SMC CPU and GPU die temperatures when available. | yes | no |
@@ -416,7 +417,7 @@ Metrics:
 
 ### Thermal and fan charts are missing
 
-The thermal and fan charts depend on the native Apple `powermetrics` command. On macOS, `powermetrics` requires sufficient privileges; if `netdata` cannot run it, the sampler disables itself after repeated failures to avoid log noise.
+The thermal and fan charts depend on the native Apple `powermetrics` command. On macOS, `powermetrics` requires superuser privileges, so the default installation runs it through Netdata's setuid `ndsudo` helper with a hard-coded allow-list. If `ndsudo` is missing, not setuid root, or the allow-list rejects the command, the sampler disables itself after repeated failures to avoid log noise.
 
 Battery and UPS power-source charts do not depend on `powermetrics` and should still appear when macOS exposes power-source data.
 

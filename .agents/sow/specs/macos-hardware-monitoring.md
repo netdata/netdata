@@ -47,8 +47,12 @@ monitoring in the Netdata Agent.
 - The module name is `powermetrics`, configured under `[plugin:macos]`.
 - Per-metric and sampler options live under `[plugin:macos:powermetrics]`.
 - The data source is the native Apple `/usr/bin/powermetrics` command.
-- The command is executed through Netdata spawn wrappers with an argv vector,
-  not through a shell.
+- The default installed path runs the command through Netdata's setuid
+  `ndsudo` helper with a hard-coded allow-list for the thermal/SMC plist
+  sampler.
+- Direct command execution remains configurable for debugging or custom local
+  privilege models, but must use Netdata spawn wrappers with an argv vector,
+  not a shell.
 - The command must run in a background sampler thread. It must not block the
   normal one-second macOS collector loop.
 - The default sampler interval is 60 seconds.
