@@ -6,10 +6,8 @@
 #include "libnetdata/os/windows-perflib/perflib.h"
 
 #define PLUGIN_NETWORK_VIEWER_NAME   "network-viewer.plugin"
-#define NV_WIN_FUNCTION_TCP          "tcp-stats"
-#define NV_WIN_FUNCTION_TCP_HELP     "Windows TCP statistics by IP family (connections, segments, states)"
-#define NV_WIN_FUNCTION_UDP          "udp-stats"
-#define NV_WIN_FUNCTION_UDP_HELP     "Windows UDP statistics by IP family (datagrams)"
+#define NV_WIN_FUNCTION_PROTO        "network-protocols"
+#define NV_WIN_FUNCTION_PROTO_HELP   "Windows TCP and UDP statistics by transport and IP family"
 #define NV_WIN_FUNCTION_UPDATE_EVERY 5
 #define NV_WIN_FUNCTION_PRIORITY     100
 
@@ -48,10 +46,23 @@ static void nv_table_begin(BUFFER *wb, const char *help)
     buffer_json_member_add_string(wb, "help", help);
 }
 
-// Add the standard "Protocol" key column (identical in every table).
-static void nv_add_protocol_field(BUFFER *wb, size_t *field_id)
+// Finalize the JSON, then send it to pluginsd under the stdout mutex.
+static void nv_send_result(const char *transaction, BUFFER *wb, time_t now_s)
 {
-    buffer_rrdf_table_add_field(wb, (*field_id)++, "Protocol", "IP Protocol Family",
+    buffer_json_member_add_time_t(wb, "expires", now_s + NV_WIN_FUNCTION_UPDATE_EVERY);
+    buffer_json_finalize(wb);
+    netdata_mutex_lock(&stdout_mutex);
+    wb->response_code = HTTP_RESP_OK;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_s + NV_WIN_FUNCTION_UPDATE_EVERY;
+    pluginsd_function_result_to_stdout(transaction, wb);
+    netdata_mutex_unlock(&stdout_mutex);
+}
+
+// Add a sticky string key column (Transport, Family, etc.).
+static void nv_add_key_field(BUFFER *wb, size_t *field_id, const char *id, const char *label)
+{
+    buffer_rrdf_table_add_field(wb, (*field_id)++, id, label,
         RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
         0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
         RRDF_FIELD_FILTER_MULTISELECT,
@@ -66,19 +77,6 @@ static void nv_add_int_field(BUFFER *wb, size_t *field_id,
         RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
         0, unit, NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
         RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
-}
-
-// Finalize the JSON, then send it to pluginsd under the stdout mutex.
-static void nv_send_result(const char *transaction, BUFFER *wb, time_t now_s)
-{
-    buffer_json_member_add_time_t(wb, "expires", now_s + NV_WIN_FUNCTION_UPDATE_EVERY);
-    buffer_json_finalize(wb);
-    netdata_mutex_lock(&stdout_mutex);
-    wb->response_code = HTTP_RESP_OK;
-    wb->content_type = CT_APPLICATION_JSON;
-    wb->expires = now_s + NV_WIN_FUNCTION_UPDATE_EVERY;
-    pluginsd_function_result_to_stdout(transaction, wb);
-    netdata_mutex_unlock(&stdout_mutex);
 }
 
 // ============================================================
@@ -98,9 +96,6 @@ typedef struct {
     COUNTER_DATA segments_received;
     COUNTER_DATA segments_retransmitted;
     COUNTER_DATA segments_sent;
-
-    bool have_states;
-    uint32_t state_counts[NETDATA_WIN_TCP_STATE_COUNT];
 } TCP_FAMILY;
 
 static TCP_FAMILY tcp_ipv4 = {
@@ -150,103 +145,7 @@ static bool tcp_collect_family(TCP_FAMILY *tcp)
     have_any |= perflibGetObjectCounter(pDataBlock, pObjectType, &tcp->segments_retransmitted);
     have_any |= perflibGetObjectCounter(pDataBlock, pObjectType, &tcp->segments_sent);
 
-    uint32_t af = (strcmp(tcp->af, "IPv4") == 0) ? AF_INET : AF_INET6;
-    tcp->have_states = netdata_win_collect_tcp_state_counts(af, tcp->state_counts);
-
     return have_any;
-}
-
-static void tcp_emit_row(BUFFER *wb, const TCP_FAMILY *tcp)
-{
-    buffer_json_add_array_item_array(wb);
-    {
-        buffer_json_add_array_item_string(wb, tcp->af);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connection_failures.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_active.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_established.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_passive.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_reset.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_total.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_received.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_retransmitted.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_sent.current.Data);
-
-        if (tcp->have_states) {
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_CLOSED]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_LISTENING]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_SYN_SENT]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_SYN_RECEIVED]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_ESTABLISHED]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_FIN_WAIT1]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_FIN_WAIT2]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_CLOSE_WAIT]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_CLOSING]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_LAST_ACK]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_TIME_WAIT]);
-            buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->state_counts[NETDATA_WIN_TCP_STATE_DELETE_TCB]);
-        } else {
-            for (int i = 0; i < NETDATA_WIN_TCP_STATE_COUNT; i++)
-                buffer_json_add_array_item_uint64(wb, 0);
-        }
-    }
-    buffer_json_array_close(wb);
-}
-
-void function_tcp_stats(
-    const char *transaction, char *function __maybe_unused,
-    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-    BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
-    const char *source __maybe_unused, void *data __maybe_unused)
-{
-    static bool initialized = false;
-    if (unlikely(!initialized)) {
-        tcp_initialize();
-        initialized = true;
-    }
-
-    tcp_collect_family(&tcp_ipv4);
-    tcp_collect_family(&tcp_ipv6);
-
-    time_t now_s = now_realtime_sec();
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    nv_table_begin(wb, NV_WIN_FUNCTION_TCP_HELP);
-
-    buffer_json_member_add_array(wb, "data");
-    {
-        tcp_emit_row(wb, &tcp_ipv4);
-        tcp_emit_row(wb, &tcp_ipv6);
-    }
-    buffer_json_array_close(wb); // data
-
-    size_t field_id = 0;
-    buffer_json_member_add_object(wb, "columns");
-    {
-        nv_add_protocol_field(wb, &field_id);
-        nv_add_int_field(wb, &field_id, "ConnFailures",    "Connection Failures",               "connections");
-        nv_add_int_field(wb, &field_id, "ConnActive",      "Active Connections Opened",          "connections");
-        nv_add_int_field(wb, &field_id, "ConnEstablished", "Currently Established Connections",  "connections");
-        nv_add_int_field(wb, &field_id, "ConnPassive",     "Passive Connections Opened",         "connections");
-        nv_add_int_field(wb, &field_id, "ConnReset",       "Reset Connections",                  "connections");
-        nv_add_int_field(wb, &field_id, "SegsTotal",       "Total Segments",                     "segments");
-        nv_add_int_field(wb, &field_id, "SegsReceived",    "Received Segments",                  "segments");
-        nv_add_int_field(wb, &field_id, "SegsRetransmitted","Retransmitted Segments",            "segments");
-        nv_add_int_field(wb, &field_id, "SegsSent",        "Sent Segments",                      "segments");
-        nv_add_int_field(wb, &field_id, "StateClosed",     "Connections in CLOSED state",        "connections");
-        nv_add_int_field(wb, &field_id, "StateListening",  "Connections in LISTENING state",     "connections");
-        nv_add_int_field(wb, &field_id, "StateSynSent",    "Connections in SYN_SENT state",      "connections");
-        nv_add_int_field(wb, &field_id, "StateSynReceived","Connections in SYN_RECEIVED state",  "connections");
-        nv_add_int_field(wb, &field_id, "StateEstablished","Connections in ESTABLISHED state",   "connections");
-        nv_add_int_field(wb, &field_id, "StateFinWait1",   "Connections in FIN_WAIT1 state",     "connections");
-        nv_add_int_field(wb, &field_id, "StateFinWait2",   "Connections in FIN_WAIT2 state",     "connections");
-        nv_add_int_field(wb, &field_id, "StateCloseWait",  "Connections in CLOSE_WAIT state",    "connections");
-        nv_add_int_field(wb, &field_id, "StateClosing",    "Connections in CLOSING state",       "connections");
-        nv_add_int_field(wb, &field_id, "StateLastAck",    "Connections in LAST_ACK state",      "connections");
-        nv_add_int_field(wb, &field_id, "StateTimeWait",   "Connections in TIME_WAIT state",     "connections");
-        nv_add_int_field(wb, &field_id, "StateDeleteTcb",  "Connections in DELETE_TCB state",    "connections");
-    }
-    buffer_json_object_close(wb); // columns
-
-    nv_send_result(transaction, wb, now_s);
 }
 
 // ============================================================
@@ -303,20 +202,55 @@ static bool udp_collect_family(UDP_FAMILY *udp)
     return have_any;
 }
 
-static void udp_emit_row(BUFFER *wb, const UDP_FAMILY *udp)
+// ============================================================
+// Network Protocols (combined TCP + UDP function)
+// ============================================================
+
+// Column order for all rows: Transport, Family, Received, Sent, Errors,
+//   ConnActive, ConnEstablished, ConnPassive, ConnReset, SegsTotal, SegsRetransmitted,
+//   DatagramsNoPort.
+
+static void proto_emit_tcp_row(BUFFER *wb, const TCP_FAMILY *tcp)
 {
     buffer_json_add_array_item_array(wb);
     {
-        buffer_json_add_array_item_string(wb, udp->af);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_no_port.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_received_errors.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_received.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_sent.current.Data);
+        buffer_json_add_array_item_string(wb, "TCP");
+        buffer_json_add_array_item_string(wb, tcp->af);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_received.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_sent.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connection_failures.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_active.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_established.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_passive.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_reset.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_total.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_retransmitted.current.Data);
+        buffer_json_add_array_item_uint64(wb, 0); // DatagramsNoPort — UDP only
     }
     buffer_json_array_close(wb);
 }
 
-void function_udp_stats(
+static void proto_emit_udp_row(BUFFER *wb, const UDP_FAMILY *udp)
+{
+    buffer_json_add_array_item_array(wb);
+    {
+        buffer_json_add_array_item_string(wb, "UDP");
+        buffer_json_add_array_item_string(wb, udp->af);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_received.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_sent.current.Data);
+        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_received_errors.current.Data);
+        buffer_json_add_array_item_uint64(wb, 0); // ConnActive        — TCP only
+        buffer_json_add_array_item_uint64(wb, 0); // ConnEstablished   — TCP only
+        buffer_json_add_array_item_uint64(wb, 0); // ConnPassive       — TCP only
+        buffer_json_add_array_item_uint64(wb, 0); // ConnReset         — TCP only
+        buffer_json_add_array_item_uint64(wb, 0); // SegsTotal         — TCP only
+        buffer_json_add_array_item_uint64(wb, 0); // SegsRetransmitted — TCP only
+        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_no_port.current.Data);
+    }
+    buffer_json_array_close(wb);
+}
+
+void function_network_protocols(
     const char *transaction, char *function __maybe_unused,
     usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
     BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
@@ -324,34 +258,128 @@ void function_udp_stats(
 {
     static bool initialized = false;
     if (unlikely(!initialized)) {
+        tcp_initialize();
         udp_initialize();
         initialized = true;
     }
 
+    tcp_collect_family(&tcp_ipv4);
+    tcp_collect_family(&tcp_ipv6);
     udp_collect_family(&udp_ipv4);
     udp_collect_family(&udp_ipv6);
 
     time_t now_s = now_realtime_sec();
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    nv_table_begin(wb, NV_WIN_FUNCTION_UDP_HELP);
+    nv_table_begin(wb, NV_WIN_FUNCTION_PROTO_HELP);
 
     buffer_json_member_add_array(wb, "data");
     {
-        udp_emit_row(wb, &udp_ipv4);
-        udp_emit_row(wb, &udp_ipv6);
+        proto_emit_tcp_row(wb, &tcp_ipv4);
+        proto_emit_tcp_row(wb, &tcp_ipv6);
+        proto_emit_udp_row(wb, &udp_ipv4);
+        proto_emit_udp_row(wb, &udp_ipv6);
     }
     buffer_json_array_close(wb); // data
 
     size_t field_id = 0;
     buffer_json_member_add_object(wb, "columns");
     {
-        nv_add_protocol_field(wb, &field_id);
-        nv_add_int_field(wb, &field_id, "DatagramsNoPort",   "Datagrams with No Port",             "datagrams");
-        nv_add_int_field(wb, &field_id, "DatagramsErrors",   "Datagrams Received with Errors",      "datagrams");
-        nv_add_int_field(wb, &field_id, "DatagramsReceived", "Received Datagrams",                  "datagrams");
-        nv_add_int_field(wb, &field_id, "DatagramsSent",     "Sent Datagrams",                      "datagrams");
+        nv_add_key_field(wb, &field_id, "Transport", "Transport Protocol");
+        nv_add_key_field(wb, &field_id, "Family",    "IP Protocol Family");
+
+        // Normalized columns — TCP: segments, UDP: datagrams
+        nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams)", "packets");
+        nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams)",     "packets");
+        nv_add_int_field(wb, &field_id, "Errors",   "Errors (Failures/Rx Errors)",   "errors");
+
+        // TCP-only columns (UDP rows carry 0)
+        nv_add_int_field(wb, &field_id, "ConnActive",        "Active Connections Opened",         "connections");
+        nv_add_int_field(wb, &field_id, "ConnEstablished",   "Currently Established Connections",  "connections");
+        nv_add_int_field(wb, &field_id, "ConnPassive",       "Passive Connections Opened",         "connections");
+        nv_add_int_field(wb, &field_id, "ConnReset",         "Reset Connections",                  "connections");
+        nv_add_int_field(wb, &field_id, "SegsTotal",         "Total Segments",                     "segments");
+        nv_add_int_field(wb, &field_id, "SegsRetransmitted", "Retransmitted Segments",             "segments");
+
+        // UDP-only column (TCP rows carry 0)
+        nv_add_int_field(wb, &field_id, "DatagramsNoPort", "Datagrams with No Port", "datagrams");
     }
     buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "Received by Transport");
+        {
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Transport");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Sent by Transport");
+        {
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Transport");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Received by Family");
+        {
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Family");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Sent by Family");
+        {
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Family");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Received");
+        buffer_json_add_array_item_string(wb, "Transport");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Sent");
+        buffer_json_add_array_item_string(wb, "Transport");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb); // default_charts
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        buffer_json_member_add_object(wb, "Transport");
+        {
+            buffer_json_member_add_string(wb, "name", "Transport");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Transport");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Family");
+        {
+            buffer_json_member_add_string(wb, "name", "Family");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Family");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
 
     nv_send_result(transaction, wb, now_s);
 }
@@ -378,12 +406,7 @@ int main(int argc, char **argv)
 
     fprintf(stdout,
             PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
-            NV_WIN_FUNCTION_TCP, 60, NV_WIN_FUNCTION_TCP_HELP,
-            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
-            NV_WIN_FUNCTION_PRIORITY);
-    fprintf(stdout,
-            PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
-            NV_WIN_FUNCTION_UDP, 60, NV_WIN_FUNCTION_UDP_HELP,
+            NV_WIN_FUNCTION_PROTO, 60, NV_WIN_FUNCTION_PROTO_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
             NV_WIN_FUNCTION_PRIORITY);
     fflush(stdout);
@@ -391,9 +414,7 @@ int main(int argc, char **argv)
     struct functions_evloop_globals *wg =
         functions_evloop_init(5, "NV-WIN", &stdout_mutex, &plugin_should_exit, NULL);
 
-    functions_evloop_add_function(wg, NV_WIN_FUNCTION_TCP, function_tcp_stats,
-                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
-    functions_evloop_add_function(wg, NV_WIN_FUNCTION_UDP, function_udp_stats,
+    functions_evloop_add_function(wg, NV_WIN_FUNCTION_PROTO, function_network_protocols,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
 
     usec_t send_newline_ut = 0;
