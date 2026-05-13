@@ -33,6 +33,9 @@ members = [
 
     # Plugin IPC library
     "netipc",
+
+    # PromQL evaluator (FFI staticlib, called from C)
+    "netdata_promql",
 ]
 
 [workspace.package]

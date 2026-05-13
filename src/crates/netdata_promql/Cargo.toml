@@ -1,0 +1,19 @@
+[package]
+name = "netdata_promql"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "PromQL evaluator for the Netdata Agent"
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+promql-parser = "0.9"
+
+[build-dependencies]
+cbindgen = "0.28"

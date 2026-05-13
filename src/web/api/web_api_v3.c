@@ -246,6 +246,17 @@ static struct web_api_command api_commands_v3[] = {
         .allow_subpaths = 0
     },
 
+    // PromQL query endpoints (Phase 0 of SOW-0016).
+    // Handler dispatches internally between /promql/query and /promql/query_range.
+    {
+        .api = "promql",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v3_promql,
+        .allow_subpaths = 1
+    },
+
     {// terminator
      .api = NULL,
      .hash = 0,
