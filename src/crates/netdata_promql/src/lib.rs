@@ -11,6 +11,16 @@
 //!
 //! The signatures here are intended to be stable across phases. Only the
 //! bodies change as real evaluation logic lands. See SOW-0016 for context.
+//!
+//! Phase 1 chunk 2 (SOW-0017) adds the `storage` module: safe wrappers
+//! around the C data-source shim. The stub query handlers still return the
+//! placeholder constant; chunk 3 introduces the evaluator that consumes
+//! the storage adapter.
+
+// Storage adapter is staged in chunk 2 (SOW-0017); chunk 3 wires it into
+// the query handlers. Until then, the items are unused -- that's expected.
+#[allow(dead_code, unused_imports)]
+mod storage;
 
 use std::ffi::{c_char, c_int, CStr, CString};
 use std::ptr;

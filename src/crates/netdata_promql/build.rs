@@ -1,17 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Regenerate `nd_promql.h` from the public FFI surface of this crate.
+// Two header passes:
 //
-// The generated header is committed to the source tree (see SOW-0016).
-// `build.rs` writes it idempotently; PR review catches drift.
+//   1. cbindgen produces `nd_promql.h` from the public FFI surface of this
+//      crate. The header is committed to the source tree (SOW-0016) so the
+//      C side never has to wait on a build step to find it. `build.rs`
+//      regenerates it idempotently; PR review catches drift.
+//
+//   2. bindgen produces Rust bindings to the C data-source shim at
+//      `src/database/contexts/promql-data-source.h` so the Rust side can
+//      call into Netdata storage. The generated file lives under
+//      `$OUT_DIR/shim_bindings.rs` and is consumed by `src/storage/raw.rs`
+//      through `include!`. Bindgen is allowlisted to `nd_pds_*` symbols
+//      and the matcher enum so the binding output stays small and stable.
 
 use std::env;
+use std::path::PathBuf;
 
-fn main() {
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-
+fn run_cbindgen(crate_dir: &str) {
     cbindgen::Builder::new()
-        .with_crate(&crate_dir)
+        .with_crate(crate_dir)
         .with_language(cbindgen::Language::C)
         .with_cpp_compat(true)
         .with_include_guard("ND_PROMQL_H")
@@ -23,6 +31,46 @@ fn main() {
         .generate()
         .expect("Unable to generate bindings for netdata-promql")
         .write_to_file(format!("{crate_dir}/nd_promql.h"));
+}
+
+fn run_bindgen(crate_dir: &str) {
+    // The shim header lives in the daemon's source tree.
+    let shim_header = PathBuf::from(crate_dir)
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.join("database/contexts/promql-data-source.h"))
+        .expect("could not derive shim header path from CARGO_MANIFEST_DIR");
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("shim_bindings.rs");
+
+    bindgen::Builder::default()
+        .header(shim_header.to_str().expect("non-utf8 shim header path"))
+        // Lock the binding surface to exactly what the shim exposes.
+        .allowlist_function("nd_pds_.*")
+        .allowlist_type("nd_pds_.*")
+        .allowlist_var("ND_PDS_.*")
+        // Opaque types stay opaque on the Rust side. We never reach into them.
+        .opaque_type("nd_pds_query")
+        .opaque_type("nd_pds_samples")
+        // Match enum surfaces are flat ints; map as module constants so we
+        // can compare integer values across the boundary without ceremony.
+        .default_enum_style(bindgen::EnumVariation::ModuleConsts)
+        .layout_tests(false)
+        .generate()
+        .expect("bindgen failed for promql-data-source.h")
+        .write_to_file(&out_path)
+        .expect("could not write shim_bindings.rs");
+
+    println!(
+        "cargo:rerun-if-changed={}",
+        shim_header.to_str().expect("non-utf8 shim header path")
+    );
+}
+
+fn main() {
+    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    run_cbindgen(&crate_dir);
+    run_bindgen(&crate_dir);
 
     println!("cargo:rerun-if-changed=src/");
     println!("cargo:rerun-if-changed=Cargo.toml");
