@@ -61,24 +61,21 @@ fi
 
 set -exu -o pipefail
 
-if [ ! -d "${build}" ]
-then
-  /usr/bin/cmake -S "${WT_ROOT}" -B "${build}" \
-      -G Ninja \
-      -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
-      -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-      -DCMAKE_C_FLAGS="-fstack-protector-all -O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1" \
-      -DBUILD_FOR_PACKAGING=${BUILD_FOR_PACKAGING} \
-      -DUSE_MOLD=Off \
-      -DNETDATA_USER="${USER}" \
-      -DDEFAULT_FEATURE_STATE=Off \
-      -DENABLE_ML=On \
-      -DENABLE_BUNDLED_JSONC=On \
-      -DENABLE_BUNDLED_PROTOBUF=Off \
-      -DENABLE_PLUGIN_APPS=On \
-      -DENABLE_PLUGIN_GO=On \
-      ${NULL}
-fi
+/usr/bin/cmake -S "${WT_ROOT}" -B "${build}" \
+    -G Ninja \
+    -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
+    -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+    -DCMAKE_C_FLAGS="-fstack-protector-all -O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1" \
+    -DBUILD_FOR_PACKAGING=${BUILD_FOR_PACKAGING} \
+    -DUSE_MOLD=Off \
+    -DNETDATA_USER="${USER}" \
+    -DDEFAULT_FEATURE_STATE=Off \
+    -DENABLE_ML=On \
+    -DENABLE_BUNDLED_JSONC=On \
+    -DENABLE_BUNDLED_PROTOBUF=Off \
+    -DENABLE_PLUGIN_APPS=On \
+    -DENABLE_PLUGIN_GO=On \
+    ${NULL}
 
 echo "Compiling Netdata..."
 ninja -v -C "${build}" || ninja -v -C "${build}" -j 1
