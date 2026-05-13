@@ -2,6 +2,12 @@
 
 Enterprise Single Sign-On (SSO) integration enables you to manage Netdata Cloud access through your existing identity management solution. This simplifies user authentication and improves security through centralized access control.
 
+:::note
+
+Enterprise SSO is available for both the Netdata Cloud Service (Business plan and above) and Enterprise On-Prem (self-hosted) deployments.
+
+:::
+
 :::important
 
 Enterprise SSO handles authentication only. You must configure user and role management separately within Netdata Cloud.
@@ -14,7 +20,7 @@ Enterprise SSO handles authentication only. You must configure user and role man
 |--------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **SSO Provider**   | Must be [supported by Netdata](https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/cloud-authentication-&-authorization-integrations) |
 | **Account Status** | Active Netdata Cloud account                                                                                                                                    |
-| **Subscription**   | Business plan or higher                                                                                                                                         |
+| **Subscription**   | Business plan or higher, or Enterprise On-Prem                                                                                                                  |
 | **Access Level**   | Space Administrator permissions                                                                                                                                 |
 
 ## Setup
