@@ -80,13 +80,13 @@ static char *get_mgmt_api_key(void) {
         close(fd);
 #else
         // Without O_NOFOLLOW: write to a uniquely named temp file then rename atomically.
-        // O_EXCL guarantees we create a fresh file (fails if a symlink exists at tmp path).
+        // Use mkstemp() so the temporary filename is not predictable.
         // rename() replaces the destination entry without following symlinks there,
         // so a symlink planted at api_key_filename cannot redirect truncation to another file.
         char tmp_filename[FILENAME_MAX + 1];
-        snprintfz(tmp_filename, FILENAME_MAX, "%s.%u.tmp", api_key_filename, (unsigned)getpid());
+        snprintfz(tmp_filename, FILENAME_MAX, "%s.tmp.XXXXXX", api_key_filename);
 
-        fd = open(tmp_filename, O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC, 0600);
+        fd = mkstemp(tmp_filename);
         if(fd == -1) {
             netdata_log_error("Cannot create temporary management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", tmp_filename);
             goto temp_key;
