@@ -83,6 +83,13 @@ struct NdPromqlResponse *nd_promql_labels(const char *host_machine_guid,
 /**
  * FFI: `/api/v1/label/<name>/values`.
  *
+ * Includes a fast path for `__name__`: when the requested label is
+ * `__name__` AND no `match[]` selectors were supplied, the call walks
+ * `host->rrdctx.contexts` directly via `nd_pds_metric_names_collect`
+ * instead of resolving every series on every chart. On a populated host
+ * this is roughly an order of magnitude faster (32 ms -> ~3 ms for the
+ * Grafana metric-browser fetch).
+ *
  * # Safety
  * `label_name` and each non-null pointer in `matchers` must be valid
  * NUL-terminated C strings for the duration of the call.
@@ -91,8 +98,8 @@ struct NdPromqlResponse *nd_promql_label_values(const char *host_machine_guid,
                                                 const char *label_name,
                                                 const char *const *matchers,
                                                 uintptr_t matchers_len,
-                                                int64_t _start_ms,
-                                                int64_t _end_ms,
+                                                int64_t start_ms,
+                                                int64_t end_ms,
                                                 uintptr_t limit);
 
 /**
@@ -110,14 +117,18 @@ struct NdPromqlResponse *nd_promql_series(const char *host_machine_guid,
 
 /**
  * FFI: `/api/v1/metadata`. Returns per-metric TYPE/HELP/unit, optionally
- * filtered to a single metric name.
+ * filtered to a single metric name. `start_ms`/`end_ms` are honored when
+ * both non-zero: contexts whose last collection predates the window are
+ * skipped.
  *
  * # Safety
  * `metric_filter` must be NULL or a valid NUL-terminated C string.
  */
 struct NdPromqlResponse *nd_promql_metadata(const char *host_machine_guid,
                                             const char *metric_filter,
-                                            uintptr_t limit);
+                                            uintptr_t limit,
+                                            int64_t start_ms,
+                                            int64_t end_ms);
 
 #ifdef __cplusplus
 }  // extern "C"

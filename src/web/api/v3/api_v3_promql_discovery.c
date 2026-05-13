@@ -251,7 +251,9 @@ static int handle_metadata(struct web_client *w, char *params) {
     struct NdPromqlResponse *resp =
         nd_promql_metadata(p.host,
                            p.metric_filter,
-                           p.limit);
+                           p.limit,
+                           p.start_ms,
+                           p.end_ms);
     return write_response_to_buffer(w, resp);
 }
 

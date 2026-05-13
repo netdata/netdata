@@ -53,6 +53,7 @@ fn run_bindgen(crate_dir: &str) {
         .opaque_type("nd_pds_query")
         .opaque_type("nd_pds_samples")
         .opaque_type("nd_pds_metadata_set")
+        .opaque_type("nd_pds_metric_names")
         // Match enum surfaces are flat ints; map as module constants so we
         // can compare integer values across the boundary without ceremony.
         .default_enum_style(bindgen::EnumVariation::ModuleConsts)

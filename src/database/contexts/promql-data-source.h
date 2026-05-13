@@ -60,9 +60,10 @@ typedef struct {
 //   __name__ matchers cause the shim to enumerate all contexts on each
 //   host and post-filter.
 //
-// after_s / before_s: the query time range in Unix seconds. Used as a
-//   retention hint for instance filtering; sample iteration takes its own
-//   time range later.
+// after_s / before_s: the query time range in Unix seconds. When both
+//   are non-zero, contexts whose last-collected timestamp predates
+//   `after_s` are skipped. Use 0/0 to disable the retention filter.
+//   Sample iteration takes its own time range later, separate from this.
 //
 // max_series: cardinality backstop. If resolution would yield more than
 //   this many series, the call fails with an error.
@@ -164,10 +165,17 @@ typedef struct nd_pds_metadata_entry {
 // `max_entries` caps the result count. Returns NULL only on hard failure
 // (allocation, invalid host). An empty result returns an empty set, not
 // NULL.
+//
+// `after_s` / `before_s`: same retention semantics as `nd_pds_resolve`.
+//   When both are non-zero, contexts whose last collection timestamp
+//   predates `after_s` are skipped. Use 0/0 to disable retention
+//   filtering (the Phase 2 behavior).
 nd_pds_metadata_set *
 nd_pds_metadata_collect(const char *host_machine_guid,
                         const char *metric_filter,
-                        size_t max_entries);
+                        size_t max_entries,
+                        int64_t after_s,
+                        int64_t before_s);
 
 size_t nd_pds_metadata_count(const nd_pds_metadata_set *m);
 
@@ -177,6 +185,39 @@ void nd_pds_metadata_get(const nd_pds_metadata_set *m, size_t i,
 
 // Release a metadata set. Safe to call on NULL.
 void nd_pds_metadata_free(nd_pds_metadata_set *m);
+
+// ---------------------------------------------------------------------------
+// Metric-name enumeration (fast path for `/api/v1/label/__name__/values`)
+// ---------------------------------------------------------------------------
+//
+// The Grafana metric browser fetches `/api/v1/label/__name__/values` to
+// populate its dropdown. The general `nd_promql_label_values` path
+// resolves every series on every chart just to project the sanitized
+// __name__ field, which scales O(series). This helper walks
+// `host->rrdctx.contexts` directly, applies optional retention filtering,
+// sanitizes, dedupes, and returns sorted names. O(contexts), typically
+// 10x faster on a populated host.
+//
+// `after_s` / `before_s`: when both non-zero, contexts whose retention
+//   window does not overlap [after_s, before_s] are skipped. Use 0/0 to
+//   disable the retention filter.
+// `max_entries`: caps the result size; 0 means "default 10000".
+
+typedef struct nd_pds_metric_names nd_pds_metric_names;
+
+nd_pds_metric_names *
+nd_pds_metric_names_collect(const char *host_machine_guid,
+                            size_t max_entries,
+                            int64_t after_s,
+                            int64_t before_s);
+
+size_t nd_pds_metric_names_count(const nd_pds_metric_names *m);
+
+// Returns a pointer to the i-th name (valid until `nd_pds_metric_names_free`).
+// Returns NULL for out-of-range indices.
+const char *nd_pds_metric_names_get(const nd_pds_metric_names *m, size_t i);
+
+void nd_pds_metric_names_free(nd_pds_metric_names *m);
 
 #ifdef __cplusplus
 }

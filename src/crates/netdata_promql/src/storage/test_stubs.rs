@@ -78,9 +78,37 @@ pub extern "C" fn nd_pds_metadata_collect(
     _host: *const c_char,
     _metric_filter: *const c_char,
     _max_entries: usize,
+    _after_s: i64,
+    _before_s: i64,
 ) -> *mut super::raw::nd_pds_metadata_set {
     std::ptr::null_mut()
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nd_pds_metric_names_collect(
+    _host: *const c_char,
+    _max_entries: usize,
+    _after_s: i64,
+    _before_s: i64,
+) -> *mut super::raw::nd_pds_metric_names {
+    std::ptr::null_mut()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nd_pds_metric_names_count(_m: *const super::raw::nd_pds_metric_names) -> usize {
+    0
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nd_pds_metric_names_get(
+    _m: *const super::raw::nd_pds_metric_names,
+    _i: usize,
+) -> *const c_char {
+    std::ptr::null()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nd_pds_metric_names_free(_m: *mut super::raw::nd_pds_metric_names) {}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nd_pds_metadata_count(_m: *const super::raw::nd_pds_metadata_set) -> usize {

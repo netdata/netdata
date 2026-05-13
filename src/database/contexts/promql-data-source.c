@@ -372,10 +372,28 @@ typedef struct resolve_state {
     size_t max_series;
     bool overflowed;
 
+    // Retention window. When both are non-zero, charts whose last
+    // collection time predates `after_s` are skipped. 0/0 disables the
+    // filter -- the Phase 2 behavior.
+    int64_t after_s;
+    int64_t before_s;
+
     // Per-host scratch.
     RRDHOST *current_host;
     const char *current_host_name;
 } resolve_state;
+
+// Returns true if a chart's collection window intersects [after_s, before_s].
+// 0/0 means "no filter" -- accept everything.
+static bool chart_in_retention(RRDSET *st, int64_t after_s, int64_t before_s) {
+    if (after_s == 0 && before_s == 0) return true;
+    // st->last_collected_time.tv_sec is when the chart last received a
+    // sample. Charts that haven't been collected since `after_s` cannot
+    // contribute to a query against [after_s, before_s].
+    time_t last = st->last_collected_time.tv_sec;
+    if (last == 0) return false;
+    return last >= (time_t)after_s;
+}
 
 static void series_record_destroy(nd_pds_series_record *rec) {
     if (!rec) return;
@@ -442,6 +460,9 @@ static int resolve_instance_cb(RRDSET *st, void *data) {
     resolve_state *state = ctx->state;
 
     if (rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
+        return 0;
+
+    if (!chart_in_retention(st, state->after_s, state->before_s))
         return 0;
 
     // Pre-build the chart-level portion of the labels. We'll dup it per
@@ -594,7 +615,7 @@ static void resolve_named_context_on_host(resolve_state *state, RRDHOST *host, c
 nd_pds_query *
 nd_pds_resolve(const char *host_machine_guid,
                const nd_pds_matcher *matchers, size_t matchers_len,
-               int64_t after_s __maybe_unused, int64_t before_s __maybe_unused,
+               int64_t after_s, int64_t before_s,
                size_t max_series,
                char *err, size_t err_len) {
     if (max_series == 0) max_series = 10000;
@@ -611,6 +632,8 @@ nd_pds_resolve(const char *host_machine_guid,
         .matchers_len = matchers_len,
         .max_series = max_series,
         .overflowed = false,
+        .after_s = after_s,
+        .before_s = before_s,
     };
 
     const char *name_eq = find_name_eq(matchers, matchers_len);
@@ -774,6 +797,8 @@ typedef struct meta_walk_state {
     nd_pds_metadata_set *out;
     size_t max_entries;
     const char *requested_metric;  // NULL means "all"
+    int64_t after_s;
+    int64_t before_s;
     // Per-context scratch.
     bool found_help;
     bool found_type;
@@ -799,6 +824,7 @@ static bool meta_reserve(nd_pds_metadata_set *m) {
 static int meta_instance_cb(RRDSET *st, void *data) {
     meta_walk_state *state = data;
     if (rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)) return 0;
+    if (!chart_in_retention(st, state->after_s, state->before_s)) return 0;
     if (state->found_help && state->found_type) return 0;
 
     if (!state->found_help) {
@@ -857,6 +883,15 @@ static void meta_collect_on_host(meta_walk_state *state, RRDHOST *host) {
 
         rrdcontext_foreach_instance_with_rrdset_in_context(host, ctx_name, meta_instance_cb, state);
 
+        // If the retention filter rejected every chart in this context,
+        // skip the context entirely rather than emitting a placeholder
+        // "gauge" entry. found_type stays false only when no in-retention
+        // chart was seen.
+        if ((state->after_s != 0 || state->before_s != 0) &&
+            !state->found_type && !state->found_help) {
+            continue;
+        }
+
         if (!meta_reserve(state->out)) break;
         meta_record *rec = &state->out->items[state->out->count];
         rec->metric_name = strdupz(sanitized);
@@ -871,7 +906,9 @@ static void meta_collect_on_host(meta_walk_state *state, RRDHOST *host) {
 nd_pds_metadata_set *
 nd_pds_metadata_collect(const char *host_machine_guid,
                         const char *metric_filter,
-                        size_t max_entries) {
+                        size_t max_entries,
+                        int64_t after_s,
+                        int64_t before_s) {
     if (max_entries == 0) max_entries = 10000;
 
     nd_pds_metadata_set *m = callocz(1, sizeof(*m));
@@ -879,6 +916,8 @@ nd_pds_metadata_collect(const char *host_machine_guid,
         .out = m,
         .max_entries = max_entries,
         .requested_metric = (metric_filter && *metric_filter) ? metric_filter : NULL,
+        .after_s = after_s,
+        .before_s = before_s,
         .found_help = false,
         .found_type = false,
     };
@@ -926,6 +965,155 @@ void nd_pds_metadata_free(nd_pds_metadata_set *m) {
         freez(m->items[i].help);
         freez(m->items[i].unit);
     }
+    freez(m->items);
+    freez(m);
+}
+
+// ---------------------------------------------------------------------------
+// Metric-name fast path (feeds /api/v1/label/__name__/values)
+// ---------------------------------------------------------------------------
+//
+// Walk the host's context dictionary, sanitize each name, optionally drop
+// out-of-retention contexts, dedupe (many-to-one sanitization can collapse
+// distinct raw context names), and return a sorted list. No series
+// resolution -- O(contexts), where contexts is typically 1-2 orders of
+// magnitude smaller than total series on a populated host.
+
+struct nd_pds_metric_names {
+    char **items;
+    size_t count;
+    size_t cap;
+};
+
+typedef struct names_walk_state {
+    nd_pds_metric_names *out;
+    size_t max_entries;
+    int64_t after_s;
+    int64_t before_s;
+    // Per-context scratch: did any chart in the current context survive
+    // the retention filter? Tracked separately so we can short-circuit
+    // out of the foreach as soon as the first survivor is seen.
+    bool any_in_retention;
+} names_walk_state;
+
+static bool names_reserve(nd_pds_metric_names *m) {
+    if (m->count < m->cap) return true;
+    size_t newcap = m->cap ? m->cap * 2 : 64;
+    void *r = reallocz(m->items, newcap * sizeof(m->items[0]));
+    if (!r) return false;
+    m->items = r;
+    m->cap = newcap;
+    return true;
+}
+
+// Compare for sort + dedupe.
+static int cstr_cmp(const void *a, const void *b) {
+    const char *const *aa = a;
+    const char *const *bb = b;
+    return strcmp(*aa, *bb);
+}
+
+// Callback that observes a single chart in the current context. Returns
+// non-zero (1) the first time a chart passes the retention test, so the
+// foreach can break out -- we only need to know that *at least one* chart
+// is in retention to keep the context.
+static int names_retention_cb(RRDSET *st, void *data) {
+    names_walk_state *state = data;
+    if (rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)) return 0;
+    if (!chart_in_retention(st, state->after_s, state->before_s)) return 0;
+    state->any_in_retention = true;
+    return 1;  // signal early-exit to the foreach
+}
+
+static void names_collect_on_host(names_walk_state *state, RRDHOST *host) {
+    if (!host || !host->rrdctx.contexts) return;
+
+    void *unused;
+    dfe_start_read(host->rrdctx.contexts, unused) {
+        (void)unused;
+        if (state->out->count >= state->max_entries) break;
+        const char *ctx_name = unused_dfe.name;
+        if (!ctx_name || !*ctx_name) continue;
+
+        char sanitized[ND_PDS_LABEL_NAME_MAX + 1];
+        if (sanitize_label_name(sanitized, ctx_name, sizeof(sanitized)) == 0)
+            continue;
+
+        // Require at least one non-obsolete chart in the context that
+        // also passes the (optional) retention filter. This matches the
+        // semantics of the slow `resolve` path: a context with no live
+        // instances is not surfaced. The foreach callback returns 1 on
+        // the first match and exits the iteration early -- per-context
+        // cost stays O(1) in the common case.
+        state->any_in_retention = false;
+        rrdcontext_foreach_instance_with_rrdset_in_context(
+            host, ctx_name, names_retention_cb, state);
+        if (!state->any_in_retention) continue;
+
+        if (!names_reserve(state->out)) break;
+        state->out->items[state->out->count++] = strdupz(sanitized);
+    }
+    dfe_done(unused);
+}
+
+nd_pds_metric_names *
+nd_pds_metric_names_collect(const char *host_machine_guid,
+                            size_t max_entries,
+                            int64_t after_s,
+                            int64_t before_s) {
+    if (max_entries == 0) max_entries = 10000;
+
+    nd_pds_metric_names *m = callocz(1, sizeof(*m));
+    names_walk_state state = {
+        .out = m,
+        .max_entries = max_entries,
+        .after_s = after_s,
+        .before_s = before_s,
+    };
+
+    host_scope scope = resolve_host_scope(host_machine_guid);
+    if (scope.scan_all) {
+        rrd_rdlock();
+        RRDHOST *host;
+        dfe_start_read(rrdhost_root_index, host) {
+            if (m->count >= max_entries) break;
+            names_collect_on_host(&state, host);
+        }
+        dfe_done(host);
+        rrd_rdunlock();
+    } else if (scope.single_host) {
+        names_collect_on_host(&state, scope.single_host);
+    }
+
+    // Sort and dedupe in place.
+    if (m->count > 1) {
+        qsort(m->items, m->count, sizeof(m->items[0]), cstr_cmp);
+        size_t w = 1;
+        for (size_t r = 1; r < m->count; r++) {
+            if (strcmp(m->items[r], m->items[w - 1]) == 0) {
+                freez(m->items[r]);
+            } else {
+                m->items[w++] = m->items[r];
+            }
+        }
+        m->count = w;
+    }
+
+    return m;
+}
+
+size_t nd_pds_metric_names_count(const nd_pds_metric_names *m) {
+    return m ? m->count : 0;
+}
+
+const char *nd_pds_metric_names_get(const nd_pds_metric_names *m, size_t i) {
+    if (!m || i >= m->count) return NULL;
+    return m->items[i];
+}
+
+void nd_pds_metric_names_free(nd_pds_metric_names *m) {
+    if (!m) return;
+    for (size_t i = 0; i < m->count; i++) freez(m->items[i]);
     freez(m->items);
     freez(m);
 }
