@@ -11,6 +11,7 @@ mod aggregation;
 mod binop;
 mod context;
 mod dispatch;
+mod functions;
 mod lookback;
 mod select;
 mod types;

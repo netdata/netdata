@@ -50,9 +50,12 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
             super::aggregation::apply_aggregate(*op, grouping.as_ref(), inner)
         }
 
-        Plan::Call { func, .. } => Err(EvalError::NotYetImplemented(format!(
-            "function {:?} -- chunk 4 of SOW-0017",
-            func
-        ))),
+        Plan::Call { func, args } => {
+            let mut evaled = Vec::with_capacity(args.len());
+            for a in args {
+                evaled.push(eval(ctx, a)?);
+            }
+            super::functions::apply_call(*func, evaled)
+        }
     }
 }
