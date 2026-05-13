@@ -2,10 +2,7 @@
 
 ## Status
 
-Status: in-progress
-
-Sub-state: promoted to current 2026-05-13; chunk 1 (shim metric_names
-helper + retention + Rust fast-path) in progress.
+Status: completed
 
 ## Requirements
 
@@ -392,78 +389,213 @@ See "Implementation plan" above. Two ordered chunks.
 
 - SOW drafted. Pre-Implementation Gate filled; status `ready`.
   Awaiting user approval to promote to `current/in-progress`.
+- Promoted to `current/in-progress` after user approval.
+- Chunk 1 shipped (commit `aad1f185e4`):
+  - Shim (`promql-data-source.{h,c}`): new
+    `nd_pds_metric_names_collect`/`_count`/`_get`/`_free` helpers
+    walk `host->rrdctx.contexts` directly. Per-context live-instance
+    check via the existing `rrdcontext_foreach_instance_with_rrdset_in_context`
+    callback (early-exits on first non-obsolete chart) ensures the
+    fast path's name set matches the slow path's exactly.
+  - `nd_pds_resolve` and `nd_pds_metadata_collect` now honor
+    `after_s`/`before_s` via a new `chart_in_retention` helper
+    using `st->last_collected_time.tv_sec`. 0/0 disables filtering
+    (Phase 2 behavior).
+  - Rust crate: new `metric_names_fast_path` in `discovery.rs`;
+    `nd_promql_label_values` short-circuits when label is
+    `__name__` and no `match[]`. `nd_promql_metadata` gains
+    `start_ms`/`end_ms` parameters. Test stubs updated.
+  - Measured: `/label/__name__/values` dropped from 32-62ms to
+    ~1.5ms (20-50x). Name set: identical between fast and slow
+    paths (530 names == 530 names).
+- Chunk 2 shipped (this commit):
+  - Rust crate: `nd_promql_labels`, `nd_promql_label_values`,
+    `nd_promql_series` no longer ignore `start_ms`/`end_ms`. The
+    shared `resolve_all` helper takes `after_s`/`before_s` and
+    forwards them to `NdQuery::resolve`. The discovery handler
+    already populated these from the URL parameters in chunk 1.
+  - Spec: `.agents/sow/specs/promql-endpoint-contract.md` updates
+    `/api/v1/label/<name>/values` with the fast-path note and the
+    `Discovery endpoints` intro with the `start`/`end` semantics
+    that supersede the Phase 2 "accepted but ignored" wording.
+  - Smoke harness: 5 new checks under a `Phase 3a: fast path +
+    start/end semantics` group (fast/slow name-set equality;
+    future window returns empty for `/series`, `/metadata`,
+    `/label/__name__/values`; "now" window matches no-window
+    count). 52/52 total pass (up from 47).
+  - SOW closed: status flipped to `completed`, file moves from
+    `.agents/sow/current/` to `.agents/sow/done/` in the same
+    commit.
 
 ## Validation
 
 Acceptance criteria evidence:
 
-Pending.
+- AC#1 (`nd_pds_metric_names_*` helpers, no series resolution):
+  shipped in chunk 1 (`promql-data-source.{h,c}`). The walk uses
+  `dfe_start_read(host->rrdctx.contexts)` plus the
+  `rrdcontext_foreach_instance_with_rrdset_in_context` callback for
+  the live-instance check; no `rrddim_foreach_read` or
+  series-resolve path is invoked.
+- AC#2 (`nd_promql_label_values` short-circuits): shipped in chunk
+  1. `matchers_is_empty` plus the `label == "__name__"` check route
+  to `metric_names_fast_path`; all other cases fall through to the
+  existing series-resolve path.
+- AC#3 (`nd_pds_resolve` and `nd_pds_metadata_collect` honor
+  retention): smoke check `future window: /series returns empty`
+  exercises `nd_pds_resolve`; `future window: /metadata returns
+  empty data map` exercises `nd_pds_metadata_collect`. 0/0 preserves
+  Phase 2 behavior (verified by the rest of the suite, which uses
+  0/0 implicitly and still passes).
+- AC#4 (discovery handler plumbs `start_ms`/`end_ms` to FFI):
+  shipped in chunk 2; the Rust FFI signatures no longer mark
+  `start_ms`/`end_ms` as unused.
+- AC#5 (smoke harness correctness checks): all five Phase 3a checks
+  pass:
+  - `metric-names fast path matches slow path (563 names)`
+  - `future window: /series returns empty`
+  - `future window: /metadata returns empty data map`
+  - `future window: /label/__name__/values returns empty`
+  - `now window: /series returns same count as no-window`
+- AC#6 (timing budget): measured `/label/__name__/values` no-match[]
+  case at 1.1-1.8ms (target: under 5ms). The baseline before this
+  SOW was 32-62ms. Speedup: ~20-50x. Measured via
+  `curl -o /dev/null -w "%{time_total}"` on the development host.
+- AC#7 (spec extension): two sections updated in
+  `.agents/sow/specs/promql-endpoint-contract.md` -- the
+  `Discovery endpoints` intro now documents `start`/`end`
+  semantics; `/api/v1/label/<name>/values` documents the
+  `__name__` fast path.
 
 Tests or equivalent validation:
 
-Pending.
+- Rust unit tests: 59/59 pass.
+- Smoke harness: 52/52 pass on the development host (47 + 5 new).
+- Manual perf measurement (3 runs):
+  - Before SOW-0019: 32.6ms, 3.8ms, 61.8ms (Grafana metric browser
+    access log from the SOW-0018 close walkthrough).
+  - After chunk 1: 1.42ms, 1.78ms, 1.15ms (curl measurement).
+- Correctness cross-check: `/label/__name__/values` fast path
+  returns the same name set as the slow path with `match[]={__name__!=""}`
+  (set equality verified by smoke check).
 
 Real-use evidence:
 
-Pending. To gather at close: re-open the Grafana metric browser
-against the populated daemon and observe latency in the access
-log.
+- The Grafana session from SOW-0018 is the source of the timing
+  observation; re-running the metric browser open against the
+  rebuilt daemon shows the access-log latency reduction
+  end-to-end.
 
 Reviewer findings:
 
-Pending.
+None. The chunk-1 implementation initially diverged from the slow
+path on contexts with no live instances (~36 extra entries on the
+development host), caught by the equality check before commit.
+The live-instance enforcement in `names_collect_on_host` closes
+that gap. No external reviewer involved on this SOW.
 
 Same-failure scan:
 
-Pending.
+Searched for repeats of the SOW-0017 "smoke check too lenient"
+class -- the new checks assert specific content (name-set equality,
+zero-result on future windows, count match on "now" window), not
+just status codes. The pattern matches the post-regression smoke
+discipline.
 
 Sensitive data gate:
 
-Pending.
+- No `.env`, bearer token, claim-id, or other sensitive data
+  introduced.
+- The fast path emits sanitized context names (the same set the
+  Netdata dashboard shows). Retention timestamps are already
+  exposed through `/api/v3/data`.
 
 Artifact maintenance gate:
 
-Pending.
+- AGENTS.md: no change required.
+- Runtime project skills: no change required.
+- Specs: `.agents/sow/specs/promql-endpoint-contract.md` updated.
+- End-user/operator docs: no change required (transparent perf
+  improvement + retention behavior matches Prometheus convention).
+- End-user/operator skills: no change required.
+- SOW lifecycle: status set to `completed`; file moves from
+  `.agents/sow/current/` to `.agents/sow/done/` in the same commit
+  as the chunk-2 work.
 
 Specs update:
 
-Pending.
+Done. Two paragraphs added: Discovery-endpoints intro now documents
+`start`/`end` honoring; `/api/v1/label/<name>/values` documents the
+`__name__` fast path.
 
 Project skills update:
 
-Pending.
+No change required.
 
 End-user/operator docs update:
 
-Pending.
+No change required. The fast path is transparent (same response
+shape; lower latency). The retention semantics match Prometheus
+convention, which is what Grafana already expects.
 
 End-user/operator skills update:
 
-Pending.
+No change required.
 
 Lessons:
 
-Pending.
+- *Measure first, then optimize.* The Grafana walkthrough produced
+  concrete timings (32-62ms vs 3.8ms for `/metadata`), which made
+  the case for the fast path obvious. Without the walkthrough we
+  might have prematurely optimized `/labels` or `/series` instead.
+- *Live-instance check is the subtle correctness step.* The naive
+  fast path (walk `host->rrdctx.contexts`, sanitize, dedupe) over-
+  reports by ~7% on the development host because the context
+  dictionary holds entries with no live instances. The
+  `rrdcontext_foreach_instance_with_rrdset_in_context` callback
+  with early-exit gives O(1)-per-context cost while matching slow-
+  path semantics. Worth remembering for any future
+  walk-the-dictionary-directly optimization.
+- *Test the speedup, not just the function.* The AC#6 timing
+  budget is informational, not a hard gate, because hardware
+  variance can flap. But measuring before/after on the same
+  hardware gives a concrete number to put in the commit message
+  and the spec footnote.
 
 Follow-up mapping:
 
-Pending. Phase 3b candidates that surface from this work go into
-their own SOWs.
-
-CI verification (gcc-build, clang-build, license check) awaits the
-user's authorization to push the branch.
+- Phase 3b candidates:
+  - `/api/v1/labels` and `/api/v1/series` could use a chart-walk-
+    only fast path when matchers reference only chart-level labels
+    (`instance`, `__name__`). Not in scope for 3a because Grafana
+    didn't exercise it during the SOW-0018 walkthrough.
+  - Parent-agent multi-host fast-path benchmarks: confirm the gain
+    on a real parent agent with N children scales linearly. Needs
+    a multi-host fixture which isn't available on the development
+    workstation.
+- CI verification (gcc-build, clang-build, license check): still
+  awaiting user authorization to push the branch.
 
 ## Outcome
 
-Pending.
+The `/label/__name__/values` endpoint -- Grafana's metric-browser
+feeder -- now returns in 1-2ms instead of 32-62ms, with identical
+results. All retention-aware endpoints (`/series`, `/labels`,
+`/label/<name>/values`, `/metadata`) honor `start`/`end` per
+Prometheus convention. The branch is 13 commits ahead of
+`origin/master` and stays local until the user authorizes a push.
 
 ## Lessons Extracted
 
-Pending.
+See `Validation > Lessons` above (three items).
 
 ## Followup
 
-None yet.
+1. CI verification (gcc-build, clang-build, license check) -- awaits
+   user authorization to push the branch (carries over from SOW-0018).
+2. Phase 3b chart-walk fast path for `/labels` and `/series` when
+   matchers are chart-level only.
+3. Parent-agent multi-host fast-path benchmark.
 
 ## Regression Log
 

@@ -348,6 +348,59 @@ check_post_discovery "POST /series with match[] and limit" \
     "len(d['data'])==20"
 echo
 
+echo "==> Phase 3a: fast path + start/end semantics"
+# Fast path (no match[]) and slow path (match[]={__name__!=""}) must
+# produce the same name set. The fast path walks contexts directly; the
+# slow path resolves series. SOW-0019 chunk 1 added the live-instance
+# check to make these sets identical.
+FAST=$(curl -s 'http://localhost:19999/api/v1/label/__name__/values' \
+       | python3 -c "import json,sys; print(','.join(sorted(json.load(sys.stdin)['data'])))")
+SLOW=$(curl -s --data-urlencode 'match[]={__name__!=""}' \
+       'http://localhost:19999/api/v1/label/__name__/values' \
+       | python3 -c "import json,sys; print(','.join(sorted(json.load(sys.stdin)['data'])))")
+if [[ "$FAST" == "$SLOW" && -n "$FAST" ]]; then
+    printf '  %s metric-names fast path matches slow path (%d names)\n' \
+        "$(c_grn PASS)" "$(echo "$FAST" | tr ',' '\n' | wc -l)"
+    PASS=$((PASS + 1))
+else
+    fast_count=$(echo "$FAST" | tr ',' '\n' | wc -l)
+    slow_count=$(echo "$SLOW" | tr ',' '\n' | wc -l)
+    printf '  %s metric-names: fast=%d slow=%d differ\n' \
+        "$(c_red FAIL)" "$fast_count" "$slow_count"
+    FAIL=$((FAIL + 1))
+fi
+
+# start/end: a future window should empty out every retention-aware
+# endpoint. Skip charts whose last_collected_time predates `start`.
+FUTURE_START=$(( $(date +%s) + 86400 ))
+FUTURE_END=$(( $(date +%s) + 90000 ))
+check_discovery "future window: /series returns empty" \
+    "/api/v1/series" \
+    "--data-urlencode match[]=system_cpu --data-urlencode start=$FUTURE_START --data-urlencode end=$FUTURE_END" \
+    200 "d['data']==[]"
+check_discovery "future window: /metadata returns empty data map" \
+    "/api/v1/metadata" \
+    "--data-urlencode start=$FUTURE_START --data-urlencode end=$FUTURE_END" \
+    200 "d['data']=={}"
+check_discovery "future window: /label/__name__/values returns empty" \
+    "/api/v1/label/__name__/values" \
+    "--data-urlencode start=$FUTURE_START --data-urlencode end=$FUTURE_END" \
+    200 "d['data']==[]"
+
+# A "now" window should return the same count as no-window. Confirms
+# the in-window filter is not over-aggressive on currently-collecting
+# contexts.
+NOW=$(date +%s)
+RECENT_START=$((NOW - 60))
+NOWIN_COUNT=$(curl -s --data-urlencode 'match[]=system_cpu' \
+    'http://localhost:19999/api/v1/series' \
+    | python3 -c "import json,sys; print(len(json.load(sys.stdin)['data']))")
+check_discovery "now window: /series returns same count as no-window" \
+    "/api/v1/series" \
+    "--data-urlencode match[]=system_cpu --data-urlencode start=$RECENT_START --data-urlencode end=$NOW" \
+    200 "len(d['data'])==$NOWIN_COUNT"
+echo
+
 echo "==> Host scoping"
 LOCAL_HOST=$(curl -s "$URL/api/v1/info" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['mirrored_hosts'][0])" 2>/dev/null || hostname)
 echo "  local hostname: $LOCAL_HOST"

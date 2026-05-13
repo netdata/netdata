@@ -76,8 +76,8 @@ void nd_promql_response_free(struct NdPromqlResponse *r);
 struct NdPromqlResponse *nd_promql_labels(const char *host_machine_guid,
                                           const char *const *matchers,
                                           uintptr_t matchers_len,
-                                          int64_t _start_ms,
-                                          int64_t _end_ms,
+                                          int64_t start_ms,
+                                          int64_t end_ms,
                                           uintptr_t limit);
 
 /**
@@ -111,8 +111,8 @@ struct NdPromqlResponse *nd_promql_label_values(const char *host_machine_guid,
 struct NdPromqlResponse *nd_promql_series(const char *host_machine_guid,
                                           const char *const *matchers,
                                           uintptr_t matchers_len,
-                                          int64_t _start_ms,
-                                          int64_t _end_ms,
+                                          int64_t start_ms,
+                                          int64_t end_ms,
                                           uintptr_t limit);
 
 /**

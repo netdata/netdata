@@ -242,6 +242,16 @@ datasource health-check / Prometheus-vs-Mimir heuristics). All five live
 under `/api/v1/` per Prometheus convention and route through a single C
 dispatcher in `src/web/api/v3/api_v3_promql_discovery.c`.
 
+**`start`/`end` semantics** (Phase 3a, SOW-0019): the `start` and `end`
+query parameters are honored across `/api/v1/series`, `/api/v1/labels`,
+`/api/v1/label/<name>/values`, and `/api/v1/metadata`. When both are
+non-zero, contexts whose last-collected timestamp predates `start` are
+skipped (Prometheus convention: "metrics with at least one series in
+the queried window"). When either is zero, retention filtering is
+disabled and every live (non-obsolete) context contributes -- the
+Phase 2 behavior. Phase 2's "accepted but ignored" wording on these
+parameters is superseded by this paragraph.
+
 ### `/api/v1/labels`
 
 Returns the union of label names across all series resolved by the
@@ -268,6 +278,17 @@ Query parameters: same as `/labels`. `GET` only -- Grafana's
 `GET_AND_POST_METADATA_ENDPOINTS` does not include this path.
 
 Response: `{"status":"success","data":["<value>",...]}`, sorted.
+
+**Fast path** (Phase 3a, SOW-0019): when the requested label is
+`__name__` and no `match[]` selectors are supplied, the handler
+short-circuits through `nd_pds_metric_names_collect`, which walks
+`host->rrdctx.contexts` directly instead of resolving series. Same
+correctness (the live-instance check inside the walk ensures
+contexts with no non-obsolete charts are excluded, matching the
+slow-path semantics), 20-50x faster end to end. Any `match[]` other
+than the no-op case routes through the slow series-resolve path
+because labels like `{instance="server-7"}` cannot be evaluated
+without per-series data.
 
 ### `/api/v1/series`
 

@@ -118,6 +118,8 @@ impl DiscoveryError {
 fn resolve_all<F>(
     host: Option<&str>,
     selector_matchers: &[Vec<Matcher>],
+    after_s: i64,
+    before_s: i64,
     max_series: usize,
     mut visit: F,
 ) -> bool
@@ -128,7 +130,7 @@ where
     let mut truncated = false;
 
     for matchers in selector_matchers {
-        let q = match NdQuery::resolve(host, matchers, 0, 0, max_series) {
+        let q = match NdQuery::resolve(host, matchers, after_s, before_s, max_series) {
             Ok(q) => q,
             Err(ResolveError::Empty) => continue,
             Err(_) => continue,
@@ -159,8 +161,8 @@ pub unsafe extern "C" fn nd_promql_labels(
     host_machine_guid: *const c_char,
     matchers: *const *const c_char,
     matchers_len: usize,
-    _start_ms: i64,
-    _end_ms: i64,
+    start_ms: i64,
+    end_ms: i64,
     limit: usize,
 ) -> *mut NdPromqlResponse {
     let selectors = match parse_selectors(matchers, matchers_len) {
@@ -168,12 +170,21 @@ pub unsafe extern "C" fn nd_promql_labels(
         Err(e) => return Box::into_raw(Box::new(e.into_response())),
     };
     let host = host_from_ptr(host_machine_guid);
+    let after_s = start_ms / 1000;
+    let before_s = end_ms / 1000;
     let mut names: BTreeSet<String> = BTreeSet::new();
-    let truncated = resolve_all(host.as_deref(), &selectors, max_series(limit), |labels| {
-        for (n, _) in labels {
-            names.insert((*n).to_string());
-        }
-    });
+    let truncated = resolve_all(
+        host.as_deref(),
+        &selectors,
+        after_s,
+        before_s,
+        max_series(limit),
+        |labels| {
+            for (n, _) in labels {
+                names.insert((*n).to_string());
+            }
+        },
+    );
 
     let mut items: Vec<String> = names.into_iter().collect();
     if limit > 0 && items.len() > limit {
@@ -228,14 +239,23 @@ pub unsafe extern "C" fn nd_promql_label_values(
         Err(e) => return Box::into_raw(Box::new(e.into_response())),
     };
     let host = host_from_ptr(host_machine_guid);
+    let after_s = start_ms / 1000;
+    let before_s = end_ms / 1000;
     let mut values: BTreeSet<String> = BTreeSet::new();
-    let truncated = resolve_all(host.as_deref(), &selectors, max_series(limit), |labels| {
-        for (n, v) in labels {
-            if *n == label {
-                values.insert((*v).to_string());
+    let truncated = resolve_all(
+        host.as_deref(),
+        &selectors,
+        after_s,
+        before_s,
+        max_series(limit),
+        |labels| {
+            for (n, v) in labels {
+                if *n == label {
+                    values.insert((*v).to_string());
+                }
             }
-        }
-    });
+        },
+    );
     let mut items: Vec<String> = values.into_iter().collect();
     if limit > 0 && items.len() > limit {
         items.truncate(limit);
@@ -254,8 +274,8 @@ pub unsafe extern "C" fn nd_promql_series(
     host_machine_guid: *const c_char,
     matchers: *const *const c_char,
     matchers_len: usize,
-    _start_ms: i64,
-    _end_ms: i64,
+    start_ms: i64,
+    end_ms: i64,
     limit: usize,
 ) -> *mut NdPromqlResponse {
     let selectors = match parse_selectors(matchers, matchers_len) {
@@ -263,6 +283,8 @@ pub unsafe extern "C" fn nd_promql_series(
         Err(e) => return Box::into_raw(Box::new(e.into_response())),
     };
     let host = host_from_ptr(host_machine_guid);
+    let after_s = start_ms / 1000;
+    let before_s = end_ms / 1000;
     // Dedupe by signature; the signature is order-stable, so we use
     // BTreeMap with the signature as key to keep results sorted.
     let mut by_sig: BTreeMap<u64, Vec<(String, String)>> = BTreeMap::new();
@@ -272,7 +294,7 @@ pub unsafe extern "C" fn nd_promql_series(
         let mut seen: BTreeSet<u64> = BTreeSet::new();
         let mut truncated = false;
         for matchers in &selectors {
-            let q = match NdQuery::resolve(host.as_deref(), matchers, 0, 0, max_series(limit)) {
+            let q = match NdQuery::resolve(host.as_deref(), matchers, after_s, before_s, max_series(limit)) {
                 Ok(q) => q,
                 Err(ResolveError::Empty) => continue,
                 Err(_) => continue,
