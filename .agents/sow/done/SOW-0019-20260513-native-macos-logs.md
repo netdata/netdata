@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: native macOS unified logs Function implemented, metadata/docs/spec/skills updated, and validation completed with build-environment limitations recorded.
+Sub-state: completed again on 2026-05-13 after fixing the runtime permissions regression for installed macOS logs and related powermetrics hardware metrics.
 
 ## Requirements
 
@@ -335,4 +335,78 @@ None for this SOW. The remaining macOS hardware/storage monitoring work is track
 
 ## Regression Log
 
-None yet.
+### Regression - 2026-05-13
+
+What broke:
+
+- Direct use of the Logs tab returned HTTP 500 with `failed to open macOS unified log store`.
+- Local installed log evidence showed `MACOS-LOGS: failed to open OSLogStore, domain 'OSLogErrorDomain', code 9` in `/opt/netdata/var/log/netdata/collector.log`.
+- The installed plugin permission model differed from privileged plugin patterns: `/opt/netdata/usr/libexec/netdata/plugins.d/macos-logs.plugin` was `root:netdata` mode `0750`, while existing privileged plugins such as `apps.plugin`, `go.d.plugin`, and `ndsudo` were `root:netdata` mode `4750`.
+- A local sanitized OSLog probe confirmed that an effective-root process invoked by the `netdata` user can open and enumerate `OSLogStore` without recording log payloads.
+- Related macOS hardware metrics also exposed a permission bug: `/usr/bin/powermetrics` failed with `powermetrics must be invoked as the superuser` when spawned directly from the unprivileged daemon.
+
+Why previous validation missed it:
+
+- The original SOW validation used a standalone Objective-C OSLog probe as the invoking user/root path and did not validate the installed plugin under Netdata's runtime user and installed file permissions.
+- Build validation was environment-blocked at the time, so the full installer permission path was not exercised before completion.
+
+User decision:
+
+- 2026-05-13: user selected option 1, least-privilege escalation per component.
+- Logs: make `macos-logs.plugin` follow the existing privileged Function plugin pattern with `root:netdata` ownership and setuid root mode.
+- Metrics: route the native Apple `powermetrics` sampler through `ndsudo` with a hard-coded allow-list for the exact supported argv shape instead of running the whole daemon as root.
+
+Repair plan:
+
+- Update installer and makeself permission setup so installed `macos-logs.plugin` is owned by `root:${NETDATA_GROUP}` and mode `4750` when present.
+- Add a narrow `ndsudo` allow-list entry for the supported `powermetrics` sampler command.
+- Update `macos.plugin` powermetrics execution to default to `ndsudo powermetrics-thermal-smc` while preserving a configurable command path for advanced/debug use.
+- Update docs/specs to state the installed privilege model.
+- Rebuild/reinstall locally, restart Netdata, and validate both `macos-logs` and powermetrics behavior without writing real log payloads into durable artifacts.
+
+Repair outcome:
+
+- Source installer path now sets installed `macos-logs.plugin` to `root:${NETDATA_GROUP}` and mode `4750`.
+- Static/makeself install path now includes `macos-logs.plugin` in privileged ownership handling and sets mode `4750`.
+- `ndsudo` now has a hard-coded `powermetrics-thermal-smc` command for `/usr/bin/powermetrics -n 1 -i {{sampleWindowMs}} -s thermal,smc -f plist`.
+- `ndsudo` validates `--sampleWindowMs` as a present positive integer before running the allow-listed command.
+- `macos.plugin` now defaults `[plugin:macos:powermetrics] use ndsudo = yes` and invokes the allow-listed helper command through the installed plugins directory.
+- The direct `command path` path remains available only when `use ndsudo` is disabled.
+
+Regression validation:
+
+- `cmake --build ./build --parallel 8 --target ndsudo netdata macos-logs.plugin`: passed before reinstall.
+- `./build/ndsudo --test powermetrics-thermal-smc --sampleWindowMs 1000`: printed `/usr/bin/powermetrics -n 1 -i 1000 -s thermal,smc -f plist`.
+- `./build/ndsudo --test powermetrics-thermal-smc --sampleWindowMs abc`: rejected the argument with exit code `2`.
+- Reinstall command completed and restarted Netdata in `/opt/netdata`. Non-fatal installer warnings were unrelated to this fix: `git fetch -t` failed under `sudo` because of SSH host-key setup, the `netdata` group already existed, and `/usr/lib/tmpfiles.d` is not writable on macOS.
+- Installed permission check:
+  - `/opt/netdata/usr/libexec/netdata/plugins.d/macos-logs.plugin`: `root netdata` mode `4750`.
+  - `/opt/netdata/usr/libexec/netdata/plugins.d/ndsudo`: `root netdata` mode `4750`.
+- Runtime API check: `http://localhost:19999/api/v1/info` returned `v2.10.0-207-g5a65ed9523` and `macOS`.
+- Launchd check: `system/com.github.netdata` was `state = running` with program `/opt/netdata/usr/sbin/netdata`.
+- Installed `ndsudo` test as the `netdata` user printed the exact allow-listed `powermetrics` argv.
+- Installed `ndsudo` real execution as the `netdata` user produced a plist payload and no `powermetrics must be invoked as the superuser` error.
+- Root `powermetrics` comparison on this host produced the same plist shape: `thermal_pressure = Nominal` and an empty `smc` dictionary. This means fan and SMC temperature charts cannot appear on this host because Apple returns no SMC sensor values here; the permission issue is fixed, but missing SMC data is hardware/OS output behavior.
+- Netdata charts API showed `macos.thermal_pressure` after restart.
+- Direct installed `macos-logs.plugin` Function-protocol query as the `netdata` user returned `FUNCTION_RESULT_BEGIN "tx1" 200 "application/json"` and reported unified-log rows read/useful. Real log payloads were not copied into durable artifacts.
+- New collector log evidence after restart did not show the prior `powermetrics must be invoked as the superuser` failure or `MACOS-LOGS: failed to open OSLogStore` failure; remaining `Invalid key detected!` lines come from Apple's `powermetrics` command on this host and also appear when run directly as root.
+
+Same-failure search:
+
+- `rg -n "powermetrics-thermal-smc|sampleWindowMs" src/collectors/utils/ndsudo.c src/collectors/macos.plugin/macos_powermetrics.c`: only the new allow-list and caller path matched.
+- `tail -n 180 /opt/netdata/var/log/netdata/collector.log | rg -n "powermetrics must be invoked|failed to open OSLogStore|MACOS-LOGS: failed|disabling powermetrics"`: only pre-reinstall failures remained in the historical tail.
+
+Artifact maintenance gate for regression:
+
+- AGENTS.md: no update needed; existing SOW regression, privilege, collector, and install rules covered the work.
+- Runtime project skills: no update needed; `project-writing-collectors` and `integrations-lifecycle` still describe the workflow used.
+- Specs: updated `.agents/sow/specs/macos-logs-function.md` and `.agents/sow/specs/macos-hardware-monitoring.md` to record installed privilege behavior.
+- End-user/operator docs: updated `src/collectors/macos-logs.plugin/README.md`, `src/collectors/macos.plugin/metadata.yaml`, and generated integration docs.
+- End-user/operator skills: no update needed for this regression; public query skill behavior did not change.
+- SOW lifecycle: reopened from `done/`, marked completed after validation, and moved back to `done/` with the repair.
+
+Regression lessons:
+
+- macOS log validation must include the installed setuid/runtime-user path, not just a standalone OSLog probe.
+- Privileged macOS metric collection should use a narrow helper allow-list instead of requiring the full daemon to run as root.
+- `powermetrics` can succeed yet expose no SMC fan/temperature keys on some Macs; absence of those charts is not necessarily a privilege regression.

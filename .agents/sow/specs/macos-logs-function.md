@@ -33,8 +33,12 @@ It applies to:
 - On macOS versions exposing system-wide `OSLogStore` scope, the plugin uses
   that scope. Older supported versions fall back to the local store API.
 - OSLog access is permission-dependent. Apple's API requires an admin account
-  for local system log access, and Netdata must report store/enumerator open
-  failures as Function errors rather than silently fabricating empty data.
+  for local system log access.
+- Installed source and static builds must make `macos-logs.plugin`
+  `root:netdata` and mode `4750` where setuid-root plugins are supported, in
+  line with other privileged Netdata Function plugins.
+- Netdata must report store/enumerator open failures as Function errors rather
+  than silently fabricating empty data.
 
 ## Source Selector Contract
 

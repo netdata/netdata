@@ -220,6 +220,14 @@ struct command {
         },
     },
     {
+        .name = "powermetrics-thermal-smc",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal,smc -f plist",
+        .search = {
+            [0] = "powermetrics",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "megacli-disk-info",
         .params = "-LDPDInfo -aAll -NoLog",
         .search = {
@@ -315,6 +323,43 @@ bool check_params(int argc, char **argv, char *err, size_t err_size) {
     for(int i = 0 ; i < argc ;i++)
         if(!check_string(argv[i], i, err, err_size))
             return false;
+
+    return true;
+}
+
+bool check_positive_integer_argument(const char *cmd, int argc, char **argv, const char *name, char *err, size_t err_size) {
+    for (int i = 2; i < argc - 1; i++) {
+        if (strcmp(argv[i], name) != 0)
+            continue;
+
+        const char *value = argv[i + 1];
+        if (!value || !*value) {
+            snprintf(err, err_size, "%s: %s requires a positive integer value", cmd, name);
+            return false;
+        }
+
+        for (const char *s = value; *s; s++) {
+            if (*s < '0' || *s > '9') {
+                snprintf(err, err_size, "%s: %s must be a positive integer", cmd, name);
+                return false;
+            }
+        }
+
+        if (value[0] == '0' && value[1] == '\0') {
+            snprintf(err, err_size, "%s: %s must be greater than zero", cmd, name);
+            return false;
+        }
+
+        return true;
+    }
+
+    snprintf(err, err_size, "%s: required argument %s is missing", cmd, name);
+    return false;
+}
+
+bool check_command_specific_params(const char *cmd, int argc, char **argv, char *err, size_t err_size) {
+    if (strcmp(cmd, "powermetrics-thermal-smc") == 0)
+        return check_positive_integer_argument(cmd, argc, argv, "--sampleWindowMs", err, err_size);
 
     return true;
 }
@@ -451,6 +496,11 @@ int main(int argc, char *argv[]) {
     if(!command) {
         fprintf(stderr, "command not recognized: %s\n", cmd);
         return 3;
+    }
+
+    if(!check_command_specific_params(cmd, argc, argv, error_buffer, sizeof(error_buffer))) {
+        fprintf(stderr, "invalid command parameters: %s\n", error_buffer);
+        return 2;
     }
 
     char new_path[] = "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";

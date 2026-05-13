@@ -109,7 +109,7 @@ Netdata requires the `SYS_RAWIO` capability and access to the storage devices to
 
 > **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
 
-> **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvme#readme) to monitor NVMe devices.
+> **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvme#readme) to monitor NVMe devices on Linux/BSD. On macOS, `macos.plugin` provides native NVMe health metrics when IOKit exposes SMART-capable NVMe services.
 
 
 

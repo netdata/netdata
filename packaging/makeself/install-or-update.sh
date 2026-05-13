@@ -180,7 +180,7 @@ fi
 
 progress "changing plugins ownership and permissions"
 
-for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh otel-plugin otel-signal-viewer-plugin systemd-journal.plugin netflow-plugin; do
+for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh otel-plugin otel-signal-viewer-plugin systemd-journal.plugin macos-logs.plugin netflow-plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chown root:${NETDATA_GROUP} "${f}"
@@ -219,6 +219,9 @@ if command -v setcap >/dev/null 2>&1; then
       run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
     fi
   fi
+  if [ -f "usr/libexec/netdata/plugins.d/macos-logs.plugin" ]; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/macos-logs.plugin"
+  fi
 else
   for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
@@ -229,6 +232,9 @@ else
   fi
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
+  fi
+  if [ -f "usr/libexec/netdata/plugins.d/macos-logs.plugin" ]; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/macos-logs.plugin"
   fi
 fi
 
