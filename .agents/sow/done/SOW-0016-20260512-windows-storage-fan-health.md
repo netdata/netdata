@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Implementation, documentation, targeted validation, spec update, and artifact gates are complete.
+Sub-state: Regression fixed 2026-05-13 by enabling `go.d.plugin.exe` in the Windows compile/run helper; implementation, documentation, validation, spec update, and artifact gates are complete.
 
 ## Requirements
 
@@ -186,6 +186,7 @@ Open decisions:
 - Added `windows.plugin` `GetFans` WMI collection for requested fan speed and fan state, wired it into the Windows plugin module list, build file list, metadata, README, and generated integration docs.
 - Updated NVMe and SMART collector metadata/generated docs for Windows support and updated NVMe config schema wording for the Windows native path.
 - Added `.agents/sow/specs/windows-storage-fan-monitoring.md` to record the durable Windows SMART/NVMe/fan contracts.
+- Reopened after live service validation showed the Windows compile/run helper did not install `go.d.plugin.exe`, then enabled `ENABLE_PLUGIN_GO=On` in that helper so SMART/NVMe go.d collectors are reachable in Windows service installs.
 
 ## Validation
 
@@ -205,6 +206,7 @@ Tests or equivalent validation:
 - `PYTHONUTF8=1 python integrations/gen_integrations.py`: passed.
 - Targeted integration doc generation for `go.d.plugin/nvme`, `go.d.plugin/smartctl`, and `windows.plugin/GetFans`: passed.
 - `git diff --check`: passed with only existing Windows line-ending conversion warnings.
+- `bash -n packaging/utils/compile-and-run-windows.sh`: passed after enabling `ENABLE_PLUGIN_GO=On`.
 - `.agents/sow/audit.sh`: this SOW passed status/directory and sensitive-data checks; the audit also reported pre-existing unrelated repository warnings for cross-tool bridges, legacy non-project skill classification, and `SOW-0015-20260508-snmp-bgp-typed-projection.md` already living in `done/` with `Status: in-progress`.
 - `cmake --build build-cygwin-MSYS --target netdata.exe`: blocked before changed code by the existing build-tree issue `build-cygwin-MSYS/include/json-c` being a directory where the Ninja rule expects to create a symlink.
 
@@ -212,6 +214,8 @@ Real-use evidence:
 
 - Read-only local CIM checks found no `Win32_Fan` instances and no local NVMe physical disks on this host, so runtime hardware-positive fan/NVMe evidence was not available here.
 - The absence case matches the documented fan behavior: systems without `Win32_Fan` data do not create fan charts.
+- Live Windows service validation showed the service was running the PR build and listening on port 19999. API requests were blocked by Netdata's authorization gate, which is unrelated to collector startup.
+- The installed service tree initially lacked `go.d.plugin.exe`; this regression was repaired by enabling `ENABLE_PLUGIN_GO=On` in the Windows helper build configuration.
 
 Reviewer findings:
 
@@ -235,7 +239,7 @@ Artifact maintenance gate:
 - Specs: Updated `.agents/sow/specs/windows-storage-fan-monitoring.md`.
 - End-user/operator docs: Updated collector metadata/generated integration docs and `src/collectors/windows.plugin/README.md`.
 - End-user/operator skills: No update needed; public/operator AI skills were not affected.
-- SOW lifecycle: This SOW is completed and moved from `current/` to `done/`; it will be committed with implementation and artifact updates.
+- SOW lifecycle: This SOW was completed, reopened for the live-service install-path regression, repaired, and will be moved back to `done/` with implementation and artifact updates.
 
 Specs update:
 
@@ -267,7 +271,7 @@ Follow-up mapping:
 
 ## Outcome
 
-Implemented Windows SMART documentation/fix, native Windows NVMe health and thermal-signal collection, and best-effort Windows WMI fan telemetry. The branch is ready for commit/PR creation after staging the completed SOW move with the code and documentation changes.
+Implemented Windows SMART documentation/fix, native Windows NVMe health and thermal-signal collection, best-effort Windows WMI fan telemetry, and Windows helper build enablement for `go.d.plugin.exe`. The branch is ready for PR update after staging the completed SOW move with the repair.
 
 ## Lessons Extracted
 
@@ -282,3 +286,40 @@ None.
 None yet.
 
 Append regression entries here only after this SOW was completed or closed and subsequent testing or use found broken behavior. Use a dated `## Regression - YYYY-MM-DD` heading at the end of the file. Never prepend regression content above the original SOW narrative.
+
+## Regression - 2026-05-13
+
+What broke:
+
+- The initial PR claimed Windows SMART/NVMe support through go.d collectors, but live service validation on the Windows VM showed `/opt/netdata/usr/libexec/netdata/plugins.d` contained no `go.d.plugin.exe`.
+- The Windows compile/run helper configures CMake with `DEFAULT_FEATURE_STATE=Off` and explicitly enables only `ENABLE_PLUGIN_APPS=On`, so `ENABLE_PLUGIN_GO` remains off for that install path.
+
+Evidence:
+
+- Netdata service was running from `C:\msys64\opt\netdata\usr\bin\netdata.exe` at commit `2953301da7`.
+- `C:\msys64\opt\netdata\usr\libexec\netdata\plugins.d` contained `windows-events.plugin.exe` but no `go.d.plugin.exe`.
+- `CMakeLists.txt` already has Windows-aware `go.d.plugin.exe` build/install rules gated by `ENABLE_PLUGIN_GO`.
+- `packaging/utils/compile-and-run-windows.sh` passes `-DDEFAULT_FEATURE_STATE=Off` and did not pass `-DENABLE_PLUGIN_GO=On`.
+
+Why previous validation missed it:
+
+- The first pass validated go.d collector packages with `go test` and validated C code compiles, but did not validate that the Windows service install path includes the Go plugin binary.
+- The VM lacks fan/NVMe hardware, which is expected, but the missing `go.d.plugin.exe` is independent of hardware and blocks SMART/NVMe collection entirely.
+
+Repair plan:
+
+- Enable `ENABLE_PLUGIN_GO=On` in the Windows compile/run helper so Windows service builds install `go.d.plugin.exe` and the go.d stock configuration tree.
+- Validate by checking the CMake/install rules and rerunning targeted Go tests.
+- Record that hardware-positive fan/NVMe runtime validation remains unavailable on this VM, while install reachability is now addressed.
+
+Validation:
+
+- `go test ./plugin/go.d/collector/nvme`: passed.
+- `go test ./plugin/go.d/collector/smartctl`: passed.
+- `bash -n packaging/utils/compile-and-run-windows.sh`: passed.
+- Source inspection confirmed `packaging/utils/compile-and-run-windows.sh` now passes `-DENABLE_PLUGIN_GO=On`, while `CMakeLists.txt` already maps that to Windows `go.d.plugin.exe` build/install rules.
+
+Artifact updates:
+
+- Updated SOW validation/outcome after repair.
+- No new end-user docs were needed; this changes the Windows developer/helper build path so the already-documented SMART/NVMe support is reachable.

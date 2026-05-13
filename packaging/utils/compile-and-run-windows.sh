@@ -76,6 +76,7 @@ then
       -DENABLE_BUNDLED_JSONC=On \
       -DENABLE_BUNDLED_PROTOBUF=Off \
       -DENABLE_PLUGIN_APPS=On \
+      -DENABLE_PLUGIN_GO=On \
       ${NULL}
 fi
 
