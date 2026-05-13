@@ -6,6 +6,8 @@ learn_rel_path: "Network Flows"
 keywords: ['netflow', 'sflow', 'ipfix', 'network flows', 'traffic analysis', 'overview']
 endmeta-->
 
+<!-- markdownlint-disable-file -->
+
 # Network Flows
 
 Netdata can collect, store, and visualise network flow data from your routers and switches. You see who is talking to whom on your network, how much data they exchanged, over what protocols, and to which countries — without inspecting packet contents and without an external database.
@@ -45,19 +47,19 @@ If those are your questions, flow data is the wrong tool. You probably need appl
 
 These two facts are not Netdata-specific. They're how flow data works on every collector. Understanding them up-front saves a lot of head-scratching when you first see the dashboard.
 
-### Traffic appears doubled by default
+### Traffic can appear doubled
 
-A router exports flow records for both ingress and egress on every monitored interface. A single packet entering interface A and leaving interface B produces two records: one tagged ingress on A, one tagged egress on B.
+When a router exports flow records for both ingress and egress on every monitored interface — a common configuration — a single packet entering interface A and leaving interface B produces two records: one tagged ingress on A, one tagged egress on B. With a second router on the same path doing the same thing, **4×**. Vendor best practice is to enable ingress-only exports to avoid this entirely; if you can't change exporter configuration, the dashboard view still has to compensate.
 
-If you sum every flow record without filtering, you see roughly **2× the actual traffic**. With a second router on the same path, **4×**.
+To see real numbers, filter by one exporter and one interface. Each packet then appears in exactly one record on that interface. See the [Anti-patterns page](/docs/network-flows/anti-patterns.md) for the full framing.
 
-To see real numbers: filter by one exporter, one interface, in one direction. The dashboard makes this easy. See the [Anti-patterns page](/docs/network-flows/anti-patterns.md) for the full framing.
+### Bidirectional traffic shows both directions
 
-### Conversations are mirrored
+A conversation between host A and host B has packets going both ways: A→B for requests or uploads, B→A for responses or downloads. These are real, separate packets, exported as separate flow records. The Sankey diagram, country map, and sorted top-N tables show both directions when you don't filter by direction.
 
-A bidirectional conversation (host A talks to host B, B replies to A) produces at least two flow records — one for each direction. They're real, distinct flows. But on a Sankey diagram, country map, or sorted top-N table without direction filtering, you see both ends of every conversation. That's correct, but it can look like the same traffic appears twice.
+Volumes in the two directions are usually asymmetric — for example, a video download produces large B→A flows and small A→B ACKs. So a "host A to host B" entry and a "host B to host A" entry refer to the same conversation but typically have very different byte counts.
 
-When you see "traffic from your country to a foreign country" *and* "traffic from that foreign country to your country" of similar volume, you're looking at one conversation, not two.
+This is not duplication; it's correct per-direction accounting.
 
 ## What ships with the plugin
 
@@ -77,19 +79,21 @@ Each flow record is enriched at ingestion with:
 - **Exporter name and labels** — from your static-metadata configuration
 - **Interface name, description, speed, provider, connectivity, boundary** — from your static-metadata configuration
 - **Network labels** for your own CIDRs (name, role, site, region, tenant)
-- **Classifier-derived attributes** for rule-based tagging (Akvorado-compatible expression language)
+- **Classifier-derived attributes** for rule-based tagging (Akvorado-compatible subset of the expression language)
 - **Live BGP attributes** (AS path, communities, next-hop) — from BMP, BioRIS, or static prefix configuration
 - **Decapsulated inner-packet fields** for SRv6 / VXLAN traffic
 
-Flow records land in a four-tier journal: raw + 1-minute + 5-minute + 1-hour rollups, with independent retention per tier. The dashboard auto-picks the best tier for each query.
+Flow records land in a four-tier journal: raw + 1-minute + 5-minute + 1-hour rollups, with independent retention per tier. Rollup tiers drop a few high-cardinality fields (IPs, ports, city/coordinates) to stay compact, so any query that filters or groups by those fields is served from the raw tier; everything else can use a coarser tier. The dashboard auto-picks the best tier for each query.
 
 ## What sampling does to your numbers
 
-Many routers sample. They export one packet in N — typically 1-in-100 to 1-in-2000. Netdata multiplies bytes and packets by the sampling rate at ingestion, so the numbers you see are estimates of actual traffic.
+Many routers sample. They export one packet in N — typically 1-in-100 to 1-in-2000. Each flow record carries its own sampling rate (in the record itself, in the protocol header, in a Sampling Options Template, or — for sFlow — in the flow sample). At ingestion, Netdata multiplies that record's bytes and packets by **its own rate**, so dashboard numbers are estimates of actual traffic.
 
-This works correctly **only if all your exporters use the same sampling rate**. With mixed rates, the multiplication is per-flow and the aggregate becomes a blend of estimates that's hard to interpret. The clean path: keep sampling rates uniform across your network, or run unsampled where the flow rate allows.
+The multiplication is per-flow, so different exporters and different interfaces can sample at different rates and aggregates remain accurate. The dashboard does not surface the sampling rate as a UI element — with mixed rates a single displayed value would be meaningless, and with uniform rates the operator already knows it.
 
-Sampling at 1-in-1000 also misses small flows. A single-packet flow has a 99.9% chance of not being seen at all. If you need to detect small, rare events (security beaconing, scanning), use unsampled or 1-in-100 on critical exporters.
+Sampling has a real statistical limit, separate from the multiplication. At 1-in-1000, a single-packet flow has roughly a 99.9% chance of not being sampled at all. If you need to catch small, rare events (security beaconing, scanning), pick a lower sampling rate on the exporters that watch that traffic, or run unsampled there.
+
+For the exact pre-multiplication counts the exporter literally reported, see `RAW_BYTES` and `RAW_PACKETS` in the [field reference](/docs/network-flows/field-reference.md).
 
 ## What the dashboard looks like
 
@@ -98,11 +102,11 @@ Six visualisations, all driven by the same query engine:
 - **Sankey + Table** — the default. Top-N flows aggregated by 1-10 fields you pick. Best for "who's responsible".
 - **Time-Series** — the same top-N over time. Best for "how does this change".
 - **Country map / state map / city map** — geographic views. Best for "where".
-- **Globe** — a 3D rendering of the city-level data. Visual demo, less useful for analysis.
+- **Globe** — a 3D rendering of the city-level data. Same data and table as the city map; useful when distance and great-circle paths matter (e.g. transcontinental traffic).
 
 A filter ribbon between the visualisation and the table lets you narrow data by any combination of fields. Selections persist in the URL — copy and share to give a colleague exactly your view.
 
-Default settings on first open: last 15 minutes, top-25 flows by bytes, grouped as `Source ASN → Protocol → Destination ASN`.
+Default settings on first open: last 15 minutes, top-25 flows by bytes, grouped as `Source AS Name → Protocol → Destination AS Name`.
 
 Default fields are tuned to surface meaningful traffic at a glance. From there, you adjust the time range, change the aggregation, add filters, and dig in.
 
@@ -114,50 +118,3 @@ Pick the page that matches your situation:
 - **You have data, you want to find a bandwidth hog or trace an IP** — [Investigation Playbooks](/docs/network-flows/investigation-playbooks.md).
 - **You want to make sure your data is trustworthy** — [Validation and Data Quality](/docs/network-flows/validation.md).
 - **You want to avoid the most common mistakes** — [Anti-patterns](/docs/network-flows/anti-patterns.md).
-- **You want to understand a specific feature in depth** — see the section index below.
-
-## Section index
-
-**Setup and configuration**
-
-- [Installation](/docs/network-flows/installation.md) — Package names, install commands, file locations
-- [Quick Start](/docs/network-flows/quick-start.md) — Configure your first router, see traffic in 15 minutes
-- [Configuration](/docs/network-flows/configuration.md) — `netflow.yaml` reference
-
-**Sources**
-
-- [NetFlow](/src/crates/netflow-plugin/integrations/netflow.md) — v5, v7, v9
-- [IPFIX](/src/crates/netflow-plugin/integrations/ipfix.md) — IETF-standardised, biflow-capable
-- [sFlow](/src/crates/netflow-plugin/integrations/sflow.md) — packet-sampling, fundamentally different
-
-**Enrichment**
-
-- [GeoIP](/docs/network-flows/enrichment/ip-intelligence.md) — Country, city, AS-name lookups
-- [Static metadata](/docs/network-flows/enrichment/static-metadata.md) — Naming exporters, interfaces, your networks
-- [Classifiers](/docs/network-flows/enrichment/classifiers.md) — Rule-based tagging
-- [ASN resolution](/docs/network-flows/enrichment/asn-resolution.md) — Where AS numbers and names come from
-- [BMP routing](/docs/network-flows/enrichment/bgp-routing.md) — Live BGP feed for routing attributes
-- [BioRIS](/docs/network-flows/enrichment/bgp-routing.md) — RIPE RIS via gRPC
-- [Network sources](/docs/network-flows/enrichment/network-identity.md) — HTTP-fetched prefix metadata
-- [Decapsulation](/docs/network-flows/enrichment/decapsulation.md) — SRv6 and VXLAN inner-packet extraction
-
-**Reference**
-
-- [Field reference](/docs/network-flows/field-reference.md) — All 91 fields and which protocols populate each
-- [Retention and querying](/docs/network-flows/retention-querying.md) — The four-tier model and how queries pick a tier
-- [Sizing and capacity planning](/docs/network-flows/sizing-capacity.md) — Hardware, throughput, storage estimates
-
-**Visualisation**
-
-- [Sankey and Table](/docs/network-flows/visualization/summary-sankey.md) — The default view
-- [Time-Series](/docs/network-flows/visualization/time-series.md) — Top-N over time
-- [Maps and Globe](/docs/network-flows/visualization/maps-globe.md) — Geographic views
-- [Filters and Facets](/docs/network-flows/visualization/filters-facets.md) — Narrowing the data
-- [Plugin Health Charts](/docs/network-flows/visualization/dashboard-cards.md) — Operational metrics for the plugin itself
-
-**Operations**
-
-- [Validation and Data Quality](/docs/network-flows/validation.md) — Cross-checks and silent failures
-- [Investigation Playbooks](/docs/network-flows/investigation-playbooks.md) — Recipes for common questions
-- [Anti-patterns](/docs/network-flows/anti-patterns.md) — Common mistakes and how to avoid them
-- [Troubleshooting](/docs/network-flows/troubleshooting.md) — When something doesn't work

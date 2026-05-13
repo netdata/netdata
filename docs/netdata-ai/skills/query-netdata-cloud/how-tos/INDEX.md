@@ -86,6 +86,7 @@ how-to is written.)
 ### Topology / flows
 
 - `local-l2-topology-summary.md` (stub -- not yet authored)
+- [`validate-local-netflow-function.md`](./validate-local-netflow-function.md)
 - `top-flow-talkers-last-hour.md` (stub -- not yet authored)
 
 ### Members / rooms / feed

@@ -224,7 +224,7 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []ddsnmp.Metric{},
 			expectedError:  false,
-			checkMissing:   map[string]bool{"1.3.6.1.2.1.2.2": true},
+			checkMissing:   map[string]bool{"1.3.6.1.2.1.2.2": false},
 		},
 		"table walk error": {
 			profile: &ddsnmp.Profile{

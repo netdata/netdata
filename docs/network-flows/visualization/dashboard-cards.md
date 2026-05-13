@@ -6,11 +6,13 @@ learn_rel_path: "Network Flows/Visualization"
 keywords: ['plugin health', 'metrics', 'operational charts', 'monitoring']
 endmeta-->
 
+<!-- markdownlint-disable-file -->
+
 # Plugin Health Charts
 
-The netflow plugin publishes its own operational charts under the `netdata.netflow.*` chart context. These appear on the standard Netdata charts page (alongside system metrics like CPU and memory), **not** inside the Network Flows tab. They are how you monitor the plugin itself: is it receiving data, are templates flowing, is memory growing, is disk being written.
+The netflow plugin publishes its own operational charts under the `netdata.netflow.*` chart context. These appear on the standard Netdata charts page (alongside system metrics like CPU and memory), **not** inside the Network Flows view. They are how you monitor the plugin itself: is it receiving data, are templates flowing, is memory growing, is disk being written.
 
-This is also where you look first when something seems wrong — long before opening the Network Flows tab.
+This is also where you look first when something seems wrong — long before opening the Network Flows view.
 
 All charts update every 1 second.
 
@@ -69,22 +71,20 @@ This one breaks RSS down by what's mapped. Useful when you want to attribute "th
 
 ## What's NOT in these charts
 
-A few signals that aren't published today:
+These charts do not include:
 
 - **Per-exporter ingest counter.** No per-source rate dimension. Decoder-scope cardinality tells you how many sources, not how busy each one is.
-- **UDP socket drops.** Kernel-level drops (full receive buffer, NIC drops) are not surfaced. Use the OS-level metrics: `cat /proc/net/udp` (column `RcvbufErrors`) or `ss -uam`.
+- **UDP socket drops.** Kernel-level drops (full receive buffer, NIC drops) are not surfaced. Use OS-level signals: `sudo ss -uamn sport = :2055` for per-socket drops, or `grep ^Udp: /proc/net/snmp` for the system-wide `RcvbufErrors` counter.
 - **Template cache hit ratio.** `template_errors` counts misses; there's no corresponding "hits" counter to form a ratio.
 - **GeoIP staleness signal.** No "MMDB last loaded" timestamp or version. The mapping memory dimensions tell you if a database is loaded, not how old it is.
 - **Per-tier query latency.** These charts cover ingest and storage; query-side performance isn't observable.
-- **BioRIS counters.** They're collected internally but not published as chart dimensions today.
-
-If you need any of these, mention it in an issue — they're not hard to add but haven't been needed enough yet.
+- **BioRIS counters.** BioRIS routing-state details are not published as chart dimensions.
 
 ## How to use these charts for diagnosis
 
 | Symptom | Look at | What it means |
 |---|---|---|
-| Network Flows tab is empty | `netflow.input_packets` `udp_received` | Zero = no datagrams arriving (firewall? wrong port?). Non-zero with `parsed_packets` zero = wrong protocol or all datagrams malformed. |
+| Network Flows view is empty | `netflow.input_packets` `udp_received` | Zero = no datagrams arriving (firewall? wrong port?). Non-zero with `parsed_packets` zero = wrong protocol or all datagrams malformed. |
 | Sudden drop in flows | per-protocol dimensions | Identifies which protocol stopped (helps narrow whether it's a router, a router class, or all routers). |
 | Templates failing | `template_errors` rising | Exporter not sending templates often enough; collector lost cache; cache mismatch after firmware update. |
 | Cache growing without bound | `decoder_scopes` rising over hours | Exporter churn or unstable template IDs. Investigate per-router behaviour. |
@@ -94,7 +94,7 @@ If you need any of these, mention it in an issue — they're not hard to add but
 
 ## Where these are NOT shown
 
-These charts are **not** in the Network Flows tab. Look for them on the standard Netdata charts page, in the family `netflow`. The Network Flows tab itself shows traffic data, not plugin health.
+These charts are **not** in the Network Flows view. Look for them on the standard Netdata charts page, in the family `netflow`. The Network Flows view itself shows traffic data, not plugin health.
 
 ## What's next
 

@@ -359,8 +359,64 @@ fn request_deserialization_defaults_missing_view_group_by_sort_by_and_top_n() {
     )
     .expect_err("invalid top_n should fail");
     assert!(
-        invalid_top_n.to_string().contains("unknown variant `42`"),
+        invalid_top_n.to_string().contains("unsupported top_n `42`"),
         "unexpected error: {invalid_top_n}"
+    );
+}
+
+#[test]
+fn request_deserialization_accepts_numeric_top_n_values() {
+    let request = serde_json::from_str::<FlowsRequest>(
+        r#"{"view":"table-sankey","group_by":["PROTOCOL"],"sort_by":"bytes","top_n":100}"#,
+    )
+    .expect("numeric top_n should match documented JSON examples");
+
+    assert_eq!(request.top_n, super::TopN::N100);
+
+    let invalid_top_n = serde_json::from_str::<FlowsRequest>(
+        r#"{"view":"table-sankey","group_by":["PROTOCOL"],"sort_by":"bytes","top_n":42}"#,
+    )
+    .expect_err("unsupported numeric top_n should fail");
+    assert!(
+        invalid_top_n.to_string().contains("unsupported top_n `42`"),
+        "unexpected error: {invalid_top_n}"
+    );
+}
+
+#[test]
+fn request_deserialization_accepts_relative_time_bounds() {
+    let request = serde_json::from_str::<FlowsRequest>(
+        r#"{"view":"table-sankey","after":-3600,"before":0,"group_by":["PROTOCOL"],"sort_by":"bytes","top_n":100}"#,
+    )
+    .expect("documented relative time bounds should parse");
+
+    assert_eq!(request.after, Some(-3600));
+    assert_eq!(request.before, Some(0));
+    assert_eq!(request.top_n, super::TopN::N100);
+}
+
+#[test]
+fn resolve_time_bounds_treats_negative_after_as_relative_to_before() {
+    let request = FlowsRequest {
+        after: Some(-300),
+        before: Some(1_000),
+        ..Default::default()
+    };
+
+    assert_eq!(super::resolve_time_bounds(&request), (700, 1_000));
+}
+
+#[test]
+fn resolve_time_bounds_preserves_order_after_clamping() {
+    let request = FlowsRequest {
+        after: Some(i64::MAX - 10),
+        before: Some(i64::MAX),
+        ..Default::default()
+    };
+
+    assert_eq!(
+        super::resolve_time_bounds(&request),
+        (u32::MAX - 1, u32::MAX)
     );
 }
 
@@ -543,9 +599,7 @@ fn request_deserialization_supports_autocomplete_mode() {
 #[test]
 fn request_deserialization_rejects_oversized_autocomplete_term() {
     let term = "x".repeat(257);
-    let payload = format!(
-        r#"{{"mode":"autocomplete","field":"src_as_name","term":"{term}"}}"#
-    );
+    let payload = format!(r#"{{"mode":"autocomplete","field":"src_as_name","term":"{term}"}}"#);
     let error = serde_json::from_str::<FlowsRequest>(&payload)
         .expect_err("oversized autocomplete term should be rejected");
     assert!(
@@ -559,9 +613,7 @@ fn request_deserialization_accepts_long_term_for_non_autocomplete_mode() {
     // The 256-byte cap is autocomplete-only. Regular flows/timeseries requests
     // may carry an ignored `term` of any length and must not be rejected.
     let term = "x".repeat(1024);
-    let payload = format!(
-        r#"{{"mode":"flows","view":"table-sankey","term":"{term}"}}"#
-    );
+    let payload = format!(r#"{{"mode":"flows","view":"table-sankey","term":"{term}"}}"#);
     let request = serde_json::from_str::<FlowsRequest>(&payload)
         .expect("non-autocomplete request with long term must deserialize");
     assert!(!request.is_autocomplete_mode());

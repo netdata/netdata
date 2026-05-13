@@ -80,6 +80,7 @@ how-to is written.)
 
 - `topology-summary-direct.md` (stub -- not yet authored)
 - `flows-top-talkers-direct.md` (stub -- not yet authored)
+- [validate-direct-local-flow-function.md](./validate-direct-local-flow-function.md) -- prove a local Cloud-connected `flows:netflow` Function works through a Cloud-minted direct-agent bearer.
 
 ### Metrics
 

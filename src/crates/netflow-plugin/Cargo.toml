@@ -49,7 +49,7 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 sflow-parser = { workspace = true }
 tokio = { workspace = true }
-tokio-stream = { workspace = true }
+tokio-stream = { workspace = true, features = ["net"] }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
 regex = { workspace = true }
@@ -70,6 +70,7 @@ netdata-plugin-error = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
 
 [dev-dependencies]
+bytes = { workspace = true }
 etherparse = { workspace = true }
 pcap-file = { workspace = true }
 proptest = { workspace = true }

@@ -1,0 +1,19 @@
+# Profile for Cisco NCS routers
+
+extends:
+  - _system-base.yaml
+  - _cisco-base.yaml
+  - _cisco-bgp4-mib.yaml
+
+metadata:
+  device:
+    fields:
+      type:
+        value: Router
+      vendor:
+        value: Cisco
+
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.9.1.2984 # ciscoNCS540L

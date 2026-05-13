@@ -22,8 +22,8 @@ pub(crate) fn decode_asn_name(record: &AsnLookupRecord) -> Option<String> {
         .map(str::to_string)
 }
 
-pub(crate) fn decode_ip_class(record: &AsnLookupRecord) -> Option<String> {
-    let ip_class = record.netdata.ip_class.trim();
+pub(crate) fn decode_ip_class(netdata: &NetdataLookupRecord) -> Option<String> {
+    let ip_class = netdata.ip_class.trim();
     (!ip_class.is_empty()).then(|| ip_class.to_string())
 }
 
@@ -38,6 +38,9 @@ pub(crate) fn parse_asn_text(value: &str) -> Option<u32> {
 }
 
 pub(crate) fn apply_geo_record(out: &mut NetworkAttributes, record: &GeoLookupRecord) {
+    if let Some(ip_class) = decode_ip_class(&record.netdata) {
+        out.ip_class = ip_class;
+    }
     if let Some(country) = &record.country
         && let Some(code) = country_code(country)
         && !code.is_empty()

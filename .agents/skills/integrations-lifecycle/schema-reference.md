@@ -49,6 +49,14 @@ The "what is this thing" descriptor used by every per-integration entry.
 | `instance.icon_filename` | string | yes | -- | learn / www / in-app | Path under `${NETDATA_REPOS_DIR}/website/themes/tailwind/static/img/` (icon repo). |
 | `instance.variables` | object | no | values: string / int / bool / number | all rendered text | Triggers two-pass Jinja templating; see `pipeline.md`. |
 
+Do not use `instance.variables` or option/default text to build the
+short catalog description. For collector-like integrations, the
+Monitor Anything table description is extracted from the first
+sentence of the generated overview, usually
+`overview.data_collection.metrics_description`. See
+`description-authoring.md` before writing or reviewing description
+fields.
+
 ### `$defs.keywords`
 
 Search-keyword array.
@@ -135,7 +143,7 @@ where each module is one collector integration.
 | `modules[].meta.related_resources.integrations.list[].module_name` | string | conditional | required if `monitored_instance_name` is set (Draft-7 `dependencies` at `collector.json:61-63`) | related-integrations | See `gotchas.md` for non-obvious dependency semantics. |
 | `modules[].meta.related_resources.integrations.list[].monitored_instance_name` | string | no | -- | related-integrations | For cgroups multi-instance disambiguation. |
 | `modules[].meta.info_provided_to_referring_integrations.description` | string | yes | markdown | rendered when ANOTHER collector references this one | The "what THIS collector says when referenced from another." |
-| `modules[].overview.data_collection.metrics_description` | string | yes | markdown | learn / www | The "what we collect" prose. |
+| `modules[].overview.data_collection.metrics_description` | string | yes | markdown | learn / www / Monitor Anything first-sentence source | The "what we collect" prose. First sentence is the catalog description and must start with an active user-facing phrase such as `Monitor...`, `Collect...`, `Enrich network flows with...`, or `Annotate network flows with...`. Do not start with setup, variables, defaults, limits, or option names. |
 | `modules[].overview.data_collection.method_description` | string | yes | markdown | learn / www | The "how we collect" prose. |
 | `modules[].overview.supported_platforms.include` | array<string> | yes (may be empty) | platform names | learn (`overview/collector.md:12-26`) | Allow-list. |
 | `modules[].overview.supported_platforms.exclude` | array<string> | yes (may be empty) | platform names | learn (`overview/collector.md:12-26`) | Block-list. |

@@ -74,17 +74,20 @@ echo -e "${CA_GRAY}[pr-issues] fetching issues for PR #${PR} ...${CA_NC}" >&2
 # Wrap raw issues array into an envelope with metadata.
 issues_array="$(codacyaudit_pr_issues "$PR")"
 total="$(printf '%s' "$issues_array" | jq 'length')"
+issues_tmp="$(mktemp "${TMPDIR:-/tmp}/codacy-pr-issues-XXXXXX")"
+trap 'rm -f "$issues_tmp"' EXIT
+printf '%s' "$issues_array" > "$issues_tmp"
 
 jq -n \
    --arg pr "$PR" \
    --arg fetched_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
    --argjson total "$total" \
-   --argjson data "$issues_array" \
+   --slurpfile data "$issues_tmp" \
    '{
        pr: ($pr | tonumber),
        fetched_at: $fetched_at,
        total: $total,
-       data: $data
+       data: $data[0]
     }' > "$OUTPUT"
 
 echo -e "${CA_GREEN}[pr-issues]${CA_NC} wrote ${total} issue(s) to ${OUTPUT}" >&2

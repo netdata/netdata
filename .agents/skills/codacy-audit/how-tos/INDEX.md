@@ -6,4 +6,5 @@ Skipping this rule means the next assistant repeats the analysis from scratch --
 
 ## Entries
 
+- [fetch-large-pr-issue-list](fetch-large-pr-issue-list.md) -- fix or verify the `jq: Argument list too long` failure mode by passing large Codacy issue arrays through a temporary file and `jq --slurpfile`.
 - [reproduce-pr-22423-markdownlint](reproduce-pr-22423-markdownlint.md) -- reproduce the 864 markdownlint findings PR #22423 saw on its first CI run, locally via `analyze-local.sh --tool markdownlint`.

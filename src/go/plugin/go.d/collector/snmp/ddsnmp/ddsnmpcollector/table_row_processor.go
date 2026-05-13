@@ -168,6 +168,27 @@ func (p *tableRowProcessor) extractIndexPosition(index string, position uint) (s
 	return index, n == position && index != ""
 }
 
+func (p *tableRowProcessor) extractIndexPositionFromEnd(index string, position uint) (string, bool) {
+	if position == 0 || index == "" {
+		return "", false
+	}
+
+	end := len(index)
+	for n := uint(1); ; n++ {
+		start := strings.LastIndexByte(index[:end], '.')
+		if n == position {
+			if start == -1 {
+				return index[:end], end > 0
+			}
+			return index[start+1 : end], start+1 < end
+		}
+		if start == -1 {
+			return "", false
+		}
+		end = start
+	}
+}
+
 func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
 	symbolCount := 0
 	for _, syms := range ctx.columnOIDs {
@@ -354,8 +375,4 @@ func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddpr
 	}
 
 	return strings.Join(result, ".")
-}
-
-func (r *crossTableResolver) isCrossTable(tagCfg ddprofiledefinition.MetricTagConfig, currentTableName string) bool {
-	return tagCfg.Table != "" && tagCfg.Table != currentTableName && tagCfg.Index == 0
 }

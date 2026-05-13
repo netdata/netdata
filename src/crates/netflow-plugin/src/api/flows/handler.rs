@@ -47,16 +47,15 @@ impl NetflowFlowsHandler {
             // tokio workers handling unrelated traffic.
             let request_for_query = request.clone();
             let query = Arc::clone(&self.query);
-            let query_output = task::spawn_blocking(move || {
-                query.autocomplete_field_values(&request_for_query)
-            })
-            .await
-            .map_err(|err| NetdataPluginError::Other {
-                message: format!("autocomplete task join failed: {err}"),
-            })?
-            .map_err(|err| NetdataPluginError::Other {
-                message: format!("failed to autocomplete facet values: {err:#}"),
-            })?;
+            let query_output =
+                task::spawn_blocking(move || query.autocomplete_field_values(&request_for_query))
+                    .await
+                    .map_err(|err| NetdataPluginError::Other {
+                        message: format!("autocomplete task join failed: {err}"),
+                    })?
+                    .map_err(|err| NetdataPluginError::Other {
+                        message: format!("failed to autocomplete facet values: {err:#}"),
+                    })?;
             let mut stats = self.metrics.snapshot();
             stats.extend(query_output.stats);
 
@@ -212,7 +211,7 @@ fn args_to_value(function_call: &FunctionCall) -> Value {
     for arg in &function_call.args {
         if let Some((key, value)) = arg.split_once(':') {
             let json_value = if numeric_fields.contains(&key) {
-                value.parse::<u64>().map_or_else(
+                value.parse::<i64>().map_or_else(
                     |_| serde_json::json!(value),
                     |number| serde_json::json!(number),
                 )

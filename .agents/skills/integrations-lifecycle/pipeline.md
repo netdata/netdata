@@ -253,21 +253,35 @@ NOT used by CI; CI always runs without `-c` (full regen).
 
 Repo path: `integrations/gen_doc_collector_page.py`.
 
-Reads `integrations/integrations.js` (`:37-46`). Walks the
-category tree; the "section-level" categories are children of
-`data-collection` (`:82` -- `parent == 'data-collection'`).
+Reads `integrations/integrations.js` (`:38-47`). Walks the
+category tree; the "section-level" categories are normally
+children of `data-collection`, plus the top-level `flows`
+category (`:82-86`). `flows` is deliberately included because
+Network Flows entries cover both flow protocols and enrichment
+inputs, so the Monitor Anything page must list them together
+under a `Network Flows` section instead of dropping them into
+`Other`.
 
 Writes `src/collectors/COLLECTORS.md` (committed). This is the
 "Monitor anything with Netdata" umbrella marketing page that
-lists every collector in tabular form, grouped by category.
+lists every collector and Network Flows integration in tabular
+form, grouped by section. The write path is
+`generate_collectors_md()` (`:565-584`), which renders the
+header plus dynamic tables and atomically replaces the file.
 
 ### Notable behaviors
 
-- Sort order: "Linux first, Other last" (`:279-303`).
+- Sort order: "Linux first, Other last" (`:285-301`); Network
+  Flows follows its position in `integrations/categories.yaml`
+  because it is treated as a section.
 - Description extraction: `extract_description_from_overview`
   reads `## Overview` body, uses the first sentence (`:143-183`);
   falls back to `meta.monitored_instance.description`; final
-  fallback `Monitor <name>`.
+  fallback `Monitor <name>`. Because this text becomes the
+  Monitor Anything table description, the first sentence of the
+  overview must describe the integration itself, not a setting,
+  variable, default, limit, or troubleshooting detail. See
+  `description-authoring.md`.
 - Slug for table links: `to_slug(display_name)` -- lowercase,
   spaces to `_`, `/` to `-`, strips parentheses (`:213-215`).
 - Hardcoded marketing anchors: `_render_tech_navigation`
@@ -426,3 +440,29 @@ scripts directly during active development.
    `integrations.js` into its source. See `in-app-contract.md`.
 8. Learn's ingest pulls the new `integrations/foo.md` on its
    3-hourly schedule. See the `learn-site-structure` skill.
+
+## End-to-end: Monitor Anything / `COLLECTORS.md`
+
+1. `metadata.yaml` entries declare
+   `meta.monitored_instance.categories`.
+2. `python3 integrations/gen_integrations.py` validates those
+   categories against `integrations/categories.yaml`, renders the
+   integration content, and writes the runtime
+   `integrations/integrations.js` catalog.
+3. `python3 integrations/gen_doc_collector_page.py` reads
+   `integrations/integrations.js`, groups integrations by Monitor
+   Anything section, and writes `src/collectors/COLLECTORS.md`.
+4. `check-markdown.yml` runs the same generator before Learn
+   ingest on PRs, so broken generated `COLLECTORS.md` content
+   (for example, unresolved links) blocks the PR. It does not
+   diff-check that the committed `COLLECTORS.md` file is fresh.
+5. `generate-integrations.yml` runs the same generator after
+   metadata changes land on `master` and opens the
+   `integrations-regen` PR if committed generated artifacts drift.
+6. Learn ingests `src/collectors/COLLECTORS.md` as the
+   "Monitor anything with Netdata" page.
+
+For Network Flows specifically, keep the top-level `flows`
+category handling in `gen_doc_collector_page.py`. Without it,
+NetFlow / IPFIX / sFlow and enrichment entries will not appear
+as a coherent `Network Flows` section on Monitor Anything.

@@ -90,6 +90,10 @@ No issues on PR #22423.
 
 For a PR with findings, the script emits a clustered TSV summary. Default grouping is `--by pattern`; switch to `--by tool`, `--by severity`, `--by file`, or `--by category` for other angles. The JSON dump under `.local/audits/codacy/` carries the full issue payload for follow-up jq queries.
 
+Operational note: large Codacy PR issue arrays must be passed to `jq` via a
+temporary file and `--slurpfile`, not `--argjson`, because shell argument-size
+limits can fail before `jq` starts.
+
 ## Path discipline
 
 This skill follows `<repo>/.agents/sow/specs/sensitive-data-discipline.md`:

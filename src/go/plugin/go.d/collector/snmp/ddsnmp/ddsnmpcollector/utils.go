@@ -76,6 +76,9 @@ func convPduToStringf(pdu gosnmp.SnmpPDU, format string) (string, error) {
 		}
 		return hex.EncodeToString(bs), nil
 	case "snmp_dateandtime":
+		if isEmptyOctetStringPDU(pdu) {
+			return "", errNoTextDateValue
+		}
 		ts, err := convPduToDateAndTimeUnix(pdu)
 		if err != nil {
 			return "", err
@@ -99,6 +102,17 @@ func convPduToStringf(pdu gosnmp.SnmpPDU, format string) (string, error) {
 	default:
 		// For unknown formats, use the default string conversion
 		return convPduToString(pdu)
+	}
+}
+
+func isEmptyOctetStringPDU(pdu gosnmp.SnmpPDU) bool {
+	switch v := pdu.Value.(type) {
+	case []byte:
+		return len(v) == 0
+	case string:
+		return v == ""
+	default:
+		return false
 	}
 }
 

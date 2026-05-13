@@ -3,135 +3,127 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/network-fl
 sidebar_label: "Sizing and Capacity Planning"
 learn_status: "Published"
 learn_rel_path: "Network Flows"
-keywords: ['sizing', 'capacity planning', 'storage', 'cpu', 'memory', 'benchmarks']
+keywords: ['sizing', 'capacity', 'planning', 'storage', 'memory', 'scaling', 'distributed']
 endmeta-->
+
+<!-- markdownlint-disable-file -->
 
 # Sizing and Capacity Planning
 
-Use the following benchmarks and formulas to estimate the CPU, memory, and storage requirements for your Network Flows deployment.
+A practical guide to choosing the host, the storage, and the deployment shape for the netflow plugin. Read this before you decide where the plugin runs and how big it has to be.
 
-## What was measured
+## What this plugin is built for
 
-These numbers come from a release-mode benchmark on an Intel i9-12900K workstation with a Seagate FireCuda 530 NVMe SSD (ext4). The benchmark runs the full ingest pipeline — raw journal plus the 1-minute, 5-minute, and 1-hour tiers — writing to real disk-backed journals. **Enrichment is not loaded** (no GeoIP/MMDB, no static metadata, no classifiers); enrichment adds CPU on top of the figures below.
+The netflow plugin is designed to receive, decode, and store flow records (NetFlow / IPFIX / sFlow) from one network — typically the routers and switches at one site — directly on a Netdata Agent.
 
-Cardinality is synthetic: low-cardinality cycles 256 unique flow records, high-cardinality cycles 4 096 unique records. Real exporter traffic falls between the two.
+Sustained ingestion of about **25 000 flows per second** on a single agent already approaches **ISP-level traffic capacities** for most enterprise / branch / data-centre profiles. Past that point you are at the scale of a regional service provider, and you should be running multiple agents (see "Distributed deployment" below), not pushing harder on one box.
 
-CPU is reported as percent of one core (100% = one core fully consumed). The post-decode ingest path is currently single-threaded, so the practical ceiling per agent is bounded by one core's worth of CPU.
+If your worst-case sustained flow rate stays at or below **~25 000 flows/s**, you have headroom on a single agent. If it does not, plan distributed before you plan harder iron.
 
-## Practical headline
+## Plugin throughput cap
 
-On this hardware class, plan for:
+The post-decode ingest path has a single-thread hot path. For planning, treat **~25 000 flows/s sustained** as the comfortable ceiling for a well-provisioned single agent running the full pipeline (raw + 1m + 5m + 1h tiers). High-cardinality traffic reaches the ceiling sooner; low-cardinality traffic has more headroom.
 
-| Scenario | Practical ceiling |
-|---|---|
-| High-cardinality, all three protocols, four storage tiers, no enrichment, including UDP receive and decode | **~20-25 000 flows/s** |
-| Low-cardinality | comfortably above 60 000 flows/s |
+Practical guidance:
 
-The 20-25k figure is conservative and includes decode cost (~10 µs/flow on top of the post-decode numbers below).
+- Plan for ~25 000 flows/s sustained on a well-provisioned agent. That is the comfortable steady-state ceiling and includes UDP receive, protocol decode, all four storage tiers, and the typical enrichment stack without BMP / BioRIS.
+- Bursts above the ceiling cost UDP queue backpressure and eventually `RcvbufErrors` (kernel-level drops). Tune the kernel UDP receive buffer (`net.core.rmem_max`, `net.core.rmem_default`, `net.core.netdev_max_backlog`) for headroom.
+- The hot path is single-threaded. Adding cores does not raise the per-agent ceiling. The way to go past it is to add agents (next section).
 
-## Detailed measurements (post-decode, paced)
+## Distributed deployment is the scaling answer
 
-These tables show the cost of pre-decoded flows traversing the full ingest pipeline. To get the full UDP-to-disk cost, add roughly 10 µs/flow for protocol decoding.
+Aggregation across many routers is rarely operationally meaningful for flow data — you almost always investigate one site, one router, or one interface at a time. So instead of pushing every flow to a single central collector, **deploy one Netdata Agent next to each router (or each site, or each branch office)**.
 
-### Low cardinality
+This pattern is how Netdata is built to scale: each agent owns its own flow journal, its own enrichment, and its own dashboard view; Netdata Cloud federates queries across them. The benefits compound:
 
-| offered flows/s | NetFlow v9 CPU | IPFIX CPU | sFlow CPU | RAM peak |
-|---:|---:|---:|---:|---|
-| 1 000 | 1.3% | 1.0% | 1.5% | ~25 MiB |
-| 10 000 | 12.6% | 11.5% | 16.9% | ~75 MiB |
-| 30 000 | 35.7% | 32.9% | 46.2% | ~85 MiB |
-| 60 000 | 70.3% | 64.1% | 87.1% | ~85 MiB |
+- **Each agent's load is bounded by one router's flow rate**, not the whole network's. A 10 000 flows/s router stays comfortably under the per-agent ceiling.
+- **No single host becomes the bottleneck** for ingest, storage, or query latency.
+- **Failure of one agent loses one router's history**, not the whole network's.
+- **You don't pay the bandwidth cost** of moving every flow datagram to a central collector across WAN links.
 
-All three protocols deliver 100% of offered rate at every tested point. Saturation is above 60 000 flows/s and was not reached in this matrix.
-
-### High cardinality
-
-| offered flows/s | NetFlow v9 achieved | IPFIX achieved | sFlow achieved | CPU at saturation |
-|---:|---:|---:|---:|---|
-| 10 000 | 10 000 | 9 970 | 9 990 | 28-37% |
-| 20 000 | 20 000 | 19 970 | 19 980 | 56-74% |
-| 30 000 | 29 331 | 29 985 | 29 257 | 84-98% |
-| 40 000 | 29 087 | 35 771 | 30 543 | 99% (plateau) |
-| 60 000 | 26 475 | 28 835 | 30 227 | 99% (plateau) |
-
-Saturation is around 30 000 flows/s on this host. Beyond the knee, the achieved rate plateaus at roughly the saturation value while the offered rate grows.
-
-:::warning
-These are host-specific reference points. Actual throughput depends on your CPU clock, disk speed, real flow cardinality, the number of populated fields, and any enrichment you enable (GeoIP, classifiers, static networks, ASN providers, BMP routing).
-:::
+For a multi-site / multi-data-centre / multi-branch deployment, this is the recommended shape: one Netdata Agent per router, federated through Netdata Cloud. Use the central collector pattern only if your sites are too small to host an agent each.
 
 ## Storage
 
-Storage is governed by two things, not by the flow rate alone:
+Storage cost scales linearly with **sustained flows per second** and the **retention** you configure on each tier.
 
-- **Retention policy per tier** — caps how long each tier is kept and how much disk it can use.
-- **Cardinality and dedup** — flow records are indexed and key-value pairs are deduplicated. Low-cardinality traffic stores fewer bytes per flow than high-cardinality traffic, because repeated values share dictionary entries.
+### How ingestion rate maps to disk
 
-Because the journals are not append-only logs, `flow_rate × bytes_per_flow × time` is not a valid estimator.
+Use **~800 bytes on disk per flow** as the journal sizing estimate for the raw tier. For sustained ingestion this gives you:
 
-### Empirical measurement on this hardware class
+| Sustained flows/s | Disk used per day, raw tier |
+|---|---|
+| 1 000 | ~70 GB |
+| 5 000 | ~350 GB |
+| 10 000 | ~700 GB |
+| 25 000 | ~1.7 TB |
 
-A 15-minute run of paced ingest at 10 000 flows/s with the full pipeline active (raw + 1m + 5m + 1h tiers, real disk-backed journals) produced:
+These numbers are dominated by raw-tier writes; rollup tiers (1m, 5m, 1h) add a small constant on top because each rollup row aggregates many raw rows.
 
-| | Low cardinality (256 unique records) | High cardinality (4 096 unique records) |
-|---|---:|---:|
-| Flows ingested | 9.00 million | 8.97 million |
-| On-disk total | 6.46 GiB | 7.29 GiB |
-| Bytes per stored flow | **771** | **872** |
-| Write amplification (real I/O / logical encoded) | 1.79× | 2.00× |
-| Raw tier (final) | 6.45 GiB | 7.13 GiB |
-| 1-minute tier | 8 MiB | 112 MiB |
-| 5-minute tier | 8 MiB | 40 MiB |
-| 1-hour tier | 0 (rollup not reached in 15 min) | 16 MiB |
+The number is sensitive to traffic cardinality (how unique the 5-tuples are). Real-world traffic with many repeated flows trends a bit lower; pathological all-unique traffic trends a bit higher.
 
-Two key observations:
+### Raw tier dominates — keep it bounded
 
-- **Dedup is effective.** High cardinality stores only 13% more per flow despite 16× more unique field combinations. Real exporter traffic, which has heavy repetition (same src/dst/protocol patterns), will compress closer to the low-cardinality figure.
-- **Raw is 99% of the on-disk cost** at 15 minutes. The rollup tiers are small in absolute size because each rollup row aggregates many raw flows.
+The raw tier carries every individual flow record. **Rollup tiers (1m, 5m, 1h) are tiny by comparison** — each row in a rollup tier aggregates many raw flows.
 
-### Bounding storage for capacity planning
+Set raw-tier retention to match your forensic window — typically **24 hours**. Rollup tiers can keep weeks to a year of history at a small fraction of raw-tier cost.
 
-Set retention limits explicitly and let them bound the disk footprint:
+The example below is sized for an agent at the **upper end of the per-host scaling envelope (25 000 flows/s sustained)** — the raw tier needs about 1.7 TB / day at that rate (see the table above), so the 2 TB raw budget gives a small safety margin to keep the duration limit (24 h) the one that fires first:
 
-- raw: typically 24 hours
-- 1-minute tier: 14 days
-- 5-minute tier: 30 days
-- 1-hour tier: 365 days
+```yaml
+journal:
+  tiers:
+    raw:      { size_of_journal_files: 2TB,  duration_of_journal_files: 24h }
+    minute_1: { size_of_journal_files: 20GB, duration_of_journal_files: 14d }
+    minute_5: { size_of_journal_files: 20GB, duration_of_journal_files: 30d }
+    hour_1:   { size_of_journal_files: 20GB, duration_of_journal_files: 365d }
+```
 
-Configure per-tier `size_of_journal_files` (hard cap) and `duration_of_journal_files` (time cap). The plugin enforces whichever limit is hit first.
+For lighter loads, scale `size_of_journal_files` on the raw tier down proportionally — at 10 000 flows/s ~700 GB / 24 h is enough; at 1 000 flows/s ~70 GB / 24 h is enough. Whichever limit (size or duration) is hit first triggers rotation; size your raw tier so the **duration limit fires first** under normal load and the size cap is a safety net for traffic surges.
 
-For your own measurement, run the plugin against representative traffic for at least 15 minutes and inspect `du -sh` on each tier directory. The `bench_storage_footprint_child` test in this repository ships the same measurement harness used to produce the table above.
+### Use fast NVMe for the raw tier
+
+The raw tier is queried directly for any IP-level investigation, full-text search, city / latitude / longitude maps, and anything that filters on a raw-only field (see [Field Reference](/docs/network-flows/field-reference.md) for which fields survive into rollups). At 25 000 flows/s sustained, the raw tier produces 1.7 TB / day of indexed writes that you may also be reading back in real time.
+
+This is **fast-NVMe territory**. 1.7 TB/day of write throughput is well within a modern PCIe Gen4 / Gen5 NVMe drive but punishes SATA SSDs (queue-depth and write-endurance) and HDDs (IOPS) once concurrent queries land on the same device. A modern PCIe Gen4 / Gen5 NVMe is what you want for the raw-tier directory. Rollup tiers (1m / 5m / 1h) are far less I/O-intensive and can live on slower storage if needed, but in practice it's easier to put the whole journal directory on one fast device.
+
+If the raw tier exceeds the device capacity for your retention target, **shorten raw-tier retention** before you switch to slower storage. A 12-hour raw tier on fast NVMe queries cleanly; a 7-day raw tier on slow storage will time out queries.
 
 ## Memory
 
-Memory consumption is dominated by:
+The journal backend uses **free system memory as page cache** — the bigger the database on disk, the more free RAM you want to keep available so the kernel can keep the working set hot.
 
-- **Active journal rows** — flow records currently being accumulated before they are flushed to disk
-- **Field indexes** — structures that map field values (IPs, ASNs, ports) for fast filtering
-- **Facet indexes** — structures that power the filter sidebar
-- **GeoIP MMDB** — the IP-intelligence database (DB-IP-based by default) loaded into memory for enrichment
+Concrete guidance:
 
-The plugin exposes memory charts you can monitor:
+- For the agent process itself, expect **a few hundred MB to ~1 GB of RSS** at typical 5-25k flows/s loads. Enrichment, classifiers, accumulators, and routing tries add to the base process footprint. BMP / BioRIS full-table feeds can add a few hundred MB per peer, depending on table count and prefix mix.
+- For the kernel page cache, aim to **leave at least the size of the recently-queried working set free** — practically, plan a few GB of free RAM on a 25k flows/s agent so query I/O lands in cache instead of hitting NVMe each time.
+- Watch `netflow.memory_resident_bytes`, `netflow.memory_resident_mapping_bytes`, and `netflow.memory_accounted_bytes` for the agent's own footprint. Watch the system's overall free memory for the page-cache headroom.
 
-- `netflow.memory_resident_bytes` — total memory in use
-- `netflow.memory_allocator_bytes` — memory from the system allocator
-- `netflow.memory_accounted_bytes` — memory broken down by component (indexes, GeoIP, facets)
-- `netflow.memory_tier_index_bytes` — memory used by tiered storage indexes
-- `netflow.decoder_scopes` — protocol decoder memory usage
+The plugin does **not** preload the journal into RAM. Memory consumption is driven by active accumulators (during ingestion) and routing tries (when configured). Storage growth pressures memory only via the page cache, which the kernel manages.
 
-## Disk I/O
+## Querying — what's fast and what isn't
 
-The plugin writes flow records to journal files continuously. Writes are dominated by the raw tier; the rollup tiers add a small amount on top. SSDs are recommended for collectors that handle thousands of flows per second — the index updates and frequent fsync calls benefit substantially from low-latency storage.
+The journal is **fully indexed**: every field is indexed, exact-match selections (`SRC_AS_NAME = "AS15169 GOOGLE"`, `PROTOCOL = 6`) hit the index and return quickly regardless of how much data the tier holds.
 
-Read operations only happen during queries. There is no background read activity in steady state.
+The exception is the **full-text search box** in the dashboard. FTS runs as a regex against the raw journal payload bytes — it is a **full scan** of the matching tier. Any non-empty FTS query also forces the query to the raw tier (FTS is meaningless on aggregated rollup rows). That means:
 
-:::tip
-For production deployments, monitor the `netflow.memory_resident_bytes` chart and set a threshold alert. If resident memory grows steadily without stabilising, check your cardinality and consider reducing retention or increasing the sync interval.
-:::
+- A full-text search over a 24-hour raw tier with 25k flows/s sustained scans hundreds of GB. It runs but it is not fast.
+- For fast queries, use **filters on indexed fields** (the filter ribbon, exact selections). Reserve full-text for the cases where you don't have an indexed handle.
+- The 30-second hard query timeout is a real ceiling for FTS over wide windows. Narrow the time range, add an indexed filter, or switch to a rollup tier (which means dropping the FTS).
+
+## Practical checklist before you deploy
+
+1. **Estimate sustained flows/s** for the worst-case router or site. If it exceeds ~25k/s, plan distributed before iron.
+2. **Pick raw-tier retention** that matches your forensic window — typically 24 hours.
+3. **Compute storage** for that retention from the table above; size the raw-tier directory with a realistic safety margin, usually **1.2× to 1.5×** depending on burstiness and available disk.
+4. **Use NVMe** for the raw tier. Slower storage shortens raw-tier retention until queries are responsive.
+5. **Leave RAM headroom** for the page cache on top of the agent's own ~1 GB RSS budget.
+6. **Tune kernel UDP buffers** for burst headroom (see [Troubleshooting](/docs/network-flows/troubleshooting.md)).
+7. **For multi-site deployments**, run one Netdata Agent per router or per site rather than central aggregation.
 
 ## What's next
 
-- [Configuration](/docs/network-flows/configuration.md) — Per-tier retention configuration and tuning knobs.
-- [Retention and Querying](/docs/network-flows/retention-querying.md) — How tiers are picked at query time.
-- [Validation and Data Quality](/docs/network-flows/validation.md) — How to confirm the numbers in your environment.
-- [Plugin Health Charts](/docs/network-flows/visualization/dashboard-cards.md) — Monitoring the plugin itself.
+- [Configuration](/docs/network-flows/configuration.md#per-tier-retention) — Per-tier retention schema.
+- [Retention and Querying](/docs/network-flows/retention-querying.md) — How tiers map to queries and the auto-tier-pick rules.
+- [Field Reference](/docs/network-flows/field-reference.md) — Which fields survive into rollups and which are raw-only.
+- [Troubleshooting](/docs/network-flows/troubleshooting.md) — UDP buffer tuning, query timeout, and disk write pressure.

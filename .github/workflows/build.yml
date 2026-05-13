@@ -186,6 +186,7 @@ jobs:
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -317,6 +318,7 @@ jobs:
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -422,6 +424,7 @@ jobs:
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -581,6 +584,7 @@ jobs:
         with:
           name: final-artifacts
           path: artifacts/*
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2

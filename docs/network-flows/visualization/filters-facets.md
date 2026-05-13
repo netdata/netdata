@@ -6,6 +6,8 @@ learn_rel_path: "Network Flows/Visualization"
 keywords: ['filters', 'facets', 'autocomplete', 'search', 'fts', 'negative match', 'visualization']
 endmeta-->
 
+<!-- markdownlint-disable-file -->
+
 # Filters and Facets
 
 The filter ribbon (between the visualisation and the table) is how you narrow flow data to the subset you want. Filters apply to every view — Sankey, table, time-series, country/state/city maps, globe — at once.
@@ -25,11 +27,11 @@ Within a single field: **OR**. Selecting `PROTOCOL = TCP` and `PROTOCOL = UDP` s
 
 Across different fields: **AND**. Adding `SRC_COUNTRY = US` to the above shows TCP-or-UDP from the US.
 
-## No negative match (yet)
+## No negative match
 
 You cannot directly say "everything except X". The workaround is to select all values and remove the unwanted one — works for low-cardinality fields like `PROTOCOL` (a handful of values). For high-cardinality fields like `SRC_AS_NAME`, the autocomplete only surfaces the top 100 values, so there's no practical way to "select all and remove".
 
-This is a real limitation. Negative match is a known feature gap.
+Negative matching is not supported.
 
 ## Autocomplete
 
@@ -50,10 +52,10 @@ The search box at the top of the filter ribbon performs a regex match against th
 
 - The search is **regex**, not literal. `8.8.8.8` is a regex where `.` matches any byte — so it can match `8a8b8c8`, `888x888`, etc. To match the literal string, escape with backslashes: `8\.8\.8\.8`.
 - The match is **byte-level** against the journal payload, so it can find substrings inside enriched fields (AS names, exporter names, country codes).
-- Any non-empty search **forces tier 0**. The full-text search only works against the raw journal — it doesn't apply to the rollup tiers. Time depth is therefore bounded by raw-tier retention.
+- Any non-empty search **forces raw tier**. The full-text search only works against the raw journal — it doesn't apply to the rollup tiers. Time depth is therefore bounded by raw-tier retention.
 - The plugin's "fast aggregation" path is also disabled when full-text search is active, because aggregation needs to scan every record. Expect somewhat slower responses than tier-based aggregation queries.
 
-For "find anything containing this string in any field", the search is the right tool. For "filter by an exact value of a specific field", use the facet on that field — it's faster and doesn't trigger tier-0 mode.
+For "find anything containing this string in any field", the search is the right tool. For "filter by an exact value of a specific field", use the facet on that field — it's faster and doesn't trigger raw-tier mode.
 
 ## URL preservation
 
@@ -61,17 +63,11 @@ Every filter and selection is preserved in the dashboard URL. Copy the URL and s
 
 A practical note: filters use a structured representation (per-field IN-list) that's easy to encode as a JSON payload but awkward to URL-encode. The dashboard handles this transparently for sharing — but anyone scripting their own queries against the function should use JSON-payload requests to the function, not GET-style args.
 
-## Facet limits
-
-`query_facet_max_values_per_field` (default `5000`) caps how many distinct values a single facet can return per query. Past that, the facet stops accumulating; the response carries an indicator. Useful when you have an extremely high-cardinality field — autocomplete still surfaces the top 100, but the full list is bounded.
-
-You can raise this limit in `netflow.yaml`. Higher values use more memory at query time.
-
 ## Things that go wrong
 
 - **Search for `192.168.1.1` matches unrelated rows.** Regex semantics: each `.` is "any byte". Escape: `192\.168\.1\.1`.
-- **Time depth shrinks unexpectedly after typing in search.** Full-text search forces tier 0. Clear the search to use rollup tiers and longer time ranges.
-- **Negative match isn't there.** Workaround: select-all-minus-one for low-cardinality fields. For high-cardinality fields, no good workaround exists today.
+- **Time depth shrinks unexpectedly after typing in search.** Full-text search forces raw tier. Clear the search to use rollup tiers and longer time ranges.
+- **Negative match is unsupported.** Workaround: select-all-minus-one for low-cardinality fields. For high-cardinality fields, use a positive filter that narrows the result set instead.
 - **Filter on an ICMP virtual facet seems slower than expected.** `ICMPV4` / `ICMPV6` virtual facets aren't optimised by the journal index — they're evaluated per-record. The query still returns; the cost shows up as longer wall time on busy collectors.
 - **`query_max_groups` exceeded.** Result rows after the limit fold into `__overflow__`. Narrow the filter or reduce group-by depth.
 - **GET-style args don't carry selections.** When integrating the function call yourself, send a JSON payload — the dashboard does this automatically.

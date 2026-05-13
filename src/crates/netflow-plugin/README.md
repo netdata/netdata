@@ -218,8 +218,6 @@ protocols:
 
 journal:
   journal_dir: flows
-  size_of_journal_files: 10GB
-  duration_of_journal_files: 7d
   tiers:
     raw:
       size_of_journal_files: 200GB
@@ -233,15 +231,20 @@ journal:
     hour_1:
       size_of_journal_files: 20GB
       duration_of_journal_files: 365d
-  query_1m_max_window: 6h
-  query_5m_max_window: 24h
   query_max_groups: 50000
-  query_facet_max_values_per_field: 5000
 ```
 
-`query_max_groups` and `query_facet_max_values_per_field` are guardrails for
-query-time accumulator cardinality. When limits are hit, overflow is reported
-via response stats/facet metadata instead of growing unbounded memory.
+Standalone CLI runs still accept the legacy uniform retention flags
+`--netflow-retention-size-of-journal-files` and
+`--netflow-retention-duration-of-journal-files`. They apply the same value to
+all tiers and exist only for standalone/CLI compatibility; YAML configuration is
+per-tier.
+
+`query_max_groups` caps the number of distinct group keys a single
+aggregation query may build before extra groups are folded into a synthetic
+`__overflow__` bucket. The response carries a warning when this happens. The
+limit protects the query worker from accidentally wide group-by combinations
+exhausting memory.
 
 Journal rotation size is not user-configured. The plugin derives it per tier:
 
@@ -293,15 +296,16 @@ in production:
 These charts are intended for debugging memory explosions under high-cardinality
 traffic, not for billing or hard enforcement decisions.
 
-`journal.tiers` optionally allows per-tier retention overrides for:
+`journal.tiers` configures retention independently for:
 
 - `raw`
 - `minute_1` (aliases: `1m`, `minute-1`, `minute1`)
 - `minute_5` (aliases: `5m`, `minute-5`, `minute5`)
 - `hour_1` (aliases: `1h`, `hour-1`, `hour1`)
 
-If a tier override is omitted, that tier inherits top-level journal retention
-(`size_of_journal_files`, `duration_of_journal_files`).
+If a tier is omitted, it uses the built-in tier default (`10GB / 7d`). There
+are no top-level journal retention knobs; set retention on each tier you want
+to tune.
 
 To make a tier time-only, set `size_of_journal_files: null`.
 To make a tier size-only, set `duration_of_journal_files: null`.

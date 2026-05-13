@@ -117,7 +117,7 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]*P
 		if err != nil {
 			return err
 		}
-		if !(strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
+		if !strings.HasSuffix(d.Name(), ".yaml") && !strings.HasSuffix(d.Name(), ".yml") {
 			return nil
 		}
 		// Skip abstract profiles
@@ -163,6 +163,9 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 	if prof.SourceFile == "" {
 		prof.SourceFile, _ = filepath.Abs(filename)
 	}
+	originID := profileOriginID(filename, extendsPaths)
+	setLicensingOriginProfileID(&prof, originID)
+	setBGPOriginProfileID(&prof, originID)
 
 	// Handle empty profiles - these are profiles where content has been deliberately removed,
 	// but the file itself is preserved. This ensures that when users update, their existing
@@ -208,6 +211,47 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 	}
 
 	return &prof, nil
+}
+
+func setLicensingOriginProfileID(prof *Profile, originID string) {
+	if prof == nil || prof.Definition == nil {
+		return
+	}
+	for i := range prof.Definition.Licensing {
+		if prof.Definition.Licensing[i].OriginProfileID == "" {
+			prof.Definition.Licensing[i].OriginProfileID = originID
+		}
+	}
+}
+
+func setBGPOriginProfileID(prof *Profile, originID string) {
+	if prof == nil || prof.Definition == nil {
+		return
+	}
+	for i := range prof.Definition.BGP {
+		if prof.Definition.BGP[i].OriginProfileID == "" {
+			prof.Definition.BGP[i].OriginProfileID = originID
+		}
+	}
+}
+
+func profileOriginID(filename string, paths multipath.MultiPath) string {
+	absFile, err := filepath.Abs(filename)
+	if err != nil {
+		absFile = filename
+	}
+	for _, dir := range paths {
+		absDir, err := filepath.Abs(dir)
+		if err != nil {
+			continue
+		}
+		rel, err := filepath.Rel(absDir, absFile)
+		if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
+			continue
+		}
+		return filepath.ToSlash(rel)
+	}
+	return filepath.ToSlash(filepath.Base(filename))
 }
 
 func prepareLoadedProfile(profile *Profile) error {

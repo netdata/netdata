@@ -16,6 +16,7 @@ extends:
   - _checkpoint-hardware.yaml
   - _checkpoint-cluster.yaml
   - _checkpoint-vsx.yaml
+  - _checkpoint-licensing.yaml
 
 selector:
   - sysobjectid:

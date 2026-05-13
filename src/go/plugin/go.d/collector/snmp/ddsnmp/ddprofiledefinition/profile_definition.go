@@ -15,6 +15,8 @@ type ProfileDefinition struct {
 	SysobjectIDMetadata []SysobjectIDMetadataEntryConfig `yaml:"sysobjectid_metadata,omitempty"`
 	Metrics             []MetricsConfig                  `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 	Topology            []TopologyConfig                 `yaml:"topology,omitempty" json:"topology,omitempty"`
+	Licensing           []LicensingConfig                `yaml:"licensing,omitempty" json:"licensing,omitempty"`
+	BGP                 []BGPConfig                      `yaml:"bgp,omitempty" json:"bgp,omitempty"`
 	MetricTags          []GlobalMetricTagConfig          `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 	StaticTags          []StaticMetricTagConfig          `yaml:"static_tags,omitempty" json:"static_tags,omitempty"`
 
@@ -39,6 +41,8 @@ func (p *ProfileDefinition) Clone() *ProfileDefinition {
 		StaticTags:          slices.Clone(p.StaticTags),
 		Metrics:             cloneSlice(p.Metrics),
 		Topology:            cloneSlice(p.Topology),
+		Licensing:           cloneSlice(p.Licensing),
+		BGP:                 cloneSlice(p.BGP),
 		VirtualMetrics:      cloneSlice(p.VirtualMetrics),
 	}
 }

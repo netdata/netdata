@@ -1,0 +1,155 @@
+# Cisco Smart Licensing mixin.
+
+licensing:
+  - MIB: CISCO-SMART-LIC-MIB
+    id: smart_registration
+    identity:
+      id:
+        value: smart_registration
+      name:
+        value: Smart Licensing registration
+      component:
+        value: smart_licensing
+    descriptors:
+      type:
+        value: registration
+      impact:
+        value: Smart Licensing registration state on the device
+    state:
+      OID: 1.3.6.1.4.1.9.9.831.0.6.1.0
+      name: ciscoSlaRegistrationStatus
+      mapping:
+        1: "1"
+        2: "0"
+        3: "2"
+        4: "1"
+        5: "0"
+
+  - MIB: CISCO-SMART-LIC-MIB
+    id: smart_authorization
+    identity:
+      id:
+        value: smart_authorization
+      name:
+        value: Smart Licensing authorization
+      component:
+        value: smart_licensing
+    descriptors:
+      type:
+        value: authorization
+      impact:
+        value: Overall Smart Licensing compliance or authorization state on the device
+    state:
+      OID: 1.3.6.1.4.1.9.9.831.0.7.2.0
+      name: ciscoSlaAuthComplianceStatus
+      mapping:
+        Authorized: "0"
+        AUTHORIZED: "0"
+        In Compliance: "0"
+        IN COMPLIANCE: "0"
+        Out of Compliance: "2"
+        OUT OF COMPLIANCE: "2"
+        Evaluation Mode: "1"
+        EVALUATION MODE: "1"
+        Eval Mode: "1"
+        EVAL MODE: "1"
+        Evaluation Expired: "2"
+        EVALUATION EXPIRED: "2"
+        Eval Expired: "2"
+        EVAL EXPIRED: "2"
+        Authorization Expired: "2"
+        AUTHORIZATION EXPIRED: "2"
+        Overage: "1"
+        OVERAGE: "1"
+        Not In Use: "0"
+        NOT IN USE: "0"
+    signals:
+      authorization:
+        timestamp:
+          OID: 1.3.6.1.4.1.9.9.831.0.7.1.0
+          name: ciscoSlaAuthExpireTime
+
+  - MIB: CISCO-SMART-LIC-MIB
+    id: smart_id_certificate
+    identity:
+      id:
+        value: smart_id_certificate
+      name:
+        value: Smart Licensing ID certificate
+      component:
+        value: smart_licensing
+    descriptors:
+      type:
+        value: certificate
+    signals:
+      certificate:
+        timestamp:
+          OID: 1.3.6.1.4.1.9.9.831.0.6.3.0
+          name: ciscoSlaNextCertificateExpireTime
+
+  - MIB: CISCO-SMART-LIC-MIB
+    id: smart_evaluation_period
+    identity:
+      id:
+        value: smart_evaluation_period
+      name:
+        value: Smart Licensing evaluation period
+      component:
+        value: smart_licensing
+    descriptors:
+      type:
+        value: evaluation
+    signals:
+      grace:
+        timestamp:
+          OID: 1.3.6.1.4.1.9.9.831.0.7.4.2.0
+          name: ciscoSlaAuthEvalExpiredTime
+
+  - MIB: CISCO-SMART-LIC-MIB
+    id: smart_entitlements
+    table:
+      OID: 1.3.6.1.4.1.9.9.831.0.5.1
+      name: ciscoSlaEntitlementInfoTable
+    identity:
+      id:
+        OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.3
+        name: ciscoSlaEntitlementTag
+      name:
+        OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.7
+        name: ciscoSlaEntitlementFeatureName
+      feature:
+        OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.4
+        name: ciscoSlaEntitlementVersion
+      component:
+        value: smart_licensing
+    descriptors:
+      type:
+        value: entitlement
+      impact:
+        OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.6
+        name: ciscoSlaEntitlementDescription
+    state:
+      OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.5
+      name: ciscoSlaEntitlementEnforceMode
+      mapping:
+        1: "1"
+        2: "1"
+        3: "0"
+        4: "2"
+        5: "1"
+        6: "1"
+        7: "2"
+        8: "2"
+        9: "2"
+        10: "2"
+        11: "2"
+        12: "2"
+        13: "2"
+        14: "0"
+        15: "0"
+        16: "0"
+    signals:
+      usage:
+        used:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.2
+          name: ciscoSlaEntitlementRequestCount

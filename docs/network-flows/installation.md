@@ -6,6 +6,8 @@ learn_rel_path: "Network Flows"
 keywords: ['installation', 'package', 'netdata-plugin-netflow', 'setup']
 endmeta-->
 
+<!-- markdownlint-disable-file -->
+
 # Installation
 
 The netflow plugin is **packaged separately from the main Netdata Agent**. You install it on the same host where Netdata runs, after Netdata itself is in place.
@@ -71,20 +73,29 @@ cd netdata
 sudo ./netdata-installer.sh
 ```
 
-**Caveat:** source builds do **not** include the stock GeoIP / IP-intelligence database files. The plugin starts fine without them, but country, city, and AS-name fields will be empty until you run the downloader once:
+**Caveat:** source builds do **not** include the stock GeoIP / IP-intelligence database files. Packaged 32-bit installs ship the stock MMDB payload but do not include `topology-ip-intel-downloader`. The plugin starts fine without cache files, but country, city, and AS-name fields will be empty until you run the downloader once on an install that includes it:
 
 ```bash
 sudo /usr/sbin/topology-ip-intel-downloader
 ```
 
-This populates `/var/cache/netdata/topology-ip-intel/` with the DB-IP-based MMDB files. The plugin auto-detects the cache copy on its next 30-second poll. See [GeoIP enrichment](/docs/network-flows/enrichment/ip-intelligence.md) for details and refresh scheduling.
+This populates `/var/cache/netdata/topology-ip-intel/` with the DB-IP-based MMDB files. The plugin auto-detects the cache copy on its next 30-second poll. See the [Enrichment Intel Downloader page](/docs/network-flows/intel-downloader.md) for the refresh tool and the [DB-IP integration card](/src/crates/netflow-plugin/integrations/db-ip_ip_intelligence.md) for cadence and license details.
+
+## IP intelligence defaults
+
+| Item | Behaviour |
+|---|---|
+| Native packages | Ship stock DB-IP ASN and Geo MMDB files under `/usr/share/netdata/topology-ip-intel/`. |
+| Source builds | Do not include stock MMDB files; run the downloader once if you want GeoIP / ASN enrichment. |
+| Fresh copies | The downloader writes to `/var/cache/netdata/topology-ip-intel/`, which takes precedence over the stock files. |
+| Refresh schedule | Netdata does not install a timer or cron job for the downloader. Schedule it yourself if freshness matters. |
 
 ## What gets installed
 
 | Path | Purpose |
 |---|---|
 | `/usr/libexec/netdata/plugins.d/netflow-plugin` | The plugin binary (mode 0750, root:netdata) |
-| `/usr/sbin/topology-ip-intel-downloader` | Helper for refreshing the GeoIP / IP-intel MMDBs |
+| `/usr/sbin/topology-ip-intel-downloader` | Helper for refreshing the GeoIP / IP-intel MMDBs; not included in packaged 32-bit installs |
 | `/usr/lib/netdata/conf.d/netflow.yaml` | Stock configuration (read-only reference; copy to `/etc/netdata/netflow.yaml` to customise) |
 | `/usr/lib/netdata/conf.d/topology-ip-intel.yaml` | IP-intel downloader configuration |
 | `/usr/share/netdata/topology-ip-intel/topology-ip-asn.mmdb` | Stock ASN database (DB-IP) |
@@ -97,7 +108,7 @@ This populates `/var/cache/netdata/topology-ip-intel/` with the DB-IP-based MMDB
 After installation and restart:
 
 ```bash
-sudo journalctl -u netdata --since "5 minutes ago" | grep -E 'netflow|listener'
+sudo journalctl --namespace netdata --since "5 minutes ago" | grep -E 'netflow|listener'
 ```
 
 You should see entries indicating that the plugin loaded its config and that the UDP listener bound to its port.
@@ -112,12 +123,12 @@ A line for `netflow-plugin` confirms the listener is up.
 
 ## Open Netdata to confirm
 
-Open the Netdata UI in your browser. The **Network Flows** tab should appear in the top navigation. The plugin's operational charts also appear under the standard charts page in the `netflow` family.
+Open the Netdata UI in your browser. Click the **Live** tab in the top navigation; **Network Flows** appears in the Functions list on the right (see [Live tab](/docs/dashboards-and-charts/live-tab.md)). Selecting it opens the Sankey + Table view. The plugin's operational charts also appear under the standard charts page in the `netflow` family.
 
-If the tab doesn't appear, or appears empty:
+If Network Flows doesn't appear under Live, or the view is empty:
 
 - Check that the plugin process is running: `pgrep -fa netflow-plugin`.
-- Check Netdata Cloud SSO: the Network Flows function requires authenticated access to the agent's space.
+- Check Netdata Cloud SSO: Functions require authenticated access to the agent's space.
 - See [Troubleshooting](/docs/network-flows/troubleshooting.md).
 
 ## Configuring flow sources
@@ -127,9 +138,9 @@ Installing the plugin enables it. To actually see flow data, you need to configu
 That's the next step:
 
 - [Quick Start](/docs/network-flows/quick-start.md) — A 15-minute path to your first flow data.
-- [Sources / NetFlow](/src/crates/netflow-plugin/integrations/netflow.md) — Vendor configurations for NetFlow.
-- [Sources / IPFIX](/src/crates/netflow-plugin/integrations/ipfix.md) — Vendor configurations for IPFIX.
-- [Sources / sFlow](/src/crates/netflow-plugin/integrations/sflow.md) — Vendor configurations for sFlow.
+- [Flow Protocols / NetFlow](/src/crates/netflow-plugin/integrations/netflow.md) — Vendor configurations for NetFlow.
+- [Flow Protocols / IPFIX](/src/crates/netflow-plugin/integrations/ipfix.md) — Vendor configurations for IPFIX.
+- [Flow Protocols / sFlow](/src/crates/netflow-plugin/integrations/sflow.md) — Vendor configurations for sFlow.
 
 ## Uninstall
 

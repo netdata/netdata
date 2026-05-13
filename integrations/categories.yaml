@@ -65,23 +65,15 @@
   children: []
 - id: flows
   name: Network Flows
-  description: "Network flow ingestion, enrichment, and routing-data sources for NetFlow / IPFIX / sFlow analysis"
+  description: "Network flow ingestion and enrichment data sources for NetFlow / IPFIX / sFlow analysis"
   children:
     - id: flows.sources
-      name: Sources
+      name: Flow Protocols
       description: "Flow protocols Netdata receives directly from routers, switches, and software exporters"
       children: []
-    - id: flows.ip-intelligence
-      name: IP Intelligence
-      description: "GeoIP and ASN data sources used to enrich flow records with country, city, and AS-number labels"
-      children: []
-    - id: flows.bgp-routing
-      name: BGP Routing
-      description: "Live BGP route feeds used to enrich flow records with AS path, communities, and next-hop attributes"
-      children: []
-    - id: flows.network-identity
-      name: Network Identity Sources
-      description: "External feeds (cloud-provider IP ranges, IPAM systems, custom CMDBs) that label network prefixes with names, roles, sites, and tenants"
+    - id: flows.enrichment-methods
+      name: Enrichment Methods
+      description: "Configurable data sources that label flow records with operational context: geolocation, AS / BGP routing, network ownership, exporter / interface metadata, classifiers, and inner-packet decapsulation"
       children: []
 - id: export
   name: exporters

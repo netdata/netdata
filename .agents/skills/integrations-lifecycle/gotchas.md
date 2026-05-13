@@ -276,9 +276,12 @@ just out-of-date docs.
 ## Umbrella pages have NO DO-NOT-EDIT banner
 
 `src/collectors/COLLECTORS.md`, `src/collectors/SECRETS.md`,
-`src/collectors/SERVICE-DISCOVERY.md` all open with marketing
-headers (e.g. `# Monitor anything with Netdata`). None has a
-`<!--startmeta` block, none has any DO-NOT-EDIT comment.
+`src/collectors/SERVICE-DISCOVERY.md` have no generated-file
+warning. `COLLECTORS.md` opens with
+`<!-- markdownlint-disable-file -->` and then the marketing
+header (`# Monitor anything with Netdata`); the other two open
+with their marketing headers. None has a `<!--startmeta` block,
+none has any DO-NOT-EDIT comment.
 
 A maintainer who edits these files directly will have their
 edits silently overwritten on the next CI run (for

@@ -1235,7 +1235,9 @@ mod tests {
             .autocomplete("SRC_AS_NAME", "Akamai")
             .expect("autocomplete by org name");
         assert!(
-            mid_token.iter().any(|v| v == "AS20940 Akamai International"),
+            mid_token
+                .iter()
+                .any(|v| v == "AS20940 Akamai International"),
             "substring search on AS_NAME must match the organisation token; got {mid_token:?}"
         );
 

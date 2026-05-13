@@ -8,6 +8,8 @@ use super::{
     field_tracks_presence, finalize_canonical_flow_fields, normalize_direction_value,
     observe_v9_templates_from_raw_payload, to_field_token, xxhash64,
 };
+use crate::enrichment::FlowEnricher;
+use crate::plugin_config::{EnrichmentConfig, NetworkAttributesConfig, NetworkAttributesValue};
 use etherparse::{NetSlice, SlicedPacket, TransportSlice};
 use netflow_parser::variable_versions::v9_lookup::V9Field;
 use pcap_file::pcap::PcapReader;
@@ -390,6 +392,51 @@ fn akvorado_sflow_expanded_sample_fixture_matches_expected_projection() {
 }
 
 #[test]
+fn sflow_fixture_applies_enrichment_during_decode() {
+    let cfg = EnrichmentConfig {
+        networks: BTreeMap::from([
+            (
+                "52.52.52.0/24".to_string(),
+                NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+                    name: "sflow-src".to_string(),
+                    tenant: "fixture".to_string(),
+                    asn: 64_502,
+                    ..Default::default()
+                }),
+            ),
+            (
+                "53.53.53.0/24".to_string(),
+                NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+                    name: "sflow-dst".to_string(),
+                    tenant: "fixture".to_string(),
+                    asn: 64_503,
+                    ..Default::default()
+                }),
+            ),
+        ]),
+        ..Default::default()
+    };
+    let flows = decode_fixture_sequence_with_enrichment(&["data-sflow-expanded-sample.pcap"], &cfg);
+    assert_eq!(flows.len(), 1);
+    let flow = &flows[0].record.to_fields();
+
+    assert_fields(
+        flow,
+        &[
+            ("FLOW_VERSION", "sflow"),
+            ("SRC_NET_NAME", "sflow-src"),
+            ("DST_NET_NAME", "sflow-dst"),
+            ("SRC_NET_TENANT", "fixture"),
+            ("DST_NET_TENANT", "fixture"),
+            ("SRC_AS", "64502"),
+            ("DST_AS", "64503"),
+            ("SRC_AS_NAME", "AS64502"),
+            ("DST_AS_NAME", "AS64503"),
+        ],
+    );
+}
+
+#[test]
 fn emits_flow_records_for_v5_fixture() {
     let mut decoders = FlowDecoders::new();
     let (stats, records) = decode_pcap(&fixture_dir().join("nfv5.pcap"), &mut decoders);
@@ -564,6 +611,46 @@ fn akvorado_v9_data_fixture_core_fields_match_including_sampling_rate() {
     );
     assert_eq!(first.get("DIRECTION").map(String::as_str), Some("ingress"));
     assert_eq!(first.get("TCP_FLAGS").map(String::as_str), Some("16"));
+}
+
+#[test]
+fn netflow_v9_fixture_applies_enrichment_during_decode() {
+    let cfg = EnrichmentConfig {
+        networks: BTreeMap::from([(
+            "198.38.121.0/24".to_string(),
+            NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+                name: "netflow-src".to_string(),
+                role: "fixture".to_string(),
+                tenant: "decode-test".to_string(),
+                asn: 64_501,
+                ..Default::default()
+            }),
+        )]),
+        ..Default::default()
+    };
+    let flows = decode_fixture_sequence_with_enrichment(
+        &[
+            "options-template.pcap",
+            "options-data.pcap",
+            "template.pcap",
+            "data.pcap",
+        ],
+        &cfg,
+    );
+    let flow = find_flow(&flows, &[("SRC_ADDR", "198.38.121.178")]);
+
+    assert_fields(
+        &flow,
+        &[
+            ("FLOW_VERSION", "v9"),
+            ("SRC_NET_NAME", "netflow-src"),
+            ("SRC_NET_ROLE", "fixture"),
+            ("SRC_NET_TENANT", "decode-test"),
+            ("SRC_AS", "64501"),
+            ("SRC_AS_NAME", "AS64501"),
+            ("DST_NET_NAME", ""),
+        ],
+    );
 }
 
 #[test]
@@ -3061,6 +3148,25 @@ fn decode_fixture_sequence_with_options(
             &base.join(fixture),
             &mut decoders,
             input_realtime_usec,
+        ));
+    }
+    out
+}
+
+fn decode_fixture_sequence_with_enrichment(
+    fixtures: &[&str],
+    cfg: &EnrichmentConfig,
+) -> Vec<DecodedFlow> {
+    let base = fixture_dir();
+    let mut decoders = FlowDecoders::new();
+    decoders
+        .set_enricher(FlowEnricher::from_config(cfg).expect("build enricher for decoder fixture"));
+    let mut out = Vec::new();
+    for fixture in fixtures {
+        out.extend(decode_pcap_flows_at(
+            &base.join(fixture),
+            &mut decoders,
+            TEST_INPUT_REALTIME_USEC,
         ));
     }
     out

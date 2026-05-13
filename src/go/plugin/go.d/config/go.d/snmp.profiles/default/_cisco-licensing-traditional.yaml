@@ -1,0 +1,69 @@
+# Cisco traditional licensing mixin.
+
+licensing:
+  - MIB: CISCO-LICENSE-MGMT-MIB
+    id: cisco_traditional_licenses
+    table:
+      OID: 1.3.6.1.4.1.9.9.543.1.2.3.1
+      name: clmgmtLicenseInfoTable
+    identity:
+      id:
+        index_transform:
+          - start: 0
+            end: 2
+      name:
+        OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.3
+        name: clmgmtLicenseFeatureName
+      feature:
+        OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.4
+        name: clmgmtLicenseFeatureVersion
+      component:
+        value: traditional_licensing
+    descriptors:
+      type:
+        OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.5
+        name: clmgmtLicenseType
+        mapping:
+          1: demo
+          2: extension
+          3: grace_period
+          4: permanent
+          5: paid_subscription
+          6: evaluation_subscription
+          7: extension_subscription
+          8: eval_right_to_use
+          9: right_to_use
+          10: permanent_right_to_use
+      perpetual:
+        OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.5
+        name: clmgmtLicenseType
+        mapping:
+          4: "true"
+          9: "true"
+          10: "true"
+      impact:
+        OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.13
+        name: clmgmtLicenseComments
+    state:
+      OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.14
+      name: clmgmtLicenseStatus
+      mapping:
+        1: "0"
+        2: "0"
+        3: "0"
+        4: "2"
+        5: "2"
+        6: "2"
+    signals:
+      expiry:
+        timestamp:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.16
+          name: clmgmtLicenseEndDate
+          format: snmp_dateandtime
+      usage:
+        capacity:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.10
+          name: clmgmtLicenseMaxUsageCount
+        available:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.11
+          name: clmgmtLicenseUsageCountRemaining

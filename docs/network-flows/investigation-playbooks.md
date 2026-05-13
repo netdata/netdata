@@ -6,9 +6,11 @@ learn_rel_path: "Network Flows"
 keywords: ['playbooks', 'investigation', 'workflows', 'troubleshooting traffic']
 endmeta-->
 
+<!-- markdownlint-disable-file -->
+
 # Investigation playbooks
 
-Step-by-step recipes for common questions, all using the Netdata Network Flows tab. Each playbook fits in a 5-15 minute investigation window.
+Step-by-step recipes for common questions, all using the Netdata Network Flows view (open the **Live** tab and select **Network Flows**). Each playbook fits in a 5-15 minute investigation window.
 
 ## Playbook 1 — "The link is saturated, who's responsible?"
 
@@ -18,16 +20,16 @@ Step-by-step recipes for common questions, all using the Netdata Network Flows t
 
 **Steps.**
 
-1. **Open the Network Flows tab** with the default view (Sankey + Table). Set the time range to **the last 15 minutes** — recent enough to be live, wide enough to smooth bursts.
+1. **Open Network Flows** with the default view (Sankey + Table). Set the time range to **the last 15 minutes** — recent enough to be live, wide enough to smooth bursts.
 
 2. **Filter to the saturated interface.** In the filter ribbon, set:
    - `Exporter Name` = the router with the saturated link
-   - `Output Interface Name` = the interface name (or `Input Interface Name` if you want incoming traffic)
+   - `Egress Interface Name` = the interface name (or `Ingress Interface Name` if you want incoming traffic)
 
    This eliminates the doubling effect and shows only one direction.
 
 3. **Change the aggregation to "who's responsible".** Click the group-by selector and change the fields to:
-   - `Source ASN` → `Destination ASN` (for an Internet-edge link)
+   - `Source AS Name` → `Destination AS Name` (for an Internet-edge link)
 
    Or for an internal link:
    - `Source IP` → `Destination IP`
@@ -60,14 +62,14 @@ Step-by-step recipes for common questions, all using the Netdata Network Flows t
 
 **Steps.**
 
-1. **Open the Network Flows tab** with **the last 24 hours** as the time range.
+1. **Open Network Flows** with **the last 24 hours** as the time range.
 
 2. **Filter by the IP.** In the filter ribbon:
    - For inbound investigation: `Destination IP` = the IP
    - For outbound investigation: `Source IP` = the IP
    - For both directions: filter both, separately, in two browser tabs
 
-   IP filtering forces tier 0 (raw retention) — the time depth is bounded by your raw-tier retention. If you need to look further back than that, the data isn't there.
+   IP filtering forces raw tier (raw retention) — the time depth is bounded by your raw-tier retention. If you need to look further back than that, the data isn't there.
 
 3. **Switch to Time-Series view.** This shows when the IP was active. Look for:
    - When did activity start? End?
@@ -94,7 +96,7 @@ Step-by-step recipes for common questions, all using the Netdata Network Flows t
 
 **Caveats.**
 
-- IP filter forces tier 0; older data may not be available.
+- IP filter forces raw tier; older data may not be available.
 - If the IP is internal and you haven't declared it under `enrichment.networks`, GeoIP may misrepresent its country.
 - If the IP is a NAT public address, multiple internal hosts may be hidden behind it. Cross-check with NAT translation logs.
 
@@ -106,15 +108,15 @@ Step-by-step recipes for common questions, all using the Netdata Network Flows t
 
 **Steps.**
 
-1. **Open the Network Flows tab** with **the last 30 days** as the time range. (Adjust based on tier-1/5/60 retention. If your retention is shorter, use whatever you have.)
+1. **Open Network Flows** with **the last 30 days** as the time range. (Adjust based on tier-1/5/60 retention. If your retention is shorter, use whatever you have.)
 
-2. **Filter to the WAN interface.** Set `Exporter Name` and `Output Interface Name` (or input — pick one direction). This removes the doubling effect.
+2. **Filter to the WAN interface.** Set `Exporter Name` and `Egress Interface Name` (or `Ingress Interface Name` — pick one direction). This removes the doubling effect.
 
 3. **Switch to Time-Series view.** The chart now shows ~30 days of bandwidth on the link. The bucket size auto-adjusts to roughly 1 hour at this range.
 
 4. **Identify the trend.** Look at the daily peaks (one curve cycle = one day). The peak should be growing month-over-month. Eyeball the slope.
 
-5. **Identify the growth driver.** Switch back to Sankey + Table, group by `Destination ASN` or `Application` (port). Compare top consumers from the start of the period to the end. New entries that weren't there 30 days ago are growth drivers.
+5. **Identify the growth driver.** Switch back to Sankey + Table, group by `Destination ASN` or `Destination Port` (service). Compare top consumers from the start of the period to the end. New entries that weren't there 30 days ago are growth drivers.
 
 6. **Compute the upgrade need.** Take the current peak (e.g., 80% of 100 Mbps = 80 Mbps), project forward at the observed monthly growth rate (e.g., 10%/month = ~30%/quarter), and find when it crosses 100% (or 70% if you want headroom).
 
@@ -125,11 +127,8 @@ Step-by-step recipes for common questions, all using the Netdata Network Flows t
 - Trend chart (screenshot or shareable URL)
 - Growth driver: the specific applications / services consuming the new bandwidth
 - Projected saturation date and recommended upgrade timeline
-- Sampling rate of the exporter (so the numbers can be interpreted)
-
 **Caveats.**
 
-- Always note the sampling rate. A change in sampling rate during the analysis window invalidates the trend.
 - A large spike one day shouldn't drive the projection. Use weekly peaks (averaged across same-day-of-week) for stability.
 - If your retention is shorter than 30 days, use what you have but caveat the projection.
 
@@ -141,11 +140,11 @@ Step-by-step recipes for common questions, all using the Netdata Network Flows t
 
 **Steps.**
 
-1. **Open the Network Flows tab** with the time range covering 24 hours before the alert through now.
+1. **Open Network Flows** with the time range covering 24 hours before the alert through now.
 
 2. **Filter by the external IP.** In the filter ribbon: `Destination IP` = the external IP.
 
-   This forces tier 0. Time depth is your raw-tier retention.
+   This forces raw tier. Time depth is your raw-tier retention.
 
 3. **Switch to Time-Series view.** When did communication start? Is it ongoing? Did it correlate with the alert time?
 

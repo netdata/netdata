@@ -6,6 +6,8 @@ learn_rel_path: "Network Flows/Visualization"
 keywords: ['country map', 'state map', 'city map', 'globe', 'visualization']
 endmeta-->
 
+<!-- markdownlint-disable-file -->
+
 # Maps and Globe
 
 Four geographic views, all driven by the same aggregation engine as the Sankey and Time-Series:
@@ -48,7 +50,7 @@ The country map and state map can use the rollup tiers. They're cheap over long 
 The city map and the globe **need raw-tier data**. City, latitude, and longitude are dropped from the rollup tiers (1m / 5m / 1h) to keep cardinality manageable. So:
 
 - Country / state map over the last 30 days — fine, uses the 1-hour tier.
-- City map over the last 30 days — likely empty. Tier 0 retention defaults to 7 days (shared budget across all tiers); often less in practice.
+- City map over the last 30 days — likely empty. Raw-tier retention defaults to its own 10GB / 7d limits; busy collectors often hit the raw-tier size cap before 7 days.
 
 If your city map looks empty over a long window, try the country map first to confirm data is arriving, then narrow the time range until the city map fills in.
 
@@ -72,23 +74,19 @@ Globe view, top-N at 500, rotated over the Atlantic. The 3D projection shows US 
 
 ### GeoIP is required
 
-Without a GeoIP database, country / state / city / coordinate fields are empty and the maps are blank. The default install includes a stock DB-IP database — see [GeoIP enrichment](/docs/network-flows/enrichment/ip-intelligence.md). Source builds need the operator to run the downloader once.
-
-### Internal IPs in random countries
-
-If you see "traffic from China" or "traffic to Russia" coming from your own network, that's almost always GeoIP misidentifying internal IPs. The fix is to declare your internal CIDRs explicitly under `enrichment.networks` with a country override. See [Static metadata](/docs/network-flows/enrichment/static-metadata.md). Don't trust GeoIP for RFC 1918 / RFC 6598 / link-local addresses.
+Without a GeoIP database, country / state / city / coordinate fields are empty and the maps are blank. Native packages include a stock DB-IP database — see the [DB-IP integration card](/src/crates/netflow-plugin/integrations/db-ip_ip_intelligence.md) and the [Enrichment Intel Downloader](/docs/network-flows/intel-downloader.md). Source builds need the operator to run the downloader once.
 
 ### CDN traffic shifts
 
 Your traffic to a SaaS provider may resolve to one country today and another tomorrow because the CDN's routing changed. This is normal CDN behaviour, not a security incident. ASN-based aggregation is more stable for cloud / CDN traffic than country-based — see the [Anti-patterns page](/docs/network-flows/anti-patterns.md) "Geographic firewall of shame".
 
-### Mirroring
+### Bidirectional traffic on the map
 
-Bidirectional conversations show up as two arcs (A→B and B→A). With the default 25 top-N, that means about 12 actual conversations get rendered, not 25. To see one direction only, filter on a specific source or destination.
+Bidirectional traffic between two endpoints produces two separate flow records (one per direction) and renders as two distinct edges (A→B and B→A). The two directions are usually asymmetric in volume — for example, a download is large in one direction and small in the other. To see only one direction, filter on a specific source or destination.
 
 ### Globe vs City Map
 
-The globe and city map use the same data. The globe is purely a different rendering of the same response — useful for visual presentation, less useful for analysis (the 3D projection makes precise reading harder than a 2D map).
+The globe and city map render the same data with the same table beneath. The 2D city map is best for precise comparisons within a continent. The 3D globe is best when distance and great-circle paths matter — transcontinental traffic, undersea cable corridors, intercontinental CDN routing. Pick the one that fits the question.
 
 ## What controls are available
 
@@ -100,15 +98,15 @@ The globe and city map use the same data. The globe is purely a different render
 
 ## Things that go wrong
 
-- **City map empty.** Time range exceeds tier-0 retention. Narrow the range, or use country/state map for a wider view.
-- **Random countries appearing for internal traffic.** Declare your internal CIDRs in `enrichment.networks`.
+- **City map empty.** Time range exceeds raw-tier retention. Narrow the range, or use country/state map for a wider view.
 - **Ireland or Singapore showing up unexpectedly.** Probably AWS/GCP/Azure shifting CDN routing. ASN-based aggregation is more stable.
 - **A whole country disappears.** Your filter excluded it. Check the filter ribbon.
 - **No data on globe but city map works.** Both should fail or succeed identically — they consume the same response. If they diverge, that's a dashboard bug worth reporting.
 
 ## What's next
 
-- [GeoIP enrichment](/docs/network-flows/enrichment/ip-intelligence.md) — Required for any geographic visualization.
-- [Static metadata](/docs/network-flows/enrichment/static-metadata.md) — Declare your internal networks to override GeoIP for RFC 1918.
+- [Enrichment](/docs/network-flows/enrichment.md) — Order of evaluation and the MMDB shared mechanism that drives geographic visualisation.
+- [DB-IP integration card](/src/crates/netflow-plugin/integrations/db-ip_ip_intelligence.md) — The default GeoIP source that ships with Netdata.
+- [Static Metadata integration card](/src/crates/netflow-plugin/integrations/static_metadata.md) — Declare your internal networks to override GeoIP for RFC 1918.
 - [Filters and Facets](/docs/network-flows/visualization/filters-facets.md) — Narrowing geographic views.
 - [Anti-patterns](/docs/network-flows/anti-patterns.md) — Why "alert on traffic to country X" is fragile.

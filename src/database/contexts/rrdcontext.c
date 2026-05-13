@@ -106,10 +106,62 @@ ALWAYS_INLINE void rrdcontext_host_child_connected(RRDHOST *host) {
     rrdset_foreach_done(st);
 }
 
+// Cross-thread schedule slot for the deep rrdcontext GC pass. Written by
+// rrdcontext_db_rotation() (dbengine rotation), rrdcontext_request_full_gc()
+// (chart-cleanup), and the rrdcontext worker (reset to 0 after a pass).
+// All accesses go through __atomic_* so 32-bit platforms cannot tear the
+// 64-bit value, and the request_full_gc() check-then-set is a real CAS
+// rather than a TOCTOU race.
 usec_t rrdcontext_next_db_rotation_ut = 0;
+
+// Companion flag for rrdcontext_request_full_gc(): set when its CAS
+// failed because the worker was already mid-pass with the deadline in
+// the past. The worker reads-and-clears this after each pass and arms
+// a follow-up if set, so an archive that landed mid-pass (after the
+// worker had already walked its host) doesn't get stranded.
+size_t rrdcontext_full_gc_rerun_requested = 0;
+
 ALWAYS_INLINE void rrdcontext_db_rotation(void) {
     // called when the db rotates its database
-    rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+    __atomic_store_n(&rrdcontext_next_db_rotation_ut,
+                     now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC,
+                     __ATOMIC_RELAXED);
+    // Count only real dbengine rotations (not chart-cleanup-driven scans),
+    // so the extreme-cardinality guard in the rrdcontext worker preserves
+    // its original "wait for first rotation" semantics.
+    rrdcontext_count_db_rotation();
+}
+
+ALWAYS_INLINE void rrdcontext_request_full_gc(void) {
+    // Schedule a deep rrdcontext GC pass. Called from chart-cleanup paths
+    // (e.g. svc_rrd_cleanup_obsolete_charts_from_all_hosts) so non-dbengine
+    // hosts also drop archived rrdinstance / rrdmetric entries -- otherwise
+    // those grow unbounded with chart churn (k8s cgroups, etc.) because the
+    // dbengine rotation trigger never fires on them.
+    //
+    // The maintenance loop runs every 10 s; under continuous churn it would
+    // free charts on every pass. Unconditionally rewriting the deadline
+    // would push it out by another 120 s on every call, so under sustained
+    // churn the deep GC would never actually fire. Only arm the deadline if
+    // no pass is already scheduled; the worker resets the slot to 0 after
+    // it runs, at which point the next chart-free arms a fresh window.
+    // Multiple requests within that window coalesce into a single GC pass.
+    usec_t now = now_realtime_usec();
+    usec_t expected = 0;
+    usec_t deadline = now + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+    if(!__atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
+                                    &expected, deadline,
+                                    false,
+                                    __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+        // CAS failed -- expected now holds the slot's actual value.
+        // If that deadline is in the past, the worker is mid-pass and
+        // may already have walked the host whose archive triggered this
+        // request. Mark for a follow-up so the worker schedules another
+        // pass after the current one. Future-armed deadlines need no
+        // follow-up: their upcoming pass will see the archive.
+        if(expected && expected <= now)
+            __atomic_store_n(&rrdcontext_full_gc_rerun_requested, 1, __ATOMIC_RELAXED);
+    }
 }
 
 int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, nd_uuid_t *store_uuid) {

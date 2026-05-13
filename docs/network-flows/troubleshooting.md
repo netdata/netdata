@@ -6,6 +6,8 @@ learn_rel_path: "Network Flows"
 keywords: ['troubleshooting', 'debugging', 'plugin health', 'failures']
 endmeta-->
 
+<!-- markdownlint-disable-file -->
+
 # Troubleshooting
 
 Concrete recipes for the most common failures, organised by symptom. Most issues are diagnosable from the [plugin health charts](/docs/network-flows/visualization/dashboard-cards.md), the Netdata journal logs, and a couple of OS-level commands.
@@ -16,14 +18,14 @@ The plugin won't come up at all, or starts and immediately exits.
 
 **Symptoms:**
 - Netdata reports `netflow-plugin` as not running, or restart-looping.
-- Nothing in the Network Flows tab.
-- An error in `journalctl -u netdata`.
+- Nothing in the Network Flows view.
+- An error in `journalctl --namespace netdata`.
 
 **Likely causes:**
 
 | Cause | What to check |
 |---|---|
-| YAML typo or unknown key | `journalctl -u netdata --since "5 minutes ago" \| grep -E 'failed to load configuration\|netflow'`. The plugin uses strict YAML — any unknown key fails parsing. |
+| YAML typo or unknown key | `journalctl --namespace netdata --since "5 minutes ago" \| grep -E 'failed to load configuration\|netflow'`. The plugin uses strict YAML — any unknown key fails parsing. |
 | Required GeoIP DB missing (`optional: false`) | Same log search. Look for `failed to load database`. Either fix the path or set `optional: true`. |
 | Listen address conflict | Look for `failed to bind`. Another process is on the configured port (default 2055). |
 | Validation error | Look for `must be greater than 0` and similar. The plugin validates the full config at startup. |
@@ -33,7 +35,7 @@ The plugin won't come up at all, or starts and immediately exits.
 
 ```bash
 # Read the failure
-sudo journalctl -u netdata --since "5 minutes ago" | grep -E 'netflow|failed to|error'
+sudo journalctl --namespace netdata --since "5 minutes ago" | grep -E 'netflow|failed to|error'
 
 # Validate the YAML (use an online linter or `yamllint`)
 yamllint /etc/netdata/netflow.yaml
@@ -44,7 +46,7 @@ sudo systemctl restart netdata
 
 ## The plugin starts, but no flows appear
 
-The plugin is running, but the Network Flows tab is empty.
+The plugin is running, but the Network Flows view is empty.
 
 **First check:** is anything reaching the plugin?
 
@@ -69,7 +71,7 @@ Open `netflow.input_packets` on the standard Netdata charts page. The dimensions
 
 - `udp_received > 0`, `parsed_packets == 0` — datagrams arriving, none decoding successfully. Wrong protocol on the listener, or all datagrams malformed.
 - `udp_received > 0`, `parsed_packets > 0`, but no per-protocol counter (`netflow_v9`, `ipfix`, etc.) is moving — the protocol you're sending may be disabled in the plugin config. Check `protocols.v9`, `protocols.ipfix`, etc. in `netflow.yaml`.
-- `parse_errors` rising in lockstep with `udp_received` — datagrams aren't valid for the protocols the plugin supports. Capture a sample (`tcpdump -w sample.pcap`) and inspect with Wireshark.
+- `parse_errors` rising in lockstep with `udp_received` — datagrams aren't valid for the protocols the plugin supports. Capture a small UDP sample with `tcpdump -w` and inspect it with Wireshark.
 
 ## Partial data — some flows are dropped
 
@@ -84,8 +86,8 @@ Counters show received traffic but you suspect data loss.
 
 If it's climbing, the exporter is sending data records before their templates. Either:
 
-- The exporter restarted and the plugin's template cache is stale. Wait for the exporter to send the next template (typically every 30-60 seconds, depending on its config), or restart the exporter to force an immediate template refresh.
-- Templates are sent rarely (Cisco's default template refresh is 30 minutes). After a plugin restart, you'll see template errors for that long. **Fix on the router side**: lower the template refresh interval to 60 seconds.
+- The exporter restarted and the plugin's template cache is stale. Wait for the exporter to send the next template (the cadence depends on the exporter's `template-refresh` configuration — vendor defaults vary widely), or restart the exporter to force an immediate template refresh.
+- Templates are sent rarely. Cisco IOS / IOS-XE Flexible NetFlow ships a default `template data timeout` of **600 seconds (10 minutes)**; Juniper and others have their own defaults, often longer. After a plugin restart, you'll see template errors until the next template re-send. **Fix on the router side**: lower the template refresh interval to 60 seconds (the [Quick Start](/docs/network-flows/quick-start.md) configurations show this).
 - The exporter is using template IDs that collide with another exporter's templates. Most common cause: two exporters NATted behind the same public IP. Place the plugin inside the NAT boundary or give each exporter a distinct address.
 
 **UDP kernel drops:**
@@ -93,9 +95,11 @@ If it's climbing, the exporter is sending data records before their templates. E
 The plugin doesn't count these. Check at the OS level:
 
 ```bash
-sudo ss -uam sport = :2055         # check 'd' columns for drops
-cat /proc/net/udp | head -20       # RcvbufErrors column
+sudo ss -uamn sport = :2055        # inspect the d<N> field inside skmem:(...)
+grep ^Udp: /proc/net/snmp          # RcvbufErrors counter (system-wide)
 ```
+
+`/proc/net/udp` lists open sockets and includes per-socket `drops`; the kernel-wide UDP `RcvbufErrors` total lives under the `Udp:` line of `/proc/net/snmp` (this is what Netdata's own `ipv4.udperrors` chart and the `1m_ipv4_udp_receive_buffer_errors` alert read).
 
 If drops are occurring, the kernel UDP receive buffer is too small for the burst rate. Tune:
 
@@ -118,24 +122,18 @@ protocols:
 
 **Volume looks doubled:**
 
-This is the most common report. With one router, traffic appears 2× because every packet generates an ingress record AND an egress record. With two routers on the same path, 4×. Filter to one exporter + one direction (input interface OR output interface) to see real volume. See [Anti-patterns](/docs/network-flows/anti-patterns.md).
+This is the most common report. When a router is configured to export both ingress and egress on each monitored interface — a common configuration; vendor best practice is ingress-only — every packet generates an ingress record AND an egress record, so traffic appears 2× on a single such router. With two routers on the same path doing the same thing, 4×. Filter to one exporter and one interface (`Ingress Interface Name` OR `Egress Interface Name`, pick one) to see real volume. See [Anti-patterns](/docs/network-flows/anti-patterns.md).
 
 **Bandwidth doesn't match SNMP:**
 
 Several legitimate causes:
 
-- **Doubling**, as above. Filter properly before comparing.
-- **Sampling rate not honoured.** The plugin auto-multiplies bytes by the sampling rate, but if the exporter doesn't carry the rate (NetFlow v7 has no field for it; v5 sometimes sends 0 instead of the actual rate; v9 may not send the Sampling Options Template), the result is undercounted.
-- **Mixed sampling rates across exporters.** If your dashboard aggregates exporters with different rates, the result blends estimates and isn't comparable to any single SNMP measurement.
+- **Doubling**, as above. Filter to one exporter and one interface before comparing.
+- **Comparing aggregates to a single interface counter.** SNMP `ifInOctets` / `ifOutOctets` is per-interface; an unfiltered flow aggregate sums many interfaces. Compare like-with-like by filtering the dashboard to the same exporter and the same interface (Input or Output, pick one).
+- **Sampling rate not honoured by the exporter.** The plugin multiplies each flow's bytes/packets by that flow's own sampling rate. If the exporter doesn't carry the rate (NetFlow v7 has no field for it; v5 sometimes sends 0 instead of the actual rate; v9 / IPFIX without the Sampling Options Template), the plugin treats those records as unsampled and undercounts.
 - **SNMP includes layer-2 traffic** (ARP, STP, LLDP, routing protocols) that flow data filters out. Expect SNMP to be 5-15% higher than flow on a healthy collector. More than that, investigate.
 
 See [Validation and Data Quality](/docs/network-flows/validation.md).
-
-**Internal IPs in random countries:**
-
-GeoIP databases don't have entries for RFC 1918 / private space. The plugin doesn't skip private IPs — it just hands the IP to the database and uses what comes back. For the stock DB-IP build, private ranges are tagged so they render as "AS0 Private IP Address Space" with empty country. For other MMDBs, private ranges may resolve to weird countries.
-
-**Fix:** declare your internal CIDRs under `enrichment.networks` with country / role / name labels. See [Static metadata](/docs/network-flows/enrichment/static-metadata.md).
 
 **AS resolution chain misbehaving:**
 
@@ -144,7 +142,7 @@ If `SRC_AS` / `DST_AS` are zero everywhere despite the exporter sending them, ch
 - `[geoip, ...]` — `geoip` is a terminal short-circuit. The chain stops at `geoip` (it returns 0). Reorder: `[flow, routing, geoip]`.
 - `[]` (empty) — no validation rejects this. Every AS is forced to 0.
 
-See [ASN resolution](/docs/network-flows/enrichment/asn-resolution.md).
+See [Enrichment](/docs/network-flows/enrichment.md) (the asn_providers chain section).
 
 **Decapsulation eating non-tunnel traffic:**
 
@@ -183,14 +181,13 @@ See [Sizing and Capacity Planning](/docs/network-flows/sizing-capacity.md) for m
 sudo du -sh /var/cache/netdata/flows/*
 ```
 
-Default retention is `10GB / 7d` per tier — the same budget applies to all four tiers, so total can reach roughly 40 GB plus some. If your config left this default and your collector is busy, expect to hit it. See [Configuration](/docs/network-flows/configuration.md) for per-tier overrides — most production deployments need them.
+Default retention is `10GB / 7d` per tier. The default is applied separately to raw, 1m, 5m, and 1h tiers, so total can reach roughly 40 GB plus some. If your config left this default and your collector is busy, expect to hit the size cap before the time cap. See [Configuration](/docs/network-flows/configuration.md) for per-tier overrides — most production deployments need them.
 
 ## Things that look like bugs but aren't
 
-- **Traffic appears 2×.** Standard ingress + egress monitoring. Filter to one direction.
-- **Bidirectional conversations show twice.** A→B and B→A are real, distinct flows. Filter to one direction or one ASN to see one side.
-- **Internal IPs in odd countries.** GeoIP doesn't know about your private space. Declare it explicitly.
-- **City map empty over long windows.** City + lat/lon are tier-0-only. Default tier-0 retention is short. Use the country map for long ranges.
+- **Traffic appears 2×.** When the router is configured to export both ingress + egress (common, but not universal — vendor best practice is ingress-only), the same packet is recorded once on entry and once on exit on a single router. Filter to one exporter and one interface (`Ingress Interface Name` or `Egress Interface Name`, pick one).
+- **Bidirectional conversations show twice.** A→B and B→A are real, distinct flows representing different packets going each way. Their volumes are usually asymmetric. Filter by `Source AS Name` (your network) for outbound or `Destination AS Name` (your network) for inbound to see one side.
+- **City map empty over long windows.** City + lat/lon are raw-tier-only. Default raw-tier retention is short. Use the country or state map for long ranges.
 - **`__overflow__` row in results.** Your aggregation produced more groups than `query_max_groups`. Narrow the filter or reduce group-by depth.
 - **30-second query timeout.** Hard limit. Narrow time range, add filters, or reduce group-by depth.
 - **Sampled byte counts not exact.** sFlow is statistical by design; even NetFlow with sampling is an estimate. Cross-check against SNMP for sanity, accept some divergence.
@@ -200,7 +197,7 @@ Default retention is `10GB / 7d` per tier — the same budget applies to all fou
 
 ```bash
 # What's happening
-sudo journalctl -u netdata --since "10 minutes ago" | grep -iE 'netflow|geoip|bmp|bioris|network-sources'
+sudo journalctl --namespace netdata --since "10 minutes ago" | grep -iE 'netflow|geoip|bmp|bioris|network-sources'
 
 # What's arriving on the wire
 sudo tcpdump -i any -nn -c 50 'udp port 2055'
@@ -209,8 +206,8 @@ sudo tcpdump -i any -nn -c 50 'udp port 2055'
 sudo ss -unlp | grep 2055
 
 # UDP kernel drops
-sudo ss -uam sport = :2055
-cat /proc/net/udp
+sudo ss -uamn sport = :2055
+grep ^Udp: /proc/net/snmp
 
 # Disk usage by tier
 sudo du -sh /var/cache/netdata/flows/*
@@ -219,7 +216,7 @@ sudo du -sh /var/cache/netdata/flows/*
 top -p $(pgrep -f netflow-plugin)
 
 # Capture a sample for offline analysis
-sudo tcpdump -w /tmp/netflow-sample.pcap -c 200 'udp port 2055'
+sudo tcpdump -w /tmp/netflow-sample.cap -c 200 'udp port 2055'
 ```
 
 ## When to file an issue
@@ -229,9 +226,9 @@ Collect this before opening a bug report:
 - Plugin version (`netdata --version` from the running daemon).
 - A sample of `netflow.input_packets` chart for the failure window — all dimensions visible.
 - A sample of `netflow.memory_resident_bytes` if performance-related.
-- A captured pcap (`tcpdump -w` from the agent's interface) reproducing the issue.
+- A small packet-capture file (`tcpdump -w` from the agent's interface) reproducing the issue.
 - Sanitised `netflow.yaml` (redact internal IPs, customer names, secrets).
-- Relevant log lines from `journalctl -u netdata`.
+- Relevant log lines from `journalctl --namespace netdata`.
 
 Open issues against [github.com/netdata/netdata](https://github.com/netdata/netdata) with `area/collectors/netflow` in the title.
 

@@ -11,8 +11,10 @@ import (
 type ProfileConsumer = ddprofiledefinition.ProfileConsumer
 
 const (
-	ConsumerMetrics  = ddprofiledefinition.ConsumerMetrics
-	ConsumerTopology = ddprofiledefinition.ConsumerTopology
+	ConsumerMetrics   = ddprofiledefinition.ConsumerMetrics
+	ConsumerTopology  = ddprofiledefinition.ConsumerTopology
+	ConsumerLicensing = ddprofiledefinition.ConsumerLicensing
+	ConsumerBGP       = ddprofiledefinition.ConsumerBGP
 )
 
 type ManualProfilePolicy int
@@ -82,16 +84,33 @@ func (r *ResolvedProfileSet) Profiles() []*Profile {
 	return r.profiles
 }
 
-func (r *ResolvedProfileSet) Project(consumer ProfileConsumer) ProjectedView {
+func (r *ResolvedProfileSet) Project(consumer ProfileConsumer, consumers ...ProfileConsumer) ProjectedView {
 	if r == nil || len(r.profiles) == 0 {
 		return ProjectedView{}
 	}
 
+	requested := append([]ProfileConsumer{consumer}, consumers...)
+	if len(requested) > 1 {
+		return r.project(func(prof *Profile) {
+			projectProfileForConsumers(prof, requested)
+		}, func(def *ddprofiledefinition.ProfileDefinition) bool {
+			return profileHasProjectedDataForConsumers(def, requested)
+		})
+	}
+
+	return r.project(func(prof *Profile) {
+		projectProfile(prof, consumer)
+	}, func(def *ddprofiledefinition.ProfileDefinition) bool {
+		return profileHasProjectedData(def, consumer)
+	})
+}
+
+func (r *ResolvedProfileSet) project(project func(*Profile), keep func(*ddprofiledefinition.ProfileDefinition) bool) ProjectedView {
 	profiles := make([]*Profile, 0, len(r.profiles))
 	for _, prof := range r.profiles {
 		projected := prof.clone()
-		projectProfile(projected, consumer)
-		if profileHasProjectedData(projected.Definition, consumer) {
+		project(projected)
+		if keep(projected.Definition) {
 			profiles = append(profiles, projected)
 		}
 	}
@@ -178,16 +197,57 @@ func projectProfile(prof *Profile, consumer ProfileConsumer) {
 	switch consumer {
 	case ConsumerMetrics:
 		def.Topology = nil
+		def.Licensing = nil
+		def.BGP = nil
 	case ConsumerTopology:
 		def.Metrics = nil
+		def.Licensing = nil
+		def.BGP = nil
+		def.VirtualMetrics = nil
+	case ConsumerLicensing:
+		def.Metrics = nil
+		def.Topology = nil
+		def.BGP = nil
+		def.VirtualMetrics = nil
+	case ConsumerBGP:
+		def.Metrics = nil
+		def.Topology = nil
+		def.Licensing = nil
 		def.VirtualMetrics = nil
 	default:
 		def.Metrics = nil
 		def.Topology = nil
+		def.Licensing = nil
+		def.BGP = nil
 		def.VirtualMetrics = nil
 		def.Metadata = nil
 		def.SysobjectIDMetadata = nil
 		def.MetricTags = nil
+	}
+}
+
+func projectProfileForConsumers(prof *Profile, consumers []ProfileConsumer) {
+	if prof == nil || prof.Definition == nil {
+		return
+	}
+
+	def := prof.Definition
+	def.Metadata = projectMetadataForConsumers(def.Metadata, consumers)
+	def.SysobjectIDMetadata = projectSysobjectIDMetadataForConsumers(def.SysobjectIDMetadata, consumers)
+	def.MetricTags = projectGlobalMetricTagsForConsumers(def.MetricTags, consumers)
+
+	if !profileConsumersInclude(consumers, ConsumerMetrics) {
+		def.Metrics = nil
+		def.VirtualMetrics = nil
+	}
+	if !profileConsumersInclude(consumers, ConsumerTopology) {
+		def.Topology = nil
+	}
+	if !profileConsumersInclude(consumers, ConsumerLicensing) {
+		def.Licensing = nil
+	}
+	if !profileConsumersInclude(consumers, ConsumerBGP) {
+		def.BGP = nil
 	}
 }
 
@@ -204,6 +264,33 @@ func projectMetadata(meta ddprofiledefinition.MetadataConfig, consumer ProfileCo
 			}
 		}
 		idTags := projectMetricTagList(res.IDTags, consumer)
+		if len(fields) == 0 && len(idTags) == 0 {
+			continue
+		}
+		projected[resName] = ddprofiledefinition.MetadataResourceConfig{
+			Fields: fields,
+			IDTags: idTags,
+		}
+	}
+	if len(projected) == 0 {
+		return nil
+	}
+	return projected
+}
+
+func projectMetadataForConsumers(meta ddprofiledefinition.MetadataConfig, consumers []ProfileConsumer) ddprofiledefinition.MetadataConfig {
+	if len(meta) == 0 {
+		return nil
+	}
+	projected := make(ddprofiledefinition.MetadataConfig)
+	for resName, res := range meta {
+		fields := make(map[string]ddprofiledefinition.MetadataField)
+		for name, field := range res.Fields {
+			if consumersIncludeAny(field.Consumers, consumers) {
+				fields[name] = field
+			}
+		}
+		idTags := projectMetricTagListForConsumers(res.IDTags, consumers)
 		if len(fields) == 0 && len(idTags) == 0 {
 			continue
 		}
@@ -244,9 +331,43 @@ func projectSysobjectIDMetadata(entries []ddprofiledefinition.SysobjectIDMetadat
 	return projected
 }
 
+func projectSysobjectIDMetadataForConsumers(entries []ddprofiledefinition.SysobjectIDMetadataEntryConfig, consumers []ProfileConsumer) []ddprofiledefinition.SysobjectIDMetadataEntryConfig {
+	if len(entries) == 0 {
+		return nil
+	}
+	projected := make([]ddprofiledefinition.SysobjectIDMetadataEntryConfig, 0, len(entries))
+	for _, entry := range entries {
+		fields := make(map[string]ddprofiledefinition.MetadataField)
+		for name, field := range entry.Metadata {
+			if consumersIncludeAny(field.Consumers, consumers) {
+				fields[name] = field
+			}
+		}
+		if len(fields) == 0 {
+			continue
+		}
+		projected = append(projected, ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+			SysobjectID: entry.SysobjectID,
+			Metadata:    fields,
+		})
+	}
+	if len(projected) == 0 {
+		return nil
+	}
+	return projected
+}
+
 func projectMetricTagList(tags []ddprofiledefinition.MetricTagConfig, consumer ProfileConsumer) []ddprofiledefinition.MetricTagConfig {
 	// Metadata id_tags do not carry Consumers today. They inherit metadata defaults.
-	if consumer == ConsumerMetrics || consumer == ConsumerTopology {
+	if consumer == ConsumerMetrics || consumer == ConsumerTopology || consumer == ConsumerBGP {
+		return tags
+	}
+	return nil
+}
+
+func projectMetricTagListForConsumers(tags []ddprofiledefinition.MetricTagConfig, consumers []ProfileConsumer) []ddprofiledefinition.MetricTagConfig {
+	// Metadata id_tags do not carry Consumers today. They inherit metadata defaults.
+	if profileConsumersInclude(consumers, ConsumerMetrics) || profileConsumersInclude(consumers, ConsumerTopology) || profileConsumersInclude(consumers, ConsumerBGP) {
 		return tags
 	}
 	return nil
@@ -265,8 +386,32 @@ func projectGlobalMetricTags(tags []ddprofiledefinition.GlobalMetricTagConfig, c
 	return filtered
 }
 
+func projectGlobalMetricTagsForConsumers(tags []ddprofiledefinition.GlobalMetricTagConfig, consumers []ProfileConsumer) []ddprofiledefinition.GlobalMetricTagConfig {
+	filtered := tags[:0]
+	for _, tag := range tags {
+		if consumersIncludeAny(tag.Consumers, consumers) {
+			filtered = append(filtered, tag)
+		}
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	return filtered
+}
+
 func consumersInclude(consumers ddprofiledefinition.ConsumerSet, consumer ProfileConsumer) bool {
 	return len(consumers) == 0 || consumers.Contains(consumer)
+}
+
+func consumersIncludeAny(consumers ddprofiledefinition.ConsumerSet, requested []ProfileConsumer) bool {
+	if len(consumers) == 0 {
+		return true
+	}
+	return slices.ContainsFunc(requested, consumers.Contains)
+}
+
+func profileConsumersInclude(consumers []ProfileConsumer, want ProfileConsumer) bool {
+	return slices.Contains(consumers, want)
 }
 
 func profileHasProjectedData(def *ddprofiledefinition.ProfileDefinition, consumer ProfileConsumer) bool {
@@ -285,7 +430,26 @@ func profileHasProjectedData(def *ddprofiledefinition.ProfileDefinition, consume
 			len(def.MetricTags) > 0 ||
 			len(def.Metadata) > 0 ||
 			len(def.SysobjectIDMetadata) > 0
+	case ConsumerLicensing:
+		return len(def.Licensing) > 0 ||
+			len(def.MetricTags) > 0 ||
+			len(def.Metadata) > 0 ||
+			len(def.SysobjectIDMetadata) > 0
+	case ConsumerBGP:
+		return len(def.BGP) > 0 ||
+			len(def.MetricTags) > 0 ||
+			len(def.Metadata) > 0 ||
+			len(def.SysobjectIDMetadata) > 0
 	default:
 		return false
 	}
+}
+
+func profileHasProjectedDataForConsumers(def *ddprofiledefinition.ProfileDefinition, consumers []ProfileConsumer) bool {
+	for _, consumer := range consumers {
+		if profileHasProjectedData(def, consumer) {
+			return true
+		}
+	}
+	return false
 }

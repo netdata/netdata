@@ -10,8 +10,8 @@
 #     claim_id to stdout.
 #   * Internal helpers (named `_agents_*`, leading underscore) may
 #     handle token bytes inside their own scope but must return
-#     them only via `local -n` namerefs into the caller's local
-#     variables -- never to stdout.
+#     them only through validated caller-local variable names --
+#     never to stdout.
 #   * `_agents_log_masked` redacts token / bearer bytes in stderr
 #     argv echoes.
 #   * The unit test `agents_selftest_no_token_leak` drives every
@@ -143,6 +143,14 @@ _agents_log_masked() {
             # name; the rejoined arg is harmless even if the
             # leading text is the bare header. Tests cover this.
         fi
+        arg="$(printf '%s' "${arg}" | sed -E \
+            -e 's/(node_id=)[^&]+/\1<NODE_ID>/g' \
+            -e 's/(machine_guid=)[^&]+/\1<MACHINE_GUID>/g' \
+            -e 's/(claim_id=)[^&]+/\1<CLAIM_ID>/g' \
+            -e 's#(/api/v2/nodes/)[0-9a-fA-F-]{36}#\1<NODE_ID>#g' \
+            -e 's#(/api/v[0-9]+/spaces/)[0-9a-fA-F-]{36}#\1<SPACE_ID>#g' \
+            -e 's#(/rooms/)[0-9a-fA-F-]{36}#\1<ROOM_ID>#g' \
+            -e 's#(/host/)[0-9a-fA-F-]{36}#\1<NODE_ID>#g')"
         printf >&2 '%q ' "${arg}"
     done
     printf >&2 '%s\n' "${AGENTS_NC}"
@@ -152,21 +160,35 @@ _agents_log_masked() {
 # Internal: claim_id / bearer mint / cache
 # ---------------------------------------------------------------------------
 
+_agents_set_outvar() {
+    local _agents_out_name="${1:?output variable name required}"
+    local _agents_out_value="${2-}"
+    if [[ ! "${_agents_out_name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Invalid output variable name: ${_agents_out_name}" >&2
+        return 1
+    fi
+    # Avoid eval here because values come from curl/jq output.
+    if ! printf -v "${_agents_out_name}" '%s' "${_agents_out_value}"; then
+        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Failed to set output variable: ${_agents_out_name}" >&2
+        return 1
+    fi
+}
+
 # Resolve claim_id from a node's /api/v3/info. The /info endpoint
-# is unauthenticated. INTERNAL: returns via nameref into a caller
-# local; never prints to stdout.
+# is unauthenticated. INTERNAL: writes to a caller-local variable;
+# never prints to stdout.
 #
 # Args:
 #   $1 = OUTVAR    -- caller-local variable name to receive the claim_id
 #   $2 = HOST      -- host:port (e.g. "agent-events:19999")
 _agents_get_claim_id() {
-    local -n _out="$1"; shift
+    local _out_var="${1:?usage: _agents_get_claim_id OUTVAR <host:port>}"; shift
     local host="${1:?usage: _agents_get_claim_id OUTVAR <host:port>}"
-    local resp claim
+    local resp resolved_claim
     if resp="$(curl -sS --max-time 10 "http://${host}/api/v3/info" 2>/dev/null)"; then
-        claim="$(jq -r '.agents[0].cloud.claim_id // empty' <<< "${resp}" 2>/dev/null)"
-        if [[ -n "${claim}" && "${claim}" != "null" ]]; then
-            _out="${claim}"
+        resolved_claim="$(jq -r '.agents[0].cloud.claim_id // empty' <<< "${resp}" 2>/dev/null)"
+        if [[ -n "${resolved_claim}" && "${resolved_claim}" != "null" ]]; then
+            _agents_set_outvar "${_out_var}" "${resolved_claim}" || return 1
             return 0
         fi
     fi
@@ -207,8 +229,8 @@ _agents_exp_to_seconds() {
     fi
 }
 
-# Cache-aware bearer resolution. INTERNAL: returns via nameref;
-# never prints the bearer to stdout.
+# Cache-aware bearer resolution. INTERNAL: writes to a caller-local
+# variable; never prints the bearer to stdout.
 #
 # Args:
 #   $1 = OUTVAR       -- caller-local variable to receive the bearer
@@ -220,7 +242,7 @@ _agents_exp_to_seconds() {
 # Mode 0600. Stamps `_cached_at` (unix-seconds) so the cache window
 # survives Cloud responses with expiration=0.
 _agents_resolve_bearer() {
-    local -n _out="$1"; shift
+    local _out_var="${1:?usage: _agents_resolve_bearer OUTVAR <node_id> <machine_guid> <host:port>}"; shift
     local node_id="${1:?usage: _agents_resolve_bearer OUTVAR <node_id> <machine_guid> <host:port>}"
     local mg="${2:?machine_guid required}"
     local host="${3:?host required}"
@@ -248,11 +270,11 @@ _agents_resolve_bearer() {
             #     ~3h-TTL bearers, so 2h leaves a 1h safety margin.
             if (( exp_s > 0 )); then
                 if (( exp_s - now > 3600 )); then
-                    _out="${cached_token}"
+                    _agents_set_outvar "${_out_var}" "${cached_token}" || return 1
                     return 0
                 fi
             elif (( cached_at > 0 )) && (( now - cached_at < 7200 )); then
-                _out="${cached_token}"
+                _agents_set_outvar "${_out_var}" "${cached_token}" || return 1
                 return 0
             fi
         fi
@@ -260,7 +282,7 @@ _agents_resolve_bearer() {
 
     # Need to mint -- resolve claim_id first.
     local claim
-    _agents_get_claim_id claim "${host}"
+    _agents_get_claim_id claim "${host}" || return 1
 
     local resp
     resp="$(_agents_mint_bearer_json "${node_id}" "${mg}" "${claim}")"
@@ -273,7 +295,7 @@ _agents_resolve_bearer() {
     # Stamp cache and persist.
     jq --argjson t "${now}" '. + {_cached_at: $t}' <<< "${resp}" > "${cache_file}"
     chmod 0600 "${cache_file}"
-    _out="$(jq -r '.token' "${cache_file}")"
+    _agents_set_outvar "${_out_var}" "$(jq -r '.token' "${cache_file}")" || return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -294,13 +316,13 @@ _agents_resolve_bearer() {
 #   agents_query_cloud POST /api/v2/nodes/$NODE/function?function=systemd-journal '{"info":true}'
 agents_query_cloud() {
     local method="${1:?usage: agents_query_cloud METHOD PATH [BODY]}"
-    local path="${2:?path required}"
+    local api_path="${2:?path required}"
     local body="${3:-}"
 
     local args=(curl --fail --silent --show-error --max-time 120 -X "${method}" \
         -H "Authorization: Bearer ${NETDATA_CLOUD_TOKEN}" \
         -H 'Content-Type: application/json' \
-        "https://${NETDATA_CLOUD_HOSTNAME}${path}")
+        "https://${NETDATA_CLOUD_HOSTNAME}${api_path}")
     if [[ -n "${body}" ]]; then
         args+=(-d "${body}")
     fi
@@ -321,7 +343,7 @@ agents_query_cloud() {
 #   agents_query_agent --node $NODE --host $HOST --machine-guid $MG \
 #       POST /api/v3/function?function=systemd-journal '{"info":true}'
 agents_query_agent() {
-    local node="" host="" mg="" method="" path="" body=""
+    local node="" host="" mg="" method="" api_path="" body=""
     while (( $# > 0 )); do
         local arg="$1"
         case "$arg" in
@@ -337,7 +359,7 @@ agents_query_agent() {
         esac
     done
     method="${1:?usage: agents_query_agent --node N --host H --machine-guid M METHOD PATH [BODY]}"
-    path="${2:?path required}"
+    api_path="${2:?path required}"
     body="${3:-}"
 
     : "${node:?--node required}"
@@ -345,12 +367,12 @@ agents_query_agent() {
     : "${mg:?--machine-guid required}"
 
     local bearer
-    _agents_resolve_bearer bearer "${node}" "${mg}" "${host}"
+    _agents_resolve_bearer bearer "${node}" "${mg}" "${host}" || return 1
 
     local args=(curl --fail --silent --show-error --max-time 120 -X "${method}" \
         -H "X-Netdata-Auth: Bearer ${bearer}" \
         -H 'Content-Type: application/json' \
-        "http://${host}/host/${node}${path}")
+        "http://${host}/host/${node}${api_path}")
     if [[ -n "${body}" ]]; then
         args+=(-d "${body}")
     fi
@@ -412,6 +434,9 @@ agents_call_function() {
 agents_selftest_no_token_leak() {
     local sentinel='UNIQUE_SENTINEL_TOKEN_xK4mP7qR9sT2vW8y'
     local fake_bearer='deadbeef-1234-5678-9abc-def012345678'
+    local fake_claim='11111111-2222-3333-4444-555555555555'
+    local fake_node='22222222-3333-4444-5555-666666666666'
+    local fake_mg='33333333-4444-5555-6666-777777777777'
 
     # Save real values, swap in sentinels, run wrappers in dry-run,
     # capture stdout, restore.
@@ -434,6 +459,9 @@ agents_selftest_no_token_leak() {
     # 2. _agents_log_masked must mask Bearer <uuid> patterns.
     out="$(_agents_log_masked curl -H "Authorization: Bearer ${sentinel}" \
         -H "X-Netdata-Auth: Bearer ${fake_bearer}" \
+        "https://app.netdata.cloud/api/v2/bearer_get_token?node_id=${fake_node}&machine_guid=${fake_mg}&claim_id=${fake_claim}" \
+        "https://app.netdata.cloud/api/v3/spaces/${fake_node}/rooms/${fake_mg}/nodes" \
+        "http://agent.test:19999/host/${fake_node}/api/v3/function?function=flows:netflow" \
         https://example.invalid 2>&1 1>/dev/null)"
     if [[ "${out}" == *"${sentinel}"* ]]; then
         echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_log_masked leaked NETDATA_CLOUD_TOKEN to stderr" >&2
@@ -445,8 +473,69 @@ agents_selftest_no_token_leak() {
         NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
         return 1
     fi
+    if [[ "${out}" == *"${fake_claim}"* || "${out}" == *"${fake_node}"* || "${out}" == *"${fake_mg}"* ]]; then
+        echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_log_masked leaked node identity to stderr" >&2
+        NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
+        return 1
+    fi
 
-    # 3. The unit test passes if both checks above passed.
+    # 3. _agents_get_claim_id must write through the caller-provided
+    # output variable even when the caller names the output variable `claim`.
+    # This mirrors _agents_resolve_bearer and catches local-variable
+    # shadowing regressions before direct-agent calls need credentials.
+    local fake_bin_dir old_path claim
+    fake_bin_dir="$(mktemp -d)"
+    old_path="${PATH}"
+    cat > "${fake_bin_dir}/curl" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' '{"agents":[{"cloud":{"claim_id":"${fake_claim}"}}]}'
+EOF
+    chmod +x "${fake_bin_dir}/curl"
+    PATH="${fake_bin_dir}:${PATH}"
+    claim=""
+    if ! _agents_get_claim_id claim "agent.test:19999"; then
+        PATH="${old_path}"
+        rm -rf "${fake_bin_dir}"
+        echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_get_claim_id failed with fake agent info" >&2
+        NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
+        return 1
+    fi
+    if [[ "${claim}" != "${fake_claim}" ]]; then
+        PATH="${old_path}"
+        rm -rf "${fake_bin_dir}"
+        echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_get_claim_id did not populate caller output variable" >&2
+        NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
+        return 1
+    fi
+    if _agents_get_claim_id "not-a-valid-name" "agent.test:19999" 2>/dev/null; then
+        PATH="${old_path}"
+        rm -rf "${fake_bin_dir}"
+        echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_get_claim_id ignored invalid output variable failure" >&2
+        NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
+        return 1
+    fi
+    PATH="${old_path}"
+    rm -rf "${fake_bin_dir}"
+
+    # 4. _agents_set_outvar must preserve shell metacharacters as data.
+    # This protects bearer/claim assignment from accidental eval-style
+    # interpretation of external command output.
+    local assigned marker weird_value
+    marker="unchanged"
+    weird_value=$'space * ? ; marker=changed $(echo bad) `bad`\nline2 "quote"'
+    assigned=""
+    if ! _agents_set_outvar assigned "${weird_value}"; then
+        echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_set_outvar failed on metacharacter payload" >&2
+        NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
+        return 1
+    fi
+    if [[ "${assigned}" != "${weird_value}" || "${marker}" != "unchanged" ]]; then
+        echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_set_outvar interpreted metacharacters instead of assigning data" >&2
+        NETDATA_CLOUD_TOKEN="${real_token}"; unset AGENTS_DRY_RUN
+        return 1
+    fi
+
+    # 5. The unit test passes if all checks above passed.
     NETDATA_CLOUD_TOKEN="${real_token}"
     unset AGENTS_DRY_RUN
     echo -e "${AGENTS_GREEN}[PASS]${AGENTS_NC} no-token-leak self-test" >&2

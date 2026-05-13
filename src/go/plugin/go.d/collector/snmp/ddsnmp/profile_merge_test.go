@@ -33,6 +33,78 @@ func TestProfile_MultipleExtends_TableSymbolLaterOverrideEarlierByNameWithinTabl
 	assert.Equal(t, "base2", sym.ChartMeta.Description)
 }
 
+func TestProfile_MergeLicensingPreservesOriginProfileID(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeYAML(t, filepath.Join(tmp, "_licensing.yaml"), ddprofiledefinition.ProfileDefinition{
+		Licensing: []ddprofiledefinition.LicensingConfig{
+			{
+				ID: "base-license",
+				Identity: ddprofiledefinition.LicenseIdentityConfig{
+					ID: ddprofiledefinition.LicenseValueConfig{Value: "base"},
+				},
+			},
+		},
+	})
+	writeYAML(t, filepath.Join(tmp, "device.yaml"), ddprofiledefinition.ProfileDefinition{
+		Extends: []string{"_licensing.yaml"},
+		Licensing: []ddprofiledefinition.LicensingConfig{
+			{
+				ID: "device-license",
+				Identity: ddprofiledefinition.LicenseIdentityConfig{
+					ID: ddprofiledefinition.LicenseValueConfig{Value: "device"},
+				},
+			},
+		},
+	})
+
+	prof, err := loadProfile(filepath.Join(tmp, "device.yaml"), multipath.New(tmp))
+	require.NoError(t, err)
+	require.Len(t, prof.Definition.Licensing, 2)
+
+	assert.Equal(t, "device.yaml", prof.Definition.Licensing[0].OriginProfileID)
+	assert.Equal(t, "_licensing.yaml", prof.Definition.Licensing[1].OriginProfileID)
+}
+
+func TestProfile_MergeLicensingDerivedRowOverridesBaseIdentity(t *testing.T) {
+	tmp := t.TempDir()
+
+	baseState := ddprofiledefinition.LicenseStateConfig{
+		LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
+			Symbol: ddprofiledefinition.SymbolConfig{OID: "1.2.3.0", Name: "baseState"},
+		},
+	}
+	derivedState := ddprofiledefinition.LicenseStateConfig{
+		LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
+			Symbol: ddprofiledefinition.SymbolConfig{OID: "1.2.4.0", Name: "derivedState"},
+		},
+	}
+
+	writeYAML(t, filepath.Join(tmp, "_licensing.yaml"), ddprofiledefinition.ProfileDefinition{
+		Licensing: []ddprofiledefinition.LicensingConfig{
+			{
+				ID:    "smart",
+				State: baseState,
+			},
+		},
+	})
+	writeYAML(t, filepath.Join(tmp, "device.yaml"), ddprofiledefinition.ProfileDefinition{
+		Extends: []string{"_licensing.yaml"},
+		Licensing: []ddprofiledefinition.LicensingConfig{
+			{
+				ID:    "smart",
+				State: derivedState,
+			},
+		},
+	})
+
+	prof, err := loadProfile(filepath.Join(tmp, "device.yaml"), multipath.New(tmp))
+	require.NoError(t, err)
+	require.Len(t, prof.Definition.Licensing, 1)
+	assert.Equal(t, "device.yaml", prof.Definition.Licensing[0].OriginProfileID)
+	assert.Equal(t, "derivedState", prof.Definition.Licensing[0].State.Symbol.Name)
+}
+
 func TestProfile_MultipleExtends_TableSymbolLaterOverrideEarlierByTableNameWhenOIDDiffers(t *testing.T) {
 	tmp := t.TempDir()
 

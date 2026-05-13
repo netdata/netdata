@@ -41,6 +41,28 @@ does the in-app integrations page get its data?".
    `metadata.yaml` by the pipeline. Edit `metadata.yaml`, run
    the pipeline, commit the regenerated artifacts.
 
+   `src/collectors/COLLECTORS.md` is the source page for
+   Learn's "Monitor anything with Netdata" page. It is generated
+   from `integrations/integrations.js` by
+   `integrations/gen_doc_collector_page.py`; never hand-edit its
+   integration tables. To update that page, change the source
+   metadata/categories or the generator, then run
+   `gen_integrations.py` and `gen_doc_collector_page.py`.
+
+   Treat short descriptions as public product copy. Catalog
+   descriptions must say what the integration is and what it
+   monitors, enriches, exports, authenticates, or discovers.
+   For collector-like metadata, the first sentence of
+   `overview.data_collection.metrics_description` is the catalog
+   sentence used by generated pages such as `COLLECTORS.md`.
+   Start that sentence with a user-facing action phrase such as
+   `Monitor...`, `Collect...`, `Enrich network flows with...`, or
+   `Annotate network flows with...`.
+   Do not use the catalog description for variables, defaults,
+   option names, setup instructions, limits, or troubleshooting.
+   Put those details in setup, default-behavior, examples, or
+   troubleshooting fields. See `description-authoring.md`.
+
 2. **`integrations/*.md` files are GENERATED. DO NOT EDIT.**
    Every per-integration `.md` opens with a
    `<!--startmeta ... endmeta-->` block that ends with
@@ -89,6 +111,7 @@ does the in-app integrations page get its data?".
 |---|---|
 | `pipeline.md` | The 4-stage pipeline graph, every script, every artifact, the CI workflows. |
 | `schema-reference.md` | Exhaustive per-field reference for all 12 JSON Schemas under `integrations/schemas/`. |
+| `description-authoring.md` | Product-copy rules for `metadata.yaml` descriptions and the Monitor Anything table text. |
 | `per-type-matrix.md` | One-row-per-integration-type quick lookup: source paths, validator, render keys, output location. |
 | `artifacts-and-banners.md` | Every committed and gitignored artifact; banner conventions; symlink rules. |
 | `ibm-d.md` | The `contexts.yaml` -> `metadata.yaml` chain for ibm.d modules. |

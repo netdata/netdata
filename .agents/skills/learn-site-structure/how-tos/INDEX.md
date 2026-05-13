@@ -23,12 +23,9 @@ violation.
 
 ## Catalog
 
-(empty -- entries grow as assistants encounter
-not-yet-documented questions)
-
 | Topic | Slug | Notes |
 |---|---|---|
-| -- | -- | -- |
+| Preview a documentation PR locally | `preview-documentation-pr-locally.md` | Isolated Learn ingest/build/browser inspection from PR source content before merge. |
 
 ## How to add a how-to
 

@@ -71,8 +71,8 @@ implementation.
 5. **Bearer values stay in `.env` and `.local/`.** The bearer
    cache file at `<repo>/.local/audits/query-netdata-agents/
    bearers/<machine_guid>.json` is mode 0600 and gitignored. The
-   internal helper `_agents_resolve_bearer` returns it via bash
-   nameref, never to stdout.
+   internal helper `_agents_resolve_bearer` returns it through a
+   validated caller-local output variable, never to stdout.
 6. **For bearer-protected agents, default to the Cloud-token
    flow** in this skill (it auto-mints + caches the bearer).
 
@@ -256,8 +256,9 @@ agents_call_function \
 ### Internal helpers (do NOT call directly)
 
 These start with `_` and operate on token bytes inside their own
-scope. They return token data via bash namerefs (so the assistant
-never sees them on stdout). Don't shell-out to them.
+scope. They return token data through validated caller-local output
+variables (so the assistant never sees them on stdout). Don't
+shell-out to them.
 
 | Internal | Purpose |
 |---|---|

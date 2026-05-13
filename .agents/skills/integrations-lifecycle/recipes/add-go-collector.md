@@ -68,7 +68,8 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          One paragraph: what we collect.
+          First sentence: Monitor <thing> or collect <data> from <thing>.
+          Add more detail after that only if it is useful on the full page.
         method_description: |
           One paragraph: how we collect it.
       supported_platforms:
@@ -129,6 +130,14 @@ modules:
               dimensions:
                 - name: <dim>
 ```
+
+The first sentence of `metrics_description` is also used as the
+description in generated catalog-style pages such as
+`src/collectors/COLLECTORS.md`. Keep it product-facing and stable:
+start with an action phrase, describe the integration, and do not
+describe configuration variables, defaults, limits, or setup steps.
+Put those details in the setup, default-behavior, examples, or
+troubleshooting fields.
 
 Hit every required field. The validator is strict (fatal on
 warnings). Refer to `../schema-reference.md` for the

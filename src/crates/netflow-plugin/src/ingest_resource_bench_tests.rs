@@ -172,11 +172,8 @@ fn run_storage_footprint_child() -> StorageFootprintReport {
     let profile = ResourceProfile::from_env();
     let flows_per_sec = env_u64(RATE_ENV, DEFAULT_STORAGE_FLOWS_PER_SEC);
     let duration_secs = env_u64(STORAGE_DURATION_ENV, DEFAULT_STORAGE_DURATION_SECS);
-    let sample_interval_secs = env_u64(
-        STORAGE_SAMPLE_ENV,
-        DEFAULT_STORAGE_SAMPLE_INTERVAL_SECS,
-    )
-    .max(1);
+    let sample_interval_secs =
+        env_u64(STORAGE_SAMPLE_ENV, DEFAULT_STORAGE_SAMPLE_INTERVAL_SECS).max(1);
 
     let (record_batches, protocol_name) = build_record_batches(profile);
     let (_tmp, mut service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
@@ -207,8 +204,7 @@ fn run_storage_footprint_child() -> StorageFootprintReport {
             false,
         );
         entries_since_sync = segment.entries_since_sync;
-        total_flows_ingested =
-            total_flows_ingested.saturating_add(segment.ingested_flows as u64);
+        total_flows_ingested = total_flows_ingested.saturating_add(segment.ingested_flows as u64);
 
         let elapsed = started.elapsed().as_secs();
         let proc_now = take_proc_snapshot();

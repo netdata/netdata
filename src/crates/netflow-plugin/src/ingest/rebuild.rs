@@ -1,6 +1,8 @@
 use super::*;
 use crate::memory_allocator::trim_allocator_if_worthwhile;
 
+const REBUILD_SCAN_QUEUE_CAPACITY: usize = 1024;
+
 impl IngestService {
     /// Query the most recent `_SOURCE_REALTIME_TIMESTAMP` from a tier's journal
     /// files. Returns `None` when the tier directory is empty or unreadable.
@@ -65,7 +67,11 @@ impl IngestService {
 
     pub(super) async fn rebuild_materialized_from_raw(&mut self) -> Result<()> {
         let now = now_usec();
-        let before = (now / 1_000_000).max(1) as u32;
+        let before = now
+            .saturating_add(999_999)
+            .saturating_div(1_000_000)
+            .min(u64::from(u32::MAX))
+            .max(1) as u32;
         let after = before.saturating_sub(REBUILD_WINDOW_SECONDS);
 
         let raw_dir = self.cfg.journal.raw_tier_dir();
@@ -109,73 +115,89 @@ impl IngestService {
                     }
                 }
 
-                let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-                let facets = Facets::new(&["_SOURCE_REALTIME_TIMESTAMP".to_string()]);
-                let keys: Vec<FileIndexKey> = files
-                    .iter()
-                    .map(|file_info| {
-                        FileIndexKey::new(
-                            &file_info.file,
-                            &facets,
-                            Some(source_timestamp_field.clone()),
-                        )
-                    })
-                    .collect();
-
-                let time_range =
-                    QueryTimeRange::new(after, before).context("invalid rebuild raw time range")?;
-
-                let indexing_cancellation = CancellationToken::new();
-                let indexed_files = tokio::select! {
-                    result = batch_compute_file_indexes(
-                        &cache,
-                        &registry,
-                        keys,
-                        &time_range,
-                        indexing_cancellation.clone(),
-                        IndexingLimits::default(),
-                        None,
-                    ) => result.context("failed to build raw indexes for tier rebuild"),
-                    _ = tokio::time::sleep(Duration::from_secs(REBUILD_TIMEOUT_SECONDS)) => {
-                        indexing_cancellation.cancel();
-                        Err(anyhow!(
-                            "timed out building raw indexes for tier rebuild after {}s",
-                            REBUILD_TIMEOUT_SECONDS
-                        ))
-                    }
-                }?;
-                let file_indexes: Vec<_> = indexed_files.into_iter().map(|(_, idx)| idx).collect();
-
-                if file_indexes.is_empty() {
-                    self.refresh_open_tier_state(now);
-                    return Ok(());
-                }
-
                 let after_usec = (after as u64).saturating_mul(1_000_000);
                 let before_usec = (before as u64).saturating_mul(1_000_000);
-                let anchor_usec = before_usec.saturating_sub(1);
+                let file_paths = files
+                    .iter()
+                    .map(|file_info| PathBuf::from(file_info.file.path()))
+                    .collect::<Vec<_>>();
+                let rebuild_started = Instant::now();
+                let rebuild_timeout = Duration::from_secs(REBUILD_TIMEOUT_SECONDS);
+                let (rebuild_tx, mut rebuild_rx) =
+                    tokio::sync::mpsc::channel::<(u64, crate::flow::FlowFields)>(
+                        REBUILD_SCAN_QUEUE_CAPACITY,
+                    );
+                let scan_handle = tokio::task::spawn_blocking(move || -> Result<()> {
+                    let mut scanned_entries = 0_u64;
 
-                let entries = LogQuery::new(
-                    &file_indexes,
-                    Anchor::Timestamp(Microseconds(anchor_usec)),
-                    Direction::Backward,
-                )
-                .with_after_usec(after_usec)
-                .with_before_usec(before_usec)
-                .execute()
-                .context("failed to query raw flows for tier rebuild")?;
+                    scan_journal_files_forward(
+                        &file_paths,
+                        Some(after_usec),
+                        Some(before_usec),
+                        None,
+                        0,
+                        0,
+                        &[],
+                        "raw tier rebuild",
+                        |_file_path, journal, entry_timestamp_usec, data_offsets, decompress_buf| {
+                            scanned_entries = scanned_entries.saturating_add(1);
+                            if rebuild_started.elapsed() >= rebuild_timeout {
+                                return Err(anyhow!(
+                                    "timed out scanning raw flows for tier rebuild after {}s (scanned {} entries)",
+                                    REBUILD_TIMEOUT_SECONDS,
+                                    scanned_entries
+                                ));
+                            }
 
-                for entry in entries {
-                    let mut fields = crate::flow::FlowFields::new();
-                    for pair in entry.fields {
-                        let name = pair.field();
-                        if let Some(interned) = crate::decoder::intern_field_name(name) {
-                            fields.insert(interned, pair.value().to_string());
-                        }
-                    }
+                            let mut fields = crate::flow::FlowFields::new();
+                            visit_journal_payloads(
+                                journal,
+                                _file_path,
+                                data_offsets,
+                                decompress_buf,
+                                |payload| {
+                                    let Some(eq_pos) = payload.iter().position(|&b| b == b'=') else {
+                                        return Ok(());
+                                    };
+                                    let Ok(name) = std::str::from_utf8(&payload[..eq_pos]) else {
+                                        return Ok(());
+                                    };
+                                    let Some(interned) = crate::decoder::intern_field_name(name) else {
+                                        return Ok(());
+                                    };
+                                    let value =
+                                        String::from_utf8_lossy(&payload[eq_pos + 1..]).into_owned();
+                                    fields.insert(interned, value);
+                                    Ok(())
+                                },
+                            )?;
 
-                    self.observe_tiers_with_cutoffs(entry.timestamp, &fields, &tier_cutoffs);
+                            if rebuild_started.elapsed() >= rebuild_timeout {
+                                return Err(anyhow!(
+                                    "timed out scanning raw flows for tier rebuild after {}s (scanned {} entries)",
+                                    REBUILD_TIMEOUT_SECONDS,
+                                    scanned_entries
+                                ));
+                            }
+
+                            rebuild_tx
+                                .blocking_send((entry_timestamp_usec, fields))
+                                .map_err(|_| anyhow!("raw tier rebuild receiver dropped"))?;
+                            Ok(true)
+                        },
+                    )
+                    .context("failed to scan raw flows for tier rebuild")?;
+
+                    Ok(())
+                });
+
+                while let Some((entry_timestamp_usec, fields)) = rebuild_rx.recv().await {
+                    self.observe_tiers_with_cutoffs(entry_timestamp_usec, &fields, &tier_cutoffs);
                 }
+
+                scan_handle
+                    .await
+                    .context("raw tier rebuild scan task join failed")??;
 
                 Ok(())
             }

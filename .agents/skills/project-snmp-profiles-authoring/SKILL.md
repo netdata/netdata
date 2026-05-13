@@ -30,6 +30,27 @@ Use this skill before editing files under:
 8. Keep regular `systemUptime` rows under `metrics:`. Do not model uptime as a
    topology row kind; topology-specific uptime acquisition belongs in collector
    code, not profile topology schema.
+9. Put SNMP licensing rows under top-level `licensing:`. Do not model licensing
+   telemetry as underscore-prefixed hidden metrics or `_license_*` tag
+   protocols.
+10. Licensing row value symbols may use `format` and exact `mapping`, but must
+   not use chart/export fields, transforms, scale factors, constant values, or
+   underscore-prefixed generated names.
+11. For scalar licensing rows that combine multiple scalar signal OIDs into one
+   license row, declare an explicit stable `id:`. For table licensing rows,
+   keep `from:` references inside the same table OID and derive
+   `not-accessible` INDEX values from the row index.
+12. Put SNMP BGP rows under top-level `bgp:`. Do not model BGP telemetry as
+   vendor-specific raw metrics, `virtual_metrics`, or underscore-prefixed tag
+   protocols when adding or migrating BGP coverage.
+13. BGP peer-state mappings must use the six RFC 4271 canonical states
+   (`idle`, `connect`, `active`, `opensent`, `openconfirm`, `established`).
+   Use `partial: true` plus `partial_states` only when the source MIB is
+   intentionally partial.
+14. For BGP table rows, derive `not-accessible` INDEX objects with exactly one
+   row-index selector: `index`, `index_from_end`, or `index_transform`. Use
+   `index_from_end` for trailing AFI/SAFI-like components after variable-length
+   indexes such as `InetAddress`.
 
 ## Index Rules
 
@@ -102,6 +123,32 @@ When adding a new topology kind, update all three parts together:
 
 Verify that topology rows are delivered through `ProfileMetrics.TopologyMetrics`,
 not through underscore-prefixed `HiddenMetrics`.
+
+When adding or migrating licensing profile coverage, update all related parts
+together:
+
+- profile YAML using `licensing:`;
+- the closed licensing signal/state/sentinel enums and validation when adding
+  new policy names;
+- typed `ProfileMetrics.LicenseRows` producer/consumer tests;
+- MIB evidence for every OID and every `not-accessible` index-derived field.
+
+Verify that licensing rows are delivered through `ProfileMetrics.LicenseRows`,
+not through underscore-prefixed `HiddenMetrics`.
+
+When adding or migrating BGP profile coverage, update all related parts
+together:
+
+- profile YAML using `bgp:`;
+- closed BGP row kind, peer-state, AFI/SAFI, and typed field validation when
+  adding new policy names or value domains;
+- typed `ProfileMetrics.BGPRows` producer/consumer tests;
+- MIB evidence for every OID and every `not-accessible` index-derived field;
+- SNMP integration metadata and generated docs when public BGP capability
+  claims change.
+
+Verify that BGP rows are delivered through `ProfileMetrics.BGPRows`, not
+through `metrics:`, `virtual_metrics:`, or underscore-prefixed hidden metrics.
 
 When adding or refactoring SNMP profile, parser, or topology tests, prefer
 table-driven cases using `map[string]struct{}` keyed by test-case name when

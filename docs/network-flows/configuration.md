@@ -6,9 +6,11 @@ learn_rel_path: "Network Flows"
 keywords: ['configuration', 'netflow.yaml', 'tuning', 'retention', 'listener']
 endmeta-->
 
+<!-- markdownlint-disable-file -->
+
 # Configuration
 
-The netflow plugin reads its configuration from `netflow.yaml`. Defaults are sane out of the box; most operators only adjust three things — the listener address, the journal retention, and (rarely) the per-tier overrides. This page documents every option, with its real default and the file that defines it.
+The netflow plugin reads its configuration from `netflow.yaml`. The defaults are good for initial validation; production deployments usually tune the listener address and retention once the observed flow rate is known. This page documents every option, with its real default and the file that defines it.
 
 ## Where the file lives
 
@@ -39,7 +41,7 @@ journal: { ... }            # tier directories, retention, query guardrails
 enrichment: { ... }         # GeoIP, classifiers, ASN, BMP, BioRIS, network sources
 ```
 
-The `listener`, `protocols`, and `journal` sections are flattened — their keys can also appear at the top level (the stock file does this for compatibility). Both forms are accepted.
+The YAML form is strictly nested — every key lives inside its section as shown above. The flat form is only valid for CLI flags (e.g. `--netflow-listen 0.0.0.0:2055`), which the plugin exposes for one-off invocation; the YAML schema rejects unknown top-level keys.
 
 ## `enabled`
 
@@ -101,15 +103,17 @@ protocols:
 | `ipfix` | `--netflow-enable-ipfix` | `true` | Boolean. IPFIX. |
 | `sflow` | `--netflow-enable-sflow` | `true` | Boolean. sFlow v5. |
 | `decapsulation_mode` | `--netflow-decapsulation-mode` | `none` | `none`, `srv6`, `vxlan`. Strips outer headers from the data-link section, surfaces the inner 5-tuple. |
-| `timestamp_source` | `--netflow-timestamp-source` | `input` | Where the dashboard's flow timestamps come from. See below. |
+| `timestamp_source` | `--netflow-timestamp-source` | `input` | Which timestamp is stored as `_SOURCE_REALTIME_TIMESTAMP`. See below. |
 
 You must keep at least one protocol enabled or the plugin refuses to start.
 
 ### `timestamp_source` values
 
-- **`input`** (default) — the time the plugin received the datagram. Charts always look "now". This is the safest choice for dashboards.
+- **`input`** (default) — the time the plugin received the datagram.
 - **`netflow_packet`** — the time the exporter put in the NetFlow/IPFIX header.
-- **`netflow_first_switched`** — the time the flow actually started, from the per-record first-switched field. Records arrive with timestamps in the past (up to your active timeout). This gives the most accurate timeline but charts may show data appearing "behind" real time.
+- **`netflow_first_switched`** — the time the flow actually started, from the per-record first-switched field when the exporter provides it.
+
+The Network Flows view still uses journal entry time, which is the time the Netdata Agent received the datagram, for query windows and tier selection. `timestamp_source` controls the stored source timestamp metadata; it does not make the dashboard time picker query by exporter timestamps.
 
 ## `journal`
 
@@ -118,45 +122,38 @@ This is the section most operators tune. It controls where flow data lives, how 
 ```yaml
 journal:
   journal_dir: flows
-  size_of_journal_files: 10GB
-  duration_of_journal_files: 7d
-  query_1m_max_window: 6h
-  query_5m_max_window: 24h
   query_max_groups: 50000
-  query_facet_max_values_per_field: 5000
   tiers:
-    raw:        { duration_of_journal_files: 24h }
-    minute_1:   { duration_of_journal_files: 14d }
-    minute_5:   { duration_of_journal_files: 30d }
-    hour_1:     { duration_of_journal_files: 365d }
+    raw:      { size_of_journal_files: 50GB, duration_of_journal_files: 24h }
+    minute_1: { size_of_journal_files: 5GB,  duration_of_journal_files: 14d }
+    minute_5: { size_of_journal_files: 5GB,  duration_of_journal_files: 30d }
+    hour_1:   { size_of_journal_files: 5GB,  duration_of_journal_files: 365d }
 ```
 
-### Top-level retention
+### Journal directory
 
 | Key | Default | Notes |
 |---|---|---|
 | `journal_dir` | `flows` | Relative paths resolve under `NETDATA_CACHE_DIR` (typically `/var/cache/netdata/flows`). Absolute paths are used as-is. |
-| `size_of_journal_files` | `10GB` | Disk budget per tier (not total). Minimum `100MB`. Set to `null` to disable size-based retention. |
-| `duration_of_journal_files` | `7d` | Time budget per tier. Set to `null` to disable time-based retention. |
 
-**Important.** The top-level retention applies to **every tier independently** unless you override it per-tier. So with the defaults, all four tiers (raw, 1m, 5m, 1h) share the same 10GB / 7d budget. **This is rarely what you want.** The whole point of having rollup tiers is to keep them around longer than raw. See per-tier overrides below.
+### Per-tier retention
 
-Either limit triggers rotation. With size = 10GB and duration = 7d, the tier expires whichever is hit first.
-
-### Per-tier overrides
+Each tier has its own size and duration budget, configured under `tiers:` only — YAML has no global retention knobs. Raw and rollup tiers have very different storage and access patterns; they should be sized independently.
 
 ```yaml
 tiers:
-  raw:                          # name in YAML
+  raw:
     size_of_journal_files: 50GB
     duration_of_journal_files: 24h
   minute_1:
+    size_of_journal_files: 5GB
     duration_of_journal_files: 14d
   minute_5:
+    size_of_journal_files: 5GB
     duration_of_journal_files: 30d
   hour_1:
+    size_of_journal_files: 5GB
     duration_of_journal_files: 365d
-    size_of_journal_files: null   # time-only retention for the long tail
 ```
 
 | YAML name | Aliases | On-disk directory |
@@ -168,28 +165,36 @@ tiers:
 
 The on-disk directory names are short (`1m`, `5m`, `1h`); the YAML keys are explicit (`minute_1`, `minute_5`, `hour_1`). Mind the difference if you go look at the disk.
 
-For each per-tier knob (`size_of_journal_files`, `duration_of_journal_files`):
+Per-tier values:
 
-- **Omit the key** to inherit the top-level default.
-- Set to `null` to **disable** that limit on this tier.
-- Set to a value to override.
+| Key | Default per tier | Notes |
+|---|---|---|
+| `size_of_journal_files` | `10GB` | Disk budget for this tier. Minimum `100MB`. Set to `null` to disable size-based retention on this tier. |
+| `duration_of_journal_files` | `7d` | Time budget for this tier. Set to `null` to disable time-based retention on this tier. |
 
-A typical production profile is the example block above: 24 hours of raw, 2 weeks at 1-minute, 30 days at 5-minute, 1 year at 1-hour. This profile keeps detailed forensics within reach while supporting year-over-year capacity trends.
+Either limit triggers rotation. The tier expires whichever is hit first. At least one of the two must be set per tier (validation enforces this).
+
+If you omit a tier entry entirely, that tier uses the built-in defaults (`10GB` / `7d`). If you provide a tier entry but omit one of the two knobs, the omitted knob falls back to its built-in default. Setting either to `null` explicitly disables that limit on that tier.
+
+Standalone CLI runs still accept the legacy uniform retention flags:
+`--netflow-retention-size-of-journal-files` and
+`--netflow-retention-duration-of-journal-files`. They apply the same value to
+all tiers and exist only for standalone/CLI compatibility; production
+configuration should use the per-tier YAML shape above.
+
+The example block at the top of this section is a typical production profile: 24 hours of raw, 2 weeks at 1-minute, 30 days at 5-minute, 1 year at 1-hour. Detailed forensics for the last day; long-term trends for the year.
 
 ### Rotation
 
-Each tier rotates files at `size_of_journal_files / 20`, clamped between 5 MB and 200 MB. Time-based rotation is fixed at one hour per file. You don't configure these directly.
+Each tier rotates files at `size_of_journal_files / 20`, clamped between 5 MB and 200 MB. Time-based rotation is fixed at one hour per file. You don't configure these directly. If `size_of_journal_files` is set to `null` on a tier (size-based retention disabled), the rotation size falls back to 100 MB so files still rotate cleanly.
 
 ### Query guardrails
 
 | Key | Default | What it limits |
 |---|---|---|
-| `query_1m_max_window` | `6h` | Above this window, the dashboard skips the 1-minute tier and uses the 5-minute or 1-hour tier. |
-| `query_5m_max_window` | `24h` | Above this window, the dashboard skips the 5-minute tier and uses the 1-hour tier. |
-| `query_max_groups` | `50000` | Maximum groups returned by a single aggregation query. Past this, results overflow into a single `__overflow__` bucket and the response carries a warning. |
-| `query_facet_max_values_per_field` | `5000` | Maximum distinct values returned per facet field. |
+| `query_max_groups` (alias: `query-max-groups`) | `50000` | Maximum number of distinct group keys a single aggregation query can build. When exceeded, additional groups are folded into a synthetic `__overflow__` bucket and the response carries a warning. Protects the query worker from memory blow-up on accidentally wide group-by combinations. |
 
-The query-window limits are about responsiveness — large windows on fine-grained tiers are slow. The group/value limits are about memory — wide aggregations on high-cardinality fields can blow up. Raise them carefully.
+The tier the planner uses for a given query is decided automatically from the time window and the query view (Sankey / time-series / map / etc.) — the planner aligns to the coarser tier when the window allows, and falls back to a finer tier for the unaligned head/tail. There are no separate "max window per tier" knobs.
 
 ## `enrichment`
 
@@ -197,12 +202,13 @@ Enrichment is a large topic and lives in dedicated pages. The top-level enable/d
 
 ```yaml
 enrichment:
-  # default_sampling_rate: 1024              # set to override; default is unset (rate=1)
-  # override_sampling_rate: { 10.1.0.0/16: 1024 }  # per-prefix override map
+  # default_sampling_rate: 1024                          # single rate, or per-prefix map
+  # default_sampling_rate: { 10.1.0.0/16: 1024 }         # per-prefix form is also valid
+  # override_sampling_rate: { 10.1.0.0/16: 1024 }        # per-prefix override map
   default_sampling_rate: ~
-  override_sampling_rate: {}
+  override_sampling_rate: ~
   metadata_static: { exporters: {} }
-  geoip: { asn_database: [], geo_database: [] }
+  geoip: { asn_database: [], geo_database: [], optional: false }
   networks: {}
   network_sources: {}
   exporter_classifiers: []
@@ -216,16 +222,17 @@ enrichment:
     bioris: { enabled: false }
 ```
 
-Detailed configuration of each section lives on its own page:
+A note on `default_sampling_rate` vs. `override_sampling_rate`: both keys accept either a single integer (applied to every record from every exporter) or a per-prefix map. The intended split is "default" for `rate=1` records that lack a sampling rate, and "override" for replacing a known-wrong rate; the schema does not enforce that intent — either knob can take either form.
 
-- [GeoIP](/docs/network-flows/enrichment/ip-intelligence.md)
-- [Static metadata](/docs/network-flows/enrichment/static-metadata.md)
-- [Classifiers](/docs/network-flows/enrichment/classifiers.md)
-- [ASN resolution](/docs/network-flows/enrichment/asn-resolution.md)
-- [BMP routing](/docs/network-flows/enrichment/bgp-routing.md)
-- [BioRIS](/docs/network-flows/enrichment/bgp-routing.md)
-- [Network sources](/docs/network-flows/enrichment/network-identity.md)
-- [Decapsulation](/docs/network-flows/enrichment/decapsulation.md)
+`enrichment.geoip.optional` (default `false`) decides what happens when an MMDB file declared in `asn_database` / `geo_database` is missing at startup: `false` aborts the plugin, `true` logs a warning and continues without that database.
+
+For the cross-cutting picture — order of evaluation, the `asn_providers` and `net_providers` chains, the MMDB shared mechanism, the static-vs-dynamic composition rules — see the [Enrichment](/docs/network-flows/enrichment.md) page. Per-method configuration details (URLs, refresh cadence, license, vendor commands) live on the integration cards under flows.enrichment-methods:
+
+- IP intelligence (MMDB): [DB-IP](/src/crates/netflow-plugin/integrations/db-ip_ip_intelligence.md), [MaxMind GeoIP / GeoLite2](/src/crates/netflow-plugin/integrations/maxmind_geoip_-_geolite2.md), [IPtoASN](/src/crates/netflow-plugin/integrations/iptoasn.md), [Custom MMDB](/src/crates/netflow-plugin/integrations/custom_mmdb_database.md).
+- BGP routing: [BMP](/src/crates/netflow-plugin/integrations/bmp_bgp_monitoring_protocol.md), [bio-rd RIS](/src/crates/netflow-plugin/integrations/bio-rd_-_ripe_ris.md).
+- Network sources: [AWS IP Ranges](/src/crates/netflow-plugin/integrations/aws_ip_ranges.md), [Azure IP Ranges](/src/crates/netflow-plugin/integrations/azure_ip_ranges.md), [GCP IP Ranges](/src/crates/netflow-plugin/integrations/gcp_ip_ranges.md), [NetBox](/src/crates/netflow-plugin/integrations/netbox.md), [Generic JSON-over-HTTP IPAM](/src/crates/netflow-plugin/integrations/generic_json-over-http_ipam.md).
+- YAML-defined: [Static Metadata](/src/crates/netflow-plugin/integrations/static_metadata.md), [Classifiers](/src/crates/netflow-plugin/integrations/classifiers.md), [Decapsulation](/src/crates/netflow-plugin/integrations/decapsulation.md).
+- Operational: [Enrichment Intel Downloader](/docs/network-flows/intel-downloader.md) — the bundled refresh tool for MMDB providers.
 
 The enrichment section has no CLI flag — it is YAML-only.
 
@@ -274,29 +281,29 @@ The plugin reads the inner 5-tuple from `dataLinkFrameSection` records (IPFIX IE
 
 ```yaml
 journal:
-  size_of_journal_files: 100GB
-  duration_of_journal_files: 7d
   tiers:
     raw:
       size_of_journal_files: 200GB
       duration_of_journal_files: 24h
     minute_1:
+      size_of_journal_files: 20GB
       duration_of_journal_files: 14d
     minute_5:
+      size_of_journal_files: 20GB
       duration_of_journal_files: 30d
     hour_1:
+      size_of_journal_files: 20GB
       duration_of_journal_files: 365d
-      size_of_journal_files: null
 ```
 
-The default 10GB / 7d on every tier is too tight for most production deployments. This profile gives you 24 hours of full-detail forensics, 14 days of 1-minute trends, 30 days of 5-minute snapshots, and a year of hourly aggregates. Storage required scales with your flow rate — see [Sizing and Capacity Planning](/docs/network-flows/sizing-capacity.md).
+The built-in defaults (10GB / 7d on every tier) are intended for first validation and small deployments. Most production deployments should size retention from observed flow rate. This profile gives you 24 hours of full-detail forensics, 14 days of 1-minute trends, 30 days of 5-minute snapshots, and a year of hourly aggregates. Storage required scales with your flow rate — see [Sizing and Capacity Planning](/docs/network-flows/sizing-capacity.md).
 
 ## Things that go wrong
 
-- **The plugin doesn't start.** Check `journalctl -u netdata --since "5 minutes ago" | grep netflow`. The most common cause is a typo in a YAML key (strict mode rejects unknowns).
+- **The plugin doesn't start.** Check `journalctl --namespace netdata --since "5 minutes ago" | grep netflow`. The most common cause is a typo in a YAML key (strict mode rejects unknowns).
 - **Edits don't take effect.** Restart Netdata. There is no DynCfg integration for the plugin's configuration.
 - **CLI flags I added don't do anything.** When running under Netdata, only the YAML is read.
-- **Tiers fill up faster than expected.** All tiers share the top-level retention by default. Set explicit per-tier overrides.
+- **Tiers fill up faster than expected.** Each tier has its own size/duration. Set per-tier values that match how long you actually need each tier.
 - **Queries time out at 30 seconds.** Function calls have a hard 30s timeout in the plugin. If your query is too wide, narrow the time range or add filters that let a higher tier serve it.
 - **`__overflow__` appears in results.** A group-by exceeded `query_max_groups` (default 50 000). Either narrow the filter, reduce the number of group-by fields, or raise the limit.
 
