@@ -115,8 +115,14 @@ evaluation time with a clear error:
 <!-- count_values shipped in SOW-0024. -->
 <!-- `stddev_over_time`, `stdvar_over_time`, `quantile_over_time`
      shipped in Phase 3e (SOW-0023). -->
-* `keep_metric_names` -- a query-level modifier (not a function);
-  needs threading through the evaluator.
+* `keep_metric_names` -- a query-level modifier that preserves
+  `__name__` through transforms that would normally strip it.
+  Blocked upstream: the `promql-parser` crate this project depends
+  on does not tokenize the keyword, so any query containing it
+  fails at parse time with `bad_data: parse error: invalid promql
+  query`. Lighting up this feature requires either forking
+  `promql-parser` or landing the change upstream first; deferred
+  until that decision is made.
 <!-- `@` modifier on selectors shipped in SOW-0025; `@` on subqueries
      waits for subqueries themselves. -->
 * Subqueries (`<expr>[1h:5m]`).
