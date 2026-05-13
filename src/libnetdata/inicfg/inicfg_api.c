@@ -74,20 +74,15 @@ static char *transform_log_path_setting(const char *setting, bool for_display) {
     CLEAN_CHAR_P *translated = for_display
         ? os_translate_msys_to_windows_path(output)
         : os_translate_windows_to_msys_path(output);
-    const char *safe_translated;
-    if(translated)
-        safe_translated = translated;
-    else if(output)
-        safe_translated = output;
-    else
-        safe_translated = "";
-    size_t safe_translated_len = strnlen(safe_translated, CONFIG_MAX_VALUE + 1);
+    // os_translate_*_path() returns an allocated non-NULL string, using ""
+    // for empty input, so no NULL fallback is needed here.
+    size_t translated_len = strnlen(translated, CONFIG_MAX_VALUE + 1);
 
     if(output == copy)
-        return strdupz(safe_translated);
+        return strdupz(translated);
 
-    BUFFER *wb = buffer_create(prefix_len + safe_translated_len + 2, NULL);
-    buffer_sprintf(wb, "%s@%s", copy, safe_translated);
+    BUFFER *wb = buffer_create(prefix_len + translated_len + 2, NULL);
+    buffer_sprintf(wb, "%s@%s", copy, translated);
     char *result = strdupz(buffer_tostring(wb));
     buffer_free(wb);
 
