@@ -43,6 +43,12 @@ This **distributed yet centralized** approach gives you the benefits of both dec
 | **Multi-Node Dashboards Without Netdata Cloud** | Aggregates data from all your nodes for centralized dashboards                                 | You get Cloud-like functionality in environments that prefer or require on-premises solutions |
 | **Restricted Netdata Cloud Access**             | Acts as a bridge when your monitored systems can't connect to Netdata Cloud                    | You can still use Cloud features despite firewall restrictions or security policies           |
 
+:::tip
+
+If you want the full Netdata Cloud experience within your own infrastructure, consider [Netdata Cloud Enterprise On-Prem](/docs/netdata-cloud/versions.md) — a self-hosted version that deploys the complete Cloud control plane in your environment.
+
+:::
+
 ## How Multiple Parents Work
 
 <details>
