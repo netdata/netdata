@@ -155,6 +155,11 @@ void ml_host_stop(RRDHOST *rh) {
 
     netdata_mutex_lock(&host->mutex);
 
+    // Re-assert under the mutex so stop deterministically wins over a racing
+    // ml_host_start() that may have flipped the flag back to true after our
+    // early write but before we acquired the mutex.
+    host->ml_running = false;
+
     // reset host stats
     host->mls = ml_machine_learning_stats_t();
     ml_host_clear_context_anomaly_rate(host);
