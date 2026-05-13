@@ -59,6 +59,8 @@ ml_worker_result_to_string(enum ml_worker_result tr)
             return "chart-under-replication";
         case ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED:
             return "downstream-model-supplied";
+        case ML_WORKER_RESULT_TRAINING_IN_PROGRESS:
+            return "training-in-progress";
         default:
             return "unknown";
     }

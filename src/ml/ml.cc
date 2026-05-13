@@ -687,7 +687,7 @@ bool ml_dimension_train_model_precheck(enum ml_metric_type mt,
     }
 
     if (training_in_progress) {
-        *worker_res = ML_WORKER_RESULT_OK;
+        *worker_res = ML_WORKER_RESULT_TRAINING_IN_PROGRESS;
         return true;
     }
 
@@ -696,6 +696,9 @@ bool ml_dimension_train_model_precheck(enum ml_metric_type mt,
 
 bool ml_should_requeue_create_new_model(enum ml_worker_result worker_res)
 {
+    // TRAINING_IN_PROGRESS keeps requeueing so the dim stays in the periodic
+    // retrain cycle; the worker loop is paced by Cfg.train_every, so this is
+    // not a tight CPU spin.
     return worker_res != ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION &&
            worker_res != ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED;
 }
@@ -1427,6 +1430,9 @@ void ml_train_main(void *arg) {
                     loop_stats.item_result_chart_under_replication = 1;
                     break;
                 case ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED:
+                    loop_stats.item_result_ok = 1;
+                    break;
+                case ML_WORKER_RESULT_TRAINING_IN_PROGRESS:
                     loop_stats.item_result_ok = 1;
                     break;
             }

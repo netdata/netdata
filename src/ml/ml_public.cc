@@ -190,6 +190,8 @@ void ml_host_stop(RRDHOST *rh) {
             dim->cns_head = 0;
             dim->km_contexts.clear();
             dim->has_received_downstream_model = false;
+            // create_new_model_queued not reset here: stop does not drain the
+            // worker queue, so pending CREATE_NEW_MODEL items remain valid.
             dim->reset_generation++;
 
             spinlock_unlock(&dim->slock);

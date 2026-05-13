@@ -900,6 +900,19 @@ static void test_downstream_model_short_circuit_and_requeue()
                    "dimensions without downstream models should continue to training");
     ML_TEST_ASSERT(ml_should_requeue_create_new_model(ML_WORKER_RESULT_OK),
                    "ordinary training results should keep CREATE_NEW_MODEL items requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                             false,
+                                                             true,
+                                                             &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "training-in-progress dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_TRAINING_IN_PROGRESS,
+                   "training-in-progress dimensions should report the distinct result");
+    ML_TEST_ASSERT(ml_should_requeue_create_new_model(worker_res),
+                   "training-in-progress result should keep CREATE_NEW_MODEL items requeueing "
+                   "so the dim stays in the periodic retrain cycle");
 }
 
 static void test_reset_generation_cancels_model_publish()
