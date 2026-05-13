@@ -305,6 +305,45 @@ static bool builder_matches(const label_builder *b,
 }
 
 // ---------------------------------------------------------------------------
+// Host scope resolution
+// ---------------------------------------------------------------------------
+
+// Resolve `host_machine_guid` into a concrete scope for resolve / metadata
+// callers. The four cases are:
+//
+//   NULL      -> (localhost, scan_all=false)            -- single host
+//   "*"       -> (NULL, scan_all=true)                  -- every host
+//   <guid>    -> rrdhost_find_by_guid first, then by hostname
+//                On match: (host, scan_all=false)
+//                On miss : (NULL, scan_all=false)        -- no series
+//
+// machine_guid is checked before hostname so a child connected with both
+// is reachable by either form; the GUID lookup is O(1) on a hashed
+// dictionary so the cost is negligible.
+typedef struct {
+    RRDHOST *single_host;
+    bool scan_all;
+} host_scope;
+
+static host_scope resolve_host_scope(const char *host_machine_guid) {
+    host_scope r = { .single_host = NULL, .scan_all = false };
+    if (!host_machine_guid) {
+        r.single_host = localhost;
+        return r;
+    }
+    if (strcmp(host_machine_guid, "*") == 0) {
+        r.scan_all = true;
+        return r;
+    }
+    // Specific host. Try GUID first (dictionary lookup), then hostname
+    // (walks the index but already handles the "localhost" alias).
+    RRDHOST *h = rrdhost_find_by_guid(host_machine_guid);
+    if (!h) h = rrdhost_find_by_hostname(host_machine_guid);
+    r.single_host = h;
+    return r;
+}
+
+// ---------------------------------------------------------------------------
 // Resolve plumbing
 // ---------------------------------------------------------------------------
 
@@ -558,10 +597,8 @@ nd_pds_resolve(const char *host_machine_guid,
 
     const char *name_eq = find_name_eq(matchers, matchers_len);
 
-    // Determine host scope.
-    bool scan_all_hosts = (host_machine_guid && strcmp(host_machine_guid, "*") == 0);
-
-    if (scan_all_hosts) {
+    host_scope scope = resolve_host_scope(host_machine_guid);
+    if (scope.scan_all) {
         rrd_rdlock();
         RRDHOST *host;
         dfe_start_read(rrdhost_root_index, host) {
@@ -573,17 +610,15 @@ nd_pds_resolve(const char *host_machine_guid,
         }
         dfe_done(host);
         rrd_rdunlock();
-    } else {
-        // NULL or specific guid -> localhost for chunk 1.
-        // Phase 1 follow-up: resolve specific GUID/hostname.
-        RRDHOST *host = localhost;
-        if (host) {
-            if (name_eq)
-                resolve_named_context_on_host(&state, host, name_eq);
-            else
-                resolve_all_contexts_on_host(&state, host);
-        }
+    } else if (scope.single_host) {
+        if (name_eq)
+            resolve_named_context_on_host(&state, scope.single_host, name_eq);
+        else
+            resolve_all_contexts_on_host(&state, scope.single_host);
     }
+    // scope.single_host == NULL && !scope.scan_all means the caller asked
+    // for a specific host that does not exist on this agent. Fall through
+    // with no series resolved; the caller sees an empty result.
 
     q->truncated = state.overflowed;
 
@@ -830,8 +865,8 @@ nd_pds_metadata_collect(const char *host_machine_guid,
         .found_type = false,
     };
 
-    bool scan_all_hosts = (host_machine_guid && strcmp(host_machine_guid, "*") == 0);
-    if (scan_all_hosts) {
+    host_scope scope = resolve_host_scope(host_machine_guid);
+    if (scope.scan_all) {
         rrd_rdlock();
         RRDHOST *host;
         dfe_start_read(rrdhost_root_index, host) {
@@ -840,11 +875,11 @@ nd_pds_metadata_collect(const char *host_machine_guid,
         }
         dfe_done(host);
         rrd_rdunlock();
-    } else {
-        // NULL or specific guid -> localhost for chunk 1 of Phase 2.
-        // Phase 2 chunk 2 lifts this restriction.
-        if (localhost) meta_collect_on_host(&state, localhost);
+    } else if (scope.single_host) {
+        meta_collect_on_host(&state, scope.single_host);
     }
+    // Unknown host: return the empty set rather than silently falling
+    // back to localhost.
     return m;
 }
 

@@ -4,7 +4,7 @@
 
 Status: in-progress
 
-Sub-state: chunk 1 (discovery endpoint handlers) shipped; chunks 2-3 pending.
+Sub-state: chunks 1-2 shipped; chunk 3 (spec + smoke + close) pending.
 
 ## Requirements
 
@@ -718,6 +718,27 @@ reviewed independently. Chunk 3 closes the SOW.
     reports `type=counter`, `system_cpu` reports `type=gauge`),
     POST on `/labels` and `/series`. Phase 1 smoke harness still
     passes 24/24.
+- Chunk 2 shipped:
+  - Shim (`src/database/contexts/promql-data-source.c`): new
+    `resolve_host_scope` helper centralizes the four host cases
+    (NULL -> localhost, "*" -> all, specific -> lookup by GUID then
+    by hostname, miss -> empty result). Both `nd_pds_resolve` and
+    `nd_pds_metadata_collect` now share this resolver.
+  - Behavior: `?host=<hostname>` and `?host=<machine_guid>` route to
+    the matching host. A nonexistent host returns an empty result
+    rather than silently falling back to localhost (the previous
+    Phase 1 chunk-1 behavior, which would have misled callers).
+  - Handler (`src/web/api/v3/api_v3_promql.c`): `handle_instant` and
+    `handle_range` now read the `host` URL parameter and forward it
+    to the Rust FFI. Phase 1 had hardcoded NULL, which made the
+    `?host=*` and `?host=<name>` query-string cases unreachable
+    through `/query` and `/query_range`.
+  - Verification against live daemon (single-host fixture):
+    `?host=nx570` on `/series`, `/query`, `/metadata` returns the
+    same series as `?host=*` and the unqualified call.
+    `?host=does-not-exist` returns an empty result envelope on each
+    endpoint (status:success, empty data). Phase 1 smoke harness
+    still passes 24/24.
 
 ## Validation
 

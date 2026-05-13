@@ -62,6 +62,7 @@ static int handle_instant(struct web_client *w, char *url) {
     char *query = NULL;
     char *time_str = NULL;
     char *timeout_str = NULL;
+    char *host_str = NULL;
 
     while (url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
@@ -80,13 +81,15 @@ static int handle_instant(struct web_client *w, char *url) {
             time_str = value;
         else if (!strcmp(name, "timeout"))
             timeout_str = value;
+        else if (!strcmp(name, "host"))
+            host_str = value;
     }
 
     int64_t at_ms = parse_unix_seconds_to_ms(time_str, (int64_t)(now_realtime_usec() / USEC_PER_MS));
     int64_t timeout_ms = parse_duration_to_ms(timeout_str, 30000);
 
     struct NdPromqlResponse *resp =
-        nd_promql_query_instant(NULL, query, at_ms, timeout_ms);
+        nd_promql_query_instant(host_str, query, at_ms, timeout_ms);
     return write_response_to_buffer(w, resp);
 }
 
@@ -96,6 +99,7 @@ static int handle_range(struct web_client *w, char *url) {
     char *end_str = NULL;
     char *step_str = NULL;
     char *timeout_str = NULL;
+    char *host_str = NULL;
 
     while (url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
@@ -118,6 +122,8 @@ static int handle_range(struct web_client *w, char *url) {
             step_str = value;
         else if (!strcmp(name, "timeout"))
             timeout_str = value;
+        else if (!strcmp(name, "host"))
+            host_str = value;
     }
 
     int64_t now_ms = (int64_t)(now_realtime_usec() / USEC_PER_MS);
@@ -127,7 +133,7 @@ static int handle_range(struct web_client *w, char *url) {
     int64_t timeout_ms = parse_duration_to_ms(timeout_str, 30000);
 
     struct NdPromqlResponse *resp =
-        nd_promql_query_range(NULL, query, start_ms, end_ms, step_ms, timeout_ms);
+        nd_promql_query_range(host_str, query, start_ms, end_ms, step_ms, timeout_ms);
     return write_response_to_buffer(w, resp);
 }
 
