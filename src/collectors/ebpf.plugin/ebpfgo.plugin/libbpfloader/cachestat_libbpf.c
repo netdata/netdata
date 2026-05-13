@@ -520,8 +520,9 @@ int netdata_cachestat_runtime_snapshot_apps(
             dst->account_page_dirtied += values[i].account_page_dirtied;
             dst->mark_buffer_dirty += values[i].mark_buffer_dirty;
             if (!dst->comm[0] && values[i].name[0]) {
-                strncpy(dst->comm, values[i].name, sizeof(dst->comm) - 1);
-                dst->comm[sizeof(dst->comm) - 1] = '\0';
+                size_t comm_len = strnlen(values[i].name, sizeof(values[i].name));
+                memcpy(dst->comm, values[i].name, comm_len);
+                dst->comm[comm_len] = '\0';
             }
         }
 
