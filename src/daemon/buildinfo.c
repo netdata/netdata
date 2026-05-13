@@ -1565,10 +1565,10 @@ static void populate_directories(void) {
 static const char *build_info_value_for_display(size_t i, char **allocated) {
     const char *value = BUILD_INFO[i].value;
 
-#if defined(OS_WINDOWS)
     if(allocated)
         *allocated = NULL;
 
+#if defined(OS_WINDOWS)
     if(BUILD_INFO[i].category == BIC_DIRECTORIES && BUILD_INFO[i].type == BIT_STRING && value) {
         if(!allocated)
             return value;
@@ -1576,8 +1576,6 @@ static const char *build_info_value_for_display(size_t i, char **allocated) {
         *allocated = os_translate_msys_to_windows_path(value);
         return *allocated;
     }
-#else
-    (void)allocated;
 #endif
 
     return value;
@@ -1587,8 +1585,12 @@ static void print_build_info_category_to_json(BUFFER *b, BUILD_INFO_CATEGORY cat
     buffer_json_member_add_object(b, key);
     for(size_t i = 0; i < BIB_TERMINATOR ;i++) {
         if(BUILD_INFO[i].category == category && BUILD_INFO[i].json) {
+#if defined(OS_WINDOWS)
             CLEAN_CHAR_P *display_path = NULL;
             const char *value = build_info_value_for_display(i, &display_path);
+#else
+            const char *value = build_info_value_for_display(i, NULL);
+#endif
 
             if(value)
                 buffer_json_member_add_string(b, BUILD_INFO[i].json, value);
@@ -1605,8 +1607,12 @@ static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, c
         if(BUILD_INFO[i].category == category && BUILD_INFO[i].print) {
             const char *v = BUILD_INFO[i].status ? "YES" : "NO";
             const char *k = BUILD_INFO[i].print;
+#if defined(OS_WINDOWS)
             CLEAN_CHAR_P *display_path = NULL;
             const char *d = build_info_value_for_display(i, &display_path);
+#else
+            const char *d = build_info_value_for_display(i, NULL);
+#endif
 
             int padding_length = 60 - strlen(k) - 1;
             if (padding_length < 0) padding_length = 0;
