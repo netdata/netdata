@@ -676,13 +676,13 @@ bool ml_dimension_train_model_precheck(enum ml_metric_type mt,
                                        bool training_in_progress,
                                        enum ml_worker_result *worker_res)
 {
-    if (mt == METRIC_TYPE_CONSTANT) {
-        *worker_res = ML_WORKER_RESULT_OK;
+    if (has_received_downstream_model) {
+        *worker_res = ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED;
         return true;
     }
 
-    if (has_received_downstream_model) {
-        *worker_res = ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED;
+    if (mt == METRIC_TYPE_CONSTANT) {
+        *worker_res = ML_WORKER_RESULT_OK;
         return true;
     }
 
@@ -714,7 +714,7 @@ bool ml_should_publish_model_update(bool host_running,
     return true;
 }
 
-static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
+static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
@@ -726,7 +726,7 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
                                         expected_generation,
                                         &dim->training_in_progress)) {
         spinlock_unlock(&dim->slock);
-        return;
+        return false;
     }
 
     // Mark the dim as downstream-supplied only after the publish-check passes
@@ -776,6 +776,7 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
     dim->training_in_progress = false;
 
     spinlock_unlock(&dim->slock);
+    return true;
 }
 
 static enum ml_worker_result
@@ -789,6 +790,8 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
                                           dim->has_received_downstream_model,
                                           dim->training_in_progress,
                                           &precheck)) {
+        if (precheck == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED)
+            dim->create_new_model_queued = false;
         spinlock_unlock(&dim->slock);
         return precheck;
     }
@@ -851,7 +854,7 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
     }
 
     // update models
-    ml_dimension_update_models(worker, dim, generation, /*from_downstream=*/false);
+    (void) ml_dimension_update_models(worker, dim, generation, /*from_downstream=*/false);
 
     return worker_result;
 }
@@ -1322,9 +1325,9 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
     Dim->kmeans = req.inlined_km;
     uint32_t generation = Dim->reset_generation;
     spinlock_unlock(&Dim->slock);
-    ml_dimension_update_models(worker, Dim, generation, /*from_downstream=*/true);
+    if (ml_dimension_update_models(worker, Dim, generation, /*from_downstream=*/true))
+        pulse_ml_models_received();
 
-    pulse_ml_models_received();
     return ML_WORKER_RESULT_OK;
 }
 

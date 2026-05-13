@@ -20,6 +20,7 @@ struct ml_dimension_t {
     uint32_t reset_generation;
     bool training_in_progress;
     bool has_received_downstream_model;
+    bool create_new_model_queued;
     size_t cns_head;
 
     std::vector<calculated_number_t> cns;

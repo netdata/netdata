@@ -880,6 +880,18 @@ static void test_downstream_model_short_circuit_and_requeue()
                    "downstream-supplied result should stop CREATE_NEW_MODEL requeueing");
 
     worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_CONSTANT,
+                                                             true,
+                                                             false,
+                                                             &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "constant downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
+                   "constant downstream-supplied dimensions should drain CREATE_NEW_MODEL items");
+    ML_TEST_ASSERT(!ml_should_requeue_create_new_model(worker_res),
+                   "constant downstream-supplied result should stop CREATE_NEW_MODEL requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
     should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
                                                              false,
                                                              false,

@@ -26,6 +26,21 @@ static void ml_dimension_enqueue_create_model(RRDHOST *rh, RRDDIM *rd)
     if (!host)
         return;
 
+    ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
+    if (!dim)
+        return;
+
+    spinlock_lock(&dim->slock);
+    bool should_enqueue = !dim->create_new_model_queued &&
+                          dim->ts == TRAINING_STATUS_UNTRAINED &&
+                          (!dim->has_received_downstream_model || dim->km_contexts.empty());
+    if (should_enqueue)
+        dim->create_new_model_queued = true;
+    spinlock_unlock(&dim->slock);
+
+    if (!should_enqueue)
+        return;
+
     ml_queue_item_t item;
     item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
     item.create_new_model.DLI = DimensionLookupInfo(
@@ -121,19 +136,7 @@ void ml_host_start(RRDHOST *rh) {
         void *rdp = NULL;
         rrddim_foreach_read(rdp, rs) {
             RRDDIM *rd = static_cast<RRDDIM *>(rdp);
-            ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
-            if (!dim)
-                continue;
-
-            bool should_enqueue = false;
-
-            spinlock_lock(&dim->slock);
-            should_enqueue = (dim->ts == TRAINING_STATUS_UNTRAINED) &&
-                             (!dim->has_received_downstream_model || dim->km_contexts.empty());
-            spinlock_unlock(&dim->slock);
-
-            if (should_enqueue)
-                ml_dimension_enqueue_create_model(rh, rd);
+            ml_dimension_enqueue_create_model(rh, rd);
         }
         rrddim_foreach_done(rdp);
     }
@@ -346,6 +349,7 @@ void ml_dimension_new(RRDDIM *rd)
     dim->suppression_window_counter = 0;
     dim->training_in_progress = false;
     dim->has_received_downstream_model = false;
+    dim->create_new_model_queued = false;
     dim->reset_generation = 0;
     dim->cns_head = 0;
 
