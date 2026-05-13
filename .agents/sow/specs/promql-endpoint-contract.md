@@ -25,10 +25,26 @@ Prometheus alerting rules:
 * Counter family: `rate`, `irate`, `increase`, `delta`.
 * Windowed aggregates (`*_over_time`): `avg_over_time`,
   `sum_over_time`, `min_over_time`, `max_over_time`,
-  `count_over_time`, `last_over_time`, `present_over_time`. NaN
-  samples are skipped; empty windows drop the series. `__name__`
-  is preserved for `last_over_time` and stripped for the other
-  six (Prometheus convention). Added in Phase 3b (SOW-0020).
+  `count_over_time`, `last_over_time`, `present_over_time` (Phase
+  3b, SOW-0020), plus `stddev_over_time`, `stdvar_over_time`,
+  `quantile_over_time(phi, v)` (Phase 3e, SOW-0023). NaN samples
+  are skipped; empty windows drop the series. `__name__` is
+  preserved for `last_over_time` and stripped for the others
+  (Prometheus convention). `stdvar`/`stddev` use the population
+  formula via `sum_of_squares - mean^2` (round-off negatives
+  clamp to zero). `quantile_over_time` clamps phi to ±Inf outside
+  [0, 1].
+* Predictive functions (Phase 3e, SOW-0023):
+  * `predict_linear(range_vector, t)` -- ordinary least squares on
+    the (timestamp, value) pairs of non-NaN samples, extrapolated
+    `t` seconds past the last sample. Windows with fewer than two
+    distinct timestamps drop the series.
+  * `holt_winters(range_vector, sf, tf)` -- double-exponential
+    smoothing with smoothing factor `sf` and trend factor `tf`,
+    each required to be in `(0, 1]`. Out-of-range factors surface
+    an evaluation error (HTTP 422) so the user notices the typo.
+    Windows shorter than two non-NaN samples drop the series.
+    Init: `s_0 = v_0`, `b_0 = v_1 - v_0` (matches Prometheus).
 * Aggregations: `sum`, `avg`, `min`, `max`, `count`, each with optional
   `by` or `without` grouping. NaN values are skipped; empty buckets
   drop.
@@ -85,10 +101,12 @@ evaluation time with a clear error:
   takes a string parameter (a label name) rather than a scalar.
   Lowering rejects it with `bad_data: count_values is deferred to
   a follow-up SOW`.
-* `stddev_over_time`, `stdvar_over_time`, `quantile_over_time` --
-  the three `*_over_time` siblings not covered by SOW-0020. The
-  lowering rejects these with `bad_data: unknown function` until
-  a future SOW lights them up.
+<!-- `stddev_over_time`, `stdvar_over_time`, `quantile_over_time` shipped
+     in Phase 3e (SOW-0023). -->
+* `keep_metric_names` -- a query-level modifier (not a function);
+  needs threading through the evaluator.
+* The `@` modifier with arithmetic -- evaluates an expression at a
+  fixed timestamp; architectural.
 * The `@` modifier.
 
 ## Naming: metric names and labels

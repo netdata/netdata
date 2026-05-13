@@ -400,6 +400,29 @@ check_post_discovery "POST /series with match[] and limit" \
     "len(d['data'])==20"
 echo
 
+echo "==> Phase 3e: stddev/stdvar/quantile_over_time, predict_linear, holt_winters"
+check_instant "stddev_over_time"     'stddev_over_time(system_cpu[1m])'             200 vector
+check_instant "stdvar_over_time"     'stdvar_over_time(system_cpu[1m])'             200 vector
+check_instant "quantile_over_time"   'quantile_over_time(0.95, system_cpu[1m])'     200 vector
+check_instant "predict_linear"       'predict_linear(system_cpu[1m], 0)'            200 vector
+check_instant "holt_winters"         'holt_winters(system_cpu[1m], 0.5, 0.5)'       200 vector
+check_discovery_args "quantile_over_time(1, ...) returns max-equivalent values" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==10" \
+    --data-urlencode "query=quantile_over_time(1, system_cpu[1m])"
+check_discovery_args "predict_linear(..., 0) returns 10 series" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==10" \
+    --data-urlencode "query=predict_linear(system_cpu[1m], 0)"
+check_discovery_args "holt_winters with valid factors returns 10" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==10" \
+    --data-urlencode "query=holt_winters(system_cpu[1m], 0.5, 0.5)"
+check_discovery_args "holt_winters with sf > 1 rejects" \
+    "/api/v1/query" 422 "" \
+    --data-urlencode "query=holt_winters(system_cpu[1m], 1.5, 0.5)"
+echo
+
 echo "==> Phase 3d: vector matching and set operators"
 # on(dimension) self-join: each series matches itself by dimension; 10 results.
 check_discovery_args "on(dimension) self-join returns 10 series" \

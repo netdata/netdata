@@ -29,6 +29,11 @@ pub fn apply_call(func: FuncKind, args: Vec<EvalResult>) -> Result<EvalResult, E
         FuncKind::CountOverTime => apply_over_time(args, OverTimeOp::Count),
         FuncKind::LastOverTime => apply_over_time(args, OverTimeOp::Last),
         FuncKind::PresentOverTime => apply_over_time(args, OverTimeOp::Present),
+        FuncKind::StddevOverTime => apply_over_time(args, OverTimeOp::Stddev),
+        FuncKind::StdvarOverTime => apply_over_time(args, OverTimeOp::Stdvar),
+        FuncKind::QuantileOverTime => apply_quantile_over_time(args),
+        FuncKind::PredictLinear => apply_predict_linear(args),
+        FuncKind::HoltWinters => apply_holt_winters(args),
     }
 }
 
@@ -43,6 +48,8 @@ enum OverTimeOp {
     Count,
     Last,
     Present,
+    Stddev,
+    Stdvar,
 }
 
 impl OverTimeOp {
@@ -55,6 +62,8 @@ impl OverTimeOp {
             OverTimeOp::Count => "count_over_time",
             OverTimeOp::Last => "last_over_time",
             OverTimeOp::Present => "present_over_time",
+            OverTimeOp::Stddev => "stddev_over_time",
+            OverTimeOp::Stdvar => "stdvar_over_time",
         }
     }
 
@@ -106,9 +115,13 @@ fn apply_over_time(args: Vec<EvalResult>, op: OverTimeOp) -> Result<EvalResult, 
 /// series.
 fn compute_over_time(samples: &[Sample], op: OverTimeOp) -> Option<(f64, i64)> {
     // Walk once: find the last non-NaN timestamp, count non-NaN samples,
-    // and accumulate the running statistic.
+    // and accumulate the running statistic. `sum_of_squares` is tracked
+    // for the variance family (stdvar/stddev_over_time) added in
+    // SOW-0023; for the other variants it's computed-but-unused, a tiny
+    // cost that keeps the single-pass shape.
     let mut count: u64 = 0;
     let mut sum: f64 = 0.0;
+    let mut sum_sq: f64 = 0.0;
     let mut min_val: f64 = f64::INFINITY;
     let mut max_val: f64 = f64::NEG_INFINITY;
     let mut last_val: f64 = 0.0;
@@ -120,6 +133,7 @@ fn compute_over_time(samples: &[Sample], op: OverTimeOp) -> Option<(f64, i64)> {
         }
         count += 1;
         sum += s.value;
+        sum_sq += s.value * s.value;
         if s.value < min_val {
             min_val = s.value;
         }
@@ -144,6 +158,28 @@ fn compute_over_time(samples: &[Sample], op: OverTimeOp) -> Option<(f64, i64)> {
         OverTimeOp::Count => count as f64,
         OverTimeOp::Last => last_val,
         OverTimeOp::Present => 1.0,
+        OverTimeOp::Stdvar => {
+            // Population variance: E[X^2] - (E[X])^2. Simple form;
+            // catastrophic cancellation only matters on highly
+            // concentrated distributions which are atypical for PromQL.
+            let mean = sum / (count as f64);
+            let var = sum_sq / (count as f64) - mean * mean;
+            // Clamp negative results (round-off) to zero.
+            if var < 0.0 {
+                0.0
+            } else {
+                var
+            }
+        }
+        OverTimeOp::Stddev => {
+            let mean = sum / (count as f64);
+            let var = sum_sq / (count as f64) - mean * mean;
+            if var < 0.0 {
+                0.0
+            } else {
+                var.sqrt()
+            }
+        }
     };
     Some((value, last_ts))
 }
@@ -468,6 +504,316 @@ fn interpolate_quantile(buckets: &[HBucket], phi: f64) -> Option<f64> {
     Some(lower_le + bucket_width * frac.clamp(0.0, 1.0))
 }
 
+// ---------------------------------------------------------------------------
+// Two-arg over_time variants and predictive functions (SOW-0023)
+// ---------------------------------------------------------------------------
+
+/// quantile_over_time(phi, range_vector): per series, sort non-NaN
+/// samples ascending and apply the same linear-interpolation formula
+/// used by the `quantile` aggregator (SOW-0021). Phi outside [0, 1]
+/// clamps to +-Inf per Prometheus. Empty window drops the series.
+fn apply_quantile_over_time(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let (phi, range) = expect_scalar_then_range(args, "quantile_over_time")?;
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let mut values: Vec<f64> = s
+            .samples
+            .iter()
+            .map(|sm| sm.value)
+            .filter(|v| !v.is_nan())
+            .collect();
+        if values.is_empty() {
+            continue;
+        }
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let value = crate::eval::aggregation::compute_quantile(&values, phi);
+        let ts = s
+            .samples
+            .iter()
+            .rev()
+            .find(|sm| !sm.value.is_nan())
+            .map(|sm| sm.timestamp_ms)
+            .unwrap_or(0);
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample { timestamp_ms: ts, value }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+/// predict_linear(range_vector, t): per series, fit y = slope*x + b on
+/// (timestamp_s - now_s, value) pairs of non-NaN samples via ordinary
+/// least squares, then return `intercept + slope * t` -- the
+/// extrapolated value `t` seconds in the future. Window with fewer
+/// than 2 distinct timestamps drops the series.
+fn apply_predict_linear(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let (range, t_secs) = expect_range_then_scalar(args, "predict_linear")?;
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        // Reference time = the most recent sample's timestamp; we
+        // center x values around it so the slope/intercept arithmetic
+        // doesn't blow up on epoch-scale Unix timestamps.
+        let Some(last_ts_ms) = s.samples.iter().rev().find_map(|sm| {
+            if sm.value.is_nan() {
+                None
+            } else {
+                Some(sm.timestamp_ms)
+            }
+        }) else {
+            continue;
+        };
+        let now_s = (last_ts_ms as f64) / 1000.0;
+        let mut n = 0.0;
+        let mut sum_x = 0.0;
+        let mut sum_y = 0.0;
+        let mut sum_xx = 0.0;
+        let mut sum_xy = 0.0;
+        let mut first_x = f64::NAN;
+        let mut distinct_x = false;
+        for sm in &s.samples {
+            if sm.value.is_nan() {
+                continue;
+            }
+            let x = (sm.timestamp_ms as f64) / 1000.0 - now_s;
+            let y = sm.value;
+            if first_x.is_nan() {
+                first_x = x;
+            } else if x != first_x {
+                distinct_x = true;
+            }
+            n += 1.0;
+            sum_x += x;
+            sum_y += y;
+            sum_xx += x * x;
+            sum_xy += x * y;
+        }
+        if n < 2.0 || !distinct_x {
+            continue;
+        }
+        let denom = n * sum_xx - sum_x * sum_x;
+        if denom == 0.0 {
+            continue;
+        }
+        let slope = (n * sum_xy - sum_x * sum_y) / denom;
+        let intercept = (sum_y - slope * sum_x) / n;
+        let value = intercept + slope * t_secs;
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample {
+                timestamp_ms: last_ts_ms,
+                value,
+            }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+/// holt_winters(range_vector, sf, tf): double-exponential smoothing.
+/// Both factors must be in (0, 1]; out-of-range params -> evaluation
+/// error. Returns the smoothed value at the end of the window.
+fn apply_holt_winters(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let (range, sf, tf) = expect_range_then_two_scalars(args, "holt_winters")?;
+    if !(sf > 0.0 && sf <= 1.0) {
+        return Err(EvalError::Other(format!(
+            "holt_winters: smoothing factor must be in (0, 1]; got {sf}"
+        )));
+    }
+    if !(tf > 0.0 && tf <= 1.0) {
+        return Err(EvalError::Other(format!(
+            "holt_winters: trend factor must be in (0, 1]; got {tf}"
+        )));
+    }
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        // Walk non-NaN samples chronologically.
+        let mut iter = s.samples.iter().filter(|sm| !sm.value.is_nan());
+        let Some(first) = iter.next() else { continue };
+        let Some(second) = iter.next() else { continue };
+        let mut s_prev = first.value;
+        let mut b_prev = second.value - first.value;
+        let mut s_curr = second.value;
+        let mut last_ts = second.timestamp_ms;
+        // Update with the second sample first to set s_curr.
+        s_curr = sf * second.value + (1.0 - sf) * (s_prev + b_prev);
+        b_prev = tf * (s_curr - s_prev) + (1.0 - tf) * b_prev;
+        s_prev = s_curr;
+        for sm in iter {
+            let s_new = sf * sm.value + (1.0 - sf) * (s_prev + b_prev);
+            let b_new = tf * (s_new - s_prev) + (1.0 - tf) * b_prev;
+            s_prev = s_new;
+            b_prev = b_new;
+            s_curr = s_new;
+            last_ts = sm.timestamp_ms;
+        }
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample {
+                timestamp_ms: last_ts,
+                value: s_curr,
+            }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+// ---------------------------------------------------------------------------
+// Two-arg argument-shape helpers
+// ---------------------------------------------------------------------------
+
+fn expect_scalar_then_range(
+    args: Vec<EvalResult>,
+    func: &'static str,
+) -> Result<(f64, Vec<Series>), EvalError> {
+    let mut it = args.into_iter();
+    let phi = match it.next() {
+        Some(EvalResult::Scalar(v)) => v,
+        Some(other) => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::Scalar,
+                got: other.value_type(),
+            });
+        }
+        None => {
+            return Err(EvalError::Other(format!(
+                "{func} requires (scalar, range-vector)"
+            )));
+        }
+    };
+    let range = match it.next() {
+        Some(EvalResult::RangeVector(s)) => s,
+        Some(other) => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::RangeVector,
+                got: other.value_type(),
+            });
+        }
+        None => {
+            return Err(EvalError::Other(format!(
+                "{func} requires (scalar, range-vector)"
+            )));
+        }
+    };
+    if it.next().is_some() {
+        return Err(EvalError::Other(format!(
+            "{func} expects exactly two arguments"
+        )));
+    }
+    Ok((phi, range))
+}
+
+fn expect_range_then_scalar(
+    args: Vec<EvalResult>,
+    func: &'static str,
+) -> Result<(Vec<Series>, f64), EvalError> {
+    let mut it = args.into_iter();
+    let range = match it.next() {
+        Some(EvalResult::RangeVector(s)) => s,
+        Some(other) => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::RangeVector,
+                got: other.value_type(),
+            });
+        }
+        None => {
+            return Err(EvalError::Other(format!(
+                "{func} requires (range-vector, scalar)"
+            )));
+        }
+    };
+    let scalar = match it.next() {
+        Some(EvalResult::Scalar(v)) => v,
+        Some(other) => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::Scalar,
+                got: other.value_type(),
+            });
+        }
+        None => {
+            return Err(EvalError::Other(format!(
+                "{func} requires (range-vector, scalar)"
+            )));
+        }
+    };
+    if it.next().is_some() {
+        return Err(EvalError::Other(format!(
+            "{func} expects exactly two arguments"
+        )));
+    }
+    Ok((range, scalar))
+}
+
+fn expect_range_then_two_scalars(
+    args: Vec<EvalResult>,
+    func: &'static str,
+) -> Result<(Vec<Series>, f64, f64), EvalError> {
+    let mut it = args.into_iter();
+    let range = match it.next() {
+        Some(EvalResult::RangeVector(s)) => s,
+        Some(other) => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::RangeVector,
+                got: other.value_type(),
+            });
+        }
+        None => {
+            return Err(EvalError::Other(format!(
+                "{func} requires (range-vector, scalar, scalar)"
+            )));
+        }
+    };
+    let sf = match it.next() {
+        Some(EvalResult::Scalar(v)) => v,
+        Some(other) => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::Scalar,
+                got: other.value_type(),
+            });
+        }
+        None => {
+            return Err(EvalError::Other(format!(
+                "{func} requires three arguments"
+            )));
+        }
+    };
+    let tf = match it.next() {
+        Some(EvalResult::Scalar(v)) => v,
+        Some(other) => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::Scalar,
+                got: other.value_type(),
+            });
+        }
+        None => {
+            return Err(EvalError::Other(format!(
+                "{func} requires three arguments"
+            )));
+        }
+    };
+    if it.next().is_some() {
+        return Err(EvalError::Other(format!(
+            "{func} expects exactly three arguments"
+        )));
+    }
+    Ok((range, sf, tf))
+}
+
 fn strip_name(labels: &[(String, String)]) -> (Vec<(String, String)>, u64) {
     let labels: Vec<(String, String)> = labels
         .iter()
@@ -672,6 +1018,8 @@ mod tests {
             OverTimeOp::Count => FuncKind::CountOverTime,
             OverTimeOp::Last => FuncKind::LastOverTime,
             OverTimeOp::Present => FuncKind::PresentOverTime,
+            OverTimeOp::Stddev => FuncKind::StddevOverTime,
+            OverTimeOp::Stdvar => FuncKind::StdvarOverTime,
         };
         let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
         let r = apply_call(func, vec![EvalResult::RangeVector(vec![s])]).unwrap();
@@ -820,6 +1168,203 @@ mod tests {
             vec![EvalResult::InstantVector(vec![s])],
             OverTimeOp::Avg,
         );
+        assert!(matches!(r, Err(EvalError::Type { .. })));
+    }
+
+    // -------------------------------------------------------------------
+    // SOW-0023: stddev/stdvar/quantile_over_time, predict_linear,
+    //          holt_winters
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn stdvar_over_time_computes_population_variance() {
+        // [1,2,3,4,5] has mean 3, variance 2.
+        let v = run_over_time(
+            OverTimeOp::Stdvar,
+            vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)],
+        );
+        assert_eq!(v.len(), 1);
+        assert!((v[0].samples[0].value - 2.0).abs() < 1e-9, "got {}", v[0].samples[0].value);
+        assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
+    }
+
+    #[test]
+    fn stddev_over_time_is_sqrt_of_stdvar() {
+        let v = run_over_time(
+            OverTimeOp::Stddev,
+            vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)],
+        );
+        assert!((v[0].samples[0].value - 2.0_f64.sqrt()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn stddev_over_time_constant_series_is_zero() {
+        let v = run_over_time(OverTimeOp::Stddev, vec![(0, 7.0), (1, 7.0), (2, 7.0)]);
+        // Negative round-off clamped to zero in compute_over_time.
+        assert!(v[0].samples[0].value.abs() < 1e-9);
+    }
+
+    #[test]
+    fn stddev_over_time_skips_nan() {
+        let v = run_over_time(
+            OverTimeOp::Stddev,
+            vec![(0, 1.0), (1, f64::NAN), (2, 5.0)],
+        );
+        // mean = 3, var = (1+25)/2 - 9 = 4 -> stddev 2.
+        assert!((v[0].samples[0].value - 2.0).abs() < 1e-9);
+    }
+
+    fn run_quantile_over_time(phi: f64, samples: Vec<(i64, f64)>) -> Vec<Series> {
+        let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
+        let r = apply_quantile_over_time(vec![
+            EvalResult::Scalar(phi),
+            EvalResult::RangeVector(vec![s]),
+        ])
+        .unwrap();
+        match r {
+            EvalResult::InstantVector(v) => v,
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn quantile_over_time_median() {
+        let v = run_quantile_over_time(
+            0.5,
+            vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)],
+        );
+        assert!((v[0].samples[0].value - 3.0).abs() < 1e-9);
+        assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
+    }
+
+    #[test]
+    fn quantile_over_time_max_at_one_min_at_zero() {
+        let samples = vec![(0, 1.0), (1, 7.0), (2, 3.0)];
+        let v1 = run_quantile_over_time(1.0, samples.clone());
+        assert_eq!(v1[0].samples[0].value, 7.0);
+        let v0 = run_quantile_over_time(0.0, samples);
+        assert_eq!(v0[0].samples[0].value, 1.0);
+    }
+
+    #[test]
+    fn quantile_over_time_clamps_phi() {
+        let samples = vec![(0, 1.0), (1, 2.0)];
+        let v_neg = run_quantile_over_time(-0.5, samples.clone());
+        assert_eq!(v_neg[0].samples[0].value, f64::NEG_INFINITY);
+        let v_high = run_quantile_over_time(1.5, samples);
+        assert_eq!(v_high[0].samples[0].value, f64::INFINITY);
+    }
+
+    fn run_predict_linear(samples: Vec<(i64, f64)>, t_secs: f64) -> Vec<Series> {
+        let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
+        let r = apply_predict_linear(vec![
+            EvalResult::RangeVector(vec![s]),
+            EvalResult::Scalar(t_secs),
+        ])
+        .unwrap();
+        match r {
+            EvalResult::InstantVector(v) => v,
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn predict_linear_on_perfect_line_extrapolates_exactly() {
+        // y = 2x + 1 at t = 0, 1000, 2000, 3000 ms (so x = 0, 1, 2, 3
+        // seconds). Last sample's x is the reference; t_secs=10 should
+        // predict y at x = 3+10 = 13s -> 27 (since y = 2x + 1 anchored
+        // at the reference: from last sample's perspective the line is
+        // y_last + 2 * delta_seconds = 7 + 20 = 27).
+        let v = run_predict_linear(
+            vec![(0, 1.0), (1000, 3.0), (2000, 5.0), (3000, 7.0)],
+            10.0,
+        );
+        assert_eq!(v.len(), 1);
+        assert!((v[0].samples[0].value - 27.0).abs() < 1e-9, "got {}", v[0].samples[0].value);
+        assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
+    }
+
+    #[test]
+    fn predict_linear_zero_t_returns_intercept_at_last_sample() {
+        // With t=0 the prediction = the linear-fit value at the last
+        // sample's reference time, which for a perfect line equals the
+        // last sample's value.
+        let v = run_predict_linear(
+            vec![(0, 1.0), (1000, 3.0), (2000, 5.0)],
+            0.0,
+        );
+        // The intercept at x=0 (the reference time = last sample's
+        // time) is the predicted value. For y=2x+1 centered at the
+        // last sample (x=2): y = 5 at x=2 -> in centered coordinates
+        // intercept = 5.
+        assert!((v[0].samples[0].value - 5.0).abs() < 1e-9, "got {}", v[0].samples[0].value);
+    }
+
+    #[test]
+    fn predict_linear_single_sample_drops() {
+        let v = run_predict_linear(vec![(0, 42.0)], 10.0);
+        assert!(v.is_empty());
+    }
+
+    fn run_holt_winters(samples: Vec<(i64, f64)>, sf: f64, tf: f64) -> Vec<Series> {
+        let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
+        apply_holt_winters(vec![
+            EvalResult::RangeVector(vec![s]),
+            EvalResult::Scalar(sf),
+            EvalResult::Scalar(tf),
+        ])
+        .map(|r| match r {
+            EvalResult::InstantVector(v) => v,
+            _ => panic!(),
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn holt_winters_two_samples_emits() {
+        // With two samples, the recursion has just enough to produce
+        // one smoothed output.
+        let v = run_holt_winters(vec![(0, 10.0), (1, 20.0)], 0.5, 0.5);
+        assert_eq!(v.len(), 1);
+        // Just a sanity check on the value: with v0=10, v1=20:
+        // s0=10, b0=10. After v1=20: s1=0.5*20+0.5*(10+10)=20.
+        assert!((v[0].samples[0].value - 20.0).abs() < 1e-9);
+        assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
+    }
+
+    #[test]
+    fn holt_winters_single_sample_drops() {
+        let v = run_holt_winters(vec![(0, 10.0)], 0.5, 0.5);
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn holt_winters_rejects_out_of_range_factors() {
+        let s = series(vec![("__name__", "foo")], vec![(0, 1.0), (1, 2.0)]);
+        let r = apply_holt_winters(vec![
+            EvalResult::RangeVector(vec![s.clone()]),
+            EvalResult::Scalar(1.5),
+            EvalResult::Scalar(0.5),
+        ]);
+        assert!(matches!(r, Err(EvalError::Other(_))));
+
+        let r = apply_holt_winters(vec![
+            EvalResult::RangeVector(vec![s.clone()]),
+            EvalResult::Scalar(0.5),
+            EvalResult::Scalar(0.0),
+        ]);
+        assert!(matches!(r, Err(EvalError::Other(_))));
+    }
+
+    #[test]
+    fn two_arg_funcs_reject_wrong_shapes() {
+        // quantile_over_time wants (scalar, range); passing two scalars
+        // is a type error.
+        let r = apply_quantile_over_time(vec![EvalResult::Scalar(0.5), EvalResult::Scalar(1.0)]);
+        assert!(matches!(r, Err(EvalError::Type { .. })));
+        // predict_linear wants (range, scalar); passing (scalar, scalar)
+        // errors on the range slot.
+        let r = apply_predict_linear(vec![EvalResult::Scalar(0.5), EvalResult::Scalar(1.0)]);
         assert!(matches!(r, Err(EvalError::Type { .. })));
     }
 }

@@ -191,7 +191,7 @@ fn apply_quantile(
 /// Standard linear-interpolation quantile over a pre-sorted slice.
 /// Matches Prometheus' `quantile` aggregator: rank = phi * (n - 1),
 /// lerp between floor(rank) and ceil(rank).
-fn compute_quantile(sorted: &[f64], phi: f64) -> f64 {
+pub(crate) fn compute_quantile(sorted: &[f64], phi: f64) -> f64 {
     if phi.is_nan() {
         return f64::NAN;
     }

@@ -166,6 +166,11 @@ pub enum FuncKind {
     CountOverTime,
     LastOverTime,
     PresentOverTime,
+    StddevOverTime,
+    StdvarOverTime,
+    QuantileOverTime,
+    PredictLinear,
+    HoltWinters,
 }
 
 impl FuncKind {
@@ -183,6 +188,11 @@ impl FuncKind {
             "count_over_time" => FuncKind::CountOverTime,
             "last_over_time" => FuncKind::LastOverTime,
             "present_over_time" => FuncKind::PresentOverTime,
+            "stddev_over_time" => FuncKind::StddevOverTime,
+            "stdvar_over_time" => FuncKind::StdvarOverTime,
+            "quantile_over_time" => FuncKind::QuantileOverTime,
+            "predict_linear" => FuncKind::PredictLinear,
+            "holt_winters" => FuncKind::HoltWinters,
             _ => return None,
         })
     }
