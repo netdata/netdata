@@ -304,47 +304,38 @@ void function_network_protocols(
         nv_add_int_field(wb, &field_id, "DatagramsNoPort", "Datagrams with No Port", "datagrams");
     }
     buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "Received");
 
+    // charts.columns = metric column(s) for the Y axis (NOT the groupby column)
     buffer_json_member_add_object(wb, "charts");
     {
-        buffer_json_member_add_object(wb, "Received by Transport");
+        buffer_json_member_add_object(wb, "Received");
         {
+            buffer_json_member_add_string(wb, "name", "Received");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
-            buffer_json_add_array_item_string(wb, "Transport");
+            {
+                buffer_json_add_array_item_string(wb, "Received");
+            }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        buffer_json_member_add_object(wb, "Sent by Transport");
+        buffer_json_member_add_object(wb, "Sent");
         {
+            buffer_json_member_add_string(wb, "name", "Sent");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
-            buffer_json_add_array_item_string(wb, "Transport");
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "Received by Family");
-        {
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            buffer_json_add_array_item_string(wb, "Family");
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "Sent by Family");
-        {
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            buffer_json_add_array_item_string(wb, "Family");
+            {
+                buffer_json_add_array_item_string(wb, "Sent");
+            }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // charts
 
+    // default_charts: [chart_key, groupby_column]
     buffer_json_member_add_array(wb, "default_charts");
     {
         buffer_json_add_array_item_array(wb);
@@ -355,6 +346,16 @@ void function_network_protocols(
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, "Sent");
         buffer_json_add_array_item_string(wb, "Transport");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Received");
+        buffer_json_add_array_item_string(wb, "Family");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Sent");
+        buffer_json_add_array_item_string(wb, "Family");
         buffer_json_array_close(wb);
     }
     buffer_json_array_close(wb); // default_charts
