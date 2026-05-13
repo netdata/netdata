@@ -4,7 +4,15 @@
 
 Status: completed
 
-Sub-state: all 5 chunks delivered. C shim, Rust storage adapter, Plan IR + evaluator, counter family + histograms, Prometheus mirror paths, `ENABLE_PROMQL` cmake option, contract spec, and smoke harness all landed and verified end-to-end against a live daemon. 49 cargo unit tests pass; 21/21 smoke-harness checks pass.
+Sub-state: regression of AC#4 found and fixed 2026-05-13. The shim's
+chart-level matcher pre-filter rejected charts when a matcher
+referenced a label that is added only at the per-dimension level
+(e.g. `system_cpu{dimension="user"}`). The Phase 1 smoke check
+passed because it only asserted HTTP 200 + `resultType=vector`, not
+result content. Fix landed in the same commit that produced this
+regression entry; the smoke harness gained two count-asserting
+checks. See the appended `## Regression - 2026-05-13` section at the
+end of this file for the full account.
 
 ## Requirements
 
@@ -395,4 +403,157 @@ None directly. Phase 2 SOW filed when work resumes.
 
 ## Regression Log
 
-None yet.
+See `## Regression - 2026-05-13` below.
+
+## Regression - 2026-05-13
+
+### What broke
+
+`system_cpu{dimension="user"}` (and analogous EQ-on-`dimension`
+queries) returned an empty `data.result` array against a live daemon
+where `system_cpu` has 10 dimensions, one of which is named `user`.
+The user encountered this through Grafana's Explore view while
+opening the chunk-1 PR-merge demo: a panel that should have drawn a
+single timeseries instead read "No data" with a status:success
+envelope.
+
+Reproduction outside Grafana:
+
+```bash
+curl -s -X POST 'http://localhost:19999/api/v1/query' \
+  --data-urlencode 'query=system_cpu{dimension="user"}' \
+  --data-urlencode "time=$(date +%s)" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(len(d['data']['result']))"
+# prints 0 (broken); should print 1
+```
+
+For comparison, the regex form `{dimension=~"user"}` returned the
+correct single series. The unfiltered selector `system_cpu` returned
+all ten. The discrepancy isolates the bug to EQ/NE-on-`dimension`
+specifically.
+
+### Evidence
+
+* `src/database/contexts/promql-data-source.c:407-410` (Phase 1
+  chunk-1 code as committed). The chart-level pre-filter:
+
+  ```c
+  if (!builder_matches(&chart_labels, state->matchers, state->matchers_len)) {
+      lb_discard(&chart_labels);
+      return 0;
+  }
+  ```
+
+  ran against a builder that had `__name__`, `instance`, `chart`,
+  `family`, plus chart-instance and host labels, but **not**
+  `dimension` (added later inside `rrddim_foreach_read`).
+* `builder_matches` -> `matcher_accepts` translated an absent label
+  to `""`. For EQ on `"user"`, the comparison `"" == "user"` was
+  false, so the matcher rejected the chart. Every dimension in the
+  chart (including the legitimate `user` one) was unreachable past
+  this point.
+* RE/NRE matchers were already deferred at this layer (the comment
+  on `matcher_accepts` notes "post-filter in Rust"), which is why
+  `=~"user"` worked: the chart-level pre-filter passed unconditionally
+  for regex, the per-dim builder had `dimension`, the resolved series
+  reached the Rust regex filter, and the right series was kept.
+
+### Why previous validation missed it
+
+`tests/promql-smoke/run-smoke.sh::check_instant` asserted four
+things on a 200 response: HTTP status, JSON validity, top-level
+`status` field, and `data.resultType`. It did not assert anything
+about `data.result` -- not its length, not its contents. So
+`{"status":"success","data":{"resultType":"vector","result":[]}}`
+counted as a PASS even though the result array was wrong.
+
+This is a process gap: the AC corpus enumerated query *shapes* that
+should work, but the smoke check only verified the API contract
+shape of the response, not that any individual query produced the
+expected number of series. A query that should return 1 series was
+indistinguishable from one that should return 0.
+
+The Phase 2 work (SOW-0018) introduced the `check_discovery` helper
+which does take an optional Python assertion on the parsed JSON.
+That mechanism happened to be exercised on the discovery surface
+and so the bug went unobserved in Phase 2 chunks 1-3 even though
+those chunks shared the same shim.
+
+### Repair plan and validation
+
+Code fix:
+
+* `src/database/contexts/promql-data-source.c`: `builder_matches`
+  gains a `bool partial` parameter. When `true` (chart-level
+  caller), a matcher whose label name is absent from the builder is
+  deferred (treated as accept). When `false` (per-dim caller, where
+  every label that will ever appear is now present), absent labels
+  evaluate strictly as `""`. The two call sites pass `true` and
+  `false` respectively.
+
+This preserves the chart-level early-exit optimization for matchers
+on chart-level labels (e.g. `system_cpu{instance="server-7"}` still
+short-circuits non-matching hosts) without rejecting matchers that
+target dim-level labels.
+
+Smoke-harness fix:
+
+* `tests/promql-smoke/run-smoke.sh`: two new regression checks
+  under the `/api/v1/series` group assert exact result counts:
+
+  - `series: EQ on dimension label narrows to one series`
+    (`system_cpu{dimension="user"}` -> 1 series, dimension=user)
+  - `series: EQ on nonexistent dimension value returns empty`
+    (`system_cpu{dimension="nonexistent_dim_xyz"}` -> 0 series)
+
+  Both pass after the fix; both would have failed before it.
+
+Validation:
+
+* Manual curl reproduction: post-fix `system_cpu{dimension="user"}`
+  returns count=1 with the user series; `{dimension="nonexistent"}`
+  returns count=0; bare `system_cpu` still returns 10.
+* Smoke harness: 47/47 pass on the populated local daemon (24 Phase
+  1 + 23 Phase 2, the latter including the two new regression
+  guards).
+* Rust unit tests: 59/59 pass.
+* Grafana Explore: `system_cpu{dimension="user"}` renders one line
+  in a panel where before it rendered "No data".
+
+### Artifact and follow-up updates
+
+* AGENTS.md: no change.
+* Runtime project skills: no change.
+* Specs: `.agents/sow/specs/promql-endpoint-contract.md` -- no
+  change. The spec's matcher semantics are correct as written; the
+  bug was an implementation defect inside `builder_matches`, not a
+  contract that needed amending.
+* End-user docs: no change.
+* Project skills: no change.
+* SOW-0018: this regression surfaced *while exercising* Phase 2's
+  discovery work, but the bug is in Phase 1 code paths. SOW-0018's
+  close stays valid; this regression is scoped to SOW-0017. The
+  smoke-harness tightening lives in the chunk-3 close commit's
+  successor and is folded into this fix.
+
+### Lessons added
+
+* *Smoke checks should assert content where the expected content is
+  knowable.* The Phase 1 smoke check used a four-arg helper
+  (`name`, `query`, `expected_status`, `expected_resultType`) that
+  by construction couldn't assert anything stronger. Phase 2's
+  `check_discovery` helper showed a better shape (optional
+  Python assertion on the parsed JSON). For Phase 3 SOWs, instant
+  and range smoke checks should grow that same assertion slot.
+* *RE/NRE working when EQ/NE didn't was a visible asymmetry.* The
+  pattern "regex works, equality doesn't on the same label" is a
+  strong signal that an early-bind matcher path is rejecting too
+  eagerly. Worth keeping in mind for future shim debugging.
+
+### Closing
+
+Once this commit lands, the SOW moves back to `done/` with
+`Status: completed`. The regression entry above stays appended; the
+original SOW narrative is unchanged.

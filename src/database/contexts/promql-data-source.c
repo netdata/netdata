@@ -289,8 +289,21 @@ static const char *lb_get(const label_builder *b, const char *name) {
 // Apply all non-__name__ matchers against the labels already in the builder.
 // Returns true if every matcher accepts; false if any rejects (and RE/NRE
 // don't reject at the shim layer, see matcher_accepts).
+//
+// `partial` distinguishes the two callers:
+//
+//   true  -> chart-level pre-filter. The `dimension` label hasn't been
+//            added yet, and chart-instance labels that aren't yet
+//            populated may also be absent. A matcher on a label not yet
+//            present is deferred (treated as "accept"), to be re-checked
+//            once the per-dimension builder runs.
+//   false -> per-dimension check. Every label that will ever appear on
+//            this series is already in the builder. An absent label
+//            here means the matcher can never match -- evaluate
+//            strictly, with the absent value as "".
 static bool builder_matches(const label_builder *b,
-                            const nd_pds_matcher *matchers, size_t n) {
+                            const nd_pds_matcher *matchers, size_t n,
+                            bool partial) {
     for (size_t i = 0; i < n; i++) {
         const nd_pds_matcher *m = &matchers[i];
         if (!m->name) continue;
@@ -298,7 +311,12 @@ static bool builder_matches(const label_builder *b,
         if (m->op == ND_PDS_RE || m->op == ND_PDS_NRE) continue;  // post-filter in Rust
 
         const char *actual = lb_get(b, m->name);
-        if (!matcher_accepts(m, actual ? actual : ""))
+        if (!actual) {
+            if (partial) continue;  // defer to per-dim check
+            // strict: absent label evaluates as ""
+            actual = "";
+        }
+        if (!matcher_accepts(m, actual))
             return false;
     }
     return true;
@@ -447,7 +465,7 @@ static int resolve_instance_cb(RRDSET *st, void *data) {
         return -1;
     }
 
-    if (!builder_matches(&chart_labels, state->matchers, state->matchers_len)) {
+    if (!builder_matches(&chart_labels, state->matchers, state->matchers_len, true)) {
         lb_discard(&chart_labels);
         return 0;
     }
@@ -483,7 +501,7 @@ static int resolve_instance_cb(RRDSET *st, void *data) {
         }
 
         // Re-check matchers now that the `dimension` label is present.
-        if (!builder_matches(&dim_labels, state->matchers, state->matchers_len)) {
+        if (!builder_matches(&dim_labels, state->matchers, state->matchers_len, false)) {
             lb_discard(&dim_labels);
             continue;
         }

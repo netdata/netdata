@@ -286,6 +286,15 @@ echo "==> Discovery: /api/v1/series"
 check_discovery "series: single match[] returns shapes" \
     "/api/v1/series" "--data-urlencode match[]=system_cpu" 200 \
     "len(d['data'])>=1 and d['data'][0]['__name__']=='system_cpu' and 'dimension' in d['data'][0]"
+# Regression guard: EQ on a per-dimension label must narrow the result
+# rather than rejecting the whole chart at the pre-filter stage. The
+# original chunk-1 chart-level matcher check was too eager.
+check_discovery "series: EQ on dimension label narrows to one series" \
+    "/api/v1/series" '--data-urlencode match[]=system_cpu{dimension="user"}' 200 \
+    "len(d['data'])==1 and d['data'][0]['dimension']=='user'"
+check_discovery "series: EQ on nonexistent dimension value returns empty" \
+    "/api/v1/series" '--data-urlencode match[]=system_cpu{dimension="nonexistent_dim_xyz"}' 200 \
+    "d['data']==[]"
 check_discovery "series: multi match[] OR-unions distinct __name__" \
     "/api/v1/series" "--data-urlencode match[]=system_cpu --data-urlencode match[]=disk_io" 200 \
     "{s['__name__'] for s in d['data']} == {'system_cpu','disk_io'}"
