@@ -50,7 +50,7 @@ impl AggrKind {
     }
 }
 
-/// Binary operators supported in Phase 1.
+/// Binary operators supported in the evaluator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinopKind {
     // Arithmetic
@@ -67,6 +67,13 @@ pub enum BinopKind {
     Le,
     Gt,
     Ge,
+    // Set operators (Phase 3d / SOW-0022). These take vector/vector
+    // operands and a matching spec; they do not accept the `bool`
+    // modifier or the `group_left`/`group_right` cardinality
+    // modifiers.
+    LAnd,
+    LOr,
+    LUnless,
 }
 
 impl BinopKind {
@@ -76,6 +83,10 @@ impl BinopKind {
             BinopKind::Eq | BinopKind::Ne | BinopKind::Lt | BinopKind::Le | BinopKind::Gt | BinopKind::Ge
         )
     }
+
+    pub fn is_set_op(self) -> bool {
+        matches!(self, BinopKind::LAnd | BinopKind::LOr | BinopKind::LUnless)
+    }
 }
 
 /// Grouping clause for an aggregation. `By` keeps the listed labels;
@@ -84,6 +95,59 @@ impl BinopKind {
 pub enum Grouping {
     By(Vec<String>),
     Without(Vec<String>),
+}
+
+/// Vector-matching join key.
+///
+/// `Default` matches by every label except `__name__` (Prometheus
+/// convention). `On(labels)` matches by exactly the listed labels.
+/// `Ignoring(labels)` matches by everything except the listed labels
+/// (and `__name__`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MatchKeys {
+    Default,
+    On(Vec<String>),
+    Ignoring(Vec<String>),
+}
+
+/// Cardinality of a vector/vector binary operation.
+///
+/// `OneToOne` is the default (no `group_left` / `group_right`). Each
+/// lhs series matches at most one rhs series; duplicates on either
+/// side are an error.
+///
+/// `ManyToOne` (`group_left`) treats rhs as the "one" side: each
+/// matching rhs key can be paired with many lhs series. Multiple rhs
+/// series with the same key is still an error.
+///
+/// `OneToMany` (`group_right`) is symmetric.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cardinality {
+    OneToOne,
+    ManyToOne,
+    OneToMany,
+}
+
+/// Vector-matching spec for `Plan::Binop`.
+///
+/// `include` is the optional list of labels copied from the "one"
+/// side onto the result series in `ManyToOne` / `OneToMany`. Unused
+/// when cardinality is `OneToOne`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatchSpec {
+    pub keys: MatchKeys,
+    pub cardinality: Cardinality,
+    pub include: Vec<String>,
+}
+
+impl Default for MatchSpec {
+    fn default() -> Self {
+        Self {
+            keys: MatchKeys::Default,
+            cardinality: Cardinality::OneToOne,
+            include: Vec::new(),
+        }
+    }
 }
 
 /// Function calls supported in Phase 1. Empty in chunk 3; populated in
@@ -159,13 +223,19 @@ pub enum Plan {
 
     /// Binary operation. The Plan IR distinguishes type combinations at
     /// lowering time: scalar/scalar, scalar/vector, vector/scalar,
-    /// vector/vector. The single variant carries the kind plus the bool
-    /// modifier for comparisons.
+    /// vector/vector. The single variant carries the kind, the bool
+    /// modifier for comparisons, and the vector-matching spec (Phase 3d
+    /// / SOW-0022).
     Binop {
         op: BinopKind,
         /// True for `comparison bool` operators which return 0/1 rather
         /// than filtering.
         return_bool: bool,
+        /// Vector-matching spec. `None` for scalar/scalar; `Some` for
+        /// any binop that touches a vector, with default match keys
+        /// and 1:1 cardinality when no `on`/`ignoring`/`group_*`
+        /// clause is present.
+        matching: Option<MatchSpec>,
         lhs: Arc<Plan>,
         rhs: Arc<Plan>,
     },

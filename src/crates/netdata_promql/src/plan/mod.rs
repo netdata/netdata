@@ -10,6 +10,8 @@ mod ir;
 mod lower;
 
 #[allow(unused_imports)]
-pub use ir::{AggrKind, BinopKind, FuncKind, Grouping, Plan, ValueType};
+pub use ir::{
+    AggrKind, BinopKind, Cardinality, FuncKind, Grouping, MatchKeys, MatchSpec, Plan, ValueType,
+};
 #[allow(unused_imports)]
 pub use lower::{lower, lower_query, LowerError};

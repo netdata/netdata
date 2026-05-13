@@ -32,12 +32,13 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
         Plan::Binop {
             op,
             return_bool,
+            matching,
             lhs,
             rhs,
         } => {
             let l = eval(ctx, lhs)?;
             let r = eval(ctx, rhs)?;
-            super::binop::apply_binop(*op, *return_bool, l, r)
+            super::binop::apply_binop(*op, *return_bool, matching.as_ref(), l, r)
         }
 
         Plan::Aggregate {

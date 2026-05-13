@@ -20,6 +20,10 @@
 # Rust unit tests under src/crates/netdata_promql/.
 
 set -euo pipefail
+# Disable filename globbing: PromQL queries contain `*` (multiplication),
+# braces, brackets, etc. Without `-f`, queries like `system_cpu * on(x) y`
+# get shell-expanded against the current directory before `curl` sees them.
+set -f
 
 URL="${1:-http://localhost:19999}"
 PASS=0
@@ -143,7 +147,9 @@ echo
 echo "==> Error paths"
 check_instant "parse error"               'not_a_real_query{'                       400 ""
 check_instant "subquery rejected"         'foo[5m:1m]'                              400 ""
-check_instant "vector matching rejected"  'a + on(x) b'                             400 ""
+# Phase 1 had a "vector matching rejected" check here; SOW-0022
+# implements vector matching, so the rejection no longer applies.
+# Positive coverage lives in the Phase 3d group below.
 check_instant "histogram_quantile no le"  'histogram_quantile(0.95, system_cpu)'    422 ""
 echo
 
@@ -211,9 +217,17 @@ echo
 # extra_jq_assertion (optional Python check on the parsed JSON; receives
 # `d` as the parsed dict).
 check_discovery() {
+    # Signature: name, path, extra, expected_status, assertion
+    # `extra` is a single string that's split into curl args by the
+    # shell. Each whitespace-separated token becomes one curl arg.
+    # For queries that contain whitespace, callers must use repeated
+    # `--data-urlencode k=v --data-urlencode k2=v2` form OR call
+    # `check_discovery_args` (below) which takes the curl args as a
+    # variadic tail and avoids re-splitting.
     local name="$1" path="$2" extra="$3" expected_status="$4" assertion="$5"
     local tmp http_code body
     tmp=$(mktemp)
+    # shellcheck disable=SC2086  # intentional word-split on $extra
     http_code=$(curl -sG -o "$tmp" -w '%{http_code}' "$URL$path" $extra 2>&1)
     body=$(cat "$tmp")
     rm -f "$tmp"
@@ -316,6 +330,44 @@ check_discovery "metadata: ?metric=system_cpu has type=gauge" \
 echo
 
 echo "==> Discovery: POST on /labels and /series"
+check_discovery_args() {
+    # Variadic variant: trailing args are passed verbatim to curl, so
+    # `--data-urlencode "query=a * b"` is preserved as two tokens
+    # rather than being word-split. Use for queries containing
+    # whitespace or shell metachars.
+    local name="$1" path="$2" expected_status="$3" assertion="$4"
+    shift 4
+    local tmp http_code body
+    tmp=$(mktemp)
+    http_code=$(curl -sG -o "$tmp" -w '%{http_code}' "$URL$path" "$@" 2>&1)
+    body=$(cat "$tmp")
+    rm -f "$tmp"
+    if [[ "$http_code" != "$expected_status" ]]; then
+        printf '  %s %s -- expected HTTP %s, got %s\n' \
+            "$(c_red FAIL)" "$name" "$expected_status" "$http_code"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    if ! printf '%s' "$body" | python3 -c "import json,sys; json.load(sys.stdin)" >/dev/null 2>&1; then
+        printf '  %s %s -- response is not valid JSON\n' "$(c_red FAIL)" "$name"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    if [[ -n "$assertion" ]]; then
+        if ! printf '%s' "$body" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert $assertion, 'assertion failed: ' + repr(d)[:200]
+" >/dev/null 2>&1; then
+            printf '  %s %s -- assertion failed: %s\n' "$(c_red FAIL)" "$name" "$assertion"
+            FAIL=$((FAIL + 1))
+            return
+        fi
+    fi
+    printf '  %s %s\n' "$(c_grn PASS)" "$name"
+    PASS=$((PASS + 1))
+}
+
 check_post_discovery() {
     local name="$1" path="$2" body="$3" assertion="$4"
     local tmp http_code resp_body
@@ -346,6 +398,35 @@ check_post_discovery "POST /labels with match[]" \
 check_post_discovery "POST /series with match[] and limit" \
     "/api/v1/series" '--data-urlencode match[]={__name__!=""} --data-urlencode limit=20' \
     "len(d['data'])==20"
+echo
+
+echo "==> Phase 3d: vector matching and set operators"
+# on(dimension) self-join: each series matches itself by dimension; 10 results.
+check_discovery_args "on(dimension) self-join returns 10 series" \
+    "/api/v1/query" 200 "len(d['data']['result'])==10" \
+    --data-urlencode "query=system_cpu * on(dimension) system_cpu"
+check_discovery_args "ignoring(nope) self-join returns 10 series" \
+    "/api/v1/query" 200 "len(d['data']['result'])==10" \
+    --data-urlencode "query=system_cpu * ignoring(nope) system_cpu"
+check_discovery_args "group_left broadcasts max across all dims" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==10 and all('dimension' in s['metric'] for s in d['data']['result'])" \
+    --data-urlencode "query=system_cpu * on(instance) group_left() max by(instance)(system_cpu)"
+check_discovery_args "system_cpu and system_cpu keeps all 10" \
+    "/api/v1/query" 200 "len(d['data']['result'])==10" \
+    --data-urlencode "query=system_cpu and system_cpu"
+check_discovery_args "system_cpu unless system_cpu is empty" \
+    "/api/v1/query" 200 "d['data']['result']==[]" \
+    --data-urlencode "query=system_cpu unless system_cpu"
+check_discovery_args "system_cpu or disk_io unions both" \
+    "/api/v1/query" 200 \
+    "len({s['metric'].get('__name__') for s in d['data']['result']})==2" \
+    --data-urlencode "query=system_cpu or disk_io"
+# Ambiguity: ignoring(dimension) collapses 10 series to one key on each
+# side -> 1:1 duplicate-key error (Prometheus convention).
+check_discovery_args "ignoring(dimension) collapses ambiguously" \
+    "/api/v1/query" 422 "" \
+    --data-urlencode "query=system_cpu + ignoring(dimension) system_cpu"
 echo
 
 echo "==> Phase 3c: topk / bottomk / quantile"

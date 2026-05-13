@@ -20,7 +20,9 @@ use promql_parser::parser::{
 
 use crate::storage::{compile_regex, Matcher};
 
-use super::ir::{AggrKind, BinopKind, FuncKind, Grouping, Plan, ValueType};
+use super::ir::{
+    AggrKind, BinopKind, Cardinality, FuncKind, Grouping, MatchKeys, MatchSpec, Plan, ValueType,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LowerError {
@@ -125,39 +127,10 @@ fn lower_unary(expr: &Expr) -> Result<Plan, LowerError> {
 
 fn lower_binary(b: &BinaryExpr) -> Result<Plan, LowerError> {
     let op = binop_from_token(b.op.id())?;
-    // Phase 1 rejects vector matching modifiers (group_left, group_right,
-    // on, ignoring with non-default cardinality) -- they're Phase 2.
-    let mut return_bool = false;
-    if let Some(modifier) = &b.modifier {
-        if modifier.is_matching_labels_not_empty()
-            || !matches!(
-                modifier.card,
-                promql_parser::parser::VectorMatchCardinality::OneToOne
-            )
-        {
-            return Err(LowerError::Unsupported(
-                "vector matching with on/ignoring/group_left/group_right is Phase 2".to_string(),
-            ));
-        }
-        return_bool = modifier.return_bool;
-    }
-    if return_bool && !op.is_comparison() {
-        return Err(LowerError::Parse(
-            "bool modifier only applies to comparison operators".to_string(),
-        ));
-    }
-
     let lhs = lower(&b.lhs)?;
     let rhs = lower(&b.rhs)?;
 
-    // Set operators (and, or, unless) need vector matching; Phase 2.
-    if matches!(b.op.id(), token::T_LAND | token::T_LOR | token::T_LUNLESS) {
-        return Err(LowerError::Unsupported(
-            "set operators (and/or/unless) are Phase 2".to_string(),
-        ));
-    }
-
-    // Reject obvious typeerrors that PromQL itself rejects.
+    // Type-check operands first. Set operators are vector/vector only.
     use ValueType::*;
     match (lhs.value_type(), rhs.value_type()) {
         (Scalar | InstantVector, Scalar | InstantVector) => {}
@@ -169,10 +142,100 @@ fn lower_binary(b: &BinaryExpr) -> Result<Plan, LowerError> {
             });
         }
     }
+    if op.is_set_op()
+        && (lhs.value_type() != InstantVector || rhs.value_type() != InstantVector)
+    {
+        return Err(LowerError::Type {
+            context: "set operator",
+            expected: InstantVector,
+            got: if lhs.value_type() != InstantVector {
+                lhs.value_type()
+            } else {
+                rhs.value_type()
+            },
+        });
+    }
+
+    // Translate the matching modifier, if any. Cases:
+    //   * No modifier -> default 1:1 matching (matches by every label
+    //     except __name__).
+    //   * on(...) / ignoring(...) -> MatchKeys::On / Ignoring.
+    //   * group_left / group_right -> Cardinality::ManyToOne /
+    //     OneToMany with include labels.
+    //   * ManyToMany cardinality -> reject (Prometheus rejects too).
+    //   * Set operators reject group_left/group_right.
+    let mut return_bool = false;
+    let matching = if let Some(modifier) = &b.modifier {
+        return_bool = modifier.return_bool;
+        let keys = match &modifier.matching {
+            None => MatchKeys::Default,
+            Some(LabelModifier::Include(ls)) => MatchKeys::On(ls.labels.clone()),
+            Some(LabelModifier::Exclude(ls)) => MatchKeys::Ignoring(ls.labels.clone()),
+        };
+        use promql_parser::parser::VectorMatchCardinality as VMC;
+        let (cardinality, include) = match &modifier.card {
+            VMC::OneToOne => (Cardinality::OneToOne, Vec::new()),
+            VMC::ManyToOne(ls) => {
+                if op.is_set_op() {
+                    return Err(LowerError::Unsupported(format!(
+                        "set operator {:?} does not accept group_left/group_right",
+                        op
+                    )));
+                }
+                (Cardinality::ManyToOne, ls.labels.clone())
+            }
+            VMC::OneToMany(ls) => {
+                if op.is_set_op() {
+                    return Err(LowerError::Unsupported(format!(
+                        "set operator {:?} does not accept group_left/group_right",
+                        op
+                    )));
+                }
+                (Cardinality::OneToMany, ls.labels.clone())
+            }
+            VMC::ManyToMany => {
+                // The parser tags set operators (and/or/unless) with
+                // ManyToMany by default. For arithmetic and comparison,
+                // this is the unrepresentable case and we reject it
+                // (Prometheus rejects it too). For set operators, we
+                // treat ManyToMany as the natural cardinality: the join
+                // key still selects which series participate, but no
+                // single-side de-duplication is enforced.
+                if op.is_set_op() {
+                    (Cardinality::OneToOne, Vec::new())
+                } else {
+                    return Err(LowerError::Unsupported(
+                        "many-to-many cardinality is not supported for arithmetic/comparison \
+                         (Prometheus rejects it too)"
+                            .to_string(),
+                    ));
+                }
+            }
+        };
+        Some(MatchSpec {
+            keys,
+            cardinality,
+            include,
+        })
+    } else if matches!(lhs.value_type(), InstantVector)
+        || matches!(rhs.value_type(), InstantVector)
+    {
+        // Vector binops always carry a matching spec, defaulted.
+        Some(MatchSpec::default())
+    } else {
+        None
+    };
+
+    if return_bool && !op.is_comparison() {
+        return Err(LowerError::Parse(
+            "bool modifier only applies to comparison operators".to_string(),
+        ));
+    }
 
     Ok(Plan::Binop {
         op,
         return_bool,
+        matching,
         lhs: Arc::new(lhs),
         rhs: Arc::new(rhs),
     })
@@ -321,9 +384,12 @@ fn binop_from_token(t: token::TokenId) -> Result<BinopKind, LowerError> {
         T_LTE => BinopKind::Le,
         T_GTR => BinopKind::Gt,
         T_GTE => BinopKind::Ge,
+        T_LAND => BinopKind::LAnd,
+        T_LOR => BinopKind::LOr,
+        T_LUNLESS => BinopKind::LUnless,
         other => {
             return Err(LowerError::Unsupported(format!(
-                "binary operator token {other} is Phase 2 or unrecognized"
+                "binary operator token {other} is unrecognized"
             )))
         }
     })
@@ -457,12 +523,30 @@ mod tests {
     }
 
     #[test]
-    fn set_operator_is_phase_2() {
-        match lower_err("foo and bar") {
-            LowerError::Unsupported(msg) => assert!(msg.contains("set operator") || msg.contains("Phase 2")),
+    fn set_operator_lowers_to_binop() {
+        // SOW-0022 (Phase 3d): set operators are supported. The
+        // lowering preserves the operator kind and attaches a default
+        // matching spec.
+        let plan = lower_query("foo and bar").unwrap();
+        match plan {
+            Plan::Binop {
+                op,
+                matching,
+                ..
+            } => {
+                assert_eq!(op, BinopKind::LAnd);
+                let m = matching.expect("set op carries a matching spec");
+                assert_eq!(m.cardinality, Cardinality::OneToOne);
+            }
             other => panic!("unexpected: {other:?}"),
         }
     }
+
+    // Note: `foo and on(x) group_left(y) bar` is rejected by the
+    // promql-parser before it reaches lowering ("no grouping allowed for
+    // 'and' operation"). The lowering's protection against group_left on
+    // a set operator is therefore unreachable through normal parsing,
+    // but kept as a defense-in-depth check.
 
     #[test]
     fn rate_lowers_to_call() {

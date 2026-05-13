@@ -52,6 +52,25 @@ Prometheus alerting rules:
   combinations.
 * Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=` with or without the
   `bool` modifier.
+* Vector matching: `on(labels)` and `ignoring(labels)` for arithmetic,
+  comparison, and set operators. Default matching (no clause) joins
+  by every label except `__name__` -- matching Prometheus, and
+  meaning that arithmetic between two differently-named metrics
+  (`a + b`) joins on the rest of the label set rather than producing
+  an empty result. Added in Phase 3d (SOW-0022).
+* Cardinality modifiers: `group_left(includes)` for many-to-one and
+  `group_right(includes)` for one-to-many. The "one" side is indexed
+  by matching key; duplicates on the one side surface as an
+  evaluation error. The `include` labels are copied from the one side
+  onto each result series; result labels otherwise come from the
+  "many" side (with `__name__` dropped for arithmetic). Set
+  operators do not accept `group_left`/`group_right` (Prometheus
+  itself rejects them at parse time).
+* Set operators: `and`, `or`, `unless`. Each uses the matching key
+  (default, `on`, or `ignoring`) to decide which lhs series pass
+  through. `or` includes rhs series whose key is not present on
+  the lhs. Cardinality is implicit many-to-many for set operators;
+  no `group_*` modifier needed.
 * Unary minus.
 * `histogram_quantile(phi, vector)` with `le`-labeled cumulative buckets.
 
@@ -59,8 +78,9 @@ The following are explicitly out of scope and reject at lowering or
 evaluation time with a clear error:
 
 * Subqueries (`metric[1h:5m]`).
-* Vector matching with `on`, `ignoring`, `group_left`, `group_right`.
-* Set operators (`and`, `or`, `unless`).
+* Many-to-many cardinality for arithmetic/comparison binops. Set
+  operators are inherently many-to-many and don't accept the
+  `group_*` modifier.
 * `count_values(label, expr)` -- the fourth parametrized aggregator
   takes a string parameter (a label name) rather than a scalar.
   Lowering rejects it with `bad_data: count_values is deferred to
