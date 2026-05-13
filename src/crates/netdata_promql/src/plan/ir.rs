@@ -84,6 +84,7 @@ pub enum FuncKind {
     MaxOverTime,
     CountOverTime,
     LastOverTime,
+    PresentOverTime,
 }
 
 impl FuncKind {
@@ -100,6 +101,7 @@ impl FuncKind {
             "max_over_time" => FuncKind::MaxOverTime,
             "count_over_time" => FuncKind::CountOverTime,
             "last_over_time" => FuncKind::LastOverTime,
+            "present_over_time" => FuncKind::PresentOverTime,
             _ => return None,
         })
     }

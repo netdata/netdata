@@ -22,16 +22,130 @@ pub fn apply_call(func: FuncKind, args: Vec<EvalResult>) -> Result<EvalResult, E
         FuncKind::IRate => apply_irate(args),
         FuncKind::Delta => apply_delta(args),
         FuncKind::HistogramQuantile => apply_histogram_quantile(args),
-        FuncKind::AvgOverTime
-        | FuncKind::SumOverTime
-        | FuncKind::MinOverTime
-        | FuncKind::MaxOverTime
-        | FuncKind::CountOverTime
-        | FuncKind::LastOverTime => Err(EvalError::NotYetImplemented(format!(
-            "{:?} is Phase 2",
-            func
-        ))),
+        FuncKind::AvgOverTime => apply_over_time(args, OverTimeOp::Avg),
+        FuncKind::SumOverTime => apply_over_time(args, OverTimeOp::Sum),
+        FuncKind::MinOverTime => apply_over_time(args, OverTimeOp::Min),
+        FuncKind::MaxOverTime => apply_over_time(args, OverTimeOp::Max),
+        FuncKind::CountOverTime => apply_over_time(args, OverTimeOp::Count),
+        FuncKind::LastOverTime => apply_over_time(args, OverTimeOp::Last),
+        FuncKind::PresentOverTime => apply_over_time(args, OverTimeOp::Present),
     }
+}
+
+/// Windowed aggregator selector. The variants correspond to the seven
+/// `*_over_time` functions in Phase 3b (SOW-0020).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OverTimeOp {
+    Avg,
+    Sum,
+    Min,
+    Max,
+    Count,
+    Last,
+    Present,
+}
+
+impl OverTimeOp {
+    fn name(self) -> &'static str {
+        match self {
+            OverTimeOp::Avg => "avg_over_time",
+            OverTimeOp::Sum => "sum_over_time",
+            OverTimeOp::Min => "min_over_time",
+            OverTimeOp::Max => "max_over_time",
+            OverTimeOp::Count => "count_over_time",
+            OverTimeOp::Last => "last_over_time",
+            OverTimeOp::Present => "present_over_time",
+        }
+    }
+
+    /// True if the output series should keep `__name__`. Prometheus
+    /// strips `__name__` for the aggregating variants (they produce a
+    /// different statistic than the source metric) but preserves it for
+    /// `last_over_time` (the value is still an observation of the same
+    /// metric, just the most recent in the window).
+    /// `present_over_time` strips because the result is always 1 or
+    /// nothing -- structurally a different quantity.
+    fn keep_name(self) -> bool {
+        matches!(self, OverTimeOp::Last)
+    }
+}
+
+fn apply_over_time(args: Vec<EvalResult>, op: OverTimeOp) -> Result<EvalResult, EvalError> {
+    let range = expect_one_range_vector(args, op.name())?;
+
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let Some((value, ts_ms)) = compute_over_time(&s.samples, op) else {
+            // Empty window (no non-NaN samples) -> drop the series. This
+            // matches Prometheus' "no observation, no output" rule.
+            continue;
+        };
+        let (labels, signature) = if op.keep_name() {
+            let signature = labels_signature(&s.labels);
+            (s.labels, signature)
+        } else {
+            strip_name(&s.labels)
+        };
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample {
+                timestamp_ms: ts_ms,
+                value,
+            }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+/// Compute the windowed aggregate for one series. Returns the result and
+/// the timestamp the output sample should carry (the most recent non-NaN
+/// timestamp in the window). NaN samples are skipped; if no non-NaN
+/// sample exists in the window, returns `None` so the caller drops the
+/// series.
+fn compute_over_time(samples: &[Sample], op: OverTimeOp) -> Option<(f64, i64)> {
+    // Walk once: find the last non-NaN timestamp, count non-NaN samples,
+    // and accumulate the running statistic.
+    let mut count: u64 = 0;
+    let mut sum: f64 = 0.0;
+    let mut min_val: f64 = f64::INFINITY;
+    let mut max_val: f64 = f64::NEG_INFINITY;
+    let mut last_val: f64 = 0.0;
+    let mut last_ts: i64 = 0;
+
+    for s in samples {
+        if s.value.is_nan() {
+            continue;
+        }
+        count += 1;
+        sum += s.value;
+        if s.value < min_val {
+            min_val = s.value;
+        }
+        if s.value > max_val {
+            max_val = s.value;
+        }
+        // `last` follows iteration order; the matrix selector emits
+        // samples chronologically.
+        last_val = s.value;
+        last_ts = s.timestamp_ms;
+    }
+
+    if count == 0 {
+        return None;
+    }
+
+    let value = match op {
+        OverTimeOp::Avg => sum / (count as f64),
+        OverTimeOp::Sum => sum,
+        OverTimeOp::Min => min_val,
+        OverTimeOp::Max => max_val,
+        OverTimeOp::Count => count as f64,
+        OverTimeOp::Last => last_val,
+        OverTimeOp::Present => 1.0,
+    };
+    Some((value, last_ts))
 }
 
 /// Distinguish rate (per-second) from increase (absolute) -- the inner
@@ -534,5 +648,178 @@ mod tests {
             EvalResult::InstantVector(v) => assert_eq!(v.len(), 0),
             _ => panic!(),
         }
+    }
+
+    // -------------------------------------------------------------------
+    // *_over_time family (SOW-0020 chunk 1)
+    // -------------------------------------------------------------------
+
+    fn run_over_time(op: OverTimeOp, samples: Vec<(i64, f64)>) -> Vec<Series> {
+        let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
+        let r = apply_over_time(vec![EvalResult::RangeVector(vec![s])], op).unwrap();
+        match r {
+            EvalResult::InstantVector(v) => v,
+            _ => panic!("expected instant vector"),
+        }
+    }
+
+    fn run_over_time_call(op: OverTimeOp, samples: Vec<(i64, f64)>) -> Vec<Series> {
+        let func = match op {
+            OverTimeOp::Avg => FuncKind::AvgOverTime,
+            OverTimeOp::Sum => FuncKind::SumOverTime,
+            OverTimeOp::Min => FuncKind::MinOverTime,
+            OverTimeOp::Max => FuncKind::MaxOverTime,
+            OverTimeOp::Count => FuncKind::CountOverTime,
+            OverTimeOp::Last => FuncKind::LastOverTime,
+            OverTimeOp::Present => FuncKind::PresentOverTime,
+        };
+        let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
+        let r = apply_call(func, vec![EvalResult::RangeVector(vec![s])]).unwrap();
+        match r {
+            EvalResult::InstantVector(v) => v,
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn avg_over_time_computes_mean() {
+        let v = run_over_time(OverTimeOp::Avg, vec![(0, 1.0), (1000, 2.0), (2000, 3.0)]);
+        assert_eq!(v.len(), 1);
+        assert!((v[0].samples[0].value - 2.0).abs() < 1e-9);
+        // __name__ stripped.
+        assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
+        // Timestamp is the most recent non-NaN sample's timestamp.
+        assert_eq!(v[0].samples[0].timestamp_ms, 2000);
+    }
+
+    #[test]
+    fn sum_over_time_computes_total() {
+        let v = run_over_time(OverTimeOp::Sum, vec![(0, 1.0), (1000, 2.0), (2000, 3.0)]);
+        assert_eq!(v.len(), 1);
+        assert!((v[0].samples[0].value - 6.0).abs() < 1e-9);
+        assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
+    }
+
+    #[test]
+    fn min_max_over_time() {
+        let v_min = run_over_time(OverTimeOp::Min, vec![(0, 5.0), (1000, 1.0), (2000, 3.0)]);
+        assert_eq!(v_min[0].samples[0].value, 1.0);
+        let v_max = run_over_time(OverTimeOp::Max, vec![(0, 5.0), (1000, 1.0), (2000, 3.0)]);
+        assert_eq!(v_max[0].samples[0].value, 5.0);
+    }
+
+    #[test]
+    fn count_over_time_counts_non_nan() {
+        let v = run_over_time(
+            OverTimeOp::Count,
+            vec![(0, 1.0), (1000, f64::NAN), (2000, 3.0), (3000, 4.0)],
+        );
+        assert_eq!(v[0].samples[0].value, 3.0);
+    }
+
+    #[test]
+    fn last_over_time_preserves_name_and_returns_last_value() {
+        let v = run_over_time(OverTimeOp::Last, vec![(0, 1.0), (1000, 2.0), (2000, 3.0)]);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].samples[0].value, 3.0);
+        // __name__ PRESERVED for last_over_time (Prometheus convention).
+        assert!(
+            v[0].labels.iter().any(|(n, v)| n == "__name__" && v == "foo"),
+            "labels = {:?}",
+            v[0].labels
+        );
+    }
+
+    #[test]
+    fn last_over_time_skips_trailing_nan() {
+        // The most recent NON-NaN sample wins; trailing NaN is ignored.
+        let v = run_over_time(
+            OverTimeOp::Last,
+            vec![(0, 1.0), (1000, 2.0), (2000, f64::NAN)],
+        );
+        assert_eq!(v[0].samples[0].value, 2.0);
+        assert_eq!(v[0].samples[0].timestamp_ms, 1000);
+    }
+
+    #[test]
+    fn present_over_time_returns_one() {
+        let v = run_over_time(OverTimeOp::Present, vec![(0, 42.0), (1000, 100.0)]);
+        assert_eq!(v[0].samples[0].value, 1.0);
+        // __name__ stripped.
+        assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
+    }
+
+    #[test]
+    fn over_time_nan_samples_skipped() {
+        // NaNs do not contribute to sum/avg/min/max; count ignores them.
+        let v = run_over_time(
+            OverTimeOp::Avg,
+            vec![(0, 1.0), (1000, f64::NAN), (2000, 3.0)],
+        );
+        assert!((v[0].samples[0].value - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn over_time_empty_window_drops_series() {
+        // All NaN -> no observation -> series dropped (every variant).
+        for op in [
+            OverTimeOp::Avg,
+            OverTimeOp::Sum,
+            OverTimeOp::Min,
+            OverTimeOp::Max,
+            OverTimeOp::Count,
+            OverTimeOp::Last,
+            OverTimeOp::Present,
+        ] {
+            let v = run_over_time(op, vec![(0, f64::NAN), (1000, f64::NAN)]);
+            assert!(v.is_empty(), "op {:?} should drop empty-window series", op);
+        }
+    }
+
+    #[test]
+    fn over_time_single_sample() {
+        // A single sample is a valid window.
+        for op in [
+            OverTimeOp::Avg,
+            OverTimeOp::Sum,
+            OverTimeOp::Min,
+            OverTimeOp::Max,
+            OverTimeOp::Last,
+        ] {
+            let v = run_over_time(op, vec![(1000, 42.0)]);
+            assert_eq!(v.len(), 1, "op {:?}", op);
+            assert_eq!(v[0].samples[0].value, 42.0, "op {:?}", op);
+        }
+        let v_count = run_over_time(OverTimeOp::Count, vec![(1000, 42.0)]);
+        assert_eq!(v_count[0].samples[0].value, 1.0);
+    }
+
+    #[test]
+    fn over_time_dispatch_via_funckind() {
+        // Verify the apply_call dispatch wires up every variant. Belt-and-
+        // suspenders: each variant exercised through both apply_over_time
+        // and apply_call so a refactor of the dispatch table doesn't
+        // silently regress.
+        let v = run_over_time_call(OverTimeOp::Avg, vec![(0, 2.0), (1000, 4.0)]);
+        assert_eq!(v[0].samples[0].value, 3.0);
+        let v = run_over_time_call(OverTimeOp::Present, vec![(0, 1.0)]);
+        assert_eq!(v[0].samples[0].value, 1.0);
+        let v = run_over_time_call(OverTimeOp::Last, vec![(0, 7.0)]);
+        // last preserves __name__.
+        assert!(v[0].labels.iter().any(|(n, _)| n == "__name__"));
+    }
+
+    #[test]
+    fn over_time_requires_range_vector() {
+        // Scalar input -> Type error.
+        let r = apply_over_time(vec![EvalResult::Scalar(1.0)], OverTimeOp::Avg);
+        assert!(matches!(r, Err(EvalError::Type { .. })));
+        // Instant vector input -> Type error.
+        let s = series(vec![("__name__", "foo")], vec![(0, 1.0)]);
+        let r = apply_over_time(
+            vec![EvalResult::InstantVector(vec![s])],
+            OverTimeOp::Avg,
+        );
+        assert!(matches!(r, Err(EvalError::Type { .. })));
     }
 }
