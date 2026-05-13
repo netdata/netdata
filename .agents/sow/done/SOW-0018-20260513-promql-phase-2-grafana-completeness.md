@@ -2,9 +2,7 @@
 
 ## Status
 
-Status: in-progress
-
-Sub-state: chunks 1-2 shipped; chunk 3 (spec + smoke + close) pending.
+Status: completed
 
 ## Requirements
 
@@ -739,93 +737,252 @@ reviewed independently. Chunk 3 closes the SOW.
     `?host=does-not-exist` returns an empty result envelope on each
     endpoint (status:success, empty data). Phase 1 smoke harness
     still passes 24/24.
+- Chunk 3 shipped (this commit):
+  - Spec extended: `.agents/sow/specs/promql-endpoint-contract.md`
+    updates `Host scoping` for specific-host lookup and appends
+    three new sections (`Discovery endpoints`,
+    `Truncation and the warnings envelope field`,
+    `HTTP method matrix`).
+  - Smoke harness extended: `tests/promql-smoke/run-smoke.sh` adds
+    21 Phase 2 checks across 6 groups (buildinfo, labels,
+    label-values, series, metadata, POST, host scoping). 45/45
+    total pass (24 Phase 1 + 21 Phase 2). The big-response checks
+    (sentinel `{__name__!=""}` returns ~8500 series) pipe response
+    bodies through python3 stdin to avoid argv-length limits.
+  - End-user docs deliberately deferred to an interactive Grafana
+    walkthrough that follows this SOW close; tracked as Followup
+    #1.
+  - SOW closed: status flipped to `completed`, file moved from
+    `.agents/sow/current/` to `.agents/sow/done/` in the same
+    commit.
 
 ## Validation
 
 Acceptance criteria evidence:
 
-Pending.
+- AC#1 (buildinfo with `features:{}`): smoke check
+  `buildinfo returns 2.45.0 with features:{}` passes. Response body
+  confirmed via curl.
+- AC#2/#3/#4 (labels/label-values/series with `start`/`end`/`limit`/
+  repeatable `match[]`, GET+POST where applicable): smoke checks
+  `labels: unfiltered contains __name__`,
+  `labels: match[]=system_cpu narrows result`,
+  `label/__name__/values lists metric names`,
+  `label/dimension/values lists dim names`,
+  `label/__name__/values filtered by match[]`,
+  `series: single match[] returns shapes`,
+  `series: multi match[] OR-unions distinct __name__`,
+  `series: sentinel {__name__!=""} returns all` all pass.
+- AC#5 (metadata TYPE/HELP): smoke checks
+  `metadata: full catalog has many entries`,
+  `metadata: ?metric=disk_io has type=counter`,
+  `metadata: ?metric=system_cpu has type=gauge` all pass. INCREMENTAL
+  -> counter, others -> gauge mapping verified end to end.
+- AC#6 (specific-host lookup): smoke checks
+  `host=<this hostname> resolves to same series as default`,
+  `host=* resolves the same series`,
+  `host=nonexistent returns empty success envelope`,
+  `host parameter wired on /query`,
+  `host parameter wired on /metadata` all pass. The fixture is
+  single-host; a true multi-host fixture is not available on the
+  development workstation, but the resolve_host_scope helper handles
+  both hostname and machine_guid paths identically (one is a
+  dictionary lookup, the other is the existing localhost-aliased
+  hostname walker). The miss path is verified.
+- AC#7 (`instance` label carries hostname): verified inside the
+  host-scoping smoke checks: the `instance` field on returned series
+  equals the queried hostname.
+- AC#8 (Grafana Save & Test): reframed at the second-pass review.
+  The health check is `1+1` via QueryData, which Phase 1 already
+  passed. Phase 2 verifies buildinfo's `features:{}` so the heuristic
+  reports `Application: Prometheus`. End-to-end Grafana verification
+  (Save & Test, panel render) happens in the interactive Grafana
+  session that follows this SOW close.
+- AC#9 (metric browser populates): reframed -- the metric browser
+  reads `/api/v1/label/__name__/values` (verified by smoke); metadata
+  TYPE/HELP feeds tooltips (verified). Browser-level visual
+  confirmation is part of the interactive Grafana session.
+- AC#10 (repeatable `match[]`): smoke check
+  `series: multi match[] OR-unions distinct __name__` exercises
+  `match[]=system_cpu&match[]=disk_io` and asserts the union.
+- AC#11 (`limit`/`warnings` truncation): the truncation path is
+  implemented in `discovery.rs::warnings_for` and the Phase 1
+  `select.rs` truncation-as-error. A dedicated smoke check for the
+  `warnings` field requires a fixture with >10000 series, which the
+  development workstation does not produce; the code path is covered
+  by Rust unit tests for the JSON serializer
+  (`warnings_field_appears_when_provided`,
+  `warnings_field_omitted_when_empty`).
+- AC#12 (contract spec extension): done. `Host scoping` section
+  updated, new sections appended (`Discovery endpoints`,
+  `Truncation and the warnings envelope field`, `HTTP method matrix`).
+- AC#13 (30+ smoke checks): 45 checks pass against the live daemon
+  (24 Phase 1 + 21 Phase 2).
 
 Tests or equivalent validation:
 
-Pending.
+- Rust unit tests: 59/59 pass (`cargo test`). Includes the
+  discovery_json serializer, the regex matcher cache, the matcher
+  FFI translation, and the lower-side rejections.
+- Smoke harness: 45/45 pass on a populated local daemon.
 
 Real-use evidence:
 
-Pending. To gather at close: Grafana "Save & Test" screenshot or
-log; metric-browser dropdown demonstration; one rendered panel.
+- All five discovery endpoints exercised via curl against a live
+  daemon (verified during chunk 1 and again at chunk 3 close).
+- Host scoping verified with `?host=nx570`, `?host=*`,
+  `?host=does-not-exist` on `/series`, `/query`, `/metadata`.
+- Grafana end-to-end (Save & Test, metric browser, rendered panel)
+  is the next thing on the user's todo list and runs interactively
+  after this SOW closes.
 
 Reviewer findings:
 
-Pending.
+- Pre-implementation review against current Grafana sources
+  (`@grafana/prometheus@13.1.2` + `grafana-prometheus-datasource`)
+  caught five issues in the original SOW draft that this iteration
+  fixed before any code was written:
+  1. AC#1 was missing `features:{}` and would have classified the
+     daemon as Mimir.
+  2. AC#8 was overstated; Save & Test already passed after Phase 1.
+  3. AC#9 incorrectly named `/api/v1/metadata` as the
+     metric-browser feed; the actual feed is
+     `/api/v1/label/__name__/values`.
+  4. Repeatable `match[]` and POST semantics on `/labels` and
+     `/series` were missing from the AC list and added as AC#10.
+  5. Limit divergence (Grafana sends `limit=40000`,
+     `max_series=10000`) and the `warnings` envelope field were
+     missing and added as AC#11.
 
 Same-failure scan:
 
-Pending.
+Searched for repeats of the Phase 1 close issue (git mv pre-stages a
+rename but subsequent content edits to the new path aren't re-staged
+automatically). For chunks 1, 2, and 3, the workflow used `git add -A`
+which captures everything; no recurrence.
+
+Searched for repeats of the Phase 1 background-process issue
+(daemons dying when parent bash exited). Continued to use the harness
+`run_in_background` flag for daemon launches; no recurrence.
 
 Sensitive data gate:
 
-Pending. To confirm at close: no `.env`/bearer/claim-id data
-introduced; discovery endpoints surface only labels the Netdata
-dashboard already exposes; deployment-topology audit note added to
-the spec.
+- No `.env`, bearer token, claim-id, or other sensitive data
+  introduced.
+- Discovery endpoints surface only labels the Netdata dashboard
+  already exposes today. The shim explicitly filters `_*`-prefixed
+  host labels (internal metadata: install fingerprints, system info,
+  cloud-detection markers) so a Grafana-facing `/labels` enumeration
+  does not leak deployment topology beyond what the existing
+  dashboards show.
+- The contract spec documents which labels surface through which
+  endpoint so a security-conscious operator can audit.
 
 Artifact maintenance gate:
 
-Pending. To confirm at close:
 - AGENTS.md: no change required.
 - Runtime project skills: no change required.
-- Specs: `.agents/sow/specs/promql-endpoint-contract.md` extended
-  with discovery and host-scoping sections.
-- End-user/operator docs: short Grafana datasource setup note added
-  in chunk 3.
+- Specs: `.agents/sow/specs/promql-endpoint-contract.md` updated
+  with the Phase 2 surface.
+- End-user/operator docs: deliberately deferred to an interactive
+  Grafana walkthrough session that follows this SOW close; the user
+  will exercise Save & Test, the metric browser, and one rendered
+  panel against a live `localhost:19999` daemon. Notes captured
+  during that session may become a short Grafana setup README in a
+  follow-up commit -- tracked as Followup #1 below.
 - End-user/operator skills: no change required.
-- SOW lifecycle: status set to `completed` and the file moved to
-  `.agents/sow/done/` in the same commit as the final code change.
+- SOW lifecycle: status set to `completed`; file moves from
+  `.agents/sow/current/` to `.agents/sow/done/` in the same commit
+  as the final code change (this commit).
 
 Specs update:
 
-Pending.
+`.agents/sow/specs/promql-endpoint-contract.md` -- updated `Host
+scoping` section; appended `Discovery endpoints`,
+`Truncation and the warnings envelope field`, and
+`HTTP method matrix`.
 
 Project skills update:
 
-Pending.
+No change required.
 
 End-user/operator docs update:
 
-Pending.
+Deferred -- see "Artifact maintenance gate" above and Followup #1.
 
 End-user/operator skills update:
 
-Pending.
+No change required.
 
 Lessons:
 
-Pending.
+- *Verify the third-party contract before drafting acceptance
+  criteria.* The first SOW draft assumed Grafana behaviors that were
+  off by varying degrees. Inspecting the actual datasource source
+  (frontend dist + Go backend) before chunking saved at least one
+  rework cycle on the buildinfo and metric-browser ACs. For Phase 3,
+  the same discipline applies to the Prometheus compliance test
+  suite.
+- *Split overflow strictness by caller, not by API.* Phase 1's
+  `nd_pds_resolve` treated overflow as a hard error, which is right
+  for query evaluation but wrong for discovery. Adding a `truncated`
+  flag and letting each caller choose strictness was a one-flag
+  change that preserved Phase 1 semantics and unlocked the
+  Prometheus-style `warnings` field for Phase 2.
+- *Don't silently fall back to localhost.* The original Phase 1 chunk
+  treated any non-`*` host string as localhost. That behavior would
+  have masked typos and led to wrong results in multi-host
+  deployments. The chunk-2 resolver returns an empty success envelope
+  on miss, making the failure visible.
+- *Chunk-per-commit pays off for non-trivial SOWs.* Three chunks
+  produced three reviewable commits. The earlier behavior of one
+  commit per SOW (Phase 0) was harder to review and would have
+  bundled the chunk-2 host-parameter wiring with the chunk-1
+  endpoint plumbing where they belong logically separated.
 
 Follow-up mapping:
 
-Pending. Phase 3 (subqueries, vector matching, full rollup family,
-`topk`/`bottomk`/`quantile`, tier selection, rollup result cache,
-performance work, Prometheus compliance test suite, macOS
-verification) will be tracked in a successor SOW filed when this one
-closes.
-
-CI verification (gcc-build, clang-build, license check) awaits the
-user's authorization to push the branch. Until that authorization is
-given, the branch stays local and CI gates remain deferred.
+- *Phase 3 SOW* (subqueries, vector matching with
+  `on`/`ignoring`/`group_left`, full `*_over_time` family,
+  `topk`/`bottomk`/`quantile`, `predict_linear`/`holt_winters`,
+  `@` modifier with arithmetic, `keep_metric_names`, tier selection
+  beyond tier 0, rollup result cache, performance work, Prometheus
+  compliance test suite, macOS verification, cardinality telemetry,
+  optional endpoints `/query_exemplars`/`/format_query`/
+  `/parse_query`/`/targets`/`/rules`/`/alerts`/`/alertmanagers`/
+  `/status/{runtimeinfo,config,flags,tsdb}`) -- to be filed as
+  successor SOW when the user starts that phase.
+- *Followup #1: Grafana datasource setup README.* Captures the
+  interactive walkthrough's output as a short user-facing note;
+  deferred until the walkthrough runs.
+- *CI verification (gcc-build, clang-build, license check)* awaits
+  user authorization to push the branch. Until that authorization is
+  given, the branch stays local and CI gates remain deferred (per
+  the no-push memory).
 
 ## Outcome
 
-Pending.
+PromQL on this branch now satisfies what Grafana needs from a
+Prometheus datasource for the basic flow: instant + range queries
+already worked after Phase 1; this SOW adds the discovery surface
+(metric browser, label autocomplete, series listing, TYPE/HELP
+metadata, buildinfo heuristics) plus specific-host scoping that lets
+operators address a single child of a parent agent. The branch is 10
+commits ahead of `origin/master` and holds local-only until the user
+authorizes a push.
 
 ## Lessons Extracted
 
-Pending.
+See `Validation > Lessons` above (four items).
 
 ## Followup
 
-None yet.
+1. Grafana datasource setup README -- captures the interactive
+   walkthrough output; deferred until the walkthrough runs.
+2. CI verification (gcc-build, clang-build, license check) -- awaits
+   user authorization to push the branch.
+3. Phase 3 SOW (the deferred items above) -- filed when the user
+   begins that phase.
 
 ## Regression Log
 

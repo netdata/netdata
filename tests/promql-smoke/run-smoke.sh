@@ -197,6 +197,169 @@ check_range "range range vector at top level (must fail)"  'system_cpu[5m]' \
 echo
 
 # ---------------------------------------------------------------------------
+# Phase 2 (SOW-0018) discovery endpoints
+# ---------------------------------------------------------------------------
+#
+# These checks verify the Grafana-compatible discovery surface: metric
+# browser, label autocomplete, /series resolve, /metadata catalog,
+# /status/buildinfo heuristics, and the host scoping rules introduced in
+# chunk 2.
+
+# Issue a GET with arbitrary query-string arguments (the existing _check
+# helper assumes a single `query=` parameter, which doesn't fit /labels or
+# /series). Args: name, path, extra_args, expected_status,
+# extra_jq_assertion (optional Python check on the parsed JSON; receives
+# `d` as the parsed dict).
+check_discovery() {
+    local name="$1" path="$2" extra="$3" expected_status="$4" assertion="$5"
+    local tmp http_code body
+    tmp=$(mktemp)
+    http_code=$(curl -sG -o "$tmp" -w '%{http_code}' "$URL$path" $extra 2>&1)
+    body=$(cat "$tmp")
+    rm -f "$tmp"
+
+    if [[ "$http_code" != "$expected_status" ]]; then
+        printf '  %s %s -- expected HTTP %s, got %s\n' \
+            "$(c_red FAIL)" "$name" "$expected_status" "$http_code"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    # Pipe the body through stdin to avoid argv-length limits on large
+    # responses (the sentinel selector pulls back tens of thousands of
+    # series on a populated daemon).
+    if ! printf '%s' "$body" | python3 -c "import json,sys; json.load(sys.stdin)" >/dev/null 2>&1; then
+        printf '  %s %s -- response is not valid JSON\n' "$(c_red FAIL)" "$name"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    if [[ -n "$assertion" ]]; then
+        if ! printf '%s' "$body" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert $assertion, 'assertion failed: ' + repr(d)[:200]
+" >/dev/null 2>&1; then
+            printf '  %s %s -- assertion failed: %s\n' "$(c_red FAIL)" "$name" "$assertion"
+            FAIL=$((FAIL + 1))
+            return
+        fi
+    fi
+    printf '  %s %s\n' "$(c_grn PASS)" "$name"
+    PASS=$((PASS + 1))
+}
+
+echo "==> Discovery: /api/v1/status/buildinfo"
+# The frontend version-gating uses jsonData.prometheusVersion, not this,
+# but Grafana's Go backend reads `features` to classify Prometheus vs
+# Mimir. The empty map is load-bearing.
+check_discovery "buildinfo returns 2.45.0 with features:{}" \
+    "/api/v1/status/buildinfo" "" 200 \
+    "d['status']=='success' and d['data']['version']=='2.45.0' and d['data']['features']=={}"
+echo
+
+echo "==> Discovery: /api/v1/labels"
+check_discovery "labels: unfiltered contains __name__" \
+    "/api/v1/labels" "" 200 \
+    "'__name__' in d['data']"
+check_discovery "labels: unfiltered contains dimension and instance" \
+    "/api/v1/labels" "" 200 \
+    "'dimension' in d['data'] and 'instance' in d['data']"
+check_discovery "labels: match[]=system_cpu narrows result" \
+    "/api/v1/labels" "--data-urlencode match[]=system_cpu" 200 \
+    "all(l in d['data'] for l in ['__name__','chart','dimension','family','instance'])"
+echo
+
+echo "==> Discovery: /api/v1/label/<name>/values"
+check_discovery "label/__name__/values lists metric names" \
+    "/api/v1/label/__name__/values" "" 200 \
+    "'system_cpu' in d['data'] and 'disk_io' in d['data']"
+check_discovery "label/dimension/values lists dim names" \
+    "/api/v1/label/dimension/values" "" 200 \
+    "'user' in d['data'] and 'system' in d['data']"
+check_discovery "label/__name__/values filtered by match[]" \
+    "/api/v1/label/__name__/values" "--data-urlencode match[]=system_cpu" 200 \
+    "d['data']==['system_cpu']"
+check_discovery "label/.../wrong (malformed path) -> 404" \
+    "/api/v1/label/dimension/wrong" "" 404 ""
+echo
+
+echo "==> Discovery: /api/v1/series"
+check_discovery "series: single match[] returns shapes" \
+    "/api/v1/series" "--data-urlencode match[]=system_cpu" 200 \
+    "len(d['data'])>=1 and d['data'][0]['__name__']=='system_cpu' and 'dimension' in d['data'][0]"
+check_discovery "series: multi match[] OR-unions distinct __name__" \
+    "/api/v1/series" "--data-urlencode match[]=system_cpu --data-urlencode match[]=disk_io" 200 \
+    "{s['__name__'] for s in d['data']} == {'system_cpu','disk_io'}"
+check_discovery "series: sentinel {__name__!=\"\"} returns all" \
+    "/api/v1/series" '--data-urlencode match[]={__name__!=""}' 200 \
+    "len(d['data']) > 100"
+echo
+
+echo "==> Discovery: /api/v1/metadata"
+check_discovery "metadata: full catalog has many entries" \
+    "/api/v1/metadata" "" 200 \
+    "len(d['data']) > 100 and 'system_cpu' in d['data']"
+check_discovery "metadata: ?metric=disk_io has type=counter" \
+    "/api/v1/metadata" "--data-urlencode metric=disk_io" 200 \
+    "d['data']['disk_io'][0]['type']=='counter'"
+check_discovery "metadata: ?metric=system_cpu has type=gauge" \
+    "/api/v1/metadata" "--data-urlencode metric=system_cpu" 200 \
+    "d['data']['system_cpu'][0]['type']=='gauge'"
+echo
+
+echo "==> Discovery: POST on /labels and /series"
+check_post_discovery() {
+    local name="$1" path="$2" body="$3" assertion="$4"
+    local tmp http_code resp_body
+    tmp=$(mktemp)
+    http_code=$(curl -s -X POST -o "$tmp" -w '%{http_code}' "$URL$path" $body 2>&1)
+    resp_body=$(cat "$tmp")
+    rm -f "$tmp"
+    if [[ "$http_code" != "200" ]]; then
+        printf '  %s %s -- got HTTP %s\n' "$(c_red FAIL)" "$name" "$http_code"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    if ! printf '%s' "$resp_body" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert $assertion, 'failed: ' + repr(d)[:200]
+" >/dev/null 2>&1; then
+        printf '  %s %s -- assertion failed\n' "$(c_red FAIL)" "$name"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    printf '  %s %s\n' "$(c_grn PASS)" "$name"
+    PASS=$((PASS + 1))
+}
+check_post_discovery "POST /labels with match[]" \
+    "/api/v1/labels" "--data-urlencode match[]=system_cpu" \
+    "'__name__' in d['data']"
+check_post_discovery "POST /series with match[] and limit" \
+    "/api/v1/series" '--data-urlencode match[]={__name__!=""} --data-urlencode limit=20' \
+    "len(d['data'])==20"
+echo
+
+echo "==> Host scoping"
+LOCAL_HOST=$(curl -s "$URL/api/v1/info" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['mirrored_hosts'][0])" 2>/dev/null || hostname)
+echo "  local hostname: $LOCAL_HOST"
+check_discovery "host=<this hostname> resolves to same series as default" \
+    "/api/v1/series" "--data-urlencode match[]=system_cpu --data-urlencode host=$LOCAL_HOST" 200 \
+    "len(d['data'])>=1 and d['data'][0]['instance']=='$LOCAL_HOST'"
+check_discovery "host=* resolves the same series" \
+    "/api/v1/series" "--data-urlencode match[]=system_cpu --data-urlencode host=*" 200 \
+    "len(d['data'])>=1"
+check_discovery "host=nonexistent returns empty success envelope" \
+    "/api/v1/series" "--data-urlencode match[]=system_cpu --data-urlencode host=does-not-exist-123" 200 \
+    "d['status']=='success' and d['data']==[]"
+check_discovery "host parameter wired on /query" \
+    "/api/v1/query" "--data-urlencode query=system_cpu --data-urlencode host=$LOCAL_HOST" 200 \
+    "len(d['data']['result'])>=1 and d['data']['result'][0]['metric']['instance']=='$LOCAL_HOST'"
+check_discovery "host parameter wired on /metadata" \
+    "/api/v1/metadata" "--data-urlencode host=$LOCAL_HOST --data-urlencode metric=disk_io" 200 \
+    "d['data']['disk_io'][0]['type']=='counter'"
+echo
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 

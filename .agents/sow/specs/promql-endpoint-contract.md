@@ -139,15 +139,33 @@ enforced in the handler before evaluation begins.
 ## Host scoping
 
 The handler passes the host scope through to `nd_pds_resolve` via the
-`host_machine_guid` parameter:
+`host_machine_guid` parameter. As of Phase 2 chunk 2 (SOW-0018), the
+four cases are:
 
 * `NULL` (no `host` URL parameter): localhost only.
-* `"*"`: localhost plus every known child host on this parent agent.
-* Any other value: Phase 1 chunk 1 treats anything except `*` as
-  localhost. Specific-host lookup by machine_guid or hostname is a
-  Phase 2 follow-up; the synthetic `instance` label is intended to
-  carry hostname so users can filter via `{instance="server-7"}` once
-  multi-host resolution lands.
+* `"*"`: every known host on this agent (localhost plus every child).
+* A `machine_guid`: dictionary lookup against `rrdhost_root_index`;
+  matches exactly the host whose `machine_guid` equals the supplied
+  value.
+* Any other string: treated as a hostname; matched against
+  `host->hostname` across `rrdhost_root_index`. `"localhost"` is
+  aliased to the local host.
+* On miss (a specific value that resolves to neither a known GUID nor
+  a known hostname): the call returns an empty success envelope with
+  zero series. The shim deliberately does **not** fall back to
+  localhost, because a silent fallback would mask client-side typos
+  and surface unrelated data.
+
+GUID-first lookup is intentional: a child agent connected with both a
+known hostname and a known machine_guid is reachable by either form,
+and the GUID dictionary is O(1) so the cost is paid once.
+
+The host scope applies uniformly to `/api/v1/query`,
+`/api/v1/query_range`, `/api/v1/series`, `/api/v1/labels`,
+`/api/v1/label/<name>/values`, and `/api/v1/metadata`. The synthetic
+`instance` label on every emitted series carries the matched host's
+hostname so a Grafana panel can filter further with
+`{instance="server-7"}` if needed.
 
 ## Cardinality backstop
 
@@ -216,17 +234,175 @@ removes:
 When disabled, the daemon links without any PromQL footprint and the
 endpoints return HTTP 404.
 
+## Discovery endpoints
+
+Phase 2 (SOW-0018) adds five endpoints that Grafana's Prometheus
+datasource probes for UI features (metric browser, label autocomplete,
+datasource health-check / Prometheus-vs-Mimir heuristics). All five live
+under `/api/v1/` per Prometheus convention and route through a single C
+dispatcher in `src/web/api/v3/api_v3_promql_discovery.c`.
+
+### `/api/v1/labels`
+
+Returns the union of label names across all series resolved by the
+supplied matchers, or across every series on the host when no `match[]`
+is given.
+
+Query parameters: `start`, `end`, `limit`, repeatable `match[]`,
+`host`. `start`/`end` are accepted for spec conformance but currently
+ignored; the underlying resolve takes its own default lookback. `limit`
+is honored on the output list, after dedupe.
+
+Response: `{"status":"success","data":["<label_name>",...]}`. The
+result is sorted lexicographically. Accepts both `GET` and `POST`
+(form-encoded body) per Grafana's `httpMethod=POST` default.
+
+### `/api/v1/label/<name>/values`
+
+Returns the distinct values of the label named in the URL path. The
+metric-browser feeder uses `/api/v1/label/__name__/values` to populate
+its dropdown; the response there is the full sanitized context name
+list (e.g. `["system_cpu","disk_io",...]`).
+
+Query parameters: same as `/labels`. `GET` only -- Grafana's
+`GET_AND_POST_METADATA_ENDPOINTS` does not include this path.
+
+Response: `{"status":"success","data":["<value>",...]}`, sorted.
+
+### `/api/v1/series`
+
+Returns the full label set of each unique series matched by the
+supplied selectors.
+
+Query parameters: same as `/labels`. Multiple `match[]` values are
+OR-unioned at the result-series level: a series matching any one of the
+selectors appears once, deduped by signature. Grafana's
+`MATCH_ALL_LABELS = '{__name__!=""}'` sentinel resolves to every named
+series on the host scope.
+
+Response:
+`{"status":"success","data":[{"__name__":"...","instance":"...",...},...]}`.
+Accepts both `GET` and `POST`.
+
+### `/api/v1/metadata`
+
+Returns per-metric TYPE / HELP / unit, optionally filtered to a single
+metric.
+
+Query parameters: `metric` (optional; sanitized name; selects one
+metric), `limit` (caps the number of entries), `host`. `match[]` is
+**not** accepted -- this endpoint is a flat catalog walk, not a series
+resolve.
+
+TYPE mapping: a context whose first non-obsolete dimension has
+algorithm `RRD_ALGORITHM_INCREMENTAL` reports `counter`; every other
+algorithm (absolute, percent-over-diff-total, percent-over-row-total)
+reports `gauge`. HELP is the chart's title via `rrdset_title`. `unit`
+is empty in Phase 2; the chart's units are already encoded in the
+dimension axis label and Grafana rarely consumes the Prometheus `unit`
+field.
+
+Response:
+`{"status":"success","data":{"<metric>":[{"type":"<counter|gauge>","help":"<title>","unit":""}],...}}`.
+
+`GET` only.
+
+### `/api/v1/status/buildinfo`
+
+A static JSON response that Grafana's Go backend hits for the
+Prometheus-vs-Mimir heuristic
+(`grafana-prometheus-datasource/pkg/promlib/heuristics.go`).
+
+Response:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "version": "2.45.0",
+    "revision": "netdata",
+    "branch": "netdata",
+    "buildUser": "netdata",
+    "buildDate": "",
+    "goVersion": "",
+    "features": {}
+  }
+}
+```
+
+The empty `features` map is **load-bearing**: Grafana classifies a
+datasource as Prometheus when `len(features)==0` and as Mimir when the
+map has entries. The version string `2.45.0` is diagnostic-only;
+Grafana's frontend feature gating reads
+`instanceSettings.jsonData.prometheusVersion` (a user-set datasource
+field), not the buildinfo response.
+
+`GET` only.
+
+## Truncation and the `warnings` envelope field
+
+Phase 1's `nd_pds_resolve` treated `max_series` overflow as a hard
+error and returned a `bad_data` envelope. Phase 2 keeps that strict
+behavior for the query path (`/query` / `/query_range`), where wrong
+results would be silently wrong, but relaxes it for the discovery
+path. Discovery responses gain an optional `warnings` field per
+Prometheus convention:
+
+```json
+{
+  "status": "success",
+  "data": [...],
+  "warnings": [
+    "result truncated at max_series=10000; tighten match[] or raise the cap"
+  ]
+}
+```
+
+The `warnings` field is emitted only when truncation actually occurred;
+its absence means the response is complete. Grafana surfaces
+`warnings` at debug level only, so the UI continues to function with a
+capped result set.
+
+The shim accomplishes this with a `truncated` flag on `nd_pds_query`,
+exposed through `nd_pds_was_truncated`. The query path treats `true`
+as an error; the discovery path projects it into the envelope.
+
+## HTTP method matrix
+
+```
+endpoint                              GET   POST
+-----------------------------------------------
+/api/v1/query                          x     x
+/api/v1/query_range                    x     x
+/api/v1/series                         x     x
+/api/v1/labels                         x     x
+/api/v1/label/<name>/values            x
+/api/v1/metadata                       x
+/api/v1/status/buildinfo               x
+```
+
+`POST` carries the parameters as `application/x-www-form-urlencoded`
+in the request body. When both URL parameters and a body are present
+on a POST request, the body is decoded first and the URL parameters
+append after, so the URL effectively wins on duplicate keys (the
+parameter parser uses last-write semantics for non-repeated keys).
+`match[]` is the only repeatable parameter; the parser appends each
+occurrence to the list.
+
 ## Open items deferred to later phases
 
 Per the SOW-0017 close gate:
 
-* Subqueries and full vector matching are Phase 2.
-* The full `*_over_time` family is Phase 2.
-* `topk`, `bottomk`, `quantile` are Phase 2.
-* Specific-host resolution by `machine_guid` or hostname is a
-  Phase 2 refinement of the shim.
-* Tier selection beyond tier 0 is a Phase 2 refinement.
+* Subqueries and full vector matching are Phase 3.
+* The full `*_over_time` family is Phase 3.
+* `topk`, `bottomk`, `quantile` are Phase 3.
+* Tier selection beyond tier 0 is a Phase 3 refinement.
 * The Prometheus compliance test suite is Phase 3.
+
+Per the SOW-0018 close gate, specific-host resolution by `machine_guid`
+or hostname is now implemented -- see the Host scoping section above.
+macOS verification remains deferred to Phase 3 alongside production
+hardening.
 
 The contract documented above is what the evaluator implements today;
 when any of the above land, the spec is updated in the same SOW that
