@@ -3015,6 +3015,7 @@ if(ENABLE_PLUGIN_EBPF)
     netdata_add_ebpf_co_re_to_target(ebpf.plugin)
 
     install(TARGETS ebpf.plugin
+            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE SETUID
             COMPONENT plugin-ebpf
             DESTINATION usr/libexec/netdata/plugins.d)
 
@@ -3063,7 +3064,8 @@ if(ENABLE_PLUGIN_EBPF)
     if(TARGET libbpf)
         add_dependencies(ebpf-go-plugin libbpf)
     endif()
-    install(PROGRAMS "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
+    install(FILES "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
+            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE SETUID
             COMPONENT plugin-ebpf
             DESTINATION usr/libexec/netdata/plugins.d)
 
