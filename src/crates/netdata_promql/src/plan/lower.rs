@@ -188,13 +188,36 @@ fn lower_aggregate(a: &AggregateExpr) -> Result<Plan, LowerError> {
             got: expr.value_type(),
         });
     }
-    if let Some(p) = &a.param {
-        // Phase 1 aggregations (sum/avg/min/max/count) don't take a param.
-        return Err(LowerError::Aggregation(format!(
-            "{:?} does not accept a parameter (Phase 1 supports sum/avg/min/max/count only); got {p}",
-            op
-        )));
-    }
+
+    // Parametrized aggregators (topk/bottomk/quantile) require a scalar
+    // first argument; the others reject any parameter.
+    let lowered_param = match (&a.param, op.takes_param()) {
+        (Some(p), true) => {
+            let lp = lower(p)?;
+            if lp.value_type() != ValueType::Scalar {
+                return Err(LowerError::Aggregation(format!(
+                    "{:?} parameter must be a scalar; got {:?}",
+                    op,
+                    lp.value_type()
+                )));
+            }
+            Some(Arc::new(lp))
+        }
+        (Some(p), false) => {
+            return Err(LowerError::Aggregation(format!(
+                "{:?} does not accept a parameter; got {p}",
+                op
+            )));
+        }
+        (None, true) => {
+            return Err(LowerError::Aggregation(format!(
+                "{:?} requires a scalar parameter (the k or phi)",
+                op
+            )));
+        }
+        (None, false) => None,
+    };
+
     let grouping = a.modifier.as_ref().map(|m| match m {
         LabelModifier::Include(ls) => Grouping::By(ls.labels.clone()),
         LabelModifier::Exclude(ls) => Grouping::Without(ls.labels.clone()),
@@ -202,7 +225,7 @@ fn lower_aggregate(a: &AggregateExpr) -> Result<Plan, LowerError> {
     Ok(Plan::Aggregate {
         op,
         grouping,
-        param: None,
+        param: lowered_param,
         expr: Arc::new(expr),
     })
 }
@@ -314,10 +337,13 @@ fn aggr_from_token(t: token::TokenId) -> Result<AggrKind, LowerError> {
         T_MIN => AggrKind::Min,
         T_MAX => AggrKind::Max,
         T_COUNT => AggrKind::Count,
-        T_TOPK | T_BOTTOMK | T_QUANTILE | T_COUNT_VALUES => {
-            return Err(LowerError::Unsupported(format!(
-                "aggregation operator token id {t} is Phase 2"
-            )))
+        T_TOPK => AggrKind::TopK,
+        T_BOTTOMK => AggrKind::BottomK,
+        T_QUANTILE => AggrKind::Quantile,
+        T_COUNT_VALUES => {
+            return Err(LowerError::Unsupported(
+                "count_values is deferred to a follow-up SOW".to_string(),
+            ))
         }
         other => {
             return Err(LowerError::Unsupported(format!(

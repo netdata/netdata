@@ -30,7 +30,24 @@ Prometheus alerting rules:
   is preserved for `last_over_time` and stripped for the other
   six (Prometheus convention). Added in Phase 3b (SOW-0020).
 * Aggregations: `sum`, `avg`, `min`, `max`, `count`, each with optional
-  `by` or `without` grouping.
+  `by` or `without` grouping. NaN values are skipped; empty buckets
+  drop.
+* Parametrized aggregators: `topk(k, expr)`, `bottomk(k, expr)`,
+  `quantile(phi, expr)`, each with optional `by`/`without` grouping.
+  Added in Phase 3c (SOW-0021). Semantics:
+  * `topk(k, v)` / `bottomk(k, v)`: per bucket, keep the k
+    highest/lowest-valued series. Output preserves the original
+    series labels minus `__name__` (Prometheus convention -- the
+    selected series themselves are returned, not collapsed).
+    Non-integer `k` truncates; `k <= 0` or NaN yields an empty
+    result.
+  * `quantile(phi, v)`: per bucket, compute the phi-quantile via
+    linear interpolation between adjacent ranked observations
+    (the standard rank-based formula `rank = phi * (n - 1)`).
+    Output: one series per bucket carrying the grouping labels
+    only, same shape as `sum`/`avg`. Phi outside `[0, 1]` clamps
+    to `+Inf` (phi > 1) or `-Inf` (phi < 0) per Prometheus.
+    NaN-only buckets drop.
 * Arithmetic: `+`, `-`, `*`, `/`, `%`, `^` across scalar / vector
   combinations.
 * Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=` with or without the
@@ -44,7 +61,10 @@ evaluation time with a clear error:
 * Subqueries (`metric[1h:5m]`).
 * Vector matching with `on`, `ignoring`, `group_left`, `group_right`.
 * Set operators (`and`, `or`, `unless`).
-* `topk`, `bottomk`, `quantile`, `count_values`.
+* `count_values(label, expr)` -- the fourth parametrized aggregator
+  takes a string parameter (a label name) rather than a scalar.
+  Lowering rejects it with `bad_data: count_values is deferred to
+  a follow-up SOW`.
 * `stddev_over_time`, `stdvar_over_time`, `quantile_over_time` --
   the three `*_over_time` siblings not covered by SOW-0020. The
   lowering rejects these with `bad_data: unknown function` until

@@ -23,7 +23,12 @@ pub enum ValueType {
     String,
 }
 
-/// Aggregation operators supported in Phase 1.
+/// Aggregation operators supported in the evaluator.
+///
+/// Sum/Avg/Min/Max/Count: Phase 1 (SOW-0017), no parameter.
+/// TopK/BottomK/Quantile: Phase 3c (SOW-0021), each takes a single
+/// scalar parameter (k or phi). `count_values` is parametrized but
+/// takes a string; deferred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AggrKind {
     Sum,
@@ -31,6 +36,18 @@ pub enum AggrKind {
     Min,
     Max,
     Count,
+    TopK,
+    BottomK,
+    Quantile,
+}
+
+impl AggrKind {
+    /// True when the operator requires a scalar parameter
+    /// (e.g. `topk(5, expr)`). Non-parametrized aggregators
+    /// reject any param at lowering time.
+    pub fn takes_param(self) -> bool {
+        matches!(self, AggrKind::TopK | AggrKind::BottomK | AggrKind::Quantile)
+    }
 }
 
 /// Binary operators supported in Phase 1.

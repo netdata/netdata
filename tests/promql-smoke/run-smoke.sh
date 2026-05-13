@@ -348,6 +348,41 @@ check_post_discovery "POST /series with match[] and limit" \
     "len(d['data'])==20"
 echo
 
+echo "==> Phase 3c: topk / bottomk / quantile"
+check_instant "topk shape"      'topk(3, system_cpu)'      200 vector
+check_instant "bottomk shape"   'bottomk(3, system_cpu)'   200 vector
+check_instant "quantile shape"  'quantile(0.5, system_cpu)' 200 vector
+# Result-count assertions: topk(3, ...) and bottomk(3, ...) should
+# return exactly 3 series.
+check_discovery "topk(3,...) returns exactly 3 series" \
+    "/api/v1/query" \
+    "--data-urlencode query=topk(3,system_cpu)" 200 \
+    "len(d['data']['result'])==3"
+check_discovery "bottomk(3,...) returns exactly 3 series" \
+    "/api/v1/query" \
+    "--data-urlencode query=bottomk(3,system_cpu)" 200 \
+    "len(d['data']['result'])==3"
+# Label preservation: topk keeps original `dimension`, drops `__name__`.
+check_discovery "topk preserves dimension, strips __name__" \
+    "/api/v1/query" \
+    "--data-urlencode query=topk(3,system_cpu)" 200 \
+    "all('__name__' not in s['metric'] and 'dimension' in s['metric'] for s in d['data']['result'])"
+# Quantile correctness: quantile(1, x) == max(x). Floating-point exact
+# match because the implementation returns the sorted max directly when
+# phi == 1.
+check_discovery "quantile(1, x) equals max(x)" \
+    "/api/v1/query" \
+    "--data-urlencode query=quantile(1,system_cpu)-max(system_cpu)" 200 \
+    "abs(float(d['data']['result'][0]['value'][1]))<1e-9"
+# Out-of-range phi: clamp to +Inf or -Inf per Prometheus convention.
+check_discovery "quantile(2, x) returns +Inf" \
+    "/api/v1/query" \
+    "--data-urlencode query=quantile(2,system_cpu)" 200 \
+    "d['data']['result'][0]['value'][1]=='+Inf'"
+# Aggregation operator that should still reject (count_values).
+check_instant "count_values rejected" 'count_values("v", system_cpu)' 400 ""
+echo
+
 echo "==> Phase 3b: *_over_time family"
 check_instant "avg_over_time"      'avg_over_time(system_cpu[1m])'      200 vector
 check_instant "sum_over_time"      'sum_over_time(system_cpu[1m])'      200 vector

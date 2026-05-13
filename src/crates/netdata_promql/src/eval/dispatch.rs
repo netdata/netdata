@@ -43,11 +43,30 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
         Plan::Aggregate {
             op,
             grouping,
+            param,
             expr,
-            ..
         } => {
+            // Parametrized aggregators (topk/bottomk/quantile) take a
+            // scalar param. Evaluate it before the inner vector so we
+            // can fail fast on a malformed parameter expression.
+            let param_value = match param {
+                Some(p) => {
+                    let r = eval(ctx, p)?;
+                    match r {
+                        super::types::EvalResult::Scalar(v) => Some(v),
+                        other => {
+                            return Err(super::types::EvalError::Type {
+                                context: "aggregation parameter",
+                                expected: crate::plan::ValueType::Scalar,
+                                got: other.value_type(),
+                            });
+                        }
+                    }
+                }
+                None => None,
+            };
             let inner = eval(ctx, expr)?;
-            super::aggregation::apply_aggregate(*op, grouping.as_ref(), inner)
+            super::aggregation::apply_aggregate(*op, grouping.as_ref(), param_value, inner)
         }
 
         Plan::Call { func, args } => {
