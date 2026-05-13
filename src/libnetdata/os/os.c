@@ -71,7 +71,7 @@ char *os_translate_msys_to_windows_path(const char *src) {
             i++;
         }
     }
-    else if (src_len >= 3 && src[0] == '/' && isalpha((unsigned char)src[1]) && (src[2] == '/' || src[2] == '\0')) {
+    else if (src_len >= 2 && src[0] == '/' && isalpha((unsigned char)src[1]) && (src_len == 2 || src[2] == '/')) {
         converted_path[j++] = (char)toupper((unsigned char)src[1]);
         converted_path[j++] = ':';
         i = 2;
