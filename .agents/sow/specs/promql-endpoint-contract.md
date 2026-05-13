@@ -95,6 +95,14 @@ Prometheus alerting rules:
   the lhs. Cardinality is implicit many-to-many for set operators;
   no `group_*` modifier needed.
 * Unary minus.
+* The `@` modifier on vector and matrix selectors (SOW-0025).
+  `<selector> @ <unix_ts>` pins the evaluation time to a fixed
+  timestamp; `@ start()` / `@ end()` pin to the outer query
+  range's start / end (for an instant query both collapse to the
+  query time). The modifier shifts only the lookback / window
+  right-edge; output samples remain stamped at the natural query
+  step time. The `@` modifier is not yet supported on subqueries
+  (subqueries are still out of scope).
 * `histogram_quantile(phi, vector)` with `le`-labeled cumulative buckets.
 
 The following are explicitly out of scope and reject at lowering or
@@ -109,8 +117,8 @@ evaluation time with a clear error:
      shipped in Phase 3e (SOW-0023). -->
 * `keep_metric_names` -- a query-level modifier (not a function);
   needs threading through the evaluator.
-* The `@` modifier with arithmetic -- evaluates an expression at a
-  fixed timestamp; architectural.
+<!-- `@` modifier on selectors shipped in SOW-0025; `@` on subqueries
+     waits for subqueries themselves. -->
 * Subqueries (`<expr>[1h:5m]`).
 
 ## Naming: metric names and labels

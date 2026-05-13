@@ -14,6 +14,12 @@ pub struct EvalContext {
     pub host_machine_guid: Option<String>,
     /// Cardinality backstop passed to the shim on resolve.
     pub max_series: usize,
+    /// Outer query range start (Unix ms). For an instant query, equals
+    /// `at_ms`. Used by the `@` modifier's `start()` form (SOW-0025).
+    pub outer_start_ms: i64,
+    /// Outer query range end (Unix ms). For an instant query, equals
+    /// `at_ms`. Used by the `@` modifier's `end()` form (SOW-0025).
+    pub outer_end_ms: i64,
 }
 
 impl Default for EvalContext {
@@ -23,6 +29,8 @@ impl Default for EvalContext {
             lookback_ms: 5 * 60 * 1000,
             host_machine_guid: None,
             max_series: 10_000,
+            outer_start_ms: 0,
+            outer_end_ms: 0,
         }
     }
 }

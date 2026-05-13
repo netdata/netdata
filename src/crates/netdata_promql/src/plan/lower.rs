@@ -21,7 +21,8 @@ use promql_parser::parser::{
 use crate::storage::{compile_regex, Matcher};
 
 use super::ir::{
-    AggrKind, BinopKind, Cardinality, FuncKind, Grouping, MatchKeys, MatchSpec, Plan, ValueType,
+    AggrKind, AtMod, BinopKind, Cardinality, FuncKind, Grouping, MatchKeys, MatchSpec, Plan,
+    ValueType,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -79,25 +80,17 @@ pub fn lower(expr: &Expr) -> Result<Plan, LowerError> {
 }
 
 fn lower_vector_select(vs: &VectorSelector) -> Result<Plan, LowerError> {
-    if vs.at.is_some() {
-        return Err(LowerError::Unsupported(
-            "@ modifiers are Phase 2".to_string(),
-        ));
-    }
     let matchers = lower_matchers(vs.name.as_deref(), &vs.matchers.matchers)?;
     let offset_ms = offset_to_ms(vs.offset.as_ref());
+    let at = lower_at(vs.at.as_ref())?;
     Ok(Plan::VectorSelect {
         matchers,
         offset_ms,
+        at,
     })
 }
 
 fn lower_matrix_select(vs: &VectorSelector, range: Duration) -> Result<Plan, LowerError> {
-    if vs.at.is_some() {
-        return Err(LowerError::Unsupported(
-            "@ modifiers are Phase 2".to_string(),
-        ));
-    }
     let matchers = lower_matchers(vs.name.as_deref(), &vs.matchers.matchers)?;
     let offset_ms = offset_to_ms(vs.offset.as_ref());
     let range_ms = duration_to_ms(range);
@@ -106,10 +99,39 @@ fn lower_matrix_select(vs: &VectorSelector, range: Duration) -> Result<Plan, Low
             "matrix selector range must be positive".to_string(),
         ));
     }
+    let at = lower_at(vs.at.as_ref())?;
     Ok(Plan::MatrixSelect {
         matchers,
         range_ms,
         offset_ms,
+        at,
+    })
+}
+
+/// Translate the parser's `@` modifier into our `AtMod`. `At(SystemTime)`
+/// resolves to a Unix-millisecond timestamp; the special `start()` /
+/// `end()` forms carry through to the evaluator which resolves them
+/// against the outer query range.
+fn lower_at(at: Option<&promql_parser::parser::AtModifier>) -> Result<Option<AtMod>, LowerError> {
+    use promql_parser::parser::AtModifier as P;
+    Ok(match at {
+        None => None,
+        Some(P::Start) => Some(AtMod::Start),
+        Some(P::End) => Some(AtMod::End),
+        Some(P::At(time)) => {
+            // SystemTime -> Unix ms. The parser allows timestamps that
+            // pre-date UNIX_EPOCH; we encode them as negative i64
+            // milliseconds.
+            let dur = time.duration_since(std::time::UNIX_EPOCH);
+            let ms = match dur {
+                Ok(d) => i64::try_from(d.as_millis()).unwrap_or(i64::MAX),
+                Err(neg) => {
+                    let back = neg.duration();
+                    -(i64::try_from(back.as_millis()).unwrap_or(i64::MAX))
+                }
+            };
+            Some(AtMod::AtTs(ms))
+        }
     })
 }
 
@@ -476,7 +498,7 @@ mod tests {
     fn vector_selector_with_name_and_matcher() {
         let p = lower_ok("http_requests_total{method=\"GET\"}");
         match p {
-            Plan::VectorSelect { matchers, offset_ms } => {
+            Plan::VectorSelect { matchers, offset_ms, .. } => {
                 assert_eq!(offset_ms, 0);
                 assert_eq!(matchers.len(), 2);
                 assert_eq!(matchers[0].name(), "__name__");
@@ -552,6 +574,46 @@ mod tests {
     fn subquery_is_phase_2() {
         match lower_err("foo[5m:1m]") {
             LowerError::Unsupported(msg) => assert!(msg.contains("subquer")),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn at_modifier_lowers_to_atts() {
+        // SOW-0025: `@` modifier preserved through lowering.
+        let p = lower_ok("foo @ 1234.5");
+        match p {
+            Plan::VectorSelect { at, .. } => {
+                assert_eq!(at, Some(AtMod::AtTs(1_234_500)));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn at_start_and_end_lower() {
+        let p_start = lower_ok("foo @ start()");
+        match p_start {
+            Plan::VectorSelect { at, .. } => assert_eq!(at, Some(AtMod::Start)),
+            other => panic!("unexpected: {other:?}"),
+        }
+        let p_end = lower_ok("foo @ end()");
+        match p_end {
+            Plan::VectorSelect { at, .. } => assert_eq!(at, Some(AtMod::End)),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn at_on_matrix_selector_lowers() {
+        let p = lower_ok("foo[5m] @ 100");
+        // The matrix selector wraps a vector; the @ rides with the
+        // matrix variant via its inner vs.
+        match p {
+            Plan::MatrixSelect { at, range_ms, .. } => {
+                assert_eq!(at, Some(AtMod::AtTs(100_000)));
+                assert_eq!(range_ms, 5 * 60 * 1000);
+            }
             other => panic!("unexpected: {other:?}"),
         }
     }

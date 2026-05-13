@@ -97,6 +97,21 @@ impl BinopKind {
     }
 }
 
+/// The `@` modifier on a vector or matrix selector. When present, the
+/// selector evaluates at the resolved timestamp instead of the
+/// EvalContext's `at_ms`. Phase 3g (SOW-0025).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AtMod {
+    /// Fixed Unix timestamp in milliseconds.
+    AtTs(i64),
+    /// Outer query range's start; for an instant query, equals the
+    /// query time.
+    Start,
+    /// Outer query range's end; for an instant query, equals the
+    /// query time.
+    End,
+}
+
 /// Grouping clause for an aggregation. `By` keeps the listed labels;
 /// `Without` drops them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -226,6 +241,10 @@ pub enum Plan {
         /// Positive offset shifts the evaluation backwards in time; negative
         /// forwards.
         offset_ms: i64,
+        /// `@` modifier. When `Some`, the selector evaluates at the
+        /// resolved timestamp instead of the EvalContext's `at_ms`.
+        /// Added in SOW-0025.
+        at: Option<AtMod>,
     },
 
     /// A range-vector selector. The window is `[t - range_ms, t]` shifted
@@ -234,6 +253,8 @@ pub enum Plan {
         matchers: Vec<Matcher>,
         range_ms: i64,
         offset_ms: i64,
+        /// `@` modifier; same semantics as on VectorSelect.
+        at: Option<AtMod>,
     },
 
     /// Unary negation. Operand is Scalar or InstantVector.

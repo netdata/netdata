@@ -16,13 +16,15 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
         Plan::VectorSelect {
             matchers,
             offset_ms,
-        } => eval_vector_select(ctx, matchers, *offset_ms),
+            at,
+        } => eval_vector_select(ctx, matchers, *offset_ms, at.as_ref()),
 
         Plan::MatrixSelect {
             matchers,
             range_ms,
             offset_ms,
-        } => eval_matrix_select(ctx, matchers, *range_ms, *offset_ms),
+            at,
+        } => eval_matrix_select(ctx, matchers, *range_ms, *offset_ms, at.as_ref()),
 
         Plan::UnaryMinus(inner) => {
             let r = eval(ctx, inner)?;

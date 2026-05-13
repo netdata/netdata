@@ -400,6 +400,27 @@ check_post_discovery "POST /series with match[] and limit" \
     "len(d['data'])==20"
 echo
 
+echo "==> Phase 3g: @ modifier"
+NOW_TS=$(date +%s)
+FUTURE_TS=$((NOW_TS + 86400))
+check_discovery_args "@ <now> matches bare selector" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==10" \
+    --data-urlencode "query=system_cpu @ $NOW_TS"
+check_discovery_args "@ <future> returns empty" \
+    "/api/v1/query" 200 \
+    "d['data']['result']==[]" \
+    --data-urlencode "query=system_cpu @ $FUTURE_TS"
+check_discovery_args "@ start() in instant query returns all series" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==10" \
+    --data-urlencode "query=system_cpu @ start()"
+check_discovery_args "@ on matrix selector: rate(metric[1m] @ <now>)" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])>=1" \
+    --data-urlencode "query=rate(disk_io[1m] @ $NOW_TS)"
+echo
+
 echo "==> Phase 3f: count_values"
 check_discovery_args "count_values bucketizes by value" \
     "/api/v1/query" 200 \

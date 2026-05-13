@@ -236,11 +236,14 @@ fn run_instant(
     host: Option<String>,
 ) -> Result<NdPromqlResponse, QueryError> {
     let plan = lower_query(query)?;
+    // For instant queries, the outer "range" is a single point.
     let ctx = EvalContext {
         at_ms,
         lookback_ms: DEFAULT_LOOKBACK_MS,
         host_machine_guid: host,
         max_series: DEFAULT_MAX_SERIES,
+        outer_start_ms: at_ms,
+        outer_end_ms: at_ms,
     };
     let result = eval(&ctx, &plan)?;
     let body = match result {
@@ -276,11 +279,16 @@ fn run_range(
 
     let mut t = start_ms;
     loop {
+        // The outer range stays constant across steps; only `at_ms`
+        // shifts. `@ start()` / `@ end()` resolve against the outer
+        // bounds, not the per-step time.
         let ctx = EvalContext {
             at_ms: t,
             lookback_ms: DEFAULT_LOOKBACK_MS,
             host_machine_guid: host.clone(),
             max_series: DEFAULT_MAX_SERIES,
+            outer_start_ms: start_ms,
+            outer_end_ms: end_ms,
         };
         let r = eval(&ctx, &plan)?;
         match r {
