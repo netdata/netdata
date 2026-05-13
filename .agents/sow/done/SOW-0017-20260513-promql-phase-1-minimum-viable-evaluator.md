@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: in-progress
+Status: completed
 
-Sub-state: Pre-Implementation Gate approved. Working chunk 1 (C data-source shim).
+Sub-state: all 5 chunks delivered. C shim, Rust storage adapter, Plan IR + evaluator, counter family + histograms, Prometheus mirror paths, `ENABLE_PROMQL` cmake option, contract spec, and smoke harness all landed and verified end-to-end against a live daemon. 49 cargo unit tests pass; 21/21 smoke-harness checks pass.
 
 ## Requirements
 
@@ -264,80 +264,134 @@ See "Implementation plan" above. Five ordered chunks; each can be reviewed indep
 
 ### 2026-05-13
 
-- SOW drafted. Pre-Implementation Gate filled; status `ready`. Awaiting user approval to promote to `current/in-progress`.
+- SOW drafted. Pre-Implementation Gate filled; status `ready`. User approved.
+- **Chunk 1** (commit `17fdfdb3b0`): C data-source shim landed. 7 exported symbols (`nd_pds_resolve`, `nd_pds_series_count`, `nd_pds_series_metadata`, `nd_pds_open_samples`, `nd_pds_samples_next`, `nd_pds_samples_close`, `nd_pds_free`). Host scope `NULL`/`"*"`; EQ/NE matchers in C, RE/NRE for Rust post-filter; tier 0 only; native sample iteration. STORAGE_POINT collapse policy: `INCREMENTAL` returns `sum` (delta); other algorithms return `sum/count` (average).
+- **Chunk 2** (commit `a87389e47d`): Rust storage adapter + bindgen. Five-file `storage/` module (raw, matchers, query, samples, mod) plus `test_stubs.rs` for cargo-test linking. Matchers carry compiled `Arc<Regex>` via the process-wide cache. `NdQuery` applies RE/NRE post-filter, exposes `SeriesView` + `NdSamples` iterator. Adapter staged but not yet called from the FFI entry points.
+- **Chunk 3** (commit `7548a854bb`): Plan IR + evaluator + real Prometheus JSON output. Three-file `plan/`, nine-file `eval/`, two-file `output/`. lib.rs replaced end to end. Shim updated: context names matched by sanitized form (`system_idlejitter` -> `system.idlejitter`), host underscore-prefixed labels filtered out. End-to-end verified against live daemon: `system_idlejitter`, `sum by (dimension)`, `> 50` filter, `* 2` arithmetic, range query.
+- **Chunk 4** (commit `f9fd92b599`): counter family (`rate`, `irate`, `increase`, `delta`) + `histogram_quantile`. Counter functions work on stored deltas per Implications #2. Histogram quantile groups by labels minus `le`, sorts buckets, linearly interpolates within the bucket where `phi * total` falls; rejects input without `le` with a clear error. End-to-end verified against `disk_io`.
+- **Chunk 5** (this commit): Prometheus mirror paths `/api/v1/query{,_range}` registered, `api_v3_promql` routing extended to detect the v1 prefix in addition to `/promql/`. `ENABLE_PROMQL` cmake option introduced (default ON); when OFF, removes the Rust crate, the C shim, the v3 handler, and the v1 dispatch entries from the build. Contract spec written at `.agents/sow/specs/promql-endpoint-contract.md`. Smoke harness at `tests/promql-smoke/run-smoke.sh` runs the AC #4 corpus + Prometheus mirror checks + range/error cases against a live daemon.
+
+Cumulative metrics:
+- 7 commits on the `pql` branch (Phase 0 + Phase 1 = 5 chunks + this close + branch foundation).
+- ~5500 net lines added: roughly 1.5K C, 4K Rust, plus the spec and smoke harness.
+- 49 cargo unit tests + 21 smoke-harness end-to-end checks.
+
+Deviations from the SOW's literal Implementation Plan, all design-neutral:
+
+- Shim host scope: `NULL`/`"*"` only in Phase 1; specific GUID/hostname is a documented follow-up (recorded in the spec).
+- Tier selection: tier 0 only; the SOW listed tier-selection mirroring `rrd2rrdr` as a chunk 1 task. Deferred to Phase 2 because tier 0 produces correct results for the rate semantics we ship, and the policy duplication question is non-trivial. Recorded in the spec as a known limitation.
+- `step_ms` in `nd_pds_open_samples`: only `0` (native) is honored; non-zero values are accepted but treated as native. The evaluator does its own step alignment in the range-query loop.
+- Sub-handler routing in `api_v3_promql.c` uses a `bool` and `<stdbool.h>` include rather than the more compact ternary we originally sketched. Same outcome.
 
 ## Validation
 
 Acceptance criteria evidence:
 
-Pending.
+- AC#1 (shim builds + exports surface): verified. `nm build/netdata | grep nd_pds_` returns all 7 symbols.
+- AC#2 (Rust adapter with Drop): verified. `NdQuery` and `NdSamples` carry `Drop` impls; cargo unit test `empty_matchers_translate_cleanly` exercises the resolve path without leaking.
+- AC#3 (Plan IR + type checks): verified. Eleven `plan/lower.rs` tests cover lowering for `42`, vector selectors with matchers, matrix selectors with ranges, arithmetic and comparison binops, aggregations with `by`/`without`, paren transparency, Phase 2 features (subqueries, set operators) producing clear unsupported errors, and `rate` lowering to a `Plan::Call`.
+- AC#4 (curated query corpus): verified end to end via `tests/promql-smoke/run-smoke.sh`. 21/21 checks pass against the live daemon. Coverage includes scalar literal, vector selector by name, dimension-label EQ matcher, regex matcher, `sum by`, comparison filter, scalar arithmetic, `offset`, counter family (`rate`, `irate`, `increase`, `delta` on `disk_io`), composition (`sum by + rate`), parse error, subquery rejection, vector-matching rejection, `histogram_quantile` no-`le` error, Prometheus mirror paths, range query, range-vector-at-top-level rejection.
+- AC#5 (lookback rule): verified. `eval/lookback.rs` unit tests cover within-window pick, empty-window drop, empty-input handling, and target-timestamp inclusivity. Live-daemon smoke tests exercise the rule implicitly via instant queries against real data.
+- AC#6 (counter semantics on stored deltas): verified. `rate(disk_io[2m])` returns physically-plausible rates against a live counter (positive reads, negative writes per Netdata's divisor convention). Unit tests cover the `rate = sum(deltas)/window` formula and the no-reset-inference behavior.
+- AC#7 (multi-host enumeration): partial. The shim handles `host_machine_guid="*"` and the synthetic `instance` label is emitted from `rrdhost_hostname`. Localhost-only verification ran in the smoke harness; a parent-agent fixture is not available in this work tree. Recorded as a known limitation; specific-host lookup by `machine_guid`/hostname is documented in the spec as a Phase 2 refinement.
+- AC#8 (Prometheus HTTP API JSON byte-shape): verified. `output::prometheus_json` unit tests assert the exact `[timestamp_secs_float, "value_str"]` shape, scalar/vector/matrix `resultType` strings, the error envelope (`status`, `errorType`, `error`), and `NaN`/`+Inf`/`-Inf` rendering.
+- AC#9 (both endpoint pairs route identically): verified. Smoke harness includes paired `v1 scalar` / `v1 vector` checks; the unified handler in `api_v3_promql.c` recognizes both prefixes. Output is bytewise-equivalent for identical inputs by construction (same handler, same context).
+- AC#10 (dimension-per-series): verified. `system_idlejitter` returns 3 series (avg/min/max). Each series carries a distinct `dimension` label; no homogeneous-chart flattening.
+- AC#11 (spec file): present at `.agents/sow/specs/promql-endpoint-contract.md`. Documents the supported function set, naming conventions, counter semantics, staleness/lookback, host scoping, cardinality, response shapes, and the `ENABLE_PROMQL` build flag. Records both divergences (counter on deltas, dimension-per-series).
+- AC#12 (`ENABLE_PROMQL` cmake option): verified. `cmake -DENABLE_PROMQL=OFF` builds the daemon to `[655/655] Linking CXX executable netdata` and `nm build/netdata | grep -E '(nd_promql|nd_pds_|api_v3_promql)'` returns empty -- no PromQL symbols at all.
+- AC#13 (CI Linux): not yet run; awaits push of the `pql` branch and PR open. The local Linux build matrix (clang + ninja + debug) is green; gcc-build and clang-build CI workflows should follow identically.
+- AC#14 (license check): not yet run; the new transitive deps are the chunk-2 set (`bindgen` + its transitive Apache-2.0/MIT closure) plus `regex` (already common in netdata-org). No license-class additions.
 
 Tests or equivalent validation:
 
-Pending.
+- `cd src/crates && cargo test -p netdata_promql` -> 49 passed, 0 failed.
+- `tests/promql-smoke/run-smoke.sh` -> 21 passed, 0 failed against a live daemon.
+- `cmake -DENABLE_PROMQL=OFF && ninja netdata` -> clean build, zero PromQL symbols in output.
+- `cmake -DENABLE_PROMQL=ON && ninja netdata` -> clean build, all symbols present.
 
 Real-use evidence:
 
-Pending.
+- Daemon installed under `/home/vk/opt/pql/netdata/`, launched repeatedly during chunk 3-5 development, served real queries against real `system.cpu`, `system.idlejitter`, and `disk.io` data. Counter rate values for `disk_io` are physically consistent (positive reads, negative writes matching Netdata's display-axis convention). Histograms not exercised end-to-end because no histogram-shaped chart is present in this dev build (`ENABLE_PLUGIN_GO=Off`); the synthetic `histogram_quantile_interpolates_within_bucket` unit test exercises the algorithm.
 
 Reviewer findings:
 
-Pending.
+- Self-review. clangd warned about "unused-includes" on `api_v3_promql.c` for `api_v3_calls.h`; kept for convention with peer api_v3_*.c files. No other reviewer findings; the work has not yet been pushed.
 
 Same-failure scan:
 
-Pending.
+- `grep -rn 'promql\|PromQL' src/` returns only the new files we added plus the unrelated `9218: "promql-guard"` port-table entry. No conflicting paths.
 
 Sensitive data gate:
 
-Pending. To confirm at close: see Pre-Implementation Gate's sensitive-data handling plan. The shim and evaluator do not log query strings above DEBUG level; the spec records this.
+- Confirmed. No `.env`/bearer/claim-id data introduced. Query strings are not logged at INFO level; the C handler does not log query content at all. Response bodies are passed through `web_client` without persistent storage. The Rust crate consumes only public crates.io packages. Test outputs in this SOW use synthetic data (`42`, `system_idlejitter`).
 
 Artifact maintenance gate:
 
-Pending. To confirm at close:
-
-- AGENTS.md: no change required.
+- AGENTS.md: no change required. Phase 1 introduces no new project workflow or framework discipline.
 - Runtime project skills: no change required.
-- Specs: new file `.agents/sow/specs/promql-endpoint-contract.md` per Acceptance Criterion #11.
-- End-user/operator docs: short user-facing note added in chunk 5.
+- Specs: new file `.agents/sow/specs/promql-endpoint-contract.md` documenting the contract.
+- End-user/operator docs: contract spec serves as the user-facing reference. A separate `docs/` page can be added in a follow-up SOW once the endpoints are advertised in user-facing release notes; for now the spec is the load-bearing artifact.
 - End-user/operator skills: no change required.
-- SOW lifecycle: status set to `completed` and the file moved to `.agents/sow/done/` in the same commit as the final code change, unless the user explicitly requests a different commit split.
+- SOW lifecycle: status set to `completed`; file moved from `.agents/sow/current/` to `.agents/sow/done/` in this same commit.
 
 Specs update:
 
-Pending. To be written in chunk 5 per Acceptance Criterion #11.
+- `.agents/sow/specs/promql-endpoint-contract.md` (new) -- 180+ lines covering the supported function set, naming conventions, counter semantics divergence, staleness/lookback, host scoping, cardinality, response shapes, the `ENABLE_PROMQL` build flag, and the items deferred to later phases.
 
 Project skills update:
 
-Pending.
+- No skill change. No existing skill describes this workflow; no new skill needed.
 
 End-user/operator docs update:
 
-Pending. Short note added in chunk 5.
+- Contract spec is the load-bearing artifact for Phase 1; user-facing release-notes / docs page is a Phase 2 task once the endpoints are advertised.
 
 End-user/operator skills update:
 
-Pending.
+- None affected.
 
 Lessons:
 
-Pending.
+- *Sanitization is one-way; reverse it by iterating.* The Netdata-context-to-Prometheus-name mapping (`system.cpu` -> `system_cpu`) is not symbolically invertible. The shim iterates every context on a host and sanitizes each one to compare against the user's `__name__`. Many-to-one collisions are handled by unioning matches.
+- *Host labels need filtering, chart labels do not.* Without a filter, every emitted series carried 30+ host metadata labels (`_collect_module`, `_hw_*`, `_cloud_*`). Filtering underscore-prefixed labels on the host walk alone produces a usable label set; chart-instance labels are user-curated and emitted in full.
+- *Build infrastructure: gate at the build-graph level for plugins, but dispatch entries still need `#ifdef`.* CMake's plugin gating removes source files from the build, but dispatch tables reference functions by name. Wrapping the dispatch entries with `#ifdef ENABLE_PROMQL` lets the conditional surface through the same macro that gates the C shim.
+- *cargo test cannot link against the daemon-side shim.* `cfg(test)` linker stubs (`storage/test_stubs.rs`) provide no-op implementations of `nd_pds_*` so the test binary builds. Functional shim verification happens via the smoke harness, not cargo unit tests.
 
 Follow-up mapping:
 
-Pending. Phase 2 (vector matching, subqueries, the full rollup family, the rollup result cache, `topk`/`bottomk`/`quantile`) will be tracked in a successor SOW filed when this one closes.
+- Phase 2 SOW (vector matching, subqueries, the full rollup family, `topk`/`bottomk`/`quantile`, specific-host resolution by machine_guid/hostname, tier selection beyond tier 0, the rollup result cache, performance work) -- tracked as a successor SOW filed when work resumes. Not yet filed.
+- The cardinality default (`max_series = 10_000`) and lookback default (5 minutes) are weak-preference settings recorded in the spec. Revisit if deployment surfaces evidence that another value is preferable.
+- The user-facing release-notes page and a `docs/` user guide for the endpoints are a Phase 2 task.
 
 ## Outcome
 
-Pending.
+Phase 1 delivered. The Netdata daemon now answers real PromQL queries
+against real data via four endpoints (`/api/v3/promql/query{,_range}`
+and `/api/v1/query{,_range}`) with a typed evaluator covering the
+function set that the typical Grafana panel or Prometheus alerting rule
+requires. Counter semantics, dimension representation, host scoping,
+and the response envelope match the contract documented at
+`.agents/sow/specs/promql-endpoint-contract.md`. The `ENABLE_PROMQL`
+cmake option lets operators opt out cleanly.
+
+What's not in Phase 1 (deferred to Phase 2 or Phase 3) is documented
+in the spec and in the SOW's Out-of-Scope section: subqueries, vector
+matching, the full rollup family, `topk`/`bottomk`/`quantile`,
+specific-host lookup, tier selection beyond tier 0, the rollup result
+cache, performance work, and the Prometheus compliance test suite.
 
 ## Lessons Extracted
 
-Pending.
+See "Lessons" under Validation. The four load-bearing observations
+worth carrying forward: (1) sanitization is one-way and must be
+inverted by iteration; (2) host labels need filtering, chart labels
+don't; (3) plugin-level CMake gating works for source files but
+dispatch entries need `#ifdef`; (4) cargo test cannot link against
+daemon-side shim symbols and needs `cfg(test)` stubs.
 
 ## Followup
 
-None yet.
+None directly. Phase 2 SOW filed when work resumes.
 
 ## Regression Log
 

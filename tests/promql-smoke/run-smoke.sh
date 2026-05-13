@@ -152,6 +152,39 @@ check_instant_v1 "v1 scalar"              '42'                                  
 check_instant_v1 "v1 vector"              'system_cpu'                              200 vector
 echo
 
+# POST is what Grafana uses for queries past a certain length. The handler
+# should accept form-encoded bodies the same way it accepts URL params.
+check_post() {
+    local name="$1" path="$2" query="$3" expected_status="$4" expected_result_type="$5"
+    local resp http_code body
+    resp=$(curl -s -X POST -w '\n__HTTP__:%{http_code}\n' "$URL$path" \
+        --data-urlencode "query=$query" 2>&1) || true
+    http_code=$(printf '%s' "$resp" | awk -F: '/^__HTTP__:/ { print $2 }')
+    body=$(printf '%s' "$resp" | awk '/^__HTTP__:/{exit} {print}')
+    if [[ "$http_code" != "$expected_status" ]]; then
+        printf '  %s %s -- expected HTTP %s, got %s\n' \
+            "$(c_red FAIL)" "$name" "$expected_status" "$http_code"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    local rt
+    rt=$(printf '%s' "$body" | python3 -c "import json,sys; print(json.load(sys.stdin).get('data',{}).get('resultType',''))" 2>/dev/null || echo '')
+    if [[ "$expected_result_type" != "" && "$rt" != "$expected_result_type" ]]; then
+        printf '  %s %s -- resultType=%s (expected %s)\n' \
+            "$(c_red FAIL)" "$name" "$rt" "$expected_result_type"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    printf '  %s %s\n' "$(c_grn PASS)" "$name"
+    PASS=$((PASS + 1))
+}
+
+echo "==> POST method (Grafana long-query path)"
+check_post "POST v1 scalar"               "/api/v1/query"        '42'                       200 scalar
+check_post "POST v1 vector"               "/api/v1/query"        'system_cpu'               200 vector
+check_post "POST v3 with encoded payload" "/api/v3/promql/query" 'rate(disk_io[2m])'        200 vector
+echo
+
 echo "==> Range queries"
 NOW=$(date +%s)
 START=$((NOW - 60))

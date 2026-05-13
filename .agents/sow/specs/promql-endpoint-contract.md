@@ -159,6 +159,17 @@ The cap is the only safety net against runaway label cardinality on
 parent agents with hundreds of child hosts; it is not yet a per-endpoint
 configurable.
 
+## HTTP methods
+
+Both endpoint families accept `GET` and `POST`. GET requests carry
+parameters in the URL query string. POST requests carry parameters in
+the body, `Content-Type: application/x-www-form-urlencoded`. The
+handler URL-decodes the body and parses it the same way it parses the
+URL query string; if both are populated, the URL query string takes
+precedence and the body is ignored. POST is what Grafana uses when a
+query is long enough to push the URL past common length thresholds, so
+both methods need to work for the typical datasource configuration.
+
 ## Response shape
 
 Success responses follow the Prometheus HTTP API contract:

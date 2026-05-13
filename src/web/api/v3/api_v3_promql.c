@@ -139,10 +139,26 @@ int api_v3_promql(RRDHOST *host __maybe_unused, struct web_client *w, char *url)
     bool is_range = strstr(path, "promql/query_range") || strstr(path, "/v1/query_range");
     bool is_instant = strstr(path, "promql/query") || strstr(path, "/v1/query");
 
+    // POST + form-encoded body: Grafana uses POST for queries that don't
+    // fit comfortably in a URL. Netdata routes the body into `w->payload`
+    // separately from `url_query_string_decoded`, so when the URL has no
+    // params we copy the payload through `url_decode_r` (the body arrives
+    // as raw x-www-form-urlencoded bytes) and parse it the same way.
+    //
+    // `params_buf` must live until the handler returns: handle_instant /
+    // handle_range mutate it in place via `strsep_skip_consecutive_separators`.
+    char params_buf[NETDATA_WEB_REQUEST_URL_SIZE + 2];
+    char *params = url;
+    if ((!url || !*url) && w->payload && buffer_strlen(w->payload) > 0) {
+        url_decode_r(params_buf, buffer_tostring(w->payload), sizeof(params_buf));
+        params_buf[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
+        params = params_buf;
+    }
+
     if (is_range)
-        return handle_range(w, url);
+        return handle_range(w, params);
     if (is_instant)
-        return handle_instant(w, url);
+        return handle_instant(w, params);
 
     buffer_flush(w->response.data);
     buffer_strcat(w->response.data,
