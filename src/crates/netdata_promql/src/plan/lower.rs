@@ -15,7 +15,7 @@ use promql_parser::label::{MatchOp as ParserMatchOp, Matcher as ParserMatcher, M
 use promql_parser::parser::token;
 use promql_parser::parser::{
     AggregateExpr, BinaryExpr, Call, Expr, LabelModifier, MatrixSelector, Offset, ParenExpr,
-    UnaryExpr, VectorSelector,
+    SubqueryExpr, UnaryExpr, VectorSelector,
 };
 
 use crate::storage::{compile_regex, Matcher};
@@ -67,9 +67,7 @@ pub fn lower(expr: &Expr) -> Result<Plan, LowerError> {
         Expr::Binary(b) => lower_binary(b),
         Expr::Aggregate(a) => lower_aggregate(a),
         Expr::Call(c) => lower_call(c),
-        Expr::Subquery(_) => Err(LowerError::Unsupported(
-            "subqueries are Phase 2".to_string(),
-        )),
+        Expr::Subquery(sq) => lower_subquery(sq),
         Expr::StringLiteral(_) => Err(LowerError::Unsupported(
             "top-level string literals are not supported".to_string(),
         )),
@@ -353,6 +351,65 @@ fn lower_aggregate(a: &AggregateExpr) -> Result<Plan, LowerError> {
     })
 }
 
+/// Default step when the parser leaves `step` as `None`. Prometheus uses
+/// the global evaluation interval; we adopt 1 second (the minimum
+/// sensible value) and document it in the contract spec. SOW-0026.
+const DEFAULT_SUBQUERY_STEP_MS: i64 = 1000;
+
+fn lower_subquery(sq: &SubqueryExpr) -> Result<Plan, LowerError> {
+    let inner = lower(&sq.expr)?;
+    if inner.value_type() != ValueType::InstantVector {
+        return Err(LowerError::Type {
+            context: "subquery inner expression",
+            expected: ValueType::InstantVector,
+            got: inner.value_type(),
+        });
+    }
+    let range_ms = duration_to_ms(sq.range);
+    if range_ms <= 0 {
+        return Err(LowerError::InvalidMatcher(
+            "subquery range must be positive".to_string(),
+        ));
+    }
+    let step_ms = match sq.step {
+        Some(d) => {
+            let ms = duration_to_ms(d);
+            if ms <= 0 {
+                return Err(LowerError::InvalidMatcher(
+                    "subquery step must be positive".to_string(),
+                ));
+            }
+            ms
+        }
+        None => DEFAULT_SUBQUERY_STEP_MS,
+    };
+    // Reuse Prometheus' per-timeseries point cap. `range_ms / step_ms`
+    // gives the count of grid points minus 1 (the inclusive endpoint),
+    // but for the cap check the +1 is irrelevant -- we only want to
+    // reject pathological step values, and the existing range-query
+    // path uses the same "no greater than 11000" rule.
+    let points = (range_ms / step_ms) as usize + 1;
+    if points > crate::MAX_POINTS_PER_TIMESERIES {
+        return Err(LowerError::InvalidMatcher(format!(
+            "subquery exceeds maximum resolution of {} points per timeseries \
+             ({}ms / {}ms = {} points)",
+            crate::MAX_POINTS_PER_TIMESERIES,
+            range_ms,
+            step_ms,
+            points,
+        )));
+    }
+    let offset_ms = offset_to_ms(sq.offset.as_ref());
+    let at = lower_at(sq.at.as_ref())?;
+    Ok(Plan::Subquery {
+        expr: Arc::new(inner),
+        range_ms,
+        step_ms,
+        offset_ms,
+        at,
+    })
+}
+
 fn lower_call(c: &Call) -> Result<Plan, LowerError> {
     let func = FuncKind::from_name(&c.func.name).ok_or_else(|| {
         LowerError::Call(format!(
@@ -571,9 +628,147 @@ mod tests {
     }
 
     #[test]
-    fn subquery_is_phase_2() {
-        match lower_err("foo[5m:1m]") {
-            LowerError::Unsupported(msg) => assert!(msg.contains("subquer")),
+    fn subquery_lowers_to_range_vector() {
+        // SOW-0026: subqueries are supported and produce a range vector.
+        let p = lower_ok("foo[5m:1m]");
+        match p {
+            Plan::Subquery {
+                range_ms,
+                step_ms,
+                offset_ms,
+                at,
+                ref expr,
+            } => {
+                assert_eq!(range_ms, 5 * 60 * 1000);
+                assert_eq!(step_ms, 60 * 1000);
+                assert_eq!(offset_ms, 0);
+                assert_eq!(at, None);
+                assert!(matches!(**expr, Plan::VectorSelect { .. }));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+        assert_eq!(p.value_type(), ValueType::RangeVector);
+    }
+
+    #[test]
+    fn subquery_defaults_step_to_one_second() {
+        // The parser leaves `step` as None when omitted; we substitute
+        // 1000 ms (the minimum sensible value).
+        let p = lower_ok("foo[1m:]");
+        match p {
+            Plan::Subquery { step_ms, .. } => assert_eq!(step_ms, 1000),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn subquery_rejects_range_vector_inner() {
+        // `foo[5m]` already lowers to a range vector; wrapping it in
+        // a subquery would compose a range over a range, which
+        // Prometheus also rejects. promql-parser catches this before
+        // it reaches the lowering layer (Parse error from the AST
+        // builder); the in-lowering type check is defense in depth
+        // for any future caller that constructs a Plan::Subquery
+        // directly.
+        match lower_err("(foo[5m])[10m:1m]") {
+            LowerError::Parse(msg) => {
+                assert!(msg.contains("vector"), "msg = {msg}");
+            }
+            LowerError::Type { context, expected, got } => {
+                assert_eq!(context, "subquery inner expression");
+                assert_eq!(expected, ValueType::InstantVector);
+                assert_eq!(got, ValueType::RangeVector);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn subquery_rejects_oversized_point_count() {
+        // 1m / 1ms = 60_001 points > 11_000 cap.
+        match lower_err("foo[1m:1ms]") {
+            LowerError::InvalidMatcher(msg) => {
+                assert!(
+                    msg.contains("11000 points") || msg.contains("11000"),
+                    "msg = {msg}"
+                );
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn subquery_carries_at_modifier() {
+        let p = lower_ok("foo[5m:1m] @ 1234");
+        match p {
+            Plan::Subquery { at, .. } => assert_eq!(at, Some(AtMod::AtTs(1_234_000))),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn subquery_at_start_and_end_lower() {
+        match lower_ok("foo[5m:1m] @ start()") {
+            Plan::Subquery { at, .. } => assert_eq!(at, Some(AtMod::Start)),
+            other => panic!("unexpected: {other:?}"),
+        }
+        match lower_ok("foo[5m:1m] @ end()") {
+            Plan::Subquery { at, .. } => assert_eq!(at, Some(AtMod::End)),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn subquery_over_rate_lowers() {
+        // `rate(metric[5m])[10m:1m]` -- the canonical alert-rule
+        // shape. The inner is a Call (instant vector); the outer is
+        // the subquery.
+        let p = lower_ok("rate(metric[5m])[10m:1m]");
+        match p {
+            Plan::Subquery {
+                expr,
+                range_ms,
+                step_ms,
+                ..
+            } => {
+                assert_eq!(range_ms, 10 * 60 * 1000);
+                assert_eq!(step_ms, 60 * 1000);
+                match &*expr {
+                    Plan::Call { func, .. } => assert_eq!(*func, FuncKind::Rate),
+                    other => panic!("unexpected inner: {other:?}"),
+                }
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn max_over_time_consumes_subquery() {
+        // `max_over_time(sum(metric)[5m:1m])` -- the subquery
+        // produces a range vector that `max_over_time` consumes.
+        let p = lower_ok("max_over_time(sum(metric)[5m:1m])");
+        match p {
+            Plan::Call { func, args } => {
+                assert_eq!(func, FuncKind::MaxOverTime);
+                assert_eq!(args.len(), 1);
+                match &args[0] {
+                    Plan::Subquery { range_ms, step_ms, expr, .. } => {
+                        assert_eq!(*range_ms, 5 * 60 * 1000);
+                        assert_eq!(*step_ms, 60 * 1000);
+                        assert!(matches!(**expr, Plan::Aggregate { .. }));
+                    }
+                    other => panic!("unexpected arg: {other:?}"),
+                }
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn subquery_carries_offset() {
+        let p = lower_ok("foo[5m:1m] offset 10m");
+        match p {
+            Plan::Subquery { offset_ms, .. } => assert_eq!(offset_ms, 10 * 60 * 1000),
             other => panic!("unexpected: {other:?}"),
         }
     }

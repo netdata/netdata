@@ -95,20 +95,30 @@ Prometheus alerting rules:
   the lhs. Cardinality is implicit many-to-many for set operators;
   no `group_*` modifier needed.
 * Unary minus.
-* The `@` modifier on vector and matrix selectors (SOW-0025).
-  `<selector> @ <unix_ts>` pins the evaluation time to a fixed
-  timestamp; `@ start()` / `@ end()` pin to the outer query
-  range's start / end (for an instant query both collapse to the
-  query time). The modifier shifts only the lookback / window
-  right-edge; output samples remain stamped at the natural query
-  step time. The `@` modifier is not yet supported on subqueries
-  (subqueries are still out of scope).
+* The `@` modifier on vector, matrix selectors, and subqueries
+  (SOW-0025, SOW-0026). `<selector> @ <unix_ts>` pins the
+  evaluation time to a fixed timestamp; `@ start()` / `@ end()`
+  pin to the outer query range's start / end (for an instant
+  query both collapse to the query time). The modifier shifts
+  only the lookback / window right-edge; output samples remain
+  stamped at the natural query step time. On a subquery the `@`
+  shifts the right edge of the subquery's own step grid.
 * `histogram_quantile(phi, vector)` with `le`-labeled cumulative buckets.
+* Subqueries `<expr>[<range>:<step>] [@ <ts>] [offset <d>]`
+  (SOW-0026). The inner expression must be an instant vector;
+  evaluating the subquery re-runs the inner at every grid point
+  in `[t - range, t]` at the configured `step` and yields a
+  range vector keyed by series signature. When `step` is
+  omitted, the evaluator defaults to 1000 ms. The same
+  per-timeseries point cap (11,000) that bounds range queries
+  also bounds subqueries; `range / step + 1 > 11000` rejects
+  with `bad_data` at lowering time. Subqueries compose with
+  `*_over_time` and `rate`-family functions exactly as in
+  Prometheus.
 
 The following are explicitly out of scope and reject at lowering or
 evaluation time with a clear error:
 
-* Subqueries (`metric[1h:5m]`).
 * Many-to-many cardinality for arithmetic/comparison binops. Set
   operators are inherently many-to-many and don't accept the
   `group_*` modifier.
@@ -123,9 +133,6 @@ evaluation time with a clear error:
   query`. Lighting up this feature requires either forking
   `promql-parser` or landing the change upstream first; deferred
   until that decision is made.
-<!-- `@` modifier on selectors shipped in SOW-0025; `@` on subqueries
-     waits for subqueries themselves. -->
-* Subqueries (`<expr>[1h:5m]`).
 
 ## Naming: metric names and labels
 
@@ -494,11 +501,14 @@ occurrence to the list.
 
 ## Open items deferred to later phases
 
-Per the SOW-0017 close gate:
+Per the SOW-0017 close gate (status as of 2026-05-14):
 
-* Subqueries and full vector matching are Phase 3.
-* The full `*_over_time` family is Phase 3.
-* `topk`, `bottomk`, `quantile` are Phase 3.
+* Subqueries shipped in SOW-0026.
+* Full vector matching shipped in SOW-0022.
+* The full `*_over_time` family shipped in SOW-0020 (plus
+  stddev/stdvar/quantile_over_time in SOW-0023).
+* `topk`, `bottomk`, `quantile` shipped in SOW-0021;
+  `count_values` in SOW-0024.
 * Tier selection beyond tier 0 is a Phase 3 refinement.
 * The Prometheus compliance test suite is Phase 3.
 

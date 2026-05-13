@@ -6,6 +6,7 @@ use crate::plan::Plan;
 
 use super::context::EvalContext;
 use super::select::{eval_matrix_select, eval_vector_select};
+use super::subquery::eval_subquery;
 use super::types::{EvalError, EvalResult};
 
 /// Evaluate one plan node at `ctx.at_ms`.
@@ -88,5 +89,13 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
             }
             super::functions::apply_call(*func, evaled)
         }
+
+        Plan::Subquery {
+            expr,
+            range_ms,
+            step_ms,
+            offset_ms,
+            at,
+        } => eval_subquery(ctx, expr, *range_ms, *step_ms, *offset_ms, at.as_ref()),
     }
 }

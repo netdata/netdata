@@ -29,8 +29,9 @@ use output::{serialize_error, serialize_scalar_at, serialize_success};
 use plan::{lower_query, LowerError, ValueType};
 
 /// Prometheus' default cap on the number of points per timeseries in a
-/// range query. Guards against pathological step values.
-const MAX_POINTS_PER_TIMESERIES: usize = 11_000;
+/// range query. Guards against pathological step values. Subquery
+/// lowering reuses this cap (SOW-0026).
+pub(crate) const MAX_POINTS_PER_TIMESERIES: usize = 11_000;
 
 /// Default lookback window for instant vector selectors.
 const DEFAULT_LOOKBACK_MS: i64 = 5 * 60 * 1000;

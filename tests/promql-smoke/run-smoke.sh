@@ -146,7 +146,9 @@ echo
 
 echo "==> Error paths"
 check_instant "parse error"               'not_a_real_query{'                       400 ""
-check_instant "subquery rejected"         'foo[5m:1m]'                              400 ""
+# Phase 1 had a "subquery rejected" check here; SOW-0026 implements
+# subqueries. Positive coverage lives in the Phase 3h group below;
+# the point-cap rejection lives there too.
 # Phase 1 had a "vector matching rejected" check here; SOW-0022
 # implements vector matching, so the rejection no longer applies.
 # Positive coverage lives in the Phase 3d group below.
@@ -419,6 +421,32 @@ check_discovery_args "@ on matrix selector: rate(metric[1m] @ <now>)" \
     "/api/v1/query" 200 \
     "len(d['data']['result'])>=1" \
     --data-urlencode "query=rate(disk_io[1m] @ $NOW_TS)"
+echo
+
+echo "==> Phase 3h: subqueries"
+# Bare subquery: range vector with grid points at the configured step.
+# 1m at 30s -> 3 step times (window_start+step, +2*step, +3*step) per
+# Prometheus semantics; we assert "matrix" resultType and at least one
+# series so the test stays robust against the exact grid count.
+check_discovery_args "system_cpu[1m:30s] returns a matrix" \
+    "/api/v1/query" 200 \
+    "d['data']['resultType']=='matrix' and len(d['data']['result'])>=1" \
+    --data-urlencode "query=system_cpu[1m:30s]"
+# Subquery + *_over_time composition: the canonical alert-rule shape.
+check_discovery_args "max_over_time over subquery returns a vector" \
+    "/api/v1/query" 200 \
+    "d['data']['resultType']=='vector' and len(d['data']['result'])>=1" \
+    --data-urlencode "query=max_over_time((sum(system_cpu))[1m:30s])"
+# Subquery + rate composition: per-step rates over a window, useful for
+# rate-of-rate analysis (alert rules commonly do this).
+check_discovery_args "rate(disk_io[2m])[5m:1m] returns a matrix" \
+    "/api/v1/query" 200 \
+    "d['data']['resultType']=='matrix' and len(d['data']['result'])>=1" \
+    --data-urlencode "query=rate(disk_io[2m])[5m:1m]"
+# Point-cap rejection. 1m / 1ms = 60001 points > 11000 cap.
+check_discovery_args "system_cpu[1m:1ms] rejects with bad_data" \
+    "/api/v1/query" 400 "" \
+    --data-urlencode "query=system_cpu[1m:1ms]"
 echo
 
 echo "==> Phase 3f: count_values"

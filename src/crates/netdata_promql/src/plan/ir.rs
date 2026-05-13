@@ -298,6 +298,22 @@ pub enum Plan {
         func: FuncKind,
         args: Vec<Plan>,
     },
+
+    /// Subquery `<expr>[range_ms:step_ms] [@<ts>] [offset <d>]`. The
+    /// inner expression must lower to `InstantVector`; evaluating the
+    /// subquery yields a `RangeVector` by re-evaluating the inner at
+    /// every grid point in `[t - range_ms, t]` at `step_ms` stride.
+    /// SOW-0026.
+    Subquery {
+        expr: Arc<Plan>,
+        range_ms: i64,
+        /// Resolution. Parser permits `None` (defaults to the global
+        /// evaluation interval upstream); we default to 1000 ms at
+        /// lowering time.
+        step_ms: i64,
+        offset_ms: i64,
+        at: Option<AtMod>,
+    },
 }
 
 impl Plan {
@@ -310,6 +326,7 @@ impl Plan {
             Plan::Binop { lhs, rhs, .. } => binop_result_type(lhs.value_type(), rhs.value_type()),
             Plan::Aggregate { .. } => ValueType::InstantVector,
             Plan::Call { func, .. } => func.return_type(),
+            Plan::Subquery { .. } => ValueType::RangeVector,
         }
     }
 }

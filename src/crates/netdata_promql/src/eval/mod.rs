@@ -14,6 +14,7 @@ mod dispatch;
 mod functions;
 mod lookback;
 mod select;
+mod subquery;
 mod types;
 mod unary;
 
