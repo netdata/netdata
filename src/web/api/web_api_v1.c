@@ -231,6 +231,28 @@ static struct web_api_command api_commands_v1[] = {
         .allow_subpaths = 0
     },
 
+    // Prometheus HTTP API mirror paths. Same handler as /api/v3/promql/*,
+    // exposed under /api/v1/ so Grafana Prometheus datasources work without
+    // a non-default path prefix. See SOW-0017.
+#ifdef ENABLE_PROMQL
+    {
+        .api = "query",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v3_promql,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "query_range",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v3_promql,
+        .allow_subpaths = 0
+    },
+#endif
+
     {
         // terminator - keep this last on this list
         .api = NULL,

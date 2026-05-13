@@ -13,6 +13,7 @@
 
 #include "api_v3_calls.h"
 #include "crates/netdata_promql/nd_promql.h"
+#include <stdbool.h>
 
 // Prometheus convention: timestamps are float seconds; we pass int64
 // milliseconds to Rust.
@@ -131,11 +132,16 @@ static int handle_range(struct web_client *w, char *url) {
 }
 
 int api_v3_promql(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    // Distinguish the two endpoints by inspecting the decoded path.
+    // Distinguish the two endpoints by inspecting the decoded path. The
+    // same handler serves both /api/v3/promql/* (the Netdata-namespaced
+    // surface) and the Prometheus mirror paths /api/v1/query{,_range}.
     const char *path = buffer_tostring(w->url_path_decoded);
-    if (strstr(path, "promql/query_range"))
+    bool is_range = strstr(path, "promql/query_range") || strstr(path, "/v1/query_range");
+    bool is_instant = strstr(path, "promql/query") || strstr(path, "/v1/query");
+
+    if (is_range)
         return handle_range(w, url);
-    if (strstr(path, "promql/query"))
+    if (is_instant)
         return handle_instant(w, url);
 
     buffer_flush(w->response.data);
