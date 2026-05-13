@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
 
 func TestCachestatGlobalStateUpdate(t *testing.T) {
@@ -77,15 +80,26 @@ func TestCachestatGlobalStateUpdate(t *testing.T) {
 }
 
 func TestFormatCachestatGlobalChart(t *testing.T) {
-	got := formatCachestatGlobalChart(cachestatGlobalCharts[0], 10)
+	updateEvery := 7
+	got := formatCachestatGlobalChart(cachestatGlobalCharts[0], updateEvery)
 
-	if !strings.Contains(got, "CHART mem.cachestat_ratio") {
-		t.Fatalf("chart header missing expected chart name: %q", got)
+	wantHeader := "HOST ''\n\nCHART 'mem.cachestat_ratio' '' 'Hit ratio' '%' 'page_cache' 'mem.cachestat_ratio' 'line' '21100' '7' '' 'ebpf-go.plugin' 'cachestat'\n"
+	wantDimension := "DIMENSION 'ratio' 'ratio' 'absolute' '1' '1' ''\n"
+
+	if !strings.Contains(got, wantHeader) {
+		t.Fatalf("chart header = %q, want substring %q", got, wantHeader)
 	}
-	if !strings.Contains(got, "'ebpf-go.plugin' 'cachestat'") {
-		t.Fatalf("chart header missing expected plugin/module names: %q", got)
+	if !strings.Contains(got, wantDimension) {
+		t.Fatalf("chart dimension = %q, want substring %q", got, wantDimension)
 	}
-	if !strings.Contains(got, "DIMENSION percentage percentage absolute 1 1") {
-		t.Fatalf("chart header missing expected dimension line: %q", got)
-	}
+}
+
+func formatCachestatGlobalChart(chart cachestatGlobalChart, updateEvery int) string {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	api.HOST("")
+	emitCachestatGlobalChart(api, chart, updateEvery)
+
+	return buf.String()
 }

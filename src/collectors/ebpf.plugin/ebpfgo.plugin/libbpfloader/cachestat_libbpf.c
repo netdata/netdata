@@ -88,6 +88,27 @@ static const char *cachestat_account_program_name(const char *account_function, 
     return "netdata_account_page_dirtied_kprobe";
 }
 
+static const char *cachestat_data_program_name(const char *event_name, int flavor)
+{
+    if (flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
+        if (!strcmp(event_name, "add_to_page_cache_lru"))
+            return "netdata_add_to_page_cache_lru_buffer";
+        if (!strcmp(event_name, "mark_page_accessed"))
+            return "netdata_mark_page_accessed_buffer";
+        if (!strcmp(event_name, "mark_buffer_dirty"))
+            return "netdata_mark_buffer_dirty_buffer";
+    } else {
+        if (!strcmp(event_name, "add_to_page_cache_lru"))
+            return "netdata_add_to_page_cache_lru_kprobe";
+        if (!strcmp(event_name, "mark_page_accessed"))
+            return "netdata_mark_page_accessed_kprobe";
+        if (!strcmp(event_name, "mark_buffer_dirty"))
+            return "netdata_mark_buffer_dirty_kprobe";
+    }
+
+    return NULL;
+}
+
 static void cachestat_disable_program_if_present(struct bpf_object *obj, const char *name)
 {
     struct bpf_program *prog = bpf_object__find_program_by_name(obj, name);
@@ -119,9 +140,21 @@ static void cachestat_prepare_autoload(struct bpf_object *obj, const char *accou
     if (!account_function)
         account_function = "account_page_dirtied";
 
-    struct bpf_program *prog = bpf_object__find_program_by_name(obj, cachestat_account_program_name(account_function, flavor));
-    if (prog)
-        bpf_program__set_autoload(prog, true);
+    const char *program_names[] = {
+        cachestat_data_program_name("add_to_page_cache_lru", flavor),
+        cachestat_data_program_name("mark_page_accessed", flavor),
+        cachestat_account_program_name(account_function, flavor),
+        cachestat_data_program_name("mark_buffer_dirty", flavor),
+    };
+
+    for (size_t i = 0; i < sizeof(program_names) / sizeof(program_names[0]); i++) {
+        if (!program_names[i])
+            continue;
+
+        struct bpf_program *prog = bpf_object__find_program_by_name(obj, program_names[i]);
+        if (prog)
+            bpf_program__set_autoload(prog, true);
+    }
 }
 
 static void cachestat_update_map_types(struct bpf_object *obj, int maps_per_core)
@@ -308,13 +341,17 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
     return rt;
 }
 
-int netdata_cachestat_runtime_prepare(struct netdata_ebpf_cachestat_runtime *rt, unsigned int pid_table_size, int maps_per_core)
+int netdata_cachestat_runtime_prepare(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    unsigned int pid_table_size,
+    int maps_per_core,
+    const char *account_function)
 {
     struct bpf_object *obj = cachestat_runtime_object(rt);
     if (!rt || !obj)
         return -1;
 
-    cachestat_prepare_autoload(obj, NULL, rt->flavor);
+    cachestat_prepare_autoload(obj, account_function, rt->flavor);
     cachestat_update_map_types(obj, maps_per_core);
     cachestat_update_map_sizes(obj, pid_table_size);
     return 0;

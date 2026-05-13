@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"os"
 	"sort"
 	"sync"
 	"time"
@@ -154,7 +152,6 @@ func runCachestatSharedMemoryCollector(handle *CachestatLegacyHandle, stop <-cha
 
 		apps, err := handle.Runtime.SnapshotApps(true)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat apps snapshot failed: %v\n", err)
 			continue
 		}
 

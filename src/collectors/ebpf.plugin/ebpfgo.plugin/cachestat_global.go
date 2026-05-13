@@ -7,6 +7,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
 
 const (
@@ -36,47 +38,51 @@ type cachestatGlobalState struct {
 }
 
 type cachestatGlobalChart struct {
-	id      string
-	title   string
-	units   string
-	context string
-	order   int
-	dim     string
-	metric  string
+	id        string
+	title     string
+	units     string
+	context   string
+	order     int
+	dimension string
+	algorithm string
 }
 
 var cachestatGlobalCharts = []cachestatGlobalChart{
 	{
-		id:      "cachestat_ratio",
-		title:   "Hit ratio",
-		units:   "percentage",
-		context: "mem.cachestat_ratio",
-		order:   21100,
-		dim:     "percentage",
+		id:        "cachestat_ratio",
+		title:     "Hit ratio",
+		units:     "%",
+		context:   "mem.cachestat_ratio",
+		order:     21100,
+		dimension: "ratio",
+		algorithm: "absolute",
 	},
 	{
-		id:      "cachestat_dirties",
-		title:   "Number of dirty pages",
-		units:   "pages/s",
-		context: "mem.cachestat_dirties",
-		order:   21101,
-		dim:     "pages",
+		id:        "cachestat_dirties",
+		title:     "Number of dirty pages",
+		units:     "pages/s",
+		context:   "mem.cachestat_dirties",
+		order:     21101,
+		dimension: "dirty",
+		algorithm: "incremental",
 	},
 	{
-		id:      "cachestat_hits",
-		title:   "Number of accessed files",
-		units:   "hits/s",
-		context: "mem.cachestat_hits",
-		order:   21102,
-		dim:     "hits",
+		id:        "cachestat_hits",
+		title:     "Number of accessed files",
+		units:     "hits/s",
+		context:   "mem.cachestat_hits",
+		order:     21102,
+		dimension: "hit",
+		algorithm: "absolute",
 	},
 	{
-		id:      "cachestat_misses",
-		title:   "Files out of page cache",
-		units:   "misses/s",
-		context: "mem.cachestat_misses",
-		order:   21103,
-		dim:     "misses",
+		id:        "cachestat_misses",
+		title:     "Files out of page cache",
+		units:     "misses/s",
+		context:   "mem.cachestat_misses",
+		order:     21103,
+		dimension: "miss",
+		algorithm: "absolute",
 	},
 }
 
@@ -131,38 +137,52 @@ func diffCounters(current, previous uint64) int64 {
 	return int64(current - previous)
 }
 
-func createCachestatGlobalCharts(updateEvery int) {
+func createCachestatGlobalCharts(api *netdataapi.API, updateEvery int) {
 	cachestatGlobalChartsOnce.Do(func() {
 		cachestatStdoutMutex.Lock()
 		defer cachestatStdoutMutex.Unlock()
 
+		if api != nil {
+			api.HOST("")
+		}
 		for _, chart := range cachestatGlobalCharts {
-			fmt.Print(formatCachestatGlobalChart(chart, updateEvery))
+			emitCachestatGlobalChart(api, chart, updateEvery)
 		}
 	})
 }
 
-func formatCachestatGlobalChart(chart cachestatGlobalChart, updateEvery int) string {
-	return fmt.Sprintf(
-		"CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' '%s' '%s'\nDIMENSION %s %s %s 1 1\n",
-		cachestatGlobalGroup,
-		chart.id,
-		chart.title,
-		chart.units,
-		cachestatGlobalFamily,
-		chart.context,
-		"line",
-		chart.order,
-		updateEvery,
-		cachestatGlobalPlugin,
-		cachestatGlobalModule,
-		chart.dim,
-		chart.dim,
-		"absolute",
-	)
+func emitCachestatGlobalChart(api *netdataapi.API, chart cachestatGlobalChart, updateEvery int) {
+	if api == nil {
+		return
+	}
+
+	api.CHART(netdataapi.ChartOpts{
+		TypeID:      cachestatGlobalGroup,
+		ID:          chart.id,
+		Title:       chart.title,
+		Units:       chart.units,
+		Family:      cachestatGlobalFamily,
+		Context:     chart.context,
+		ChartType:   "line",
+		Priority:    chart.order,
+		UpdateEvery: updateEvery,
+		Plugin:      cachestatGlobalPlugin,
+		Module:      cachestatGlobalModule,
+	})
+	api.DIMENSION(netdataapi.DimensionOpts{
+		ID:         chart.dimension,
+		Name:       chart.dimension,
+		Algorithm:  chart.algorithm,
+		Multiplier: 1,
+		Divisor:    1,
+	})
 }
 
-func (p cachestatGlobalPublish) write() {
+func (p cachestatGlobalPublish) write(api *netdataapi.API, msSince int) {
+	if api == nil {
+		return
+	}
+
 	cachestatStdoutMutex.Lock()
 	defer cachestatStdoutMutex.Unlock()
 
@@ -171,18 +191,18 @@ func (p cachestatGlobalPublish) write() {
 		dim   string
 		value int64
 	}{
-		{chart: "cachestat_ratio", dim: "percentage", value: p.Ratio},
-		{chart: "cachestat_dirties", dim: "pages", value: p.Dirty},
-		{chart: "cachestat_hits", dim: "hits", value: p.Hit},
-		{chart: "cachestat_misses", dim: "misses", value: p.Miss},
+		{chart: "cachestat_ratio", dim: "ratio", value: p.Ratio},
+		{chart: "cachestat_dirties", dim: "dirty", value: p.Dirty},
+		{chart: "cachestat_hits", dim: "hit", value: p.Hit},
+		{chart: "cachestat_misses", dim: "miss", value: p.Miss},
 	} {
-		fmt.Printf("BEGIN %s.%s\n", cachestatGlobalGroup, item.chart)
-		fmt.Printf("SET %s = %d\n", item.dim, item.value)
-		fmt.Println("END")
+		api.BEGIN(cachestatGlobalGroup, item.chart, msSince)
+		api.SET(item.dim, item.value)
+		api.END()
 	}
 }
 
-func runCachestatGlobalCollector(handle *CachestatLegacyHandle, stop <-chan struct{}, updateEvery int) {
+func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHandle, stop <-chan struct{}, updateEvery int) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -191,20 +211,15 @@ func runCachestatGlobalCollector(handle *CachestatLegacyHandle, stop <-chan stru
 		updateEvery = cachestatDefaultUpdateEvery
 	}
 
-	createCachestatGlobalCharts(updateEvery)
+	createCachestatGlobalCharts(api, updateEvery)
 
 	state := &cachestatGlobalState{}
-	for {
-		select {
-		case <-stop:
-			return
-		case <-time.After(time.Duration(updateEvery) * time.Second):
-		}
-
+	lastCollection := time.Now()
+	collectAndPublish := func(msSince int) {
 		snapshot, err := handle.Runtime.Snapshot(true)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat snapshot failed: %v\n", err)
-			continue
+			return
 		}
 
 		publish, ok := state.Update(cachestatGlobalCounters{
@@ -214,14 +229,36 @@ func runCachestatGlobalCollector(handle *CachestatLegacyHandle, stop <-chan stru
 			AccountPageDirtied: snapshot.AccountPageDirtied,
 		})
 		if !ok {
-			continue
+			return
 		}
 
-		publish.write()
+		publish.write(api, msSince)
+	}
+
+	collectAndPublish(0)
+	lastCollection = time.Now()
+
+	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+		}
+
+		now := time.Now()
+		msSince := int(now.Sub(lastCollection).Milliseconds())
+		if msSince < 0 {
+			msSince = 0
+		}
+		lastCollection = now
+		collectAndPublish(msSince)
 	}
 }
 
-func runCachestatPlugin(handle *CachestatLegacyHandle) {
+func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -230,7 +267,10 @@ func runCachestatPlugin(handle *CachestatLegacyHandle) {
 	if handle.UpdateEvery > 0 {
 		updateEvery = handle.UpdateEvery
 	}
-	createCachestatGlobalCharts(updateEvery)
+	if updateEveryArg > 0 {
+		updateEvery = updateEveryArg
+	}
+	api := netdataapi.New(os.Stdout)
 
 	store := NewCachestatSharedMemoryStore()
 	service := NewSharedSnapshotService(
@@ -268,7 +308,7 @@ func runCachestatPlugin(handle *CachestatLegacyHandle) {
 		service.Stop()
 	}()
 
-	runCachestatGlobalCollector(handle, stop, updateEvery)
+	runCachestatGlobalCollector(api, handle, stop, updateEvery)
 
 	wg.Wait()
 	handle.Close()
