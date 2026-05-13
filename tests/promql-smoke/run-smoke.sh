@@ -400,6 +400,21 @@ check_post_discovery "POST /series with match[] and limit" \
     "len(d['data'])==20"
 echo
 
+echo "==> Phase 3f: count_values"
+check_discovery_args "count_values bucketizes by value" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])>=1 and all('v' in s['metric'] for s in d['data']['result'])" \
+    --data-urlencode 'query=count_values("v", system_cpu)'
+check_discovery_args "count_values total equals input series count" \
+    "/api/v1/query" 200 \
+    "sum(float(s['value'][1]) for s in d['data']['result'])==10" \
+    --data-urlencode 'query=count_values("v", system_cpu)'
+check_discovery_args "count_values output strips __name__" \
+    "/api/v1/query" 200 \
+    "all('__name__' not in s['metric'] for s in d['data']['result'])" \
+    --data-urlencode 'query=count_values("v", system_cpu)'
+echo
+
 echo "==> Phase 3e: stddev/stdvar/quantile_over_time, predict_linear, holt_winters"
 check_instant "stddev_over_time"     'stddev_over_time(system_cpu[1m])'             200 vector
 check_instant "stdvar_over_time"     'stdvar_over_time(system_cpu[1m])'             200 vector
@@ -483,8 +498,8 @@ check_discovery "quantile(2, x) returns +Inf" \
     "/api/v1/query" \
     "--data-urlencode query=quantile(2,system_cpu)" 200 \
     "d['data']['result'][0]['value'][1]=='+Inf'"
-# Aggregation operator that should still reject (count_values).
-check_instant "count_values rejected" 'count_values("v", system_cpu)' 400 ""
+# count_values shipped in SOW-0024; positive coverage lives in the
+# Phase 3f group below.
 echo
 
 echo "==> Phase 3b: *_over_time family"

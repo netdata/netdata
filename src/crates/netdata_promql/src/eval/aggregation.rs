@@ -15,12 +15,14 @@ use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
 /// Apply an aggregation operator to an instant vector.
 ///
 /// `param` carries the scalar argument for parametrized aggregators
-/// (topk/bottomk/quantile). It must be `Some` for those and `None` for
-/// the others; the lowering layer enforces this.
+/// (topk/bottomk/quantile). `param_string` carries the string argument
+/// for `count_values`. The lowering layer enforces that exactly one is
+/// `Some` when required.
 pub fn apply_aggregate(
     op: AggrKind,
     grouping: Option<&Grouping>,
     param: Option<f64>,
+    param_string: Option<&str>,
     inner: EvalResult,
 ) -> Result<EvalResult, EvalError> {
     let series = match inner {
@@ -42,6 +44,10 @@ pub fn apply_aggregate(
         AggrKind::Quantile => {
             let phi = param.expect("lowering guarantees phi for quantile");
             apply_quantile(grouping, phi, series)
+        }
+        AggrKind::CountValues => {
+            let label = param_string.expect("lowering guarantees label for count_values");
+            apply_count_values(grouping, label, series)
         }
         _ => apply_collapsing(op, grouping, series),
     }
@@ -188,6 +194,79 @@ fn apply_quantile(
     Ok(EvalResult::InstantVector(out))
 }
 
+/// count_values(label, expr): group input series by their per-series
+/// value (stringified), emit one output series per bucket with the
+/// supplied label set to that value-string and the series value equal
+/// to the bucket count. Grouping labels carry through; `__name__` is
+/// stripped (aggregation convention).
+///
+/// NaN-valued inputs bucket under `"NaN"`; +Inf/-Inf bucket under
+/// `"+Inf"`/`"-Inf"`. The exact float-to-string formatting comes from
+/// `format_value_for_label`, which matches Rust's default `{}` output
+/// for finite values (e.g. `42`, `0.5`).
+fn apply_count_values(
+    grouping: Option<&Grouping>,
+    label: &str,
+    series: Vec<Series>,
+) -> Result<EvalResult, EvalError> {
+    // Bucket key = (signature of grouping projection, value-string).
+    // Value of each output series = bucket size.
+    let mut by_bucket: BTreeMap<(u64, String), (Vec<(String, String)>, u64, i64)> =
+        BTreeMap::new();
+
+    for s in series.into_iter() {
+        let mut key_labels = project_labels(&s.labels, grouping);
+        let v = s.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
+        let ts = s.samples.first().map(|s| s.timestamp_ms).unwrap_or(0);
+        let value_str = format_value_for_label(v);
+        // The output series has the grouping labels plus
+        // `<label>=<value_str>`. Sort the final label list by name so
+        // signatures are stable.
+        key_labels.push((label.to_string(), value_str.clone()));
+        key_labels.sort_by(|a, b| a.0.cmp(&b.0));
+        let key_sig = labels_signature(&key_labels);
+        let entry = by_bucket
+            .entry((key_sig, value_str))
+            .or_insert_with(|| (key_labels.clone(), 0, ts));
+        entry.1 += 1;
+    }
+
+    let mut out: Vec<Series> = by_bucket
+        .into_iter()
+        .map(|((_, _), (labels, count, ts))| {
+            let signature = labels_signature(&labels);
+            Series {
+                labels,
+                signature,
+                samples: vec![Sample {
+                    timestamp_ms: ts,
+                    value: count as f64,
+                }],
+            }
+        })
+        .collect();
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+/// Format a float for use as a PromQL label value. Mirrors
+/// Prometheus' Go default formatting closely enough for typical
+/// inputs (integers render without a decimal, percentages render
+/// with the natural digit count). NaN and +/-Inf get their string
+/// forms.
+fn format_value_for_label(v: f64) -> String {
+    if v.is_nan() {
+        return "NaN".to_string();
+    }
+    if v.is_infinite() {
+        return if v > 0.0 { "+Inf".to_string() } else { "-Inf".to_string() };
+    }
+    // Use Rust's default `{}` formatter: it elides the decimal point
+    // for whole-valued floats, matching Prometheus' rendering for
+    // typical PromQL inputs.
+    format!("{v}")
+}
+
 /// Standard linear-interpolation quantile over a pre-sorted slice.
 /// Matches Prometheus' `quantile` aggregator: rank = phi * (n - 1),
 /// lerp between floor(rank) and ceil(rank).
@@ -266,7 +345,10 @@ impl Bucket {
                 // Parametrized aggregators are routed by `apply_aggregate`
                 // before they reach this path; reaching here means a bug
                 // in the dispatch.
-                AggrKind::TopK | AggrKind::BottomK | AggrKind::Quantile => {
+                AggrKind::TopK
+                | AggrKind::BottomK
+                | AggrKind::Quantile
+                | AggrKind::CountValues => {
                     unreachable!("parametrized aggregator in Bucket::finalize: {:?}", op)
                 }
             }
@@ -346,7 +428,7 @@ mod tests {
             s("foo", "b", 2.0),
             s("foo", "c", 3.0),
         ]);
-        let r = apply_aggregate(AggrKind::Sum, None, None, input).unwrap();
+        let r = apply_aggregate(AggrKind::Sum, None, None, None, input).unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
@@ -367,6 +449,7 @@ mod tests {
         let r = apply_aggregate(
             AggrKind::Sum,
             Some(&Grouping::By(vec!["dimension".to_string()])),
+            None,
             None,
             input,
         )
@@ -390,7 +473,7 @@ mod tests {
             s("foo", "b", 2.0),
             s("foo", "c", 3.0),
         ]);
-        let r = apply_aggregate(AggrKind::Count, None, None, input).unwrap();
+        let r = apply_aggregate(AggrKind::Count, None, None, None, input).unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 assert!((v[0].samples[0].value - 3.0).abs() < 1e-9);
@@ -406,9 +489,9 @@ mod tests {
             s("foo", "b", 5.0),
             s("foo", "c", 3.0),
         ]);
-        let avg = apply_aggregate(AggrKind::Avg, None, None, input.clone()).unwrap();
-        let min = apply_aggregate(AggrKind::Min, None, None, input.clone()).unwrap();
-        let max = apply_aggregate(AggrKind::Max, None, None, input).unwrap();
+        let avg = apply_aggregate(AggrKind::Avg, None, None, None, input.clone()).unwrap();
+        let min = apply_aggregate(AggrKind::Min, None, None, None, input.clone()).unwrap();
+        let max = apply_aggregate(AggrKind::Max, None, None, None, input).unwrap();
         if let (EvalResult::InstantVector(a), EvalResult::InstantVector(b), EvalResult::InstantVector(c)) =
             (avg, min, max)
         {
@@ -445,7 +528,7 @@ mod tests {
             s("foo", "c", 3.0),
             s("foo", "d", 2.0),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(2.0), input).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(2.0), None, input).unwrap());
         assert_eq!(v.len(), 2);
         assert_eq!(values_sorted(&v), vec![3.0, 4.0]);
         // __name__ stripped; `dimension` preserved (original labels).
@@ -463,7 +546,7 @@ mod tests {
             s("foo", "c", 3.0),
             s("foo", "d", 2.0),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::BottomK, None, Some(2.0), input).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::BottomK, None, Some(2.0), None, input).unwrap());
         assert_eq!(v.len(), 2);
         assert_eq!(values_sorted(&v), vec![1.0, 2.0]);
     }
@@ -471,12 +554,12 @@ mod tests {
     #[test]
     fn topk_zero_returns_empty() {
         let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0)]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(0.0), input.clone()).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(0.0), None, input.clone()).unwrap());
         assert!(v.is_empty());
         // Negative or NaN k -> empty.
-        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(-1.0), input.clone()).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(-1.0), None, input.clone()).unwrap());
         assert!(v.is_empty());
-        let v = unwrap_vec(apply_aggregate(AggrKind::BottomK, None, Some(f64::NAN), input).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::BottomK, None, Some(f64::NAN), None, input).unwrap());
         assert!(v.is_empty());
     }
 
@@ -487,7 +570,7 @@ mod tests {
             s("foo", "b", f64::NAN),
             s("foo", "c", 5.0),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(3.0), input).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(3.0), None, input).unwrap());
         // Only two non-NaN candidates; NaN dropped.
         assert_eq!(v.len(), 2);
     }
@@ -511,6 +594,7 @@ mod tests {
                 AggrKind::TopK,
                 Some(&Grouping::By(vec!["group".to_string()])),
                 Some(1.0),
+                None,
                 input,
             )
             .unwrap(),
@@ -529,7 +613,7 @@ mod tests {
             s("foo", "d", 4.0),
             s("foo", "e", 5.0),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.5), input).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.5), None, input).unwrap());
         assert_eq!(v.len(), 1);
         assert!((v[0].samples[0].value - 3.0).abs() < 1e-9);
     }
@@ -541,9 +625,9 @@ mod tests {
             s("foo", "b", 7.0),
             s("foo", "c", 3.0),
         ]);
-        let v0 = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.0), input.clone()).unwrap());
+        let v0 = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.0), None, input.clone()).unwrap());
         assert_eq!(v0[0].samples[0].value, 1.0);
-        let v1 = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(1.0), input).unwrap());
+        let v1 = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(1.0), None, input).unwrap());
         assert_eq!(v1[0].samples[0].value, 7.0);
     }
 
@@ -558,16 +642,16 @@ mod tests {
             s("foo", "d", 4.0),
             s("foo", "e", 5.0),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.95), input).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.95), None, input).unwrap());
         assert!((v[0].samples[0].value - 4.8).abs() < 1e-9, "got {}", v[0].samples[0].value);
     }
 
     #[test]
     fn quantile_out_of_range_clamps_to_infinity() {
         let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0), s("foo", "b", 2.0)]);
-        let v_neg = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(-0.5), input.clone()).unwrap());
+        let v_neg = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(-0.5), None, input.clone()).unwrap());
         assert_eq!(v_neg[0].samples[0].value, f64::NEG_INFINITY);
-        let v_high = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(2.0), input).unwrap());
+        let v_high = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(2.0), None, input).unwrap());
         assert_eq!(v_high[0].samples[0].value, f64::INFINITY);
     }
 
@@ -584,6 +668,7 @@ mod tests {
                 AggrKind::Quantile,
                 Some(&Grouping::By(vec!["group".to_string()])),
                 Some(0.5),
+                None,
                 input,
             )
             .unwrap(),
@@ -600,7 +685,7 @@ mod tests {
             s("foo", "a", f64::NAN),
             s("foo", "b", f64::NAN),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.5), input).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.5), None, input).unwrap());
         assert!(v.is_empty());
     }
 
@@ -612,7 +697,125 @@ mod tests {
             s("foo", "b", 2.0),
             s("foo", "c", 3.0),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(2.9), input).unwrap());
+        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(2.9), None, input).unwrap());
         assert_eq!(v.len(), 2);
+    }
+
+    // -----------------------------------------------------------------
+    // count_values (SOW-0024)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn count_values_buckets_by_value() {
+        // Three series with values 1, 2, 1 -> two buckets: {v="1"}=2,
+        // {v="2"}=1.
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", 2.0),
+            s("foo", "c", 1.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::CountValues,
+                None,
+                None,
+                Some("v"),
+                input,
+            )
+            .unwrap(),
+        );
+        assert_eq!(v.len(), 2);
+        let pairs: Vec<(String, f64)> = v
+            .iter()
+            .map(|s| {
+                let label = s
+                    .labels
+                    .iter()
+                    .find(|(n, _)| n == "v")
+                    .map(|(_, v)| v.clone())
+                    .unwrap_or_default();
+                (label, s.samples[0].value)
+            })
+            .collect();
+        assert!(pairs.contains(&("1".to_string(), 2.0)));
+        assert!(pairs.contains(&("2".to_string(), 1.0)));
+        // __name__ stripped.
+        for s in &v {
+            assert!(s.labels.iter().all(|(n, _)| n != "__name__"));
+        }
+    }
+
+    #[test]
+    fn count_values_all_same_collapses_to_one() {
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 5.0),
+            s("foo", "b", 5.0),
+            s("foo", "c", 5.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::CountValues,
+                None,
+                None,
+                Some("v"),
+                input,
+            )
+            .unwrap(),
+        );
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].samples[0].value, 3.0);
+    }
+
+    #[test]
+    fn count_values_with_grouping_partitions() {
+        let input = EvalResult::InstantVector(vec![
+            s_with("g1", "a", 1.0),
+            s_with("g1", "b", 1.0),
+            s_with("g1", "c", 2.0),
+            s_with("g2", "a", 1.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::CountValues,
+                Some(&Grouping::By(vec!["group".to_string()])),
+                None,
+                Some("v"),
+                input,
+            )
+            .unwrap(),
+        );
+        // g1: {v=1}=2, {v=2}=1; g2: {v=1}=1 -> 3 series total.
+        assert_eq!(v.len(), 3);
+    }
+
+    #[test]
+    fn count_values_nan_bucket() {
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", f64::NAN),
+            s("foo", "b", f64::NAN),
+            s("foo", "c", 1.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::CountValues,
+                None,
+                None,
+                Some("v"),
+                input,
+            )
+            .unwrap(),
+        );
+        // Two buckets: "NaN" and "1".
+        assert_eq!(v.len(), 2);
+        let nan_count = v
+            .iter()
+            .find(|s| {
+                s.labels
+                    .iter()
+                    .any(|(n, vl)| n == "v" && vl == "NaN")
+            })
+            .map(|s| s.samples[0].value)
+            .unwrap();
+        assert_eq!(nan_count, 2.0);
     }
 }

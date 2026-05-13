@@ -39,6 +39,7 @@ pub enum AggrKind {
     TopK,
     BottomK,
     Quantile,
+    CountValues,
 }
 
 impl AggrKind {
@@ -47,6 +48,13 @@ impl AggrKind {
     /// reject any param at lowering time.
     pub fn takes_param(self) -> bool {
         matches!(self, AggrKind::TopK | AggrKind::BottomK | AggrKind::Quantile)
+    }
+
+    /// True when the operator requires a string parameter (the
+    /// label name for `count_values("label", expr)`). String- and
+    /// scalar-param aggregators are mutually exclusive.
+    pub fn takes_string_param(self) -> bool {
+        matches!(self, AggrKind::CountValues)
     }
 }
 
@@ -254,10 +262,13 @@ pub enum Plan {
     Aggregate {
         op: AggrKind,
         grouping: Option<Grouping>,
-        /// Parameter for topk/bottomk/quantile (none of which are in Phase
-        /// 1). Carried for forward compatibility; lowering rejects values
-        /// here today.
+        /// Scalar parameter for topk/bottomk/quantile (the `k` or `phi`).
+        /// `None` for everything else.
         param: Option<Arc<Plan>>,
+        /// String parameter for `count_values("label", expr)`. The
+        /// supplied label name is used as the key for the value-bucket
+        /// label on each output series. `None` for every other operator.
+        param_string: Option<String>,
         expr: Arc<Plan>,
     },
 

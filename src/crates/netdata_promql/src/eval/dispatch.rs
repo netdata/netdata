@@ -45,11 +45,14 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
             op,
             grouping,
             param,
+            param_string,
             expr,
         } => {
             // Parametrized aggregators (topk/bottomk/quantile) take a
             // scalar param. Evaluate it before the inner vector so we
             // can fail fast on a malformed parameter expression.
+            // `count_values` takes a string param that already lived
+            // in the Plan IR -- no evaluation step needed.
             let param_value = match param {
                 Some(p) => {
                     let r = eval(ctx, p)?;
@@ -67,7 +70,13 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
                 None => None,
             };
             let inner = eval(ctx, expr)?;
-            super::aggregation::apply_aggregate(*op, grouping.as_ref(), param_value, inner)
+            super::aggregation::apply_aggregate(
+                *op,
+                grouping.as_ref(),
+                param_value,
+                param_string.as_deref(),
+                inner,
+            )
         }
 
         Plan::Call { func, args } => {

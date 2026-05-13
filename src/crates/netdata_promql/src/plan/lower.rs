@@ -252,34 +252,71 @@ fn lower_aggregate(a: &AggregateExpr) -> Result<Plan, LowerError> {
         });
     }
 
-    // Parametrized aggregators (topk/bottomk/quantile) require a scalar
-    // first argument; the others reject any parameter.
-    let lowered_param = match (&a.param, op.takes_param()) {
-        (Some(p), true) => {
-            let lp = lower(p)?;
-            if lp.value_type() != ValueType::Scalar {
+    // Three flavors of param:
+    //   - count_values requires a string param (the bucket label name).
+    //   - topk/bottomk/quantile require a scalar param (k or phi).
+    //   - everything else rejects any param.
+    let mut lowered_param: Option<Arc<Plan>> = None;
+    let mut lowered_param_string: Option<String> = None;
+
+    match (&a.param, op.takes_param(), op.takes_string_param()) {
+        // String-param aggregator with a StringLiteral param: accept.
+        (Some(p), false, true) => match p.as_ref() {
+            Expr::StringLiteral(s) => {
+                lowered_param_string = Some(s.val.clone());
+            }
+            other => {
                 return Err(LowerError::Aggregation(format!(
-                    "{:?} parameter must be a scalar; got {:?}",
+                    "{:?} requires a string parameter (the bucket label name); got {:?}",
                     op,
-                    lp.value_type()
+                    other
                 )));
             }
-            Some(Arc::new(lp))
-        }
-        (Some(p), false) => {
+        },
+        // Scalar-param aggregator: lower as a Plan.
+        (Some(p), true, false) => match p.as_ref() {
+            Expr::StringLiteral(_) => {
+                return Err(LowerError::Aggregation(format!(
+                    "{:?} requires a scalar parameter (the k or phi); got a string",
+                    op
+                )));
+            }
+            _ => {
+                let lp = lower(p)?;
+                if lp.value_type() != ValueType::Scalar {
+                    return Err(LowerError::Aggregation(format!(
+                        "{:?} parameter must be a scalar; got {:?}",
+                        op,
+                        lp.value_type()
+                    )));
+                }
+                lowered_param = Some(Arc::new(lp));
+            }
+        },
+        // Non-parametrized aggregator with a param: reject.
+        (Some(p), false, false) => {
             return Err(LowerError::Aggregation(format!(
                 "{:?} does not accept a parameter; got {p}",
                 op
             )));
         }
-        (None, true) => {
+        // Parametrized aggregator without a param: reject.
+        (None, true, false) => {
             return Err(LowerError::Aggregation(format!(
                 "{:?} requires a scalar parameter (the k or phi)",
                 op
             )));
         }
-        (None, false) => None,
-    };
+        (None, false, true) => {
+            return Err(LowerError::Aggregation(format!(
+                "{:?} requires a string parameter (the bucket label name)",
+                op
+            )));
+        }
+        (None, false, false) => {}
+        // The two predicates are mutually exclusive by construction.
+        (_, true, true) => unreachable!(),
+    }
 
     let grouping = a.modifier.as_ref().map(|m| match m {
         LabelModifier::Include(ls) => Grouping::By(ls.labels.clone()),
@@ -289,6 +326,7 @@ fn lower_aggregate(a: &AggregateExpr) -> Result<Plan, LowerError> {
         op,
         grouping,
         param: lowered_param,
+        param_string: lowered_param_string,
         expr: Arc::new(expr),
     })
 }
@@ -406,11 +444,7 @@ fn aggr_from_token(t: token::TokenId) -> Result<AggrKind, LowerError> {
         T_TOPK => AggrKind::TopK,
         T_BOTTOMK => AggrKind::BottomK,
         T_QUANTILE => AggrKind::Quantile,
-        T_COUNT_VALUES => {
-            return Err(LowerError::Unsupported(
-                "count_values is deferred to a follow-up SOW".to_string(),
-            ))
-        }
+        T_COUNT_VALUES => AggrKind::CountValues,
         other => {
             return Err(LowerError::Unsupported(format!(
                 "aggregation operator token {other} is unrecognized"

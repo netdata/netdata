@@ -49,8 +49,15 @@ Prometheus alerting rules:
   `by` or `without` grouping. NaN values are skipped; empty buckets
   drop.
 * Parametrized aggregators: `topk(k, expr)`, `bottomk(k, expr)`,
-  `quantile(phi, expr)`, each with optional `by`/`without` grouping.
-  Added in Phase 3c (SOW-0021). Semantics:
+  `quantile(phi, expr)` (Phase 3c, SOW-0021), and
+  `count_values(label, expr)` (SOW-0024), each with optional
+  `by`/`without` grouping. Semantics:
+  * `count_values("label", v)`: bucket input series by their
+    per-series value (stringified). One output series per
+    distinct value carrying `<label>=<value_string>` plus the
+    grouping labels. NaN values bucket under `"NaN"`; +/-Inf
+    under `"+Inf"`/`"-Inf"`. `__name__` stripped (aggregation
+    convention).
   * `topk(k, v)` / `bottomk(k, v)`: per bucket, keep the k
     highest/lowest-valued series. Output preserves the original
     series labels minus `__name__` (Prometheus convention -- the
@@ -97,17 +104,14 @@ evaluation time with a clear error:
 * Many-to-many cardinality for arithmetic/comparison binops. Set
   operators are inherently many-to-many and don't accept the
   `group_*` modifier.
-* `count_values(label, expr)` -- the fourth parametrized aggregator
-  takes a string parameter (a label name) rather than a scalar.
-  Lowering rejects it with `bad_data: count_values is deferred to
-  a follow-up SOW`.
-<!-- `stddev_over_time`, `stdvar_over_time`, `quantile_over_time` shipped
-     in Phase 3e (SOW-0023). -->
+<!-- count_values shipped in SOW-0024. -->
+<!-- `stddev_over_time`, `stdvar_over_time`, `quantile_over_time`
+     shipped in Phase 3e (SOW-0023). -->
 * `keep_metric_names` -- a query-level modifier (not a function);
   needs threading through the evaluator.
 * The `@` modifier with arithmetic -- evaluates an expression at a
   fixed timestamp; architectural.
-* The `@` modifier.
+* Subqueries (`<expr>[1h:5m]`).
 
 ## Naming: metric names and labels
 
