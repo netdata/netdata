@@ -209,6 +209,18 @@ static int lb_label_walker(const char *name, const char *value, RRDLABEL_SRC ls 
     return lb_push(b, name, value) ? 0 : -1;
 }
 
+// Walk-callback variant that skips Netdata's internal underscore-prefixed
+// labels (host system info, install metadata, etc). Used when walking
+// host labels so query output isn't drowned in metadata the user did not
+// ask for. Chart-instance labels are walked with `lb_label_walker` and
+// emitted in full.
+static int lb_label_walker_skip_underscore(const char *name, const char *value,
+                                           RRDLABEL_SRC ls __maybe_unused, void *data) {
+    if (name && name[0] == '_') return 0;
+    label_builder *b = data;
+    return lb_push(b, name, value) ? 0 : -1;
+}
+
 static int lb_entry_cmp(const void *a, const void *b, void *ud) {
     const label_builder *lb = ud;
     const typeof(lb->entries[0]) *ae = a;
@@ -385,7 +397,7 @@ static int resolve_instance_cb(RRDSET *st, void *data) {
     if (ok && st->rrdlabels)
         ok = (rrdlabels_walkthrough_read(st->rrdlabels, lb_label_walker, &chart_labels) >= 0);
     if (ok && state->current_host && state->current_host->rrdlabels)
-        ok = (rrdlabels_walkthrough_read(state->current_host->rrdlabels, lb_label_walker, &chart_labels) >= 0);
+        ok = (rrdlabels_walkthrough_read(state->current_host->rrdlabels, lb_label_walker_skip_underscore, &chart_labels) >= 0);
 
     if (!ok) {
         lb_discard(&chart_labels);
@@ -454,10 +466,9 @@ static int resolve_instance_cb(RRDSET *st, void *data) {
 }
 
 // Iterate every context known to `host` and call the resolver on each.
-// Used when no `__name__` EQ matcher fixes the context up front. We pull
-// the context id from the dictionary's foreach-iterator name rather than
-// from `RRDCONTEXT` directly -- the value type is internal to the
-// rrdcontext module.
+// Used when no `__name__` EQ matcher fixes the context up front. We emit
+// the sanitized (Prometheus-style) context name as `__name__` on every
+// resulting series.
 static void resolve_all_contexts_on_host(resolve_state *state, RRDHOST *host) {
     if (!host || !host->rrdctx.contexts) return;
 
@@ -470,20 +481,49 @@ static void resolve_all_contexts_on_host(resolve_state *state, RRDHOST *host) {
         if (state->overflowed) break;
         const char *ctx_name = unused_dfe.name;
         if (!ctx_name || !*ctx_name) continue;
-        instance_cb_ctx cb_ctx = { .state = state, .context_name = ctx_name };
+
+        char sanitized[ND_PDS_LABEL_NAME_MAX + 1];
+        sanitize_label_name(sanitized, ctx_name, sizeof(sanitized));
+
+        instance_cb_ctx cb_ctx = { .state = state, .context_name = sanitized };
         rrdcontext_foreach_instance_with_rrdset_in_context(host, ctx_name, resolve_instance_cb, &cb_ctx);
     }
     dfe_done(unused);
 }
 
-// Resolve a single specified context on a host.
-static void resolve_named_context_on_host(resolve_state *state, RRDHOST *host, const char *context_name) {
-    if (!host || !context_name || !*context_name) return;
+// Resolve a single specified context name on a host.
+//
+// The user's `__name__` is a Prometheus-style identifier (`system_cpu`),
+// but the Netdata context id is dotted (`system.cpu`). We compare each
+// context's sanitized form against the requested name and iterate every
+// match -- many-to-one sanitization means more than one context can have
+// the same sanitized name, and we union them all.
+//
+// The `__name__` we emit on resulting series carries the requested
+// (sanitized) form so the round-trip is stable: a user who queries
+// `system_cpu` gets back series labelled `__name__=system_cpu`.
+static void resolve_named_context_on_host(resolve_state *state, RRDHOST *host, const char *requested_name) {
+    if (!host || !requested_name || !*requested_name || !host->rrdctx.contexts) return;
     state->current_host = host;
     state->current_host_name = rrdhost_hostname(host);
 
-    instance_cb_ctx cb_ctx = { .state = state, .context_name = context_name };
-    rrdcontext_foreach_instance_with_rrdset_in_context(host, context_name, resolve_instance_cb, &cb_ctx);
+    void *unused;
+    dfe_start_read(host->rrdctx.contexts, unused) {
+        (void)unused;
+        if (state->overflowed) break;
+        const char *ctx_name = unused_dfe.name;
+        if (!ctx_name || !*ctx_name) continue;
+
+        char sanitized[ND_PDS_LABEL_NAME_MAX + 1];
+        sanitize_label_name(sanitized, ctx_name, sizeof(sanitized));
+        if (strcmp(sanitized, requested_name) != 0) continue;
+
+        // Use the requested (sanitized) name as the `__name__` value so
+        // the user sees the same identifier they queried with.
+        instance_cb_ctx cb_ctx = { .state = state, .context_name = requested_name };
+        rrdcontext_foreach_instance_with_rrdset_in_context(host, ctx_name, resolve_instance_cb, &cb_ctx);
+    }
+    dfe_done(unused);
 }
 
 // ---------------------------------------------------------------------------

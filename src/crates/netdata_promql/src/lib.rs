@@ -1,115 +1,82 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Phase 0 stub for the Netdata PromQL evaluator.
+//! Netdata PromQL evaluator.
 //!
 //! Six entry points form the C ABI: two query functions and four accessors
-//! around an opaque response handle. The query functions parse their input
-//! with `promql-parser` and, on success, return a placeholder constant value
-//! in a Prometheus HTTP API response shape; on parse failure they return a
-//! structured error. No storage access happens in Phase 0; that arrives with
-//! the data-source shim in Phase 1.
+//! around an opaque response handle. Phase 1 (SOW-0017) replaces the
+//! Phase 0 placeholder bodies with a real pipeline: parse via
+//! `promql-parser`, lower into a typed Plan IR, evaluate against the C
+//! storage shim through the `storage` module, and serialize to the
+//! Prometheus HTTP API response shape.
 //!
-//! The signatures here are intended to be stable across phases. Only the
-//! bodies change as real evaluation logic lands. See SOW-0016 for context.
-//!
-//! Phase 1 chunk 2 (SOW-0017) adds the `storage` module: safe wrappers
-//! around the C data-source shim. The stub query handlers still return the
-//! placeholder constant; chunk 3 introduces the evaluator that consumes
-//! the storage adapter.
+//! Chunk 3 covers number literals, vector and matrix selectors, scalar
+//! arithmetic, comparisons (with and without `bool`), the five basic
+//! aggregations (sum/avg/min/max/count) with `by`/`without`, unary minus,
+//! and `offset`. Counter functions (`rate`/`irate`/`increase`/`delta`) and
+//! `histogram_quantile` arrive in chunk 4.
 
-// Storage adapter is staged in chunk 2 (SOW-0017); chunk 3 wires it into
-// the query handlers. Until then, the items are unused -- that's expected.
-#[allow(dead_code, unused_imports)]
+mod eval;
+mod output;
+mod plan;
 mod storage;
 
 use std::ffi::{c_char, c_int, CStr, CString};
 use std::ptr;
 
-const PHASE_0_CONSTANT: &str = "42";
+use eval::{eval, EvalContext, EvalError, EvalResult, Sample, Series};
+use output::{serialize_error, serialize_scalar_at, serialize_success};
+use plan::{lower_query, LowerError, ValueType};
 
-// Prometheus' default cap on the number of points per timeseries in a range
-// query. Mirrored here so a misbehaving caller can't cause us to format a
-// multi-gigabyte JSON response during the Phase 0 smoke test.
+/// Prometheus' default cap on the number of points per timeseries in a
+/// range query. Guards against pathological step values.
 const MAX_POINTS_PER_TIMESERIES: usize = 11_000;
 
+/// Default lookback window for instant vector selectors.
+const DEFAULT_LOOKBACK_MS: i64 = 5 * 60 * 1000;
+
+/// Default `max_series` cardinality backstop.
+const DEFAULT_MAX_SERIES: usize = 10_000;
+
 /// Opaque handle for a query response.
-///
-/// The C side obtains a `*mut NdPromqlResponse` from one of the query
-/// functions, reads through the accessors, and must release it with
-/// `nd_promql_response_free`. Body bytes remain valid until release.
 pub struct NdPromqlResponse {
     body: CString,
     http_status: c_int,
 }
 
 impl NdPromqlResponse {
-    fn ok_scalar(ts_ms: i64, value: &str) -> Self {
-        let ts_secs = ts_ms as f64 / 1000.0;
-        let body = format!(
-            r#"{{"status":"success","data":{{"resultType":"scalar","result":[{ts_secs},"{value}"]}}}}"#
-        );
-        Self::new_ok(body)
-    }
-
-    fn ok_matrix_single(start_ms: i64, end_ms: i64, step_ms: i64, value: &str) -> Self {
-        let mut t = start_ms;
-        let mut values: Vec<String> = Vec::new();
-        while t <= end_ms {
-            let ts_secs = t as f64 / 1000.0;
-            values.push(format!(r#"[{ts_secs},"{value}"]"#));
-            t = match t.checked_add(step_ms) {
-                Some(n) => n,
-                None => break,
-            };
-        }
-        let body = format!(
-            r#"{{"status":"success","data":{{"resultType":"matrix","result":[{{"metric":{{}},"values":[{}]}}]}}}}"#,
-            values.join(",")
-        );
-        Self::new_ok(body)
-    }
-
-    fn bad_data(msg: &str) -> Self {
-        let escaped = json_escape(msg);
-        let body = format!(
-            r#"{{"status":"error","errorType":"bad_data","error":"{escaped}"}}"#
-        );
+    fn ok(body: String) -> Self {
         Self {
-            body: CString::new(body).expect("response JSON must contain no NUL"),
-            http_status: 400,
-        }
-    }
-
-    fn new_ok(body: String) -> Self {
-        Self {
-            body: CString::new(body).expect("response JSON must contain no NUL"),
+            body: CString::new(body).unwrap_or_else(|_| {
+                CString::new(r#"{"status":"error","errorType":"internal","error":"response contained NUL byte"}"#).unwrap()
+            }),
             http_status: 200,
         }
     }
-}
 
-fn json_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
+    fn bad_data(msg: &str) -> Self {
+        Self::error(400, "bad_data", msg)
+    }
+
+    fn execution(msg: &str) -> Self {
+        Self::error(422, "execution", msg)
+    }
+
+    #[allow(dead_code)]
+    fn internal(msg: &str) -> Self {
+        Self::error(500, "internal", msg)
+    }
+
+    fn error(status: c_int, error_type: &str, msg: &str) -> Self {
+        let body = serialize_error(error_type, msg);
+        Self {
+            body: CString::new(body).unwrap_or_else(|_| CString::new("internal").unwrap()),
+            http_status: status,
         }
     }
-    out
 }
 
-/// Borrow a NUL-terminated C string as `&str`. Returns `None` on null pointer
-/// or non-UTF-8 input.
-///
-/// # Safety
-/// The caller must ensure `p` is either null or a valid NUL-terminated C
-/// string valid for the duration of the call.
+/// Borrow a NUL-terminated C string as `&str`. Returns `None` on null
+/// pointer or non-UTF-8 input.
 unsafe fn cstr_borrow<'a>(p: *const c_char) -> Option<&'a str> {
     if p.is_null() {
         return None;
@@ -117,22 +84,15 @@ unsafe fn cstr_borrow<'a>(p: *const c_char) -> Option<&'a str> {
     unsafe { CStr::from_ptr(p) }.to_str().ok()
 }
 
-/// Evaluate an instant PromQL query.
-///
-/// On parse success, returns a Prometheus-shape success response carrying a
-/// placeholder scalar value at the requested instant. On parse failure,
-/// returns a structured error.
-///
-/// `host_machine_guid` is reserved for Phase 1 and is currently ignored.
-/// `timeout_ms` is reserved for Phase 1 and is currently ignored.
+/// Evaluate an instant PromQL query at `at_ms`.
 ///
 /// # Safety
 /// All pointer parameters must be either null or valid NUL-terminated C
-/// strings valid for the duration of the call. The returned handle must be
-/// released exactly once with `nd_promql_response_free`.
+/// strings valid for the duration of the call. The returned handle must
+/// be released exactly once with `nd_promql_response_free`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nd_promql_query_instant(
-    _host_machine_guid: *const c_char,
+    host_machine_guid: *const c_char,
     query: *const c_char,
     at_ms: i64,
     _timeout_ms: i64,
@@ -145,24 +105,22 @@ pub unsafe extern "C" fn nd_promql_query_instant(
             )));
         }
     };
-    let resp = match promql_parser::parser::parse(q) {
-        Ok(_expr) => NdPromqlResponse::ok_scalar(at_ms, PHASE_0_CONSTANT),
-        Err(msg) => NdPromqlResponse::bad_data(&msg),
+    let host = unsafe { cstr_borrow(host_machine_guid) }.map(|s| s.to_string());
+    let resp = match run_instant(q, at_ms, host) {
+        Ok(r) => r,
+        Err(e) => e.into_response(),
     };
     Box::into_raw(Box::new(resp))
 }
 
-/// Evaluate a range PromQL query.
-///
-/// On parse success, returns a Prometheus-shape success response carrying a
-/// single dummy series with the placeholder value at every step grid point.
-/// On parse failure or invalid time range, returns a structured error.
+/// Evaluate a range PromQL query over `[start_ms, end_ms]` at `step_ms`
+/// granularity.
 ///
 /// # Safety
 /// Same requirements as `nd_promql_query_instant`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nd_promql_query_range(
-    _host_machine_guid: *const c_char,
+    host_machine_guid: *const c_char,
     query: *const c_char,
     start_ms: i64,
     end_ms: i64,
@@ -177,12 +135,12 @@ pub unsafe extern "C" fn nd_promql_query_range(
             )));
         }
     };
+    let host = unsafe { cstr_borrow(host_machine_guid) }.map(|s| s.to_string());
     if step_ms <= 0 || end_ms < start_ms {
         return Box::into_raw(Box::new(NdPromqlResponse::bad_data(
             "invalid time range or non-positive step",
         )));
     }
-
     let span = end_ms.saturating_sub(start_ms);
     let n_points = (span / step_ms) as usize + 1;
     if n_points > MAX_POINTS_PER_TIMESERIES {
@@ -190,22 +148,14 @@ pub unsafe extern "C" fn nd_promql_query_range(
             "exceeded maximum resolution of 11000 points per timeseries",
         )));
     }
-
-    let resp = match promql_parser::parser::parse(q) {
-        Ok(_expr) => NdPromqlResponse::ok_matrix_single(start_ms, end_ms, step_ms, PHASE_0_CONSTANT),
-        Err(msg) => NdPromqlResponse::bad_data(&msg),
+    let resp = match run_range(q, start_ms, end_ms, step_ms, host) {
+        Ok(r) => r,
+        Err(e) => e.into_response(),
     };
     Box::into_raw(Box::new(resp))
 }
 
 /// Pointer to the NUL-terminated response body.
-///
-/// Returns null if `r` is null. The pointed-to bytes remain valid until
-/// `nd_promql_response_free` is called on `r`.
-///
-/// # Safety
-/// `r` must be either null or a valid handle previously returned by one of
-/// the query functions and not yet freed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nd_promql_response_body(r: *const NdPromqlResponse) -> *const c_char {
     if r.is_null() {
@@ -215,9 +165,6 @@ pub unsafe extern "C" fn nd_promql_response_body(r: *const NdPromqlResponse) -> 
 }
 
 /// Byte length of the response body, excluding the trailing NUL.
-///
-/// # Safety
-/// Same as `nd_promql_response_body`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nd_promql_response_body_len(r: *const NdPromqlResponse) -> usize {
     if r.is_null() {
@@ -226,11 +173,7 @@ pub unsafe extern "C" fn nd_promql_response_body_len(r: *const NdPromqlResponse)
     unsafe { (*r).body.as_bytes().len() }
 }
 
-/// HTTP status code that should accompany the response body. 200 on success,
-/// 400 on parse error. Returns 500 if `r` is null.
-///
-/// # Safety
-/// Same as `nd_promql_response_body`.
+/// HTTP status code that should accompany the response body.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nd_promql_response_http_status(r: *const NdPromqlResponse) -> c_int {
     if r.is_null() {
@@ -240,10 +183,6 @@ pub unsafe extern "C" fn nd_promql_response_http_status(r: *const NdPromqlRespon
 }
 
 /// Release a response handle. Safe to call on null.
-///
-/// # Safety
-/// `r` must be either null or a handle returned by one of the query
-/// functions, and must not be used after this call returns.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nd_promql_response_free(r: *mut NdPromqlResponse) {
     if r.is_null() {
@@ -252,88 +191,207 @@ pub unsafe extern "C" fn nd_promql_response_free(r: *mut NdPromqlResponse) {
     drop(unsafe { Box::from_raw(r) });
 }
 
+// ---------------------------------------------------------------------------
+// Pipeline
+// ---------------------------------------------------------------------------
+
+#[derive(Debug)]
+enum QueryError {
+    Lower(LowerError),
+    Eval(EvalError),
+    UnsupportedTopLevel(ValueType),
+}
+
+impl From<LowerError> for QueryError {
+    fn from(e: LowerError) -> Self {
+        QueryError::Lower(e)
+    }
+}
+
+impl From<EvalError> for QueryError {
+    fn from(e: EvalError) -> Self {
+        QueryError::Eval(e)
+    }
+}
+
+impl QueryError {
+    fn into_response(self) -> NdPromqlResponse {
+        match self {
+            QueryError::Lower(e) => NdPromqlResponse::bad_data(&format!("{e}")),
+            QueryError::Eval(EvalError::NotYetImplemented(msg)) => {
+                NdPromqlResponse::execution(&format!("not yet implemented: {msg}"))
+            }
+            QueryError::Eval(e) => NdPromqlResponse::execution(&format!("{e}")),
+            QueryError::UnsupportedTopLevel(t) => NdPromqlResponse::bad_data(&format!(
+                "range query top-level expression must be scalar or instant-vector; got {t:?}"
+            )),
+        }
+    }
+}
+
+fn run_instant(
+    query: &str,
+    at_ms: i64,
+    host: Option<String>,
+) -> Result<NdPromqlResponse, QueryError> {
+    let plan = lower_query(query)?;
+    let ctx = EvalContext {
+        at_ms,
+        lookback_ms: DEFAULT_LOOKBACK_MS,
+        host_machine_guid: host,
+        max_series: DEFAULT_MAX_SERIES,
+    };
+    let result = eval(&ctx, &plan)?;
+    let body = match result {
+        EvalResult::Scalar(v) => serialize_scalar_at(v, at_ms),
+        EvalResult::InstantVector(_) | EvalResult::RangeVector(_) => serialize_success(&result),
+    };
+    Ok(NdPromqlResponse::ok(body))
+}
+
+fn run_range(
+    query: &str,
+    start_ms: i64,
+    end_ms: i64,
+    step_ms: i64,
+    host: Option<String>,
+) -> Result<NdPromqlResponse, QueryError> {
+    let plan = lower_query(query)?;
+
+    // Range queries require the top-level expression to evaluate to a
+    // scalar or instant vector at each step. A range vector (matrix
+    // selector at top level) is meaningless here.
+    let tt = plan.value_type();
+    if matches!(tt, ValueType::RangeVector | ValueType::String) {
+        return Err(QueryError::UnsupportedTopLevel(tt));
+    }
+
+    use std::collections::BTreeMap;
+    // Accumulate per-signature label sets + sample sequence across steps.
+    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
+    // For top-level scalars, every step contributes the same scalar value
+    // to a single "metric: {}" series.
+    let mut scalar_samples: Option<Vec<Sample>> = None;
+
+    let mut t = start_ms;
+    loop {
+        let ctx = EvalContext {
+            at_ms: t,
+            lookback_ms: DEFAULT_LOOKBACK_MS,
+            host_machine_guid: host.clone(),
+            max_series: DEFAULT_MAX_SERIES,
+        };
+        let r = eval(&ctx, &plan)?;
+        match r {
+            EvalResult::Scalar(v) => {
+                scalar_samples
+                    .get_or_insert_with(Vec::new)
+                    .push(Sample {
+                        timestamp_ms: t,
+                        value: v,
+                    });
+            }
+            EvalResult::InstantVector(series) => {
+                for s in series {
+                    let sample = s.samples.first().copied().unwrap_or(Sample {
+                        timestamp_ms: t,
+                        value: f64::NAN,
+                    });
+                    accum
+                        .entry(s.signature)
+                        .or_insert_with(|| (s.labels, Vec::new()))
+                        .1
+                        .push(Sample {
+                            timestamp_ms: t,
+                            value: sample.value,
+                        });
+                }
+            }
+            EvalResult::RangeVector(_) => {
+                return Err(QueryError::UnsupportedTopLevel(ValueType::RangeVector));
+            }
+        }
+        let next = match t.checked_add(step_ms) {
+            Some(n) => n,
+            None => break,
+        };
+        if next > end_ms {
+            break;
+        }
+        t = next;
+    }
+
+    let result = if let Some(samples) = scalar_samples {
+        EvalResult::RangeVector(vec![Series {
+            labels: Vec::new(),
+            signature: 0,
+            samples,
+        }])
+    } else {
+        let mut series: Vec<Series> = accum
+            .into_iter()
+            .map(|(sig, (labels, samples))| Series {
+                labels,
+                signature: sig,
+                samples,
+            })
+            .collect();
+        series.sort_by_key(|s| s.signature);
+        EvalResult::RangeVector(series)
+    };
+    Ok(NdPromqlResponse::ok(serialize_success(&result)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ffi::CString;
 
-    fn body_of(r: *mut NdPromqlResponse) -> String {
-        unsafe {
-            let s = CStr::from_ptr(nd_promql_response_body(r))
-                .to_str()
-                .unwrap()
-                .to_string();
-            nd_promql_response_free(r);
-            s
-        }
-    }
+    // These tests cover the FFI surface that does not depend on a live
+    // Netdata daemon -- parse-error reporting and null/argument handling.
+    // Tests that exercise the storage layer (real queries against real
+    // contexts) live in the integration smoke harness (`tests/`) and run
+    // against an installed binary in chunk 5.
 
     #[test]
-    fn instant_success_returns_scalar_shape() {
-        let q = CString::new("up").unwrap();
-        let r = unsafe {
-            nd_promql_query_instant(ptr::null(), q.as_ptr(), 1_715_594_400_000, 0)
-        };
-        assert!(!r.is_null());
-        assert_eq!(unsafe { nd_promql_response_http_status(r) }, 200);
-        let body = body_of(r);
-        assert!(body.contains(r#""resultType":"scalar""#), "body = {body}");
-        assert!(body.contains(r#""42""#), "body = {body}");
-    }
-
-    #[test]
-    fn instant_parse_failure_returns_bad_data() {
+    fn parse_failure_yields_bad_data_envelope() {
         let q = CString::new("not a valid query {").unwrap();
         let r = unsafe { nd_promql_query_instant(ptr::null(), q.as_ptr(), 0, 0) };
         assert!(!r.is_null());
         assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
-        let body = body_of(r);
-        assert!(body.contains(r#""status":"error""#), "body = {body}");
+        let body = unsafe { CStr::from_ptr(nd_promql_response_body(r)) }
+            .to_str()
+            .unwrap()
+            .to_string();
         assert!(body.contains(r#""errorType":"bad_data""#), "body = {body}");
-    }
-
-    #[test]
-    fn range_success_returns_matrix_shape() {
-        let q = CString::new("up").unwrap();
-        let r = unsafe {
-            nd_promql_query_range(
-                ptr::null(),
-                q.as_ptr(),
-                1_715_594_400_000,
-                1_715_594_460_000,
-                15_000,
-                0,
-            )
-        };
-        assert_eq!(unsafe { nd_promql_response_http_status(r) }, 200);
-        let body = body_of(r);
-        assert!(body.contains(r#""resultType":"matrix""#), "body = {body}");
-        assert!(body.contains(r#""values":["#), "body = {body}");
-    }
-
-    #[test]
-    fn range_rejects_oversized_resolution() {
-        let q = CString::new("up").unwrap();
-        // 1 ms step over a 1-hour window -> 3.6M points; capped.
-        let r = unsafe {
-            nd_promql_query_range(ptr::null(), q.as_ptr(), 0, 3_600_000, 1, 0)
-        };
-        assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
-        let body = body_of(r);
-        assert!(body.contains("11000 points"), "body = {body}");
+        unsafe { nd_promql_response_free(r) };
     }
 
     #[test]
     fn null_query_yields_bad_data() {
         let r = unsafe { nd_promql_query_instant(ptr::null(), ptr::null(), 0, 0) };
         assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
-        body_of(r);
+        unsafe { nd_promql_response_free(r) };
     }
 
     #[test]
-    fn json_escape_handles_quotes_and_controls() {
-        assert_eq!(json_escape(r#"a"b"#), r#"a\"b"#);
-        assert_eq!(json_escape("a\tb"), "a\\tb");
-        assert_eq!(json_escape("a\u{01}b"), "a\\u0001b");
+    fn range_rejects_oversized_resolution() {
+        let q = CString::new("foo").unwrap();
+        let r = unsafe { nd_promql_query_range(ptr::null(), q.as_ptr(), 0, 3_600_000, 1, 0) };
+        assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
+        let body = unsafe { CStr::from_ptr(nd_promql_response_body(r)) }
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert!(body.contains("11000 points"), "body = {body}");
+        unsafe { nd_promql_response_free(r) };
     }
+
+    #[test]
+    fn range_rejects_bad_window() {
+        let q = CString::new("foo").unwrap();
+        let r = unsafe { nd_promql_query_range(ptr::null(), q.as_ptr(), 100, 50, 1000, 0) };
+        assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
+        unsafe { nd_promql_response_free(r) };
+    }
+
 }

@@ -11,10 +11,6 @@
 
 /**
  * Opaque handle for a query response.
- *
- * The C side obtains a `*mut NdPromqlResponse` from one of the query
- * functions, reads through the accessors, and must release it with
- * `nd_promql_response_free`. Body bytes remain valid until release.
  */
 typedef struct NdPromqlResponse NdPromqlResponse;
 
@@ -23,36 +19,26 @@ extern "C" {
 #endif // __cplusplus
 
 /**
- * Evaluate an instant PromQL query.
- *
- * On parse success, returns a Prometheus-shape success response carrying a
- * placeholder scalar value at the requested instant. On parse failure,
- * returns a structured error.
- *
- * `host_machine_guid` is reserved for Phase 1 and is currently ignored.
- * `timeout_ms` is reserved for Phase 1 and is currently ignored.
+ * Evaluate an instant PromQL query at `at_ms`.
  *
  * # Safety
  * All pointer parameters must be either null or valid NUL-terminated C
- * strings valid for the duration of the call. The returned handle must be
- * released exactly once with `nd_promql_response_free`.
+ * strings valid for the duration of the call. The returned handle must
+ * be released exactly once with `nd_promql_response_free`.
  */
-struct NdPromqlResponse *nd_promql_query_instant(const char *_host_machine_guid,
+struct NdPromqlResponse *nd_promql_query_instant(const char *host_machine_guid,
                                                  const char *query,
                                                  int64_t at_ms,
                                                  int64_t _timeout_ms);
 
 /**
- * Evaluate a range PromQL query.
- *
- * On parse success, returns a Prometheus-shape success response carrying a
- * single dummy series with the placeholder value at every step grid point.
- * On parse failure or invalid time range, returns a structured error.
+ * Evaluate a range PromQL query over `[start_ms, end_ms]` at `step_ms`
+ * granularity.
  *
  * # Safety
  * Same requirements as `nd_promql_query_instant`.
  */
-struct NdPromqlResponse *nd_promql_query_range(const char *_host_machine_guid,
+struct NdPromqlResponse *nd_promql_query_range(const char *host_machine_guid,
                                                const char *query,
                                                int64_t start_ms,
                                                int64_t end_ms,
@@ -61,39 +47,21 @@ struct NdPromqlResponse *nd_promql_query_range(const char *_host_machine_guid,
 
 /**
  * Pointer to the NUL-terminated response body.
- *
- * Returns null if `r` is null. The pointed-to bytes remain valid until
- * `nd_promql_response_free` is called on `r`.
- *
- * # Safety
- * `r` must be either null or a valid handle previously returned by one of
- * the query functions and not yet freed.
  */
 const char *nd_promql_response_body(const struct NdPromqlResponse *r);
 
 /**
  * Byte length of the response body, excluding the trailing NUL.
- *
- * # Safety
- * Same as `nd_promql_response_body`.
  */
 uintptr_t nd_promql_response_body_len(const struct NdPromqlResponse *r);
 
 /**
- * HTTP status code that should accompany the response body. 200 on success,
- * 400 on parse error. Returns 500 if `r` is null.
- *
- * # Safety
- * Same as `nd_promql_response_body`.
+ * HTTP status code that should accompany the response body.
  */
 int nd_promql_response_http_status(const struct NdPromqlResponse *r);
 
 /**
  * Release a response handle. Safe to call on null.
- *
- * # Safety
- * `r` must be either null or a handle returned by one of the query
- * functions, and must not be used after this call returns.
  */
 void nd_promql_response_free(struct NdPromqlResponse *r);
 
