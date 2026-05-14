@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "ml_config.h"
+#include "ml_memory.h"
 
 void ml_train_main(void *arg);
 void ml_detect_main(void *arg);
