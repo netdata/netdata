@@ -3047,7 +3047,7 @@ if(ENABLE_PLUGIN_EBPF)
         string(APPEND EBPF_GO_CGO_CFLAGS " -I${include_dir}")
     endforeach()
     string(APPEND EBPF_GO_CGO_CFLAGS " -I${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin")
-    string(APPEND EBPF_GO_CGO_CFLAGS " -I${CMAKE_SOURCE_DIR}/build/ebpf-co-re")
+    string(APPEND EBPF_GO_CGO_CFLAGS " -I${ebpf-co-re_SOURCE_DIR}")
     string(STRIP "${EBPF_GO_CGO_CFLAGS}" EBPF_GO_CGO_CFLAGS)
     set(EBPF_GO_CGO_LDFLAGS
             "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz")
@@ -3077,6 +3077,7 @@ if(ENABLE_PLUGIN_EBPF)
         if(TARGET libbpf)
             add_dependencies(ebpf-go-plugin libbpf)
         endif()
+        add_dependencies(ebpf-go-plugin ebpf-co-re)
         install(FILES "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
                 PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE SETUID
                 COMPONENT plugin-ebpf
