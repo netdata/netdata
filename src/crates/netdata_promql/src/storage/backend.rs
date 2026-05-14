@@ -19,7 +19,6 @@
 
 use super::matchers::Matcher;
 use super::query::ResolveError;
-use super::samples::Sample;
 
 /// Metadata for one resolved series. The lifetime is owned because
 /// `BackendQuery` is trait-object-shaped and cannot borrow from itself
@@ -44,20 +43,29 @@ pub trait Backend: Send + Sync {
     ) -> Result<Box<dyn BackendQuery + 'a>, ResolveError>;
 }
 
-/// One resolved query's series set. Iterator handles for samples
-/// borrow from this; the trait object hides whether the underlying
-/// implementation is `NdQuery` (FFI) or a `MemQuery` (memory).
+/// One resolved query's series set. The trait-object boundary is the
+/// `Box<dyn BackendQuery>` in `resolve`'s return; sample drains happen
+/// through concrete-typed inner loops behind a single virtual call per
+/// series (SOW-0040, replacing the prior per-sample `Box<dyn Iterator>`
+/// dispatch).
 pub trait BackendQuery {
     fn len(&self) -> usize;
     fn was_truncated(&self) -> bool;
     fn series_meta(&self, i: usize) -> Option<SeriesMeta>;
-    /// Open a per-series sample iterator over `[after_s, before_s]`.
-    /// `step_ms = 0` requests native-resolution samples.
-    fn open_samples<'q>(
-        &'q self,
+    /// Drain samples for series `i` over `[after_s, before_s]` into the
+    /// caller's buffers. Both vectors are cleared first; on return they
+    /// hold parallel `(timestamp_ms, value)` columns in ascending
+    /// timestamp order. An out-of-bounds `i` or a series with no
+    /// samples in the window leaves the buffers empty (no error).
+    /// `step_ms = 0` requests native-resolution samples; non-zero
+    /// values are forwarded to the storage layer.
+    fn drain_samples(
+        &self,
         i: usize,
         after_s: i64,
         before_s: i64,
         step_ms: i64,
-    ) -> Option<Box<dyn Iterator<Item = Sample> + 'q>>;
+        out_ts: &mut Vec<i64>,
+        out_vals: &mut Vec<f64>,
+    );
 }

@@ -5,7 +5,7 @@
 // (and future external consumers) can drive the evaluator without
 // the C shim. SOW-0030.
 
-pub use crate::storage::{Backend, MemBackend, MemSeries, Sample};
+pub use crate::storage::{Backend, MemBackend, MemSeries};
 
 use std::sync::Arc;
 

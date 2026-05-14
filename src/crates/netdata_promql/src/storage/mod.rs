@@ -3,10 +3,11 @@
 // Storage adapter: safe wrappers around the C data-source shim
 // (`src/database/contexts/promql-data-source.{c,h}`).
 //
-// Three public types:
+// Two public abstractions:
 //   - `Matcher`  -- a single label predicate
-//   - `NdQuery`  -- the resolved series set for one query, with Drop
-//   - `NdSamples` -- a sample iterator borrowed from an `NdQuery`
+//   - `NdQuery`  -- the resolved series set for one query, with Drop.
+//                   Samples are drained per series into caller-provided
+//                   `(Vec<i64>, Vec<f64>)` column buffers (SOW-0040).
 //
 // `raw` holds bindgen output and is not re-exported.
 
@@ -18,7 +19,6 @@ mod matchers;
 mod mem_backend;
 mod query;
 pub(crate) mod raw;
-mod samples;
 
 #[cfg(test)]
 mod test_stubs;
@@ -35,7 +35,3 @@ pub use matchers::{compile_regex, Matcher, MatcherError};
 pub use mem_backend::{MemBackend, MemSeries};
 #[allow(unused_imports)]
 pub use query::{NdQuery, ResolveError, SeriesView};
-#[allow(unused_imports)]
-pub use samples::{NdSamples, Sample};
-#[allow(unused_imports)]
-pub(crate) use samples::flags;

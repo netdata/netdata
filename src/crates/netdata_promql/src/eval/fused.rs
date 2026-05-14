@@ -469,25 +469,34 @@ fn run_fused<A: IncrementalAggr>(
             .collect(),
     };
 
+    // Reusable drain buffers (SOW-0040). The fused driver keeps the
+    // filtered columns per-series because the inner two-pointer walk
+    // consumes them in one pass and they are dropped at the end of
+    // each iteration; sharing the raw drain buffer across series
+    // matches the selector pattern and avoids one allocation per
+    // input series.
+    let mut raw_ts: Vec<i64> = Vec::new();
+    let mut raw_vals: Vec<f64> = Vec::new();
+
     for i in 0..q.len() {
         let Some(meta) = q.series_meta(i) else { continue };
-        let Some(samples_iter) = q.open_samples(i, after_s, before_s, 0) else {
-            continue;
-        };
+        q.drain_samples(i, after_s, before_s, 0, &mut raw_ts, &mut raw_vals);
 
-        // Materialise the series' raw samples into column form.
-        // (NaN-filtered; mirrors eval_matrix_select.)
-        let mut series_ts: Vec<i64> = Vec::new();
-        let mut series_vals: Vec<f64> = Vec::new();
-        for s in samples_iter {
-            if s.value.is_nan() {
+        // NaN-filter into column form for the two-pointer walk.
+        // (Mirrors eval_matrix_select.)
+        let mut series_ts: Vec<i64> = Vec::with_capacity(raw_ts.len());
+        let mut series_vals: Vec<f64> = Vec::with_capacity(raw_vals.len());
+        for k in 0..raw_vals.len() {
+            let v = raw_vals[k];
+            let t = raw_ts[k];
+            if v.is_nan() {
                 continue;
             }
-            if s.timestamp_ms < fetch_after_ms || s.timestamp_ms > fetch_before_ms {
+            if t < fetch_after_ms || t > fetch_before_ms {
                 continue;
             }
-            series_ts.push(s.timestamp_ms);
-            series_vals.push(s.value);
+            series_ts.push(t);
+            series_vals.push(v);
         }
         if series_vals.is_empty() {
             continue;
@@ -599,7 +608,7 @@ mod tests {
 
     // ---- End-to-end fused equivalence against the unfused path ----
 
-    use crate::storage::{MemBackend, MemSeries, Sample as StorageSample};
+    use crate::storage::{MemBackend, MemSeries};
 
     fn mk_backend_two_series() -> Arc<MemBackend> {
         // Two series: instance="a" and instance="b". Both with three
@@ -615,31 +624,9 @@ mod tests {
             ("__name__".to_string(), "metric".to_string()),
             ("instance".to_string(), "b".to_string()),
         ];
-        let samples = vec![
-            StorageSample {
-                timestamp_ms: 0,
-                value: 10.0,
-                flags: 0,
-            },
-            StorageSample {
-                timestamp_ms: 1000,
-                value: 10.0,
-                flags: 0,
-            },
-            StorageSample {
-                timestamp_ms: 2000,
-                value: 10.0,
-                flags: 0,
-            },
-        ];
-        backend.add_series(MemSeries {
-            labels: labels_a,
-            samples: samples.clone(),
-        });
-        backend.add_series(MemSeries {
-            labels: labels_b,
-            samples,
-        });
+        let samples = vec![(0i64, 10.0), (1000, 10.0), (2000, 10.0)];
+        backend.add_series(MemSeries::new(labels_a, samples.clone()));
+        backend.add_series(MemSeries::new(labels_b, samples));
         backend
     }
 

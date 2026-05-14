@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use netdata_promql::testing::{
-    eval_instant_against, Backend, MemBackend, MemSeries, Sample, TestResult,
+    eval_instant_against, Backend, MemBackend, MemSeries, TestResult,
 };
 
 // --------------------------------------------------------------------- types
@@ -623,11 +623,7 @@ fn execute_file(path: &Path, expected_fails: &HashSet<String>) -> FileReport {
                     for (i, v) in sp.samples.iter().enumerate() {
                         let ts = (i as i64) * interval_ms;
                         let value = v.unwrap_or(f64::NAN);
-                        samples.push(Sample {
-                            timestamp_ms: ts,
-                            value,
-                            flags: 0,
-                        });
+                        samples.push((ts, value));
                     }
                     backend.add_series(MemSeries::new(labels, samples));
                 }

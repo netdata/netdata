@@ -5,9 +5,8 @@
 // `NdQuery` owns the shim's opaque pointer and releases it on Drop. Series
 // rejected by RE/NRE matchers are tracked in a Rust-side filter index --
 // the shim's series array is read-only from our perspective. Borrowing
-// rules: a `NdQuery` reference can hand out `SeriesView` borrows and open
-// any number of `NdSamples` iterators whose lifetimes are bound to the
-// query.
+// rules: a `NdQuery` reference can hand out `SeriesView` borrows and
+// drain per-series samples into caller-provided column buffers (SOW-0040).
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -16,7 +15,6 @@ use std::slice;
 
 use super::matchers::{Matcher, MatcherError, MatchersFfi};
 use super::raw;
-use super::samples::NdSamples;
 
 /// Result of a shim-side query resolution, including any RE/NRE post-filter.
 pub struct NdQuery {
@@ -238,21 +236,49 @@ impl NdQuery {
         Some(self.series_view_raw(raw_i))
     }
 
-    /// Open a sample iterator for the i-th series (after filter) over
-    /// `[after_s, before_s]`. `step_ms == 0` requests native-resolution
-    /// samples; non-zero values are forwarded to the shim.
-    pub fn open_samples(
+    /// Drain samples for the i-th series (after RE/NRE filter) into the
+    /// caller's column buffers. The buffers are cleared first; on
+    /// return they hold parallel `(timestamp_ms, value)` columns in
+    /// ascending timestamp order. SOW-0040 replaces the prior
+    /// iterator-returning shape so the per-sample fetch does not pay a
+    /// per-call indirect-dispatch cost.
+    pub fn drain_samples(
         &self,
         i: usize,
         after_s: i64,
         before_s: i64,
         step_ms: i64,
-    ) -> Option<NdSamples<'_>> {
-        let raw_i = self.resolved_index(i)?;
+        out_ts: &mut Vec<i64>,
+        out_vals: &mut Vec<f64>,
+    ) {
+        out_ts.clear();
+        out_vals.clear();
+        let Some(raw_i) = self.resolved_index(i) else {
+            return;
+        };
         let p = unsafe {
             raw::nd_pds_open_samples(self.handle.as_ptr(), raw_i, after_s, before_s, step_ms)
         };
-        NonNull::new(p).map(|h| unsafe { NdSamples::from_raw(h) })
+        let Some(handle) = NonNull::new(p) else {
+            return;
+        };
+        // Tight pull loop. The shim's per-sample call returns >0 on a
+        // valid sample, 0 on EOF, <0 on error. We treat both 0 and <0 as
+        // end-of-stream (matches the previous iterator-shape behavior).
+        loop {
+            let mut ts: i64 = 0;
+            let mut value: f64 = 0.0;
+            let mut flags: u32 = 0;
+            let r = unsafe {
+                raw::nd_pds_samples_next(handle.as_ptr(), &mut ts, &mut value, &mut flags)
+            };
+            if r <= 0 {
+                break;
+            }
+            out_ts.push(ts);
+            out_vals.push(value);
+        }
+        unsafe { raw::nd_pds_samples_close(handle.as_ptr()) };
     }
 }
 

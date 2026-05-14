@@ -6,7 +6,6 @@
 use super::backend::{Backend, BackendQuery, SeriesMeta};
 use super::matchers::Matcher;
 use super::query::{NdQuery, ResolveError};
-use super::samples::Sample;
 
 /// Zero-size marker. The shim is process-global; no per-backend state.
 pub struct FfiBackend;
@@ -48,18 +47,15 @@ impl BackendQuery for FfiQuery {
         })
     }
 
-    fn open_samples<'q>(
-        &'q self,
+    fn drain_samples(
+        &self,
         i: usize,
         after_s: i64,
         before_s: i64,
         step_ms: i64,
-    ) -> Option<Box<dyn Iterator<Item = Sample> + 'q>> {
-        let it = self.0.open_samples(i, after_s, before_s, step_ms)?;
-        Ok::<_, ()>(()).ok();
-        // Returning the iterator boxed as a trait object. The lifetime is
-        // tied to `&'q self`, so the borrow checker prevents the iterator
-        // from outliving the query.
-        Some(Box::new(it))
+        out_ts: &mut Vec<i64>,
+        out_vals: &mut Vec<f64>,
+    ) {
+        self.0.drain_samples(i, after_s, before_s, step_ms, out_ts, out_vals);
     }
 }

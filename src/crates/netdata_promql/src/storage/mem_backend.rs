@@ -11,25 +11,43 @@ use std::sync::RwLock;
 use super::backend::{Backend, BackendQuery, SeriesMeta};
 use super::matchers::Matcher;
 use super::query::ResolveError;
-use super::samples::Sample;
 use crate::eval::labels_signature;
 
 /// One synthetic series.
+///
+/// Samples are stored as parallel `(timestamps_ms, values)` columns,
+/// matching the shape `drain_samples` produces and `eval` consumes.
+/// Values may be NaN to represent "missing"; promqltest's `_` token
+/// loads as NaN. SOW-0040.
 #[derive(Clone, Debug)]
 pub struct MemSeries {
     /// Labels in sorted-by-name order. The first entry is normally
     /// `("__name__", "<metric>")`.
     pub labels: Vec<(String, String)>,
-    /// Samples sorted by timestamp ascending. Values may be NaN to
-    /// represent "missing"; promqltest's `_` token loads as NaN.
-    pub samples: Vec<Sample>,
+    /// Sample timestamps in milliseconds, ascending. Length equal to
+    /// `values`.
+    pub timestamps_ms: Vec<i64>,
+    /// Sample values, parallel to `timestamps_ms`.
+    pub values: Vec<f64>,
 }
 
 impl MemSeries {
-    pub fn new(labels: Vec<(String, String)>, samples: Vec<Sample>) -> Self {
+    /// Construct from labels and a `(ts, value)` pair list. Used by
+    /// the compliance corpus runner and unit tests.
+    pub fn new(labels: Vec<(String, String)>, samples: Vec<(i64, f64)>) -> Self {
         let mut labels = labels;
         labels.sort_by(|a, b| a.0.cmp(&b.0));
-        Self { labels, samples }
+        let mut timestamps_ms = Vec::with_capacity(samples.len());
+        let mut values = Vec::with_capacity(samples.len());
+        for (t, v) in samples {
+            timestamps_ms.push(t);
+            values.push(v);
+        }
+        Self {
+            labels,
+            timestamps_ms,
+            values,
+        }
     }
 
     pub fn signature(&self) -> u64 {
@@ -141,26 +159,32 @@ impl BackendQuery for MemQuery {
         })
     }
 
-    fn open_samples<'q>(
-        &'q self,
+    fn drain_samples(
+        &self,
         i: usize,
         after_s: i64,
         before_s: i64,
         _step_ms: i64,
-    ) -> Option<Box<dyn Iterator<Item = Sample> + 'q>> {
-        let idx = *self.indices.get(i)?;
-        let s = self.series.get(idx)?;
-        // Find the slice of samples whose ms timestamp falls in
-        // `[after_s * 1000, before_s * 1000]`. The FFI backend uses
-        // second-resolution boundaries; we mirror.
+        out_ts: &mut Vec<i64>,
+        out_vals: &mut Vec<f64>,
+    ) {
+        out_ts.clear();
+        out_vals.clear();
+        let Some(&idx) = self.indices.get(i) else { return };
+        let Some(s) = self.series.get(idx) else { return };
+        // Mirror the FFI backend's second-resolution boundaries.
         let lo_ms = after_s.saturating_mul(1000);
         let hi_ms = before_s.saturating_mul(1000);
-        let it = s
-            .samples
-            .iter()
-            .copied()
-            .filter(move |sm| sm.timestamp_ms >= lo_ms && sm.timestamp_ms <= hi_ms);
-        Some(Box::new(it))
+        for (k, &t) in s.timestamps_ms.iter().enumerate() {
+            if t < lo_ms {
+                continue;
+            }
+            if t > hi_ms {
+                break;
+            }
+            out_ts.push(t);
+            out_vals.push(s.values[k]);
+        }
     }
 }
 
@@ -188,14 +212,7 @@ mod tests {
                 .iter()
                 .map(|(n, v)| (n.to_string(), v.to_string()))
                 .collect(),
-            samples
-                .iter()
-                .map(|(t, v)| Sample {
-                    timestamp_ms: *t,
-                    value: *v,
-                    flags: 0,
-                })
-                .collect(),
+            samples.to_vec(),
         )
     }
 
@@ -233,7 +250,7 @@ mod tests {
     }
 
     #[test]
-    fn open_samples_respects_window() {
+    fn drain_samples_respects_window() {
         let b = MemBackend::new();
         b.add_series(s(
             &[("__name__", "m")],
@@ -242,8 +259,10 @@ mod tests {
         let q = b
             .resolve(None, &[Matcher::eq("__name__", "m")], 0, 100, 100)
             .unwrap();
-        let it = q.open_samples(0, 3, 12, 0).unwrap();
-        let pts: Vec<_> = it.map(|s| s.timestamp_ms).collect();
-        assert_eq!(pts, vec![5000, 10_000]);
+        let mut ts = Vec::new();
+        let mut vals = Vec::new();
+        q.drain_samples(0, 3, 12, 0, &mut ts, &mut vals);
+        assert_eq!(ts, vec![5000, 10_000]);
+        assert_eq!(vals, vec![2.0, 3.0]);
     }
 }

@@ -89,24 +89,29 @@ pub fn eval_vector_select(
     // copies of the same column.
     let grid_timestamps = Arc::clone(&grid.timestamps);
 
+    // Per-query drain buffers reused across the per-series loop
+    // (SOW-0040). `drain_samples` clears them on each call and the
+    // selector filters NaN inline.
+    let mut raw_ts: Vec<i64> = Vec::new();
+    let mut raw_vals: Vec<f64> = Vec::new();
+    let mut timestamps_buf: Vec<i64> = Vec::new();
+    let mut values_buf: Vec<f64> = Vec::new();
+
     for i in 0..q.len() {
         let Some(meta) = q.series_meta(i) else { continue };
-        let Some(samples_iter) = q.open_samples(i, after_s, before_s, 0) else {
-            continue;
-        };
+        q.drain_samples(i, after_s, before_s, 0, &mut raw_ts, &mut raw_vals);
 
-        // Materialise the per-series storage samples once in column
-        // form. The two-pointer scan below indexes into these two
-        // slices; iterator-based two-pointer is awkward when grid
-        // points can repeat samples (lookback windows overlap).
-        let mut timestamps_buf: Vec<i64> = Vec::new();
-        let mut values_buf: Vec<f64> = Vec::new();
-        for s in samples_iter {
-            if s.value.is_nan() {
+        // Filter NaN once into per-series column buffers. The two-pointer
+        // scan below indexes into these slices.
+        timestamps_buf.clear();
+        values_buf.clear();
+        for k in 0..raw_vals.len() {
+            let v = raw_vals[k];
+            if v.is_nan() {
                 continue;
             }
-            timestamps_buf.push(s.timestamp_ms);
-            values_buf.push(s.value);
+            timestamps_buf.push(raw_ts[k]);
+            values_buf.push(v);
         }
         if values_buf.is_empty() {
             continue;
@@ -253,23 +258,28 @@ pub fn eval_matrix_select(
     }
 
     let mut out = Vec::with_capacity(q.len());
+    let mut raw_ts: Vec<i64> = Vec::new();
+    let mut raw_vals: Vec<f64> = Vec::new();
     for i in 0..q.len() {
         let Some(meta) = q.series_meta(i) else { continue };
+        q.drain_samples(i, after_s, before_s, 0, &mut raw_ts, &mut raw_vals);
 
-        let Some(samples_iter) = q.open_samples(i, after_s, before_s, 0) else {
-            continue;
-        };
-        let mut timestamps: Vec<i64> = Vec::new();
-        let mut values: Vec<f64> = Vec::new();
-        for s in samples_iter {
-            if s.value.is_nan() {
+        // The matrix selector keeps the per-series timestamps as its
+        // own Arc (sample timestamps differ per series), so each pass
+        // moves the filtered samples into freshly-allocated columns.
+        let mut timestamps: Vec<i64> = Vec::with_capacity(raw_ts.len());
+        let mut values: Vec<f64> = Vec::with_capacity(raw_vals.len());
+        for k in 0..raw_vals.len() {
+            let v = raw_vals[k];
+            let t = raw_ts[k];
+            if v.is_nan() {
                 continue;
             }
-            if s.timestamp_ms < fetch_after_ms || s.timestamp_ms > fetch_before_ms {
+            if t < fetch_after_ms || t > fetch_before_ms {
                 continue;
             }
-            timestamps.push(s.timestamp_ms);
-            values.push(s.value);
+            timestamps.push(t);
+            values.push(v);
         }
 
         if values.is_empty() {
