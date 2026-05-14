@@ -94,6 +94,8 @@ if [ -d "${NETDATA_LIBEXEC_PREFIX}" ]; then
             success=0
             echo "!!! ${ebpf_go_plugin} has mode ${ebpf_go_mode}, expected ${ebpf_mode}"
         fi
+    elif [ -f "${ebpf_plugin}" ] && [ ! -e "${ebpf_go_plugin}" ]; then
+        :
     fi
 
     if [ "${success}" -eq 0 ]; then
