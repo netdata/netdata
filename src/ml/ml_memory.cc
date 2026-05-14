@@ -18,7 +18,7 @@
 #include "ml_memory.h"
 #include "daemon/pulse/pulse-ml.h"
 
-// The four operator overrides below replace the global C++ allocator hooks
+// The six operator overrides below replace the global C++ allocator hooks
 // for the netdata binary (only compiled when ENABLE_MIMALLOC is OFF).
 // They unconditionally call malloc/free; the pulse_ml_memory_* counters are
 // updated only when ml_alloc_active is true on the calling thread, so that
@@ -26,12 +26,19 @@
 // (notably ACLK protobuf serialization) that happens to share the same
 // global operator new/delete.
 //
-// The two unsized delete overloads recover the allocator's block size via
-// malloc_usable_size() so the counter decrements match the increments
-// produced by the new overloads. The returned size may be slightly larger
-// than the originally requested size (allocator rounding); the asymmetry
-// versus the sized delete overloads is bounded and acceptable for a
-// gauge-grade signal.
+// All six paths count the allocator block size returned by
+// malloc_usable_size(ptr), not the size argument to operator new/delete.
+// This is what makes the counter balance regardless of whether the
+// compiler emits sized delete calls: when -fsized-deallocation is off,
+// every free routes through the unsized overload; when it is on, GCC may
+// emit either form depending on type knowledge. By using
+// malloc_usable_size(ptr) on every path, the per-pointer alloc/free pair
+// is symmetric independent of which delete form the compiler chose.
+//
+// Side effect: the reported byte total reflects actual allocator block
+// sizes (including alignment/rounding slack), not requested sizes. This
+// is a more accurate measure of real RAM consumption than requested-size
+// accounting.
 
 void *operator new(size_t size)
 {
@@ -40,7 +47,7 @@ void *operator new(size_t size)
         throw std::bad_alloc();
 
     if (ml_alloc_active)
-        pulse_ml_memory_allocated(size);
+        pulse_ml_memory_allocated(malloc_usable_size(ptr));
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_MALLOC);
     return ptr;
 }
@@ -52,26 +59,26 @@ void *operator new[](size_t size)
         throw std::bad_alloc();
 
     if (ml_alloc_active)
-        pulse_ml_memory_allocated(size);
+        pulse_ml_memory_allocated(malloc_usable_size(ptr));
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_MALLOC);
     return ptr;
 }
 
-void operator delete(void *ptr, size_t size) noexcept
+void operator delete(void *ptr, size_t /*size*/) noexcept
 {
     if (ptr) {
         if (ml_alloc_active)
-            pulse_ml_memory_freed(size);
+            pulse_ml_memory_freed(malloc_usable_size(ptr));
         workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
         free(ptr);
     }
 }
 
-void operator delete[](void *ptr, size_t size) noexcept
+void operator delete[](void *ptr, size_t /*size*/) noexcept
 {
     if (ptr) {
         if (ml_alloc_active)
-            pulse_ml_memory_freed(size);
+            pulse_ml_memory_freed(malloc_usable_size(ptr));
         workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
         free(ptr);
     }
