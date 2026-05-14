@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: implementation, metadata/docs, spec update, validation, and SOW lifecycle move completed.
+Sub-state: completed again on 2026-05-15 after adding a thermal-only powermetrics fallback for Macs without the SMC sampler.
 
 ## Requirements
 
@@ -320,4 +320,82 @@ Storage health is tracked by SOW-0018. No additional work remains for this SOW.
 
 ## Regression Log
 
-None yet.
+### Regression - 2026-05-15 - powermetrics sampler portability
+
+What broke:
+
+- The installed powermetrics path uses the hard-coded `powermetrics-thermal-smc` `ndsudo` command.
+- On the Mac mini validation host, `/usr/bin/powermetrics` rejects `-s thermal,smc` with `powermetrics: unrecognized sampler: smc`.
+- The same host accepts `-s thermal` and returns a plist containing `thermal_pressure = Nominal`.
+- Netdata disables the powermetrics thermal/fan module after repeated failures, so no `macos.thermal_pressure` chart appears on this host even though thermal pressure is available.
+
+Evidence:
+
+- `src/collectors/utils/ndsudo.c` hard-codes `powermetrics-thermal-smc` as `-n 1 -i {{sampleWindowMs}} -s thermal,smc -f plist`.
+- `src/collectors/macos.plugin/macos_powermetrics.c` direct mode also hard-codes `-s thermal,smc`.
+- Installed validation command `ndsudo --test powermetrics-thermal-smc --sampleWindowMs 1000` expanded to the expected argv.
+- Installed real execution through `ndsudo powermetrics-thermal-smc --sampleWindowMs 1000` failed with exit code `64` and `unrecognized sampler: smc`.
+- Direct root `powermetrics -n 1 -i 1000 -s thermal -f plist` succeeded.
+
+Why previous validation missed it:
+
+- The original implementation and validation were done on a host where `powermetrics --help` listed the `smc` sampler.
+- The collector did not probe sampler availability or provide a thermal-only fallback.
+
+User decision:
+
+- 2026-05-15: user accepted fixing the non-logs regressions before continuing the logs design discussion.
+
+Repair plan:
+
+- Add a second, narrower `ndsudo` allow-list command for thermal-only powermetrics sampling.
+- Update `macos.plugin` powermetrics sampling to try the thermal+SMC command first and fall back to thermal-only when the OS rejects or cannot satisfy the SMC sampler.
+- Preserve chart semantics: thermal pressure should be emitted when thermal-only data exists; SMC fan/temperature charts should appear only when SMC fields exist.
+- Update metadata/docs/spec to describe the fallback and avoid implying SMC is always available.
+- Rebuild/reinstall and validate that thermal pressure appears on the Mac mini without SMC sampler support.
+
+Repair outcome:
+
+- Added `powermetrics-thermal` to `ndsudo` as `/usr/bin/powermetrics -n 1 -i {{sampleWindowMs}} -s thermal -f plist`.
+- Kept `powermetrics-thermal-smc` as the preferred command for Macs that expose the SMC sampler.
+- Updated `macos.plugin` to try thermal+SMC first, fall back to thermal-only, and cache the thermal-only fallback after a successful fallback so the same unsupported SMC sampler is not retried every sample interval.
+- Preserved chart semantics:
+  - `macos.thermal_pressure` can appear from thermal-only plist output.
+  - SMC fan, temperature, thermal-level, and prochot charts appear only when the plist contains those SMC fields.
+- Updated `.agents/sow/specs/macos-hardware-monitoring.md`, `src/collectors/macos.plugin/metadata.yaml`, and generated `src/collectors/macos.plugin/integrations/macos.md`.
+
+Regression validation:
+
+- `cmake --build ./build-macmini --parallel 10 --target ndsudo netdata`: passed.
+- `./build-macmini/ndsudo --test powermetrics-thermal --sampleWindowMs 1000`: printed `/usr/bin/powermetrics -n 1 -i 1000 -s thermal -f plist`.
+- `./build-macmini/ndsudo --test powermetrics-thermal --sampleWindowMs abc`: rejected the argument with exit code `2`.
+- Installed changed `netdata` and `ndsudo` binaries into `/opt/netdata` and restarted `system/com.github.netdata`.
+- Installed permission check:
+  - `/opt/netdata/usr/libexec/netdata/plugins.d/ndsudo`: `root netdata` mode `4750`.
+  - `/opt/netdata/usr/libexec/netdata/plugins.d/macos-logs.plugin`: `root netdata` mode `4750`.
+- Runtime API check: `http://localhost:19999/api/v1/info` returned macOS from the local Agent.
+- Installed `ndsudo --test powermetrics-thermal --sampleWindowMs 1000` as the `netdata` user printed the exact thermal-only allow-listed argv.
+- Installed `ndsudo powermetrics-thermal --sampleWindowMs 1000` as the `netdata` user produced a plist payload containing thermal pressure and no superuser-permission failure. The raw plist was written only to `/tmp` and removed.
+- Netdata charts API showed `macos.thermal_pressure` after restart.
+- After waiting through the next powermetrics sample interval, collector logs showed the expected one-time `smc` sampler rejection from the first preferred command attempt, no repeated second rejection, and no `disabling powermetrics` failure.
+- `.agents/sow/audit.sh`: this SOW is status/directory consistent. The audit still reports unrelated pre-existing repository hygiene issues: one older SOW status/directory mismatch and non-project skill classification warnings.
+
+Same-failure search:
+
+- `rg -n "powermetrics-thermal|thermal,smc|sampleWindowMs" src/collectors/utils/ndsudo.c src/collectors/macos.plugin/macos_powermetrics.c`: only the expected allow-list, fallback caller, and argument validation paths matched.
+- `tail -n 220 /opt/netdata/var/log/netdata/collector.log | rg -n "powermetrics|unrecognized sampler|disabling powermetrics"`: after restart and one additional sample interval, showed only the first preferred thermal+SMC rejection and no permanent-disable message.
+
+Artifact maintenance gate for regression:
+
+- AGENTS.md: no update needed; workflow, responsibilities, and project-wide guardrails did not change.
+- Runtime project skills: no update needed; `project-writing-collectors` and `integrations-lifecycle` already cover the workflow used.
+- Specs: updated `.agents/sow/specs/macos-hardware-monitoring.md`.
+- End-user/operator docs: updated `src/collectors/macos.plugin/metadata.yaml` and regenerated `src/collectors/macos.plugin/integrations/macos.md`.
+- End-user/operator skills: no update needed; no public/operator AI skill behavior changed.
+- SOW lifecycle: reopened from `done/`, marked completed after validation, and moved back to `done/` with the repair.
+
+Regression lessons:
+
+- `powermetrics` sampler availability is OS and hardware dependent; support for the `thermal` sampler does not imply support for the `smc` sampler.
+- The collector should degrade from SMC-enriched thermal/fan collection to thermal-pressure-only collection before disabling the module.
+- A fallback that succeeds must be cached to avoid repeated helper warnings for an unsupported sampler.

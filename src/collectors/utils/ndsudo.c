@@ -228,6 +228,14 @@ struct command {
         },
     },
     {
+        .name = "powermetrics-thermal",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal -f plist",
+        .search = {
+            [0] = "powermetrics",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "megacli-disk-info",
         .params = "-LDPDInfo -aAll -NoLog",
         .search = {
@@ -358,7 +366,7 @@ bool check_positive_integer_argument(const char *cmd, int argc, char **argv, con
 }
 
 bool check_command_specific_params(const char *cmd, int argc, char **argv, char *err, size_t err_size) {
-    if (strcmp(cmd, "powermetrics-thermal-smc") == 0)
+    if (strcmp(cmd, "powermetrics-thermal-smc") == 0 || strcmp(cmd, "powermetrics-thermal") == 0)
         return check_positive_integer_argument(cmd, argc, argv, "--sampleWindowMs", err, err_size);
 
     return true;

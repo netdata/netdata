@@ -9,7 +9,10 @@
 #include <unistd.h>
 
 #define MACOS_POWERMETRICS_DEFAULT_COMMAND "/usr/bin/powermetrics"
-#define MACOS_POWERMETRICS_NDSUDO_COMMAND "powermetrics-thermal-smc"
+#define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC "powermetrics-thermal-smc"
+#define MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL "powermetrics-thermal"
+#define MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC "thermal,smc"
+#define MACOS_POWERMETRICS_SAMPLERS_THERMAL "thermal"
 #define MACOS_POWERMETRICS_DEFAULT_SAMPLE_EVERY 60
 #define MACOS_POWERMETRICS_DEFAULT_SAMPLE_WINDOW_MS 1000
 #define MACOS_POWERMETRICS_DEFAULT_TIMEOUT_MS 5000
@@ -59,6 +62,7 @@ struct macos_powermetrics_state {
     bool failed_permanently;
     bool logged_unavailable;
     int consecutive_failures;
+    bool thermal_only_fallback;
 
     bool use_ndsudo;
     int sample_every_s;
@@ -366,34 +370,8 @@ static bool macos_powermetrics_parse_plist(const char *data, size_t size, struct
     return true;
 }
 
-static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *sample)
+static bool macos_powermetrics_run_argv(const char **argv, struct macos_powermetrics_sample *sample)
 {
-    char interval_ms[32];
-    snprintfz(interval_ms, sizeof(interval_ms), "%d", pm.sample_window_ms);
-
-    const char *argv_ndsudo[] = {
-        pm.command,
-        MACOS_POWERMETRICS_NDSUDO_COMMAND,
-        "--sampleWindowMs",
-        interval_ms,
-        NULL,
-    };
-
-    const char *argv_direct[] = {
-        pm.command,
-        "-n",
-        "1",
-        "-i",
-        interval_ms,
-        "-s",
-        "thermal,smc",
-        "-f",
-        "plist",
-        NULL,
-    };
-
-    const char **argv = pm.use_ndsudo ? argv_ndsudo : argv_direct;
-
     POPEN_INSTANCE *pi = spawn_popen_run_argv(argv);
     if (!pi)
         return false;
@@ -415,6 +393,68 @@ static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *samp
 
     freez(output);
     return ok;
+}
+
+static bool macos_powermetrics_run_sample(struct macos_powermetrics_sample *sample)
+{
+    char interval_ms[32];
+    snprintfz(interval_ms, sizeof(interval_ms), "%d", pm.sample_window_ms);
+
+    const char *argv_ndsudo_thermal_smc[] = {
+        pm.command,
+        MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL_SMC,
+        "--sampleWindowMs",
+        interval_ms,
+        NULL,
+    };
+
+    const char *argv_ndsudo_thermal[] = {
+        pm.command,
+        MACOS_POWERMETRICS_NDSUDO_COMMAND_THERMAL,
+        "--sampleWindowMs",
+        interval_ms,
+        NULL,
+    };
+
+    const char *argv_direct_thermal_smc[] = {
+        pm.command,
+        "-n",
+        "1",
+        "-i",
+        interval_ms,
+        "-s",
+        MACOS_POWERMETRICS_SAMPLERS_THERMAL_SMC,
+        "-f",
+        "plist",
+        NULL,
+    };
+
+    const char *argv_direct_thermal[] = {
+        pm.command,
+        "-n",
+        "1",
+        "-i",
+        interval_ms,
+        "-s",
+        MACOS_POWERMETRICS_SAMPLERS_THERMAL,
+        "-f",
+        "plist",
+        NULL,
+    };
+
+    if (!pm.thermal_only_fallback) {
+        const char **argv_thermal_smc = pm.use_ndsudo ? argv_ndsudo_thermal_smc : argv_direct_thermal_smc;
+        if (macos_powermetrics_run_argv(argv_thermal_smc, sample))
+            return true;
+    }
+
+    const char **argv_thermal = pm.use_ndsudo ? argv_ndsudo_thermal : argv_direct_thermal;
+    if (macos_powermetrics_run_argv(argv_thermal, sample)) {
+        pm.thermal_only_fallback = true;
+        return true;
+    }
+
+    return false;
 }
 
 static void macos_powermetrics_thread(void *ptr __maybe_unused)
@@ -443,7 +483,8 @@ static void macos_powermetrics_thread(void *ptr __maybe_unused)
         if (should_log)
             collector_error(
                 "MACOS: disabling powermetrics thermal/fan collection after repeated failures; "
-                "this usually means powermetrics is unavailable or netdata is not running with sufficient privileges");
+                "this usually means powermetrics is unavailable, netdata cannot run it with sufficient privileges, "
+                "or this macOS version does not expose the requested sampler");
 
         if (failed_permanently)
             break;
