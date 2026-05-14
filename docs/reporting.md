@@ -209,6 +209,34 @@ Replace `NODE_IP` with your Netdata Agent or Parent IP address:
 
 This endpoint is useful when you need metrics from a specific node or when your BI tool already integrates with Prometheus.
 
+Use the `filter` query parameter to export only matching charts. The filter accepts Netdata simple patterns matched against chart IDs and names (not dimensions or labels).
+
+**Pattern syntax:**
+
+| Syntax | Meaning | Example |
+|--------|---------|---------|
+| `text` | Exact match | `system.cpu` |
+| `prefix*` | Prefix match | `cgroup_*` |
+| `*suffix` | Suffix match | `*.cpu` |
+| `*substring*` | Substring match | `*myapp*` |
+| `!pattern` | Negation (exclude) | `!system.*` |
+| space-separated | Multiple patterns (OR) | `cgroup_* system.cpu` |
+
+**Filter cgroup metrics by name:**
+
+```bash
+# Export all cgroup charts
+curl 'http://NODE_IP:19999/api/v3/allmetrics?format=prometheus&filter=cgroup_*'
+
+# Match a specific cgroup by name (substring)
+curl 'http://NODE_IP:19999/api/v3/allmetrics?format=prometheus&filter=*mycontainer*'
+
+# Export all metrics for a specific cgroup (prefix match on chart ID)
+curl 'http://NODE_IP:19999/api/v3/allmetrics?format=prometheus&filter=cgroup_mycontainer.*'
+```
+
+Cgroup chart names include the cgroup identifier (for example, `cgroup_mycontainer.cpu`), so you can use the filter to target specific containers or services.
+
 #### REST API with JSON
 
 Query specific metrics from an Agent or Parent in JSON format. This is useful for BI tools that need to combine Netdata metrics with other business data.
