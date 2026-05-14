@@ -180,51 +180,82 @@ fn apply_topk_bottomk(
     let k = k_param as usize;
     let descending = matches!(op, AggrKind::TopK);
 
-    let mut by_bucket: BTreeMap<u64, Vec<Series>> = BTreeMap::new();
-    for s in series.into_iter() {
-        let key_labels = project_labels(&s.labels, grouping);
-        let key = labels_signature(&key_labels);
-        by_bucket.entry(key).or_default().push(s);
+    if series.is_empty() {
+        return Ok(EvalResult::InstantVector(Vec::new()));
     }
+    let n = series[0].samples.len();
+    let timestamps: Vec<i64> = series[0].samples.iter().map(|s| s.timestamp_ms).collect();
 
-    let mut out: Vec<Series> = Vec::new();
-    for (_, mut bucket) in by_bucket.into_iter() {
-        // Sort by sample value. NaN comparisons fall last with
-        // `total_cmp`, which keeps NaN-only entries from masking real
-        // candidates at the top.
-        bucket.sort_by(|a, b| {
-            let av = a.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
-            let bv = b.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
-            if descending {
-                bv.total_cmp(&av)
-            } else {
-                av.total_cmp(&bv)
-            }
-        });
-        // Drop any NaN-valued series from the kept slice (Prometheus
-        // skips them).
-        bucket.retain(|s| {
-            s.samples
-                .first()
-                .map(|sm| !sm.value.is_nan())
-                .unwrap_or(false)
-        });
-        bucket.truncate(k);
-        for s in bucket.into_iter() {
-            // Output preserves original labels minus __name__.
-            let labels: Vec<(String, String)> = s
-                .labels
-                .into_iter()
+    // Pre-compute per-input-series bucket key & stripped output labels.
+    // Output preserves the original labels minus __name__ -- distinct
+    // from sum/avg, which collapse to grouping labels only.
+    let bucket_keys: Vec<u64> = series
+        .iter()
+        .map(|s| labels_signature(&project_labels(&s.labels, grouping)))
+        .collect();
+    let stripped_labels: Vec<Vec<(String, String)>> = series
+        .iter()
+        .map(|s| {
+            s.labels
+                .iter()
                 .filter(|(n, _)| n != "__name__")
-                .collect();
-            let signature = labels_signature(&labels);
-            out.push(Series {
-                labels,
-                signature,
-                samples: s.samples,
+                .cloned()
+                .collect()
+        })
+        .collect();
+    let stripped_signatures: Vec<u64> = stripped_labels
+        .iter()
+        .map(|l| labels_signature(l))
+        .collect();
+
+    // accum keyed by output signature (stripped labels' signature).
+    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
+
+    for i in 0..n {
+        let ts = timestamps[i];
+        // Group input series indices by bucket at this position.
+        let mut by_bucket: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+        for (j, &k_) in bucket_keys.iter().enumerate() {
+            by_bucket.entry(k_).or_default().push(j);
+        }
+        for (_, mut indices) in by_bucket {
+            indices.sort_by(|&a, &b| {
+                let av = series[a].samples[i].value;
+                let bv = series[b].samples[i].value;
+                if descending {
+                    bv.total_cmp(&av)
+                } else {
+                    av.total_cmp(&bv)
+                }
             });
+            // Drop NaN candidates.
+            indices.retain(|&j| !series[j].samples[i].value.is_nan());
+            indices.truncate(k);
+            for &j in &indices {
+                let value = series[j].samples[i].value;
+                let entry = accum
+                    .entry(stripped_signatures[j])
+                    .or_insert_with(|| (stripped_labels[j].clone(), Vec::with_capacity(n)));
+                entry.1.push(Sample {
+                    timestamp_ms: ts,
+                    value,
+                });
+            }
         }
     }
+
+    let mut out: Vec<Series> = accum
+        .into_iter()
+        .map(|(_, (labels, samples))| {
+            let samples = pad_to_grid(samples, &timestamps);
+            let signature = labels_signature(&labels);
+            Series {
+                labels,
+                signature,
+                samples,
+            }
+        })
+        .collect();
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
@@ -237,38 +268,66 @@ fn apply_quantile(
     phi: f64,
     series: Vec<Series>,
 ) -> Result<EvalResult, EvalError> {
-    let mut by_bucket: BTreeMap<u64, (Vec<(String, String)>, Vec<f64>, i64)> = BTreeMap::new();
-    for s in series.into_iter() {
-        let key_labels = project_labels(&s.labels, grouping);
-        let key = labels_signature(&key_labels);
-        let v = s.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
-        let ts = s.samples.first().map(|s| s.timestamp_ms).unwrap_or(0);
-        let entry = by_bucket
-            .entry(key)
-            .or_insert_with(|| (key_labels.clone(), Vec::new(), ts));
-        if !v.is_nan() {
-            entry.1.push(v);
+    if series.is_empty() {
+        return Ok(EvalResult::InstantVector(Vec::new()));
+    }
+    let n = series[0].samples.len();
+    let timestamps: Vec<i64> = series[0].samples.iter().map(|s| s.timestamp_ms).collect();
+
+    let bucket_keys: Vec<(u64, Vec<(String, String)>)> = series
+        .iter()
+        .map(|s| {
+            let kl = project_labels(&s.labels, grouping);
+            (labels_signature(&kl), kl)
+        })
+        .collect();
+
+    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
+    for i in 0..n {
+        let ts = timestamps[i];
+        let mut per_bucket: BTreeMap<u64, (Vec<(String, String)>, Vec<f64>)> = BTreeMap::new();
+        for (j, s) in series.iter().enumerate() {
+            let v = s.samples[i].value;
+            let (key, key_labels) = &bucket_keys[j];
+            let entry = per_bucket
+                .entry(*key)
+                .or_insert_with(|| (key_labels.clone(), Vec::new()));
+            if !v.is_nan() {
+                entry.1.push(v);
+            }
+        }
+        for (key, (labels, mut values)) in per_bucket {
+            let value = if values.is_empty() {
+                f64::NAN
+            } else {
+                values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                compute_quantile(&values, phi)
+            };
+            let entry = accum
+                .entry(key)
+                .or_insert_with(|| (labels, Vec::with_capacity(n)));
+            entry.1.push(Sample {
+                timestamp_ms: ts,
+                value,
+            });
         }
     }
 
-    let mut out: Vec<Series> = Vec::new();
-    for (_, (labels, mut values, ts)) in by_bucket.into_iter() {
-        if values.is_empty() {
-            continue;
-        }
-        // Sort ascending for the standard rank-based interpolation.
-        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let value = compute_quantile(&values, phi);
-        let signature = labels_signature(&labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: ts,
-                value,
-            }],
-        });
-    }
+    let mut out: Vec<Series> = accum
+        .into_iter()
+        .filter_map(|(_, (labels, samples))| {
+            if samples.iter().all(|s| s.value.is_nan()) {
+                return None;
+            }
+            let samples = pad_to_grid(samples, &timestamps);
+            let signature = labels_signature(&labels);
+            Some(Series {
+                labels,
+                signature,
+                samples,
+            })
+        })
+        .collect();
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
@@ -288,39 +347,56 @@ fn apply_count_values(
     label: &str,
     series: Vec<Series>,
 ) -> Result<EvalResult, EvalError> {
-    // Bucket key = (signature of grouping projection, value-string).
-    // Value of each output series = bucket size.
-    let mut by_bucket: BTreeMap<(u64, String), (Vec<(String, String)>, u64, i64)> =
-        BTreeMap::new();
+    if series.is_empty() {
+        return Ok(EvalResult::InstantVector(Vec::new()));
+    }
+    let n = series[0].samples.len();
+    let timestamps: Vec<i64> = series[0].samples.iter().map(|s| s.timestamp_ms).collect();
 
-    for s in series.into_iter() {
-        let mut key_labels = project_labels(&s.labels, grouping);
-        let v = s.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
-        let ts = s.samples.first().map(|s| s.timestamp_ms).unwrap_or(0);
-        let value_str = format_value_for_label(v);
-        // The output series has the grouping labels plus
-        // `<label>=<value_str>`. Sort the final label list by name so
-        // signatures are stable.
-        key_labels.push((label.to_string(), value_str.clone()));
-        key_labels.sort_by(|a, b| a.0.cmp(&b.0));
-        let key_sig = labels_signature(&key_labels);
-        let entry = by_bucket
-            .entry((key_sig, value_str))
-            .or_insert_with(|| (key_labels.clone(), 0, ts));
-        entry.1 += 1;
+    let projected: Vec<Vec<(String, String)>> = series
+        .iter()
+        .map(|s| project_labels(&s.labels, grouping))
+        .collect();
+
+    // accum keyed by output signature (with the new label slot
+    // applied). Value at each grid position is the bucket count.
+    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
+    for i in 0..n {
+        let ts = timestamps[i];
+        // Bucket count per (signature, value_str) at this position.
+        let mut per_bucket: BTreeMap<u64, (Vec<(String, String)>, u64)> = BTreeMap::new();
+        for (j, s) in series.iter().enumerate() {
+            let v = s.samples[i].value;
+            let value_str = format_value_for_label(v);
+            let mut output_labels = projected[j].clone();
+            output_labels.push((label.to_string(), value_str));
+            output_labels.sort_by(|a, b| a.0.cmp(&b.0));
+            let sig = labels_signature(&output_labels);
+            let entry = per_bucket
+                .entry(sig)
+                .or_insert_with(|| (output_labels, 0));
+            entry.1 += 1;
+        }
+        for (sig, (labels, count)) in per_bucket {
+            let entry = accum
+                .entry(sig)
+                .or_insert_with(|| (labels, Vec::with_capacity(n)));
+            entry.1.push(Sample {
+                timestamp_ms: ts,
+                value: count as f64,
+            });
+        }
     }
 
-    let mut out: Vec<Series> = by_bucket
+    let mut out: Vec<Series> = accum
         .into_iter()
-        .map(|((_, _), (labels, count, ts))| {
+        .map(|(_, (labels, samples))| {
+            let samples = pad_to_grid(samples, &timestamps);
             let signature = labels_signature(&labels);
             Series {
                 labels,
                 signature,
-                samples: vec![Sample {
-                    timestamp_ms: ts,
-                    value: count as f64,
-                }],
+                samples,
             }
         })
         .collect();

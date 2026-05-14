@@ -85,9 +85,9 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
         Plan::Call { func, args } => {
             // `time()` and `vector(s)` need the eval-context timestamp to
             // produce their output; the rest go through the
-            // context-independent dispatcher in `functions::apply_call`.
-            // Keeping the special cases here avoids threading `ctx`
-            // through every per-sample helper.
+            // context-aware dispatcher in `functions::apply_call`.
+            // Keeping the special cases here avoids threading the
+            // grid through every per-sample helper.
             match func {
                 FuncKind::Time => {
                     if !args.is_empty() {
@@ -125,11 +125,20 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
                 }
                 _ => {}
             }
+            // SOW-0031: rollup functions need the range window so they
+            // can two-pointer-window per grid point. The window comes
+            // from the first argument when it is a matrix selector or
+            // a subquery; otherwise None.
+            let range_ms: Option<i64> = args.first().and_then(|a| match a {
+                Plan::MatrixSelect { range_ms, .. } => Some(*range_ms),
+                Plan::Subquery { range_ms, .. } => Some(*range_ms),
+                _ => None,
+            });
             let mut evaled = Vec::with_capacity(args.len());
             for a in args {
                 evaled.push(eval(ctx, a)?);
             }
-            super::functions::apply_call(*func, evaled)
+            super::functions::apply_call(ctx, *func, evaled, range_ms)
         }
 
         Plan::Subquery {

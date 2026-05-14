@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// `absent` and `absent_over_time`. SOW-0027 Group G.
+// `absent` and `absent_over_time`. SOW-0027 Group G, rewritten for
+// SOW-0031.
 //
-// Both functions return a single 1-valued series when their inner
-// expression yielded no data, with labels carried from the static `=`
-// matchers on the inner selector (extracted at lowering time and
-// stored in the Plan::Absent variant). When the inner expression
-// produced any series, both functions return the empty vector.
+// Both functions return a 1-valued series at every grid point where the
+// inner expression yielded no data, with labels carried from the
+// static `=` matchers on the inner selector (extracted at lowering time
+// and stored in the `Plan::Absent` variant). At grid points where the
+// inner produced any series with a non-NaN value, the output is NaN.
+// If every grid point has data present, the output vector is empty.
 //
 // The two variants are folded into one evaluator path; the
-// instant-vs-range distinction lives in the inner Plan's return
-// type and the evaluator only needs to look at "did anything come
-// back".
+// instant-vs-range distinction lives in the inner Plan's return type
+// and the evaluator only needs to look at "is data present at this grid
+// point?".
 
 use super::context::EvalContext;
 use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
@@ -21,23 +23,81 @@ pub fn eval_absent(
     labels: &[(String, String)],
     inner: EvalResult,
 ) -> Result<EvalResult, EvalError> {
-    let any = match &inner {
-        EvalResult::InstantVector(s) => !s.is_empty(),
-        EvalResult::RangeVector(s) => !s.is_empty(),
-        EvalResult::Scalar(_) => true,
-    };
-    if any {
+    let grid = &ctx.grid;
+    let n = grid.len();
+
+    // For each grid position, decide "is data present here?".
+    let mut present = vec![false; n];
+
+    match &inner {
+        EvalResult::Scalar(v) => {
+            // A scalar is always-present unless it's literally NaN.
+            // (No grid position discrimination.)
+            if !v.is_nan() {
+                return Ok(EvalResult::InstantVector(Vec::new()));
+            }
+            // A NaN scalar = absent at every grid point: fall through
+            // with `present` all false.
+        }
+        EvalResult::InstantVector(series) => {
+            for s in series {
+                for (i, sm) in s.samples.iter().enumerate() {
+                    if i >= n {
+                        break;
+                    }
+                    if !sm.value.is_nan() {
+                        present[i] = true;
+                    }
+                }
+            }
+        }
+        EvalResult::RangeVector(series) => {
+            // For absent_over_time: the inner range vector spans the
+            // matrix window for each grid point. SOW-0031 selectors
+            // emit samples across the whole [grid.start - range, grid.end]
+            // window without per-grid-point segmentation, so to decide
+            // presence at grid point `t` we'd need range_ms here. The
+            // dispatch layer doesn't currently pass range_ms to absent;
+            // approximate: if any series has any non-NaN sample at all,
+            // mark every grid point as present. Refining this needs the
+            // same range_ms threading that the rollup family uses --
+            // tracked as a follow-up.
+            let any_present = series.iter().any(|s| s.samples.iter().any(|x| !x.value.is_nan()));
+            if any_present {
+                return Ok(EvalResult::InstantVector(Vec::new()));
+            }
+        }
+    }
+
+    // Build the output samples. A grid point is "absent" when present[i]
+    // is false; emit 1 there. Present points emit NaN.
+    let mut absent_count = 0usize;
+    let samples: Vec<Sample> = (0..n)
+        .map(|i| {
+            let value = if present[i] {
+                f64::NAN
+            } else {
+                absent_count += 1;
+                1.0
+            };
+            Sample {
+                timestamp_ms: grid.timestamps[i],
+                value,
+            }
+        })
+        .collect();
+
+    // If no grid point was absent, emit no series.
+    if absent_count == 0 {
         return Ok(EvalResult::InstantVector(Vec::new()));
     }
+
     let labels: Vec<(String, String)> = labels.to_vec();
     let signature = labels_signature(&labels);
     Ok(EvalResult::InstantVector(vec![Series {
         labels,
         signature,
-        samples: vec![Sample {
-            timestamp_ms: ctx.at_ms(),
-            value: 1.0,
-        }],
+        samples,
     }]))
 }
 

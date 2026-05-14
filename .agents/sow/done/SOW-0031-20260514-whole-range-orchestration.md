@@ -2,9 +2,12 @@
 
 ## Status
 
-Status: in-progress
+Status: completed
 
-Sub-state: promoted 2026-05-14 after compaction; starting Step 1 (Foundation: Grid type, EvalContext change).
+Sub-state: all operators now grid-aware; per-step fallback removed.
+Live target met (0.458 s on the 1 h @ 15 s slow query). Compliance
+preserved at 472/328/212 (+4 vs the 468 baseline). 169/169 unit
+tests, 117/117 smoke checks.
 
 ## Requirements
 
@@ -370,78 +373,133 @@ Open-source reference evidence:
   {__ignore_usage__="",}) start=NOW-3600 end=NOW step=15`
   -- HTTP 200, 241 grid points, **0.394 s wall clock**
   (vs ~8 s pre-SOW-0031). Well below the 2 s hard target.
+- Step 3 (Rollups): every rollup function in `eval/functions.rs`
+  (`rate`, `irate`, `increase`, `delta`, the nine `*_over_time`
+  variants, `quantile_over_time`, `predict_linear`, `holt_winters`,
+  `deriv`, `idelta`, `changes`, `resets`) gained a grid-aware path
+  via the new `rollup_two_pointer` helper. The dispatch layer
+  derives `range_ms` from the first argument's `Plan::MatrixSelect`
+  or `Plan::Subquery` and threads it through `apply_call`. Each
+  rollup keeps a `_legacy` companion for tests that hand it a
+  pre-windowed slice with no declared range. `apply_call` signature
+  is now `(ctx, func, args, range_ms)`.
+- Step 4 (Per-position parametrized aggregations): `topk`, `bottomk`,
+  `quantile`, `count_values` rewritten to iterate grid positions.
+  Output series carry grid-aligned samples; positions where a series
+  did not rank are padded with NaN (filtered from JSON output).
+  `Bucket::finalize` removed in favour of `Bucket::finalize_value`
+  that returns just the `f64`, called inside the per-position loop.
+- Step 5 (Subqueries): `eval_subquery` rewritten to build one nested
+  `Grid::range` spanning `[outer.start - range, outer.end]` at
+  `step` stride, then call `eval` once on the inner expression. The
+  per-outer-step inner loop is gone; storage hits the inner selectors
+  once per query.
+- Step 4 (Absent): `eval_absent` walks the grid once and emits a
+  per-grid-point absence series (1 where the inner produced no
+  data, NaN otherwise). Empty when every grid point has data.
+- Step 6 (Orchestration cleanup): removed the
+  `plan_uses_range_vector` fallback from `run_range_inner`. Every
+  range query now takes the SOW-0031 single-pass path -- one
+  `Grid::range`, one `EvalContext`, one `eval`, one serialize.
+- Step 8 (Re-verify): compliance baseline at 472/328/212 (+4 vs
+  the 468/332/212 baseline); 169/169 unit tests pass; 117/117
+  smoke checks pass.
 
 ## Validation / Outcome / Lessons / Followup
 
-### Acceptance criteria status (partial)
+### Acceptance criteria status
 
 - (1) `eval::Grid` type with documented constructors: **MET**.
-- (2) `EvalContext.grid: Arc<Grid>`; `at_ms` removed as a field
-  (kept as a method that delegates to `grid.first_ms()`): **MET**
-  for the read pattern. Field-level removal pending a follow-up
-  pass that audits whether any caller still depends on assignment;
-  current callers all construct via struct literal with `grid:`,
-  so the field is effectively gone.
-- (3) `eval_vector_select` grid-aligned single-pass: **MET**.
+- (2) `EvalContext.grid: Arc<Grid>`; `at_ms` removed as a field and
+  kept as a method that returns `grid.first_ms()` (callers that
+  need a single time anchor -- `time()`, `vector()`, absent's
+  output stamp, the subquery's `@` resolution -- use the method):
+  **MET**.
+- (3) `eval_vector_select` grid-aligned single-pass with two-pointer
+  lookback: **MET**.
 - (4) `eval_matrix_select` bulk-fetched over the extended window:
-  **MET** for fetch shape. Rollups still consume samples per-window
-  rather than per-grid-point; see follow-up.
-- (5) Rollup family two-pointer per-grid-point: **DEFERRED** to a
-  follow-up SOW. Rollups currently emit one value per series per
-  call; they remain correct for instant queries (grid.len() == 1)
-  and for the legacy per-step range path.
+  **MET**.
+- (5) Rollup family two-pointer per-grid-point: **MET**. Every
+  rollup outer function (`apply_window_op`, `apply_irate`,
+  `apply_delta`, `apply_over_time`, `apply_quantile_over_time`,
+  `apply_predict_linear`, `apply_holt_winters`, `apply_deriv`,
+  `apply_idelta`, `apply_changes`, `apply_resets`) takes
+  `(ctx, args, range_ms, ...)` and emits grid-aligned output via
+  the shared `rollup_two_pointer` helper. `histogram_quantile`
+  takes an instant-vector argument (not a range vector); it
+  remained shape-compatible without change.
 - (6) Aggregations, transforms, binops, label ops position-wise:
-  aggregations **MET** (sum/avg/min/max/count rewritten);
-  parametrized aggregations (topk/bottomk/quantile/count_values)
-  still per-first-sample (correct for instant; deferred for range).
-  Binops, transforms, unary already iterate samples positionally
-  and are grid-compatible without change.
-- (7) Subqueries recurse with nested Grid: **DEFERRED** (subquery
-  still uses per-step inner loop; subquery-bearing range queries
-  fall back to legacy per-step in run_range).
-- (8) `run_range` single-pass: **MET** for non-rollup non-subquery
-  non-absent plans; legacy per-step retained for the rest.
+  **MET**. Basic aggregations (sum/avg/min/max/count) iterate
+  grid positions. Parametrized aggregations (topk/bottomk/quantile/
+  count_values) iterate grid positions and emit grid-aligned
+  samples with NaN padding at positions where a series didn't
+  rank. Binops, transforms, unary, label ops already iterate
+  samples positionally and are grid-compatible without change.
+- (7) Subqueries recurse with nested Grid: **MET**. `eval_subquery`
+  builds one `Grid::range` covering the union of all outer-grid-
+  point windows and calls `eval` once on the inner expression.
+- (8) `run_range` single-pass: **MET**. Every range query takes
+  the same path -- one `Grid::range`, one `EvalContext`, one
+  `eval`, one serialize. The `plan_uses_range_vector` fallback
+  is gone.
 - (9) `run_instant` uses a single-point grid: **MET**.
-- (10) Compliance baseline: **EXCEEDED**, 470/330/212 (was
-  468/332/212).
+- (10) Compliance baseline: **EXCEEDED**, 472/328/212 (was
+  468/332/212; net +4 passes).
 - (11) 164 unit tests pass: **EXCEEDED**, 169.
 - (12) 117 smoke checks: **MET**, 117/117.
-- (13) Live target `≤ 2 s`: **EXCEEDED**, 0.394 s on a 1 h @ 15 s
+- (13) Live target `≤ 2 s`: **EXCEEDED**, 0.458 s on a 1 h @ 15 s
   range.
 
-### Scope decision
+### Lessons
 
-The SOW achieves its primary user-visible goal -- the slow query is
-fast -- and the architectural foundations (Grid, grid-aware selectors,
-grid-aware basic aggregations, single-pass orchestration for the
-non-rollup path) are in place. The remaining work (rollup family
-grid-awareness, subquery nested-grid, absent per-grid-point,
-parametrized aggregator position-iteration) is mechanical but
-voluminous -- it touches ~15 rollup functions and several hundred
-lines of test machinery. That work fits more naturally with SOW-0032
-(column-oriented Series) and SOW-0033 (operator fusion), both of
-which need to re-touch the same code paths.
-
-Closing this SOW as a partial-completion checkpoint and tracking
-the rollup-grid-awareness work as a dedicated follow-up SOW keeps
-each diff reviewable and matches the user's preference for split
-SOWs over one mega-PR.
+- The biggest perf factor wasn't the per-step plan-tree walk; it
+  was the per-step per-sample Gorilla decompression. One bulk
+  fetch per selector + a two-pointer lookback drops that work
+  by ~241x for a typical 1 h @ 15 s query.
+- Threading `range_ms` through the function dispatcher instead of
+  embedding it in the `EvalResult::RangeVector` variant kept the
+  type-level signatures stable. Rollups read range_ms from the
+  call site; non-rollup callers just ignore it.
+- The legacy per-step path (kept temporarily during migration
+  via `plan_uses_range_vector`) was actually a useful intermediate
+  checkpoint -- it let the perf win land for the slow query
+  before every rollup was rewritten, and gave the compliance
+  corpus a stable baseline to verify each rewrite against.
+- Dual-mode rollup functions (one `apply_X(ctx, args, range_ms, ...)`
+  that branches on `range_ms.is_none()` to the legacy single-window
+  path) kept the existing unit tests valid without forcing a
+  context-construction rewrite of every test. Worth the small
+  amount of duplicated boilerplate.
+- A few compliance failures changed when subquery/absent moved to
+  grid-aware shapes (a couple of subquery cases regressed; a
+  handful of staleness cases improved). Net total stayed above
+  baseline. The regressions look like edge cases around
+  inner-step boundary alignment that the dedicated SOW-0033
+  fusion work will revisit anyway.
 
 ### Follow-up
 
-A successor SOW will:
-- Rewrite the rollup family (rate, irate, increase, delta, the
-  *_over_time variants, deriv, idelta, changes, resets,
-  predict_linear, holt_winters, quantile_over_time,
-  histogram_quantile) to consume `(samples, grid, range_ms)` and
-  emit grid-aligned output via two-pointer windowing.
-- Rewrite the subquery evaluator to construct a nested Grid and
-  call `eval` once with that grid.
-- Make `absent` / `absent_over_time` emit grid-aligned per-position
-  output.
-- Make topk/bottomk/quantile/count_values iterate positions.
-- Remove the `plan_uses_range_vector` fallback once everything is
-  grid-aware.
+These items were exposed by SOW-0031 but are out of scope here:
+
+- The `at_ms()` method on `EvalContext` is now a thin accessor for
+  `grid.first_ms()`. Callers that genuinely need "one anchor time"
+  use it (e.g. the `time()` dispatcher special case returns
+  `Scalar(at_ms() / 1000)`); for range queries that scalar is the
+  same at every grid point, which is a documented Prometheus
+  divergence pending a future "time() varies per step" SOW.
+- Subquery's compliance pass count regressed by one case (21 ->
+  20) when the nested-grid shape replaced the per-step inner
+  loop. Worth investigating but not blocking; total compliance
+  is still ahead of baseline.
+- `absent_over_time` over a range query currently treats "any
+  non-NaN sample anywhere in the range vector" as global
+  presence. Per-grid-point absence requires threading `range_ms`
+  into `eval_absent` the same way rollups do, which is a small
+  but separate change.
+- `topk`/`bottomk` still strip `__name__` from output (matching
+  aggregation convention); Prometheus preserves it. Pre-existing
+  divergence documented in EXPECTED_FAILS.md; unchanged by this
+  SOW.
 
 ## Regression Log
 

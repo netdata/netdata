@@ -13,27 +13,33 @@ use std::collections::BTreeMap;
 
 use crate::plan::FuncKind;
 
+use super::context::EvalContext;
 use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
 
-pub fn apply_call(func: FuncKind, args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+pub fn apply_call(
+    ctx: &EvalContext,
+    func: FuncKind,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
     match func {
-        FuncKind::Rate => apply_window_op(args, WindowOp::Rate),
-        FuncKind::Increase => apply_window_op(args, WindowOp::Increase),
-        FuncKind::IRate => apply_irate(args),
-        FuncKind::Delta => apply_delta(args),
+        FuncKind::Rate => apply_window_op(ctx, args, range_ms, WindowOp::Rate),
+        FuncKind::Increase => apply_window_op(ctx, args, range_ms, WindowOp::Increase),
+        FuncKind::IRate => apply_irate(ctx, args, range_ms),
+        FuncKind::Delta => apply_delta(ctx, args, range_ms),
         FuncKind::HistogramQuantile => apply_histogram_quantile(args),
-        FuncKind::AvgOverTime => apply_over_time(args, OverTimeOp::Avg),
-        FuncKind::SumOverTime => apply_over_time(args, OverTimeOp::Sum),
-        FuncKind::MinOverTime => apply_over_time(args, OverTimeOp::Min),
-        FuncKind::MaxOverTime => apply_over_time(args, OverTimeOp::Max),
-        FuncKind::CountOverTime => apply_over_time(args, OverTimeOp::Count),
-        FuncKind::LastOverTime => apply_over_time(args, OverTimeOp::Last),
-        FuncKind::PresentOverTime => apply_over_time(args, OverTimeOp::Present),
-        FuncKind::StddevOverTime => apply_over_time(args, OverTimeOp::Stddev),
-        FuncKind::StdvarOverTime => apply_over_time(args, OverTimeOp::Stdvar),
-        FuncKind::QuantileOverTime => apply_quantile_over_time(args),
-        FuncKind::PredictLinear => apply_predict_linear(args),
-        FuncKind::HoltWinters => apply_holt_winters(args),
+        FuncKind::AvgOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Avg),
+        FuncKind::SumOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Sum),
+        FuncKind::MinOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Min),
+        FuncKind::MaxOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Max),
+        FuncKind::CountOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Count),
+        FuncKind::LastOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Last),
+        FuncKind::PresentOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Present),
+        FuncKind::StddevOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Stddev),
+        FuncKind::StdvarOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Stdvar),
+        FuncKind::QuantileOverTime => apply_quantile_over_time(ctx, args, range_ms),
+        FuncKind::PredictLinear => apply_predict_linear(ctx, args, range_ms),
+        FuncKind::HoltWinters => apply_holt_winters(ctx, args, range_ms),
         // SOW-0027 Group A: per-sample math transforms.
         FuncKind::Abs => apply_per_sample(args, "abs", f64::abs),
         FuncKind::Ceil => apply_per_sample(args, "ceil", f64::ceil),
@@ -64,11 +70,47 @@ pub fn apply_call(func: FuncKind, args: Vec<EvalResult>) -> Result<EvalResult, E
         )),
         FuncKind::Timestamp => apply_timestamp(args),
         // SOW-0027 Group E: range-vector reductions.
-        FuncKind::Deriv => apply_deriv(args),
-        FuncKind::IDelta => apply_idelta(args),
-        FuncKind::Changes => apply_changes(args),
-        FuncKind::Resets => apply_resets(args),
+        FuncKind::Deriv => apply_deriv(ctx, args, range_ms),
+        FuncKind::IDelta => apply_idelta(ctx, args, range_ms),
+        FuncKind::Changes => apply_changes(ctx, args, range_ms),
+        FuncKind::Resets => apply_resets(ctx, args, range_ms),
     }
+}
+
+/// Apply `compute` to a sliding window over `samples` at each grid
+/// timestamp. The window is the half-open `(t - range_ms, t]`. Returns
+/// one `Sample` per grid timestamp; positions where `compute` returns
+/// `None` get a NaN sample. Used by every range-vector rollup to
+/// produce grid-aligned output in a single pass over the underlying
+/// sample sequence. SOW-0031.
+fn rollup_two_pointer<F>(
+    samples: &[Sample],
+    grid_ts: &[i64],
+    range_ms: i64,
+    mut compute: F,
+) -> Vec<Sample>
+where
+    F: FnMut(&[Sample]) -> Option<f64>,
+{
+    let mut out = Vec::with_capacity(grid_ts.len());
+    let mut left: usize = 0;
+    let mut right: usize = 0;
+    for &t in grid_ts {
+        let lower = t.saturating_sub(range_ms);
+        while right < samples.len() && samples[right].timestamp_ms <= t {
+            right += 1;
+        }
+        while left < right && samples[left].timestamp_ms <= lower {
+            left += 1;
+        }
+        let window = &samples[left..right];
+        let value = compute(window).unwrap_or(f64::NAN);
+        out.push(Sample {
+            timestamp_ms: t,
+            value,
+        });
+    }
+    out
 }
 
 /// Windowed aggregator selector. The variants correspond to the seven
@@ -113,14 +155,51 @@ impl OverTimeOp {
     }
 }
 
-fn apply_over_time(args: Vec<EvalResult>, op: OverTimeOp) -> Result<EvalResult, EvalError> {
+fn apply_over_time(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+    op: OverTimeOp,
+) -> Result<EvalResult, EvalError> {
     let range = expect_one_range_vector(args, op.name())?;
 
+    // Tests and other callers that hand us a pre-windowed slice without
+    // declaring the matrix [range] go through the legacy single-window
+    // path: one output sample per input series, stamped at the latest
+    // non-NaN sample.
+    let Some(window_ms) = range_ms else {
+        return apply_over_time_legacy(range, op);
+    };
+
+    let grid = &ctx.grid;
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
+            compute_over_time(window, op).map(|(v, _)| v)
+        });
+        if samples.iter().all(|p| p.value.is_nan()) {
+            continue;
+        }
+        let (labels, signature) = if op.keep_name() {
+            let signature = labels_signature(&s.labels);
+            (s.labels, signature)
+        } else {
+            strip_name(&s.labels)
+        };
+        out.push(Series {
+            labels,
+            signature,
+            samples,
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn apply_over_time_legacy(range: Vec<Series>, op: OverTimeOp) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
         let Some((value, ts_ms)) = compute_over_time(&s.samples, op) else {
-            // Empty window (no non-NaN samples) -> drop the series. This
-            // matches Prometheus' "no observation, no output" rule.
             continue;
         };
         let (labels, signature) = if op.keep_name() {
@@ -246,13 +325,41 @@ fn expect_one_range_vector(args: Vec<EvalResult>, func: &'static str) -> Result<
     }
 }
 
-fn apply_window_op(args: Vec<EvalResult>, op: WindowOp) -> Result<EvalResult, EvalError> {
+fn apply_window_op(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+    op: WindowOp,
+) -> Result<EvalResult, EvalError> {
     let name = match op {
         WindowOp::Rate => "rate",
         WindowOp::Increase => "increase",
     };
     let range = expect_one_range_vector(args, name)?;
+    let Some(window_ms) = range_ms else {
+        return apply_window_op_legacy(range, op);
+    };
+    let grid = &ctx.grid;
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
+            compute_window_op(window, op)
+        });
+        if samples.iter().all(|p| p.value.is_nan()) {
+            continue;
+        }
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples,
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
 
+fn apply_window_op_legacy(range: Vec<Series>, op: WindowOp) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
         let Some(value) = compute_window_op(&s.samples, op) else { continue };
@@ -303,34 +410,60 @@ fn compute_window_op(samples: &[Sample], op: WindowOp) -> Option<f64> {
 /// irate: the per-second rate computed from the last two samples only.
 /// Used for high-frequency change detection where rate() over a window
 /// would smooth too aggressively.
-fn apply_irate(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+fn apply_irate(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
     let range = expect_one_range_vector(args, "irate")?;
+    let Some(window_ms) = range_ms else {
+        return apply_irate_legacy(range);
+    };
+    let grid = &ctx.grid;
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let n = s.samples.len();
-        if n < 1 {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
+            compute_irate(window)
+        });
+        if samples.iter().all(|p| p.value.is_nan()) {
             continue;
         }
-        // For stored deltas, the last sample IS the per-bucket delta.
-        // irate is that delta divided by the bucket width. The bucket
-        // width is the gap between the last two stored timestamps; if
-        // we only have one sample we can't infer it.
-        if n < 2 {
-            continue;
-        }
-        let last = s.samples[n - 1];
-        let prev = s.samples[n - 2];
-        let dt_ms = (last.timestamp_ms - prev.timestamp_ms).max(0);
-        if dt_ms <= 0 || last.value.is_nan() {
-            continue;
-        }
-        let value = last.value / (dt_ms as f64 / 1000.0);
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples,
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn compute_irate(samples: &[Sample]) -> Option<f64> {
+    let n = samples.len();
+    if n < 2 {
+        return None;
+    }
+    let last = samples[n - 1];
+    let prev = samples[n - 2];
+    let dt_ms = (last.timestamp_ms - prev.timestamp_ms).max(0);
+    if dt_ms <= 0 || last.value.is_nan() {
+        return None;
+    }
+    Some(last.value / (dt_ms as f64 / 1000.0))
+}
+
+fn apply_irate_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let Some(value) = compute_irate(&s.samples) else { continue };
+        let ts = s.samples.last().map(|p| p.timestamp_ms).unwrap_or(0);
         let (labels, signature) = strip_name(&s.labels);
         out.push(Series {
             labels,
             signature,
             samples: vec![Sample {
-                timestamp_ms: last.timestamp_ms,
+                timestamp_ms: ts,
                 value,
             }],
         });
@@ -344,25 +477,58 @@ fn apply_irate(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
 /// stored values are already deltas, this returns the difference of two
 /// deltas -- not what the user wants. Use rate()/increase() on counters
 /// and delta() on gauges. We do not detect or warn.
-fn apply_delta(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+fn apply_delta(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
     let range = expect_one_range_vector(args, "delta")?;
+    let Some(window_ms) = range_ms else {
+        return apply_delta_legacy(range);
+    };
+    let grid = &ctx.grid;
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        if s.samples.len() < 2 {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
+            compute_delta(window)
+        });
+        if samples.iter().all(|p| p.value.is_nan()) {
             continue;
         }
-        let first = s.samples.first().copied().unwrap();
-        let last = s.samples.last().copied().unwrap();
-        if first.value.is_nan() || last.value.is_nan() {
-            continue;
-        }
-        let value = last.value - first.value;
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples,
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn compute_delta(samples: &[Sample]) -> Option<f64> {
+    if samples.len() < 2 {
+        return None;
+    }
+    let first = samples.first().copied()?;
+    let last = samples.last().copied()?;
+    if first.value.is_nan() || last.value.is_nan() {
+        return None;
+    }
+    Some(last.value - first.value)
+}
+
+fn apply_delta_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let Some(value) = compute_delta(&s.samples) else { continue };
+        let ts = s.samples.last().map(|p| p.timestamp_ms).unwrap_or(0);
         let (labels, signature) = strip_name(&s.labels);
         out.push(Series {
             labels,
             signature,
             samples: vec![Sample {
-                timestamp_ms: last.timestamp_ms,
+                timestamp_ms: ts,
                 value,
             }],
         });
@@ -546,21 +712,55 @@ fn interpolate_quantile(buckets: &[HBucket], phi: f64) -> Option<f64> {
 /// samples ascending and apply the same linear-interpolation formula
 /// used by the `quantile` aggregator (SOW-0021). Phi outside [0, 1]
 /// clamps to +-Inf per Prometheus. Empty window drops the series.
-fn apply_quantile_over_time(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+fn apply_quantile_over_time(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
     let (phi, range) = expect_scalar_then_range(args, "quantile_over_time")?;
+    let Some(window_ms) = range_ms else {
+        return apply_quantile_over_time_legacy(phi, range);
+    };
+    let grid = &ctx.grid;
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let mut values: Vec<f64> = s
-            .samples
-            .iter()
-            .map(|sm| sm.value)
-            .filter(|v| !v.is_nan())
-            .collect();
-        if values.is_empty() {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
+            compute_quantile_over_window(window, phi)
+        });
+        if samples.iter().all(|p| p.value.is_nan()) {
             continue;
         }
-        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let value = crate::eval::aggregation::compute_quantile(&values, phi);
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples,
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn compute_quantile_over_window(samples: &[Sample], phi: f64) -> Option<f64> {
+    let mut values: Vec<f64> = samples
+        .iter()
+        .map(|sm| sm.value)
+        .filter(|v| !v.is_nan())
+        .collect();
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    Some(crate::eval::aggregation::compute_quantile(&values, phi))
+}
+
+fn apply_quantile_over_time_legacy(
+    phi: f64,
+    range: Vec<Series>,
+) -> Result<EvalResult, EvalError> {
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let Some(value) = compute_quantile_over_window(&s.samples, phi) else { continue };
         let ts = s
             .samples
             .iter()
@@ -584,65 +784,98 @@ fn apply_quantile_over_time(args: Vec<EvalResult>) -> Result<EvalResult, EvalErr
 /// least squares, then return `intercept + slope * t` -- the
 /// extrapolated value `t` seconds in the future. Window with fewer
 /// than 2 distinct timestamps drops the series.
-fn apply_predict_linear(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+fn apply_predict_linear(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
     let (range, t_secs) = expect_range_then_scalar(args, "predict_linear")?;
+    let Some(window_ms) = range_ms else {
+        return apply_predict_linear_legacy(range, t_secs);
+    };
+    let grid = &ctx.grid;
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        // Reference time = the most recent sample's timestamp; we
-        // center x values around it so the slope/intercept arithmetic
-        // doesn't blow up on epoch-scale Unix timestamps.
-        let Some(last_ts_ms) = s.samples.iter().rev().find_map(|sm| {
-            if sm.value.is_nan() {
-                None
-            } else {
-                Some(sm.timestamp_ms)
-            }
-        }) else {
-            continue;
-        };
-        let now_s = (last_ts_ms as f64) / 1000.0;
-        let mut n = 0.0;
-        let mut sum_x = 0.0;
-        let mut sum_y = 0.0;
-        let mut sum_xx = 0.0;
-        let mut sum_xy = 0.0;
-        let mut first_x = f64::NAN;
-        let mut distinct_x = false;
-        for sm in &s.samples {
-            if sm.value.is_nan() {
-                continue;
-            }
-            let x = (sm.timestamp_ms as f64) / 1000.0 - now_s;
-            let y = sm.value;
-            if first_x.is_nan() {
-                first_x = x;
-            } else if x != first_x {
-                distinct_x = true;
-            }
-            n += 1.0;
-            sum_x += x;
-            sum_y += y;
-            sum_xx += x * x;
-            sum_xy += x * y;
-        }
-        if n < 2.0 || !distinct_x {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
+            compute_predict_linear(window, t_secs)
+        });
+        if samples.iter().all(|p| p.value.is_nan()) {
             continue;
         }
-        let denom = n * sum_xx - sum_x * sum_x;
-        if denom == 0.0 {
-            continue;
-        }
-        let slope = (n * sum_xy - sum_x * sum_y) / denom;
-        let intercept = (sum_y - slope * sum_x) / n;
-        let value = intercept + slope * t_secs;
         let (labels, signature) = strip_name(&s.labels);
         out.push(Series {
             labels,
             signature,
-            samples: vec![Sample {
-                timestamp_ms: last_ts_ms,
-                value,
-            }],
+            samples,
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn compute_predict_linear(samples: &[Sample], t_secs: f64) -> Option<f64> {
+    let last_ts_ms = samples.iter().rev().find_map(|sm| {
+        if sm.value.is_nan() {
+            None
+        } else {
+            Some(sm.timestamp_ms)
+        }
+    })?;
+    let now_s = (last_ts_ms as f64) / 1000.0;
+    let mut n = 0.0;
+    let mut sum_x = 0.0;
+    let mut sum_y = 0.0;
+    let mut sum_xx = 0.0;
+    let mut sum_xy = 0.0;
+    let mut first_x = f64::NAN;
+    let mut distinct_x = false;
+    for sm in samples {
+        if sm.value.is_nan() {
+            continue;
+        }
+        let x = (sm.timestamp_ms as f64) / 1000.0 - now_s;
+        let y = sm.value;
+        if first_x.is_nan() {
+            first_x = x;
+        } else if x != first_x {
+            distinct_x = true;
+        }
+        n += 1.0;
+        sum_x += x;
+        sum_y += y;
+        sum_xx += x * x;
+        sum_xy += x * y;
+    }
+    if n < 2.0 || !distinct_x {
+        return None;
+    }
+    let denom = n * sum_xx - sum_x * sum_x;
+    if denom == 0.0 {
+        return None;
+    }
+    let slope = (n * sum_xy - sum_x * sum_y) / denom;
+    let intercept = (sum_y - slope * sum_x) / n;
+    Some(intercept + slope * t_secs)
+}
+
+fn apply_predict_linear_legacy(
+    range: Vec<Series>,
+    t_secs: f64,
+) -> Result<EvalResult, EvalError> {
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let Some(value) = compute_predict_linear(&s.samples, t_secs) else { continue };
+        let last_ts_ms = s
+            .samples
+            .iter()
+            .rev()
+            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .unwrap_or(0);
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample { timestamp_ms: last_ts_ms, value }],
         });
     }
     out.sort_by_key(|s| s.signature);
@@ -652,7 +885,11 @@ fn apply_predict_linear(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> 
 /// holt_winters(range_vector, sf, tf): double-exponential smoothing.
 /// Both factors must be in (0, 1]; out-of-range params -> evaluation
 /// error. Returns the smoothed value at the end of the window.
-fn apply_holt_winters(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+fn apply_holt_winters(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
     let (range, sf, tf) = expect_range_then_two_scalars(args, "holt_winters")?;
     if !(sf > 0.0 && sf <= 1.0) {
         return Err(EvalError::Other(format!(
@@ -664,35 +901,69 @@ fn apply_holt_winters(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
             "holt_winters: trend factor must be in (0, 1]; got {tf}"
         )));
     }
+    let Some(window_ms) = range_ms else {
+        return apply_holt_winters_legacy(range, sf, tf);
+    };
+    let grid = &ctx.grid;
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        // Walk non-NaN samples chronologically.
-        let mut iter = s.samples.iter().filter(|sm| !sm.value.is_nan());
-        let Some(first) = iter.next() else { continue };
-        let Some(second) = iter.next() else { continue };
-        let mut s_prev = first.value;
-        let mut b_prev = second.value - first.value;
-        let mut s_curr = second.value;
-        let mut last_ts = second.timestamp_ms;
-        // Update with the second sample first to set s_curr.
-        s_curr = sf * second.value + (1.0 - sf) * (s_prev + b_prev);
-        b_prev = tf * (s_curr - s_prev) + (1.0 - tf) * b_prev;
-        s_prev = s_curr;
-        for sm in iter {
-            let s_new = sf * sm.value + (1.0 - sf) * (s_prev + b_prev);
-            let b_new = tf * (s_new - s_prev) + (1.0 - tf) * b_prev;
-            s_prev = s_new;
-            b_prev = b_new;
-            s_curr = s_new;
-            last_ts = sm.timestamp_ms;
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
+            compute_holt_winters(window, sf, tf)
+        });
+        if samples.iter().all(|p| p.value.is_nan()) {
+            continue;
         }
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples,
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn compute_holt_winters(samples: &[Sample], sf: f64, tf: f64) -> Option<f64> {
+    let mut iter = samples.iter().filter(|sm| !sm.value.is_nan());
+    let first = iter.next()?;
+    let second = iter.next()?;
+    let mut s_prev = first.value;
+    let mut b_prev = second.value - first.value;
+    let mut s_curr = sf * second.value + (1.0 - sf) * (s_prev + b_prev);
+    b_prev = tf * (s_curr - s_prev) + (1.0 - tf) * b_prev;
+    s_prev = s_curr;
+    for sm in iter {
+        let s_new = sf * sm.value + (1.0 - sf) * (s_prev + b_prev);
+        let b_new = tf * (s_new - s_prev) + (1.0 - tf) * b_prev;
+        s_prev = s_new;
+        b_prev = b_new;
+        s_curr = s_new;
+    }
+    Some(s_curr)
+}
+
+fn apply_holt_winters_legacy(
+    range: Vec<Series>,
+    sf: f64,
+    tf: f64,
+) -> Result<EvalResult, EvalError> {
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let Some(value) = compute_holt_winters(&s.samples, sf, tf) else { continue };
+        let last_ts = s
+            .samples
+            .iter()
+            .rev()
+            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .unwrap_or(0);
         let (labels, signature) = strip_name(&s.labels);
         out.push(Series {
             labels,
             signature,
             samples: vec![Sample {
                 timestamp_ms: last_ts,
-                value: s_curr,
+                value,
             }],
         });
     }
@@ -1082,137 +1353,256 @@ fn apply_timestamp(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
     Ok(EvalResult::InstantVector(out))
 }
 
-fn apply_deriv(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+fn apply_deriv(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
     let range = expect_one_range_vector(args, "deriv")?;
+    let Some(window_ms) = range_ms else {
+        return apply_deriv_legacy(range);
+    };
+    let grid = &ctx.grid;
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let finite: Vec<&Sample> = s.samples.iter().filter(|x| !x.value.is_nan()).collect();
-        if finite.len() < 2 {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, compute_deriv);
+        if samples.iter().all(|p| p.value.is_nan()) {
             continue;
         }
-        // Simple linear regression slope, with timestamps centered around
-        // the last sample (same convention as predict_linear) for
-        // numerical stability.
-        let last_ts = finite.last().unwrap().timestamp_ms as f64 / 1000.0;
-        let n = finite.len() as f64;
-        let mut sx = 0.0;
-        let mut sy = 0.0;
-        let mut sxy = 0.0;
-        let mut sxx = 0.0;
-        for s in &finite {
-            let x = s.timestamp_ms as f64 / 1000.0 - last_ts;
-            let y = s.value;
-            sx += x;
-            sy += y;
-            sxy += x * y;
-            sxx += x * x;
-        }
-        let denom = n * sxx - sx * sx;
-        if denom == 0.0 {
-            continue;
-        }
-        let slope = (n * sxy - sx * sy) / denom;
         let (labels, signature) = strip_name(&s.labels);
         out.push(Series {
             labels,
             signature,
-            samples: vec![Sample {
-                timestamp_ms: finite.last().unwrap().timestamp_ms,
-                value: slope,
-            }],
+            samples,
         });
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn apply_idelta(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+fn compute_deriv(samples: &[Sample]) -> Option<f64> {
+    let finite: Vec<&Sample> = samples.iter().filter(|x| !x.value.is_nan()).collect();
+    if finite.len() < 2 {
+        return None;
+    }
+    let last_ts = finite.last().unwrap().timestamp_ms as f64 / 1000.0;
+    let n = finite.len() as f64;
+    let mut sx = 0.0;
+    let mut sy = 0.0;
+    let mut sxy = 0.0;
+    let mut sxx = 0.0;
+    for s in &finite {
+        let x = s.timestamp_ms as f64 / 1000.0 - last_ts;
+        let y = s.value;
+        sx += x;
+        sy += y;
+        sxy += x * y;
+        sxx += x * x;
+    }
+    let denom = n * sxx - sx * sx;
+    if denom == 0.0 {
+        return None;
+    }
+    Some((n * sxy - sx * sy) / denom)
+}
+
+fn apply_deriv_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let Some(value) = compute_deriv(&s.samples) else { continue };
+        let last_ts = s
+            .samples
+            .iter()
+            .rev()
+            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .unwrap_or(0);
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample { timestamp_ms: last_ts, value }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn apply_idelta(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
     let range = expect_one_range_vector(args, "idelta")?;
+    let Some(window_ms) = range_ms else {
+        return apply_idelta_legacy(range);
+    };
+    let grid = &ctx.grid;
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let finite: Vec<&Sample> = s.samples.iter().filter(|x| !x.value.is_nan()).collect();
-        if finite.len() < 2 {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, compute_idelta);
+        if samples.iter().all(|p| p.value.is_nan()) {
             continue;
         }
-        let last = finite[finite.len() - 1];
-        let prev = finite[finite.len() - 2];
         let (labels, signature) = strip_name(&s.labels);
         out.push(Series {
             labels,
             signature,
-            samples: vec![Sample {
-                timestamp_ms: last.timestamp_ms,
-                value: last.value - prev.value,
-            }],
+            samples,
         });
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn apply_changes(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+fn compute_idelta(samples: &[Sample]) -> Option<f64> {
+    let finite: Vec<&Sample> = samples.iter().filter(|x| !x.value.is_nan()).collect();
+    if finite.len() < 2 {
+        return None;
+    }
+    let last = finite[finite.len() - 1];
+    let prev = finite[finite.len() - 2];
+    Some(last.value - prev.value)
+}
+
+fn apply_idelta_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let Some(value) = compute_idelta(&s.samples) else { continue };
+        let last_ts = s
+            .samples
+            .iter()
+            .rev()
+            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .unwrap_or(0);
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample { timestamp_ms: last_ts, value }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn apply_changes(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
     let range = expect_one_range_vector(args, "changes")?;
+    let Some(window_ms) = range_ms else {
+        return apply_changes_legacy(range);
+    };
+    let grid = &ctx.grid;
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let finite: Vec<&Sample> = s.samples.iter().filter(|x| !x.value.is_nan()).collect();
-        if finite.is_empty() {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, compute_changes);
+        if samples.iter().all(|p| p.value.is_nan()) {
             continue;
         }
-        let mut count: f64 = 0.0;
-        for w in finite.windows(2) {
-            // Prometheus treats NaN-to-value and value-to-NaN as a change;
-            // we filter NaN out so the comparison is value-to-value. The
-            // observable behavior on real data is the same.
-            if w[0].value != w[1].value {
-                count += 1.0;
-            }
-        }
-        let last_ts = finite.last().unwrap().timestamp_ms;
         let (labels, signature) = strip_name(&s.labels);
         out.push(Series {
             labels,
             signature,
-            samples: vec![Sample {
-                timestamp_ms: last_ts,
-                value: count,
-            }],
+            samples,
         });
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn apply_resets(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
-    let range = expect_one_range_vector(args, "resets")?;
+fn compute_changes(samples: &[Sample]) -> Option<f64> {
+    let finite: Vec<&Sample> = samples.iter().filter(|x| !x.value.is_nan()).collect();
+    if finite.is_empty() {
+        return None;
+    }
+    let mut count: f64 = 0.0;
+    for w in finite.windows(2) {
+        if w[0].value != w[1].value {
+            count += 1.0;
+        }
+    }
+    Some(count)
+}
+
+fn apply_changes_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let finite: Vec<&Sample> = s.samples.iter().filter(|x| !x.value.is_nan()).collect();
-        if finite.is_empty() {
-            continue;
-        }
-        let mut count: f64 = 0.0;
-        for w in finite.windows(2) {
-            // A reset is a strict decrease between consecutive samples.
-            // Netdata stores INCREMENTAL counters as deltas, so for true
-            // counters every stored value is non-negative and a "reset"
-            // in our storage would mean the collector reported a delta
-            // smaller than the previous one -- which is the actual
-            // semantic Prometheus is testing for. For gauge inputs the
-            // call returns the count of decreases, which is a defensible
-            // generalisation.
-            if w[1].value < w[0].value {
-                count += 1.0;
-            }
-        }
-        let last_ts = finite.last().unwrap().timestamp_ms;
+        let Some(value) = compute_changes(&s.samples) else { continue };
+        let last_ts = s
+            .samples
+            .iter()
+            .rev()
+            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .unwrap_or(0);
         let (labels, signature) = strip_name(&s.labels);
         out.push(Series {
             labels,
             signature,
-            samples: vec![Sample {
-                timestamp_ms: last_ts,
-                value: count,
-            }],
+            samples: vec![Sample { timestamp_ms: last_ts, value }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn apply_resets(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
+    let range = expect_one_range_vector(args, "resets")?;
+    let Some(window_ms) = range_ms else {
+        return apply_resets_legacy(range);
+    };
+    let grid = &ctx.grid;
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, compute_resets);
+        if samples.iter().all(|p| p.value.is_nan()) {
+            continue;
+        }
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples,
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn compute_resets(samples: &[Sample]) -> Option<f64> {
+    let finite: Vec<&Sample> = samples.iter().filter(|x| !x.value.is_nan()).collect();
+    if finite.is_empty() {
+        return None;
+    }
+    let mut count: f64 = 0.0;
+    for w in finite.windows(2) {
+        if w[1].value < w[0].value {
+            count += 1.0;
+        }
+    }
+    Some(count)
+}
+
+fn apply_resets_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let Some(value) = compute_resets(&s.samples) else { continue };
+        let last_ts = s
+            .samples
+            .iter()
+            .rev()
+            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .unwrap_or(0);
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample { timestamp_ms: last_ts, value }],
         });
     }
     out.sort_by_key(|s| s.signature);
@@ -1395,7 +1785,7 @@ mod tests {
             samples.push((i * 10_000, 10.0));
         }
         let s = series(vec![("__name__", "foo")], samples);
-        let r = apply_window_op(vec![EvalResult::RangeVector(vec![s])], WindowOp::Rate).unwrap();
+        let r = apply_window_op(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None, WindowOp::Rate).unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
@@ -1416,7 +1806,7 @@ mod tests {
             vec![(0, 10.0), (1000, 5.0), (2000, 20.0)],
         );
         let r =
-            apply_window_op(vec![EvalResult::RangeVector(vec![s])], WindowOp::Increase).unwrap();
+            apply_window_op(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None, WindowOp::Increase).unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 assert!((v[0].samples[0].value - 35.0).abs() < 1e-9);
@@ -1431,7 +1821,7 @@ mod tests {
             vec![("__name__", "foo")],
             vec![(0, 1.0), (5_000, 2.0), (10_000, 3.0)],
         );
-        let r = apply_irate(vec![EvalResult::RangeVector(vec![s])]).unwrap();
+        let r = apply_irate(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None).unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 // Last delta = 3.0 over 5s gap = 0.6/s.
@@ -1447,7 +1837,7 @@ mod tests {
             vec![("__name__", "g")],
             vec![(0, 100.0), (10_000, 105.0), (20_000, 90.0)],
         );
-        let r = apply_delta(vec![EvalResult::RangeVector(vec![s])]).unwrap();
+        let r = apply_delta(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None).unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 assert!((v[0].samples[0].value - (-10.0)).abs() < 1e-9);
@@ -1529,7 +1919,7 @@ mod tests {
     #[test]
     fn rate_on_empty_drops_series() {
         let s = series(vec![("__name__", "foo")], vec![]);
-        let r = apply_window_op(vec![EvalResult::RangeVector(vec![s])], WindowOp::Rate).unwrap();
+        let r = apply_window_op(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None, WindowOp::Rate).unwrap();
         match r {
             EvalResult::InstantVector(v) => assert_eq!(v.len(), 0),
             _ => panic!(),
@@ -1542,7 +1932,7 @@ mod tests {
 
     fn run_over_time(op: OverTimeOp, samples: Vec<(i64, f64)>) -> Vec<Series> {
         let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
-        let r = apply_over_time(vec![EvalResult::RangeVector(vec![s])], op).unwrap();
+        let r = apply_over_time(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None, op).unwrap();
         match r {
             EvalResult::InstantVector(v) => v,
             _ => panic!("expected instant vector"),
@@ -1562,7 +1952,8 @@ mod tests {
             OverTimeOp::Stdvar => FuncKind::StdvarOverTime,
         };
         let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
-        let r = apply_call(func, vec![EvalResult::RangeVector(vec![s])]).unwrap();
+        let ctx = EvalContext::default();
+        let r = apply_call(&ctx, func, vec![EvalResult::RangeVector(vec![s])], None).unwrap();
         match r {
             EvalResult::InstantVector(v) => v,
             _ => panic!(),
@@ -1700,12 +2091,14 @@ mod tests {
     #[test]
     fn over_time_requires_range_vector() {
         // Scalar input -> Type error.
-        let r = apply_over_time(vec![EvalResult::Scalar(1.0)], OverTimeOp::Avg);
+        let r = apply_over_time(&EvalContext::default(), vec![EvalResult::Scalar(1.0)], None, OverTimeOp::Avg);
         assert!(matches!(r, Err(EvalError::Type { .. })));
         // Instant vector input -> Type error.
         let s = series(vec![("__name__", "foo")], vec![(0, 1.0)]);
         let r = apply_over_time(
+            &EvalContext::default(),
             vec![EvalResult::InstantVector(vec![s])],
+            None,
             OverTimeOp::Avg,
         );
         assert!(matches!(r, Err(EvalError::Type { .. })));
@@ -1756,10 +2149,11 @@ mod tests {
 
     fn run_quantile_over_time(phi: f64, samples: Vec<(i64, f64)>) -> Vec<Series> {
         let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
-        let r = apply_quantile_over_time(vec![
-            EvalResult::Scalar(phi),
-            EvalResult::RangeVector(vec![s]),
-        ])
+        let r = apply_quantile_over_time(
+            &EvalContext::default(),
+            vec![EvalResult::Scalar(phi), EvalResult::RangeVector(vec![s])],
+            None,
+        )
         .unwrap();
         match r {
             EvalResult::InstantVector(v) => v,
@@ -1797,10 +2191,11 @@ mod tests {
 
     fn run_predict_linear(samples: Vec<(i64, f64)>, t_secs: f64) -> Vec<Series> {
         let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
-        let r = apply_predict_linear(vec![
-            EvalResult::RangeVector(vec![s]),
-            EvalResult::Scalar(t_secs),
-        ])
+        let r = apply_predict_linear(
+            &EvalContext::default(),
+            vec![EvalResult::RangeVector(vec![s]), EvalResult::Scalar(t_secs)],
+            None,
+        )
         .unwrap();
         match r {
             EvalResult::InstantVector(v) => v,
@@ -1848,11 +2243,15 @@ mod tests {
 
     fn run_holt_winters(samples: Vec<(i64, f64)>, sf: f64, tf: f64) -> Vec<Series> {
         let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
-        apply_holt_winters(vec![
-            EvalResult::RangeVector(vec![s]),
-            EvalResult::Scalar(sf),
-            EvalResult::Scalar(tf),
-        ])
+        apply_holt_winters(
+            &EvalContext::default(),
+            vec![
+                EvalResult::RangeVector(vec![s]),
+                EvalResult::Scalar(sf),
+                EvalResult::Scalar(tf),
+            ],
+            None,
+        )
         .map(|r| match r {
             EvalResult::InstantVector(v) => v,
             _ => panic!(),
@@ -1881,18 +2280,26 @@ mod tests {
     #[test]
     fn holt_winters_rejects_out_of_range_factors() {
         let s = series(vec![("__name__", "foo")], vec![(0, 1.0), (1, 2.0)]);
-        let r = apply_holt_winters(vec![
-            EvalResult::RangeVector(vec![s.clone()]),
-            EvalResult::Scalar(1.5),
-            EvalResult::Scalar(0.5),
-        ]);
+        let r = apply_holt_winters(
+            &EvalContext::default(),
+            vec![
+                EvalResult::RangeVector(vec![s.clone()]),
+                EvalResult::Scalar(1.5),
+                EvalResult::Scalar(0.5),
+            ],
+            None,
+        );
         assert!(matches!(r, Err(EvalError::Other(_))));
 
-        let r = apply_holt_winters(vec![
-            EvalResult::RangeVector(vec![s.clone()]),
-            EvalResult::Scalar(0.5),
-            EvalResult::Scalar(0.0),
-        ]);
+        let r = apply_holt_winters(
+            &EvalContext::default(),
+            vec![
+                EvalResult::RangeVector(vec![s.clone()]),
+                EvalResult::Scalar(0.5),
+                EvalResult::Scalar(0.0),
+            ],
+            None,
+        );
         assert!(matches!(r, Err(EvalError::Other(_))));
     }
 
@@ -1900,11 +2307,19 @@ mod tests {
     fn two_arg_funcs_reject_wrong_shapes() {
         // quantile_over_time wants (scalar, range); passing two scalars
         // is a type error.
-        let r = apply_quantile_over_time(vec![EvalResult::Scalar(0.5), EvalResult::Scalar(1.0)]);
+        let r = apply_quantile_over_time(
+            &EvalContext::default(),
+            vec![EvalResult::Scalar(0.5), EvalResult::Scalar(1.0)],
+            None,
+        );
         assert!(matches!(r, Err(EvalError::Type { .. })));
         // predict_linear wants (range, scalar); passing (scalar, scalar)
         // errors on the range slot.
-        let r = apply_predict_linear(vec![EvalResult::Scalar(0.5), EvalResult::Scalar(1.0)]);
+        let r = apply_predict_linear(
+            &EvalContext::default(),
+            vec![EvalResult::Scalar(0.5), EvalResult::Scalar(1.0)],
+            None,
+        );
         assert!(matches!(r, Err(EvalError::Type { .. })));
     }
 
@@ -2034,7 +2449,7 @@ mod tests {
             vec![("__name__", "x")],
             samples,
         )]);
-        match apply_deriv(vec![v]).unwrap() {
+        match apply_deriv(&EvalContext::default(), vec![v], None).unwrap() {
             EvalResult::InstantVector(s) => {
                 assert!((s[0].samples[0].value - 1.0).abs() < 1e-9);
             }
@@ -2048,7 +2463,7 @@ mod tests {
             vec![("__name__", "x")],
             vec![(0, 1.0), (1000, 5.0), (2000, 12.0)],
         )]);
-        match apply_idelta(vec![v]).unwrap() {
+        match apply_idelta(&EvalContext::default(), vec![v], None).unwrap() {
             EvalResult::InstantVector(s) => {
                 assert_eq!(s[0].samples[0].value, 7.0);
             }
@@ -2062,7 +2477,7 @@ mod tests {
             vec![("__name__", "x")],
             vec![(0, 1.0), (1000, 1.0), (2000, 2.0), (3000, 2.0), (4000, 3.0)],
         )]);
-        match apply_changes(vec![v]).unwrap() {
+        match apply_changes(&EvalContext::default(), vec![v], None).unwrap() {
             EvalResult::InstantVector(s) => assert_eq!(s[0].samples[0].value, 2.0),
             other => panic!("unexpected: {other:?}"),
         }
@@ -2074,7 +2489,7 @@ mod tests {
             vec![("__name__", "x")],
             vec![(0, 5.0), (1000, 6.0), (2000, 1.0), (3000, 3.0), (4000, 0.0)],
         )]);
-        match apply_resets(vec![v]).unwrap() {
+        match apply_resets(&EvalContext::default(), vec![v], None).unwrap() {
             EvalResult::InstantVector(s) => assert_eq!(s[0].samples[0].value, 2.0),
             other => panic!("unexpected: {other:?}"),
         }
