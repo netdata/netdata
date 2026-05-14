@@ -35,6 +35,23 @@ Restarting the Netdata Agent will cause temporary gaps in your collected metrics
 | start   | `sudo systemctl start netdata`   | `sudo service netdata start`   |
 | stop    | `sudo systemctl stop netdata`    | `sudo service netdata stop`    |
 | restart | `sudo systemctl restart netdata` | `sudo service netdata restart` |
+| status  | `sudo systemctl status netdata`  | `sudo service netdata status`  |
+
+### Check status
+
+Use the commands above to check whether the Netdata Agent service is running.
+
+You can also verify that the Agent is reachable by opening `http://localhost:19999` in a browser, or by running:
+
+```bash
+curl http://localhost:19999/api/v1/info
+```
+
+:::tip
+
+Use `sudo netdatacli ping` to check whether the Agent is ready. It outputs `pong` with exit code `0` when the Agent is ready, exit code `1` while still initializing, and exit code `255` if the Agent is unreachable.
+
+:::
 
 ### Using `netdata`
 
@@ -97,6 +114,7 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 | **Start**         | `sudo systemctl start netdata`   | `sudo service netdata start`     | `sudo netdata`                   |
 | **Stop**          | `sudo systemctl stop netdata`    | `sudo service netdata stop`      | `sudo killall netdata`           |
 | **Restart**       | `sudo systemctl restart netdata` | `sudo service netdata restart`   | Stop + Start                     |
+| **Status**        | `sudo systemctl status netdata`  | `sudo service netdata status`    | `curl http://localhost:19999/api/v1/info` |
 | **Reload Health** | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  |
 | **Shutdown**      | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` |
 
