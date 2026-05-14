@@ -49,22 +49,16 @@ modules:
         list: []
       configuration:
         file:
-          name: "netdata.conf"
-          section_name: "[plugin:network-viewer:PerflibTCP]"
-          description: "The Netdata main configuration file"
+          name: ""
         options:
           description: ""
           folding:
-            title: "Config option"
+            title: ""
             enabled: false
-          list:
-            - name: update every
-              description: Data collection frequency.
-              default_value: 1
-              required: false
+          list: []
         examples:
           folding:
-            enabled: true
+            enabled: false
             title: ""
           list: []
     troubleshooting:
@@ -101,9 +95,9 @@ modules:
             availability: ""
   - meta:
       plugin_name: network-viewer.plugin
-      module_name: PerflibTCP
+      module_name: PerflibNetworkProtocols
       monitored_instance:
-        name: TCP Stack
+        name: Windows Network Protocols
         link: "https://learn.microsoft.com/en-us/windows/win32/networking"
         categories:
           - data-collection.networking
@@ -112,120 +106,10 @@ modules:
       keywords:
         - network
         - tcp
-        - stack
-        - connections
-        - segments
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ""
-    overview:
-      data_collection:
-        metrics_description: |
-          This collector monitors TCP stack counters and TCP connection states on Windows systems.
-        method_description: |
-          It queries the TCPv4 and TCPv6 objects from Perflib and uses the Windows IP Helper API for TCP connection-state counts.
-      supported_platforms:
-        include:
-          - windows
-        exclude: []
-      multi_instance: false
-      additional_permissions:
-        description: ""
-      default_behavior:
-        auto_detection:
-          description: |
-            The collector automatically detects all of the metrics, no further configuration is required.
-        limits:
-          description: ""
-        performance_impact:
-          description: ""
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ""
-        options:
-          description: ""
-          folding:
-            title: ""
-            enabled: false
-          list: []
-        examples:
-          folding:
-            title: ""
-            enabled: false
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: Per TCP Stack
-          description: |
-            These metrics refer to the TCP stack for each address family.
-          labels:
-            - name: af
-              description: The address family. On Windows systems, this collector exposes `ipv4` and `ipv6`.
-          metrics:
-            - name: tcp.connections
-              description: TCP connection counters.
-              unit: connections
-              chart_type: line
-              dimensions:
-                - name: failures
-                - name: active
-                - name: established
-                - name: passive
-                - name: reset
-            - name: tcp.segments
-              description: TCP segment counters.
-              unit: segments/s
-              chart_type: line
-              dimensions:
-                - name: total
-                - name: received
-                - name: retransmitted
-                - name: sent
-            - name: tcp.connections_state_count
-              description: TCP connection state counts.
-              unit: connections
-              chart_type: stacked
-              dimensions:
-                - name: closed
-                - name: listening
-                - name: syn_sent
-                - name: syn_received
-                - name: established
-                - name: fin_wait1
-                - name: fin_wait2
-                - name: close_wait
-                - name: closing
-                - name: last_ack
-                - name: time_wait
-                - name: delete_tcb
-  - meta:
-      plugin_name: network-viewer.plugin
-      module_name: PerflibUDP
-      monitored_instance:
-        name: UDP Stack
-        link: "https://learn.microsoft.com/en-us/windows/win32/networking"
-        categories:
-          - data-collection.networking
-        icon_filename: windows.svg
-      alternative_monitored_instances: []
-      keywords:
-        - network
         - udp
-        - stack
+        - windows
+        - perflib
+        - segments
         - datagrams
       related_resources:
         integrations:
@@ -235,9 +119,10 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors UDP datagram counters on Windows systems.
+          This collector exposes TCP and UDP stack statistics on Windows systems via a real-time table function.
         method_description: |
-          It queries the UDPv4 and UDPv6 objects from Perflib.
+          It queries the TCPv4, TCPv6, UDPv4, and UDPv6 objects from Windows Perflib,
+          combining the results into a single table grouped by transport protocol and IP family.
       supported_platforms:
         include:
           - windows
@@ -280,20 +165,25 @@ modules:
         enabled: false
       description: ""
       availability: []
-      scopes:
-        - name: Per UDP Stack
-          description: |
-            These metrics refer to the UDP stack for each address family.
-          labels:
-            - name: af
-              description: The address family. On Windows systems, this collector exposes `ipv4` and `ipv6`.
-          metrics:
-            - name: udp.datagrams
-              description: UDP datagram counters.
-              unit: datagrams/s
-              chart_type: line
-              dimensions:
-                - name: no_port
-                - name: received_errors
-                - name: received
-                - name: sent
+      scopes: []
+      functions:
+        description: |
+          This collector exposes a real-time function for viewing Windows TCP and UDP stack statistics.
+        list:
+          - id: network-protocols
+            name: Network Protocols
+            description: |
+              Shows Windows TCP and UDP stack counters grouped by transport protocol (TCP/UDP)
+              and IP family (IPv4/IPv6).
+
+              Each row covers one transport+family combination (TCPv4, TCPv6, UDPv4, UDPv6) and includes
+              traffic counters (received, sent, errors), TCP-specific connection counters
+              (active opens, established, passive opens, resets, total segments, retransmitted segments),
+              and the UDP-specific datagrams-with-no-port counter.
+            parameters: []
+            returns:
+              description: ""
+              columns: []
+            performance: ""
+            security: ""
+            availability: ""
