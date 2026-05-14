@@ -415,6 +415,46 @@ pub enum Plan {
         labels: Vec<(String, String)>,
         expr: Arc<Plan>,
     },
+
+    /// `aggr(rollup(matrix-selector | subquery))` fused into a single
+    /// streaming pass. Emitted by the lowering layer when the inner
+    /// expression matches the pattern and both the aggregator and the
+    /// rollup are on the supported list (see `eval::fused`). SOW-0033.
+    ///
+    /// The unfused `Plan::Aggregate{expr: Plan::Call{...}}` shape is
+    /// still emitted for combinations outside the supported list
+    /// (parametrized aggregators, predict_linear/holt_winters/etc.).
+    FusedAggrRollup {
+        aggr: AggrKind,
+        grouping: Option<Grouping>,
+        rollup: FuncKind,
+        /// Selector source. Either a vector/matrix-selector's matchers
+        /// directly, or a subquery whose inner expression supplies the
+        /// per-step series. The two variants below carry the same
+        /// `(range_ms, offset_ms, at)` window descriptors that the
+        /// unfused matrix-selector / subquery nodes carry.
+        source: FusedSource,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum FusedSource {
+    /// A matrix selector inside the fused rollup -- the canonical
+    /// `aggr(rate(metric[range]))` shape.
+    Matrix {
+        matchers: Vec<Matcher>,
+        range_ms: i64,
+        offset_ms: i64,
+        at: Option<AtMod>,
+    },
+    /// A subquery inside the fused rollup -- `aggr(rate(<expr>[range:step]))`.
+    Subquery {
+        expr: Arc<Plan>,
+        range_ms: i64,
+        step_ms: i64,
+        offset_ms: i64,
+        at: Option<AtMod>,
+    },
 }
 
 impl Plan {
@@ -430,6 +470,7 @@ impl Plan {
             Plan::Subquery { .. } => ValueType::RangeVector,
             Plan::LabelOp { .. } => ValueType::InstantVector,
             Plan::Absent { .. } => ValueType::InstantVector,
+            Plan::FusedAggrRollup { .. } => ValueType::InstantVector,
         }
     }
 }

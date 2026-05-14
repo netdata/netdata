@@ -151,5 +151,52 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
             let inner = eval(ctx, expr)?;
             super::absent::eval_absent(ctx, labels, inner)
         }
+
+        Plan::FusedAggrRollup {
+            aggr,
+            grouping,
+            rollup,
+            source,
+        } => {
+            use crate::plan::FusedSource;
+            // The lowering layer guarantees both aggr and rollup are on
+            // the supported list, but defense in depth.
+            let Some(fusable_aggr) = super::fused::FusableAggrKind::try_from_aggr(*aggr) else {
+                return Err(super::types::EvalError::Other(format!(
+                    "fused IR carries unsupported aggregator {aggr:?}"
+                )));
+            };
+            let Some(rollup_kind) = super::fused::RollupKind::try_from_func(*rollup) else {
+                return Err(super::types::EvalError::Other(format!(
+                    "fused IR carries unsupported rollup {rollup:?}"
+                )));
+            };
+            match source {
+                FusedSource::Matrix {
+                    matchers,
+                    range_ms,
+                    offset_ms,
+                    at,
+                } => super::fused::eval_fused_aggr_rollup(
+                    ctx,
+                    fusable_aggr,
+                    grouping.as_ref(),
+                    rollup_kind,
+                    matchers,
+                    *range_ms,
+                    *offset_ms,
+                    at.as_ref(),
+                ),
+                FusedSource::Subquery { .. } => {
+                    // Subquery in fused position: not yet wired through
+                    // (the inner expression needs to drive the
+                    // two-pointer instead of raw storage samples).
+                    // Tracked as a follow-up; rare in practice.
+                    Err(super::types::EvalError::NotYetImplemented(
+                        "fused aggr/rollup over subquery".to_string(),
+                    ))
+                }
+            }
+        }
     }
 }

@@ -13,6 +13,7 @@ mod binop;
 mod context;
 mod dispatch;
 mod functions;
+mod fused;
 mod grid;
 mod labelops;
 mod select;

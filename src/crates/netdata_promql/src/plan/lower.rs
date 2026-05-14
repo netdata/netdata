@@ -21,8 +21,8 @@ use promql_parser::parser::{
 use crate::storage::{compile_regex, Matcher};
 
 use super::ir::{
-    AggrKind, AtMod, BinopKind, Cardinality, FuncKind, Grouping, MatchKeys, MatchSpec, Plan,
-    ValueType,
+    AggrKind, AtMod, BinopKind, Cardinality, FuncKind, FusedSource, Grouping, MatchKeys,
+    MatchSpec, Plan, ValueType,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -342,12 +342,99 @@ fn lower_aggregate(a: &AggregateExpr) -> Result<Plan, LowerError> {
         LabelModifier::Include(ls) => Grouping::By(ls.labels.clone()),
         LabelModifier::Exclude(ls) => Grouping::Without(ls.labels.clone()),
     });
+
+    // SOW-0033: try to fuse `aggr(rollup(matrix|subquery))` into a
+    // single streaming plan node. The unfused Plan::Aggregate is
+    // returned when fusion doesn't apply (parametrized aggregator,
+    // non-rollup inner, predict_linear/holt_winters/etc.).
+    if lowered_param.is_none() && lowered_param_string.is_none() {
+        if let Some(fused) = try_fuse_aggr_rollup(op, &grouping, &expr) {
+            return Ok(fused);
+        }
+    }
+
     Ok(Plan::Aggregate {
         op,
         grouping,
         param: lowered_param,
         param_string: lowered_param_string,
         expr: Arc::new(expr),
+    })
+}
+
+/// Detect `aggr(rollup(matrix|subquery))` and rewrite to
+/// `Plan::FusedAggrRollup` when both the aggregator and the rollup are
+/// on the supported list. Returns `None` (keeping the unfused
+/// `Plan::Aggregate`) for any other shape. SOW-0033.
+fn try_fuse_aggr_rollup(
+    aggr: AggrKind,
+    grouping: &Option<Grouping>,
+    expr: &Plan,
+) -> Option<Plan> {
+    // Aggregator must be one of sum/avg/min/max/count.
+    match aggr {
+        AggrKind::Sum
+        | AggrKind::Avg
+        | AggrKind::Min
+        | AggrKind::Max
+        | AggrKind::Count => {}
+        _ => return None,
+    }
+    // Inner must be a Call into a fusable rollup, with a single
+    // argument that is itself a matrix selector or subquery.
+    let Plan::Call { func, args } = expr else { return None };
+    if args.len() != 1 {
+        return None;
+    }
+    // The rollup must be on the fusion-friendly list.
+    match func {
+        FuncKind::Rate
+        | FuncKind::Increase
+        | FuncKind::Delta
+        | FuncKind::IRate
+        | FuncKind::AvgOverTime
+        | FuncKind::SumOverTime
+        | FuncKind::MinOverTime
+        | FuncKind::MaxOverTime
+        | FuncKind::CountOverTime
+        | FuncKind::LastOverTime
+        | FuncKind::PresentOverTime
+        | FuncKind::StddevOverTime
+        | FuncKind::StdvarOverTime => {}
+        _ => return None,
+    }
+    let source = match &args[0] {
+        Plan::MatrixSelect {
+            matchers,
+            range_ms,
+            offset_ms,
+            at,
+        } => FusedSource::Matrix {
+            matchers: matchers.clone(),
+            range_ms: *range_ms,
+            offset_ms: *offset_ms,
+            at: at.clone(),
+        },
+        Plan::Subquery {
+            expr,
+            range_ms,
+            step_ms,
+            offset_ms,
+            at,
+        } => FusedSource::Subquery {
+            expr: Arc::clone(expr),
+            range_ms: *range_ms,
+            step_ms: *step_ms,
+            offset_ms: *offset_ms,
+            at: at.clone(),
+        },
+        _ => return None,
+    };
+    Some(Plan::FusedAggrRollup {
+        aggr,
+        grouping: grouping.clone(),
+        rollup: *func,
+        source,
     })
 }
 

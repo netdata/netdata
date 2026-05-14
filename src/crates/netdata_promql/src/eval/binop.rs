@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use crate::plan::{BinopKind, Cardinality, MatchKeys, MatchSpec, ValueType};
 
-use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
+use super::types::{labels_signature, EvalError, EvalResult, Series};
 
 /// Apply a binary operator. `return_bool` toggles the Prometheus `bool`
 /// modifier on comparison operators. `matching` is `Some` for any binop

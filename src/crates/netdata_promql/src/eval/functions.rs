@@ -115,7 +115,7 @@ where
 /// Windowed aggregator selector. The variants correspond to the seven
 /// `*_over_time` functions in Phase 3b (SOW-0020).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OverTimeOp {
+pub(crate) enum OverTimeOp {
     Avg,
     Sum,
     Min,
@@ -207,7 +207,7 @@ fn apply_over_time_legacy(range: Vec<Series>, op: OverTimeOp) -> Result<EvalResu
 /// timestamp in the window). NaN samples are skipped; if no non-NaN
 /// sample exists in the window, returns `None` so the caller drops the
 /// series.
-fn compute_over_time(
+pub(crate) fn compute_over_time(
     timestamps: &[i64],
     values: &[f64],
     op: OverTimeOp,
@@ -279,7 +279,7 @@ fn compute_over_time(
 /// Distinguish rate (per-second) from increase (absolute) -- the inner
 /// arithmetic is identical except for the division by the window width.
 #[derive(Debug, Clone, Copy)]
-enum WindowOp {
+pub(crate) enum WindowOp {
     Rate,
     Increase,
 }
@@ -347,7 +347,7 @@ fn apply_window_op_legacy(range: Vec<Series>, op: WindowOp) -> Result<EvalResult
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_window_op(timestamps: &[i64], values: &[f64], op: WindowOp) -> Option<f64> {
+pub(crate) fn compute_window_op(timestamps: &[i64], values: &[f64], op: WindowOp) -> Option<f64> {
     if values.is_empty() {
         return None;
     }
@@ -396,7 +396,7 @@ fn apply_irate(
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_irate(timestamps: &[i64], values: &[f64]) -> Option<f64> {
+pub(crate) fn compute_irate(timestamps: &[i64], values: &[f64]) -> Option<f64> {
     let n = values.len();
     if n < 2 {
         return None;
@@ -454,7 +454,7 @@ fn apply_delta(
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_delta(values: &[f64]) -> Option<f64> {
+pub(crate) fn compute_delta(values: &[f64]) -> Option<f64> {
     if values.len() < 2 {
         return None;
     }
