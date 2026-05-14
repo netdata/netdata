@@ -289,6 +289,8 @@ set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-ebpf/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE On)
+set(CPACK_RPM_PLUGIN-EBPF_USER_FILELIST
+        "%{_libexecdir}/%{name}/plugins.d/ebpf-go.plugin")
 
 #
 # ebpf-code-legacy
