@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::sync::Arc;
+
+use crate::storage::{Backend, FfiBackend};
+
 /// Evaluation context: query-time parameters threaded through the evaluator.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EvalContext {
     /// Query evaluation time, in Unix milliseconds.
     pub at_ms: i64,
@@ -20,6 +24,11 @@ pub struct EvalContext {
     /// Outer query range end (Unix ms). For an instant query, equals
     /// `at_ms`. Used by the `@` modifier's `end()` form (SOW-0025).
     pub outer_end_ms: i64,
+    /// Storage backend. Production uses `FfiBackend`; compliance tests
+    /// and future unit tests inject `MemBackend` or another stand-in.
+    /// `Arc<dyn Backend>` so it's cheap to clone across sub-eval
+    /// contexts (e.g. subqueries) and across HTTP request handlers.
+    pub backend: Arc<dyn Backend>,
 }
 
 impl Default for EvalContext {
@@ -31,6 +40,7 @@ impl Default for EvalContext {
             max_series: 10_000,
             outer_start_ms: 0,
             outer_end_ms: 0,
+            backend: Arc::new(FfiBackend),
         }
     }
 }

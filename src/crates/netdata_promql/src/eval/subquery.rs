@@ -64,6 +64,7 @@ pub fn eval_subquery(
             max_series: ctx.max_series,
             outer_start_ms: ctx.outer_start_ms,
             outer_end_ms: ctx.outer_end_ms,
+            backend: std::sync::Arc::clone(&ctx.backend),
         };
         match eval(&inner_ctx, expr)? {
             EvalResult::InstantVector(series) => {

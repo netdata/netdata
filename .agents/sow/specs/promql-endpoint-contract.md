@@ -603,6 +603,30 @@ jq -s 'sort_by(-.elapsed_ms) | .[0:10]' /var/log/netdata/promql.jsonl
 jq -rc 'select(.elapsed_ms > 100) | .query' /var/log/netdata/promql.jsonl
 ```
 
+## Compliance corpus (SOW-0030)
+
+A subset of Prometheus' upstream `promqltest` corpus is vendored at
+`src/crates/netdata_promql/tests/compliance-data/` and runs as
+`cargo test -p netdata_promql --test compliance`. The harness:
+
+* Loads synthetic series into an in-memory `MemBackend` from each
+  test file's `load <interval>` block.
+* Evaluates each `eval instant at <time> <query>` and compares the
+  result against the file's expected output with float tolerance.
+* Skips cases that exercise unimplemented features (native
+  histograms, `info()`, trig/calendar functions,
+  `keep_metric_names`, `*_over_time` of native histograms,
+  `limit`/`limit_ratio`, `mad_over_time`).
+* Reports per-file pass / fail / skip counts.
+* Honours `tests/compliance-data/EXPECTED_FAILS.md` -- cases listed
+  there are reported as `skip` rather than `fail`. The current
+  baseline (first-run, no exemptions): 468 pass / 332 fail / 212
+  skip across 1012 cases drawn from 10 in-scope `.test` files.
+  Categories of remaining failures are documented in EXPECTED_FAILS.md.
+
+The corpus is the safety net for the engine rewrite tracked under
+SOW-0031.
+
 ## Open items deferred to later phases
 
 Per the SOW-0017 close gate (status as of 2026-05-14):

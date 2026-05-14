@@ -22,6 +22,10 @@ mod plan;
 mod slow_log;
 mod storage;
 
+// Public testing surface for the compliance corpus runner and future
+// out-of-crate consumers. SOW-0030.
+pub mod testing;
+
 use std::ffi::{c_char, c_int, CStr, CString};
 use std::ptr;
 use std::time::Instant;
@@ -273,6 +277,7 @@ fn run_instant_inner(
         max_series: DEFAULT_MAX_SERIES,
         outer_start_ms: at_ms,
         outer_end_ms: at_ms,
+        backend: std::sync::Arc::new(storage::FfiBackend),
     };
     let result = eval(&ctx, &plan)?;
     let series_count = match &result {
@@ -338,6 +343,10 @@ fn run_range_inner(
     // to a single "metric: {}" series.
     let mut scalar_samples: Option<Vec<Sample>> = None;
 
+    // Build the backend Arc once and clone it cheaply into each
+    // per-step EvalContext.
+    let backend: std::sync::Arc<dyn storage::Backend> = std::sync::Arc::new(storage::FfiBackend);
+
     let mut t = start_ms;
     loop {
         // The outer range stays constant across steps; only `at_ms`
@@ -350,6 +359,7 @@ fn run_range_inner(
             max_series: DEFAULT_MAX_SERIES,
             outer_start_ms: start_ms,
             outer_end_ms: end_ms,
+            backend: std::sync::Arc::clone(&backend),
         };
         let r = eval(&ctx, &plan)?;
         match r {

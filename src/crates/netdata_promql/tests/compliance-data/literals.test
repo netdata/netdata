@@ -1,0 +1,74 @@
+eval instant at 50m 12.34e6
+	12340000
+
+eval instant at 50m 12.34e+6
+	12340000
+
+eval instant at 50m 12.34e-6
+	0.00001234
+
+eval instant at 50m 1+1
+	2
+
+eval instant at 50m 1-1
+	0
+
+eval instant at 50m 1 - -1
+	2
+
+eval instant at 50m .2
+	0.2
+
+eval instant at 50m +0.2
+	0.2
+
+eval instant at 50m -0.2e-6
+	-0.0000002
+
+eval instant at 50m +Inf
+	+Inf
+
+eval instant at 50m inF
+	+Inf
+
+eval instant at 50m -inf
+	-Inf
+
+eval instant at 50m NaN
+	NaN
+
+eval instant at 50m nan
+	NaN
+
+eval instant at 50m 2.
+	2
+
+eval instant at 50m 1 / 0
+	+Inf
+
+eval instant at 50m ((1) / (0))
+	+Inf
+
+eval instant at 50m -1 / 0
+	-Inf
+
+eval instant at 50m 0 / 0
+	NaN
+
+eval instant at 50m 1 % 0
+	NaN
+
+eval instant at 50m ("Foo")
+	expect string `Foo`
+
+eval instant at 50m "Foo"
+	expect string "Foo"
+
+eval instant at 50m " Foo "
+    expect string " Foo "
+
+eval instant at 50m ("")
+	expect string ""
+
+eval instant at 50m ""
+   	expect string ""

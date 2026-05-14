@@ -3,10 +3,10 @@
 // Evaluation of vector and matrix selectors against the storage adapter.
 
 use crate::plan::AtMod;
-use crate::storage::{Matcher, NdQuery};
+use crate::storage::Matcher;
 
 use super::context::EvalContext;
-use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
+use super::types::{EvalError, EvalResult, Sample, Series};
 
 /// Resolve the `@` modifier (if any) against the current eval context.
 /// `AtMod::AtTs(ms)` -> `ms`; `Start` -> outer range start; `End` ->
@@ -37,7 +37,7 @@ pub fn eval_vector_select(
     let after_s = (effective_t_ms - ctx.lookback_ms) / 1000;
     let before_s = effective_t_ms / 1000;
 
-    let q = match NdQuery::resolve(
+    let q = match ctx.backend.resolve(
         ctx.host_machine_guid.as_deref(),
         matchers,
         after_s,
@@ -62,18 +62,13 @@ pub fn eval_vector_select(
     // whose timestamp falls inside the precise millisecond window
     // `[effective_t_ms - lookback_ms, effective_t_ms]` and whose value
     // is not NaN. Walking forward and keeping a running "latest seen"
-    // is equivalent to the previous reverse-scan-over-Vec because the
-    // shim guarantees non-decreasing timestamps. SOW-0029.
+    // is equivalent to a reverse-scan because the shim guarantees
+    // non-decreasing timestamps. SOW-0029 / SOW-0030.
     let earliest_ms = effective_t_ms.saturating_sub(ctx.lookback_ms);
 
     let mut out = Vec::with_capacity(q.len());
     for i in 0..q.len() {
-        let Some(view) = q.series(i) else { continue };
-        let labels: Vec<(String, String)> = view
-            .labels()
-            .map(|(n, v)| (n.to_string(), v.to_string()))
-            .collect();
-        let signature = labels_signature(&labels);
+        let Some(meta) = q.series_meta(i) else { continue };
 
         let Some(samples_iter) = q.open_samples(i, after_s, before_s, 0) else {
             continue;
@@ -101,8 +96,8 @@ pub fn eval_vector_select(
 
         if let Some(value) = picked_value {
             out.push(Series {
-                labels,
-                signature,
+                labels: meta.labels,
+                signature: meta.signature,
                 // Stamp at the query time, not the sample's actual time.
                 // Prometheus does this so a range query returns aligned
                 // timestamps regardless of underlying collection cadence.
@@ -133,7 +128,7 @@ pub fn eval_matrix_select(
     let after_s = (effective_t_ms - range_ms) / 1000;
     let before_s = effective_t_ms / 1000;
 
-    let q = match NdQuery::resolve(
+    let q = match ctx.backend.resolve(
         ctx.host_machine_guid.as_deref(),
         matchers,
         after_s,
@@ -153,32 +148,33 @@ pub fn eval_matrix_select(
         ));
     }
 
+    // Use the precise millisecond window for the matrix selector too;
+    // the second-resolution shim boundary may include samples just
+    // outside the strict range.
+    let earliest_ms = effective_t_ms.saturating_sub(range_ms);
+
     let mut out = Vec::with_capacity(q.len());
     for i in 0..q.len() {
-        let Some(view) = q.series(i) else { continue };
-        let labels: Vec<(String, String)> = view
-            .labels()
-            .map(|(n, v)| (n.to_string(), v.to_string()))
-            .collect();
-        let signature = labels_signature(&labels);
+        let Some(meta) = q.series_meta(i) else { continue };
 
         let Some(samples_iter) = q.open_samples(i, after_s, before_s, 0) else {
             continue;
         };
         let samples: Vec<Sample> = samples_iter
+            .filter(|s| !s.value.is_nan())
+            .filter(|s| s.timestamp_ms >= earliest_ms && s.timestamp_ms <= effective_t_ms)
             .map(|s| Sample {
                 timestamp_ms: s.timestamp_ms,
                 value: s.value,
             })
-            .filter(|s| !s.value.is_nan())
             .collect();
 
         if samples.is_empty() {
             continue;
         }
         out.push(Series {
-            labels,
-            signature,
+            labels: meta.labels,
+            signature: meta.signature,
             samples,
         });
     }
@@ -186,3 +182,4 @@ pub fn eval_matrix_select(
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::RangeVector(out))
 }
+

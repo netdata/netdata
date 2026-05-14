@@ -12,7 +12,10 @@
 
 #![allow(dead_code)] // Some methods are reserved for chunks 4/5.
 
+mod backend;
+mod ffi_backend;
 mod matchers;
+mod mem_backend;
 mod query;
 pub(crate) mod raw;
 mod samples;
@@ -23,7 +26,13 @@ mod test_stubs;
 // Some items are exposed for use by later chunks (eval needs Matcher, plan
 // needs compile_regex). Mark the unused ones as expected-dead.
 #[allow(unused_imports)]
+pub use backend::{Backend, BackendQuery, SeriesMeta};
+#[allow(unused_imports)]
+pub use ffi_backend::FfiBackend;
+#[allow(unused_imports)]
 pub use matchers::{compile_regex, Matcher, MatcherError};
+#[allow(unused_imports)]
+pub use mem_backend::{MemBackend, MemSeries};
 #[allow(unused_imports)]
 pub use query::{NdQuery, ResolveError, SeriesView};
 #[allow(unused_imports)]
