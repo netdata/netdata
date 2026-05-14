@@ -122,9 +122,9 @@ void ml_host_delete(RRDHOST *rh)
     if (!host)
         return;
 
-    ml_host_clear_context_anomaly_rate(host);
     MlAllocScope _ml_scope;
 
+    ml_host_clear_context_anomaly_rate(host);
     netdata_mutex_destroy(&host->mutex);
     netdata_mutex_destroy(&host->start_stop_mutex);
 
