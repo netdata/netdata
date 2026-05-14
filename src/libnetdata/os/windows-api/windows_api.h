@@ -3,31 +3,12 @@
 #ifndef NETDATA_WINDOWS_API_H
 #define NETDATA_WINDOWS_API_H
 
-#define NETDATA_WIN_TCP_STATE_COUNT 12
-
-enum netdata_win_tcp_state_index {
-    NETDATA_WIN_TCP_STATE_CLOSED = 0,
-    NETDATA_WIN_TCP_STATE_LISTENING,
-    NETDATA_WIN_TCP_STATE_SYN_SENT,
-    NETDATA_WIN_TCP_STATE_SYN_RECEIVED,
-    NETDATA_WIN_TCP_STATE_ESTABLISHED,
-    NETDATA_WIN_TCP_STATE_FIN_WAIT1,
-    NETDATA_WIN_TCP_STATE_FIN_WAIT2,
-    NETDATA_WIN_TCP_STATE_CLOSE_WAIT,
-    NETDATA_WIN_TCP_STATE_CLOSING,
-    NETDATA_WIN_TCP_STATE_LAST_ACK,
-    NETDATA_WIN_TCP_STATE_TIME_WAIT,
-    NETDATA_WIN_TCP_STATE_DELETE_TCB,
-};
-
 #if defined(OS_WINDOWS)
 
 #include <stdbool.h>
-#include <stdint.h>
 
 char *netdata_win_local_interface();
 char *netdata_win_local_ip();
-bool netdata_win_collect_tcp_state_counts(uint32_t af, uint32_t state_counts[]);
 
 #endif
 
