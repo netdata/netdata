@@ -1007,7 +1007,7 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 
 | Constant         | Numeric Value | Usage                          |
 |------------------|---------------|--------------------------------|
-| `$REMOVED`       | -2            | Alert deleted (SIGUSR2 reload) |
+| `$REMOVED`       | -2            | Alert deleted during configuration reload or chart became obsolete (no data for 60s) |
 | `$UNINITIALIZED` | -1            | Alert not initialized          |
 | `$UNDEFINED`     | 0             | Calculation failed             |
 | `$CLEAR`         | 1             | Alert OK/not triggered         |
@@ -1036,12 +1036,22 @@ Status values increase with severity, so `$status > $CLEAR` will match both WARN
 
 **When Status Changes:**
 
-- **`REMOVED`** - Alert deleted during configuration reload
+- **`REMOVED`** - Alert deleted during configuration reload, or alert's associated chart has been marked obsolete and has stopped collecting data for 60 seconds
 - **`UNINITIALIZED`** - Alert created but not yet calculated
 - **`UNDEFINED`** - Database lookup failed, division by zero, etc.
 - **`CLEAR`** - Alert conditions aren’t met (normal state)
 - **`WARNING`** - Warning expression returned true/non-zero
 - **`CRITICAL`** - Critical expression returned true/non-zero
+
+#### What Happens When a Chart Becomes Obsolete
+
+When a collector stops providing data for a chart (for example, a custom Prometheus collector stops scraping a service, or a container disappears), Netdata marks the chart as obsolete.
+
+1. The health engine skips evaluation of any alerts attached to obsolete charts — they are not re-evaluated.
+2. After the chart has not collected data for **60 seconds**, any active alert transitions to `REMOVED` status.
+3. A notification is dispatched for the status change (from whatever the current status was to `REMOVED`), and the alert value is set to `NaN`.
+
+This is the mechanism by which alerts for disappeared services or ephemeral instances are automatically cleared.
 
 **Script Execution:** The external script (`exec` line) is called for ALL status changes.
 
