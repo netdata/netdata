@@ -47,7 +47,17 @@ void pulse_ml_memory_allocated(size_t n)
 
 void pulse_ml_memory_freed(size_t n)
 {
-    __atomic_fetch_sub(&ml_statistics.ml_memory_consumption, n, __ATOMIC_RELAXED);
+    // Clamp at zero: cross-thread allocations whose new/delete happen on
+    // different sides of an MlAllocScope guard can produce a free without a
+    // matching counted allocation. Saturate so the counter cannot wrap.
+    uint64_t cur = __atomic_load_n(&ml_statistics.ml_memory_consumption, __ATOMIC_RELAXED);
+    while (true) {
+        uint64_t next = (n > cur) ? 0 : (cur - n);
+        if (__atomic_compare_exchange_n(&ml_statistics.ml_memory_consumption,
+                                        &cur, next, true,
+                                        __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            break;
+    }
     __atomic_fetch_add(&ml_statistics.ml_memory_delete, 1, __ATOMIC_RELAXED);
 }
 
