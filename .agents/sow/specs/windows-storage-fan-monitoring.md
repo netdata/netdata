@@ -20,15 +20,18 @@ health, NVMe health, NVMe thermal-throttling signals, and fan telemetry.
 
 - Windows NVMe health is collected by the go.d `nvme` collector so it reuses
   the existing NVMe chart contexts, alert context, labels, and metric names.
-- On Windows, the collector executes an installed `nvme.exe` directly from
-  `PATH` or the default `nvme-cli` installation directories. There is no native
-  Windows storage-protocol backend in this contract.
-- The Windows `nvme.exe` path maps the same `nvme list` and `nvme smart-log`
-  JSON surfaces into the existing collector model, including critical warnings,
-  composite temperature, warning/critical temperature time,
-  thermal-management transition counts, and thermal-management total time.
-- Linux and BSD continue to use the existing `ndsudo` execution path for the
-  same `nvme` CLI.
+- The native Windows backend discovers local physical drives as
+  `\\.\PhysicalDriveN`, filters for `BusTypeNvme`, and queries the NVMe SMART /
+  health information log through `IOCTL_STORAGE_QUERY_PROPERTY` with
+  `StorageDeviceProtocolSpecificProperty`.
+- The native backend maps the NVMe health log into the existing collector model,
+  including critical warnings, composite temperature, warning/critical
+  temperature time, thermal-management transition counts, and
+  thermal-management total time.
+- Windows may optionally fall back to an installed `nvme.exe` when native
+  discovery does not produce devices and the CLI is available.
+- Native Windows storage access must be read-first and fail closed; the backend
+  must not perform destructive or state-changing storage operations.
 
 ## Fan Telemetry
 

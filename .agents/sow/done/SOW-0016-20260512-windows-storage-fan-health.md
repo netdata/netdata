@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Fan context alignment was rebuilt, installed, and verified with an isolated foreground Windows Agent instance on port 19998; the service restart remains blocked by local elevation, but the collector runtime path is verified.
+Sub-state: Reopened on 2026-05-15 because the prior `nvme.exe`-only Windows NVMe correction was wrong; restored native Windows NVMe querying in the go.d `nvme` collector and validated the build/install path.
 
 ## Requirements
 
@@ -472,3 +472,59 @@ Artifact maintenance gate:
 - End-user/operator docs: Updated Windows plugin metadata, generated integration docs, and README entries for the fan contexts and dimensions.
 - End-user/operator skills: Updated the public `query-netdata-agents` how-to catalog with direct local collector context verification guidance.
 - SOW lifecycle: Reopened this completed SOW for the regression, recorded the new root cause and validation, and will move it back to `done/` with this implementation commit.
+
+## Regression - 2026-05-15 Native Windows NVMe Needed
+
+What broke:
+
+- Commit `d7887f5973` removed the native Windows NVMe backend and changed the contract to require an installed `nvme.exe` on Windows.
+- That assumption was wrong for the PR goal: Windows does not provide a stock `nvme.exe`, so the Agent should not require an external Windows NVMe CLI for local NVMe health collection.
+
+Evidence:
+
+- `d7887f5973` deleted `src/go/plugin/go.d/collector/nvme/exec_windows.go`, `exec_windows_test.go`, `init_windows.go`, and `init_nonwindows.go`, and rewrote metadata/spec text to say Windows requires `nvme.exe`.
+- The removed native code implemented the existing go.d `nvmeCli` interface by enumerating `\\.\PhysicalDrive*`, filtering `BusTypeNvme`, and querying the NVMe SMART / health log page through `IOCTL_STORAGE_QUERY_PROPERTY`.
+- Microsoft documents `IOCTL_STORAGE_QUERY_PROPERTY` plus `STORAGE_PROTOCOL_SPECIFIC_DATA` as the Windows API for protocol-specific NVMe data. The documented request shape supports `ProtocolTypeNVMe`, `NVMeDataTypeLogPage`, and log pages including SMART/health data.
+- The existing go.d `nvme` collector already owns the `nvme.*` contexts, dimensions, labels, health alert, and docs. Keeping native Windows querying inside go.d reuses those contracts; moving it to `windows.plugin` would duplicate the NVMe dashboard model and risk cross-platform aggregation drift.
+
+Why previous validation missed it:
+
+- The earlier correction treated the presence of a direct `nvme.exe` runner as sufficient Windows support, but did not distinguish "optional third-party executable" from "stock Windows capability".
+- The local Windows host does not have `nvme.exe`, so the dependency was visible, but it was incorrectly recorded as a prerequisite instead of a regression against the intended Windows support.
+
+Repair plan:
+
+- Restore the native Windows NVMe backend in the go.d `nvme` collector, with `nvme.exe` only as an optional fallback.
+- Restore Windows physical-drive path handling in collection helpers and tests.
+- Update the Windows storage/fan spec and NVMe metadata/config schema/generated integration docs to describe native Windows querying as the primary path.
+- Validate with go.d NVMe tests, integration metadata generation, same-failure searches, and local Windows API/runtime checks where hardware and permissions permit.
+
+Validation:
+
+- `go test -count=1 ./plugin/go.d/collector/nvme ./plugin/go.d/collector/smartctl` from `src/go`: passed.
+- `GOOS=linux GOARCH=amd64 go test -c ./plugin/go.d/collector/nvme`: passed compile-only.
+- `GOOS=freebsd GOARCH=amd64 go test -c ./plugin/go.d/collector/nvme`: passed compile-only.
+- `go build -o ..\..\.local\go.d.plugin.exe ./cmd/godplugin` from `src/go`: passed.
+- `MSYSTEM=MSYS ninja -C build-cygwin-MSYS go-plugin`: passed and rebuilt `go.d.plugin.exe` after CMake detected the restored Windows NVMe files.
+- `MSYSTEM=MSYS ninja -C build-cygwin-MSYS install`: passed and installed `/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin.exe`.
+- `PYTHONUTF8=1 C:\msys64\mingw64\bin\python.exe integrations\gen_integrations.py`: passed and regenerated `src/go/plugin/go.d/collector/nvme/integrations/nvme_devices.md`.
+- `git diff --check`: passed with only repository-standard Windows line-ending conversion warnings.
+- Same-failure search over the NVMe collector and Windows storage/fan spec found no remaining active text that says Windows requires `nvme.exe` as the primary NVMe collection path.
+- Local Windows inventory evidence: `Get-PhysicalDisk` reports two healthy NVMe disks, `Samsung SSD 990 PRO 4TB` and `KXG60PNV2T04 NVMe KIOXIA 2048GB`.
+- Direct installed-plugin smoke evidence: `/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin.exe -d -m nvme -j nvme 1` loads the `nvme` module and stock `nvme` job config from the installed tree.
+- Direct native enumerator live evidence from a temporary package test: the non-elevated shell returns `Access is denied` when opening `\\.\PhysicalDrive*`. This confirms the local permission boundary; the Netdata Windows service path runs with service privileges, and the code path itself is covered by package tests, cross-builds, and installed-plugin loading.
+- PR helper scripts from `.agents/skills/pr-reviews` could not run locally because `gh` is not installed; post-push CI and review state will be checked through the GitHub connector.
+
+Artifact updates:
+
+- Restored `src/go/plugin/go.d/collector/nvme/exec_windows.go`, `exec_windows_test.go`, `init_windows.go`, and `init_nonwindows.go`.
+- Restored Windows `\\.\PhysicalDriveN` handling in `src/go/plugin/go.d/collector/nvme/collect.go` and `collector_test.go`.
+- Kept native Windows querying in go.d rather than C `windows.plugin` so the collector reuses existing `nvme.*` contexts, dimensions, labels, metadata, and alert contracts across operating systems.
+- Updated `src/go/plugin/go.d/collector/nvme/metadata.yaml`, `config_schema.json`, and generated `integrations/nvme_devices.md` to document native Windows collection as primary and `nvme.exe` as an optional fallback.
+- Updated `.agents/sow/specs/windows-storage-fan-monitoring.md` with the native Windows NVMe contract.
+- AGENTS.md: no update needed; repository workflow and guardrails did not change.
+- Runtime project skills: no update needed; existing collector and integrations lifecycle skills covered the workflow.
+- Specs: updated the Windows storage/fan monitoring spec.
+- End-user/operator docs: updated the NVMe collector metadata and generated integration page.
+- End-user/operator skills: no update needed; no public/operator skill behavior changed.
+- SOW lifecycle: reopened this completed SOW for the regression and will move it back to `done/` with the implementation commit.
