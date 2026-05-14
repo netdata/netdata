@@ -20,6 +20,13 @@ health monitoring in the Netdata Agent.
   consumes `smartctl --json` output.
 - On macOS, `smartctl` execution follows the same non-Windows `ndsudo` path as
   Linux and BSD.
+- The `smartctl` binary used by `ndsudo` must be discoverable from a
+  root-controlled trusted path. Do not add user-writable package-manager
+  prefixes such as a default Apple Silicon Homebrew prefix to the setuid helper
+  search path.
+- Apple internal NVMe/Apple Fabric storage may be visible to `smartctl` scans
+  but still fail to open through smartmontools. In that case the generic
+  `smartctl` collector cannot provide health metrics for the internal device.
 - The collector keeps its existing bounded discovery and polling cadence:
   default chart update every 10 seconds, device discovery every 900 seconds,
   and device polling every 300 seconds.
@@ -38,6 +45,9 @@ health monitoring in the Netdata Agent.
   tools for native macOS NVMe health.
 - The collector discovers services that expose the documented
   `NVMe SMART Capable` IORegistry property.
+- A service with the `NVMe SMART Capable` property is not sufficient by itself;
+  the collector must be able to open the native SMART user client before adding
+  the device.
 - Discovery is rate-limited and defaults to every 300 seconds.
 - SMART reads are rate-limited and default to every 10 seconds, matching the
   existing `nvme` collector cadence and the existing critical-warning alert.
@@ -46,6 +56,9 @@ health monitoring in the Netdata Agent.
 - Labels include `device`, `model_number`, and `source=iokit`.
 - Labels must not include serial numbers, IORegistry paths, UUIDs, or other
   unique hardware identifiers.
+- Apple internal Apple Fabric SSDs may expose generic disk I/O and APFS
+  filesystem metrics while not exposing readable detailed NVMe health fields
+  through the public SMART user client.
 
 ## Native NVMe Metrics
 

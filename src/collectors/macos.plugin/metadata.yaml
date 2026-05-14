@@ -28,7 +28,7 @@ modules:
             - The function `IOServiceGetMatchingServices` is called to collect storage information.
             - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
             - The native Apple `powermetrics` command is sampled in the background to collect thermal pressure, plus SMC temperatures and fan speed when the macOS sampler is available.
-            - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes SMART-capable NVMe services.
+            - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
       supported_platforms:
         include:
           - macOS
@@ -38,7 +38,7 @@ modules:
         description: "Battery, UPS power-source, and native NVMe SMART metrics use public IOKit APIs and do not require external tools. Exact thermal pressure, fan, and sensor readings use the native Apple `powermetrics` command, which requires `netdata` to run with sufficient macOS privileges. The default sampler falls back to thermal-pressure-only data when macOS does not expose the SMC sampler; without required privileges, the thermal/fan sampler disables itself after repeated failures."
       default_behavior:
         auto_detection:
-          description: "The collector auto-detects macOS power sources and NVMe SMART-capable services, and only creates charts for values exposed by the hardware and operating system."
+          description: "The collector auto-detects macOS power sources and readable NVMe SMART-capable services, and only creates charts for values exposed by the hardware and operating system."
         limits:
           description: "Power-source and NVMe SMART enumeration are capped internally to avoid unexpected chart cardinality. The `powermetrics` sampler is rate-limited and cached so it does not run in the one-second collection hot path."
         performance_impact:
@@ -388,9 +388,9 @@ modules:
               Battery and UPS power-source charts do not depend on `powermetrics` and should still appear when macOS exposes power-source data.
           - name: NVMe health charts are missing
             description: |
-              Native NVMe health charts appear only when macOS exposes NVMe SMART-capable services through IOKit. The collector does not use `nvme-cli` or any external NVMe tool on macOS.
+              Native NVMe health charts appear only when macOS exposes NVMe SMART-capable services through IOKit and allows the native SMART user client to open them. The collector does not use `nvme-cli` or any external NVMe tool on macOS.
 
-              If generic disk I/O charts are present but NVMe health charts are absent, the device, controller, or macOS driver may not expose the native NVMe SMART user client.
+              If generic disk I/O charts are present but NVMe health charts are absent, the device, controller, or macOS driver may not expose a readable native NVMe SMART user client. Some Apple internal Apple Fabric SSDs expose disk I/O and filesystem metrics but not detailed public NVMe health fields.
     alerts:
       - name: interface_speed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf

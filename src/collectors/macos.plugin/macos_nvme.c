@@ -101,6 +101,7 @@ static struct macos_nvme_device *nvme_devices_root = NULL;
 static unsigned nvme_next_device_id = 0;
 static bool nvme_logged_registry_error = false;
 static bool nvme_logged_read_error = false;
+static bool nvme_logged_unreadable_service = false;
 
 static collected_number macos_nvme_le128_to_number(const uint64_t value[2], uint64_t multiplier)
 {
@@ -313,6 +314,15 @@ static void macos_nvme_free_device(struct macos_nvme_device *d)
     freez(d);
 }
 
+static void macos_nvme_free_devices(void)
+{
+    while (nvme_devices_root) {
+        struct macos_nvme_device *d = nvme_devices_root;
+        nvme_devices_root = d->next;
+        macos_nvme_free_device(d);
+    }
+}
+
 static void macos_nvme_prune_missing_devices(void)
 {
     struct macos_nvme_device **pp = &nvme_devices_root;
@@ -352,6 +362,18 @@ static unsigned macos_nvme_discover_devices(void)
 
         uint64_t registry_id = 0;
         if (IORegistryEntryGetRegistryEntryID(entry, &registry_id) != kIOReturnSuccess || registry_id == 0) {
+            IOObjectRelease(entry);
+            continue;
+        }
+
+        struct macos_nvme_metrics probe = {0};
+        if (!macos_nvme_read_metrics(entry, &probe)) {
+            if (!nvme_logged_unreadable_service) {
+                collector_error(
+                    "MACOS: found an NVMe SMART-capable IORegistry service, but cannot read native SMART data from it; "
+                    "NVMe health charts will appear when macOS exposes readable NVMe SMART data");
+                nvme_logged_unreadable_service = true;
+            }
             IOObjectRelease(entry);
             continue;
         }
@@ -736,6 +758,8 @@ int do_macos_nvme_smart(int update_every __maybe_unused, usec_t dt __maybe_unuse
                 "NVMe health charts will appear when macOS exposes readable NVMe SMART data");
             nvme_logged_read_error = true;
         }
+        if (consecutive_read_failures >= 3)
+            macos_nvme_free_devices();
     } else {
         consecutive_read_failures = 0;
     }
@@ -745,11 +769,6 @@ int do_macos_nvme_smart(int update_every __maybe_unused, usec_t dt __maybe_unuse
 
 void macos_nvme_smart_cleanup(void)
 {
-    while (nvme_devices_root) {
-        struct macos_nvme_device *d = nvme_devices_root;
-        nvme_devices_root = d->next;
-        macos_nvme_free_device(d);
-    }
-
+    macos_nvme_free_devices();
     nvme_next_device_id = 0;
 }
