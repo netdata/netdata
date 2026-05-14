@@ -14,7 +14,6 @@ mod context;
 mod dispatch;
 mod functions;
 mod labelops;
-mod lookback;
 mod select;
 mod subquery;
 mod types;

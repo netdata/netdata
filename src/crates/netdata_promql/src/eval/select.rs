@@ -6,7 +6,6 @@ use crate::plan::AtMod;
 use crate::storage::{Matcher, NdQuery};
 
 use super::context::EvalContext;
-use super::lookback::pick_latest_within_window;
 use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
 
 /// Resolve the `@` modifier (if any) against the current eval context.
@@ -58,6 +57,15 @@ pub fn eval_vector_select(
         ));
     }
 
+    // Lookback rule: of the samples the storage iterator returns for
+    // each series in the `[after_s, before_s]` window, pick the latest
+    // whose timestamp falls inside the precise millisecond window
+    // `[effective_t_ms - lookback_ms, effective_t_ms]` and whose value
+    // is not NaN. Walking forward and keeping a running "latest seen"
+    // is equivalent to the previous reverse-scan-over-Vec because the
+    // shim guarantees non-decreasing timestamps. SOW-0029.
+    let earliest_ms = effective_t_ms.saturating_sub(ctx.lookback_ms);
+
     let mut out = Vec::with_capacity(q.len());
     for i in 0..q.len() {
         let Some(view) = q.series(i) else { continue };
@@ -67,20 +75,32 @@ pub fn eval_vector_select(
             .collect();
         let signature = labels_signature(&labels);
 
-        // Fetch native-resolution samples in the lookback window.
         let Some(samples_iter) = q.open_samples(i, after_s, before_s, 0) else {
             continue;
         };
-        let samples: Vec<Sample> = samples_iter
-            .map(|s| Sample {
-                timestamp_ms: s.timestamp_ms,
-                value: s.value,
-            })
-            .filter(|s| !s.value.is_nan())
-            .collect();
 
-        match pick_latest_within_window(&samples, effective_t_ms, ctx.lookback_ms) {
-            Some(picked) => out.push(Series {
+        // Single-pass fold over the per-series sample iterator. No
+        // intermediate `Vec` allocation; we only need the value of
+        // the latest qualifying sample.
+        let mut picked_value: Option<f64> = None;
+        for s in samples_iter {
+            if s.value.is_nan() {
+                continue;
+            }
+            if s.timestamp_ms < earliest_ms || s.timestamp_ms > effective_t_ms {
+                // The shim's window check is in whole seconds, so a
+                // few samples at the boundary may fall outside the
+                // strict millisecond bounds; skip those.
+                continue;
+            }
+            // Samples arrive in non-decreasing order, so each in-window
+            // non-NaN sample is at least as recent as the previous one.
+            // Overwrite unconditionally; the last write wins.
+            picked_value = Some(s.value);
+        }
+
+        if let Some(value) = picked_value {
+            out.push(Series {
                 labels,
                 signature,
                 // Stamp at the query time, not the sample's actual time.
@@ -88,10 +108,9 @@ pub fn eval_vector_select(
                 // timestamps regardless of underlying collection cadence.
                 samples: vec![Sample {
                     timestamp_ms: ctx.at_ms,
-                    value: picked.value,
+                    value,
                 }],
-            }),
-            None => continue,
+            });
         }
     }
 
