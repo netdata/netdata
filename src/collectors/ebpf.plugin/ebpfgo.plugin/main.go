@@ -20,9 +20,13 @@ func main() {
 		return
 	}
 
-	if !handle.ConfigFound && updateEvery > 0 {
-		handle.UpdateEvery = updateEvery
+	if updateEvery <= 0 {
+		updateEvery = handle.UpdateEvery
 	}
+	if updateEvery <= 0 {
+		updateEvery = cachestatDefaultUpdateEvery
+	}
+	handle.UpdateEvery = updateEvery
 
 	runCachestatPlugin(handle, updateEvery)
 }

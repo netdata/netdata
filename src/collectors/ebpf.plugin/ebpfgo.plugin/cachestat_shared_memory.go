@@ -130,12 +130,11 @@ func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatApp
 	s.Replace(nextEntries, nextPrev)
 }
 
-func runCachestatSharedMemoryCollector(handle *CachestatLegacyHandle, stop <-chan struct{}, store *cachestatSharedMemoryStore) {
+func runCachestatSharedMemoryCollector(handle *CachestatLegacyHandle, stop <-chan struct{}, store *cachestatSharedMemoryStore, updateEvery int) {
 	if handle == nil || handle.Runtime == nil || store == nil {
 		return
 	}
 
-	updateEvery := handle.UpdateEvery
 	if updateEvery <= 0 {
 		updateEvery = cachestatDefaultUpdateEvery
 	}

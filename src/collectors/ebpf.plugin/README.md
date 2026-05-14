@@ -76,9 +76,9 @@ To edit the `ebpf.d.conf`:
 
 ### `[global]` configuration options
 
-The `[global]` section defines settings for the whole eBPF collector. For `update every`, the collector uses the
-configuration files first and only falls back to the pluginsd command-line interval when no local config file is
-available.
+The `[global]` section defines settings for the whole eBPF collector. For `update every`, the collector follows the
+pluginsd command-line interval when Netdata provides one, and falls back to the configuration value only when no
+pluginsd interval is available.
 
 #### eBPF load mode
 
@@ -161,8 +161,8 @@ will only enable these threads integrated with other collectors when the kernel 
 
 #### Collection period
 
-The plugin uses the option `update every` to define the number of seconds used for eBPF to send data for Netdata. The default value
-is 5 seconds.
+The plugin uses the option `update every` to define the number of seconds used for eBPF to send data when Netdata does
+not provide a pluginsd interval. The default value is 5 seconds.
 
 #### PID table size
 

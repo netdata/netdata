@@ -71,7 +71,7 @@ modules:
             enabled: true
           list:
             - name: update every
-              description: Data collection frequency. When no local config file is available, the collector falls back to the pluginsd command-line interval.
+              description: Data collection frequency. When Netdata provides a pluginsd interval, the collector follows it and uses this value only as a fallback.
               default_value: 10
               required: false
             - name: ebpf load mode

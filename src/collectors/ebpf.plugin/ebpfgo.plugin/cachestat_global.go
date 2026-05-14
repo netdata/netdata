@@ -263,13 +263,14 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 		return
 	}
 
-	updateEvery := handle.UpdateEvery
-	if updateEvery <= 0 && updateEveryArg > 0 {
-		updateEvery = updateEveryArg
+	updateEvery := updateEveryArg
+	if updateEvery <= 0 {
+		updateEvery = handle.UpdateEvery
 	}
 	if updateEvery <= 0 {
 		updateEvery = cachestatDefaultUpdateEvery
 	}
+	handle.UpdateEvery = updateEvery
 	api := netdataapi.New(os.Stdout)
 
 	store := NewCachestatSharedMemoryStore()
@@ -295,7 +296,7 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		runCachestatSharedMemoryCollector(handle, stop, store)
+		runCachestatSharedMemoryCollector(handle, stop, store, updateEvery)
 	}()
 
 	go func() {
