@@ -775,6 +775,11 @@ fn aggr_from_token(t: token::TokenId) -> Result<AggrKind, LowerError> {
         T_BOTTOMK => AggrKind::BottomK,
         T_QUANTILE => AggrKind::Quantile,
         T_COUNT_VALUES => AggrKind::CountValues,
+        T_STDDEV => AggrKind::Stddev,
+        T_STDVAR => AggrKind::Stdvar,
+        T_LIMITK => AggrKind::LimitK,
+        T_LIMIT_RATIO => AggrKind::LimitRatio,
+        T_GROUP => AggrKind::Group,
         other => {
             return Err(LowerError::Unsupported(format!(
                 "aggregation operator token {other} is unrecognized"

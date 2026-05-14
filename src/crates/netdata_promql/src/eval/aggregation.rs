@@ -50,6 +50,18 @@ pub fn apply_aggregate(
             let label = param_string.expect("lowering guarantees label for count_values");
             apply_count_values(grouping, label, series)
         }
+        AggrKind::LimitK => {
+            let k = param.expect("lowering guarantees k for limitk");
+            apply_limitk(grouping, k, series)
+        }
+        AggrKind::LimitRatio => {
+            let ratio = param.expect("lowering guarantees ratio for limit_ratio");
+            apply_limit_ratio(grouping, ratio, series)
+        }
+        AggrKind::Group => apply_group(grouping, series),
+        // Sum/Avg/Min/Max/Count/Stddev/Stdvar all flow through the
+        // shared collapsing path; their Bucket::finalize_value arms
+        // produce the per-position output.
         _ => apply_collapsing(op, grouping, series),
     }
 }
@@ -355,6 +367,214 @@ fn apply_count_values(
     Ok(EvalResult::InstantVector(out))
 }
 
+/// `group(v)` (SOW-0034). Per bucket per grid position, emit 1.0 if
+/// any input series had a non-NaN value at that position; NaN
+/// otherwise. Output labels follow the grouping projection (same as
+/// sum/avg). Used in production as a join-key fabricator: takes a
+/// labeled input and emits a singleton-per-group series of 1s that
+/// can be joined against other vectors via vector matching.
+fn apply_group(
+    grouping: Option<&Grouping>,
+    series: Vec<Series>,
+) -> Result<EvalResult, EvalError> {
+    if series.is_empty() {
+        return Ok(EvalResult::InstantVector(Vec::new()));
+    }
+    let n = series[0].len();
+    let timestamps = Arc::clone(&series[0].timestamps);
+
+    let bucket_keys: Vec<(u64, Vec<(String, String)>)> = series
+        .iter()
+        .map(|s| {
+            let kl = project_labels(&s.labels, grouping);
+            (labels_signature(&kl), kl)
+        })
+        .collect();
+
+    // accum: per bucket -> (labels, has_input_per_position).
+    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<bool>)> = BTreeMap::new();
+    for i in 0..n {
+        for (j, s) in series.iter().enumerate() {
+            let (key, key_labels) = &bucket_keys[j];
+            let entry = accum
+                .entry(*key)
+                .or_insert_with(|| (key_labels.clone(), vec![false; n]));
+            if !s.values[i].is_nan() {
+                entry.1[i] = true;
+            }
+        }
+    }
+
+    let mut out: Vec<Series> = accum
+        .into_iter()
+        .filter_map(|(_, (labels, present))| {
+            let values: Vec<f64> = present
+                .into_iter()
+                .map(|p| if p { 1.0 } else { f64::NAN })
+                .collect();
+            if values.iter().all(|v| v.is_nan()) {
+                return None;
+            }
+            Some(Series::new(labels, Arc::clone(&timestamps), values))
+        })
+        .collect();
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+/// `limitk(k, v)` (SOW-0034). Per bucket per grid position, pick the
+/// first `k` input series in signature order (stable, deterministic,
+/// independent of value). Output series carry the original input
+/// labels minus `__name__` -- same convention as `topk`/`bottomk`.
+///
+/// At grid positions where a selected series happens to be NaN, the
+/// output preserves the NaN; selection is by series identity, not by
+/// per-position value.
+fn apply_limitk(
+    grouping: Option<&Grouping>,
+    k_param: f64,
+    series: Vec<Series>,
+) -> Result<EvalResult, EvalError> {
+    if !k_param.is_finite() || k_param <= 0.0 {
+        return Ok(EvalResult::InstantVector(Vec::new()));
+    }
+    let k = k_param as usize;
+    if series.is_empty() {
+        return Ok(EvalResult::InstantVector(Vec::new()));
+    }
+
+    // Group input series indices by bucket-signature; within each
+    // bucket, the input series whose stripped signatures sort first
+    // are kept.
+    let bucket_keys: Vec<u64> = series
+        .iter()
+        .map(|s| labels_signature(&project_labels(&s.labels, grouping)))
+        .collect();
+    let stripped_labels: Vec<Vec<(String, String)>> = series
+        .iter()
+        .map(|s| {
+            s.labels
+                .iter()
+                .filter(|(n, _)| n != "__name__")
+                .cloned()
+                .collect()
+        })
+        .collect();
+    let stripped_signatures: Vec<u64> = stripped_labels
+        .iter()
+        .map(|l| labels_signature(l))
+        .collect();
+
+    let mut by_bucket: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+    for (j, &b) in bucket_keys.iter().enumerate() {
+        by_bucket.entry(b).or_default().push(j);
+    }
+
+    // Select the kept input-series indices once (selection is
+    // position-independent for limitk).
+    let mut kept: Vec<usize> = Vec::new();
+    for (_, mut indices) in by_bucket {
+        indices.sort_by_key(|&j| stripped_signatures[j]);
+        indices.truncate(k);
+        kept.extend(indices);
+    }
+
+    let mut out: Vec<Series> = kept
+        .into_iter()
+        .map(|j| {
+            Series::new(
+                stripped_labels[j].clone(),
+                Arc::clone(&series[j].timestamps),
+                series[j].values.clone(),
+            )
+        })
+        .collect();
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+/// `limit_ratio(ratio, v)` (SOW-0034). Per bucket, select a
+/// deterministic-random subset of input series whose
+/// `hash01(signature)` falls below `ratio` (positive) or above
+/// `1 + ratio` (negative). `ratio` outside `[-1, 1]` clamps to all-
+/// selected. `ratio` NaN or zero -> empty result.
+///
+/// Like `limitk`, selection is series-level (not per-position), and
+/// output labels are the input series' labels minus `__name__`.
+fn apply_limit_ratio(
+    grouping: Option<&Grouping>,
+    ratio: f64,
+    series: Vec<Series>,
+) -> Result<EvalResult, EvalError> {
+    if ratio.is_nan() || ratio == 0.0 {
+        return Ok(EvalResult::InstantVector(Vec::new()));
+    }
+    if series.is_empty() {
+        return Ok(EvalResult::InstantVector(Vec::new()));
+    }
+    let r = ratio.clamp(-1.0, 1.0);
+
+    // Group by bucket. Within each bucket, select series by
+    // `hash01(sig) < r` for positive r, or `hash01(sig) >= 1+r` for
+    // negative r. The hash01 lives on the *stripped* signature so
+    // that label projection doesn't change the selection.
+    let bucket_keys: Vec<u64> = series
+        .iter()
+        .map(|s| labels_signature(&project_labels(&s.labels, grouping)))
+        .collect();
+    let stripped_labels: Vec<Vec<(String, String)>> = series
+        .iter()
+        .map(|s| {
+            s.labels
+                .iter()
+                .filter(|(n, _)| n != "__name__")
+                .cloned()
+                .collect()
+        })
+        .collect();
+    let stripped_signatures: Vec<u64> = stripped_labels
+        .iter()
+        .map(|l| labels_signature(l))
+        .collect();
+
+    let mut by_bucket: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+    for (j, &b) in bucket_keys.iter().enumerate() {
+        by_bucket.entry(b).or_default().push(j);
+    }
+
+    let mut kept: Vec<usize> = Vec::new();
+    for (_, indices) in by_bucket {
+        for j in indices {
+            let h = hash01(stripped_signatures[j]);
+            let select = if r >= 0.0 { h < r } else { h >= 1.0 + r };
+            if select {
+                kept.push(j);
+            }
+        }
+    }
+
+    let mut out: Vec<Series> = kept
+        .into_iter()
+        .map(|j| {
+            Series::new(
+                stripped_labels[j].clone(),
+                Arc::clone(&series[j].timestamps),
+                series[j].values.clone(),
+            )
+        })
+        .collect();
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+/// Map a u64 signature to a deterministic `f64` in `[0, 1)`. Used by
+/// `limit_ratio` for stable per-series selection. The output is not
+/// bit-identical to Prometheus' choice of hash, but it satisfies the
+/// spec (deterministic, uniform-ish across the input space).
+fn hash01(sig: u64) -> f64 {
+    (sig as f64) / (u64::MAX as f64)
+}
+
 /// Format a float for use as a PromQL label value. Mirrors Prometheus'
 /// Go default formatting closely enough for typical inputs.
 fn format_value_for_label(v: f64) -> String {
@@ -400,6 +620,7 @@ pub(crate) fn compute_quantile(sorted: &[f64], phi: f64) -> f64 {
 struct Bucket {
     labels: Vec<(String, String)>,
     sum: f64,
+    sum_sq: f64,
     count: u64,
     min: f64,
     max: f64,
@@ -410,6 +631,7 @@ impl Bucket {
         Self {
             labels,
             sum: 0.0,
+            sum_sq: 0.0,
             count: 0,
             min: f64::INFINITY,
             max: f64::NEG_INFINITY,
@@ -421,6 +643,7 @@ impl Bucket {
             return;
         }
         self.sum += v;
+        self.sum_sq += v * v;
         self.count += 1;
         if v < self.min {
             self.min = v;
@@ -438,17 +661,42 @@ impl Bucket {
         if self.count == 0 {
             return f64::NAN;
         }
+        let n = self.count as f64;
         match op {
             AggrKind::Sum => self.sum,
-            AggrKind::Avg => self.sum / self.count as f64,
+            AggrKind::Avg => self.sum / n,
             AggrKind::Min => self.min,
             AggrKind::Max => self.max,
-            AggrKind::Count => self.count as f64,
+            AggrKind::Count => n,
+            AggrKind::Stdvar => {
+                // Population variance: E[X²] - (E[X])². Clamp tiny
+                // negative round-off to zero. Same formula as the
+                // `stdvar_over_time` rollup.
+                let mean = self.sum / n;
+                let var = self.sum_sq / n - mean * mean;
+                if var < 0.0 {
+                    0.0
+                } else {
+                    var
+                }
+            }
+            AggrKind::Stddev => {
+                let mean = self.sum / n;
+                let var = self.sum_sq / n - mean * mean;
+                if var < 0.0 {
+                    0.0
+                } else {
+                    var.sqrt()
+                }
+            }
             AggrKind::TopK
             | AggrKind::BottomK
             | AggrKind::Quantile
-            | AggrKind::CountValues => {
-                unreachable!("parametrized aggregator in Bucket::finalize_value: {:?}", op)
+            | AggrKind::CountValues
+            | AggrKind::LimitK
+            | AggrKind::LimitRatio
+            | AggrKind::Group => {
+                unreachable!("parametrized/non-collapsing aggregator in Bucket::finalize_value: {:?}", op)
             }
         }
     }
@@ -861,5 +1109,227 @@ mod tests {
             .map(|s| s.values[0])
             .unwrap();
         assert_eq!(nan_count, 2.0);
+    }
+
+    // -----------------------------------------------------------------
+    // SOW-0034: stddev / stdvar / limitk / limit_ratio / group
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn stddev_population_of_known_set() {
+        // Population variance of {1, 2, 3, 4, 5}: mean = 3, var = 2,
+        // stddev = sqrt(2) ≈ 1.41421356.
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", 2.0),
+            s("foo", "c", 3.0),
+            s("foo", "d", 4.0),
+            s("foo", "e", 5.0),
+        ]);
+        let v = unwrap_vec(apply_aggregate(AggrKind::Stddev, None, None, None, input).unwrap());
+        assert_eq!(v.len(), 1);
+        assert!((v[0].values[0] - (2.0_f64).sqrt()).abs() < 1e-9, "got {}", v[0].values[0]);
+        assert!(v[0].labels.is_empty());
+    }
+
+    #[test]
+    fn stdvar_skips_nan_inputs() {
+        // {1, NaN, 3, 5}; non-NaN count=3, mean=3, var = (4+0+4)/3 ≈ 2.6667.
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", f64::NAN),
+            s("foo", "c", 3.0),
+            s("foo", "d", 5.0),
+        ]);
+        let v = unwrap_vec(apply_aggregate(AggrKind::Stdvar, None, None, None, input).unwrap());
+        assert_eq!(v.len(), 1);
+        let expected = (16.0 / 3.0) / 1.0 - 9.0; // sum_sq/n - mean^2 = 35/3 - 9 = 8/3
+        // sum_sq = 1 + 9 + 25 = 35; mean = 9/3 = 3; var = 35/3 - 9 = 8/3 ≈ 2.6667.
+        let _ = expected;
+        assert!((v[0].values[0] - 8.0 / 3.0).abs() < 1e-9, "got {}", v[0].values[0]);
+    }
+
+    #[test]
+    fn stddev_by_grouping_per_bucket() {
+        let input = EvalResult::InstantVector(vec![
+            s_with("g1", "a", 1.0),
+            s_with("g1", "b", 2.0),
+            s_with("g1", "c", 3.0),
+            s_with("g2", "a", 10.0),
+            s_with("g2", "b", 20.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::Stdvar,
+                Some(&Grouping::By(vec!["group".to_string()])),
+                None,
+                None,
+                input,
+            )
+            .unwrap(),
+        );
+        assert_eq!(v.len(), 2);
+        // g1: mean=2, var=2/3; g2: mean=15, var=25.
+        let mut vals: Vec<f64> = v.iter().map(|s| s.values[0]).collect();
+        vals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert!((vals[0] - 2.0 / 3.0).abs() < 1e-9);
+        assert!((vals[1] - 25.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn group_emits_one_per_bucket() {
+        // No grouping -> one output series whose value is 1.0.
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", 5.0),
+            s("foo", "c", 99.0),
+        ]);
+        let v = unwrap_vec(apply_aggregate(AggrKind::Group, None, None, None, input).unwrap());
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].values[0], 1.0);
+        assert!(v[0].labels.is_empty());
+    }
+
+    #[test]
+    fn group_by_dimension_keeps_one_per_dimension() {
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "a", 2.0),
+            s("foo", "b", 3.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::Group,
+                Some(&Grouping::By(vec!["dimension".to_string()])),
+                None,
+                None,
+                input,
+            )
+            .unwrap(),
+        );
+        assert_eq!(v.len(), 2);
+        for s in &v {
+            assert_eq!(s.values[0], 1.0);
+        }
+    }
+
+    #[test]
+    fn group_drops_all_nan_bucket() {
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", f64::NAN),
+            s("foo", "b", f64::NAN),
+        ]);
+        let v = unwrap_vec(apply_aggregate(AggrKind::Group, None, None, None, input).unwrap());
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn limitk_picks_first_k_in_signature_order() {
+        // Stable selection: limitk(2, ...) over 4 input series keeps 2.
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", 2.0),
+            s("foo", "c", 3.0),
+            s("foo", "d", 4.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(AggrKind::LimitK, None, Some(2.0), None, input).unwrap(),
+        );
+        assert_eq!(v.len(), 2);
+        // __name__ stripped on output (per topk/bottomk convention).
+        for s in &v {
+            assert!(s.labels.iter().all(|(n, _)| n != "__name__"));
+        }
+    }
+
+    #[test]
+    fn limitk_with_k_zero_returns_empty() {
+        let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0)]);
+        let v = unwrap_vec(
+            apply_aggregate(AggrKind::LimitK, None, Some(0.0), None, input.clone()).unwrap(),
+        );
+        assert!(v.is_empty());
+        // Negative k -> empty too.
+        let v = unwrap_vec(
+            apply_aggregate(AggrKind::LimitK, None, Some(-3.0), None, input).unwrap(),
+        );
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn limitk_by_grouping_per_bucket() {
+        // 4 series across 2 groups -> limitk(1) per group keeps 2 total.
+        let input = EvalResult::InstantVector(vec![
+            s_with("g1", "a", 1.0),
+            s_with("g1", "b", 2.0),
+            s_with("g2", "a", 10.0),
+            s_with("g2", "b", 20.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::LimitK,
+                Some(&Grouping::By(vec!["group".to_string()])),
+                Some(1.0),
+                None,
+                input,
+            )
+            .unwrap(),
+        );
+        assert_eq!(v.len(), 2);
+    }
+
+    #[test]
+    fn limit_ratio_one_keeps_all() {
+        // ratio=1 means every series whose hash < 1, i.e. all of them.
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", 2.0),
+            s("foo", "c", 3.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(AggrKind::LimitRatio, None, Some(1.0), None, input).unwrap(),
+        );
+        assert_eq!(v.len(), 3);
+    }
+
+    #[test]
+    fn limit_ratio_zero_returns_empty() {
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", 2.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(AggrKind::LimitRatio, None, Some(0.0), None, input.clone()).unwrap(),
+        );
+        assert!(v.is_empty());
+        // NaN ratio -> empty.
+        let v = unwrap_vec(
+            apply_aggregate(AggrKind::LimitRatio, None, Some(f64::NAN), None, input).unwrap(),
+        );
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn limit_ratio_complementary_negatives_sum_to_all() {
+        // For any input, limit_ratio(r, v) and limit_ratio(r-1, v) together
+        // cover the full input (no overlap, no gap). For r=0.4: positive
+        // picks `hash < 0.4`, negative picks `hash >= 1 + (0.4 - 1) = 0.4`.
+        // Concatenating yields every input series exactly once.
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", 2.0),
+            s("foo", "c", 3.0),
+            s("foo", "d", 4.0),
+            s("foo", "e", 5.0),
+        ]);
+        let n_input = if let EvalResult::InstantVector(v) = &input { v.len() } else { 0 };
+        let pos = unwrap_vec(
+            apply_aggregate(AggrKind::LimitRatio, None, Some(0.4), None, input.clone())
+                .unwrap(),
+        );
+        let neg = unwrap_vec(
+            apply_aggregate(AggrKind::LimitRatio, None, Some(-0.6), None, input).unwrap(),
+        );
+        assert_eq!(pos.len() + neg.len(), n_input);
     }
 }

@@ -40,6 +40,23 @@ pub enum AggrKind {
     BottomK,
     Quantile,
     CountValues,
+    // SOW-0034: missing-aggregators batch.
+    /// `stddev(v)` -- population standard deviation per group.
+    /// Distinct from `stddev_over_time`, which is a rollup.
+    Stddev,
+    /// `stdvar(v)` -- population variance per group.
+    Stdvar,
+    /// `limitk(k, v)` -- first k series per group in signature
+    /// order (Prometheus 2.40+).
+    LimitK,
+    /// `limit_ratio(ratio, v)` -- deterministic-random selection
+    /// of approximately `ratio` of input series per group
+    /// (Prometheus 2.40+).
+    LimitRatio,
+    /// `group(v)` -- emits 1 per output bucket whenever any
+    /// input series had a non-NaN value. Used as a join-key
+    /// fabricator.
+    Group,
 }
 
 impl AggrKind {
@@ -47,7 +64,14 @@ impl AggrKind {
     /// (e.g. `topk(5, expr)`). Non-parametrized aggregators
     /// reject any param at lowering time.
     pub fn takes_param(self) -> bool {
-        matches!(self, AggrKind::TopK | AggrKind::BottomK | AggrKind::Quantile)
+        matches!(
+            self,
+            AggrKind::TopK
+                | AggrKind::BottomK
+                | AggrKind::Quantile
+                | AggrKind::LimitK
+                | AggrKind::LimitRatio
+        )
     }
 
     /// True when the operator requires a string parameter (the

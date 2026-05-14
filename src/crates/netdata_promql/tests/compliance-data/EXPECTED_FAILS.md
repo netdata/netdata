@@ -9,21 +9,17 @@ The first run of the compliance corpus (SOW-0030) produced **468 pass
 `.test` files. The failures fall into the following categories, in
 rough order of impact. Each is a follow-up SOW.
 
-## Category: missing aggregators
+SOW-0031/0032/0033 (whole-range orchestration, column-oriented
+Series, aggr × rollup fusion) brought the baseline to 472. SOW-0034
+(the five missing aggregators) brought it to **501 pass / 299 fail
+/ 212 skip**. The aggregators category is closed; the rest stand.
 
-We don't yet implement these aggregation operators:
+## Category: missing aggregators (CLOSED, SOW-0034)
 
-* `stddev` (aggregation of an instant vector -- distinct from
-  `stddev_over_time` which we do have)
-* `stdvar` (aggregation of an instant vector)
-* `limitk(k, v)` (Prometheus 2.40+: limit-by-count)
-* `limit_ratio(ratio, v)` (Prometheus 2.40+: limit-by-ratio)
-* `group(v)` (returns 1 for every input series; used as a join key
-  fabricator)
-
-Adds ~5 variants to `AggrKind`. Trivial implementations; not in
-SOW-0030 because the SOW is about the harness, not the gaps it
-exposes.
+The five missing aggregation operators -- `stddev`, `stdvar`,
+`limitk(k, v)`, `limit_ratio(ratio, v)`, `group(v)` -- now ship.
+`aggregators.test` improved from 80 -> 108 passes; the overall
+corpus from 472 -> 501.
 
 ## Category: `topk` / `bottomk` `__name__` preservation
 
