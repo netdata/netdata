@@ -30,7 +30,7 @@ use std::ffi::{c_char, c_int, CStr, CString};
 use std::ptr;
 use std::time::Instant;
 
-use eval::{eval, EvalContext, EvalError, EvalResult, Sample, Series};
+use eval::{eval, EvalContext, EvalError, EvalResult, Grid, Sample, Series};
 use output::{serialize_error, serialize_scalar_at, serialize_success};
 use plan::{lower_query, LowerError, ValueType};
 
@@ -271,7 +271,7 @@ fn run_instant_inner(
     let plan = lower_query(query)?;
     // For instant queries, the outer "range" is a single point.
     let ctx = EvalContext {
-        at_ms,
+        grid: std::sync::Arc::new(Grid::instant(at_ms)),
         lookback_ms: DEFAULT_LOOKBACK_MS,
         host_machine_guid: host,
         max_series: DEFAULT_MAX_SERIES,
@@ -336,6 +336,18 @@ fn run_range_inner(
         return Err(QueryError::UnsupportedTopLevel(tt));
     }
 
+    // SOW-0031: queries whose only inputs are vector selectors and
+    // per-position operators (binops, aggregations, transforms, label
+    // ops) take the single-pass path: build a range Grid, call eval
+    // once, serialize the grid-aligned output. Queries containing
+    // matrix selectors, subqueries, or absent fall back to the
+    // pre-SOW-0031 per-step loop because their rollups/absences are
+    // not yet grid-aware. Grid-awareness for those is tracked as a
+    // follow-up SOW.
+    if !plan_uses_range_vector(&plan) {
+        return run_range_single_pass(plan, start_ms, end_ms, step_ms, host);
+    }
+
     use std::collections::BTreeMap;
     // Accumulate per-signature label sets + sample sequence across steps.
     let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
@@ -353,7 +365,7 @@ fn run_range_inner(
         // shifts. `@ start()` / `@ end()` resolve against the outer
         // bounds, not the per-step time.
         let ctx = EvalContext {
-            at_ms: t,
+            grid: std::sync::Arc::new(Grid::instant(t)),
             lookback_ms: DEFAULT_LOOKBACK_MS,
             host_machine_guid: host.clone(),
             max_series: DEFAULT_MAX_SERIES,
@@ -427,6 +439,85 @@ fn run_range_inner(
         NdPromqlResponse::ok(serialize_success(&result)),
         series_count,
     ))
+}
+
+/// SOW-0031 single-pass range query path. Builds a Grid::range once,
+/// calls `eval` once. Selectors and per-position operators emit grid-
+/// aligned series; the serializer reads them as a matrix.
+///
+/// Only invoked for plans that do not contain matrix selectors or
+/// subqueries (i.e. no rollups). Rollup grid-awareness is tracked as
+/// a follow-up SOW.
+fn run_range_single_pass(
+    plan: plan::Plan,
+    start_ms: i64,
+    end_ms: i64,
+    step_ms: i64,
+    host: Option<String>,
+) -> Result<(NdPromqlResponse, usize), QueryError> {
+    let grid = std::sync::Arc::new(Grid::range(start_ms, end_ms, step_ms));
+    let ctx = EvalContext {
+        grid: std::sync::Arc::clone(&grid),
+        lookback_ms: DEFAULT_LOOKBACK_MS,
+        host_machine_guid: host,
+        max_series: DEFAULT_MAX_SERIES,
+        outer_start_ms: start_ms,
+        outer_end_ms: end_ms,
+        backend: std::sync::Arc::new(storage::FfiBackend),
+    };
+    let r = eval(&ctx, &plan)?;
+    let result = match r {
+        EvalResult::Scalar(v) => {
+            // Broadcast the scalar across the grid.
+            let samples: Vec<Sample> = grid
+                .timestamps
+                .iter()
+                .map(|&ts| Sample {
+                    timestamp_ms: ts,
+                    value: v,
+                })
+                .collect();
+            EvalResult::RangeVector(vec![Series {
+                labels: Vec::new(),
+                signature: 0,
+                samples,
+            }])
+        }
+        EvalResult::InstantVector(series) => EvalResult::RangeVector(series),
+        EvalResult::RangeVector(_) => {
+            return Err(QueryError::UnsupportedTopLevel(ValueType::RangeVector));
+        }
+    };
+    let series_count = match &result {
+        EvalResult::RangeVector(v) => v.len(),
+        _ => 0,
+    };
+    Ok((
+        NdPromqlResponse::ok(serialize_success(&result)),
+        series_count,
+    ))
+}
+
+/// Walk the plan tree to detect rollup-bearing nodes. Returns true if
+/// any `MatrixSelect`, `Subquery`, or `Absent` is found anywhere in
+/// the plan. The range orchestrator uses this to choose between
+/// SOW-0031 single-pass (false) and the legacy per-step loop (true).
+fn plan_uses_range_vector(p: &plan::Plan) -> bool {
+    use plan::Plan;
+    match p {
+        Plan::Number(_) | Plan::VectorSelect { .. } => false,
+        Plan::MatrixSelect { .. } | Plan::Subquery { .. } | Plan::Absent { .. } => true,
+        Plan::UnaryMinus(inner) => plan_uses_range_vector(inner),
+        Plan::Binop { lhs, rhs, .. } => {
+            plan_uses_range_vector(lhs) || plan_uses_range_vector(rhs)
+        }
+        Plan::Aggregate { param, expr, .. } => {
+            param.as_ref().map(|p| plan_uses_range_vector(p)).unwrap_or(false)
+                || plan_uses_range_vector(expr)
+        }
+        Plan::Call { args, .. } => args.iter().any(plan_uses_range_vector),
+        Plan::LabelOp { expr, .. } => plan_uses_range_vector(expr),
+    }
 }
 
 /// Emit one slow-query log record. The result is borrowed so the

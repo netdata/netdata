@@ -9,7 +9,7 @@ use super::select::{eval_matrix_select, eval_vector_select};
 use super::subquery::eval_subquery;
 use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
 
-/// Evaluate one plan node at `ctx.at_ms`.
+/// Evaluate one plan node at `ctx.at_ms()`.
 pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
     match plan {
         Plan::Number(v) => Ok(EvalResult::Scalar(*v)),
@@ -95,7 +95,7 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
                             "time() expects no arguments".to_string(),
                         ));
                     }
-                    return Ok(EvalResult::Scalar(ctx.at_ms as f64 / 1000.0));
+                    return Ok(EvalResult::Scalar(ctx.at_ms() as f64 / 1000.0));
                 }
                 FuncKind::Vector => {
                     if args.len() != 1 {
@@ -117,7 +117,7 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
                         labels: Vec::new(),
                         signature: labels_signature(&[]),
                         samples: vec![Sample {
-                            timestamp_ms: ctx.at_ms,
+                            timestamp_ms: ctx.at_ms(),
                             value: v,
                         }],
                     };

@@ -53,35 +53,114 @@ pub fn apply_aggregate(
     }
 }
 
-/// The original Phase 1 path for sum/avg/min/max/count: bucket by
-/// grouping key, accumulate, collapse each bucket to a single series.
+/// Grid-aware path for sum/avg/min/max/count (SOW-0031). At each grid
+/// position the input series share a common timestamp; we bucket by
+/// grouping key, accumulate over the position, and collapse to a per-
+/// bucket value. The output series have grid-aligned samples (one per
+/// grid position).
+///
+/// For instant queries (grid.len() == 1) this is equivalent to the
+/// pre-SOW-0031 path: one bucket per grouping key, one sample per
+/// bucket. For range queries the same buckets carry a sample per grid
+/// point.
 fn apply_collapsing(
     op: AggrKind,
     grouping: Option<&Grouping>,
     series: Vec<Series>,
 ) -> Result<EvalResult, EvalError> {
-    // Bucket series by grouping key. The key is the projection of each
-    // series's labels onto (or away from) the named labels in the clause.
-    // `BTreeMap` keyed on signature gives stable iteration order.
-    let mut buckets: BTreeMap<u64, Bucket> = BTreeMap::new();
-
-    for s in series.into_iter() {
-        let key_labels = project_labels(&s.labels, grouping);
-        let key = labels_signature(&key_labels);
-        // Aggregations operate on the first sample per input series. PromQL
-        // instant-vector inputs to an aggregation are guaranteed to have
-        // exactly one sample per series at the query time.
-        let v = s.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
-        let ts = s.samples.first().map(|s| s.timestamp_ms).unwrap_or(0);
-        buckets.entry(key).or_insert_with(|| Bucket::new(key_labels.clone(), ts)).accumulate(v);
+    if series.is_empty() {
+        return Ok(EvalResult::InstantVector(Vec::new()));
     }
 
-    let mut out: Vec<Series> = buckets
+    // All input series are grid-aligned: same length, same per-position
+    // timestamps. Use the first series's samples as the canonical grid
+    // timestamps (selectors emit grid-aligned NaN-padded samples).
+    let n = series[0].samples.len();
+    let timestamps: Vec<i64> = series[0].samples.iter().map(|s| s.timestamp_ms).collect();
+
+    // Pre-compute per-series bucket key & projected labels so we don't
+    // recompute them at each grid position.
+    let bucket_keys: Vec<(u64, Vec<(String, String)>)> = series
+        .iter()
+        .map(|s| {
+            let kl = project_labels(&s.labels, grouping);
+            (labels_signature(&kl), kl)
+        })
+        .collect();
+
+    // out_buckets: signature -> (labels, sample_per_position).
+    let mut out_buckets: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
+
+    for i in 0..n {
+        let ts = timestamps[i];
+        let mut per_bucket: BTreeMap<u64, Bucket> = BTreeMap::new();
+        for (j, s) in series.iter().enumerate() {
+            let v = s.samples[i].value;
+            let (key, key_labels) = &bucket_keys[j];
+            per_bucket
+                .entry(*key)
+                .or_insert_with(|| Bucket::new(key_labels.clone(), ts))
+                .accumulate(v);
+        }
+        for (key, bucket) in per_bucket {
+            let value = bucket.finalize_value(op);
+            let labels = bucket.labels.clone();
+            let entry = out_buckets
+                .entry(key)
+                .or_insert_with(|| (labels, Vec::with_capacity(n)));
+            entry.1.push(Sample {
+                timestamp_ms: ts,
+                value,
+            });
+        }
+    }
+
+    // For positions where a bucket got no input, the position is
+    // missing from out_buckets's sample list. Pad with NaN to keep
+    // grid alignment. Buckets that never accumulated anywhere are
+    // dropped (an aggregation with no observations emits no series at
+    // that bucket).
+    let mut out: Vec<Series> = out_buckets
         .into_iter()
-        .map(|(_, b)| b.finalize(op))
+        .map(|(_, (labels, samples))| {
+            let samples = pad_to_grid(samples, &timestamps);
+            let signature = labels_signature(&labels);
+            Series {
+                labels,
+                signature,
+                samples,
+            }
+        })
         .collect();
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
+}
+
+/// Right-fill a per-bucket sample list to match the grid. Each emitted
+/// position that the bucket missed becomes a NaN sample at the grid
+/// timestamp.
+fn pad_to_grid(samples: Vec<Sample>, timestamps: &[i64]) -> Vec<Sample> {
+    if samples.len() == timestamps.len() {
+        return samples;
+    }
+    // The accumulator only pushes samples for positions where the
+    // bucket received at least one observation; positions where every
+    // input was NaN are skipped. We need to interleave NaNs for the
+    // skipped slots, indexed by timestamp.
+    let mut out = Vec::with_capacity(timestamps.len());
+    let mut it = samples.into_iter().peekable();
+    for &ts in timestamps {
+        match it.peek() {
+            Some(s) if s.timestamp_ms == ts => {
+                out.push(it.next().unwrap());
+            }
+            _ => out.push(Sample {
+                timestamp_ms: ts,
+                value: f64::NAN,
+            }),
+        }
+    }
+    out
 }
 
 /// topk(k, expr) / bottomk(k, expr): bucket by grouping, sort each
@@ -332,35 +411,29 @@ impl Bucket {
         }
     }
 
-    fn finalize(self, op: AggrKind) -> Series {
-        let value = if self.count == 0 {
-            f64::NAN
-        } else {
-            match op {
-                AggrKind::Sum => self.sum,
-                AggrKind::Avg => self.sum / self.count as f64,
-                AggrKind::Min => self.min,
-                AggrKind::Max => self.max,
-                AggrKind::Count => self.count as f64,
-                // Parametrized aggregators are routed by `apply_aggregate`
-                // before they reach this path; reaching here means a bug
-                // in the dispatch.
-                AggrKind::TopK
-                | AggrKind::BottomK
-                | AggrKind::Quantile
-                | AggrKind::CountValues => {
-                    unreachable!("parametrized aggregator in Bucket::finalize: {:?}", op)
-                }
+    /// Reduce the bucket to a single f64 for one grid position. NaN
+    /// when no non-NaN observation reached the bucket; matches the
+    /// Prometheus "no observations -> drop the series at this point"
+    /// semantics (the upstream caller filters all-NaN series).
+    fn finalize_value(&self, op: AggrKind) -> f64 {
+        if self.count == 0 {
+            return f64::NAN;
+        }
+        match op {
+            AggrKind::Sum => self.sum,
+            AggrKind::Avg => self.sum / self.count as f64,
+            AggrKind::Min => self.min,
+            AggrKind::Max => self.max,
+            AggrKind::Count => self.count as f64,
+            // Parametrized aggregators are routed by `apply_aggregate`
+            // before they reach this path; reaching here means a bug
+            // in the dispatch.
+            AggrKind::TopK
+            | AggrKind::BottomK
+            | AggrKind::Quantile
+            | AggrKind::CountValues => {
+                unreachable!("parametrized aggregator in Bucket::finalize_value: {:?}", op)
             }
-        };
-        let signature = labels_signature(&self.labels);
-        Series {
-            labels: self.labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: self.ts,
-                value,
-            }],
         }
     }
 }

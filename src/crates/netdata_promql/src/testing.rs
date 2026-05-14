@@ -9,7 +9,7 @@ pub use crate::storage::{Backend, MemBackend, MemSeries, Sample};
 
 use std::sync::Arc;
 
-use crate::eval::{eval, EvalContext, EvalError, EvalResult};
+use crate::eval::{eval, EvalContext, EvalError, EvalResult, Grid};
 use crate::plan::lower_query;
 
 /// One series in an instant-vector result. Owned strings for ease of
@@ -38,7 +38,7 @@ pub fn eval_instant_against(
 ) -> Result<TestResult, String> {
     let plan = lower_query(query).map_err(|e| format!("lower: {e}"))?;
     let ctx = EvalContext {
-        at_ms,
+        grid: Arc::new(Grid::instant(at_ms)),
         lookback_ms: 5 * 60 * 1000,
         host_machine_guid: None,
         max_series: 10_000,

@@ -27,7 +27,7 @@ use super::types::{EvalError, EvalResult, Sample, Series};
 /// Same semantics as on a vector/matrix selector.
 fn resolve_at(ctx: &EvalContext, at: Option<&AtMod>) -> i64 {
     match at {
-        None => ctx.at_ms,
+        None => ctx.at_ms(),
         Some(AtMod::AtTs(ms)) => *ms,
         Some(AtMod::Start) => ctx.outer_start_ms,
         Some(AtMod::End) => ctx.outer_end_ms,
@@ -58,7 +58,7 @@ pub fn eval_subquery(
     let mut t = window_start_ms + step_ms;
     while t <= effective_t_ms {
         let inner_ctx = EvalContext {
-            at_ms: t,
+            grid: std::sync::Arc::new(super::grid::Grid::instant(t)),
             lookback_ms: ctx.lookback_ms,
             host_machine_guid: ctx.host_machine_guid.clone(),
             max_series: ctx.max_series,
@@ -120,7 +120,7 @@ mod tests {
         // type check. Drive it directly: a `Number` plan evaluates
         // to a scalar, which is not allowed.
         let ctx = EvalContext {
-            at_ms: 10_000,
+            grid: std::sync::Arc::new(crate::eval::Grid::instant(10_000)),
             outer_start_ms: 10_000,
             outer_end_ms: 10_000,
             ..EvalContext::default()

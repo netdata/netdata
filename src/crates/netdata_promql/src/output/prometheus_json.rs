@@ -96,10 +96,20 @@ fn write_range_series(out: &mut String, series: &[Series]) {
         out.push_str(r#"{"metric":"#);
         write_metric_object(out, &s.labels);
         out.push_str(r#","values":["#);
-        for (j, sample) in s.samples.iter().enumerate() {
-            if j > 0 {
+        // Filter NaN samples from matrix output to match Prometheus
+        // ("no observation at this point" = absent from values array).
+        // Grid-aligned series (SOW-0031) carry NaN at missing-data grid
+        // positions; emitting them as numeric NaN would render incorrectly
+        // in Grafana / break downstream consumers.
+        let mut first = true;
+        for sample in s.samples.iter() {
+            if sample.value.is_nan() {
+                continue;
+            }
+            if !first {
                 out.push(',');
             }
+            first = false;
             write_pair(out, sample.timestamp_ms, sample.value);
         }
         out.push_str("]}");

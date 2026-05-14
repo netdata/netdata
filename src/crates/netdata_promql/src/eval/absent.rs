@@ -35,7 +35,7 @@ pub fn eval_absent(
         labels,
         signature,
         samples: vec![Sample {
-            timestamp_ms: ctx.at_ms,
+            timestamp_ms: ctx.at_ms(),
             value: 1.0,
         }],
     }]))
@@ -48,7 +48,7 @@ mod tests {
 
     fn ctx(t: i64) -> EvalContext {
         EvalContext {
-            at_ms: t,
+            grid: std::sync::Arc::new(crate::eval::Grid::instant(t)),
             outer_start_ms: t,
             outer_end_ms: t,
             ..EvalContext::default()
