@@ -20,15 +20,16 @@ struct win_fan {
     bool active_cooling;
     bool variable_speed_valid;
     bool variable_speed;
+    bool availability_valid;
+    uint64_t availability;
     bool online_valid;
     bool online;
 
     RRDSET *st_speed;
     RRDDIM *rd_speed;
     RRDSET *st_state;
-    RRDDIM *rd_active_cooling;
-    RRDDIM *rd_variable_speed;
-    RRDDIM *rd_online;
+    RRDDIM *rd_clear;
+    RRDDIM *rd_fault;
 
     struct win_fan *next;
 };
@@ -115,9 +116,8 @@ static void obsolete_fan_charts(struct win_fan *fan)
     fan->st_speed = NULL;
     fan->rd_speed = NULL;
     fan->st_state = NULL;
-    fan->rd_active_cooling = NULL;
-    fan->rd_variable_speed = NULL;
-    fan->rd_online = NULL;
+    fan->rd_clear = NULL;
+    fan->rd_fault = NULL;
 }
 
 static void free_fan(struct win_fan *fan)
@@ -154,12 +154,50 @@ static void update_fan_string(char **dst, const char *src)
     *dst = (src && *src) ? strdupz(src) : NULL;
 }
 
+static const char *fan_bool_label(bool valid, bool value)
+{
+    if (!valid)
+        return "unknown";
+
+    return value ? "true" : "false";
+}
+
+static const char *fan_availability_label(struct win_fan *fan, char *dst, size_t dst_size)
+{
+    if (!fan->availability_valid)
+        return "unknown";
+
+    snprintfz(dst, dst_size, "%" PRIu64, fan->availability);
+    return dst;
+}
+
 static void fan_labels(RRDSET *st, struct win_fan *fan)
 {
-    rrdlabels_add(st->rrdlabels, "fan", fan->name ? fan->name : fan->id, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "feature", fan->name ? fan->name : fan->id, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "label", fan->name ? fan->name : fan->id, RRDLABEL_SRC_AUTO);
 
     if (fan->device_id)
         rrdlabels_add(st->rrdlabels, "device_id", fan->device_id, RRDLABEL_SRC_AUTO);
+
+    if (fan->status)
+        rrdlabels_add(st->rrdlabels, "status", fan->status, RRDLABEL_SRC_AUTO);
+
+    char availability[32];
+    rrdlabels_add(
+        st->rrdlabels,
+        "availability",
+        fan_availability_label(fan, availability, sizeof(availability)),
+        RRDLABEL_SRC_AUTO);
+    rrdlabels_add(
+        st->rrdlabels,
+        "active_cooling",
+        fan_bool_label(fan->active_cooling_valid, fan->active_cooling),
+        RRDLABEL_SRC_AUTO);
+    rrdlabels_add(
+        st->rrdlabels,
+        "variable_speed",
+        fan_bool_label(fan->variable_speed_valid, fan->variable_speed),
+        RRDLABEL_SRC_AUTO);
 }
 
 static void update_fan_charts(struct win_fan *fan, int update_every)
@@ -167,24 +205,24 @@ static void update_fan_charts(struct win_fan *fan, int update_every)
     if (fan->desired_speed_valid) {
         if (!fan->st_speed) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "fan_%s_requested_speed", fan->id);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "win32_fan_%s_input", fan->id);
             netdata_fix_chart_name(id);
 
             fan->st_speed = rrdset_create_localhost(
-                "system",
+                "sensors",
                 id,
                 NULL,
-                "fans",
-                "system.fan_requested_speed",
-                "Fan requested speed",
-                "RPM",
+                "Fan",
+                "system.hw.sensor.fan.input",
+                "Sensor Fan Speed",
+                "rotations per minute",
                 PLUGIN_WINDOWS_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_SENSORS + 30,
+                NETDATA_CHART_PRIO_SENSORS + 5,
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            fan->rd_speed = rrddim_add(fan->st_speed, "requested", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            fan->rd_speed = rrddim_add(fan->st_speed, "input", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             fan_labels(fan->st_speed, fan);
         }
 
@@ -196,38 +234,39 @@ static void update_fan_charts(struct win_fan *fan, int update_every)
         fan->rd_speed = NULL;
     }
 
-    if (fan->active_cooling_valid || fan->variable_speed_valid || fan->online_valid) {
+    if (fan->online_valid) {
         if (!fan->st_state) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "fan_%s_state", fan->id);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "win32_fan_%s_alarm", fan->id);
             netdata_fix_chart_name(id);
 
             fan->st_state = rrdset_create_localhost(
-                "system",
+                "sensors",
                 id,
                 NULL,
-                "fans",
-                "system.fan_state",
-                "Fan state",
-                "state",
+                "Fan",
+                "system.hw.sensor.fan.alarm",
+                "Sensor Fan Alarm Status",
+                "status",
                 PLUGIN_WINDOWS_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_SENSORS + 31,
+                NETDATA_CHART_PRIO_SENSORS + 7,
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            fan->rd_active_cooling =
-                rrddim_add(fan->st_state, "active_cooling", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            fan->rd_variable_speed =
-                rrddim_add(fan->st_state, "variable_speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            fan->rd_online = rrddim_add(fan->st_state, "online", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            fan->rd_clear = rrddim_add(fan->st_state, "clear", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            fan->rd_fault = rrddim_add(fan->st_state, "fault", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             fan_labels(fan->st_state, fan);
         }
 
-        rrddim_set_by_pointer(fan->st_state, fan->rd_active_cooling, fan->active_cooling ? 1 : 0);
-        rrddim_set_by_pointer(fan->st_state, fan->rd_variable_speed, fan->variable_speed ? 1 : 0);
-        rrddim_set_by_pointer(fan->st_state, fan->rd_online, fan->online ? 1 : 0);
+        rrddim_set_by_pointer(fan->st_state, fan->rd_clear, fan->online ? 1 : 0);
+        rrddim_set_by_pointer(fan->st_state, fan->rd_fault, fan->online ? 0 : 1);
         rrdset_done(fan->st_state);
+    } else if (fan->st_state) {
+        rrdset_is_obsolete___safe_from_collector_thread(fan->st_state);
+        fan->st_state = NULL;
+        fan->rd_clear = NULL;
+        fan->rd_fault = NULL;
     }
 }
 
@@ -343,10 +382,10 @@ int do_GetFans(int update_every, usec_t dt __maybe_unused)
         fan->active_cooling_valid = get_wmi_bool(obj, L"ActiveCooling", &fan->active_cooling);
         fan->variable_speed_valid = get_wmi_bool(obj, L"VariableSpeed", &fan->variable_speed);
 
-        uint64_t availability = 0;
-        bool availability_valid = get_wmi_uint64(obj, L"Availability", &availability);
-        fan->online_valid = availability_valid || *status;
-        fan->online = (availability_valid && availability == 3) || strcasecmp(status, "OK") == 0;
+        fan->availability_valid = get_wmi_uint64(obj, L"Availability", &fan->availability);
+        fan->online_valid = fan->availability_valid || *status;
+        bool status_ok = !*status || strcasecmp(status, "OK") == 0;
+        fan->online = fan->availability_valid ? fan->availability == 3 && status_ok : status_ok;
 
         update_fan_charts(fan, update_every);
         collected = true;

@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Completed 2026-05-14 after removing the unnecessary native Windows NVMe backend and keeping the existing `nvme.exe` collection path.
+Sub-state: Fan context alignment was rebuilt, installed, and verified with an isolated foreground Windows Agent instance on port 19998; the service restart remains blocked by local elevation, but the collector runtime path is verified.
 
 ## Requirements
 
@@ -411,3 +411,64 @@ Artifact updates:
 - Updated `.agents/sow/specs/windows-storage-fan-monitoring.md`.
 - Updated NVMe metadata, config schema, and generated integration docs.
 - Updated this SOW to record the scope correction and removal.
+
+## Regression - 2026-05-14 Fan Context Alignment And Runtime Visibility
+
+What broke:
+
+- Windows fan telemetry was added with new contexts `system.fan_requested_speed` and `system.fan_state` before checking existing Netdata fan/cooling contexts on other collectors.
+- The running Windows service build at commit `d7887f5973` exposes no `fan`, `smartctl`, or `nvme` chart IDs through `/api/v1/charts`.
+- The local host exposes two `Win32_Fan` instances with `ActiveCooling=True`, `Availability=3`, and `Status=OK`, but `DesiredSpeed` and `VariableSpeed` are null. A speed chart is expected to be absent, but a fan state chart should be possible if the collector maps the available state fields correctly.
+- `smartctl.exe` and `nvme.exe` are not installed in PATH or default locations on this host, so SMART/NVMe runtime charts are blocked by documented external-tool prerequisites and are not the immediate defect.
+
+Evidence:
+
+- `src/go/plugin/go.d/collector/sensors` already uses `sensors.chip_sensor_fan` with dimension `input` and unit `RPM` for Linux lm-sensors fan readings, plus `sensors.chip_sensor_fan_alarm` with dimensions `clear` and `triggered`.
+- `src/collectors/freeipmi.plugin` uses `ipmi.sensor_fan_speed` with dimension `rotations` and unit `RPM`, and `ipmi.sensor_state` for generic IPMI sensor state.
+- The Windows fan chart contexts were introduced only in `src/collectors/windows.plugin/GetFans.c`, `metadata.yaml`, and generated `fans_win.md`.
+- Local direct Agent API checks found no charts whose ID or context matches `fan`, `smartctl`, or `nvme`.
+- Local `Get-CimInstance Win32_Fan` returned two WMI instances with active/online state data but no desired speed value.
+
+Why previous validation missed it:
+
+- The earlier pass validated compile and install reachability but did not verify chart contexts against existing cross-platform sensor collectors.
+- Runtime validation focused on external SMART/NVMe tool absence and did not follow through on the fact that WMI fan state data exists locally and should produce a visible chart.
+
+Repair plan:
+
+- Reuse the existing Linux sensors fan speed context where the semantics match RPM-like fan readings, with compatible dimension names, labels, family, and priority.
+- Map WMI `Availability` and `Status` to the existing hardware fan alarm context with `clear` and `fault`; keep WMI capability fields as labels instead of dimensions.
+- Patch `GetFans`, metadata, generated integration docs, and the Windows storage/fan spec.
+- Rebuild/install using `MSYSTEM=MSYS ./packaging/utils/compile-and-run-windows.sh service`.
+- Verify with the direct Agent API using `/api/v1/charts` and `/api/v1/data`, and record the result.
+
+Validation:
+
+- `ninja -C build-cygwin-MSYS netdata`: passed after the fan context/state mapping changes.
+- `PYTHONUTF8=1 C:\msys64\mingw64\bin\python.exe integrations\gen_integrations.py`: passed after installing the required MSYS2 MinGW Python packages. `ninja -C build-cygwin-MSYS render-docs` failed because Cygwin Python cannot build the `rpds-py` dependency, so `fans_win.md` was regenerated through `gen_docs_integrations.py` with an in-memory Windows path-normalization shim and unrelated generated deletions were restored.
+- `MSYSTEM=MSYS ./packaging/utils/compile-and-run-windows.sh service`: reconfigured and built successfully, installed `/opt/netdata/usr/bin/netdata.exe`, then exited non-zero while trying to stop/delete the Windows service and import the Windows Event Log manifest because the shell lacks service-control privileges (`Access is denied`).
+- `ninja -C build-cygwin-MSYS install`: passed after the final mapping tweak and installed the rebuilt `/opt/netdata/usr/bin/netdata.exe`.
+- Installed binary evidence: `strings /opt/netdata/usr/bin/netdata.exe` contains `system.hw.sensor.fan.input` and `system.hw.sensor.fan.alarm`; it does not contain `system.fan_requested_speed` or `system.fan_state`.
+- WMI evidence: local `Win32_Fan` exposes two fan instances with `Availability=3` and `Status=OK`, no `DesiredSpeed`, and no `VariableSpeed`; the expected live result on this host is two alarm charts and no speed chart.
+- Isolated runtime evidence: a foreground Windows Agent built from the patched tree was run on `127.0.0.1:19998` with only `windows.plugin/GetFans` enabled. `/api/v1/charts` exposed `sensors.win32_fan_root/cimv2_0_alarm` and `sensors.win32_fan_root/cimv2_1_alarm` with context `system.hw.sensor.fan.alarm`, chart type `sensors`, family `Fan`, units `status`, and dimensions `clear,fault`.
+- Isolated data evidence: `/api/v1/data` for both live fan alarm charts returned columns `time,clear,fault` with values `clear=1` and `fault=0`.
+- Same-failure API evidence: the isolated `/api/v1/charts` response contained no `system.fan_requested_speed` or `system.fan_state` contexts.
+- Direct Agent API evidence against the still-running service on port 19999 showed no fan contexts because the service did not restart into the installed binary; this is explained by the service-control `Access is denied` failure and is not used as final collector-runtime evidence.
+- `git diff --check`: passed with only Windows line-ending conversion warnings.
+
+Artifact updates:
+
+- Updated `src/collectors/windows.plugin/GetFans.c` to emit `sensors` charts with contexts `system.hw.sensor.fan.input` and `system.hw.sensor.fan.alarm`, dimensions `input`, `clear`, and `fault`, and sensor-style `feature`/`label` labels.
+- Updated `src/libnetdata/os/windows-wmi/windows-wmi.c` to treat `RPC_E_TOO_LATE` from `CoInitializeSecurity()` as non-fatal, matching COM's process-wide security initialization semantics.
+- Updated `src/collectors/windows.plugin/metadata.yaml`, generated `src/collectors/windows.plugin/integrations/fans_win.md`, and `src/collectors/windows.plugin/README.md`.
+- Updated `.agents/sow/specs/windows-storage-fan-monitoring.md` with the fan context contract.
+- Added `docs/netdata-ai/skills/query-netdata-agents/how-tos/verify-local-collector-contexts.md` and indexed it because this task required direct-agent context/dimension verification analysis.
+
+Artifact maintenance gate:
+
+- AGENTS.md: No update needed; repository workflow and guardrails did not change.
+- Runtime project skills: No update needed; existing collector and integrations lifecycle skills already covered the source/edit workflow.
+- Specs: Updated `.agents/sow/specs/windows-storage-fan-monitoring.md`.
+- End-user/operator docs: Updated Windows plugin metadata, generated integration docs, and README entries for the fan contexts and dimensions.
+- End-user/operator skills: Updated the public `query-netdata-agents` how-to catalog with direct local collector context verification guidance.
+- SOW lifecycle: Reopened this completed SOW for the regression, recorded the new root cause and validation, and will move it back to `done/` with this implementation commit.

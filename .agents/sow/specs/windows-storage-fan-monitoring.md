@@ -37,6 +37,12 @@ health, NVMe health, NVMe thermal-throttling signals, and fan telemetry.
 - `Win32_Fan.DesiredSpeed` is requested speed, not a guaranteed actual
   tachometer RPM reading. Code, docs, metadata, and PR notes must not present it
   as universal actual fan speed.
+- When `DesiredSpeed` is present, `GetFans` reports it with the existing
+  hardware sensor fan speed context `system.hw.sensor.fan.input` and dimension
+  `input` so dashboard placement and aggregation match other fan providers.
+- When WMI `Availability` or `Status` is present, `GetFans` reports online/fault
+  state with the existing hardware sensor fan alarm context
+  `system.hw.sensor.fan.alarm` and dimensions `clear` and `fault`.
 - Fan charts may be absent on systems whose firmware or drivers do not expose
   `Win32_Fan` instances.
 - Future true actual fan RPM support requires a separate reliable source, such

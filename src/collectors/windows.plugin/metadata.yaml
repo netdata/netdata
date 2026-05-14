@@ -1375,9 +1375,9 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors fan information exposed by Windows WMI.
-          It reports requested fan speed and fan state when the platform firmware exposes `Win32_Fan` data.
+          It reports requested fan speed and WMI online/fault state through Netdata's generic hardware fan sensor contexts when the platform firmware exposes `Win32_Fan` data.
         method_description: |
-          It queries the `Win32_Fan` WMI class. Requested speed is reported from `DesiredSpeed`; this is platform-provided requested speed and is not guaranteed to be an actual tachometer RPM reading on every system.
+          It queries the `Win32_Fan` WMI class. Requested speed is reported from `DesiredSpeed` using the generic hardware fan speed context; this is platform-provided requested speed and is not guaranteed to be an actual tachometer RPM reading on every system. WMI `Availability` and `Status` are mapped to the generic hardware fan alarm context.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -1433,25 +1433,34 @@ modules:
         - name: Fan
           description: "These metrics refer to WMI fan devices."
           labels:
-            - name: fan
-              description: Fan name.
+            - name: feature
+              description: WMI fan feature name.
+            - name: label
+              description: WMI fan display label.
             - name: device_id
               description: WMI fan device identifier.
+            - name: status
+              description: WMI status string.
+            - name: availability
+              description: WMI availability code.
+            - name: active_cooling
+              description: Whether WMI reports the fan as active cooling.
+            - name: variable_speed
+              description: Whether WMI reports the fan as variable speed.
           metrics:
-            - name: system.fan_requested_speed
-              description: Fan requested speed
-              unit: "RPM"
+            - name: system.hw.sensor.fan.input
+              description: Fan speed requested by WMI
+              unit: "rotations per minute"
               chart_type: line
               dimensions:
-                - name: requested
-            - name: system.fan_state
-              description: Fan state
-              unit: "state"
+                - name: input
+            - name: system.hw.sensor.fan.alarm
+              description: Fan alarm status mapped from WMI status fields
+              unit: "status"
               chart_type: line
               dimensions:
-                - name: active_cooling
-                - name: variable_speed
-                - name: online
+                - name: clear
+                - name: fault
   - meta:
       plugin_name: windows.plugin
       module_name: GetSensors

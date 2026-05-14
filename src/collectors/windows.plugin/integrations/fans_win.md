@@ -22,10 +22,10 @@ Module: GetFans
 ## Overview
 
 This collector monitors fan information exposed by Windows WMI.
-It reports requested fan speed and fan state when the platform firmware exposes `Win32_Fan` data.
+It reports requested fan speed and WMI online/fault state through Netdata's generic hardware fan sensor contexts when the platform firmware exposes `Win32_Fan` data.
 
 
-It queries the `Win32_Fan` WMI class. Requested speed is reported from `DesiredSpeed`; this is platform-provided requested speed and is not guaranteed to be an actual tachometer RPM reading on every system.
+It queries the `Win32_Fan` WMI class. Requested speed is reported from `DesiredSpeed` using the generic hardware fan speed context; this is platform-provided requested speed and is not guaranteed to be an actual tachometer RPM reading on every system. WMI `Availability` and `Status` are mapped to the generic hardware fan alarm context.
 
 
 This collector is only supported on the following platforms:
@@ -122,15 +122,20 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| fan | Fan name. |
+| feature | WMI fan feature name. |
+| label | WMI fan display label. |
 | device_id | WMI fan device identifier. |
+| status | WMI status string. |
+| availability | WMI availability code. |
+| active_cooling | Whether WMI reports the fan as active cooling. |
+| variable_speed | Whether WMI reports the fan as variable speed. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| system.fan_requested_speed | requested | RPM |
-| system.fan_state | active_cooling, variable_speed, online | state |
+| system.hw.sensor.fan.input | input | rotations per minute |
+| system.hw.sensor.fan.alarm | clear, fault | status |
 
 
 

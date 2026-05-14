@@ -63,4 +63,4 @@ and `HyperV` threads:
 
 ## Fan monitoring
 
-`GetFans` queries the Windows `Win32_Fan` WMI class. When firmware and drivers expose fan objects, Netdata charts the requested fan speed from `DesiredSpeed` and basic state flags. Windows does not provide a universal standard API for actual tachometer RPM, so these charts are best-effort and may be absent on systems that do not expose `Win32_Fan`.
+`GetFans` queries the Windows `Win32_Fan` WMI class. When firmware and drivers expose fan objects, Netdata charts requested fan speed from `DesiredSpeed` with `system.hw.sensor.fan.input` and maps WMI `Availability` / `Status` to `system.hw.sensor.fan.alarm`. Windows does not provide a universal standard API for actual tachometer RPM, so these charts are best-effort and may be absent on systems that do not expose `Win32_Fan`.
