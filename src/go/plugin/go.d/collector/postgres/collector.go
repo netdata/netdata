@@ -118,6 +118,7 @@ type (
 		dbConns map[string]*dbConn
 
 		superUser               *bool
+		canExecutePgLsDir       *bool
 		pgIsInRecovery          *bool
 		pgVersion               int
 		pgStatStatementsAvail   bool            // cached positive result only

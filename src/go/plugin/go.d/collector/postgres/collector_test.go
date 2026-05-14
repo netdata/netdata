@@ -185,6 +185,7 @@ func TestCollector_Check(t *testing.T) {
 
 				mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 				mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+				mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 				mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 				mockExpect(t, m, querySettingsMaxConnections(), dataVer140004SettingsMaxConnections)
@@ -225,6 +226,7 @@ func TestCollector_Check(t *testing.T) {
 			prepareMock: func(t *testing.T, collr *Collector, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 				mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+				mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 				mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 				mockExpect(t, m, querySettingsMaxConnections(), dataVer140004ServerVersionNum)
@@ -245,6 +247,7 @@ func TestCollector_Check(t *testing.T) {
 			prepareMock: func(t *testing.T, collr *Collector, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 				mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+				mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 				mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 				mockExpectErr(m, querySettingsMaxConnections())
@@ -289,6 +292,7 @@ func TestCollector_Collect(t *testing.T) {
 					collr.dbSr = matcher.TRUE()
 					mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 					mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+					mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 					mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 					mockExpect(t, m, querySettingsMaxConnections(), dataVer140004SettingsMaxConnections)
@@ -657,6 +661,7 @@ func TestCollector_Collect(t *testing.T) {
 				prepareMock: func(t *testing.T, collr *Collector, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 					mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+					mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 					mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 					mockExpectErr(m, querySettingsMaxConnections())
@@ -673,6 +678,7 @@ func TestCollector_Collect(t *testing.T) {
 				prepareMock: func(t *testing.T, collr *Collector, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
 					mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+					mockExpect(t, m, queryCanExecutePgLsDir(), dataVer140004IsSuperUserTrue)
 					mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 					mockExpect(t, m, querySettingsMaxConnections(), dataVer140004SettingsMaxConnections)

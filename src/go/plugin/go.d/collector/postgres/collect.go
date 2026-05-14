@@ -50,6 +50,15 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.Debugf("connected as super user: %v", *c.superUser)
 	}
 
+	if c.canExecutePgLsDir == nil && c.pgVersion >= pgVersion10 {
+		v, err := c.doQueryCanExecutePgLsDir()
+		if err != nil {
+			return nil, fmt.Errorf("querying can execute pg_ls_dir() error: %v", err)
+		}
+		c.canExecutePgLsDir = &v
+		c.Debugf("connected as can execute pg_ls_dir(): %v", *c.canExecutePgLsDir)
+	}
+
 	if c.pgIsInRecovery == nil {
 		v, err := c.doQueryPGIsInRecovery()
 		if err != nil {
@@ -224,6 +233,10 @@ func (c *Collector) azureADBeforeConnect(ctx context.Context, cfg *pgx.ConnConfi
 }
 
 func (c *Collector) isSuperUser() bool { return c.superUser != nil && *c.superUser }
+
+func (c *Collector) canQueryReplicationSlotFiles() bool {
+	return c.isSuperUser() || (c.canExecutePgLsDir != nil && *c.canExecutePgLsDir)
+}
 
 func (c *Collector) isPGInRecovery() bool { return c.pgIsInRecovery != nil && *c.pgIsInRecovery }
 

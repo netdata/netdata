@@ -10,6 +10,10 @@ func queryIsSuperUser() string {
 	return "SELECT current_setting('is_superuser') = 'on' AS is_superuser;"
 }
 
+func queryCanExecutePgLsDir() string {
+	return "SELECT has_function_privilege(current_user, 'pg_ls_dir(text)', 'EXECUTE');"
+}
+
 func queryPGIsInRecovery() string {
 	return "SELECT pg_is_in_recovery();"
 }
