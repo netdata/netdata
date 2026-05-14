@@ -19,10 +19,12 @@ mod discovery;
 mod eval;
 mod output;
 mod plan;
+mod slow_log;
 mod storage;
 
 use std::ffi::{c_char, c_int, CStr, CString};
 use std::ptr;
+use std::time::Instant;
 
 use eval::{eval, EvalContext, EvalError, EvalResult, Sample, Series};
 use output::{serialize_error, serialize_scalar_at, serialize_success};
@@ -236,6 +238,32 @@ fn run_instant(
     at_ms: i64,
     host: Option<String>,
 ) -> Result<NdPromqlResponse, QueryError> {
+    let start = Instant::now();
+    let host_for_log = host.clone();
+    let inner = run_instant_inner(query, at_ms, host);
+    let (final_resp, series_count_opt) = match inner {
+        Ok((resp, n)) => (Ok(resp), Some(n)),
+        Err(e) => (Err(e), None),
+    };
+    log_query(
+        slow_log::Kind::Instant,
+        query,
+        host_for_log.as_deref(),
+        None,
+        None,
+        None,
+        start,
+        &final_resp,
+        series_count_opt,
+    );
+    final_resp
+}
+
+fn run_instant_inner(
+    query: &str,
+    at_ms: i64,
+    host: Option<String>,
+) -> Result<(NdPromqlResponse, usize), QueryError> {
     let plan = lower_query(query)?;
     // For instant queries, the outer "range" is a single point.
     let ctx = EvalContext {
@@ -247,11 +275,15 @@ fn run_instant(
         outer_end_ms: at_ms,
     };
     let result = eval(&ctx, &plan)?;
+    let series_count = match &result {
+        EvalResult::Scalar(_) => 1,
+        EvalResult::InstantVector(v) | EvalResult::RangeVector(v) => v.len(),
+    };
     let body = match result {
         EvalResult::Scalar(v) => serialize_scalar_at(v, at_ms),
         EvalResult::InstantVector(_) | EvalResult::RangeVector(_) => serialize_success(&result),
     };
-    Ok(NdPromqlResponse::ok(body))
+    Ok((NdPromqlResponse::ok(body), series_count))
 }
 
 fn run_range(
@@ -261,6 +293,34 @@ fn run_range(
     step_ms: i64,
     host: Option<String>,
 ) -> Result<NdPromqlResponse, QueryError> {
+    let start = Instant::now();
+    let host_for_log = host.clone();
+    let inner = run_range_inner(query, start_ms, end_ms, step_ms, host);
+    let (final_resp, series_count_opt) = match inner {
+        Ok((resp, n)) => (Ok(resp), Some(n)),
+        Err(e) => (Err(e), None),
+    };
+    log_query(
+        slow_log::Kind::Range,
+        query,
+        host_for_log.as_deref(),
+        Some(start_ms),
+        Some(end_ms),
+        Some(step_ms),
+        start,
+        &final_resp,
+        series_count_opt,
+    );
+    final_resp
+}
+
+fn run_range_inner(
+    query: &str,
+    start_ms: i64,
+    end_ms: i64,
+    step_ms: i64,
+    host: Option<String>,
+) -> Result<(NdPromqlResponse, usize), QueryError> {
     let plan = lower_query(query)?;
 
     // Range queries require the top-level expression to evaluate to a
@@ -349,7 +409,60 @@ fn run_range(
         series.sort_by_key(|s| s.signature);
         EvalResult::RangeVector(series)
     };
-    Ok(NdPromqlResponse::ok(serialize_success(&result)))
+    let series_count = match &result {
+        EvalResult::RangeVector(v) => v.len(),
+        _ => 0,
+    };
+    Ok((
+        NdPromqlResponse::ok(serialize_success(&result)),
+        series_count,
+    ))
+}
+
+/// Emit one slow-query log record. The result is borrowed so the
+/// caller can return it after logging. Status / error-type / count
+/// are extracted from whichever arm the result took. SOW-0028.
+#[allow(clippy::too_many_arguments)]
+fn log_query(
+    kind: slow_log::Kind,
+    query: &str,
+    host: Option<&str>,
+    start_ms: Option<i64>,
+    end_ms: Option<i64>,
+    step_ms: Option<i64>,
+    started: Instant,
+    result: &Result<NdPromqlResponse, QueryError>,
+    series_count: Option<usize>,
+) {
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    let (status, error_type, error_message): (i32, Option<&str>, Option<String>) = match result {
+        Ok(resp) => (resp.http_status, None, None),
+        Err(QueryError::Lower(e)) => (400, Some("bad_data"), Some(format!("{e}"))),
+        Err(QueryError::Eval(EvalError::NotYetImplemented(msg))) => {
+            (422, Some("execution"), Some(format!("not yet implemented: {msg}")))
+        }
+        Err(QueryError::Eval(e)) => (422, Some("execution"), Some(format!("{e}"))),
+        Err(QueryError::UnsupportedTopLevel(t)) => (
+            400,
+            Some("bad_data"),
+            Some(format!(
+                "range query top-level expression must be scalar or instant-vector; got {t:?}"
+            )),
+        ),
+    };
+    slow_log::record(slow_log::Record {
+        kind,
+        query,
+        host,
+        start_ms,
+        end_ms,
+        step_ms,
+        elapsed_ms,
+        http_status: status,
+        series_count,
+        error_type,
+        error_message: error_message.as_deref(),
+    });
 }
 
 #[cfg(test)]

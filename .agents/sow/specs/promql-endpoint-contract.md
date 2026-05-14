@@ -545,6 +545,64 @@ parameter parser uses last-write semantics for non-repeated keys).
 `match[]` is the only repeatable parameter; the parser appends each
 occurrence to the list.
 
+## Slow-query log (SOW-0028)
+
+When the environment variable `NETDATA_PROMQL_LOG` is set on the
+daemon process, every PromQL query the evaluator runs writes one
+JSONL line to that file. The feature is opt-in (no env var = no
+log file, no per-call overhead beyond an atomic check).
+
+Configuration:
+
+* `NETDATA_PROMQL_LOG` -- path to the log file. Append-only; the
+  file is created on first call and appended to thereafter. Unset
+  = disabled.
+* `NETDATA_PROMQL_LOG_THRESHOLD_MS` -- minimum elapsed time for a
+  query to be logged. Default `0` (log every query). Set to e.g.
+  `100` to surface only queries taking 100ms or more.
+* `NETDATA_PROMQL_LOG_MAX_QUERY_LEN` -- truncate the `query` field
+  beyond this many bytes (at a UTF-8 char boundary). Default
+  `4096`.
+
+Record shape:
+
+```json
+{
+  "ts_ms": 1778749655744,
+  "kind": "instant",
+  "query": "rate(disk_io[1m])",
+  "host": null,
+  "start_ms": 1778749571000,
+  "end_ms": 1778749631000,
+  "step_ms": 15000,
+  "elapsed_ms": 6,
+  "http_status": 200,
+  "series_count": 8,
+  "error_type": "bad_data",
+  "error_message": "parse error: ..."
+}
+```
+
+`start_ms`/`end_ms`/`step_ms` appear only for range queries.
+`series_count` appears only on success. `error_type` and
+`error_message` appear only on failure.
+
+The log is observability, not auditing: write failures (disk
+full, permission denied) are swallowed silently. The feature is
+considered local-dev grade -- no rotation, no UI surface yet, no
+gating by query body content. Operators enable it at their
+discretion and treat the file like a debug log.
+
+Operator-side use:
+
+```bash
+# Top 10 slowest queries:
+jq -s 'sort_by(-.elapsed_ms) | .[0:10]' /var/log/netdata/promql.jsonl
+
+# Just the queries above 100ms, formatted for copy-paste:
+jq -rc 'select(.elapsed_ms > 100) | .query' /var/log/netdata/promql.jsonl
+```
+
 ## Open items deferred to later phases
 
 Per the SOW-0017 close gate (status as of 2026-05-14):
