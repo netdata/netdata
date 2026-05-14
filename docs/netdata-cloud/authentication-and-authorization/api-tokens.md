@@ -37,22 +37,33 @@ Netdata provides three API versions that you can access with API tokens:
 - **v2**: Multi-node API with advanced grouping and aggregation capabilities
 - **v3**: The latest API version that combines v1 and v2 endpoints and may include additional features
 
+:::tip
+
+**v3 is the recommended version for Netdata Cloud queries.** v3 endpoints use POST with a JSON body and provide the most control over scoping, filtering, and aggregation. See the [example below](#example-usage) for a v3 data query.
+
+:::
+
 ## Common Endpoints
 
 With appropriate API tokens, you can access endpoints including:
 
-- `/api/v2/nodes` - Node information
-- `/api/v2/data` - Multi-dimensional data queries
-- `/api/v2/contexts` - Context metadata
-- `/api/v2/weights` - Metric scoring/correlation
-- `/api/v2/q` - Full-text search
-- `/api/v1/info` - Agent information
-- `/api/v1/charts` - Chart information
-- `/api/v1/data` - Single node data queries
+| Endpoint | Purpose | Available On |
+|:---------|:--------|:-------------|
+| `/api/v3/spaces/{spaceID}/rooms/{roomID}/data` | Time-series metric data queries (POST with JSON body) | Netdata Cloud |
+| `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes` | List nodes in a room (POST with JSON body) | Netdata Cloud |
+| `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts` | List available metric contexts (POST with JSON body) | Netdata Cloud |
+| `/api/v2/nodes` | Node information | Netdata Cloud, Local Agent |
+| `/api/v2/data` | Multi-dimensional data queries | Netdata Cloud, Local Agent |
+| `/api/v2/contexts` | Context metadata | Netdata Cloud, Local Agent |
+| `/api/v2/weights` | Metric scoring/correlation | Netdata Cloud, Local Agent |
+| `/api/v2/q` | Full-text search | Netdata Cloud, Local Agent |
+| `/api/v1/info` | Agent information | Local Agent |
+| `/api/v1/charts` | Chart information | Local Agent |
+| `/api/v1/data` | Single node data queries | Local Agent |
 
-:::info
+:::note
 
-Currently, Netdata Cloud is not exposing the stable API.
+For Netdata Cloud metric queries, use **v3 endpoints** (POST with a JSON body). v1 endpoints such as `/api/v1/data` and `/api/v1/charts` are local Agent endpoints and will return **404** when called against `app.netdata.cloud`. v2 endpoints work on both Cloud and local Agents for backward compatibility, but v3 is recommended for Cloud.
 
 :::
 
