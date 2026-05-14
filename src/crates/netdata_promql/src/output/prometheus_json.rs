@@ -79,11 +79,9 @@ fn write_instant_series(out: &mut String, series: &[Series]) {
         out.push_str(r#"{"metric":"#);
         write_metric_object(out, &s.labels);
         out.push_str(r#","value":"#);
-        let sample = s.samples.first().copied().unwrap_or(Sample {
-            timestamp_ms: 0,
-            value: f64::NAN,
-        });
-        write_pair(out, sample.timestamp_ms, sample.value);
+        let ts = s.timestamps.first().copied().unwrap_or(0);
+        let v = s.values.first().copied().unwrap_or(f64::NAN);
+        write_pair(out, ts, v);
         out.push('}');
     }
 }
@@ -102,15 +100,16 @@ fn write_range_series(out: &mut String, series: &[Series]) {
         // positions; emitting them as numeric NaN would render incorrectly
         // in Grafana / break downstream consumers.
         let mut first = true;
-        for sample in s.samples.iter() {
-            if sample.value.is_nan() {
+        for (j, &v) in s.values.iter().enumerate() {
+            if v.is_nan() {
                 continue;
             }
             if !first {
                 out.push(',');
             }
             first = false;
-            write_pair(out, sample.timestamp_ms, sample.value);
+            let ts = s.timestamps[j];
+            write_pair(out, ts, v);
         }
         out.push_str("]}");
     }
@@ -183,23 +182,19 @@ mod tests {
     use super::*;
     use crate::eval::{labels_signature, Sample, Series};
 
-    fn series(labels: Vec<(&str, &str)>, samples: Vec<(i64, f64)>) -> Series {
+    fn series(labels: Vec<(&str, &str)>, pairs: Vec<(i64, f64)>) -> Series {
         let owned: Vec<(String, String)> = labels
             .into_iter()
             .map(|(n, v)| (n.to_string(), v.to_string()))
             .collect();
-        let signature = labels_signature(&owned);
-        Series {
-            labels: owned,
-            signature,
-            samples: samples
-                .into_iter()
-                .map(|(ts, v)| Sample {
-                    timestamp_ms: ts,
-                    value: v,
-                })
-                .collect(),
-        }
+        let samples: Vec<Sample> = pairs
+            .into_iter()
+            .map(|(ts, v)| Sample {
+                timestamp_ms: ts,
+                value: v,
+            })
+            .collect();
+        Series::from_samples(owned, samples)
     }
 
     #[test]

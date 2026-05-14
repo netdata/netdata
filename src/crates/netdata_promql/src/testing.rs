@@ -53,7 +53,7 @@ pub fn eval_instant_against(
                 .into_iter()
                 .map(|s| TestSeries {
                     labels: s.labels,
-                    value: s.samples.first().map(|x| x.value).unwrap_or(f64::NAN),
+                    value: s.values.first().copied().unwrap_or(f64::NAN),
                 })
                 .collect();
             Ok(TestResult::InstantVector(out))

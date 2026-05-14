@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Aggregations: sum, avg, min, max, count, with optional by/without grouping.
-//
-// Phase 1 scope: instant-vector inputs only. Each input series produces a
-// single output sample; the grouping clause determines which output series
-// the sample lands in.
+// Aggregations: sum, avg, min, max, count, topk, bottomk, quantile,
+// count_values, with optional by/without grouping. SOW-0031 made them
+// grid-aware (iterate positions). SOW-0032 made them column-oriented:
+// input series carry `values: Vec<f64>` indexed by grid position, and
+// output series share the same `Arc<Vec<i64>>` timestamps as the input.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use crate::plan::{AggrKind, Grouping, ValueType};
 
-use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
+use super::types::{labels_signature, EvalError, EvalResult, Series};
 
 /// Apply an aggregation operator to an instant vector.
 ///
@@ -53,16 +54,10 @@ pub fn apply_aggregate(
     }
 }
 
-/// Grid-aware path for sum/avg/min/max/count (SOW-0031). At each grid
-/// position the input series share a common timestamp; we bucket by
-/// grouping key, accumulate over the position, and collapse to a per-
-/// bucket value. The output series have grid-aligned samples (one per
-/// grid position).
-///
-/// For instant queries (grid.len() == 1) this is equivalent to the
-/// pre-SOW-0031 path: one bucket per grouping key, one sample per
-/// bucket. For range queries the same buckets carry a sample per grid
-/// point.
+/// Grid-aware path for sum/avg/min/max/count. At each grid position the
+/// input series share a common timestamp; we bucket by grouping key,
+/// accumulate over the position, and collapse to a per-bucket value.
+/// The output series share the input's `timestamps` Arc.
 fn apply_collapsing(
     op: AggrKind,
     grouping: Option<&Grouping>,
@@ -71,12 +66,8 @@ fn apply_collapsing(
     if series.is_empty() {
         return Ok(EvalResult::InstantVector(Vec::new()));
     }
-
-    // All input series are grid-aligned: same length, same per-position
-    // timestamps. Use the first series's samples as the canonical grid
-    // timestamps (selectors emit grid-aligned NaN-padded samples).
-    let n = series[0].samples.len();
-    let timestamps: Vec<i64> = series[0].samples.iter().map(|s| s.timestamp_ms).collect();
+    let n = series[0].len();
+    let timestamps = Arc::clone(&series[0].timestamps);
 
     // Pre-compute per-series bucket key & projected labels so we don't
     // recompute them at each grid position.
@@ -88,18 +79,17 @@ fn apply_collapsing(
         })
         .collect();
 
-    // out_buckets: signature -> (labels, sample_per_position).
-    let mut out_buckets: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
+    // out_buckets: signature -> (labels, values_per_position).
+    let mut out_buckets: BTreeMap<u64, (Vec<(String, String)>, Vec<f64>)> = BTreeMap::new();
 
     for i in 0..n {
-        let ts = timestamps[i];
         let mut per_bucket: BTreeMap<u64, Bucket> = BTreeMap::new();
         for (j, s) in series.iter().enumerate() {
-            let v = s.samples[i].value;
+            let v = s.values[i];
             let (key, key_labels) = &bucket_keys[j];
             per_bucket
                 .entry(*key)
-                .or_insert_with(|| Bucket::new(key_labels.clone(), ts))
+                .or_insert_with(|| Bucket::new(key_labels.clone()))
                 .accumulate(v);
         }
         for (key, bucket) in per_bucket {
@@ -108,65 +98,24 @@ fn apply_collapsing(
             let entry = out_buckets
                 .entry(key)
                 .or_insert_with(|| (labels, Vec::with_capacity(n)));
-            entry.1.push(Sample {
-                timestamp_ms: ts,
-                value,
-            });
+            entry.1.push(value);
         }
     }
 
-    // For positions where a bucket got no input, the position is
-    // missing from out_buckets's sample list. Pad with NaN to keep
-    // grid alignment. Buckets that never accumulated anywhere are
-    // dropped (an aggregation with no observations emits no series at
-    // that bucket).
     let mut out: Vec<Series> = out_buckets
         .into_iter()
-        .map(|(_, (labels, samples))| {
-            let samples = pad_to_grid(samples, &timestamps);
-            let signature = labels_signature(&labels);
-            Series {
-                labels,
-                signature,
-                samples,
-            }
-        })
+        .map(|(_, (labels, values))| Series::new(labels, Arc::clone(&timestamps), values))
         .collect();
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-/// Right-fill a per-bucket sample list to match the grid. Each emitted
-/// position that the bucket missed becomes a NaN sample at the grid
-/// timestamp.
-fn pad_to_grid(samples: Vec<Sample>, timestamps: &[i64]) -> Vec<Sample> {
-    if samples.len() == timestamps.len() {
-        return samples;
-    }
-    // The accumulator only pushes samples for positions where the
-    // bucket received at least one observation; positions where every
-    // input was NaN are skipped. We need to interleave NaNs for the
-    // skipped slots, indexed by timestamp.
-    let mut out = Vec::with_capacity(timestamps.len());
-    let mut it = samples.into_iter().peekable();
-    for &ts in timestamps {
-        match it.peek() {
-            Some(s) if s.timestamp_ms == ts => {
-                out.push(it.next().unwrap());
-            }
-            _ => out.push(Sample {
-                timestamp_ms: ts,
-                value: f64::NAN,
-            }),
-        }
-    }
-    out
-}
-
-/// topk(k, expr) / bottomk(k, expr): bucket by grouping, sort each
-/// bucket's series by value, keep top or bottom k. The output preserves
-/// the **original** input series labels minus `__name__` -- distinct
-/// from sum/avg, which collapse to grouping labels only.
+/// topk(k, expr) / bottomk(k, expr): at each grid position, bucket by
+/// grouping, sort by value, keep top or bottom k. Output preserves the
+/// **original** input series labels minus `__name__`. A series that
+/// ranked at some positions but not others gets NaN at the missing
+/// positions; the per-position drop-NaN rule does not collapse the
+/// series across positions.
 fn apply_topk_bottomk(
     op: AggrKind,
     grouping: Option<&Grouping>,
@@ -174,7 +123,6 @@ fn apply_topk_bottomk(
     series: Vec<Series>,
 ) -> Result<EvalResult, EvalError> {
     if !k_param.is_finite() || k_param <= 0.0 {
-        // Negative, zero, or NaN k: Prometheus emits no series.
         return Ok(EvalResult::InstantVector(Vec::new()));
     }
     let k = k_param as usize;
@@ -183,12 +131,9 @@ fn apply_topk_bottomk(
     if series.is_empty() {
         return Ok(EvalResult::InstantVector(Vec::new()));
     }
-    let n = series[0].samples.len();
-    let timestamps: Vec<i64> = series[0].samples.iter().map(|s| s.timestamp_ms).collect();
+    let n = series[0].len();
+    let timestamps = Arc::clone(&series[0].timestamps);
 
-    // Pre-compute per-input-series bucket key & stripped output labels.
-    // Output preserves the original labels minus __name__ -- distinct
-    // from sum/avg, which collapse to grouping labels only.
     let bucket_keys: Vec<u64> = series
         .iter()
         .map(|s| labels_signature(&project_labels(&s.labels, grouping)))
@@ -208,61 +153,71 @@ fn apply_topk_bottomk(
         .map(|l| labels_signature(l))
         .collect();
 
-    // accum keyed by output signature (stripped labels' signature).
-    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
+    // Pre-group input indices by bucket (same for every position).
+    let mut by_bucket_template: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+    for (j, &b) in bucket_keys.iter().enumerate() {
+        by_bucket_template.entry(b).or_default().push(j);
+    }
+
+    // accum: output signature -> (labels, values), one f64 per grid position.
+    // Output series get NaN at positions where the input series did not
+    // rank in the top/bottom-k for its bucket. NaN-filtered on output
+    // serialization.
+    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<f64>)> = BTreeMap::new();
 
     for i in 0..n {
-        let ts = timestamps[i];
-        // Group input series indices by bucket at this position.
-        let mut by_bucket: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
-        for (j, &k_) in bucket_keys.iter().enumerate() {
-            by_bucket.entry(k_).or_default().push(j);
-        }
-        for (_, mut indices) in by_bucket {
-            indices.sort_by(|&a, &b| {
-                let av = series[a].samples[i].value;
-                let bv = series[b].samples[i].value;
+        // Track which input indices ranked at this position. Initialise
+        // every bucket pass with the rankers; then back-fill NaN for
+        // input indices that did not rank.
+        let mut ranked_value: std::collections::HashMap<usize, f64> =
+            std::collections::HashMap::new();
+        for (_, indices) in by_bucket_template.iter() {
+            let mut candidates: Vec<usize> = indices
+                .iter()
+                .copied()
+                .filter(|&j| !series[j].values[i].is_nan())
+                .collect();
+            candidates.sort_by(|&a, &b| {
+                let av = series[a].values[i];
+                let bv = series[b].values[i];
                 if descending {
                     bv.total_cmp(&av)
                 } else {
                     av.total_cmp(&bv)
                 }
             });
-            // Drop NaN candidates.
-            indices.retain(|&j| !series[j].samples[i].value.is_nan());
-            indices.truncate(k);
-            for &j in &indices {
-                let value = series[j].samples[i].value;
-                let entry = accum
-                    .entry(stripped_signatures[j])
-                    .or_insert_with(|| (stripped_labels[j].clone(), Vec::with_capacity(n)));
-                entry.1.push(Sample {
-                    timestamp_ms: ts,
-                    value,
-                });
+            candidates.truncate(k);
+            for j in candidates {
+                ranked_value.insert(j, series[j].values[i]);
             }
+        }
+
+        for (j, _) in series.iter().enumerate() {
+            let value = ranked_value.get(&j).copied();
+            let entry = accum
+                .entry(stripped_signatures[j])
+                .or_insert_with(|| (stripped_labels[j].clone(), Vec::with_capacity(n)));
+            entry.1.push(value.unwrap_or(f64::NAN));
         }
     }
 
     let mut out: Vec<Series> = accum
         .into_iter()
-        .map(|(_, (labels, samples))| {
-            let samples = pad_to_grid(samples, &timestamps);
-            let signature = labels_signature(&labels);
-            Series {
-                labels,
-                signature,
-                samples,
+        .filter_map(|(_, (labels, values))| {
+            // Drop series that never ranked at any position.
+            if values.iter().all(|v| v.is_nan()) {
+                return None;
             }
+            Some(Series::new(labels, Arc::clone(&timestamps), values))
         })
         .collect();
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-/// quantile(phi, expr): per group, compute the phi-quantile via linear
-/// interpolation between adjacent ranked observations. Phi outside
-/// [0, 1] clamps to ±Inf to match Prometheus.
+/// quantile(phi, expr): per group at each grid position, compute the
+/// phi-quantile via linear interpolation between adjacent ranked
+/// observations. Phi outside [0, 1] clamps to ±Inf to match Prometheus.
 fn apply_quantile(
     grouping: Option<&Grouping>,
     phi: f64,
@@ -271,8 +226,8 @@ fn apply_quantile(
     if series.is_empty() {
         return Ok(EvalResult::InstantVector(Vec::new()));
     }
-    let n = series[0].samples.len();
-    let timestamps: Vec<i64> = series[0].samples.iter().map(|s| s.timestamp_ms).collect();
+    let n = series[0].len();
+    let timestamps = Arc::clone(&series[0].timestamps);
 
     let bucket_keys: Vec<(u64, Vec<(String, String)>)> = series
         .iter()
@@ -282,12 +237,11 @@ fn apply_quantile(
         })
         .collect();
 
-    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
+    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<f64>)> = BTreeMap::new();
     for i in 0..n {
-        let ts = timestamps[i];
         let mut per_bucket: BTreeMap<u64, (Vec<(String, String)>, Vec<f64>)> = BTreeMap::new();
         for (j, s) in series.iter().enumerate() {
-            let v = s.samples[i].value;
+            let v = s.values[i];
             let (key, key_labels) = &bucket_keys[j];
             let entry = per_bucket
                 .entry(*key)
@@ -306,42 +260,27 @@ fn apply_quantile(
             let entry = accum
                 .entry(key)
                 .or_insert_with(|| (labels, Vec::with_capacity(n)));
-            entry.1.push(Sample {
-                timestamp_ms: ts,
-                value,
-            });
+            entry.1.push(value);
         }
     }
 
     let mut out: Vec<Series> = accum
         .into_iter()
-        .filter_map(|(_, (labels, samples))| {
-            if samples.iter().all(|s| s.value.is_nan()) {
+        .filter_map(|(_, (labels, values))| {
+            if values.iter().all(|v| v.is_nan()) {
                 return None;
             }
-            let samples = pad_to_grid(samples, &timestamps);
-            let signature = labels_signature(&labels);
-            Some(Series {
-                labels,
-                signature,
-                samples,
-            })
+            Some(Series::new(labels, Arc::clone(&timestamps), values))
         })
         .collect();
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-/// count_values(label, expr): group input series by their per-series
-/// value (stringified), emit one output series per bucket with the
-/// supplied label set to that value-string and the series value equal
-/// to the bucket count. Grouping labels carry through; `__name__` is
-/// stripped (aggregation convention).
-///
-/// NaN-valued inputs bucket under `"NaN"`; +Inf/-Inf bucket under
-/// `"+Inf"`/`"-Inf"`. The exact float-to-string formatting comes from
-/// `format_value_for_label`, which matches Rust's default `{}` output
-/// for finite values (e.g. `42`, `0.5`).
+/// count_values(label, expr): per grid position, bucket input series by
+/// their value (stringified) and emit one output series per bucket with
+/// the supplied label set to that value-string and the series value
+/// equal to the bucket count.
 fn apply_count_values(
     grouping: Option<&Grouping>,
     label: &str,
@@ -350,23 +289,20 @@ fn apply_count_values(
     if series.is_empty() {
         return Ok(EvalResult::InstantVector(Vec::new()));
     }
-    let n = series[0].samples.len();
-    let timestamps: Vec<i64> = series[0].samples.iter().map(|s| s.timestamp_ms).collect();
+    let n = series[0].len();
+    let timestamps = Arc::clone(&series[0].timestamps);
 
     let projected: Vec<Vec<(String, String)>> = series
         .iter()
         .map(|s| project_labels(&s.labels, grouping))
         .collect();
 
-    // accum keyed by output signature (with the new label slot
-    // applied). Value at each grid position is the bucket count.
-    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<Sample>)> = BTreeMap::new();
+    // accum keyed by output signature (with the new label slot applied).
+    let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<f64>)> = BTreeMap::new();
     for i in 0..n {
-        let ts = timestamps[i];
-        // Bucket count per (signature, value_str) at this position.
         let mut per_bucket: BTreeMap<u64, (Vec<(String, String)>, u64)> = BTreeMap::new();
         for (j, s) in series.iter().enumerate() {
-            let v = s.samples[i].value;
+            let v = s.values[i];
             let value_str = format_value_for_label(v);
             let mut output_labels = projected[j].clone();
             output_labels.push((label.to_string(), value_str));
@@ -377,38 +313,50 @@ fn apply_count_values(
                 .or_insert_with(|| (output_labels, 0));
             entry.1 += 1;
         }
+        // Track which buckets contributed this position so we can pad
+        // NaN for buckets that didn't.
+        let mut touched: std::collections::HashSet<u64> = std::collections::HashSet::new();
         for (sig, (labels, count)) in per_bucket {
+            touched.insert(sig);
             let entry = accum
                 .entry(sig)
                 .or_insert_with(|| (labels, Vec::with_capacity(n)));
-            entry.1.push(Sample {
-                timestamp_ms: ts,
-                value: count as f64,
-            });
+            // Pad to current position with NaN if this bucket missed prior positions.
+            while entry.1.len() < i {
+                entry.1.push(f64::NAN);
+            }
+            entry.1.push(count as f64);
+        }
+        // Buckets that existed in prior positions but didn't appear this
+        // position get a NaN.
+        let existing_keys: Vec<u64> = accum.keys().copied().collect();
+        for sig in existing_keys {
+            let entry = accum.get_mut(&sig).unwrap();
+            if entry.1.len() < i + 1 && !touched.contains(&sig) {
+                while entry.1.len() < i + 1 {
+                    entry.1.push(f64::NAN);
+                }
+            }
+        }
+    }
+
+    // Right-pad any bucket that ran short.
+    for (_, (_, vals)) in accum.iter_mut() {
+        while vals.len() < n {
+            vals.push(f64::NAN);
         }
     }
 
     let mut out: Vec<Series> = accum
         .into_iter()
-        .map(|(_, (labels, samples))| {
-            let samples = pad_to_grid(samples, &timestamps);
-            let signature = labels_signature(&labels);
-            Series {
-                labels,
-                signature,
-                samples,
-            }
-        })
+        .map(|(_, (labels, values))| Series::new(labels, Arc::clone(&timestamps), values))
         .collect();
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-/// Format a float for use as a PromQL label value. Mirrors
-/// Prometheus' Go default formatting closely enough for typical
-/// inputs (integers render without a decimal, percentages render
-/// with the natural digit count). NaN and +/-Inf get their string
-/// forms.
+/// Format a float for use as a PromQL label value. Mirrors Prometheus'
+/// Go default formatting closely enough for typical inputs.
 fn format_value_for_label(v: f64) -> String {
     if v.is_nan() {
         return "NaN".to_string();
@@ -416,9 +364,6 @@ fn format_value_for_label(v: f64) -> String {
     if v.is_infinite() {
         return if v > 0.0 { "+Inf".to_string() } else { "-Inf".to_string() };
     }
-    // Use Rust's default `{}` formatter: it elides the decimal point
-    // for whole-valued floats, matching Prometheus' rendering for
-    // typical PromQL inputs.
     format!("{v}")
 }
 
@@ -454,7 +399,6 @@ pub(crate) fn compute_quantile(sorted: &[f64], phi: f64) -> f64 {
 
 struct Bucket {
     labels: Vec<(String, String)>,
-    ts: i64,
     sum: f64,
     count: u64,
     min: f64,
@@ -462,10 +406,9 @@ struct Bucket {
 }
 
 impl Bucket {
-    fn new(labels: Vec<(String, String)>, ts: i64) -> Self {
+    fn new(labels: Vec<(String, String)>) -> Self {
         Self {
             labels,
-            ts,
             sum: 0.0,
             count: 0,
             min: f64::INFINITY,
@@ -501,9 +444,6 @@ impl Bucket {
             AggrKind::Min => self.min,
             AggrKind::Max => self.max,
             AggrKind::Count => self.count as f64,
-            // Parametrized aggregators are routed by `apply_aggregate`
-            // before they reach this path; reaching here means a bug
-            // in the dispatch.
             AggrKind::TopK
             | AggrKind::BottomK
             | AggrKind::Quantile
@@ -543,31 +483,16 @@ mod tests {
             ("__name__".to_string(), name.to_string()),
             ("dimension".to_string(), dim.to_string()),
         ];
-        finalize_series(labels, val)
+        Series::scalar(labels, 1000, val)
     }
 
     fn s_with(group: &str, dim: &str, val: f64) -> Series {
-        // Helper for grouping tests: carries an explicit `group` label so
-        // we can exercise `by (group)` without colliding with the
-        // __name__-dropping convention that aggregation output follows.
         let labels = vec![
             ("__name__".to_string(), "metric".to_string()),
             ("group".to_string(), group.to_string()),
             ("dimension".to_string(), dim.to_string()),
         ];
-        finalize_series(labels, val)
-    }
-
-    fn finalize_series(labels: Vec<(String, String)>, val: f64) -> Series {
-        let signature = labels_signature(&labels);
-        Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: 1000,
-                value: val,
-            }],
-        }
+        Series::scalar(labels, 1000, val)
     }
 
     #[test]
@@ -581,7 +506,7 @@ mod tests {
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
-                assert!((v[0].samples[0].value - 6.0).abs() < 1e-9);
+                assert!((v[0].values[0] - 6.0).abs() < 1e-9);
                 assert!(v[0].labels.is_empty());
             }
             _ => panic!(),
@@ -606,7 +531,7 @@ mod tests {
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 2);
-                let mut values: Vec<f64> = v.iter().map(|s| s.samples[0].value).collect();
+                let mut values: Vec<f64> = v.iter().map(|s| s.values[0]).collect();
                 values.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 assert!((values[0] - 2.0).abs() < 1e-9);
                 assert!((values[1] - 11.0).abs() < 1e-9);
@@ -625,7 +550,7 @@ mod tests {
         let r = apply_aggregate(AggrKind::Count, None, None, None, input).unwrap();
         match r {
             EvalResult::InstantVector(v) => {
-                assert!((v[0].samples[0].value - 3.0).abs() < 1e-9);
+                assert!((v[0].values[0] - 3.0).abs() < 1e-9);
             }
             _ => panic!(),
         }
@@ -644,17 +569,13 @@ mod tests {
         if let (EvalResult::InstantVector(a), EvalResult::InstantVector(b), EvalResult::InstantVector(c)) =
             (avg, min, max)
         {
-            assert!((a[0].samples[0].value - 3.0).abs() < 1e-9);
-            assert!((b[0].samples[0].value - 1.0).abs() < 1e-9);
-            assert!((c[0].samples[0].value - 5.0).abs() < 1e-9);
+            assert!((a[0].values[0] - 3.0).abs() < 1e-9);
+            assert!((b[0].values[0] - 1.0).abs() < 1e-9);
+            assert!((c[0].values[0] - 5.0).abs() < 1e-9);
         } else {
             panic!();
         }
     }
-
-    // -------------------------------------------------------------------
-    // Phase 3c: topk / bottomk / quantile (SOW-0021)
-    // -------------------------------------------------------------------
 
     fn unwrap_vec(r: EvalResult) -> Vec<Series> {
         match r {
@@ -664,7 +585,7 @@ mod tests {
     }
 
     fn values_sorted(v: &[Series]) -> Vec<f64> {
-        let mut out: Vec<f64> = v.iter().map(|s| s.samples[0].value).collect();
+        let mut out: Vec<f64> = v.iter().map(|s| s.values[0]).collect();
         out.sort_by(|a, b| a.partial_cmp(b).unwrap());
         out
     }
@@ -680,7 +601,6 @@ mod tests {
         let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(2.0), None, input).unwrap());
         assert_eq!(v.len(), 2);
         assert_eq!(values_sorted(&v), vec![3.0, 4.0]);
-        // __name__ stripped; `dimension` preserved (original labels).
         for s in &v {
             assert!(s.labels.iter().all(|(n, _)| n != "__name__"));
             assert!(s.labels.iter().any(|(n, _)| n == "dimension"));
@@ -705,7 +625,6 @@ mod tests {
         let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0)]);
         let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(0.0), None, input.clone()).unwrap());
         assert!(v.is_empty());
-        // Negative or NaN k -> empty.
         let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(-1.0), None, input.clone()).unwrap());
         assert!(v.is_empty());
         let v = unwrap_vec(apply_aggregate(AggrKind::BottomK, None, Some(f64::NAN), None, input).unwrap());
@@ -720,18 +639,11 @@ mod tests {
             s("foo", "c", 5.0),
         ]);
         let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(3.0), None, input).unwrap());
-        // Only two non-NaN candidates; NaN dropped.
         assert_eq!(v.len(), 2);
     }
 
     #[test]
     fn topk_with_grouping_per_bucket() {
-        // Two buckets by `group` -> "g1" and "g2". topk(1) per bucket
-        // should give one series per bucket. We use a custom `group`
-        // label rather than `__name__` because `project_labels`
-        // deliberately strips `__name__` from grouping keys (aggregation
-        // outputs don't carry a metric name; cumulative Prometheus
-        // convention).
         let input = EvalResult::InstantVector(vec![
             s_with("g1", "a", 1.0),
             s_with("g1", "b", 2.0),
@@ -764,7 +676,7 @@ mod tests {
         ]);
         let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.5), None, input).unwrap());
         assert_eq!(v.len(), 1);
-        assert!((v[0].samples[0].value - 3.0).abs() < 1e-9);
+        assert!((v[0].values[0] - 3.0).abs() < 1e-9);
     }
 
     #[test]
@@ -775,15 +687,13 @@ mod tests {
             s("foo", "c", 3.0),
         ]);
         let v0 = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.0), None, input.clone()).unwrap());
-        assert_eq!(v0[0].samples[0].value, 1.0);
+        assert_eq!(v0[0].values[0], 1.0);
         let v1 = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(1.0), None, input).unwrap());
-        assert_eq!(v1[0].samples[0].value, 7.0);
+        assert_eq!(v1[0].values[0], 7.0);
     }
 
     #[test]
     fn quantile_interpolates_between_samples() {
-        // rank = 0.95 * (5 - 1) = 3.8, lerp(s[3], s[4], 0.8)
-        // sorted: [1, 2, 3, 4, 5], so lerp(4, 5, 0.8) = 4.8.
         let input = EvalResult::InstantVector(vec![
             s("foo", "a", 1.0),
             s("foo", "b", 2.0),
@@ -792,16 +702,16 @@ mod tests {
             s("foo", "e", 5.0),
         ]);
         let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.95), None, input).unwrap());
-        assert!((v[0].samples[0].value - 4.8).abs() < 1e-9, "got {}", v[0].samples[0].value);
+        assert!((v[0].values[0] - 4.8).abs() < 1e-9, "got {}", v[0].values[0]);
     }
 
     #[test]
     fn quantile_out_of_range_clamps_to_infinity() {
         let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0), s("foo", "b", 2.0)]);
         let v_neg = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(-0.5), None, input.clone()).unwrap());
-        assert_eq!(v_neg[0].samples[0].value, f64::NEG_INFINITY);
+        assert_eq!(v_neg[0].values[0], f64::NEG_INFINITY);
         let v_high = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(2.0), None, input).unwrap());
-        assert_eq!(v_high[0].samples[0].value, f64::INFINITY);
+        assert_eq!(v_high[0].values[0], f64::INFINITY);
     }
 
     #[test]
@@ -829,7 +739,6 @@ mod tests {
 
     #[test]
     fn quantile_empty_bucket_drops() {
-        // All NaN -> no observation -> bucket drops.
         let input = EvalResult::InstantVector(vec![
             s("foo", "a", f64::NAN),
             s("foo", "b", f64::NAN),
@@ -840,7 +749,6 @@ mod tests {
 
     #[test]
     fn topk_with_non_integer_k_truncates() {
-        // k=2.9 should behave as k=2 (Prometheus floors via `as usize`).
         let input = EvalResult::InstantVector(vec![
             s("foo", "a", 1.0),
             s("foo", "b", 2.0),
@@ -850,14 +758,8 @@ mod tests {
         assert_eq!(v.len(), 2);
     }
 
-    // -----------------------------------------------------------------
-    // count_values (SOW-0024)
-    // -----------------------------------------------------------------
-
     #[test]
     fn count_values_buckets_by_value() {
-        // Three series with values 1, 2, 1 -> two buckets: {v="1"}=2,
-        // {v="2"}=1.
         let input = EvalResult::InstantVector(vec![
             s("foo", "a", 1.0),
             s("foo", "b", 2.0),
@@ -883,12 +785,11 @@ mod tests {
                     .find(|(n, _)| n == "v")
                     .map(|(_, v)| v.clone())
                     .unwrap_or_default();
-                (label, s.samples[0].value)
+                (label, s.values[0])
             })
             .collect();
         assert!(pairs.contains(&("1".to_string(), 2.0)));
         assert!(pairs.contains(&("2".to_string(), 1.0)));
-        // __name__ stripped.
         for s in &v {
             assert!(s.labels.iter().all(|(n, _)| n != "__name__"));
         }
@@ -912,7 +813,7 @@ mod tests {
             .unwrap(),
         );
         assert_eq!(v.len(), 1);
-        assert_eq!(v[0].samples[0].value, 3.0);
+        assert_eq!(v[0].values[0], 3.0);
     }
 
     #[test]
@@ -933,7 +834,6 @@ mod tests {
             )
             .unwrap(),
         );
-        // g1: {v=1}=2, {v=2}=1; g2: {v=1}=1 -> 3 series total.
         assert_eq!(v.len(), 3);
     }
 
@@ -954,16 +854,11 @@ mod tests {
             )
             .unwrap(),
         );
-        // Two buckets: "NaN" and "1".
         assert_eq!(v.len(), 2);
         let nan_count = v
             .iter()
-            .find(|s| {
-                s.labels
-                    .iter()
-                    .any(|(n, vl)| n == "v" && vl == "NaN")
-            })
-            .map(|s| s.samples[0].value)
+            .find(|s| s.labels.iter().any(|(n, vl)| n == "v" && vl == "NaN"))
+            .map(|s| s.values[0])
             .unwrap();
         assert_eq!(nan_count, 2.0);
     }

@@ -77,38 +77,37 @@ pub fn apply_call(
     }
 }
 
-/// Apply `compute` to a sliding window over `samples` at each grid
-/// timestamp. The window is the half-open `(t - range_ms, t]`. Returns
-/// one `Sample` per grid timestamp; positions where `compute` returns
-/// `None` get a NaN sample. Used by every range-vector rollup to
-/// produce grid-aligned output in a single pass over the underlying
-/// sample sequence. SOW-0031.
+/// Apply `compute` to a sliding window over the column-shaped
+/// `(timestamps, values)` series at each grid timestamp. The window
+/// is the half-open `(t - range_ms, t]`. Returns one `f64` per grid
+/// timestamp; positions where `compute` returns `None` get NaN. Used
+/// by every range-vector rollup to produce grid-aligned output in a
+/// single pass over the underlying sample sequence. SOW-0031 + SOW-0032.
 fn rollup_two_pointer<F>(
-    samples: &[Sample],
+    timestamps: &[i64],
+    values: &[f64],
     grid_ts: &[i64],
     range_ms: i64,
     mut compute: F,
-) -> Vec<Sample>
+) -> Vec<f64>
 where
-    F: FnMut(&[Sample]) -> Option<f64>,
+    F: FnMut(&[i64], &[f64]) -> Option<f64>,
 {
+    debug_assert_eq!(timestamps.len(), values.len());
     let mut out = Vec::with_capacity(grid_ts.len());
     let mut left: usize = 0;
     let mut right: usize = 0;
     for &t in grid_ts {
         let lower = t.saturating_sub(range_ms);
-        while right < samples.len() && samples[right].timestamp_ms <= t {
+        while right < timestamps.len() && timestamps[right] <= t {
             right += 1;
         }
-        while left < right && samples[left].timestamp_ms <= lower {
+        while left < right && timestamps[left] <= lower {
             left += 1;
         }
-        let window = &samples[left..right];
-        let value = compute(window).unwrap_or(f64::NAN);
-        out.push(Sample {
-            timestamp_ms: t,
-            value,
-        });
+        let window_ts = &timestamps[left..right];
+        let window_vals = &values[left..right];
+        out.push(compute(window_ts, window_vals).unwrap_or(f64::NAN));
     }
     out
 }
@@ -162,35 +161,25 @@ fn apply_over_time(
     op: OverTimeOp,
 ) -> Result<EvalResult, EvalError> {
     let range = expect_one_range_vector(args, op.name())?;
-
-    // Tests and other callers that hand us a pre-windowed slice without
-    // declaring the matrix [range] go through the legacy single-window
-    // path: one output sample per input series, stamped at the latest
-    // non-NaN sample.
     let Some(window_ms) = range_ms else {
         return apply_over_time_legacy(range, op);
     };
-
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
-            compute_over_time(window, op).map(|(v, _)| v)
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |ts, vals| {
+            compute_over_time(ts, vals, op).map(|(v, _)| v)
         });
-        if samples.iter().all(|p| p.value.is_nan()) {
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = if op.keep_name() {
-            let signature = labels_signature(&s.labels);
-            (s.labels, signature)
+        let labels = if op.keep_name() {
+            s.labels
         } else {
-            strip_name(&s.labels)
+            strip_name(&s.labels).0
         };
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -199,23 +188,15 @@ fn apply_over_time(
 fn apply_over_time_legacy(range: Vec<Series>, op: OverTimeOp) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some((value, ts_ms)) = compute_over_time(&s.samples, op) else {
+        let Some((value, ts_ms)) = compute_over_time(&s.timestamps, &s.values, op) else {
             continue;
         };
-        let (labels, signature) = if op.keep_name() {
-            let signature = labels_signature(&s.labels);
-            (s.labels, signature)
+        let labels = if op.keep_name() {
+            s.labels
         } else {
-            strip_name(&s.labels)
+            strip_name(&s.labels).0
         };
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: ts_ms,
-                value,
-            }],
-        });
+        out.push(Series::scalar(labels, ts_ms, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -226,12 +207,11 @@ fn apply_over_time_legacy(range: Vec<Series>, op: OverTimeOp) -> Result<EvalResu
 /// timestamp in the window). NaN samples are skipped; if no non-NaN
 /// sample exists in the window, returns `None` so the caller drops the
 /// series.
-fn compute_over_time(samples: &[Sample], op: OverTimeOp) -> Option<(f64, i64)> {
-    // Walk once: find the last non-NaN timestamp, count non-NaN samples,
-    // and accumulate the running statistic. `sum_of_squares` is tracked
-    // for the variance family (stdvar/stddev_over_time) added in
-    // SOW-0023; for the other variants it's computed-but-unused, a tiny
-    // cost that keeps the single-pass shape.
+fn compute_over_time(
+    timestamps: &[i64],
+    values: &[f64],
+    op: OverTimeOp,
+) -> Option<(f64, i64)> {
     let mut count: u64 = 0;
     let mut sum: f64 = 0.0;
     let mut sum_sq: f64 = 0.0;
@@ -240,23 +220,22 @@ fn compute_over_time(samples: &[Sample], op: OverTimeOp) -> Option<(f64, i64)> {
     let mut last_val: f64 = 0.0;
     let mut last_ts: i64 = 0;
 
-    for s in samples {
-        if s.value.is_nan() {
+    for i in 0..values.len() {
+        let v = values[i];
+        if v.is_nan() {
             continue;
         }
         count += 1;
-        sum += s.value;
-        sum_sq += s.value * s.value;
-        if s.value < min_val {
-            min_val = s.value;
+        sum += v;
+        sum_sq += v * v;
+        if v < min_val {
+            min_val = v;
         }
-        if s.value > max_val {
-            max_val = s.value;
+        if v > max_val {
+            max_val = v;
         }
-        // `last` follows iteration order; the matrix selector emits
-        // samples chronologically.
-        last_val = s.value;
-        last_ts = s.timestamp_ms;
+        last_val = v;
+        last_ts = timestamps[i];
     }
 
     if count == 0 {
@@ -340,20 +319,17 @@ fn apply_window_op(
         return apply_window_op_legacy(range, op);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
-            compute_window_op(window, op)
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |ts, vals| {
+            compute_window_op(ts, vals, op)
         });
-        if samples.iter().all(|p| p.value.is_nan()) {
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -362,41 +338,25 @@ fn apply_window_op(
 fn apply_window_op_legacy(range: Vec<Series>, op: WindowOp) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_window_op(&s.samples, op) else { continue };
-        let (labels, signature) = strip_name(&s.labels);
-        let ts = s.samples.last().map(|p| p.timestamp_ms).unwrap_or(0);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: ts,
-                value,
-            }],
-        });
+        let Some(value) = compute_window_op(&s.timestamps, &s.values, op) else { continue };
+        let (labels, _) = strip_name(&s.labels);
+        let ts = s.timestamps.last().copied().unwrap_or(0);
+        out.push(Series::scalar(labels, ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_window_op(samples: &[Sample], op: WindowOp) -> Option<f64> {
-    if samples.is_empty() {
+fn compute_window_op(timestamps: &[i64], values: &[f64], op: WindowOp) -> Option<f64> {
+    if values.is_empty() {
         return None;
     }
-    // Netdata's storage hands us deltas for INCREMENTAL dimensions; the
-    // sum of those deltas is the total increase over the window.
-    let total: f64 = samples
-        .iter()
-        .map(|s| s.value)
-        .filter(|v| !v.is_nan())
-        .sum();
+    let total: f64 = values.iter().copied().filter(|v| !v.is_nan()).sum();
     match op {
         WindowOp::Increase => Some(total),
         WindowOp::Rate => {
-            // Window width in seconds. Use the actual sample span; if the
-            // span collapses to zero (single sample, or all samples at the
-            // same timestamp), the rate is undefined.
-            let first_ts = samples.first()?.timestamp_ms;
-            let last_ts = samples.last()?.timestamp_ms;
+            let first_ts = *timestamps.first()?;
+            let last_ts = *timestamps.last()?;
             let span_ms = (last_ts - first_ts).max(0);
             if span_ms <= 0 {
                 None
@@ -420,53 +380,44 @@ fn apply_irate(
         return apply_irate_legacy(range);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
-            compute_irate(window)
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |ts, vals| {
+            compute_irate(ts, vals)
         });
-        if samples.iter().all(|p| p.value.is_nan()) {
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_irate(samples: &[Sample]) -> Option<f64> {
-    let n = samples.len();
+fn compute_irate(timestamps: &[i64], values: &[f64]) -> Option<f64> {
+    let n = values.len();
     if n < 2 {
         return None;
     }
-    let last = samples[n - 1];
-    let prev = samples[n - 2];
-    let dt_ms = (last.timestamp_ms - prev.timestamp_ms).max(0);
-    if dt_ms <= 0 || last.value.is_nan() {
+    let last_v = values[n - 1];
+    let last_ts = timestamps[n - 1];
+    let prev_ts = timestamps[n - 2];
+    let dt_ms = (last_ts - prev_ts).max(0);
+    if dt_ms <= 0 || last_v.is_nan() {
         return None;
     }
-    Some(last.value / (dt_ms as f64 / 1000.0))
+    Some(last_v / (dt_ms as f64 / 1000.0))
 }
 
 fn apply_irate_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_irate(&s.samples) else { continue };
-        let ts = s.samples.last().map(|p| p.timestamp_ms).unwrap_or(0);
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: ts,
-                value,
-            }],
-        });
+        let Some(value) = compute_irate(&s.timestamps, &s.values) else { continue };
+        let ts = s.timestamps.last().copied().unwrap_or(0);
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::scalar(labels, ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -487,51 +438,41 @@ fn apply_delta(
         return apply_delta_legacy(range);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
-            compute_delta(window)
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |_ts, vals| {
+            compute_delta(vals)
         });
-        if samples.iter().all(|p| p.value.is_nan()) {
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_delta(samples: &[Sample]) -> Option<f64> {
-    if samples.len() < 2 {
+fn compute_delta(values: &[f64]) -> Option<f64> {
+    if values.len() < 2 {
         return None;
     }
-    let first = samples.first().copied()?;
-    let last = samples.last().copied()?;
-    if first.value.is_nan() || last.value.is_nan() {
+    let first = *values.first()?;
+    let last = *values.last()?;
+    if first.is_nan() || last.is_nan() {
         return None;
     }
-    Some(last.value - first.value)
+    Some(last - first)
 }
 
 fn apply_delta_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_delta(&s.samples) else { continue };
-        let ts = s.samples.last().map(|p| p.timestamp_ms).unwrap_or(0);
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: ts,
-                value,
-            }],
-        });
+        let Some(value) = compute_delta(&s.values) else { continue };
+        let ts = s.timestamps.last().copied().unwrap_or(0);
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::scalar(labels, ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -593,8 +534,8 @@ fn apply_histogram_quantile(args: Vec<EvalResult>) -> Result<EvalResult, EvalErr
         saw_le = true;
         let le = parse_le(le_str);
         let Some(le) = le else { continue };
-        let value = s.samples.first().map(|p| p.value).unwrap_or(f64::NAN);
-        let ts = s.samples.first().map(|p| p.timestamp_ms).unwrap_or(0);
+        let value = s.values.first().copied().unwrap_or(f64::NAN);
+        let ts = s.timestamps.first().copied().unwrap_or(0);
         if value.is_nan() {
             continue;
         }
@@ -622,15 +563,7 @@ fn apply_histogram_quantile(args: Vec<EvalResult>) -> Result<EvalResult, EvalErr
     for (_, (labels, mut buckets, ts)) in groups.into_iter() {
         buckets.sort_by(|a, b| a.le.partial_cmp(&b.le).unwrap_or(std::cmp::Ordering::Equal));
         let Some(value) = interpolate_quantile(&buckets, phi) else { continue };
-        let signature = labels_signature(&labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: ts,
-                value,
-            }],
-        });
+        out.push(Series::scalar(labels, ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -722,36 +655,29 @@ fn apply_quantile_over_time(
         return apply_quantile_over_time_legacy(phi, range);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
-            compute_quantile_over_window(window, phi)
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |_ts, vals| {
+            compute_quantile_over_window(vals, phi)
         });
-        if samples.iter().all(|p| p.value.is_nan()) {
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_quantile_over_window(samples: &[Sample], phi: f64) -> Option<f64> {
-    let mut values: Vec<f64> = samples
-        .iter()
-        .map(|sm| sm.value)
-        .filter(|v| !v.is_nan())
-        .collect();
-    if values.is_empty() {
+fn compute_quantile_over_window(values: &[f64], phi: f64) -> Option<f64> {
+    let mut sorted: Vec<f64> = values.iter().copied().filter(|v| !v.is_nan()).collect();
+    if sorted.is_empty() {
         return None;
     }
-    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    Some(crate::eval::aggregation::compute_quantile(&values, phi))
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    Some(crate::eval::aggregation::compute_quantile(&sorted, phi))
 }
 
 fn apply_quantile_over_time_legacy(
@@ -760,20 +686,17 @@ fn apply_quantile_over_time_legacy(
 ) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_quantile_over_window(&s.samples, phi) else { continue };
+        let Some(value) = compute_quantile_over_window(&s.values, phi) else { continue };
         let ts = s
-            .samples
+            .values
             .iter()
+            .enumerate()
             .rev()
-            .find(|sm| !sm.value.is_nan())
-            .map(|sm| sm.timestamp_ms)
+            .find(|(_, v)| !v.is_nan())
+            .map(|(i, _)| s.timestamps[i])
             .unwrap_or(0);
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample { timestamp_ms: ts, value }],
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::scalar(labels, ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -794,33 +717,28 @@ fn apply_predict_linear(
         return apply_predict_linear_legacy(range, t_secs);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
-            compute_predict_linear(window, t_secs)
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |ts, vals| {
+            compute_predict_linear(ts, vals, t_secs)
         });
-        if samples.iter().all(|p| p.value.is_nan()) {
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_predict_linear(samples: &[Sample], t_secs: f64) -> Option<f64> {
-    let last_ts_ms = samples.iter().rev().find_map(|sm| {
-        if sm.value.is_nan() {
-            None
-        } else {
-            Some(sm.timestamp_ms)
-        }
-    })?;
+fn compute_predict_linear(timestamps: &[i64], values: &[f64], t_secs: f64) -> Option<f64> {
+    let last_ts_ms = values
+        .iter()
+        .enumerate()
+        .rev()
+        .find_map(|(i, v)| if v.is_nan() { None } else { Some(timestamps[i]) })?;
     let now_s = (last_ts_ms as f64) / 1000.0;
     let mut n = 0.0;
     let mut sum_x = 0.0;
@@ -829,12 +747,13 @@ fn compute_predict_linear(samples: &[Sample], t_secs: f64) -> Option<f64> {
     let mut sum_xy = 0.0;
     let mut first_x = f64::NAN;
     let mut distinct_x = false;
-    for sm in samples {
-        if sm.value.is_nan() {
+    for i in 0..values.len() {
+        let v = values[i];
+        if v.is_nan() {
             continue;
         }
-        let x = (sm.timestamp_ms as f64) / 1000.0 - now_s;
-        let y = sm.value;
+        let x = (timestamps[i] as f64) / 1000.0 - now_s;
+        let y = v;
         if first_x.is_nan() {
             first_x = x;
         } else if x != first_x {
@@ -864,19 +783,16 @@ fn apply_predict_linear_legacy(
 ) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_predict_linear(&s.samples, t_secs) else { continue };
+        let Some(value) = compute_predict_linear(&s.timestamps, &s.values, t_secs) else { continue };
         let last_ts_ms = s
-            .samples
+            .values
             .iter()
+            .enumerate()
             .rev()
-            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
             .unwrap_or(0);
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample { timestamp_ms: last_ts_ms, value }],
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::scalar(labels, last_ts_ms, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -905,36 +821,33 @@ fn apply_holt_winters(
         return apply_holt_winters_legacy(range, sf, tf);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, |window| {
-            compute_holt_winters(window, sf, tf)
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |_ts, vals| {
+            compute_holt_winters(vals, sf, tf)
         });
-        if samples.iter().all(|p| p.value.is_nan()) {
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_holt_winters(samples: &[Sample], sf: f64, tf: f64) -> Option<f64> {
-    let mut iter = samples.iter().filter(|sm| !sm.value.is_nan());
+fn compute_holt_winters(values: &[f64], sf: f64, tf: f64) -> Option<f64> {
+    let mut iter = values.iter().copied().filter(|v| !v.is_nan());
     let first = iter.next()?;
     let second = iter.next()?;
-    let mut s_prev = first.value;
-    let mut b_prev = second.value - first.value;
-    let mut s_curr = sf * second.value + (1.0 - sf) * (s_prev + b_prev);
+    let mut s_prev = first;
+    let mut b_prev = second - first;
+    let mut s_curr = sf * second + (1.0 - sf) * (s_prev + b_prev);
     b_prev = tf * (s_curr - s_prev) + (1.0 - tf) * b_prev;
     s_prev = s_curr;
-    for sm in iter {
-        let s_new = sf * sm.value + (1.0 - sf) * (s_prev + b_prev);
+    for v in iter {
+        let s_new = sf * v + (1.0 - sf) * (s_prev + b_prev);
         let b_new = tf * (s_new - s_prev) + (1.0 - tf) * b_prev;
         s_prev = s_new;
         b_prev = b_new;
@@ -950,22 +863,16 @@ fn apply_holt_winters_legacy(
 ) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_holt_winters(&s.samples, sf, tf) else { continue };
+        let Some(value) = compute_holt_winters(&s.values, sf, tf) else { continue };
         let last_ts = s
-            .samples
+            .values
             .iter()
+            .enumerate()
             .rev()
-            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
             .unwrap_or(0);
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: last_ts,
-                value,
-            }],
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::scalar(labels, last_ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -1144,20 +1051,9 @@ fn apply_per_sample(
     let series = expect_one_instant_vector(args, func)?;
     let mut out = Vec::with_capacity(series.len());
     for s in series.into_iter() {
-        let (labels, signature) = strip_name(&s.labels);
-        let samples: Vec<Sample> = s
-            .samples
-            .into_iter()
-            .map(|x| Sample {
-                timestamp_ms: x.timestamp_ms,
-                value: op(x.value),
-            })
-            .collect();
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        let values: Vec<f64> = s.values.iter().copied().map(op).collect();
+        out.push(Series::new(labels, s.timestamps, values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -1280,21 +1176,14 @@ fn apply_vector(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
     // results back without timestamp rewriting, so we stamp 0. Callers that
     // care (range queries) re-stamp on every step. Instant queries print
     // the timestamp as ctx.at_ms via the output layer regardless.
-    let series = Series {
-        labels: Vec::new(),
-        signature: labels_signature(&[]),
-        samples: vec![Sample {
-            timestamp_ms: 0,
-            value: v,
-        }],
-    };
+    let series = Series::scalar(Vec::new(), 0, v);
     Ok(EvalResult::InstantVector(vec![series]))
 }
 
 fn apply_scalar(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
     let series = expect_one_instant_vector(args, "scalar")?;
     let v = if series.len() == 1 {
-        series[0].samples.first().map(|s| s.value).unwrap_or(f64::NAN)
+        series[0].values.first().copied().unwrap_or(f64::NAN)
     } else {
         // Prometheus: scalar of zero or >1 series is NaN.
         f64::NAN
@@ -1308,8 +1197,8 @@ fn apply_sort(args: Vec<EvalResult>, descending: bool) -> Result<EvalResult, Eva
         if descending { "sort_desc" } else { "sort" },
     )?;
     series.sort_by(|a, b| {
-        let av = a.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
-        let bv = b.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
+        let av = a.values.first().copied().unwrap_or(f64::NAN);
+        let bv = b.values.first().copied().unwrap_or(f64::NAN);
         // NaN goes to the end in both directions (matches Prometheus).
         match (av.is_nan(), bv.is_nan()) {
             (true, true) => std::cmp::Ordering::Equal,
@@ -1333,21 +1222,15 @@ fn apply_timestamp(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
     let out: Vec<Series> = series
         .into_iter()
         .map(|s| {
-            let (labels, signature) = strip_name(&s.labels);
-            let ts_s = s
-                .samples
-                .first()
-                .map(|x| x.timestamp_ms as f64 / 1000.0)
-                .unwrap_or(f64::NAN);
-            let ts_ms = s.samples.first().map(|x| x.timestamp_ms).unwrap_or(0);
-            Series {
-                labels,
-                signature,
-                samples: vec![Sample {
-                    timestamp_ms: ts_ms,
-                    value: ts_s,
-                }],
-            }
+            let (labels, _) = strip_name(&s.labels);
+            // Per-position: emit value = sample's own timestamp in
+            // seconds. Output keeps the grid-aligned timestamps Arc.
+            let values: Vec<f64> = s
+                .timestamps
+                .iter()
+                .map(|&t| t as f64 / 1000.0)
+                .collect();
+            Series::new(labels, s.timestamps, values)
         })
         .collect();
     Ok(EvalResult::InstantVector(out))
@@ -1363,37 +1246,39 @@ fn apply_deriv(
         return apply_deriv_legacy(range);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, compute_deriv);
-        if samples.iter().all(|p| p.value.is_nan()) {
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, compute_deriv);
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_deriv(samples: &[Sample]) -> Option<f64> {
-    let finite: Vec<&Sample> = samples.iter().filter(|x| !x.value.is_nan()).collect();
+fn compute_deriv(timestamps: &[i64], values: &[f64]) -> Option<f64> {
+    let finite: Vec<(i64, f64)> = timestamps
+        .iter()
+        .zip(values.iter())
+        .filter(|&(_, v)| !v.is_nan())
+        .map(|(&t, &v)| (t, v))
+        .collect();
     if finite.len() < 2 {
         return None;
     }
-    let last_ts = finite.last().unwrap().timestamp_ms as f64 / 1000.0;
+    let last_ts = finite.last().unwrap().0 as f64 / 1000.0;
     let n = finite.len() as f64;
     let mut sx = 0.0;
     let mut sy = 0.0;
     let mut sxy = 0.0;
     let mut sxx = 0.0;
-    for s in &finite {
-        let x = s.timestamp_ms as f64 / 1000.0 - last_ts;
-        let y = s.value;
+    for &(t, v) in &finite {
+        let x = t as f64 / 1000.0 - last_ts;
+        let y = v;
         sx += x;
         sy += y;
         sxy += x * y;
@@ -1409,19 +1294,16 @@ fn compute_deriv(samples: &[Sample]) -> Option<f64> {
 fn apply_deriv_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_deriv(&s.samples) else { continue };
+        let Some(value) = compute_deriv(&s.timestamps, &s.values) else { continue };
         let last_ts = s
-            .samples
+            .values
             .iter()
+            .enumerate()
             .rev()
-            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
             .unwrap_or(0);
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample { timestamp_ms: last_ts, value }],
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::scalar(labels, last_ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -1437,49 +1319,43 @@ fn apply_idelta(
         return apply_idelta_legacy(range);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, compute_idelta);
-        if samples.iter().all(|p| p.value.is_nan()) {
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, compute_idelta);
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_idelta(samples: &[Sample]) -> Option<f64> {
-    let finite: Vec<&Sample> = samples.iter().filter(|x| !x.value.is_nan()).collect();
+fn compute_idelta(_timestamps: &[i64], values: &[f64]) -> Option<f64> {
+    let finite: Vec<f64> = values.iter().copied().filter(|v| !v.is_nan()).collect();
     if finite.len() < 2 {
         return None;
     }
     let last = finite[finite.len() - 1];
     let prev = finite[finite.len() - 2];
-    Some(last.value - prev.value)
+    Some(last - prev)
 }
 
 fn apply_idelta_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_idelta(&s.samples) else { continue };
+        let Some(value) = compute_idelta(&s.timestamps, &s.values) else { continue };
         let last_ts = s
-            .samples
+            .values
             .iter()
+            .enumerate()
             .rev()
-            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
             .unwrap_or(0);
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample { timestamp_ms: last_ts, value }],
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::scalar(labels, last_ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -1495,31 +1371,28 @@ fn apply_changes(
         return apply_changes_legacy(range);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, compute_changes);
-        if samples.iter().all(|p| p.value.is_nan()) {
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, compute_changes);
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_changes(samples: &[Sample]) -> Option<f64> {
-    let finite: Vec<&Sample> = samples.iter().filter(|x| !x.value.is_nan()).collect();
+fn compute_changes(_timestamps: &[i64], values: &[f64]) -> Option<f64> {
+    let finite: Vec<f64> = values.iter().copied().filter(|v| !v.is_nan()).collect();
     if finite.is_empty() {
         return None;
     }
     let mut count: f64 = 0.0;
     for w in finite.windows(2) {
-        if w[0].value != w[1].value {
+        if w[0] != w[1] {
             count += 1.0;
         }
     }
@@ -1529,19 +1402,16 @@ fn compute_changes(samples: &[Sample]) -> Option<f64> {
 fn apply_changes_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_changes(&s.samples) else { continue };
+        let Some(value) = compute_changes(&s.timestamps, &s.values) else { continue };
         let last_ts = s
-            .samples
+            .values
             .iter()
+            .enumerate()
             .rev()
-            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
             .unwrap_or(0);
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample { timestamp_ms: last_ts, value }],
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::scalar(labels, last_ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -1557,31 +1427,28 @@ fn apply_resets(
         return apply_resets_legacy(range);
     };
     let grid = &ctx.grid;
+    let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let samples = rollup_two_pointer(&s.samples, &grid.timestamps, window_ms, compute_resets);
-        if samples.iter().all(|p| p.value.is_nan()) {
+        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, compute_resets);
+        if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::new(labels, std::sync::Arc::clone(&grid_ts), values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-fn compute_resets(samples: &[Sample]) -> Option<f64> {
-    let finite: Vec<&Sample> = samples.iter().filter(|x| !x.value.is_nan()).collect();
+fn compute_resets(_timestamps: &[i64], values: &[f64]) -> Option<f64> {
+    let finite: Vec<f64> = values.iter().copied().filter(|v| !v.is_nan()).collect();
     if finite.is_empty() {
         return None;
     }
     let mut count: f64 = 0.0;
     for w in finite.windows(2) {
-        if w[1].value < w[0].value {
+        if w[1] < w[0] {
             count += 1.0;
         }
     }
@@ -1591,19 +1458,16 @@ fn compute_resets(samples: &[Sample]) -> Option<f64> {
 fn apply_resets_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_resets(&s.samples) else { continue };
+        let Some(value) = compute_resets(&s.timestamps, &s.values) else { continue };
         let last_ts = s
-            .samples
+            .values
             .iter()
+            .enumerate()
             .rev()
-            .find_map(|sm| if sm.value.is_nan() { None } else { Some(sm.timestamp_ms) })
+            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
             .unwrap_or(0);
-        let (labels, signature) = strip_name(&s.labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples: vec![Sample { timestamp_ms: last_ts, value }],
-        });
+        let (labels, _) = strip_name(&s.labels);
+        out.push(Series::scalar(labels, last_ts, value));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
@@ -1734,20 +1598,9 @@ fn map_samples(series: Vec<Series>, op: impl Fn(f64) -> f64) -> Vec<Series> {
     let mut out: Vec<Series> = series
         .into_iter()
         .map(|s| {
-            let (labels, signature) = strip_name(&s.labels);
-            let samples = s
-                .samples
-                .into_iter()
-                .map(|x| Sample {
-                    timestamp_ms: x.timestamp_ms,
-                    value: op(x.value),
-                })
-                .collect();
-            Series {
-                labels,
-                signature,
-                samples,
-            }
+            let (labels, _) = strip_name(&s.labels);
+            let values: Vec<f64> = s.values.iter().copied().map(&op).collect();
+            Series::new(labels, s.timestamps, values)
         })
         .collect();
     out.sort_by_key(|s| s.signature);
@@ -1758,23 +1611,19 @@ fn map_samples(series: Vec<Series>, op: impl Fn(f64) -> f64) -> Vec<Series> {
 mod tests {
     use super::*;
 
-    fn series(labels: Vec<(&str, &str)>, samples: Vec<(i64, f64)>) -> Series {
+    fn series(labels: Vec<(&str, &str)>, pairs: Vec<(i64, f64)>) -> Series {
         let owned: Vec<(String, String)> = labels
             .into_iter()
             .map(|(n, v)| (n.to_string(), v.to_string()))
             .collect();
-        let signature = labels_signature(&owned);
-        Series {
-            labels: owned,
-            signature,
-            samples: samples
-                .into_iter()
-                .map(|(ts, v)| Sample {
-                    timestamp_ms: ts,
-                    value: v,
-                })
-                .collect(),
-        }
+        let samples: Vec<Sample> = pairs
+            .into_iter()
+            .map(|(ts, v)| Sample {
+                timestamp_ms: ts,
+                value: v,
+            })
+            .collect();
+        Series::from_samples(owned, samples)
     }
 
     #[test]
@@ -1789,7 +1638,7 @@ mod tests {
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
-                let value = v[0].samples[0].value;
+                let value = v[0].values[0];
                 // 7 deltas of 10 = 70, span = 60s -> ~1.166/s.
                 assert!((value - 70.0 / 60.0).abs() < 1e-6, "got {}", value);
                 // __name__ stripped.
@@ -1809,7 +1658,7 @@ mod tests {
             apply_window_op(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None, WindowOp::Increase).unwrap();
         match r {
             EvalResult::InstantVector(v) => {
-                assert!((v[0].samples[0].value - 35.0).abs() < 1e-9);
+                assert!((v[0].values[0] - 35.0).abs() < 1e-9);
             }
             _ => panic!(),
         }
@@ -1825,7 +1674,7 @@ mod tests {
         match r {
             EvalResult::InstantVector(v) => {
                 // Last delta = 3.0 over 5s gap = 0.6/s.
-                assert!((v[0].samples[0].value - 0.6).abs() < 1e-9);
+                assert!((v[0].values[0] - 0.6).abs() < 1e-9);
             }
             _ => panic!(),
         }
@@ -1840,7 +1689,7 @@ mod tests {
         let r = apply_delta(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None).unwrap();
         match r {
             EvalResult::InstantVector(v) => {
-                assert!((v[0].samples[0].value - (-10.0)).abs() < 1e-9);
+                assert!((v[0].values[0] - (-10.0)).abs() < 1e-9);
             }
             _ => panic!(),
         }
@@ -1867,7 +1716,7 @@ mod tests {
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
-                assert!((v[0].samples[0].value - 2.5).abs() < 1e-9, "got {}", v[0].samples[0].value);
+                assert!((v[0].values[0] - 2.5).abs() < 1e-9, "got {}", v[0].values[0]);
             }
             _ => panic!(),
         }
@@ -1964,27 +1813,27 @@ mod tests {
     fn avg_over_time_computes_mean() {
         let v = run_over_time(OverTimeOp::Avg, vec![(0, 1.0), (1000, 2.0), (2000, 3.0)]);
         assert_eq!(v.len(), 1);
-        assert!((v[0].samples[0].value - 2.0).abs() < 1e-9);
+        assert!((v[0].values[0] - 2.0).abs() < 1e-9);
         // __name__ stripped.
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
         // Timestamp is the most recent non-NaN sample's timestamp.
-        assert_eq!(v[0].samples[0].timestamp_ms, 2000);
+        assert_eq!(v[0].timestamps[0], 2000);
     }
 
     #[test]
     fn sum_over_time_computes_total() {
         let v = run_over_time(OverTimeOp::Sum, vec![(0, 1.0), (1000, 2.0), (2000, 3.0)]);
         assert_eq!(v.len(), 1);
-        assert!((v[0].samples[0].value - 6.0).abs() < 1e-9);
+        assert!((v[0].values[0] - 6.0).abs() < 1e-9);
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
     }
 
     #[test]
     fn min_max_over_time() {
         let v_min = run_over_time(OverTimeOp::Min, vec![(0, 5.0), (1000, 1.0), (2000, 3.0)]);
-        assert_eq!(v_min[0].samples[0].value, 1.0);
+        assert_eq!(v_min[0].values[0], 1.0);
         let v_max = run_over_time(OverTimeOp::Max, vec![(0, 5.0), (1000, 1.0), (2000, 3.0)]);
-        assert_eq!(v_max[0].samples[0].value, 5.0);
+        assert_eq!(v_max[0].values[0], 5.0);
     }
 
     #[test]
@@ -1993,14 +1842,14 @@ mod tests {
             OverTimeOp::Count,
             vec![(0, 1.0), (1000, f64::NAN), (2000, 3.0), (3000, 4.0)],
         );
-        assert_eq!(v[0].samples[0].value, 3.0);
+        assert_eq!(v[0].values[0], 3.0);
     }
 
     #[test]
     fn last_over_time_preserves_name_and_returns_last_value() {
         let v = run_over_time(OverTimeOp::Last, vec![(0, 1.0), (1000, 2.0), (2000, 3.0)]);
         assert_eq!(v.len(), 1);
-        assert_eq!(v[0].samples[0].value, 3.0);
+        assert_eq!(v[0].values[0], 3.0);
         // __name__ PRESERVED for last_over_time (Prometheus convention).
         assert!(
             v[0].labels.iter().any(|(n, v)| n == "__name__" && v == "foo"),
@@ -2016,14 +1865,14 @@ mod tests {
             OverTimeOp::Last,
             vec![(0, 1.0), (1000, 2.0), (2000, f64::NAN)],
         );
-        assert_eq!(v[0].samples[0].value, 2.0);
-        assert_eq!(v[0].samples[0].timestamp_ms, 1000);
+        assert_eq!(v[0].values[0], 2.0);
+        assert_eq!(v[0].timestamps[0], 1000);
     }
 
     #[test]
     fn present_over_time_returns_one() {
         let v = run_over_time(OverTimeOp::Present, vec![(0, 42.0), (1000, 100.0)]);
-        assert_eq!(v[0].samples[0].value, 1.0);
+        assert_eq!(v[0].values[0], 1.0);
         // __name__ stripped.
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
     }
@@ -2035,7 +1884,7 @@ mod tests {
             OverTimeOp::Avg,
             vec![(0, 1.0), (1000, f64::NAN), (2000, 3.0)],
         );
-        assert!((v[0].samples[0].value - 2.0).abs() < 1e-9);
+        assert!((v[0].values[0] - 2.0).abs() < 1e-9);
     }
 
     #[test]
@@ -2067,10 +1916,10 @@ mod tests {
         ] {
             let v = run_over_time(op, vec![(1000, 42.0)]);
             assert_eq!(v.len(), 1, "op {:?}", op);
-            assert_eq!(v[0].samples[0].value, 42.0, "op {:?}", op);
+            assert_eq!(v[0].values[0], 42.0, "op {:?}", op);
         }
         let v_count = run_over_time(OverTimeOp::Count, vec![(1000, 42.0)]);
-        assert_eq!(v_count[0].samples[0].value, 1.0);
+        assert_eq!(v_count[0].values[0], 1.0);
     }
 
     #[test]
@@ -2080,9 +1929,9 @@ mod tests {
         // and apply_call so a refactor of the dispatch table doesn't
         // silently regress.
         let v = run_over_time_call(OverTimeOp::Avg, vec![(0, 2.0), (1000, 4.0)]);
-        assert_eq!(v[0].samples[0].value, 3.0);
+        assert_eq!(v[0].values[0], 3.0);
         let v = run_over_time_call(OverTimeOp::Present, vec![(0, 1.0)]);
-        assert_eq!(v[0].samples[0].value, 1.0);
+        assert_eq!(v[0].values[0], 1.0);
         let v = run_over_time_call(OverTimeOp::Last, vec![(0, 7.0)]);
         // last preserves __name__.
         assert!(v[0].labels.iter().any(|(n, _)| n == "__name__"));
@@ -2117,7 +1966,7 @@ mod tests {
             vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)],
         );
         assert_eq!(v.len(), 1);
-        assert!((v[0].samples[0].value - 2.0).abs() < 1e-9, "got {}", v[0].samples[0].value);
+        assert!((v[0].values[0] - 2.0).abs() < 1e-9, "got {}", v[0].values[0]);
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
     }
 
@@ -2127,14 +1976,14 @@ mod tests {
             OverTimeOp::Stddev,
             vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)],
         );
-        assert!((v[0].samples[0].value - 2.0_f64.sqrt()).abs() < 1e-9);
+        assert!((v[0].values[0] - 2.0_f64.sqrt()).abs() < 1e-9);
     }
 
     #[test]
     fn stddev_over_time_constant_series_is_zero() {
         let v = run_over_time(OverTimeOp::Stddev, vec![(0, 7.0), (1, 7.0), (2, 7.0)]);
         // Negative round-off clamped to zero in compute_over_time.
-        assert!(v[0].samples[0].value.abs() < 1e-9);
+        assert!(v[0].values[0].abs() < 1e-9);
     }
 
     #[test]
@@ -2144,7 +1993,7 @@ mod tests {
             vec![(0, 1.0), (1, f64::NAN), (2, 5.0)],
         );
         // mean = 3, var = (1+25)/2 - 9 = 4 -> stddev 2.
-        assert!((v[0].samples[0].value - 2.0).abs() < 1e-9);
+        assert!((v[0].values[0] - 2.0).abs() < 1e-9);
     }
 
     fn run_quantile_over_time(phi: f64, samples: Vec<(i64, f64)>) -> Vec<Series> {
@@ -2167,7 +2016,7 @@ mod tests {
             0.5,
             vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)],
         );
-        assert!((v[0].samples[0].value - 3.0).abs() < 1e-9);
+        assert!((v[0].values[0] - 3.0).abs() < 1e-9);
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
     }
 
@@ -2175,18 +2024,18 @@ mod tests {
     fn quantile_over_time_max_at_one_min_at_zero() {
         let samples = vec![(0, 1.0), (1, 7.0), (2, 3.0)];
         let v1 = run_quantile_over_time(1.0, samples.clone());
-        assert_eq!(v1[0].samples[0].value, 7.0);
+        assert_eq!(v1[0].values[0], 7.0);
         let v0 = run_quantile_over_time(0.0, samples);
-        assert_eq!(v0[0].samples[0].value, 1.0);
+        assert_eq!(v0[0].values[0], 1.0);
     }
 
     #[test]
     fn quantile_over_time_clamps_phi() {
         let samples = vec![(0, 1.0), (1, 2.0)];
         let v_neg = run_quantile_over_time(-0.5, samples.clone());
-        assert_eq!(v_neg[0].samples[0].value, f64::NEG_INFINITY);
+        assert_eq!(v_neg[0].values[0], f64::NEG_INFINITY);
         let v_high = run_quantile_over_time(1.5, samples);
-        assert_eq!(v_high[0].samples[0].value, f64::INFINITY);
+        assert_eq!(v_high[0].values[0], f64::INFINITY);
     }
 
     fn run_predict_linear(samples: Vec<(i64, f64)>, t_secs: f64) -> Vec<Series> {
@@ -2215,7 +2064,7 @@ mod tests {
             10.0,
         );
         assert_eq!(v.len(), 1);
-        assert!((v[0].samples[0].value - 27.0).abs() < 1e-9, "got {}", v[0].samples[0].value);
+        assert!((v[0].values[0] - 27.0).abs() < 1e-9, "got {}", v[0].values[0]);
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
     }
 
@@ -2232,7 +2081,7 @@ mod tests {
         // time) is the predicted value. For y=2x+1 centered at the
         // last sample (x=2): y = 5 at x=2 -> in centered coordinates
         // intercept = 5.
-        assert!((v[0].samples[0].value - 5.0).abs() < 1e-9, "got {}", v[0].samples[0].value);
+        assert!((v[0].values[0] - 5.0).abs() < 1e-9, "got {}", v[0].values[0]);
     }
 
     #[test]
@@ -2267,7 +2116,7 @@ mod tests {
         assert_eq!(v.len(), 1);
         // Just a sanity check on the value: with v0=10, v1=20:
         // s0=10, b0=10. After v1=20: s1=0.5*20+0.5*(10+10)=20.
-        assert!((v[0].samples[0].value - 20.0).abs() < 1e-9);
+        assert!((v[0].values[0] - 20.0).abs() < 1e-9);
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
     }
 
@@ -2334,7 +2183,7 @@ mod tests {
         match apply_per_sample(vec![v], "abs", f64::abs).unwrap() {
             EvalResult::InstantVector(s) => {
                 assert_eq!(s.len(), 2);
-                assert!(s.iter().all(|x| x.samples[0].value >= 0.0));
+                assert!(s.iter().all(|x| x.values[0] >= 0.0));
                 // __name__ stripped.
                 assert!(s
                     .iter()
@@ -2361,8 +2210,8 @@ mod tests {
         ]);
         match apply_clamp(vec![v, EvalResult::Scalar(0.0), EvalResult::Scalar(10.0)]).unwrap() {
             EvalResult::InstantVector(s) => {
-                assert_eq!(s[0].samples[0].value.clamp(0.0, 10.0), s[0].samples[0].value);
-                let vals: Vec<f64> = s.iter().map(|x| x.samples[0].value).collect();
+                assert_eq!(s[0].values[0].clamp(0.0, 10.0), s[0].values[0]);
+                let vals: Vec<f64> = s.iter().map(|x| x.values[0]).collect();
                 assert!(vals.iter().all(|&v| (0.0..=10.0).contains(&v)));
             }
             other => panic!("unexpected: {other:?}"),
@@ -2377,7 +2226,7 @@ mod tests {
         )]);
         match apply_round(vec![v]).unwrap() {
             EvalResult::InstantVector(s) => {
-                let vals: Vec<f64> = s[0].samples.iter().map(|x| x.value).collect();
+                let vals: Vec<f64> = s[0].values.iter().copied().collect();
                 assert_eq!(vals, vec![2.0, 3.0, 3.0]);
             }
             other => panic!("unexpected: {other:?}"),
@@ -2417,7 +2266,7 @@ mod tests {
         ]);
         match apply_sort(vec![v], false).unwrap() {
             EvalResult::InstantVector(s) => {
-                let vals: Vec<f64> = s.iter().map(|x| x.samples[0].value).collect();
+                let vals: Vec<f64> = s.iter().map(|x| x.values[0]).collect();
                 assert_eq!(vals[0], 1.0);
                 assert_eq!(vals[1], 3.0);
                 assert!(vals[2].is_nan());
@@ -2434,7 +2283,7 @@ mod tests {
         )]);
         match apply_timestamp(vec![v]).unwrap() {
             EvalResult::InstantVector(s) => {
-                assert_eq!(s[0].samples[0].value, 12_345.0);
+                assert_eq!(s[0].values[0], 12_345.0);
                 assert!(s[0].labels.iter().all(|(n, _)| n != "__name__"));
             }
             other => panic!("unexpected: {other:?}"),
@@ -2451,7 +2300,7 @@ mod tests {
         )]);
         match apply_deriv(&EvalContext::default(), vec![v], None).unwrap() {
             EvalResult::InstantVector(s) => {
-                assert!((s[0].samples[0].value - 1.0).abs() < 1e-9);
+                assert!((s[0].values[0] - 1.0).abs() < 1e-9);
             }
             other => panic!("unexpected: {other:?}"),
         }
@@ -2465,7 +2314,7 @@ mod tests {
         )]);
         match apply_idelta(&EvalContext::default(), vec![v], None).unwrap() {
             EvalResult::InstantVector(s) => {
-                assert_eq!(s[0].samples[0].value, 7.0);
+                assert_eq!(s[0].values[0], 7.0);
             }
             other => panic!("unexpected: {other:?}"),
         }
@@ -2478,7 +2327,7 @@ mod tests {
             vec![(0, 1.0), (1000, 1.0), (2000, 2.0), (3000, 2.0), (4000, 3.0)],
         )]);
         match apply_changes(&EvalContext::default(), vec![v], None).unwrap() {
-            EvalResult::InstantVector(s) => assert_eq!(s[0].samples[0].value, 2.0),
+            EvalResult::InstantVector(s) => assert_eq!(s[0].values[0], 2.0),
             other => panic!("unexpected: {other:?}"),
         }
     }
@@ -2490,7 +2339,7 @@ mod tests {
             vec![(0, 5.0), (1000, 6.0), (2000, 1.0), (3000, 3.0), (4000, 0.0)],
         )]);
         match apply_resets(&EvalContext::default(), vec![v], None).unwrap() {
-            EvalResult::InstantVector(s) => assert_eq!(s[0].samples[0].value, 2.0),
+            EvalResult::InstantVector(s) => assert_eq!(s[0].values[0], 2.0),
             other => panic!("unexpected: {other:?}"),
         }
     }

@@ -113,14 +113,7 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
                             })
                         }
                     };
-                    let series = Series {
-                        labels: Vec::new(),
-                        signature: labels_signature(&[]),
-                        samples: vec![Sample {
-                            timestamp_ms: ctx.at_ms(),
-                            value: v,
-                        }],
-                    };
+                    let series = Series::scalar(Vec::new(), ctx.at_ms(), v);
                     return Ok(EvalResult::InstantVector(vec![series]));
                 }
                 _ => {}

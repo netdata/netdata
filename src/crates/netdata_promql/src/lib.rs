@@ -372,19 +372,12 @@ fn run_range_single_pass(
     let result = match r {
         EvalResult::Scalar(v) => {
             // Broadcast the scalar across the grid.
-            let samples: Vec<Sample> = grid
-                .timestamps
-                .iter()
-                .map(|&ts| Sample {
-                    timestamp_ms: ts,
-                    value: v,
-                })
-                .collect();
-            EvalResult::RangeVector(vec![Series {
-                labels: Vec::new(),
-                signature: 0,
-                samples,
-            }])
+            let values: Vec<f64> = vec![v; grid.len()];
+            EvalResult::RangeVector(vec![Series::new(
+                Vec::new(),
+                std::sync::Arc::clone(&grid.timestamps),
+                values,
+            )])
         }
         EvalResult::InstantVector(series) => EvalResult::RangeVector(series),
         EvalResult::RangeVector(_) => {

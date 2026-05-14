@@ -85,12 +85,7 @@ fn apply_replace(
             }
             Some(v) => set_label(s.labels, dst, &v),
         };
-        let signature = labels_signature(&new_labels);
-        out.push(Series {
-            labels: new_labels,
-            signature,
-            samples: s.samples,
-        });
+        out.push(Series::new(new_labels, s.timestamps, s.values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(out)
@@ -118,12 +113,7 @@ fn apply_join(series: Vec<Series>, dst: &str, sep: &str, srcs: &[String]) -> Vec
         } else {
             set_label(s.labels, dst, &joined)
         };
-        let signature = labels_signature(&new_labels);
-        out.push(Series {
-            labels: new_labels,
-            signature,
-            samples: s.samples,
-        });
+        out.push(Series::new(new_labels, s.timestamps, s.values));
     }
     out.sort_by_key(|s| s.signature);
     out
@@ -227,15 +217,7 @@ mod tests {
             .iter()
             .map(|(n, v)| (n.to_string(), v.to_string()))
             .collect();
-        let signature = labels_signature(&labels);
-        Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: 0,
-                value: 1.0,
-            }],
-        }
+        Series::scalar(labels, 0, 1.0)
     }
 
     #[test]

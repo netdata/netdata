@@ -6,12 +6,18 @@
 // query covers the full evaluation window; the per-grid-point latest-in-
 // lookback pick is a single sweep over the fetched samples (two-pointer
 // for vector selectors, no per-step storage I/O).
+//
+// SOW-0032: output is column-oriented. Vector selectors clone the grid's
+// shared `Arc<Vec<i64>>` for every emitted series; matrix selectors
+// build a fresh `Arc<Vec<i64>>` from each series' storage timestamps.
+
+use std::sync::Arc;
 
 use crate::plan::AtMod;
 use crate::storage::Matcher;
 
 use super::context::EvalContext;
-use super::types::{EvalError, EvalResult, Sample, Series};
+use super::types::{EvalError, EvalResult, Series};
 
 /// Resolve the `@` modifier (if any) against the current eval context.
 /// `AtMod::AtTs(ms)` -> `ms`; `Start` -> outer range start; `End` ->
@@ -28,10 +34,10 @@ fn resolve_at(ctx: &EvalContext, at: Option<&AtMod>) -> Option<i64> {
 /// Evaluate a `Plan::VectorSelect` across the eval grid.
 ///
 /// For each resolved series, produces a grid-aligned `Series` whose
-/// `samples` has length `grid.len()`. At grid point `t` the emitted
+/// values has length `grid.len()`. At grid point `t` the emitted
 /// value is the latest non-NaN sample with timestamp in
 /// `(t - lookback_ms, t]`, or `NaN` if no such sample exists (Prometheus
-/// staleness rule).
+/// staleness rule). All output series share `grid.timestamps` Arc.
 ///
 /// `offset_ms` shifts the lookback window leftward by that many ms.
 /// The `@` modifier, when present, pins every grid point to the
@@ -43,15 +49,8 @@ pub fn eval_vector_select(
     at: Option<&AtMod>,
 ) -> Result<EvalResult, EvalError> {
     let grid = &ctx.grid;
-
-    // When `@` pins the eval to a fixed timestamp, every grid point
-    // gets the same sample. Build a single-point fetch and broadcast.
     let pinned = resolve_at(ctx, at);
 
-    // Fetch window in milliseconds. For the grid case we fetch
-    // [grid.start - offset - lookback, grid.end - offset] in one shot.
-    // The shim works in whole seconds; rely on the precise-ms filter
-    // below to drop boundary-overshoot samples.
     let (fetch_after_ms, fetch_before_ms) = match pinned {
         Some(t) => (t - offset_ms - ctx.lookback_ms, t - offset_ms),
         None => (
@@ -84,63 +83,60 @@ pub fn eval_vector_select(
 
     let lookback_ms = ctx.lookback_ms;
     let mut out: Vec<Series> = Vec::with_capacity(q.len());
+    // Shared timestamps Arc for every output series. SOW-0032: this is
+    // the entire point of the column-oriented shape -- 100 series at
+    // 241 grid points share one 192-byte allocation instead of 100
+    // copies of the same column.
+    let grid_timestamps = Arc::clone(&grid.timestamps);
+
     for i in 0..q.len() {
         let Some(meta) = q.series_meta(i) else { continue };
         let Some(samples_iter) = q.open_samples(i, after_s, before_s, 0) else {
             continue;
         };
 
-        // Materialize the per-series sample list once. Iterator-based
-        // two-pointer is awkward when grid points can repeat samples
-        // (lookback windows overlap), so a Vec keeps the code simple
-        // and the allocation amortises against the single storage
-        // fetch we just did.
-        let samples: Vec<Sample> = samples_iter
-            .filter(|s| !s.value.is_nan())
-            .map(|s| Sample {
-                timestamp_ms: s.timestamp_ms,
-                value: s.value,
-            })
-            .collect();
-        if samples.is_empty() {
+        // Materialise the per-series storage samples once in column
+        // form. The two-pointer scan below indexes into these two
+        // slices; iterator-based two-pointer is awkward when grid
+        // points can repeat samples (lookback windows overlap).
+        let mut timestamps_buf: Vec<i64> = Vec::new();
+        let mut values_buf: Vec<f64> = Vec::new();
+        for s in samples_iter {
+            if s.value.is_nan() {
+                continue;
+            }
+            timestamps_buf.push(s.timestamp_ms);
+            values_buf.push(s.value);
+        }
+        if values_buf.is_empty() {
             continue;
         }
 
-        let out_samples: Vec<Sample> = if let Some(t) = pinned {
+        let out_values: Vec<f64> = if let Some(t) = pinned {
             // `@`-pinned: pick once, broadcast to every grid point.
-            let picked = pick_latest_in_window(
-                &samples,
+            let value = pick_latest_in_window(
+                &timestamps_buf,
+                &values_buf,
                 t.saturating_sub(offset_ms).saturating_sub(lookback_ms),
                 t.saturating_sub(offset_ms),
-            );
-            let value = picked.unwrap_or(f64::NAN);
-            grid.timestamps
-                .iter()
-                .map(|&ts| Sample {
-                    timestamp_ms: ts,
-                    value,
-                })
-                .collect()
+            )
+            .unwrap_or(f64::NAN);
+            vec![value; grid.len()]
         } else {
-            // Grid-aligned: two-pointer scan over samples to find the
-            // latest in window for each grid timestamp. Both the grid
-            // and the samples are monotonically non-decreasing, so the
-            // scan is O(n + g).
-            grid_aligned_lookback(&samples, &grid.timestamps, offset_ms, lookback_ms)
+            grid_aligned_lookback(
+                &timestamps_buf,
+                &values_buf,
+                &grid.timestamps,
+                offset_ms,
+                lookback_ms,
+            )
         };
 
-        // If every emitted sample is NaN, drop the series entirely.
-        // Matches the "no qualifying sample, no output" rule from the
-        // pre-SOW-0031 evaluator.
-        if out_samples.iter().all(|s| s.value.is_nan()) {
+        if out_values.iter().all(|v| v.is_nan()) {
             continue;
         }
 
-        out.push(Series {
-            labels: meta.labels,
-            signature: meta.signature,
-            samples: out_samples,
-        });
+        out.push(Series::new(meta.labels, Arc::clone(&grid_timestamps), out_values));
     }
 
     out.sort_by_key(|s| s.signature);
@@ -149,15 +145,15 @@ pub fn eval_vector_select(
 
 /// Single-pass two-pointer lookback. For each grid timestamp `t[i]`,
 /// pick the latest non-NaN sample with timestamp in `(t - offset -
-/// lookback, t - offset]`. Returns one `Sample` per grid timestamp
-/// stamped at the grid time (Prometheus stamps the evaluation time,
-/// not the underlying sample time).
+/// lookback, t - offset]`. Returns a `Vec<f64>` aligned to the grid;
+/// the caller stamps with grid timestamps.
 fn grid_aligned_lookback(
-    samples: &[Sample],
+    timestamps: &[i64],
+    values: &[f64],
     grid_ts: &[i64],
     offset_ms: i64,
     lookback_ms: i64,
-) -> Vec<Sample> {
+) -> Vec<f64> {
     let mut out = Vec::with_capacity(grid_ts.len());
     let mut idx: usize = 0;
     let mut current: Option<f64> = None;
@@ -165,25 +161,17 @@ fn grid_aligned_lookback(
     for &g in grid_ts {
         let upper = g.saturating_sub(offset_ms);
         let lower = upper.saturating_sub(lookback_ms);
-        // Advance idx past every sample with ts <= upper, keeping the
-        // most recent in `current`. Samples below `lower` will be
-        // evicted on the next grid point's lower-bound check below.
-        while idx < samples.len() && samples[idx].timestamp_ms <= upper {
-            current = Some(samples[idx].value);
-            current_ts = samples[idx].timestamp_ms;
+        while idx < timestamps.len() && timestamps[idx] <= upper {
+            current = Some(values[idx]);
+            current_ts = timestamps[idx];
             idx += 1;
         }
-        // Evict if the latest seen is no longer within the lookback
-        // window for this grid point.
         let value = if current.is_some() && current_ts > lower {
             current.unwrap()
         } else {
             f64::NAN
         };
-        out.push(Sample {
-            timestamp_ms: g,
-            value,
-        });
+        out.push(value);
     }
     out
 }
@@ -191,16 +179,21 @@ fn grid_aligned_lookback(
 /// Linear scan to find the latest sample with timestamp in
 /// `(lower_ms, upper_ms]`. Used only for the `@`-pinned single-point
 /// path.
-fn pick_latest_in_window(samples: &[Sample], lower_ms: i64, upper_ms: i64) -> Option<f64> {
+fn pick_latest_in_window(
+    timestamps: &[i64],
+    values: &[f64],
+    lower_ms: i64,
+    upper_ms: i64,
+) -> Option<f64> {
     let mut picked: Option<f64> = None;
-    for s in samples {
-        if s.timestamp_ms <= lower_ms {
+    for (i, &ts) in timestamps.iter().enumerate() {
+        if ts <= lower_ms {
             continue;
         }
-        if s.timestamp_ms > upper_ms {
+        if ts > upper_ms {
             break;
         }
-        picked = Some(s.value);
+        picked = Some(values[i]);
     }
     picked
 }
@@ -209,13 +202,11 @@ fn pick_latest_in_window(samples: &[Sample], lower_ms: i64, upper_ms: i64) -> Op
 ///
 /// Returns a RangeVector spanning the full extended window
 /// `[grid.start_ms - range_ms - offset_ms, grid.end_ms - offset_ms]`.
-/// The downstream rollup uses two-pointer windowing over this sample
-/// pool to emit one value per grid point.
-///
-/// SOW-0031 keeps the `EvalResult::RangeVector` shape unchanged; the
-/// rollup functions know the range width because the dispatch layer
-/// pulls it out of the Plan::MatrixSelect node and threads it through
-/// `apply_call`.
+/// Each series carries its own `Arc<Vec<i64>>` of storage timestamps;
+/// no sharing across series because storage samples are not grid-
+/// aligned and timestamps differ per series. The downstream rollup uses
+/// two-pointer windowing over this sample pool to emit one value per
+/// grid point.
 pub fn eval_matrix_select(
     ctx: &EvalContext,
     matchers: &[Matcher],
@@ -226,7 +217,6 @@ pub fn eval_matrix_select(
     let grid = &ctx.grid;
     let pinned = resolve_at(ctx, at);
 
-    // Fetch window: covers all per-grid-point matrix windows.
     let (fetch_after_ms, fetch_before_ms) = match pinned {
         Some(t) => (
             t.saturating_sub(offset_ms).saturating_sub(range_ms),
@@ -269,23 +259,23 @@ pub fn eval_matrix_select(
         let Some(samples_iter) = q.open_samples(i, after_s, before_s, 0) else {
             continue;
         };
-        let samples: Vec<Sample> = samples_iter
-            .filter(|s| !s.value.is_nan())
-            .filter(|s| s.timestamp_ms >= fetch_after_ms && s.timestamp_ms <= fetch_before_ms)
-            .map(|s| Sample {
-                timestamp_ms: s.timestamp_ms,
-                value: s.value,
-            })
-            .collect();
+        let mut timestamps: Vec<i64> = Vec::new();
+        let mut values: Vec<f64> = Vec::new();
+        for s in samples_iter {
+            if s.value.is_nan() {
+                continue;
+            }
+            if s.timestamp_ms < fetch_after_ms || s.timestamp_ms > fetch_before_ms {
+                continue;
+            }
+            timestamps.push(s.timestamp_ms);
+            values.push(s.value);
+        }
 
-        if samples.is_empty() {
+        if values.is_empty() {
             continue;
         }
-        out.push(Series {
-            labels: meta.labels,
-            signature: meta.signature,
-            samples,
-        });
+        out.push(Series::new(meta.labels, Arc::new(timestamps), values));
     }
 
     out.sort_by_key(|s| s.signature);

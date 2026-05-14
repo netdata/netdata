@@ -134,21 +134,30 @@ fn scalar_vec(
     return_bool: bool,
 ) -> EvalResult {
     let mut out = Vec::with_capacity(vec.len());
-    'series: for mut s in vec.into_iter() {
-        for sample in &mut s.samples {
+    for mut s in vec.into_iter() {
+        let mut kept_any = false;
+        for v in s.values.iter_mut() {
             let (lhs, rhs) = if scalar_on_left {
-                (scalar, sample.value)
+                (scalar, *v)
             } else {
-                (sample.value, scalar)
+                (*v, scalar)
             };
             if op.is_comparison() && !return_bool {
                 if !cmp(op, lhs, rhs) {
-                    continue 'series;
+                    *v = f64::NAN;
+                } else {
+                    *v = if scalar_on_left { rhs } else { lhs };
+                    kept_any = true;
                 }
-                sample.value = if scalar_on_left { rhs } else { lhs };
             } else {
-                sample.value = apply_op_or_bool(op, lhs, rhs, return_bool);
+                *v = apply_op_or_bool(op, lhs, rhs, return_bool);
+                kept_any = true;
             }
+        }
+        // Comparison-as-filter that hits at no grid position drops
+        // the series. Arithmetic and bool comparison always keep.
+        if op.is_comparison() && !return_bool && !kept_any {
+            continue;
         }
         out.push(s);
     }
@@ -246,14 +255,14 @@ fn vec_vec_many_to_one(
         let Some(one_series) = one_by_key.get(&key) else {
             continue;
         };
-        // Compute samples in operator positional order (lhs first).
+        // Compute values in operator positional order (lhs first).
         // group_left: many=lhs, one=rhs; group_right: one=lhs, many=rhs.
-        let (lhs_samples, rhs_samples) = if one_on_right {
-            (&many_series.samples, &one_series.samples)
+        let (lhs_values, rhs_values) = if one_on_right {
+            (&many_series.values, &one_series.values)
         } else {
-            (&one_series.samples, &many_series.samples)
+            (&one_series.values, &many_series.values)
         };
-        let Some(samples) = pair_samples(op, return_bool, lhs_samples, rhs_samples) else {
+        let Some(values) = pair_values(op, return_bool, lhs_values, rhs_values) else {
             continue;
         };
         // Label source: always the many side; include labels from the
@@ -272,58 +281,54 @@ fn vec_vec_many_to_one(
                 }
             }
         }
-        let signature = labels_signature(&labels);
-        out.push(Series {
-            labels,
-            signature,
-            samples,
-        });
+        // Output series inherits the many-side's timestamps Arc.
+        let timestamps = std::sync::Arc::clone(&many_series.timestamps);
+        out.push(Series::new(labels, timestamps, values));
     }
     out.sort_by_key(|s| s.signature);
     Ok(EvalResult::InstantVector(out))
 }
 
-/// Apply the binop element-wise to two sample series, returning either
-/// the resulting sample vector or `None` if the result is empty under
-/// comparison-as-filter semantics.
-fn pair_samples(
+/// Apply the binop element-wise to two value vectors, returning either
+/// the resulting `Vec<f64>` (grid-aligned, NaN where comparison-as-
+/// filter rejects) or `None` if every position fell out under
+/// comparison-as-filter semantics. Arithmetic always returns `Some`.
+fn pair_values(
     op: BinopKind,
     return_bool: bool,
-    lhs: &[Sample],
-    rhs: &[Sample],
-) -> Option<Vec<Sample>> {
+    lhs: &[f64],
+    rhs: &[f64],
+) -> Option<Vec<f64>> {
     let n = lhs.len().min(rhs.len());
-    let mut samples = Vec::with_capacity(n);
-    let mut keep = false;
+    let mut values = Vec::with_capacity(n);
+    let mut kept_any = false;
     for i in 0..n {
-        let a = lhs[i].value;
-        let b = rhs[i].value;
-        let ts = lhs[i].timestamp_ms;
+        let a = lhs[i];
+        let b = rhs[i];
         if op.is_comparison() && !return_bool {
-            if !cmp(op, a, b) {
-                continue;
+            if cmp(op, a, b) {
+                values.push(a);
+                kept_any = true;
+            } else {
+                values.push(f64::NAN);
             }
-            samples.push(Sample { timestamp_ms: ts, value: a });
-            keep = true;
         } else {
-            samples.push(Sample {
-                timestamp_ms: ts,
-                value: apply_op_or_bool(op, a, b, return_bool),
-            });
-            keep = true;
+            values.push(apply_op_or_bool(op, a, b, return_bool));
+            kept_any = true;
         }
     }
-    if keep {
-        Some(samples)
+    if kept_any {
+        Some(values)
     } else {
         None
     }
 }
 
 /// Build a single output series from a matched lhs/rhs pair. Returns
-/// `None` for the comparison-as-filter case when the comparison fails.
-/// `include` is the `group_left(...)` / `group_right(...)` label list;
-/// these labels are copied from `rhs_series` onto the result.
+/// `None` for the comparison-as-filter case when no grid position kept
+/// a value. `include` is the `group_left(...)` / `group_right(...)`
+/// label list; these labels are copied from `rhs_series` onto the
+/// result. The output series shares the lhs's timestamps Arc.
 fn combine_pair(
     op: BinopKind,
     return_bool: bool,
@@ -331,30 +336,7 @@ fn combine_pair(
     rhs_series: &Series,
     include: &[String],
 ) -> Option<Series> {
-    let n = lhs_series.samples.len().min(rhs_series.samples.len());
-    let mut samples = Vec::with_capacity(n);
-    let mut keep = false;
-    for i in 0..n {
-        let a = lhs_series.samples[i].value;
-        let b = rhs_series.samples[i].value;
-        let ts = lhs_series.samples[i].timestamp_ms;
-        if op.is_comparison() && !return_bool {
-            if !cmp(op, a, b) {
-                continue;
-            }
-            samples.push(Sample { timestamp_ms: ts, value: a });
-            keep = true;
-        } else {
-            samples.push(Sample {
-                timestamp_ms: ts,
-                value: apply_op_or_bool(op, a, b, return_bool),
-            });
-            keep = true;
-        }
-    }
-    if !keep {
-        return None;
-    }
+    let values = pair_values(op, return_bool, &lhs_series.values, &rhs_series.values)?;
 
     // Result labels: start from lhs, drop __name__ for arithmetic,
     // then add include labels from rhs.
@@ -364,7 +346,6 @@ fn combine_pair(
     }
     for inc in include {
         if let Some((_, v)) = rhs_series.labels.iter().find(|(n, _)| n == inc) {
-            // Replace existing if present, otherwise append.
             if let Some(slot) = labels.iter_mut().find(|(n, _)| n == inc) {
                 slot.1 = v.clone();
             } else {
@@ -372,12 +353,7 @@ fn combine_pair(
             }
         }
     }
-    let signature = labels_signature(&labels);
-    Some(Series {
-        labels,
-        signature,
-        samples,
-    })
+    Some(Series::new(labels, lhs_series.timestamps, values))
 }
 
 // ---------------------------------------------------------------------------
@@ -485,15 +461,7 @@ mod tests {
 
     fn instant(label: &str, val: f64) -> Series {
         let labels = vec![("__name__".to_string(), label.to_string())];
-        let signature = labels_signature(&labels);
-        Series {
-            labels,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: 1000,
-                value: val,
-            }],
-        }
+        Series::scalar(labels, 1000, val)
     }
 
     fn s_with(labels: Vec<(&str, &str)>, val: f64) -> Series {
@@ -501,15 +469,7 @@ mod tests {
             .into_iter()
             .map(|(n, v)| (n.to_string(), v.to_string()))
             .collect();
-        let signature = labels_signature(&owned);
-        Series {
-            labels: owned,
-            signature,
-            samples: vec![Sample {
-                timestamp_ms: 1000,
-                value: val,
-            }],
-        }
+        Series::scalar(owned, 1000, val)
     }
 
     #[test]
@@ -546,7 +506,7 @@ mod tests {
         match r {
             EvalResult::InstantVector(vs) => {
                 assert_eq!(vs.len(), 1);
-                assert!((vs[0].samples[0].value - 8.0).abs() < 1e-9);
+                assert!((vs[0].values[0] - 8.0).abs() < 1e-9);
             }
             _ => panic!(),
         }
@@ -601,7 +561,7 @@ mod tests {
         match r {
             EvalResult::InstantVector(vs) => {
                 assert_eq!(vs.len(), 1);
-                assert!((vs[0].samples[0].value - 5.0).abs() < 1e-9);
+                assert!((vs[0].values[0] - 5.0).abs() < 1e-9);
                 // Arithmetic drops __name__.
                 assert!(vs[0].labels.iter().all(|(n, _)| n != "__name__"));
             }
@@ -625,7 +585,7 @@ mod tests {
         match r {
             EvalResult::InstantVector(vs) => {
                 assert_eq!(vs.len(), 1);
-                assert!((vs[0].samples[0].value - 5.0).abs() < 1e-9);
+                assert!((vs[0].values[0] - 5.0).abs() < 1e-9);
             }
             _ => panic!(),
         }
@@ -700,7 +660,7 @@ mod tests {
                     assert!(meta.is_some(), "missing meta on {:?}", s.labels);
                     assert_eq!(meta.unwrap().1, "x");
                 }
-                let values: Vec<f64> = vs.iter().map(|s| s.samples[0].value).collect();
+                let values: Vec<f64> = vs.iter().map(|s| s.values[0]).collect();
                 assert!(values.contains(&20.0) && values.contains(&40.0));
             }
             _ => panic!(),
@@ -820,7 +780,7 @@ mod tests {
                     .iter()
                     .find(|s| s.labels.iter().any(|(n, v)| n == "x" && v == "1"))
                     .unwrap();
-                assert_eq!(one.samples[0].value, 1.0);
+                assert_eq!(one.values[0], 1.0);
             }
             _ => panic!(),
         }

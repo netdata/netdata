@@ -16,7 +16,7 @@
 // point?".
 
 use super::context::EvalContext;
-use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
+use super::types::{EvalError, EvalResult, Series};
 
 pub fn eval_absent(
     ctx: &EvalContext,
@@ -41,11 +41,8 @@ pub fn eval_absent(
         }
         EvalResult::InstantVector(series) => {
             for s in series {
-                for (i, sm) in s.samples.iter().enumerate() {
-                    if i >= n {
-                        break;
-                    }
-                    if !sm.value.is_nan() {
+                for i in 0..s.values.len().min(n) {
+                    if !s.values[i].is_nan() {
                         present[i] = true;
                     }
                 }
@@ -62,43 +59,36 @@ pub fn eval_absent(
             // mark every grid point as present. Refining this needs the
             // same range_ms threading that the rollup family uses --
             // tracked as a follow-up.
-            let any_present = series.iter().any(|s| s.samples.iter().any(|x| !x.value.is_nan()));
+            let any_present = series.iter().any(|s| s.values.iter().any(|v| !v.is_nan()));
             if any_present {
                 return Ok(EvalResult::InstantVector(Vec::new()));
             }
         }
     }
 
-    // Build the output samples. A grid point is "absent" when present[i]
+    // Build the output values. A grid point is "absent" when present[i]
     // is false; emit 1 there. Present points emit NaN.
     let mut absent_count = 0usize;
-    let samples: Vec<Sample> = (0..n)
+    let values: Vec<f64> = (0..n)
         .map(|i| {
-            let value = if present[i] {
+            if present[i] {
                 f64::NAN
             } else {
                 absent_count += 1;
                 1.0
-            };
-            Sample {
-                timestamp_ms: grid.timestamps[i],
-                value,
             }
         })
         .collect();
 
-    // If no grid point was absent, emit no series.
     if absent_count == 0 {
         return Ok(EvalResult::InstantVector(Vec::new()));
     }
 
-    let labels: Vec<(String, String)> = labels.to_vec();
-    let signature = labels_signature(&labels);
-    Ok(EvalResult::InstantVector(vec![Series {
-        labels,
-        signature,
-        samples,
-    }]))
+    Ok(EvalResult::InstantVector(vec![Series::new(
+        labels.to_vec(),
+        std::sync::Arc::clone(&grid.timestamps),
+        values,
+    )]))
 }
 
 #[cfg(test)]
@@ -130,8 +120,8 @@ mod tests {
         match result {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
-                assert_eq!(v[0].samples[0].value, 1.0);
-                assert_eq!(v[0].samples[0].timestamp_ms, 1000);
+                assert_eq!(v[0].values[0], 1.0);
+                assert_eq!(v[0].timestamps[0], 1000);
                 assert_eq!(v[0].labels.len(), 2);
             }
             other => panic!("unexpected: {other:?}"),
@@ -140,14 +130,7 @@ mod tests {
 
     #[test]
     fn non_empty_inner_emits_nothing() {
-        let inner = EvalResult::InstantVector(vec![Series {
-            labels: vec![],
-            signature: 0,
-            samples: vec![Sample {
-                timestamp_ms: 0,
-                value: 1.0,
-            }],
-        }]);
+        let inner = EvalResult::InstantVector(vec![Series::scalar(vec![], 0, 1.0)]);
         let result = eval_absent(&ctx(0), &[], inner).unwrap();
         match result {
             EvalResult::InstantVector(v) => assert!(v.is_empty()),
@@ -166,7 +149,7 @@ mod tests {
         match result {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
-                assert_eq!(v[0].samples[0].timestamp_ms, 2000);
+                assert_eq!(v[0].timestamps[0], 2000);
             }
             other => panic!("unexpected: {other:?}"),
         }

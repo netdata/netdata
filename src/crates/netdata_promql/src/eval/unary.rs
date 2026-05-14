@@ -17,8 +17,8 @@ pub fn negate(r: EvalResult) -> EvalResult {
 }
 
 fn negate_series(mut s: Series) -> Series {
-    for sample in &mut s.samples {
-        sample.value = -sample.value;
+    for v in s.values.iter_mut() {
+        *v = -*v;
     }
     s
 }
