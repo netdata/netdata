@@ -497,26 +497,44 @@ void ml_init()
     // prior session: rename the corrupt ml.db to ml.db.bad and drop the WAL
     // siblings so sqlite3_open recreates a fresh DB. No .recover variant --
     // ml.db only holds k-means models and is cheap to rebuild.
+    // The sentinel is removed ONLY after the rename succeeds, so a failure
+    // (permission, FS error, Windows refusing to overwrite an existing
+    // ml.db.bad) leaves the sentinel in place to retry on the next start.
     char sentinel[FILENAME_MAX + 1];
     snprintfz(sentinel, FILENAME_MAX, "%s/.ml.db.delete", netdata_configured_cache_dir);
-    if (unlink(sentinel) == 0) {
+    if (access(sentinel, F_OK) == 0) {
         char bad_path[FILENAME_MAX + 1];
         snprintfz(bad_path, FILENAME_MAX, "%s/ml.db.bad", netdata_configured_cache_dir);
-        if (rename(path, bad_path) == 0) {
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "ML: quarantined corrupt %s as %s; a fresh ml.db will be created. "
-                   "Inspect or remove the .bad file manually.",
-                   path, bad_path);
-        } else if (errno != ENOENT) {
+
+        // If a prior ml.db.bad still exists (operator hasn't cleaned it),
+        // rotate to a unique timestamped suffix so rename() doesn't fail on
+        // overwrite -- POSIX allows overwrite but Windows does not.
+        if (access(bad_path, F_OK) == 0)
+            snprintfz(bad_path, FILENAME_MAX, "%s/ml.db.bad.%lld",
+                      netdata_configured_cache_dir, (long long) now_realtime_sec());
+
+        int rename_rc = rename(path, bad_path);
+        if (rename_rc == 0 || (rename_rc == -1 && errno == ENOENT)) {
+            // Quarantine succeeded, or there was nothing to quarantine
+            // (ml.db didn't exist). Either way, safe to consume the sentinel
+            // and clean up the WAL/SHM siblings.
+            (void) unlink(sentinel);
+            char wal_path[FILENAME_MAX + 1];
+            snprintfz(wal_path, FILENAME_MAX, "%s-wal", path);
+            (void) unlink(wal_path);
+            snprintfz(wal_path, FILENAME_MAX, "%s-shm", path);
+            (void) unlink(wal_path);
+            if (rename_rc == 0) {
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "ML: quarantined corrupt %s as %s; a fresh ml.db will be created. "
+                       "Inspect or remove the .bad file manually.",
+                       path, bad_path);
+            }
+        } else {
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "ML: failed to rename %s to %s (errno=%d); leaving as-is.",
-                   path, bad_path, errno);
+                   "ML: failed to quarantine %s to %s (errno=%d); leaving sentinel %s in place to retry on next start.",
+                   path, bad_path, errno, sentinel);
         }
-        char wal_path[FILENAME_MAX + 1];
-        snprintfz(wal_path, FILENAME_MAX, "%s-wal", path);
-        (void) unlink(wal_path);
-        snprintfz(wal_path, FILENAME_MAX, "%s-shm", path);
-        (void) unlink(wal_path);
     }
 
     int rc = sqlite3_open(path, &ml_db);

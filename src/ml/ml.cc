@@ -570,9 +570,19 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (unlikely(rc != SQLITE_OK && rc != step_rc))
         error_report("Failed to %s statement when loading models, rc = %d", active_stmt ? "reset" : "finalize", rc);
 
-    // trip skip_models in metadata_scan_host so we stop hammering the bad DB
-    if (ml_db_mark_if_corrupt(step_rc))
+    // On corruption: discard whatever partial rows the step loop managed to
+    // pull from the bad DB and put the dimension back into UNTRAINED. The
+    // training-enqueue gate in ml_public.cc only requeues UNTRAINED dims, so
+    // leaving ts=TRAINED with a partial km_contexts locks the dim onto stale
+    // models until the next agent restart. Also trips skip_models in
+    // metadata_scan_host so we stop hammering the bad DB.
+    if (ml_db_mark_if_corrupt(step_rc)) {
+        spinlock_lock(&dim->slock);
+        dim->km_contexts.clear();
+        dim->ts = TRAINING_STATUS_UNTRAINED;
+        spinlock_unlock(&dim->slock);
         return 1;
+    }
 
     return 0;
 
@@ -1309,8 +1319,13 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
         rc = db_execute(ml_db, "COMMIT TRANSACTION;", NULL);
     }
 
+    // If corruption was detected mid-loop (add/delete/prune set ml_db_unusable
+    // before returning), skip rollback and vacuum -- the DB is already flagged
+    // and will be quarantined at next restart; further SQL only spams errors.
+    bool became_unusable = __atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED);
+
     // rollback transaction on failure
-    if (rc) {
+    if (rc && !became_unusable) {
         netdata_log_error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
         op_no++;
         rc = db_execute(ml_db, "ROLLBACK;", NULL);
@@ -1323,7 +1338,8 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
         worker->num_models_to_prune += worker->pending_model_info.size();
     }
 
-    vacuum_database(ml_db, "ML", 0, 0, &next_vacuum_run);
+    if (likely(!became_unusable))
+        vacuum_database(ml_db, "ML", 0, 0, &next_vacuum_run);
 
     worker->pending_model_info.clear();
 }
