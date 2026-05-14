@@ -194,6 +194,34 @@ pub enum FuncKind {
     QuantileOverTime,
     PredictLinear,
     HoltWinters,
+    // SOW-0027 Group A: per-sample math transforms on instant vectors.
+    Abs,
+    Ceil,
+    Floor,
+    Sgn,
+    Ln,
+    Log2,
+    Log10,
+    Exp,
+    Sqrt,
+    // SOW-0027 Group B: bounded transforms / rounding.
+    Clamp,
+    ClampMin,
+    ClampMax,
+    Round,
+    // SOW-0027 Group C: vector restructuring.
+    Vector,
+    Scalar,
+    Sort,
+    SortDesc,
+    // SOW-0027 Group D: timestamp / time.
+    Time,
+    Timestamp,
+    // SOW-0027 Group E: range-vector reductions.
+    Deriv,
+    IDelta,
+    Changes,
+    Resets,
 }
 
 impl FuncKind {
@@ -216,13 +244,68 @@ impl FuncKind {
             "quantile_over_time" => FuncKind::QuantileOverTime,
             "predict_linear" => FuncKind::PredictLinear,
             "holt_winters" => FuncKind::HoltWinters,
+            // SOW-0027.
+            "abs" => FuncKind::Abs,
+            "ceil" => FuncKind::Ceil,
+            "floor" => FuncKind::Floor,
+            "sgn" => FuncKind::Sgn,
+            "ln" => FuncKind::Ln,
+            "log2" => FuncKind::Log2,
+            "log10" => FuncKind::Log10,
+            "exp" => FuncKind::Exp,
+            "sqrt" => FuncKind::Sqrt,
+            "clamp" => FuncKind::Clamp,
+            "clamp_min" => FuncKind::ClampMin,
+            "clamp_max" => FuncKind::ClampMax,
+            "round" => FuncKind::Round,
+            "vector" => FuncKind::Vector,
+            "scalar" => FuncKind::Scalar,
+            "sort" => FuncKind::Sort,
+            "sort_desc" => FuncKind::SortDesc,
+            "time" => FuncKind::Time,
+            "timestamp" => FuncKind::Timestamp,
+            "deriv" => FuncKind::Deriv,
+            "idelta" => FuncKind::IDelta,
+            "changes" => FuncKind::Changes,
+            "resets" => FuncKind::Resets,
             _ => return None,
         })
     }
 
     pub fn return_type(self) -> ValueType {
-        ValueType::InstantVector
+        match self {
+            // `scalar(v)` is the one function whose return type is
+            // genuinely scalar rather than instant vector. `time()`
+            // is also scalar at the language level but Prometheus
+            // represents it as a scalar -- we match.
+            FuncKind::Scalar | FuncKind::Time => ValueType::Scalar,
+            _ => ValueType::InstantVector,
+        }
     }
+}
+
+/// Label-mutation kind. SOW-0027 Group F. Carried by `Plan::LabelOp`
+/// rather than being a regular `FuncKind` because the operator takes
+/// string-literal arguments (not lowerable Plans), and the lowering
+/// layer pre-extracts them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LabelOpKind {
+    /// `label_replace(v, dst, repl, src, regex)`. The regex is
+    /// anchored to the full label value; capture groups `$1`, `$2`,
+    /// etc. expand inside `replacement`.
+    Replace {
+        dst: String,
+        replacement: String,
+        src: String,
+        regex: String,
+    },
+    /// `label_join(v, dst, sep, src1, src2, ...)`. Concatenates the
+    /// listed source label values with `sep` into `dst`.
+    Join {
+        dst: String,
+        sep: String,
+        srcs: Vec<String>,
+    },
 }
 
 /// The Plan IR.
@@ -314,6 +397,24 @@ pub enum Plan {
         offset_ms: i64,
         at: Option<AtMod>,
     },
+
+    /// `label_replace` / `label_join` (SOW-0027 Group F). Carries the
+    /// pre-extracted string args alongside the input expression.
+    LabelOp {
+        op: LabelOpKind,
+        expr: Arc<Plan>,
+    },
+
+    /// `absent(v)` / `absent_over_time(v[w])` (SOW-0027 Group G). When
+    /// the inner returns empty, emits a single series with `labels`
+    /// taken from the inner's static `=` matchers (when the inner is
+    /// a vector/matrix selector) or an empty label set (when the
+    /// inner is a more complex expression). The evaluator decides
+    /// instant-vs-range based on `expr.value_type()`.
+    Absent {
+        labels: Vec<(String, String)>,
+        expr: Arc<Plan>,
+    },
 }
 
 impl Plan {
@@ -327,6 +428,8 @@ impl Plan {
             Plan::Aggregate { .. } => ValueType::InstantVector,
             Plan::Call { func, .. } => func.return_type(),
             Plan::Subquery { .. } => ValueType::RangeVector,
+            Plan::LabelOp { .. } => ValueType::InstantVector,
+            Plan::Absent { .. } => ValueType::InstantVector,
         }
     }
 }

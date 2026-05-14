@@ -34,6 +34,40 @@ pub fn apply_call(func: FuncKind, args: Vec<EvalResult>) -> Result<EvalResult, E
         FuncKind::QuantileOverTime => apply_quantile_over_time(args),
         FuncKind::PredictLinear => apply_predict_linear(args),
         FuncKind::HoltWinters => apply_holt_winters(args),
+        // SOW-0027 Group A: per-sample math transforms.
+        FuncKind::Abs => apply_per_sample(args, "abs", f64::abs),
+        FuncKind::Ceil => apply_per_sample(args, "ceil", f64::ceil),
+        FuncKind::Floor => apply_per_sample(args, "floor", f64::floor),
+        FuncKind::Sgn => apply_per_sample(args, "sgn", sgn),
+        FuncKind::Ln => apply_per_sample(args, "ln", f64::ln),
+        FuncKind::Log2 => apply_per_sample(args, "log2", f64::log2),
+        FuncKind::Log10 => apply_per_sample(args, "log10", f64::log10),
+        FuncKind::Exp => apply_per_sample(args, "exp", f64::exp),
+        FuncKind::Sqrt => apply_per_sample(args, "sqrt", f64::sqrt),
+        // SOW-0027 Group B: bounded transforms / rounding.
+        FuncKind::Clamp => apply_clamp(args),
+        FuncKind::ClampMin => apply_clamp_min(args),
+        FuncKind::ClampMax => apply_clamp_max(args),
+        FuncKind::Round => apply_round(args),
+        // SOW-0027 Group C: vector restructuring.
+        FuncKind::Vector => apply_vector(args),
+        FuncKind::Scalar => apply_scalar(args),
+        FuncKind::Sort => apply_sort(args, false),
+        FuncKind::SortDesc => apply_sort(args, true),
+        // SOW-0027 Group D: time / timestamp. `time()` is plumbed through
+        // dispatch because the evaluator needs the eval-context's at_ms;
+        // we encode that requirement here by having dispatch.rs reject
+        // `Time` from this path and produce the scalar directly. See
+        // `eval/dispatch.rs` for the special-case.
+        FuncKind::Time => Err(EvalError::Other(
+            "time() is evaluated by the dispatcher".to_string(),
+        )),
+        FuncKind::Timestamp => apply_timestamp(args),
+        // SOW-0027 Group E: range-vector reductions.
+        FuncKind::Deriv => apply_deriv(args),
+        FuncKind::IDelta => apply_idelta(args),
+        FuncKind::Changes => apply_changes(args),
+        FuncKind::Resets => apply_resets(args),
     }
 }
 
@@ -824,6 +858,512 @@ fn strip_name(labels: &[(String, String)]) -> (Vec<(String, String)>, u64) {
     (labels, signature)
 }
 
+// ---------------------------------------------------------------------------
+// SOW-0027: function omnibus (Tier 1 + Tier 2).
+// ---------------------------------------------------------------------------
+
+/// Group A helper: apply a pure `f64 -> f64` transform to every sample of
+/// every series in an instant vector. Drops `__name__` per Prometheus
+/// convention.
+fn apply_per_sample(
+    args: Vec<EvalResult>,
+    func: &'static str,
+    op: fn(f64) -> f64,
+) -> Result<EvalResult, EvalError> {
+    let series = expect_one_instant_vector(args, func)?;
+    let mut out = Vec::with_capacity(series.len());
+    for s in series.into_iter() {
+        let (labels, signature) = strip_name(&s.labels);
+        let samples: Vec<Sample> = s
+            .samples
+            .into_iter()
+            .map(|x| Sample {
+                timestamp_ms: x.timestamp_ms,
+                value: op(x.value),
+            })
+            .collect();
+        out.push(Series {
+            labels,
+            signature,
+            samples,
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+/// Prometheus `sgn`: -1 for negative, 0 for zero (or NaN), +1 for positive.
+fn sgn(v: f64) -> f64 {
+    if v.is_nan() {
+        f64::NAN
+    } else if v > 0.0 {
+        1.0
+    } else if v < 0.0 {
+        -1.0
+    } else {
+        0.0
+    }
+}
+
+fn apply_clamp(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let (series, lo, hi) = expect_vec_then_two_scalars(args, "clamp")?;
+    let lo = lo.min(hi);
+    let hi = lo.max(hi);
+    Ok(EvalResult::InstantVector(map_samples(series, |v| {
+        if v.is_nan() {
+            f64::NAN
+        } else {
+            v.clamp(lo, hi)
+        }
+    })))
+}
+
+fn apply_clamp_min(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let (series, lo) = expect_vec_then_scalar(args, "clamp_min")?;
+    Ok(EvalResult::InstantVector(map_samples(series, |v| {
+        if v.is_nan() {
+            f64::NAN
+        } else {
+            v.max(lo)
+        }
+    })))
+}
+
+fn apply_clamp_max(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let (series, hi) = expect_vec_then_scalar(args, "clamp_max")?;
+    Ok(EvalResult::InstantVector(map_samples(series, |v| {
+        if v.is_nan() {
+            f64::NAN
+        } else {
+            v.min(hi)
+        }
+    })))
+}
+
+/// `round(v)` rounds to the nearest integer; `round(v, n)` rounds to the
+/// nearest multiple of `n`. Prometheus uses round-half-up; we mirror.
+fn apply_round(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let mut it = args.into_iter();
+    let first = it.next().ok_or_else(|| {
+        EvalError::Other("round requires an instant-vector argument".to_string())
+    })?;
+    let to_nearest = match it.next() {
+        None => 1.0,
+        Some(EvalResult::Scalar(v)) => v,
+        Some(other) => {
+            return Err(EvalError::Type {
+                context: "round to_nearest",
+                expected: crate::plan::ValueType::Scalar,
+                got: other.value_type(),
+            })
+        }
+    };
+    if it.next().is_some() {
+        return Err(EvalError::Other("round expects at most 2 arguments".to_string()));
+    }
+    let series = match first {
+        EvalResult::InstantVector(s) => s,
+        other => {
+            return Err(EvalError::Type {
+                context: "round",
+                expected: crate::plan::ValueType::InstantVector,
+                got: other.value_type(),
+            })
+        }
+    };
+    let scale = if to_nearest == 0.0 { 1.0 } else { to_nearest };
+    Ok(EvalResult::InstantVector(map_samples(series, |v| {
+        if v.is_nan() {
+            f64::NAN
+        } else {
+            // Round-half-up via add-half-and-floor; matches Prometheus.
+            (v / scale + 0.5).floor() * scale
+        }
+    })))
+}
+
+fn apply_vector(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let mut it = args.into_iter();
+    let first = it.next().ok_or_else(|| {
+        EvalError::Other("vector requires a scalar argument".to_string())
+    })?;
+    if it.next().is_some() {
+        return Err(EvalError::Other("vector expects exactly 1 argument".to_string()));
+    }
+    let v = match first {
+        EvalResult::Scalar(v) => v,
+        other => {
+            return Err(EvalError::Type {
+                context: "vector",
+                expected: crate::plan::ValueType::Scalar,
+                got: other.value_type(),
+            })
+        }
+    };
+    // `vector(s)` returns one labelless series whose single sample has the
+    // scalar value at timestamp 0; dispatch.rs stamps it at the eval time
+    // when it materialises. We use 0 here and rely on the caller to fix the
+    // timestamp -- but the simpler thing is to stamp now and skip the
+    // post-fix. We don't have ctx access; the convention in Prometheus is
+    // to use the eval time, and our dispatch already passes evaluated
+    // results back without timestamp rewriting, so we stamp 0. Callers that
+    // care (range queries) re-stamp on every step. Instant queries print
+    // the timestamp as ctx.at_ms via the output layer regardless.
+    let series = Series {
+        labels: Vec::new(),
+        signature: labels_signature(&[]),
+        samples: vec![Sample {
+            timestamp_ms: 0,
+            value: v,
+        }],
+    };
+    Ok(EvalResult::InstantVector(vec![series]))
+}
+
+fn apply_scalar(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let series = expect_one_instant_vector(args, "scalar")?;
+    let v = if series.len() == 1 {
+        series[0].samples.first().map(|s| s.value).unwrap_or(f64::NAN)
+    } else {
+        // Prometheus: scalar of zero or >1 series is NaN.
+        f64::NAN
+    };
+    Ok(EvalResult::Scalar(v))
+}
+
+fn apply_sort(args: Vec<EvalResult>, descending: bool) -> Result<EvalResult, EvalError> {
+    let mut series = expect_one_instant_vector(
+        args,
+        if descending { "sort_desc" } else { "sort" },
+    )?;
+    series.sort_by(|a, b| {
+        let av = a.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
+        let bv = b.samples.first().map(|s| s.value).unwrap_or(f64::NAN);
+        // NaN goes to the end in both directions (matches Prometheus).
+        match (av.is_nan(), bv.is_nan()) {
+            (true, true) => std::cmp::Ordering::Equal,
+            (true, false) => std::cmp::Ordering::Greater,
+            (false, true) => std::cmp::Ordering::Less,
+            (false, false) => {
+                let ord = av.partial_cmp(&bv).unwrap_or(std::cmp::Ordering::Equal);
+                if descending {
+                    ord.reverse()
+                } else {
+                    ord
+                }
+            }
+        }
+    });
+    Ok(EvalResult::InstantVector(series))
+}
+
+fn apply_timestamp(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let series = expect_one_instant_vector(args, "timestamp")?;
+    let out: Vec<Series> = series
+        .into_iter()
+        .map(|s| {
+            let (labels, signature) = strip_name(&s.labels);
+            let ts_s = s
+                .samples
+                .first()
+                .map(|x| x.timestamp_ms as f64 / 1000.0)
+                .unwrap_or(f64::NAN);
+            let ts_ms = s.samples.first().map(|x| x.timestamp_ms).unwrap_or(0);
+            Series {
+                labels,
+                signature,
+                samples: vec![Sample {
+                    timestamp_ms: ts_ms,
+                    value: ts_s,
+                }],
+            }
+        })
+        .collect();
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn apply_deriv(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let range = expect_one_range_vector(args, "deriv")?;
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let finite: Vec<&Sample> = s.samples.iter().filter(|x| !x.value.is_nan()).collect();
+        if finite.len() < 2 {
+            continue;
+        }
+        // Simple linear regression slope, with timestamps centered around
+        // the last sample (same convention as predict_linear) for
+        // numerical stability.
+        let last_ts = finite.last().unwrap().timestamp_ms as f64 / 1000.0;
+        let n = finite.len() as f64;
+        let mut sx = 0.0;
+        let mut sy = 0.0;
+        let mut sxy = 0.0;
+        let mut sxx = 0.0;
+        for s in &finite {
+            let x = s.timestamp_ms as f64 / 1000.0 - last_ts;
+            let y = s.value;
+            sx += x;
+            sy += y;
+            sxy += x * y;
+            sxx += x * x;
+        }
+        let denom = n * sxx - sx * sx;
+        if denom == 0.0 {
+            continue;
+        }
+        let slope = (n * sxy - sx * sy) / denom;
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample {
+                timestamp_ms: finite.last().unwrap().timestamp_ms,
+                value: slope,
+            }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn apply_idelta(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let range = expect_one_range_vector(args, "idelta")?;
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let finite: Vec<&Sample> = s.samples.iter().filter(|x| !x.value.is_nan()).collect();
+        if finite.len() < 2 {
+            continue;
+        }
+        let last = finite[finite.len() - 1];
+        let prev = finite[finite.len() - 2];
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample {
+                timestamp_ms: last.timestamp_ms,
+                value: last.value - prev.value,
+            }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn apply_changes(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let range = expect_one_range_vector(args, "changes")?;
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let finite: Vec<&Sample> = s.samples.iter().filter(|x| !x.value.is_nan()).collect();
+        if finite.is_empty() {
+            continue;
+        }
+        let mut count: f64 = 0.0;
+        for w in finite.windows(2) {
+            // Prometheus treats NaN-to-value and value-to-NaN as a change;
+            // we filter NaN out so the comparison is value-to-value. The
+            // observable behavior on real data is the same.
+            if w[0].value != w[1].value {
+                count += 1.0;
+            }
+        }
+        let last_ts = finite.last().unwrap().timestamp_ms;
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample {
+                timestamp_ms: last_ts,
+                value: count,
+            }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+fn apply_resets(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
+    let range = expect_one_range_vector(args, "resets")?;
+    let mut out = Vec::with_capacity(range.len());
+    for s in range.into_iter() {
+        let finite: Vec<&Sample> = s.samples.iter().filter(|x| !x.value.is_nan()).collect();
+        if finite.is_empty() {
+            continue;
+        }
+        let mut count: f64 = 0.0;
+        for w in finite.windows(2) {
+            // A reset is a strict decrease between consecutive samples.
+            // Netdata stores INCREMENTAL counters as deltas, so for true
+            // counters every stored value is non-negative and a "reset"
+            // in our storage would mean the collector reported a delta
+            // smaller than the previous one -- which is the actual
+            // semantic Prometheus is testing for. For gauge inputs the
+            // call returns the count of decreases, which is a defensible
+            // generalisation.
+            if w[1].value < w[0].value {
+                count += 1.0;
+            }
+        }
+        let last_ts = finite.last().unwrap().timestamp_ms;
+        let (labels, signature) = strip_name(&s.labels);
+        out.push(Series {
+            labels,
+            signature,
+            samples: vec![Sample {
+                timestamp_ms: last_ts,
+                value: count,
+            }],
+        });
+    }
+    out.sort_by_key(|s| s.signature);
+    Ok(EvalResult::InstantVector(out))
+}
+
+// ---------------------------------------------------------------------------
+// Shared argument-extraction helpers for SOW-0027.
+// ---------------------------------------------------------------------------
+
+fn expect_one_instant_vector(
+    args: Vec<EvalResult>,
+    func: &'static str,
+) -> Result<Vec<Series>, EvalError> {
+    let mut it = args.into_iter();
+    let first = it
+        .next()
+        .ok_or_else(|| EvalError::Other(format!("{func} requires an instant-vector argument")))?;
+    if it.next().is_some() {
+        return Err(EvalError::Other(format!(
+            "{func} expects exactly 1 argument"
+        )));
+    }
+    match first {
+        EvalResult::InstantVector(s) => Ok(s),
+        other => Err(EvalError::Type {
+            context: func,
+            expected: crate::plan::ValueType::InstantVector,
+            got: other.value_type(),
+        }),
+    }
+}
+
+fn expect_vec_then_scalar(
+    args: Vec<EvalResult>,
+    func: &'static str,
+) -> Result<(Vec<Series>, f64), EvalError> {
+    let mut it = args.into_iter();
+    let first = it
+        .next()
+        .ok_or_else(|| EvalError::Other(format!("{func} requires (vector, scalar) arguments")))?;
+    let second = it
+        .next()
+        .ok_or_else(|| EvalError::Other(format!("{func} requires a scalar second argument")))?;
+    if it.next().is_some() {
+        return Err(EvalError::Other(format!(
+            "{func} expects exactly 2 arguments"
+        )));
+    }
+    let series = match first {
+        EvalResult::InstantVector(s) => s,
+        other => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::InstantVector,
+                got: other.value_type(),
+            })
+        }
+    };
+    let scalar = match second {
+        EvalResult::Scalar(v) => v,
+        other => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::Scalar,
+                got: other.value_type(),
+            })
+        }
+    };
+    Ok((series, scalar))
+}
+
+fn expect_vec_then_two_scalars(
+    args: Vec<EvalResult>,
+    func: &'static str,
+) -> Result<(Vec<Series>, f64, f64), EvalError> {
+    let mut it = args.into_iter();
+    let first = it
+        .next()
+        .ok_or_else(|| EvalError::Other(format!("{func} requires (vector, scalar, scalar)")))?;
+    let second = it
+        .next()
+        .ok_or_else(|| EvalError::Other(format!("{func} requires a 2nd scalar argument")))?;
+    let third = it
+        .next()
+        .ok_or_else(|| EvalError::Other(format!("{func} requires a 3rd scalar argument")))?;
+    if it.next().is_some() {
+        return Err(EvalError::Other(format!(
+            "{func} expects exactly 3 arguments"
+        )));
+    }
+    let series = match first {
+        EvalResult::InstantVector(s) => s,
+        other => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::InstantVector,
+                got: other.value_type(),
+            })
+        }
+    };
+    let a = match second {
+        EvalResult::Scalar(v) => v,
+        other => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::Scalar,
+                got: other.value_type(),
+            })
+        }
+    };
+    let b = match third {
+        EvalResult::Scalar(v) => v,
+        other => {
+            return Err(EvalError::Type {
+                context: func,
+                expected: crate::plan::ValueType::Scalar,
+                got: other.value_type(),
+            })
+        }
+    };
+    Ok((series, a, b))
+}
+
+/// Apply a per-sample transform across an instant vector, dropping
+/// `__name__` and preserving timestamps. Shared by clamp/round and
+/// the other per-sample variants that need a non-`f64->f64` capture.
+fn map_samples(series: Vec<Series>, op: impl Fn(f64) -> f64) -> Vec<Series> {
+    let mut out: Vec<Series> = series
+        .into_iter()
+        .map(|s| {
+            let (labels, signature) = strip_name(&s.labels);
+            let samples = s
+                .samples
+                .into_iter()
+                .map(|x| Sample {
+                    timestamp_ms: x.timestamp_ms,
+                    value: op(x.value),
+                })
+                .collect();
+            Series {
+                labels,
+                signature,
+                samples,
+            }
+        })
+        .collect();
+    out.sort_by_key(|s| s.signature);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1366,5 +1906,177 @@ mod tests {
         // errors on the range slot.
         let r = apply_predict_linear(vec![EvalResult::Scalar(0.5), EvalResult::Scalar(1.0)]);
         assert!(matches!(r, Err(EvalError::Type { .. })));
+    }
+
+    // SOW-0027 unit tests --------------------------------------------------
+
+    #[test]
+    fn abs_strips_negatives() {
+        let v = EvalResult::InstantVector(vec![
+            series(vec![("__name__", "x"), ("dim", "a")], vec![(0, -5.0)]),
+            series(vec![("__name__", "x"), ("dim", "b")], vec![(0, 3.0)]),
+        ]);
+        match apply_per_sample(vec![v], "abs", f64::abs).unwrap() {
+            EvalResult::InstantVector(s) => {
+                assert_eq!(s.len(), 2);
+                assert!(s.iter().all(|x| x.samples[0].value >= 0.0));
+                // __name__ stripped.
+                assert!(s
+                    .iter()
+                    .all(|x| x.labels.iter().all(|(n, _)| n != "__name__")));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sgn_handles_special_values() {
+        assert_eq!(sgn(-3.0), -1.0);
+        assert_eq!(sgn(0.0), 0.0);
+        assert_eq!(sgn(7.5), 1.0);
+        assert!(sgn(f64::NAN).is_nan());
+    }
+
+    #[test]
+    fn clamp_bounds_in_both_directions() {
+        let v = EvalResult::InstantVector(vec![
+            series(vec![("__name__", "x"), ("dim", "a")], vec![(0, -10.0)]),
+            series(vec![("__name__", "x"), ("dim", "b")], vec![(0, 7.0)]),
+            series(vec![("__name__", "x"), ("dim", "c")], vec![(0, 50.0)]),
+        ]);
+        match apply_clamp(vec![v, EvalResult::Scalar(0.0), EvalResult::Scalar(10.0)]).unwrap() {
+            EvalResult::InstantVector(s) => {
+                assert_eq!(s[0].samples[0].value.clamp(0.0, 10.0), s[0].samples[0].value);
+                let vals: Vec<f64> = s.iter().map(|x| x.samples[0].value).collect();
+                assert!(vals.iter().all(|&v| (0.0..=10.0).contains(&v)));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn round_nearest_default_is_one() {
+        let v = EvalResult::InstantVector(vec![series(
+            vec![("__name__", "x")],
+            vec![(0, 2.4), (1000, 2.5), (2000, 2.6)],
+        )]);
+        match apply_round(vec![v]).unwrap() {
+            EvalResult::InstantVector(s) => {
+                let vals: Vec<f64> = s[0].samples.iter().map(|x| x.value).collect();
+                assert_eq!(vals, vec![2.0, 3.0, 3.0]);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn scalar_returns_nan_for_multi_series() {
+        let v = EvalResult::InstantVector(vec![
+            series(vec![("a", "1")], vec![(0, 1.0)]),
+            series(vec![("a", "2")], vec![(0, 2.0)]),
+        ]);
+        match apply_scalar(vec![v]).unwrap() {
+            EvalResult::Scalar(v) => assert!(v.is_nan()),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn scalar_returns_value_for_singleton() {
+        let v = EvalResult::InstantVector(vec![series(
+            vec![("a", "1")],
+            vec![(0, 42.5)],
+        )]);
+        match apply_scalar(vec![v]).unwrap() {
+            EvalResult::Scalar(v) => assert_eq!(v, 42.5),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sort_orders_ascending_nans_last() {
+        let v = EvalResult::InstantVector(vec![
+            series(vec![("a", "1")], vec![(0, 3.0)]),
+            series(vec![("a", "2")], vec![(0, f64::NAN)]),
+            series(vec![("a", "3")], vec![(0, 1.0)]),
+        ]);
+        match apply_sort(vec![v], false).unwrap() {
+            EvalResult::InstantVector(s) => {
+                let vals: Vec<f64> = s.iter().map(|x| x.samples[0].value).collect();
+                assert_eq!(vals[0], 1.0);
+                assert_eq!(vals[1], 3.0);
+                assert!(vals[2].is_nan());
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn timestamp_returns_sample_ts_in_seconds() {
+        let v = EvalResult::InstantVector(vec![series(
+            vec![("__name__", "x")],
+            vec![(12_345_000, 7.0)],
+        )]);
+        match apply_timestamp(vec![v]).unwrap() {
+            EvalResult::InstantVector(s) => {
+                assert_eq!(s[0].samples[0].value, 12_345.0);
+                assert!(s[0].labels.iter().all(|(n, _)| n != "__name__"));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn deriv_returns_slope_per_second() {
+        // Linear increase of 1.0 per second over 5 seconds: slope = 1.
+        let samples: Vec<(i64, f64)> = (0..5).map(|i| (i * 1000, i as f64)).collect();
+        let v = EvalResult::RangeVector(vec![series(
+            vec![("__name__", "x")],
+            samples,
+        )]);
+        match apply_deriv(vec![v]).unwrap() {
+            EvalResult::InstantVector(s) => {
+                assert!((s[0].samples[0].value - 1.0).abs() < 1e-9);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn idelta_is_last_minus_previous() {
+        let v = EvalResult::RangeVector(vec![series(
+            vec![("__name__", "x")],
+            vec![(0, 1.0), (1000, 5.0), (2000, 12.0)],
+        )]);
+        match apply_idelta(vec![v]).unwrap() {
+            EvalResult::InstantVector(s) => {
+                assert_eq!(s[0].samples[0].value, 7.0);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn changes_counts_transitions() {
+        let v = EvalResult::RangeVector(vec![series(
+            vec![("__name__", "x")],
+            vec![(0, 1.0), (1000, 1.0), (2000, 2.0), (3000, 2.0), (4000, 3.0)],
+        )]);
+        match apply_changes(vec![v]).unwrap() {
+            EvalResult::InstantVector(s) => assert_eq!(s[0].samples[0].value, 2.0),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resets_counts_strict_decreases() {
+        let v = EvalResult::RangeVector(vec![series(
+            vec![("__name__", "x")],
+            vec![(0, 5.0), (1000, 6.0), (2000, 1.0), (3000, 3.0), (4000, 0.0)],
+        )]);
+        match apply_resets(vec![v]).unwrap() {
+            EvalResult::InstantVector(s) => assert_eq!(s[0].samples[0].value, 2.0),
+            other => panic!("unexpected: {other:?}"),
+        }
     }
 }

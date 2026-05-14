@@ -411,6 +411,22 @@ fn lower_subquery(sq: &SubqueryExpr) -> Result<Plan, LowerError> {
 }
 
 fn lower_call(c: &Call) -> Result<Plan, LowerError> {
+    // SOW-0027 Group F: label_replace / label_join take string-literal
+    // arguments that don't lower to Plan nodes. Intercept here and
+    // produce a Plan::LabelOp with the strings pre-extracted.
+    if c.func.name == "label_replace" {
+        return lower_label_replace(c);
+    }
+    if c.func.name == "label_join" {
+        return lower_label_join(c);
+    }
+    // SOW-0027 Group G: absent / absent_over_time need the static
+    // matcher labels extracted at lowering so the evaluator can
+    // synthesise them when the inner returns empty.
+    if c.func.name == "absent" || c.func.name == "absent_over_time" {
+        return lower_absent(c);
+    }
+
     let func = FuncKind::from_name(&c.func.name).ok_or_else(|| {
         LowerError::Call(format!(
             "unknown function {} (Phase 1 supports rate/irate/increase/delta/histogram_quantile and the *_over_time family)",
@@ -424,6 +440,154 @@ fn lower_call(c: &Call) -> Result<Plan, LowerError> {
         args.push(lower(a)?);
     }
     Ok(Plan::Call { func, args })
+}
+
+/// Extract a parser-level `StringLiteral` from an `Expr`. Returns
+/// `None` for any other expression shape.
+fn as_string_literal(e: &Expr) -> Option<&str> {
+    match e {
+        Expr::StringLiteral(s) => Some(&s.val),
+        _ => None,
+    }
+}
+
+fn lower_label_replace(c: &Call) -> Result<Plan, LowerError> {
+    if c.args.args.len() != 5 {
+        return Err(LowerError::Call(format!(
+            "label_replace requires 5 arguments (vector, dst, replacement, src, regex); got {}",
+            c.args.args.len()
+        )));
+    }
+    let inner = lower(&c.args.args[0])?;
+    if inner.value_type() != ValueType::InstantVector {
+        return Err(LowerError::Type {
+            context: "label_replace vector argument",
+            expected: ValueType::InstantVector,
+            got: inner.value_type(),
+        });
+    }
+    let dst = as_string_literal(&c.args.args[1])
+        .ok_or_else(|| LowerError::Call("label_replace dst must be a string literal".into()))?
+        .to_string();
+    let replacement = as_string_literal(&c.args.args[2])
+        .ok_or_else(|| LowerError::Call("label_replace replacement must be a string literal".into()))?
+        .to_string();
+    let src = as_string_literal(&c.args.args[3])
+        .ok_or_else(|| LowerError::Call("label_replace src must be a string literal".into()))?
+        .to_string();
+    let regex = as_string_literal(&c.args.args[4])
+        .ok_or_else(|| LowerError::Call("label_replace regex must be a string literal".into()))?
+        .to_string();
+    // Validate the regex now so failures surface at parse time, not at
+    // every step of a range query.
+    compile_regex(&regex).map_err(|e| {
+        LowerError::InvalidMatcher(format!("label_replace regex {regex}: {e}"))
+    })?;
+    Ok(Plan::LabelOp {
+        op: crate::plan::LabelOpKind::Replace {
+            dst,
+            replacement,
+            src,
+            regex,
+        },
+        expr: Arc::new(inner),
+    })
+}
+
+/// Extract the static `=` matchers from an inner Plan to seed
+/// `absent()`'s synthetic output labels. Only equality matchers
+/// against non-`__name__` labels contribute; everything else (regex,
+/// inequality, complex expressions, the metric name itself) is
+/// ignored. Returns an empty vec when the inner is anything other
+/// than a vector/matrix selector.
+fn extract_absent_labels(p: &Plan) -> Vec<(String, String)> {
+    use crate::storage::Matcher;
+    let matchers = match p {
+        Plan::VectorSelect { matchers, .. } => matchers,
+        Plan::MatrixSelect { matchers, .. } => matchers,
+        _ => return Vec::new(),
+    };
+    let mut out: Vec<(String, String)> = Vec::new();
+    for m in matchers {
+        // Only equality matchers contribute. `__name__` is kept so
+        // `absent(metric{job="x"})` returns
+        // `{__name__="metric", job="x"}` per Prometheus convention.
+        if let Matcher::Eq { name, value } = m {
+            out.push((name.clone(), value.clone()));
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
+fn lower_absent(c: &Call) -> Result<Plan, LowerError> {
+    if c.args.args.len() != 1 {
+        return Err(LowerError::Call(format!(
+            "{} requires exactly 1 argument",
+            c.func.name
+        )));
+    }
+    let inner = lower(&c.args.args[0])?;
+    // absent expects an instant vector; absent_over_time expects a
+    // range vector.
+    let expected = if c.func.name == "absent_over_time" {
+        ValueType::RangeVector
+    } else {
+        ValueType::InstantVector
+    };
+    if inner.value_type() != expected {
+        return Err(LowerError::Type {
+            context: "absent argument",
+            expected,
+            got: inner.value_type(),
+        });
+    }
+    let labels = extract_absent_labels(&inner);
+    Ok(Plan::Absent {
+        labels,
+        expr: Arc::new(inner),
+    })
+}
+
+fn lower_label_join(c: &Call) -> Result<Plan, LowerError> {
+    if c.args.args.len() < 3 {
+        return Err(LowerError::Call(format!(
+            "label_join requires at least 3 arguments (vector, dst, sep, srcs...); got {}",
+            c.args.args.len()
+        )));
+    }
+    let inner = lower(&c.args.args[0])?;
+    if inner.value_type() != ValueType::InstantVector {
+        return Err(LowerError::Type {
+            context: "label_join vector argument",
+            expected: ValueType::InstantVector,
+            got: inner.value_type(),
+        });
+    }
+    let dst = as_string_literal(&c.args.args[1])
+        .ok_or_else(|| LowerError::Call("label_join dst must be a string literal".into()))?
+        .to_string();
+    let sep = as_string_literal(&c.args.args[2])
+        .ok_or_else(|| LowerError::Call("label_join sep must be a string literal".into()))?
+        .to_string();
+    let mut srcs = Vec::with_capacity(c.args.args.len() - 3);
+    for (i, a) in c.args.args.iter().enumerate().skip(3) {
+        let s = as_string_literal(a).ok_or_else(|| {
+            LowerError::Call(format!(
+                "label_join source argument {} must be a string literal",
+                i - 2
+            ))
+        })?;
+        srcs.push(s.to_string());
+    }
+    Ok(Plan::LabelOp {
+        op: crate::plan::LabelOpKind::Join {
+            dst,
+            sep,
+            srcs,
+        },
+        expr: Arc::new(inner),
+    })
 }
 
 fn lower_matchers(
@@ -847,6 +1011,193 @@ mod tests {
                 assert_eq!(func, FuncKind::Rate);
                 assert_eq!(args.len(), 1);
                 assert!(matches!(args[0], Plan::MatrixSelect { .. }));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    // SOW-0027 tests --------------------------------------------------------
+
+    #[test]
+    fn group_a_math_functions_lower() {
+        for name in ["abs", "ceil", "floor", "sgn", "ln", "log2", "log10", "exp", "sqrt"] {
+            let p = lower_ok(&format!("{name}(foo)"));
+            match p {
+                Plan::Call { func, args } => {
+                    assert_eq!(FuncKind::from_name(name).unwrap(), func);
+                    assert_eq!(args.len(), 1);
+                    assert!(matches!(args[0], Plan::VectorSelect { .. }));
+                }
+                other => panic!("unexpected for {name}: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn clamp_family_lowers() {
+        let p = lower_ok("clamp(foo, 1, 10)");
+        match p {
+            Plan::Call { func, args } => {
+                assert_eq!(func, FuncKind::Clamp);
+                assert_eq!(args.len(), 3);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+        for name in ["clamp_min", "clamp_max"] {
+            let p = lower_ok(&format!("{name}(foo, 5)"));
+            match p {
+                Plan::Call { args, .. } => assert_eq!(args.len(), 2),
+                other => panic!("unexpected for {name}: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn round_with_and_without_to_nearest() {
+        let p = lower_ok("round(foo)");
+        match p {
+            Plan::Call { func, args } => {
+                assert_eq!(func, FuncKind::Round);
+                assert_eq!(args.len(), 1);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+        let p = lower_ok("round(foo, 0.5)");
+        match p {
+            Plan::Call { args, .. } => assert_eq!(args.len(), 2),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vector_and_scalar_lower() {
+        let p = lower_ok("vector(42)");
+        match p {
+            Plan::Call { func, .. } => assert_eq!(func, FuncKind::Vector),
+            other => panic!("unexpected: {other:?}"),
+        }
+        let p = lower_ok("scalar(foo)");
+        match p {
+            Plan::Call { func, .. } => assert_eq!(func, FuncKind::Scalar),
+            other => panic!("unexpected: {other:?}"),
+        }
+        // scalar() returns Scalar, not InstantVector.
+        assert_eq!(lower_ok("scalar(foo)").value_type(), ValueType::Scalar);
+        // time() also returns Scalar.
+        assert_eq!(lower_ok("time()").value_type(), ValueType::Scalar);
+    }
+
+    #[test]
+    fn sort_and_sort_desc_lower() {
+        for name in ["sort", "sort_desc"] {
+            let p = lower_ok(&format!("{name}(foo)"));
+            match p {
+                Plan::Call { func, .. } => {
+                    assert_eq!(FuncKind::from_name(name).unwrap(), func);
+                }
+                other => panic!("unexpected for {name}: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn range_reductions_lower() {
+        for name in ["deriv", "idelta", "changes", "resets"] {
+            let p = lower_ok(&format!("{name}(foo[1m])"));
+            match p {
+                Plan::Call { func, args } => {
+                    assert_eq!(FuncKind::from_name(name).unwrap(), func);
+                    assert!(matches!(args[0], Plan::MatrixSelect { .. }));
+                }
+                other => panic!("unexpected for {name}: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn label_replace_lowers_to_label_op() {
+        let p = lower_ok(r#"label_replace(foo, "dst", "$1", "src", "abc(\\d+)")"#);
+        match p {
+            Plan::LabelOp { op, .. } => match op {
+                crate::plan::LabelOpKind::Replace { dst, replacement, src, regex } => {
+                    assert_eq!(dst, "dst");
+                    assert_eq!(replacement, "$1");
+                    assert_eq!(src, "src");
+                    assert!(regex.contains("abc"));
+                }
+                other => panic!("unexpected op: {other:?}"),
+            },
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn label_replace_rejects_bad_regex() {
+        match lower_err(r#"label_replace(foo, "dst", "$1", "src", "(unclosed")"#) {
+            LowerError::InvalidMatcher(msg) => assert!(msg.contains("label_replace")),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn label_join_lowers() {
+        let p = lower_ok(r#"label_join(foo, "joined", "-", "a", "b", "c")"#);
+        match p {
+            Plan::LabelOp { op, .. } => match op {
+                crate::plan::LabelOpKind::Join { dst, sep, srcs } => {
+                    assert_eq!(dst, "joined");
+                    assert_eq!(sep, "-");
+                    assert_eq!(srcs, vec!["a", "b", "c"]);
+                }
+                other => panic!("unexpected op: {other:?}"),
+            },
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn absent_extracts_static_eq_matchers() {
+        let p = lower_ok(r#"absent(metric{job="api", env="prod"})"#);
+        match p {
+            Plan::Absent { labels, .. } => {
+                // sorted by name
+                assert_eq!(
+                    labels,
+                    vec![
+                        ("__name__".to_string(), "metric".to_string()),
+                        ("env".to_string(), "prod".to_string()),
+                        ("job".to_string(), "api".to_string()),
+                    ]
+                );
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn absent_over_complex_inner_has_empty_labels() {
+        let p = lower_ok(r#"absent(rate(metric[5m]))"#);
+        match p {
+            Plan::Absent { labels, .. } => {
+                assert!(labels.is_empty(), "expected empty labels for complex inner; got {:?}", labels);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn absent_over_time_requires_range_inner() {
+        let p = lower_ok(r#"absent_over_time(metric{job="api"}[5m])"#);
+        assert!(matches!(p, Plan::Absent { .. }));
+        // promql-parser pre-rejects the bad type with a Parse error;
+        // our in-lowering check is defense in depth.
+        match lower_err("absent_over_time(foo)") {
+            LowerError::Parse(msg) => {
+                assert!(msg.contains("matrix") || msg.contains("range"), "msg = {msg}");
+            }
+            LowerError::Type { expected, got, .. } => {
+                assert_eq!(expected, ValueType::RangeVector);
+                assert_eq!(got, ValueType::InstantVector);
             }
             other => panic!("unexpected: {other:?}"),
         }

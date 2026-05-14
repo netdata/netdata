@@ -104,6 +104,40 @@ Prometheus alerting rules:
   stamped at the natural query step time. On a subquery the `@`
   shifts the right edge of the subquery's own step grid.
 * `histogram_quantile(phi, vector)` with `le`-labeled cumulative buckets.
+* Function omnibus (SOW-0027) -- 27 additional functions:
+  * Per-sample math: `abs`, `ceil`, `floor`, `sgn`, `ln`, `log2`,
+    `log10`, `exp`, `sqrt`. Each maps the input instant vector to
+    an output of the same shape with `__name__` dropped.
+  * Bounded transforms: `clamp(v, lo, hi)`, `clamp_min(v, lo)`,
+    `clamp_max(v, hi)`. NaN passes through unchanged.
+  * Rounding: `round(v[, to_nearest])`. Default `to_nearest = 1`;
+    rounds half-up (`(v / n + 0.5).floor() * n`).
+  * Vector restructuring: `vector(scalar)` returns a labelless
+    1-series instant vector stamped at the eval time;
+    `scalar(vector)` returns the value of a single-element
+    instant vector (NaN for any other size).
+  * Sorting: `sort(v)` ascending, `sort_desc(v)` descending. NaN
+    sorts last in both directions.
+  * Time: `time()` returns the eval timestamp as a scalar in
+    Unix seconds; `timestamp(v)` returns the per-series
+    latest-sample timestamp.
+  * Range-vector reductions: `deriv(v[w])` is the per-series
+    linear-regression slope over the window (same numerical
+    shape as `predict_linear`); `idelta(v[w])` is the difference
+    of the last two non-NaN samples; `changes(v[w])` counts
+    distinct value transitions; `resets(v[w])` counts strict
+    decreases.
+  * Label munging: `label_replace(v, dst, repl, src, regex)`
+    anchored regex with `$N` / `${name}` capture-group expansion
+    in `repl`; `label_join(v, dst, sep, src...)` concatenates
+    the listed source labels with `sep` into `dst`. Both
+    preserve all labels including `__name__`.
+  * Empty-vector detection: `absent(v)` returns a 1-valued
+    series with labels copied from the static `=` matchers of
+    `v` (or no labels for complex inner expressions) when `v`
+    evaluates to the empty vector; otherwise empty.
+    `absent_over_time(v[w])` mirrors the rule for range-vector
+    inputs.
 * Subqueries `<expr>[<range>:<step>] [@ <ts>] [offset <d>]`
   (SOW-0026). The inner expression must be an instant vector;
   evaluating the subquery re-runs the inner at every grid point
@@ -122,9 +156,6 @@ evaluation time with a clear error:
 * Many-to-many cardinality for arithmetic/comparison binops. Set
   operators are inherently many-to-many and don't accept the
   `group_*` modifier.
-<!-- count_values shipped in SOW-0024. -->
-<!-- `stddev_over_time`, `stdvar_over_time`, `quantile_over_time`
-     shipped in Phase 3e (SOW-0023). -->
 * `keep_metric_names` -- a query-level modifier that preserves
   `__name__` through transforms that would normally strip it.
   Blocked upstream: the `promql-parser` crate this project depends
@@ -133,6 +164,21 @@ evaluation time with a clear error:
   query`. Lighting up this feature requires either forking
   `promql-parser` or landing the change upstream first; deferred
   until that decision is made.
+* Trigonometric functions (`sin`, `cos`, `tan`, the inverse and
+  hyperbolic forms, `deg`, `rad`) and `pi()`. Rarely used in
+  monitoring queries; deferred.
+* Calendar functions (`minute`, `hour`, `day_of_week`,
+  `day_of_month`, `days_in_month`, `month`, `year`). Used in
+  business-hours alert silencing rules; deferred until local-time
+  conversion plumbing is needed.
+* Native-histogram functions (`histogram_count`, `histogram_sum`,
+  `histogram_avg`, `histogram_fraction`, `histogram_stddev`,
+  `histogram_stdvar`). Netdata storage produces classic
+  cumulative-bucket histograms, not the Prometheus 2.40 native
+  shape; only `histogram_quantile` is meaningful.
+* `mad_over_time` (Prometheus 2.46+), `double_exponential_smoothing`
+  (the 2.50+ rename of `holt_winters`), and `info()`. Niche or
+  too new; deferred.
 
 ## Naming: metric names and labels
 

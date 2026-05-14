@@ -7,11 +7,13 @@
 #![allow(dead_code)] // EvalError::Other and a couple of builder helpers
                     // are reserved for chunks 4/5.
 
+mod absent;
 mod aggregation;
 mod binop;
 mod context;
 mod dispatch;
 mod functions;
+mod labelops;
 mod lookback;
 mod select;
 mod subquery;

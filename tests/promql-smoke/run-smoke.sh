@@ -423,6 +423,105 @@ check_discovery_args "@ on matrix selector: rate(metric[1m] @ <now>)" \
     --data-urlencode "query=rate(disk_io[1m] @ $NOW_TS)"
 echo
 
+echo "==> Phase 3i: function omnibus (SOW-0027)"
+# Group A: per-sample math.
+check_discovery_args "abs strips negative sign" \
+    "/api/v1/query" 200 \
+    "all(float(s['value'][1]) >= 0 for s in d['data']['result'])" \
+    --data-urlencode "query=abs(rate(disk_io{device_type=\"physical\"}[1m]))"
+check_discovery_args "sqrt + ln + exp succeed on positive input" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])>=1" \
+    --data-urlencode "query=sqrt(exp(ln(system_cpu+1)))"
+check_discovery_args "ceil/floor/round shape" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])>=1" \
+    --data-urlencode "query=ceil(system_cpu) - floor(system_cpu) <= 1"
+check_discovery_args "sgn returns -1, 0, or 1" \
+    "/api/v1/query" 200 \
+    "all(float(s['value'][1]) in (-1, 0, 1) for s in d['data']['result'])" \
+    --data-urlencode "query=sgn(system_cpu)"
+# Group B: clamp + round.
+check_discovery_args "clamp(_, 0, 100) keeps values in [0,100]" \
+    "/api/v1/query" 200 \
+    "all(0 <= float(s['value'][1]) <= 100 for s in d['data']['result'])" \
+    --data-urlencode "query=clamp(system_cpu, 0, 100)"
+check_discovery_args "clamp_min raises low values" \
+    "/api/v1/query" 200 \
+    "all(float(s['value'][1]) >= 50 for s in d['data']['result'])" \
+    --data-urlencode "query=clamp_min(system_cpu, 50)"
+check_discovery_args "round to_nearest=10 produces multiples of 10" \
+    "/api/v1/query" 200 \
+    "all(float(s['value'][1]) % 10 == 0 for s in d['data']['result'])" \
+    --data-urlencode "query=round(system_cpu, 10)"
+# Group C: vector + scalar + sort.
+check_discovery_args "vector(42) returns a labelless series of value 42" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==1 and d['data']['result'][0]['metric']=={} and d['data']['result'][0]['value'][1]=='42'" \
+    --data-urlencode "query=vector(42)"
+check_discovery_args "scalar(single-series-vector) gives that value" \
+    "/api/v1/query" 200 \
+    "d['data']['resultType']=='scalar' and abs(float(d['data']['result'][1])-42)<1e-9" \
+    --data-urlencode "query=scalar(vector(42))"
+check_discovery_args "sort_desc(system_cpu) is monotonically non-increasing" \
+    "/api/v1/query" 200 \
+    "all(float(d['data']['result'][i]['value'][1]) >= float(d['data']['result'][i+1]['value'][1]) for i in range(len(d['data']['result'])-1))" \
+    --data-urlencode "query=sort_desc(system_cpu)"
+# Group D: time + timestamp.
+check_discovery_args "time() returns a scalar" \
+    "/api/v1/query" 200 \
+    "d['data']['resultType']=='scalar' and float(d['data']['result'][1]) > 1000000" \
+    --data-urlencode "query=time()"
+check_discovery_args "timestamp(system_cpu) returns recent ts" \
+    "/api/v1/query" 200 \
+    "all(float(s['value'][1]) > 1000000 for s in d['data']['result'])" \
+    --data-urlencode "query=timestamp(system_cpu)"
+# Group E: range-vector reductions.
+check_discovery_args "deriv(system_cpu[1m]) returns 10 series" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==10" \
+    --data-urlencode "query=deriv(system_cpu[1m])"
+check_discovery_args "idelta(system_cpu[1m]) returns 10 series" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==10" \
+    --data-urlencode "query=idelta(system_cpu[1m])"
+check_discovery_args "changes(_) returns non-negative integers" \
+    "/api/v1/query" 200 \
+    "all(float(s['value'][1]) >= 0 for s in d['data']['result'])" \
+    --data-urlencode "query=changes(system_cpu[1m])"
+check_discovery_args "resets(_) returns non-negative integers" \
+    "/api/v1/query" 200 \
+    "all(float(s['value'][1]) >= 0 for s in d['data']['result'])" \
+    --data-urlencode "query=resets(system_cpu[1m])"
+# Group F: label_replace + label_join.
+check_discovery_args "label_replace adds dev_short from regex capture" \
+    "/api/v1/query" 200 \
+    "any('dev_short' in s['metric'] for s in d['data']['result'])" \
+    --data-urlencode 'query=label_replace(rate(disk_io[1m]), "dev_short", "$1", "device", "(.{4}).*")'
+check_discovery_args "label_join concatenates labels with separator" \
+    "/api/v1/query" 200 \
+    "any(s['metric'].get('combo','').count('-')==1 for s in d['data']['result'])" \
+    --data-urlencode 'query=label_join(system_cpu, "combo", "-", "dimension", "instance")'
+# Group G: absent + absent_over_time.
+check_discovery_args "absent of a non-existent metric returns synthesized labels" \
+    "/api/v1/query" 200 \
+    'len(d["data"]["result"])==1 and d["data"]["result"][0]["metric"].get("job")=="api"' \
+    --data-urlencode 'query=absent(http_requests_total{job="api"})'
+check_discovery_args "absent of an existing metric returns empty" \
+    "/api/v1/query" 200 \
+    "d['data']['result']==[]" \
+    --data-urlencode "query=absent(system_cpu)"
+check_discovery_args "absent_over_time of a missing metric returns 1" \
+    "/api/v1/query" 200 \
+    "len(d['data']['result'])==1 and float(d['data']['result'][0]['value'][1])==1" \
+    --data-urlencode 'query=absent_over_time(http_requests_total{job="api"}[5m])'
+# Bytes-per-op: the originally-broken motivating case.
+check_discovery_args "abs+ignoring bytes-per-op returns positive values" \
+    "/api/v1/query" 200 \
+    "all(float(s['value'][1]) > 0 for s in d['data']['result'] if s['value'][1] != 'NaN')" \
+    --data-urlencode 'query=abs(rate(disk_io{device_type="physical"}[1m])) / ignoring(chart, family) abs(rate(disk_ops{device_type="physical"}[1m]))'
+echo
+
 echo "==> Phase 3h: subqueries"
 # Bare subquery: range vector with grid points at the configured step.
 # 1m at 30s -> 3 step times (window_start+step, +2*step, +3*step) per
