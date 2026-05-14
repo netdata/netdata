@@ -323,20 +323,20 @@ func TestBuildLoadPlan(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := BuildLoadPlan(
-				defaultPluginsDir(),
-				tc.kernels,
-				tc.isRHF,
-				tc.kver,
-				tc.name,
-				tc.isReturn,
-				tc.hasResizableMaps,
-				tc.isDebian,
-				tc.hasBTF,
-				tc.load,
-				tc.coreAttach,
-				tc.mode,
-			)
+			got := BuildLoadPlan(LoadPlanRequest{
+				PluginsDir:       defaultPluginsDir(),
+				Kernels:          tc.kernels,
+				IsRHF:            tc.isRHF,
+				KernelVersion:    tc.kver,
+				Name:             tc.name,
+				IsReturn:         tc.isReturn,
+				HasResizableMaps: tc.hasResizableMaps,
+				IsDebian:         tc.isDebian,
+				HasBTF:           tc.hasBTF,
+				Load:             tc.load,
+				CoreAttach:       tc.coreAttach,
+				Mode:             tc.mode,
+			})
 
 			tc.want.ObjectPath = filepath.Join(defaultPluginsDir(), "ebpf.d", tc.want.ObjectPath)
 

@@ -54,6 +54,21 @@ type LoadPlan struct {
 	ProgramMode   ProgramMode
 }
 
+type LoadPlanRequest struct {
+	PluginsDir       string
+	Kernels          uint32
+	IsRHF            int
+	KernelVersion    uint32
+	Name             string
+	IsReturn         bool
+	HasResizableMaps bool
+	IsDebian         bool
+	HasBTF           bool
+	Load             LoadMethod
+	CoreAttach       string
+	Mode             RunMode
+}
+
 type ObjectFlavor string
 
 const (
@@ -402,35 +417,31 @@ func ConvertCoreType(value string, mode RunMode) ProgramMode {
 }
 
 func PlanObjectPath(pluginsDir string, kernels uint32, isRHF int, kver uint32, name string, isReturn bool) LoadPlan {
-	return BuildLoadPlan(pluginsDir, kernels, isRHF, kver, name, isReturn, false, false, false, LoadLegacy, "", RunModeEntry)
+	return BuildLoadPlan(LoadPlanRequest{
+		PluginsDir:    pluginsDir,
+		Kernels:       kernels,
+		IsRHF:         isRHF,
+		KernelVersion: kver,
+		Name:          name,
+		IsReturn:      isReturn,
+		Load:          LoadLegacy,
+		Mode:          RunModeEntry,
+	})
 }
 
-func BuildLoadPlan(
-	pluginsDir string,
-	kernels uint32,
-	isRHF int,
-	kver uint32,
-	name string,
-	isReturn bool,
-	hasResizableMaps bool,
-	isDebian bool,
-	hasBTF bool,
-	load LoadMethod,
-	coreAttach string,
-	mode RunMode,
-) LoadPlan {
-	selector := SelectIndex(kernels, isRHF, kver)
-	flavor := SelectObjectFlavor(kver, hasResizableMaps, isDebian)
-	resolvedLoad := SelectLoadMode(hasBTF, load, kver, isRHF)
+func BuildLoadPlan(req LoadPlanRequest) LoadPlan {
+	selector := SelectIndex(req.Kernels, req.IsRHF, req.KernelVersion)
+	flavor := SelectObjectFlavor(req.KernelVersion, req.HasResizableMaps, req.IsDebian)
+	resolvedLoad := SelectLoadMode(req.HasBTF, req.Load, req.KernelVersion, req.IsRHF)
 
 	return LoadPlan{
-		KernelVersion: kver,
-		IsRHF:         isRHF,
+		KernelVersion: req.KernelVersion,
+		IsRHF:         req.IsRHF,
 		Selector:      selector,
 		Flavor:        flavor,
-		ObjectPath:    BuildObjectPathWithFlavor(pluginsDir, selector, name, isReturn, isRHF, flavor),
+		ObjectPath:    BuildObjectPathWithFlavor(req.PluginsDir, selector, req.Name, req.IsReturn, req.IsRHF, flavor),
 		LoadMode:      resolvedLoad,
-		ProgramMode:   ConvertCoreType(coreAttach, mode),
+		ProgramMode:   ConvertCoreType(req.CoreAttach, req.Mode),
 	}
 }
 

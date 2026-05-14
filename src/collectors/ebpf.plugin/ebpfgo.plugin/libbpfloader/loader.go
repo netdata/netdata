@@ -20,7 +20,9 @@ func (o *Object) Load() error {
 	return ErrDisabled
 }
 
-func (o *Object) Close() {}
+func (o *Object) Close() {
+	// No-op in the disabled build because no libbpf object was opened.
+}
 
 func ParseBTFFile(filename string) (*BTF, error) {
 	return nil, ErrDisabled
@@ -30,7 +32,9 @@ func LoadBTFFile(path, filename string) (*BTF, error) {
 	return nil, ErrDisabled
 }
 
-func (b *BTF) Free() {}
+func (b *BTF) Free() {
+	// No-op in the disabled build because no BTF file was loaded.
+}
 
 func IsFunctionInsideBTF(file *BTF, function string) (bool, error) {
 	return false, ErrDisabled
@@ -67,4 +71,6 @@ func (r *CachestatRuntime) SnapshotApps(mapsPerCore bool) ([]CachestatAppSnapsho
 	return nil, ErrDisabled
 }
 
-func (r *CachestatRuntime) Close() {}
+func (r *CachestatRuntime) Close() {
+	// No-op in the disabled build because the runtime never acquired native resources.
+}
