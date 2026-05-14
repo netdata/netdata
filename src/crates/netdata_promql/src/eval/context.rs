@@ -40,6 +40,15 @@ pub struct EvalContext {
     /// Storage backend. Production uses `FfiBackend`; compliance tests
     /// and future unit tests inject `MemBackend` or another stand-in.
     pub backend: Arc<dyn Backend>,
+    /// Storage tier override (SOW-0041). `-1` = auto-select per the
+    /// shim's weight function; `0..N-1` = explicit tier, clamped at the
+    /// shim. The plan analysis pass (`plan_requires_tier_zero`)
+    /// downgrades this to `0` when the plan contains
+    /// `min_over_time` / `max_over_time` / `quantile_over_time` /
+    /// `stddev_over_time` / `stdvar_over_time` / `topk` / `bottomk` —
+    /// those operators need exact distribution shape and the higher
+    /// tiers' bucket aggregates are not sufficient.
+    pub tier_hint: i32,
 }
 
 impl Default for EvalContext {
@@ -52,6 +61,7 @@ impl Default for EvalContext {
             outer_start_ms: 0,
             outer_end_ms: 0,
             backend: Arc::new(FfiBackend),
+            tier_hint: -1,
         }
     }
 }

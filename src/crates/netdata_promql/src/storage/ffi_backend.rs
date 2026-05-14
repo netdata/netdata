@@ -18,8 +18,12 @@ impl Backend for FfiBackend {
         after_s: i64,
         before_s: i64,
         max_series: usize,
+        points_wanted: i64,
+        tier_hint: i32,
     ) -> Result<Box<dyn BackendQuery + 'a>, ResolveError> {
-        let q = NdQuery::resolve(host, matchers, after_s, before_s, max_series)?;
+        let q = NdQuery::resolve(
+            host, matchers, after_s, before_s, max_series, points_wanted, tier_hint,
+        )?;
         Ok(Box::new(FfiQuery(q)))
     }
 }

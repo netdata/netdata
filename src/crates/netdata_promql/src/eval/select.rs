@@ -67,6 +67,8 @@ pub fn eval_vector_select(
         after_s,
         before_s,
         ctx.max_series,
+        grid.len() as i64,
+        ctx.tier_hint,
     ) {
         Ok(q) => q,
         Err(crate::storage::ResolveError::Empty) => {
@@ -243,6 +245,8 @@ pub fn eval_matrix_select(
         after_s,
         before_s,
         ctx.max_series,
+        grid.len() as i64,
+        ctx.tier_hint,
     ) {
         Ok(q) => q,
         Err(crate::storage::ResolveError::Empty) => {

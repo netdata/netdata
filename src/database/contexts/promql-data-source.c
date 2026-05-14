@@ -57,6 +57,11 @@ struct nd_pds_query {
     // the candidate set. Callers decide whether to surface this as an
     // error (query path) or a warning (discovery path).
     bool truncated;
+
+    // Tier chosen for sample reads (SOW-0041). Set during resolve, used
+    // by `nd_pds_open_samples`. 0 by default; auto-selected or
+    // explicit-override per resolve params.
+    size_t tier;
 };
 
 struct nd_pds_samples {
@@ -612,11 +617,117 @@ static void resolve_named_context_on_host(resolve_state *state, RRDHOST *host, c
 // Public API
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Tier selection (SOW-0041)
+//
+// The shim picks one tier per query at resolve time. The weight function
+// is a 1:1 copy of `query_plan_points_coverage_weight` in
+// `src/web/api/queries/query-plan.c`; duplicated here to keep this TU
+// self-contained (the upstream symbol has external linkage but no header
+// declaration). The shim aggregates per-tier `(first_time, last_time,
+// update_every)` across all resolved series via the same MIN/MAX/MIN
+// rule `rrddim_find_best_tier_for_timeframe` uses, then picks the tier
+// with the highest weight.
+// ---------------------------------------------------------------------------
+
+static long shim_tier_weight(time_t db_first_time_s, time_t db_last_time_s,
+                             time_t db_update_every_s,
+                             time_t after_wanted, time_t before_wanted,
+                             size_t points_wanted, size_t tier) {
+    if (db_first_time_s == 0 || db_last_time_s == 0 ||
+        db_update_every_s == 0 ||
+        db_first_time_s > before_wanted ||
+        db_last_time_s < after_wanted)
+        return -LONG_MAX;
+
+    long long common_first_t = MAX(db_first_time_s, after_wanted);
+    long long common_last_t  = MIN(db_last_time_s,  before_wanted);
+
+    long long time_coverage =
+        (common_last_t - common_first_t) * 1000000LL /
+        (before_wanted - after_wanted);
+    long long points_in_coverage =
+        (long long)points_wanted * time_coverage / 1000000LL;
+
+    long long points_available = (common_last_t - common_first_t) / db_update_every_s;
+    long long points_delta = points_available - points_in_coverage;
+    long long points_coverage = (points_delta < 0)
+        ? (long long)(points_available * time_coverage / points_in_coverage)
+        : time_coverage;
+
+    if (points_available <= 0)
+        return -LONG_MAX;
+
+    // Mirror the upstream tier bonus (2.5% per tier).
+    return (long)(points_coverage + (25000LL * tier));
+}
+
+// Pick the tier that best covers `[after_s, before_s]` at the requested
+// resolution. Aggregates per-tier metadata across every resolved series
+// (MIN of first_time, MAX of last_time, MIN of update_every) and uses the
+// weight function to score each candidate tier.
+static size_t shim_pick_tier(const nd_pds_query *q,
+                             int64_t after_s, int64_t before_s,
+                             int64_t points_wanted) {
+    size_t tiers = nd_profile.storage_tiers;
+    if (tiers <= 1) return 0;
+    if (tiers > RRD_STORAGE_TIERS) tiers = RRD_STORAGE_TIERS;
+
+    // Degenerate: instant queries or 0 points wanted → tier 0.
+    if (points_wanted <= 0 || after_s >= before_s) return 0;
+
+    long  weights[RRD_STORAGE_TIERS];
+    for (size_t t = 0; t < tiers; t++) {
+        time_t first_t = 0, last_t = 0, ue = 0;
+        bool any = false;
+        for (size_t i = 0; i < q->series_count; i++) {
+            RRDDIM *rd = rrddim_acquired_to_rrddim(q->series[i].rda);
+            if (!rd) continue;
+            STORAGE_METRIC_HANDLE *smh = rd->tiers[t].smh;
+            if (!smh) continue;
+            STORAGE_ENGINE_BACKEND seb = rd->tiers[t].seb;
+            time_t ft = storage_engine_oldest_time_s(seb, smh);
+            time_t lt = storage_engine_latest_time_s(seb, smh);
+            time_t this_ue = (time_t) rd->rrdset->update_every *
+                             (time_t) rd->rrdset->rrdhost->db[t].tier_grouping;
+            if (!ft || !lt || !this_ue) continue;
+
+            if (!any) {
+                first_t = ft; last_t = lt; ue = this_ue;
+                any = true;
+            }
+            else {
+                first_t = MIN(first_t, ft);
+                last_t  = MAX(last_t,  lt);
+                ue      = MIN(ue,      this_ue);
+            }
+        }
+        weights[t] = any ? shim_tier_weight(first_t, last_t, ue,
+                                            (time_t)after_s, (time_t)before_s,
+                                            (size_t)points_wanted, t)
+                         : -LONG_MAX;
+    }
+
+    size_t best = 0;
+    for (size_t t = 1; t < tiers; t++)
+        if (weights[t] >= weights[best]) best = t;
+
+    // If no tier covers the window at all, fall back to tier 0 and let
+    // sample iteration find what it can.
+    if (weights[best] == -LONG_MAX) return 0;
+    return best;
+}
+
+size_t nd_pds_chosen_tier(const nd_pds_query *q) {
+    return q ? q->tier : 0;
+}
+
 nd_pds_query *
 nd_pds_resolve(const char *host_machine_guid,
                const nd_pds_matcher *matchers, size_t matchers_len,
                int64_t after_s, int64_t before_s,
                size_t max_series,
+               int64_t points_wanted, int32_t tier_hint,
                char *err, size_t err_len) {
     if (max_series == 0) max_series = 10000;
 
@@ -668,6 +779,17 @@ nd_pds_resolve(const char *host_machine_guid,
         return NULL;
     }
 
+    // SOW-0041: pick the tier this query reads from.
+    if (tier_hint < 0) {
+        q->tier = shim_pick_tier(q, after_s, before_s, points_wanted);
+    } else {
+        size_t tiers = nd_profile.storage_tiers;
+        if (tiers == 0) tiers = 1;
+        size_t requested = (size_t)tier_hint;
+        if (requested >= tiers) requested = tiers - 1;
+        q->tier = requested;
+    }
+
     (void)err;
     (void)err_len;
     return q;
@@ -706,10 +828,17 @@ nd_pds_open_samples(const nd_pds_query *q, size_t i,
     RRDDIM *rd = rrddim_acquired_to_rrddim(rec->rda);
     if (!rd) return NULL;
 
-    // Chunk 1: always tier 0. Tier selection is a chunk 5 refinement.
-    size_t tier = 0;
+    // SOW-0041: tier was picked at resolve time. Fall back to tier 0
+    // when the chosen tier has no smh for this particular series (rare
+    // -- the auto-selector should not pick a tier where any series
+    // lacks coverage, but the explicit `?tier=N` path can land here).
+    size_t tier = q->tier;
     STORAGE_METRIC_HANDLE *smh = rd->tiers[tier].smh;
-    if (!smh) return NULL;
+    if (!smh) {
+        tier = 0;
+        smh = rd->tiers[tier].smh;
+        if (!smh) return NULL;
+    }
 
     nd_pds_samples *it = callocz(1, sizeof(nd_pds_samples));
     if (!it) return NULL;

@@ -29,7 +29,8 @@ extern "C" {
 struct NdPromqlResponse *nd_promql_query_instant(const char *host_machine_guid,
                                                  const char *query,
                                                  int64_t at_ms,
-                                                 int64_t _timeout_ms);
+                                                 int64_t _timeout_ms,
+                                                 int32_t tier_hint);
 
 /**
  * Evaluate a range PromQL query over `[start_ms, end_ms]` at `step_ms`
@@ -43,7 +44,8 @@ struct NdPromqlResponse *nd_promql_query_range(const char *host_machine_guid,
                                                int64_t start_ms,
                                                int64_t end_ms,
                                                int64_t step_ms,
-                                               int64_t _timeout_ms);
+                                               int64_t _timeout_ms,
+                                               int32_t tier_hint);
 
 /**
  * Pointer to the NUL-terminated response body.

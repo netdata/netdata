@@ -130,7 +130,10 @@ where
     let mut truncated = false;
 
     for matchers in selector_matchers {
-        let q = match NdQuery::resolve(host, matchers, after_s, before_s, max_series) {
+        // Discovery walks all series in the window; no tier-shaped points
+        // wanted, no tier override. The shim auto-selects (defaults to
+        // tier 0 when points_wanted is 0).
+        let q = match NdQuery::resolve(host, matchers, after_s, before_s, max_series, 0, -1) {
             Ok(q) => q,
             Err(ResolveError::Empty) => continue,
             Err(_) => continue,
@@ -294,7 +297,7 @@ pub unsafe extern "C" fn nd_promql_series(
         let mut seen: BTreeSet<u64> = BTreeSet::new();
         let mut truncated = false;
         for matchers in &selectors {
-            let q = match NdQuery::resolve(host.as_deref(), matchers, after_s, before_s, max_series(limit)) {
+            let q = match NdQuery::resolve(host.as_deref(), matchers, after_s, before_s, max_series(limit), 0, -1) {
                 Ok(q) => q,
                 Err(ResolveError::Empty) => continue,
                 Err(_) => continue,

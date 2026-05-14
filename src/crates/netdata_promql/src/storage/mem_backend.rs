@@ -99,6 +99,8 @@ impl Backend for MemBackend {
         _after_s: i64,
         _before_s: i64,
         max_series: usize,
+        _points_wanted: i64,
+        _tier_hint: i32,
     ) -> Result<Box<dyn BackendQuery + 'a>, ResolveError> {
         let series = self.inner.read().expect("mem backend poisoned");
 
@@ -231,6 +233,8 @@ mod tests {
                 0,
                 10,
                 100,
+                0,
+                -1,
             )
             .unwrap();
         assert_eq!(q.len(), 1);
@@ -245,7 +249,7 @@ mod tests {
     fn resolve_returns_empty_for_no_match() {
         let b = MemBackend::new();
         b.add_series(s(&[("__name__", "m")], &[(0, 1.0)]));
-        let r = b.resolve(None, &[Matcher::eq("__name__", "other")], 0, 10, 100);
+        let r = b.resolve(None, &[Matcher::eq("__name__", "other")], 0, 10, 100, 0, -1);
         assert!(matches!(r, Err(ResolveError::Empty)));
     }
 
@@ -257,7 +261,7 @@ mod tests {
             &[(0, 1.0), (5000, 2.0), (10_000, 3.0), (15_000, 4.0)],
         ));
         let q = b
-            .resolve(None, &[Matcher::eq("__name__", "m")], 0, 100, 100)
+            .resolve(None, &[Matcher::eq("__name__", "m")], 0, 100, 100, 0, -1)
             .unwrap();
         let mut ts = Vec::new();
         let mut vals = Vec::new();

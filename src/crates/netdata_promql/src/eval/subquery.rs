@@ -77,6 +77,9 @@ pub fn eval_subquery(
         outer_start_ms: ctx.outer_start_ms,
         outer_end_ms: ctx.outer_end_ms,
         backend: std::sync::Arc::clone(&ctx.backend),
+        // Inherit the outer tier hint; the inner step drives the
+        // shim's points-wanted weighting separately at resolve time.
+        tier_hint: ctx.tier_hint,
     };
 
     match eval(&inner_ctx, expr)? {

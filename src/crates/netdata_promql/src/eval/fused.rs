@@ -439,6 +439,8 @@ fn run_fused<A: IncrementalAggr>(
         after_s,
         before_s,
         ctx.max_series,
+        grid.len() as i64,
+        ctx.tier_hint,
     ) {
         Ok(q) => q,
         Err(crate::storage::ResolveError::Empty) => {

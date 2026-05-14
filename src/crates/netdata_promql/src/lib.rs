@@ -104,6 +104,7 @@ pub unsafe extern "C" fn nd_promql_query_instant(
     query: *const c_char,
     at_ms: i64,
     _timeout_ms: i64,
+    tier_hint: i32,
 ) -> *mut NdPromqlResponse {
     let q = match unsafe { cstr_borrow(query) } {
         Some(q) => q,
@@ -114,7 +115,7 @@ pub unsafe extern "C" fn nd_promql_query_instant(
         }
     };
     let host = unsafe { cstr_borrow(host_machine_guid) }.map(|s| s.to_string());
-    let resp = match run_instant(q, at_ms, host) {
+    let resp = match run_instant(q, at_ms, host, tier_hint) {
         Ok(r) => r,
         Err(e) => e.into_response(),
     };
@@ -134,6 +135,7 @@ pub unsafe extern "C" fn nd_promql_query_range(
     end_ms: i64,
     step_ms: i64,
     _timeout_ms: i64,
+    tier_hint: i32,
 ) -> *mut NdPromqlResponse {
     let q = match unsafe { cstr_borrow(query) } {
         Some(q) => q,
@@ -156,7 +158,7 @@ pub unsafe extern "C" fn nd_promql_query_range(
             "exceeded maximum resolution of 11000 points per timeseries",
         )));
     }
-    let resp = match run_range(q, start_ms, end_ms, step_ms, host) {
+    let resp = match run_range(q, start_ms, end_ms, step_ms, host, tier_hint) {
         Ok(r) => r,
         Err(e) => e.into_response(),
     };
@@ -241,10 +243,11 @@ fn run_instant(
     query: &str,
     at_ms: i64,
     host: Option<String>,
+    tier_hint: i32,
 ) -> Result<NdPromqlResponse, QueryError> {
     let start = Instant::now();
     let host_for_log = host.clone();
-    let inner = run_instant_inner(query, at_ms, host);
+    let inner = run_instant_inner(query, at_ms, host, tier_hint);
     let (final_resp, series_count_opt) = match inner {
         Ok((resp, n)) => (Ok(resp), Some(n)),
         Err(e) => (Err(e), None),
@@ -267,8 +270,14 @@ fn run_instant_inner(
     query: &str,
     at_ms: i64,
     host: Option<String>,
+    tier_hint: i32,
 ) -> Result<(NdPromqlResponse, usize), QueryError> {
     let plan = lower_query(query)?;
+    // SOW-0041: operators that need exact distribution shape
+    // (min/max/quantile/stddev/stdvar over_time, topk, bottomk) force
+    // tier 0; bucket aggregates at higher tiers don't preserve enough
+    // information to compute them correctly.
+    let effective_tier_hint = if plan.requires_tier_zero() { 0 } else { tier_hint };
     // For instant queries, the outer "range" is a single point.
     let ctx = EvalContext {
         grid: std::sync::Arc::new(Grid::instant(at_ms)),
@@ -278,6 +287,7 @@ fn run_instant_inner(
         outer_start_ms: at_ms,
         outer_end_ms: at_ms,
         backend: std::sync::Arc::new(storage::FfiBackend),
+        tier_hint: effective_tier_hint,
     };
     let result = eval(&ctx, &plan)?;
     let series_count = match &result {
@@ -297,10 +307,11 @@ fn run_range(
     end_ms: i64,
     step_ms: i64,
     host: Option<String>,
+    tier_hint: i32,
 ) -> Result<NdPromqlResponse, QueryError> {
     let start = Instant::now();
     let host_for_log = host.clone();
-    let inner = run_range_inner(query, start_ms, end_ms, step_ms, host);
+    let inner = run_range_inner(query, start_ms, end_ms, step_ms, host, tier_hint);
     let (final_resp, series_count_opt) = match inner {
         Ok((resp, n)) => (Ok(resp), Some(n)),
         Err(e) => (Err(e), None),
@@ -325,6 +336,7 @@ fn run_range_inner(
     end_ms: i64,
     step_ms: i64,
     host: Option<String>,
+    tier_hint: i32,
 ) -> Result<(NdPromqlResponse, usize), QueryError> {
     let plan = lower_query(query)?;
 
@@ -336,12 +348,17 @@ fn run_range_inner(
         return Err(QueryError::UnsupportedTopLevel(tt));
     }
 
+    // SOW-0041: operators that need exact distribution shape force
+    // tier 0. See `Plan::requires_tier_zero` for the list and
+    // rationale.
+    let effective_tier_hint = if plan.requires_tier_zero() { 0 } else { tier_hint };
+
     // SOW-0031: every operator is grid-aware. Build one Grid::range,
     // call eval once, serialize. The per-step fallback that older
     // SOW-0031 checkpoints carried for rollup/subquery/absent plans
     // is gone -- those operators evaluate against the grid natively
     // now.
-    run_range_single_pass(plan, start_ms, end_ms, step_ms, host)
+    run_range_single_pass(plan, start_ms, end_ms, step_ms, host, effective_tier_hint)
 }
 
 /// SOW-0031 single-pass range query path. Builds a Grid::range once,
@@ -357,6 +374,7 @@ fn run_range_single_pass(
     end_ms: i64,
     step_ms: i64,
     host: Option<String>,
+    tier_hint: i32,
 ) -> Result<(NdPromqlResponse, usize), QueryError> {
     let grid = std::sync::Arc::new(Grid::range(start_ms, end_ms, step_ms));
     let ctx = EvalContext {
@@ -367,6 +385,7 @@ fn run_range_single_pass(
         outer_start_ms: start_ms,
         outer_end_ms: end_ms,
         backend: std::sync::Arc::new(storage::FfiBackend),
+        tier_hint,
     };
     let r = eval(&ctx, &plan)?;
     let result = match r {
@@ -453,7 +472,7 @@ mod tests {
     #[test]
     fn parse_failure_yields_bad_data_envelope() {
         let q = CString::new("not a valid query {").unwrap();
-        let r = unsafe { nd_promql_query_instant(ptr::null(), q.as_ptr(), 0, 0) };
+        let r = unsafe { nd_promql_query_instant(ptr::null(), q.as_ptr(), 0, 0, -1) };
         assert!(!r.is_null());
         assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
         let body = unsafe { CStr::from_ptr(nd_promql_response_body(r)) }
@@ -466,7 +485,7 @@ mod tests {
 
     #[test]
     fn null_query_yields_bad_data() {
-        let r = unsafe { nd_promql_query_instant(ptr::null(), ptr::null(), 0, 0) };
+        let r = unsafe { nd_promql_query_instant(ptr::null(), ptr::null(), 0, 0, -1) };
         assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
         unsafe { nd_promql_response_free(r) };
     }
@@ -474,7 +493,7 @@ mod tests {
     #[test]
     fn range_rejects_oversized_resolution() {
         let q = CString::new("foo").unwrap();
-        let r = unsafe { nd_promql_query_range(ptr::null(), q.as_ptr(), 0, 3_600_000, 1, 0) };
+        let r = unsafe { nd_promql_query_range(ptr::null(), q.as_ptr(), 0, 3_600_000, 1, 0, -1) };
         assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
         let body = unsafe { CStr::from_ptr(nd_promql_response_body(r)) }
             .to_str()
@@ -487,7 +506,7 @@ mod tests {
     #[test]
     fn range_rejects_bad_window() {
         let q = CString::new("foo").unwrap();
-        let r = unsafe { nd_promql_query_range(ptr::null(), q.as_ptr(), 100, 50, 1000, 0) };
+        let r = unsafe { nd_promql_query_range(ptr::null(), q.as_ptr(), 100, 50, 1000, 0, -1) };
         assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
         unsafe { nd_promql_response_free(r) };
     }

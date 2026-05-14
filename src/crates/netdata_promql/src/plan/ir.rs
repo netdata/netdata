@@ -499,6 +499,63 @@ impl Plan {
             Plan::FusedAggrRollup { .. } => ValueType::InstantVector,
         }
     }
+
+    /// True when the plan contains any operator that needs exact
+    /// distribution shape from the storage layer and therefore cannot
+    /// run against the bucket-aggregated samples that higher tiers
+    /// store. SOW-0041.
+    ///
+    /// Operators that force tier 0:
+    /// - `min_over_time`, `max_over_time` — need per-sample extremes
+    /// - `quantile_over_time` — needs the full distribution
+    /// - `stddev_over_time`, `stdvar_over_time` — need raw samples for
+    ///   variance (variance of bucket averages is a different
+    ///   statistic, not the user-intended one)
+    /// - `topk`, `bottomk` — select among series by exact value
+    ///
+    /// Plans without any of these operators can run on auto-selected
+    /// tiers and benefit from the longer retention.
+    pub fn requires_tier_zero(&self) -> bool {
+        match self {
+            Plan::Number(_) | Plan::VectorSelect { .. } | Plan::MatrixSelect { .. } => false,
+            Plan::UnaryMinus(inner) => inner.requires_tier_zero(),
+            Plan::Binop { lhs, rhs, .. } => lhs.requires_tier_zero() || rhs.requires_tier_zero(),
+            Plan::Aggregate { op, expr, .. } => {
+                matches!(op, AggrKind::TopK | AggrKind::BottomK)
+                    || expr.requires_tier_zero()
+            }
+            Plan::Call { func, args } => {
+                func.requires_tier_zero() || args.iter().any(|a| a.requires_tier_zero())
+            }
+            Plan::Subquery { expr, .. } => expr.requires_tier_zero(),
+            Plan::LabelOp { expr, .. } => expr.requires_tier_zero(),
+            Plan::Absent { expr, .. } => expr.requires_tier_zero(),
+            Plan::FusedAggrRollup { aggr, rollup, source, .. } => {
+                matches!(aggr, AggrKind::TopK | AggrKind::BottomK)
+                    || rollup.requires_tier_zero()
+                    || match source {
+                        FusedSource::Matrix { .. } => false,
+                        FusedSource::Subquery { expr, .. } => expr.requires_tier_zero(),
+                    }
+            }
+        }
+    }
+}
+
+impl FuncKind {
+    /// True when this rollup function needs raw samples (cannot be
+    /// computed correctly over higher-tier bucket aggregates).
+    /// See `Plan::requires_tier_zero` for the rationale.
+    pub fn requires_tier_zero(self) -> bool {
+        matches!(
+            self,
+            FuncKind::MinOverTime
+                | FuncKind::MaxOverTime
+                | FuncKind::QuantileOverTime
+                | FuncKind::StddevOverTime
+                | FuncKind::StdvarOverTime
+        )
+    }
 }
 
 /// Binary-op result type rules (Prometheus semantics):

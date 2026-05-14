@@ -103,6 +103,8 @@ impl NdQuery {
         after_s: i64,
         before_s: i64,
         max_series: usize,
+        points_wanted: i64,
+        tier_hint: i32,
     ) -> Result<Self, ResolveError> {
         let host_c = host
             .map(CString::new)
@@ -125,6 +127,8 @@ impl NdQuery {
                 after_s,
                 before_s,
                 max_series,
+                points_wanted,
+                tier_hint,
                 err.as_mut_ptr(),
                 err.len(),
             )

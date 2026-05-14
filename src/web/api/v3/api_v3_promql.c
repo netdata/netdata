@@ -41,6 +41,17 @@ static int64_t parse_duration_to_ms(const char *s, int64_t fallback_ms) {
     return (int64_t)(secs * 1000.0);
 }
 
+// SOW-0041: optional `?tier=N` parameter. Returns the parsed tier, or -1
+// when the parameter is absent / unparseable (the Rust side treats -1 as
+// the auto-select sentinel).
+static int32_t parse_tier_hint(const char *s) {
+    if (!s || !*s) return -1;
+    char *end = NULL;
+    long v = strtol(s, &end, 10);
+    if (end == s || v < 0 || v > 1000) return -1;
+    return (int32_t)v;
+}
+
 static int write_response_to_buffer(struct web_client *w, struct NdPromqlResponse *resp) {
     buffer_flush(w->response.data);
     if (!resp) {
@@ -63,6 +74,7 @@ static int handle_instant(struct web_client *w, char *url) {
     char *time_str = NULL;
     char *timeout_str = NULL;
     char *host_str = NULL;
+    char *tier_str = NULL;
 
     while (url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
@@ -83,13 +95,16 @@ static int handle_instant(struct web_client *w, char *url) {
             timeout_str = value;
         else if (!strcmp(name, "host"))
             host_str = value;
+        else if (!strcmp(name, "tier"))
+            tier_str = value;
     }
 
     int64_t at_ms = parse_unix_seconds_to_ms(time_str, (int64_t)(now_realtime_usec() / USEC_PER_MS));
     int64_t timeout_ms = parse_duration_to_ms(timeout_str, 30000);
+    int32_t tier_hint = parse_tier_hint(tier_str);
 
     struct NdPromqlResponse *resp =
-        nd_promql_query_instant(host_str, query, at_ms, timeout_ms);
+        nd_promql_query_instant(host_str, query, at_ms, timeout_ms, tier_hint);
     return write_response_to_buffer(w, resp);
 }
 
@@ -100,6 +115,7 @@ static int handle_range(struct web_client *w, char *url) {
     char *step_str = NULL;
     char *timeout_str = NULL;
     char *host_str = NULL;
+    char *tier_str = NULL;
 
     while (url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
@@ -124,6 +140,8 @@ static int handle_range(struct web_client *w, char *url) {
             timeout_str = value;
         else if (!strcmp(name, "host"))
             host_str = value;
+        else if (!strcmp(name, "tier"))
+            tier_str = value;
     }
 
     int64_t now_ms = (int64_t)(now_realtime_usec() / USEC_PER_MS);
@@ -131,9 +149,10 @@ static int handle_range(struct web_client *w, char *url) {
     int64_t end_ms = parse_unix_seconds_to_ms(end_str, now_ms);
     int64_t step_ms = parse_duration_to_ms(step_str, 15000);
     int64_t timeout_ms = parse_duration_to_ms(timeout_str, 30000);
+    int32_t tier_hint = parse_tier_hint(tier_str);
 
     struct NdPromqlResponse *resp =
-        nd_promql_query_range(host_str, query, start_ms, end_ms, step_ms, timeout_ms);
+        nd_promql_query_range(host_str, query, start_ms, end_ms, step_ms, timeout_ms, tier_hint);
     return write_response_to_buffer(w, resp);
 }
 

@@ -71,6 +71,14 @@ typedef struct {
 // err / err_len: caller-provided buffer for an error message on failure.
 //   NULL is permitted; the call still returns NULL on failure.
 //
+// points_wanted: target number of points across the [after_s, before_s]
+//   window. Used by tier auto-selection to pick the coarsest tier that
+//   still covers the request adequately. Pass 1 for instant queries; the
+//   selector then defaults to tier 0 (highest resolution).
+//
+// tier_hint: -1 = auto-select (recommended); 0..N-1 = explicit tier
+//   override, clamped to the configured tier count.
+//
 // Returns NULL on error or on no matching series. Caller must free with
 // `nd_pds_free`.
 nd_pds_query *
@@ -78,7 +86,13 @@ nd_pds_resolve(const char *host_machine_guid,
                const nd_pds_matcher *matchers, size_t matchers_len,
                int64_t after_s, int64_t before_s,
                size_t max_series,
+               int64_t points_wanted, int32_t tier_hint,
                char *err, size_t err_len);
+
+// Tier that the resolve call picked for sample reads. Useful for slow-
+// query log lines and for verifying auto-selection picked the expected
+// tier. Returns 0 on NULL input.
+size_t nd_pds_chosen_tier(const nd_pds_query *q);
 
 // Number of series resolved.
 size_t nd_pds_series_count(const nd_pds_query *q);

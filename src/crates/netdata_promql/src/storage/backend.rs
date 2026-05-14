@@ -32,6 +32,13 @@ pub struct SeriesMeta {
 /// Storage backend. Produces resolved query handles. Implementations
 /// must be thread-safe; the daemon shares one backend across all
 /// concurrent HTTP request handlers.
+///
+/// `points_wanted` and `tier_hint` (SOW-0041) thread tier-selection
+/// inputs to the storage layer. `points_wanted` is the target sample
+/// count across `[after_s, before_s]` — the natural PromQL analogue is
+/// `(end_ms - start_ms) / step_ms`; instant queries pass 1. `tier_hint`
+/// is `-1` for auto-select (recommended) or `0..N-1` for explicit
+/// override. The `MemBackend` test impl ignores both.
 pub trait Backend: Send + Sync {
     fn resolve<'a>(
         &'a self,
@@ -40,6 +47,8 @@ pub trait Backend: Send + Sync {
         after_s: i64,
         before_s: i64,
         max_series: usize,
+        points_wanted: i64,
+        tier_hint: i32,
     ) -> Result<Box<dyn BackendQuery + 'a>, ResolveError>;
 }
 

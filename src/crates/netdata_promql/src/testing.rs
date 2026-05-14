@@ -45,6 +45,8 @@ pub fn eval_instant_against(
         outer_start_ms: at_ms,
         outer_end_ms: at_ms,
         backend,
+        // Compliance harness uses MemBackend which ignores tier hints.
+        tier_hint: -1,
     };
     match eval(&ctx, &plan).map_err(|e: EvalError| format!("eval: {e}"))? {
         EvalResult::Scalar(v) => Ok(TestResult::Scalar(v)),
