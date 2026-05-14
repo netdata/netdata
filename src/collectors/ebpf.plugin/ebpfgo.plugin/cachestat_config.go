@@ -10,25 +10,28 @@ import (
 )
 
 const (
-	cachestatDefaultUpdateEvery = 10
-	cachestatDefaultBTFPath     = "/sys/kernel/btf"
-	cachestatLegacyConfigFile   = "ebpf.d/cachestat.conf"
-	cachestatPrimaryConfigFile  = "ebpf.d.conf"
-	cachestatLegacyConfigName   = "cachestat.conf"
+	cachestatDefaultUpdateEvery  = 10
+	cachestatDefaultBTFPath      = "/sys/kernel/btf"
+	cachestatDefaultObjectFlavor = "buffer"
+	cachestatLegacyConfigFile    = "ebpf.d/cachestat.conf"
+	cachestatPrimaryConfigFile   = "ebpf.d.conf"
+	cachestatLegacyConfigName    = "cachestat.conf"
 )
 
 type cachestatConfigFile struct {
-	UpdateEvery *int
-	PidTable    *uint32
-	MapsPerCore *bool
-	BTFPath     *string
-	Lifetime    *int
+	UpdateEvery  *int
+	PidTable     *uint32
+	MapsPerCore  *bool
+	BTFPath      *string
+	Lifetime     *int
+	ObjectFlavor *string
 }
 
-func loadCachestatConfigFiles() (cachestatConfigFile, error) {
+func loadCachestatConfigFiles() (cachestatConfigFile, bool, error) {
 	userRoot, stockRoot := cachestatConfigRoots()
 
 	var merged cachestatConfigFile
+	found := false
 	for _, path := range []string{
 		filepath.Join(stockRoot, cachestatPrimaryConfigFile),
 		filepath.Join(stockRoot, cachestatLegacyConfigFile),
@@ -37,15 +40,16 @@ func loadCachestatConfigFiles() (cachestatConfigFile, error) {
 	} {
 		cfg, ok, err := parseCachestatConfigFile(path)
 		if err != nil {
-			return cachestatConfigFile{}, err
+			return cachestatConfigFile{}, false, err
 		}
 		if !ok {
 			continue
 		}
+		found = true
 		merged.apply(cfg)
 	}
 
-	return merged, nil
+	return merged, found, nil
 }
 
 func cachestatConfigRoots() (userRoot, stockRoot string) {
@@ -131,6 +135,13 @@ func parseCachestatConfigFile(path string) (cachestatConfigFile, bool, error) {
 			}
 			cfg.Lifetime = intPtr(n)
 			found = true
+		case "ebpf object flavor":
+			flavor, ok := parseCachestatObjectFlavor(value)
+			if !ok {
+				return cachestatConfigFile{}, false, fmt.Errorf("%s: invalid ebpf object flavor %q", path, value)
+			}
+			cfg.ObjectFlavor = stringPtr(flavor)
+			found = true
 		}
 	}
 
@@ -156,6 +167,9 @@ func (c *cachestatConfigFile) apply(other cachestatConfigFile) {
 	}
 	if other.Lifetime != nil {
 		c.Lifetime = other.Lifetime
+	}
+	if other.ObjectFlavor != nil {
+		c.ObjectFlavor = other.ObjectFlavor
 	}
 }
 
@@ -183,5 +197,14 @@ func parseConfigBool(value string) (bool, bool) {
 		return false, true
 	default:
 		return false, false
+	}
+}
+
+func parseCachestatObjectFlavor(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "buffer", "arena", "tracing":
+		return strings.ToLower(strings.TrimSpace(value)), true
+	default:
+		return "", false
 	}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
@@ -18,10 +19,12 @@ type CachestatLegacyConfig struct {
 	KernelVersion   uint32
 	IsDebian        bool
 	HasBTF          bool
+	ConfigFound     bool
 	BTFPath         string
 	UpdateEvery     int
 	PidTableSize    uint32
 	MapsPerCore     bool
+	ObjectFlavor    string
 	AccountFunction string
 	Targets         CachestatTargets
 }
@@ -30,6 +33,7 @@ type CachestatLegacyHandle struct {
 	Plan        LoadPlan
 	Runtime     *libbpfloader.CachestatRuntime
 	UpdateEvery int
+	ConfigFound bool
 }
 
 func (h *CachestatLegacyHandle) Close() {
@@ -60,6 +64,7 @@ func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 		HasBTF:       kernelBTFSupported(cachestatDefaultBTFPath),
 		PidTableSize: cachestatDefaultPIDTableSize,
 		MapsPerCore:  true,
+		ObjectFlavor: cachestatDefaultObjectFlavor,
 		Targets:      defaultCachestatTargets(),
 	}
 }
@@ -67,10 +72,11 @@ func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	cfg := defaultCachestatLegacyConfig()
 
-	fileCfg, err := loadCachestatConfigFiles()
+	fileCfg, found, err := loadCachestatConfigFiles()
 	if err != nil {
 		return CachestatLegacyConfig{}, err
 	}
+	cfg.ConfigFound = found
 	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
 		cfg.UpdateEvery = *fileCfg.UpdateEvery
 	}
@@ -87,6 +93,9 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	if fileCfg.Lifetime != nil && *fileCfg.Lifetime > 0 {
 		// Keep the legacy lifetime value available for future runtime wiring.
 		// The current cachestat migration does not consume it yet.
+	}
+	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" {
+		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
 	}
 
 	kver, err := KernelVersion()
@@ -108,20 +117,34 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 }
 
 func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
-	return BuildLoadPlan(
-		cfg.PluginsDir,
-		cfg.Kernels,
-		cfg.IsRHF,
-		cfg.KernelVersion,
-		"cachestat",
-		false,
-		true,
-		cfg.IsDebian,
-		cfg.HasBTF,
-		LoadCore,
-		"",
-		RunModeEntry,
-	)
+	flavor := selectCachestatObjectFlavor(cfg.ObjectFlavor, cfg.KernelVersion, cfg.IsDebian)
+	loadMode := SelectLoadMode(cfg.HasBTF, LoadCore, cfg.KernelVersion, cfg.IsRHF)
+
+	selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
+	return LoadPlan{
+		KernelVersion: cfg.KernelVersion,
+		IsRHF:         cfg.IsRHF,
+		Selector:      selector,
+		Flavor:        flavor,
+		ObjectPath:    BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "cachestat", false, cfg.IsRHF, flavor),
+		LoadMode:      loadMode,
+		ProgramMode:   LoadTrampoline,
+	}
+}
+
+func selectCachestatObjectFlavor(requested string, kver uint32, isDebian bool) ObjectFlavor {
+	switch strings.ToLower(strings.TrimSpace(requested)) {
+	case "", "buffer":
+		if kver >= minimumKernelVersionBuffer {
+			return ObjectFlavorBuffer
+		}
+	case "arena":
+		if kver >= minimumKernelVersionArena && !isDebian {
+			return ObjectFlavorArena
+		}
+	}
+
+	return ObjectFlavorBase
 }
 
 func kernelBTFSupported(btfPath string) bool {

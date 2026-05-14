@@ -17,6 +17,7 @@ func TestParseCachestatConfigFile(t *testing.T) {
     maps per core = no
     btf path = /tmp/btf
     lifetime = 123
+    ebpf object flavor = arena
 `)
 	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -44,6 +45,9 @@ func TestParseCachestatConfigFile(t *testing.T) {
 	}
 	if cfg.Lifetime == nil || *cfg.Lifetime != 123 {
 		t.Fatalf("unexpected lifetime: %#v", cfg.Lifetime)
+	}
+	if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != "arena" {
+		t.Fatalf("unexpected object flavor: %#v", cfg.ObjectFlavor)
 	}
 }
 
@@ -76,6 +80,7 @@ func TestLoadCachestatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
     pid table size = 2048
     maps per core = yes
     btf path = /stock/btf
+    ebpf object flavor = tracing
 `)
 	write(stockRoot, filepath.Join("ebpf.d", "cachestat.conf"), `
 [global]
@@ -88,11 +93,15 @@ func TestLoadCachestatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
 	write(userRoot, filepath.Join("ebpf.d", "cachestat.conf"), `
 [global]
     maps per core = no
+    ebpf object flavor = buffer
 `)
 
-	cfg, err := loadCachestatConfigFiles()
+	cfg, found, err := loadCachestatConfigFiles()
 	if err != nil {
 		t.Fatalf("load config files: %v", err)
+	}
+	if !found {
+		t.Fatal("expected config files to be detected")
 	}
 
 	if cfg.UpdateEvery == nil || *cfg.UpdateEvery != 23 {
@@ -106,5 +115,24 @@ func TestLoadCachestatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
 	}
 	if cfg.BTFPath == nil || *cfg.BTFPath != "/stock/btf" {
 		t.Fatalf("unexpected btf path: %#v", cfg.BTFPath)
+	}
+	if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != "buffer" {
+		t.Fatalf("unexpected object flavor: %#v", cfg.ObjectFlavor)
+	}
+}
+
+func TestLoadCachestatConfigFilesMissingReturnsNotFound(t *testing.T) {
+	t.Setenv("NETDATA_USER_CONFIG_DIR", t.TempDir())
+	t.Setenv("NETDATA_STOCK_CONFIG_DIR", t.TempDir())
+
+	cfg, found, err := loadCachestatConfigFiles()
+	if err != nil {
+		t.Fatalf("load config files: %v", err)
+	}
+	if found {
+		t.Fatal("expected no config files to be found")
+	}
+	if cfg.UpdateEvery != nil || cfg.PidTable != nil || cfg.MapsPerCore != nil || cfg.BTFPath != nil || cfg.Lifetime != nil || cfg.ObjectFlavor != nil {
+		t.Fatalf("expected empty config, got %#v", cfg)
 	}
 }

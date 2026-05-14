@@ -20,5 +20,9 @@ func main() {
 		return
 	}
 
+	if !handle.ConfigFound && updateEvery > 0 {
+		handle.UpdateEvery = updateEvery
+	}
+
 	runCachestatPlugin(handle, updateEvery)
 }

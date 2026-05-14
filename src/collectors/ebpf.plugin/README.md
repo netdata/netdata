@@ -76,7 +76,9 @@ To edit the `ebpf.d.conf`:
 
 ### `[global]` configuration options
 
-The `[global]` section defines settings for the whole eBPF collector.
+The `[global]` section defines settings for the whole eBPF collector. For `update every`, the collector uses the
+configuration files first and only falls back to the pluginsd command-line interval when no local config file is
+available.
 
 #### eBPF load mode
 
@@ -92,6 +94,16 @@ accepts the following values:
 - `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates new
     charts for the return of these functions, such as errors. Monitoring function returns can help in debugging software,
     such as failing to close file descriptors or creating zombie processes.
+
+#### eBPF object flavor
+
+The `ebpf object flavor` option selects which cachestat object family the Go collector loads from `ebpf.d`.
+
+- `buffer`: The default flavor. Use the buffer object when the current kernel supports it.
+- `arena`: Use the arena object when it is available on the host.
+- `tracing`: Use the legacy tracing object path.
+
+If the requested flavor is not available on the current host, the collector falls back to `tracing`.
 
 #### Integration with `apps.plugin`
 

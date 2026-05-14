@@ -36,7 +36,7 @@ modules:
         description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), presence of BTF files, and the configured object flavor to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
@@ -71,7 +71,7 @@ modules:
             enabled: true
           list:
             - name: update every
-              description: Data collection frequency.
+              description: Data collection frequency. When no local config file is available, the collector falls back to the pluginsd command-line interval.
               default_value: 10
               required: false
             - name: ebpf load mode
@@ -89,6 +89,10 @@ modules:
             - name: pid table size
               description: Number of elements stored inside hash tables used to monitor calls per PID.
               default_value: 32768
+              required: false
+            - name: ebpf object flavor
+              description: "Select the cachestat object flavor to load. Available values are `buffer`, `arena`, and `tracing`. The default is `buffer`, and the collector falls back to `tracing` when the requested flavor is not available on the system."
+              default_value: buffer
               required: false
             - name: ebpf type format
               description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."

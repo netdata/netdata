@@ -263,12 +263,12 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 		return
 	}
 
-	updateEvery := cachestatDefaultUpdateEvery
-	if handle.UpdateEvery > 0 {
-		updateEvery = handle.UpdateEvery
-	}
-	if updateEveryArg > 0 {
+	updateEvery := handle.UpdateEvery
+	if updateEvery <= 0 && updateEveryArg > 0 {
 		updateEvery = updateEveryArg
+	}
+	if updateEvery <= 0 {
+		updateEvery = cachestatDefaultUpdateEvery
 	}
 	api := netdataapi.New(os.Stdout)
 
