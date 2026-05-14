@@ -5,7 +5,7 @@ Netdata Cloud is available in two versions:
 | Version                | Description                                                                                                                                                                                                                     |
 |:-----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Cloud Service**      | The fully-managed service hosted at [app.netdata.cloud](https://app.netdata.cloud). [Connect](/src/claim/README.md) your Agents to access comprehensive infrastructure monitoring, real-time dashboards, and advanced features. |
-| **Enterprise On-Prem** | A self-hosted version of Netdata Cloud for businesses requiring complete control over their monitoring infrastructure. Includes all features of our Cloud offering, deployed within your own environment.                       |
+| **Enterprise On-Prem** | A self-hosted version of Netdata Cloud for businesses requiring complete control over their monitoring infrastructure. Includes all features of our Cloud offering, including [SSO](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md) and [RBAC](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md), deployed within your own environment. |
 
 Visit our [Pricing](https://www.netdata.cloud/pricing/) page to compare features and options.
 

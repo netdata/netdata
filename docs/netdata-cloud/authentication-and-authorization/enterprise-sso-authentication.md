@@ -23,6 +23,12 @@ Enterprise SSO handles authentication only. You must configure user and role man
 | **Subscription**   | Business plan or higher, or Enterprise On-Prem                                                                                                                  |
 | **Access Level**   | Space Administrator permissions                                                                                                                                 |
 
+:::note
+
+Enterprise On-Prem deployments support OIDC-based SSO integration with identity providers that implement the OpenID Connect protocol. Refer to your On-Prem deployment configuration for OIDC setup details.
+
+:::
+ 
 ## Setup
 
 ### Netdata Cloud Configuration
