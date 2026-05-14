@@ -14,14 +14,21 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	clientpkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/client"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
+	scrapepkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
+
+//go:embed "charts.yaml"
+var chartTemplateYAML string
 
 func init() {
 	collectorapi.Register("vsphere", collectorapi.Creator{
@@ -29,12 +36,18 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 20,
 		},
-		Create: func() collectorapi.CollectorV1 { return New() },
-		Config: func() any { return &Config{} },
+		CreateV2:      func() collectorapi.CollectorV2 { return New() },
+		Config:        func() any { return &Config{} },
+		Methods:       vsphereMethods,
+		MethodHandler: vsphereMethodHandler,
 	})
 }
 
 func New() *Collector {
+	store := metrix.NewCollectorStore()
+	mx := newCollectorMetrics(store)
+	charts := inventoryChartsTmpl.Copy()
+
 	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
@@ -42,14 +55,42 @@ func New() *Collector {
 					Timeout: confopt.Duration(time.Second * 20),
 				},
 			},
-			DiscoveryInterval: confopt.Duration(time.Minute * 5),
-			HostsInclude:      []string{"/*"},
-			VMsInclude:        []string{"/*"},
-			DatastoresInclude: []string{"/*"},
-			ClustersInclude:   []string{"/*"},
+			DiscoveryInterval:          confopt.Duration(time.Minute * 5),
+			HostsInclude:               []string{"/*"},
+			VMsInclude:                 []string{"/*"},
+			DatastoresInclude:          []string{"/*"},
+			ClustersInclude:            []string{"/*"},
+			HostPowerStates:            cloneStrings(defaultHostPowerStates),
+			VMPowerStates:              cloneStrings(defaultVMPowerStates),
+			DatastoreClustersInclude:   []string{"/*"},
+			MaxDatastoreClusters:       defaultMaxDatastoreClusters,
+			VMDisksInclude:             []string{"*"},
+			MaxVMDisks:                 defaultMaxVMDisks,
+			VMNICsInclude:              []string{"*"},
+			MaxVMNICs:                  defaultMaxVMNICs,
+			HostNICsInclude:            []string{"*"},
+			MaxHostNICs:                defaultMaxHostNICs,
+			HostDisksInclude:           []string{"*"},
+			MaxHostDisks:               defaultMaxHostDisks,
+			HostStorageAdaptersInclude: []string{"*"},
+			MaxHostStorageAdapters:     defaultMaxHostStorageAdapters,
+			HostStoragePathsInclude:    []string{"*"},
+			MaxHostStoragePaths:        defaultMaxHostStoragePaths,
+			HostCPUInstancesInclude:    []string{"*"},
+			MaxHostCPUInstances:        defaultMaxHostCPUInstances,
+			CollectVSAN:                false,
+			VSANClustersInclude:        []string{"/*"},
+			MaxVSANClusters:            defaultMaxVSANClusters,
+			VSANHostsInclude:           []string{"/*"},
+			MaxVSANHosts:               defaultMaxVSANHosts,
+			VSANVMsInclude:             []string{"/*"},
+			MaxVSANVMs:                 defaultMaxVSANVMs,
+			MaxUserMetadataLabels:      defaultMaxUserMetadataLabels,
 		},
+		store:                   store,
+		mx:                      mx,
 		collectionLock:          &sync.RWMutex{},
-		charts:                  &collectorapi.Charts{},
+		charts:                  charts,
 		discoveredHosts:         make(map[string]int),
 		discoveredVMs:           make(map[string]int),
 		discoveredDatastores:    make(map[string]int),
@@ -64,15 +105,58 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	DiscoveryInterval  confopt.Duration        `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
-	HostsInclude       match.HostIncludes      `yaml:"host_include,omitempty" json:"host_include"`
-	VMsInclude         match.VMIncludes        `yaml:"vm_include,omitempty" json:"vm_include"`
-	DatastoresInclude  match.DatastoreIncludes `yaml:"datastore_include,omitempty" json:"datastore_include"`
-	ClustersInclude    match.ClusterIncludes   `yaml:"cluster_include,omitempty" json:"cluster_include"`
+	Vnode                                string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery                          int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry                   int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	web.HTTPConfig                       `yaml:",inline" json:""`
+	DiscoveryInterval                    confopt.Duration        `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
+	HostsInclude                         match.HostIncludes      `yaml:"host_include,omitempty" json:"host_include"`
+	VMsInclude                           match.VMIncludes        `yaml:"vm_include,omitempty" json:"vm_include"`
+	DatastoresInclude                    match.DatastoreIncludes `yaml:"datastore_include,omitempty" json:"datastore_include"`
+	ClustersInclude                      match.ClusterIncludes   `yaml:"cluster_include,omitempty" json:"cluster_include"`
+	HostPowerStates                      []string                `yaml:"host_power_states,omitempty" json:"host_power_states"`
+	VMPowerStates                        []string                `yaml:"vm_power_states,omitempty" json:"vm_power_states"`
+	CollectDatastoreClusters             bool                    `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
+	DatastoreClustersInclude             []string                `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
+	MaxDatastoreClusters                 int                     `yaml:"max_datastore_clusters,omitempty" json:"max_datastore_clusters"`
+	ESXIVnodes                           bool                    `yaml:"esxi_vnodes,omitempty" json:"esxi_vnodes"`
+	VMVnodes                             bool                    `yaml:"vm_vnodes,omitempty" json:"vm_vnodes"`
+	InventoryPathLabel                   bool                    `yaml:"collect_inventory_path_label,omitempty" json:"collect_inventory_path_label"`
+	VMGuestLabels                        []string                `yaml:"vm_guest_labels,omitempty" json:"vm_guest_labels"`
+	VSphereTagCategories                 []string                `yaml:"vsphere_tag_categories,omitempty" json:"vsphere_tag_categories"`
+	CustomAttributes                     []string                `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
+	MaxUserMetadataLabels                int                     `yaml:"max_user_metadata_labels,omitempty" json:"max_user_metadata_labels"`
+	CollectVMDisks                       bool                    `yaml:"collect_vm_disks,omitempty" json:"collect_vm_disks"`
+	CollectVMDiskPerformance             bool                    `yaml:"collect_vm_disk_performance,omitempty" json:"collect_vm_disk_performance"`
+	VMDisksInclude                       []string                `yaml:"vm_disk_include,omitempty" json:"vm_disk_include"`
+	MaxVMDisks                           int                     `yaml:"max_vm_disks,omitempty" json:"max_vm_disks"`
+	CollectVMNICPerformance              bool                    `yaml:"collect_vm_nic_performance,omitempty" json:"collect_vm_nic_performance"`
+	VMNICsInclude                        []string                `yaml:"vm_nic_include,omitempty" json:"vm_nic_include"`
+	MaxVMNICs                            int                     `yaml:"max_vm_nics,omitempty" json:"max_vm_nics"`
+	CollectHostNICPerformance            bool                    `yaml:"collect_host_nic_performance,omitempty" json:"collect_host_nic_performance"`
+	HostNICsInclude                      []string                `yaml:"host_nic_include,omitempty" json:"host_nic_include"`
+	MaxHostNICs                          int                     `yaml:"max_host_nics,omitempty" json:"max_host_nics"`
+	CollectHostDiskPerformance           bool                    `yaml:"collect_host_disk_performance,omitempty" json:"collect_host_disk_performance"`
+	HostDisksInclude                     []string                `yaml:"host_disk_include,omitempty" json:"host_disk_include"`
+	MaxHostDisks                         int                     `yaml:"max_host_disks,omitempty" json:"max_host_disks"`
+	CollectHostStorageAdapterPerformance bool                    `yaml:"collect_host_storage_adapter_performance,omitempty" json:"collect_host_storage_adapter_performance"`
+	HostStorageAdaptersInclude           []string                `yaml:"host_storage_adapter_include,omitempty" json:"host_storage_adapter_include"`
+	MaxHostStorageAdapters               int                     `yaml:"max_host_storage_adapters,omitempty" json:"max_host_storage_adapters"`
+	CollectHostStoragePathPerformance    bool                    `yaml:"collect_host_storage_path_performance,omitempty" json:"collect_host_storage_path_performance"`
+	HostStoragePathsInclude              []string                `yaml:"host_storage_path_include,omitempty" json:"host_storage_path_include"`
+	MaxHostStoragePaths                  int                     `yaml:"max_host_storage_paths,omitempty" json:"max_host_storage_paths"`
+	CollectHostCPUInstancePerformance    bool                    `yaml:"collect_host_cpu_instance_performance,omitempty" json:"collect_host_cpu_instance_performance"`
+	HostCPUInstancesInclude              []string                `yaml:"host_cpu_instance_include,omitempty" json:"host_cpu_instance_include"`
+	MaxHostCPUInstances                  int                     `yaml:"max_host_cpu_instances,omitempty" json:"max_host_cpu_instances"`
+	CollectPowerMetrics                  bool                    `yaml:"collect_power_metrics,omitempty" json:"collect_power_metrics"`
+	CollectVSAN                          bool                    `yaml:"collect_vsan,omitempty" json:"collect_vsan"`
+	VSANClustersInclude                  []string                `yaml:"vsan_cluster_include,omitempty" json:"vsan_cluster_include"`
+	MaxVSANClusters                      int                     `yaml:"max_vsan_clusters,omitempty" json:"max_vsan_clusters"`
+	VSANHostsInclude                     []string                `yaml:"vsan_host_include,omitempty" json:"vsan_host_include"`
+	MaxVSANHosts                         int                     `yaml:"max_vsan_hosts,omitempty" json:"max_vsan_hosts"`
+	VSANVMsInclude                       []string                `yaml:"vsan_vm_include,omitempty" json:"vsan_vm_include"`
+	MaxVSANVMs                           int                     `yaml:"max_vsan_vms,omitempty" json:"max_vsan_vms"`
+	CollectNetworkTopology               bool                    `yaml:"collect_network_topology,omitempty" json:"collect_network_topology"`
 }
 
 type (
@@ -81,7 +165,10 @@ type (
 		Config `yaml:",inline" json:""`
 
 		charts *collectorapi.Charts
+		store  metrix.CollectorStore
+		mx     *collectorMetrics
 
+		vsClient *clientpkg.Client
 		discoverer
 		scraper
 		dsPropertyCollector
@@ -99,10 +186,36 @@ type (
 		charted                 map[string]bool
 
 		// two-phase chart creation: property charts always, perf charts only when data arrives
-		datastorePerfReceived map[string]bool
-		datastorePerfCharted  map[string]bool
-		clusterPerfReceived   map[string]bool
-		clusterPerfCharted    map[string]bool
+		datastorePerfReceived                  map[string]bool
+		datastorePerfCharted                   map[string]bool
+		clusterPerfReceived                    map[string]bool
+		clusterPerfCharted                     map[string]bool
+		vcenterInstanceUUID                    string
+		datastoreClusterMatcher                matcher.Matcher
+		vmDiskMatcher                          matcher.Matcher
+		vmNICMatcher                           matcher.Matcher
+		hostNICMatcher                         matcher.Matcher
+		hostDiskMatcher                        matcher.Matcher
+		hostStorageAdapterMatcher              matcher.Matcher
+		hostStoragePathMatcher                 matcher.Matcher
+		hostCPUInstanceMatcher                 matcher.Matcher
+		vsanClusterMatcher                     matcher.Matcher
+		vsanHostMatcher                        matcher.Matcher
+		vsanVMMatcher                          matcher.Matcher
+		vsphereTagCategoryMatcher              matcher.Matcher
+		customAttributeMatcher                 matcher.Matcher
+		vmDiskPerfSamples                      map[string]*vmDiskPerfSample
+		vmNICPerfSamples                       map[string]*vmNICPerfSample
+		hostNICPerfSamples                     map[string]*hostNICPerfSample
+		hostDiskPerfSamples                    map[string]*hostDiskPerfSample
+		hostStorageAdapterPerfSamples          map[string]*hostStorageAdapterPerfSample
+		hostStorageAdapterAggregatePerfSamples map[string]*hostStorageAdapterAggregatePerfSample
+		hostStoragePathPerfSamples             map[string]*hostStoragePathPerfSample
+		hostStoragePathAggregatePerfSamples    map[string]*hostStoragePathAggregatePerfSample
+		hostCPUInstancePerfSamples             map[string]*hostCPUInstancePerfSample
+		hostPowerPerfSamples                   map[string]*hostPowerPerfSample
+		vmPowerPerfSamples                     map[string]*vmPowerPerfSample
+		vsanMetrics                            *scrapepkg.VSANMetrics
 	}
 	discoverer interface {
 		Discover() (*rs.Resources, error)
@@ -112,6 +225,7 @@ type (
 		ScrapeVMs(rs.VMs) []performance.EntityMetric
 		ScrapeDatastores(rs.Datastores) []performance.EntityMetric
 		ScrapeClusters(rs.Clusters) []performance.EntityMetric
+		ScrapeVSAN(rs.Clusters, rs.Hosts, rs.VMs) *scrapepkg.VSANMetrics
 	}
 	dsPropertyCollector interface {
 		DatastoresByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo25.Datastore, error)
@@ -129,23 +243,33 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Init(context.Context) error {
+	c.ensureRuntimeState()
+	c.stopDiscoveryTask(true)
+	c.closeClient()
+	c.resetRuntimeStateForInit()
+
 	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("error on validating config: %v", err)
+		return fmt.Errorf("validate vSphere collector configuration: %w", err)
 	}
 
 	vsClient, err := c.initClient()
 	if err != nil {
-		return fmt.Errorf("error on creating vsphere client: %v", err)
+		return fmt.Errorf("create vSphere client: %w", err)
 	}
+	c.vsClient = vsClient
 
 	if err := c.initDiscoverer(vsClient); err != nil {
-		return fmt.Errorf("error on creating vsphere discoverer: %v", err)
+		c.closeClient()
+		return fmt.Errorf("create vSphere discoverer from configuration: %w", err)
 	}
+
+	c.vcenterInstanceUUID = vsClient.InstanceUUID()
 
 	c.initScraper(vsClient)
 
 	if err := c.discoverOnce(); err != nil {
-		return fmt.Errorf("error on discovering: %v", err)
+		c.closeClient()
+		return fmt.Errorf("run initial vSphere discovery: %w", err)
 	}
 
 	c.goDiscovery()
@@ -161,21 +285,108 @@ func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(context.Context) error {
+	c.collectionLock.Lock()
+	defer c.collectionLock.Unlock()
+
+	mx, err := c.collectLocked()
 	if err != nil {
-		c.Error(err)
+		return fmt.Errorf("collect vSphere metrics: %w", err)
 	}
 
-	if len(mx) == 0 {
-		return nil
-	}
-	return mx
+	c.writeMetrics(mx)
+	return nil
 }
 
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
+
+func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }
+
 func (c *Collector) Cleanup(context.Context) {
+	c.stopDiscoveryTask(true)
+	c.closeClient()
+}
+
+func (c *Collector) ensureRuntimeState() {
+	if c.collectionLock == nil {
+		c.collectionLock = &sync.RWMutex{}
+	}
+	if c.store == nil {
+		c.store = metrix.NewCollectorStore()
+	}
+	if c.mx == nil {
+		c.mx = newCollectorMetrics(c.store)
+	}
+	if c.charts == nil {
+		c.charts = inventoryChartsTmpl.Copy()
+	}
+}
+
+func (c *Collector) resetRuntimeStateForInit() {
+	c.collectionLock.Lock()
+	defer c.collectionLock.Unlock()
+
+	c.charts = inventoryChartsTmpl.Copy()
+	c.discoverer = nil
+	c.scraper = nil
+	c.dsPropertyCollector = nil
+	c.clusterPropertyCollector = nil
+	c.rpPropertyCollector = nil
+	c.resources = nil
+	c.discoveredHosts = make(map[string]int)
+	c.discoveredVMs = make(map[string]int)
+	c.discoveredDatastores = make(map[string]int)
+	c.discoveredClusters = make(map[string]int)
+	c.discoveredResourcePools = make(map[string]int)
+	c.charted = make(map[string]bool)
+	c.datastorePerfReceived = make(map[string]bool)
+	c.datastorePerfCharted = make(map[string]bool)
+	c.clusterPerfReceived = make(map[string]bool)
+	c.clusterPerfCharted = make(map[string]bool)
+	c.vcenterInstanceUUID = ""
+	c.datastoreClusterMatcher = nil
+	c.vmDiskMatcher = nil
+	c.vmNICMatcher = nil
+	c.hostNICMatcher = nil
+	c.hostDiskMatcher = nil
+	c.hostStorageAdapterMatcher = nil
+	c.hostStoragePathMatcher = nil
+	c.hostCPUInstanceMatcher = nil
+	c.vsanClusterMatcher = nil
+	c.vsanHostMatcher = nil
+	c.vsanVMMatcher = nil
+	c.vsphereTagCategoryMatcher = nil
+	c.customAttributeMatcher = nil
+	c.vmDiskPerfSamples = nil
+	c.vmNICPerfSamples = nil
+	c.hostNICPerfSamples = nil
+	c.hostDiskPerfSamples = nil
+	c.hostStorageAdapterPerfSamples = nil
+	c.hostStorageAdapterAggregatePerfSamples = nil
+	c.hostStoragePathPerfSamples = nil
+	c.hostStoragePathAggregatePerfSamples = nil
+	c.hostCPUInstancePerfSamples = nil
+	c.hostPowerPerfSamples = nil
+	c.vmPowerPerfSamples = nil
+	c.vsanMetrics = nil
+}
+
+func (c *Collector) closeClient() {
+	if c.vsClient == nil {
+		return
+	}
+	if err := c.vsClient.Close(); err != nil {
+		c.Warningf("close vSphere client during collector cleanup: %v", err)
+	}
+	c.vsClient = nil
+}
+
+func (c *Collector) stopDiscoveryTask(wait bool) {
 	if c.discoveryTask == nil {
 		return
 	}
 	c.discoveryTask.stop()
+	if wait {
+		c.discoveryTask.wait()
+	}
 }

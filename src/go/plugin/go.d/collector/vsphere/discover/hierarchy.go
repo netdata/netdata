@@ -8,6 +8,8 @@ import (
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
+const maxHierarchyParentDepth = 64
+
 func (d Discoverer) setHierarchy(res *rs.Resources) error {
 	d.Debug("discovering : hierarchy : start setting resources hierarchy process")
 	t := time.Now()
@@ -16,13 +18,17 @@ func (d Discoverer) setHierarchy(res *rs.Resources) error {
 	h := d.setHostsHierarchy(res)
 	v := d.setVMsHierarchy(res)
 	ds := d.setDatastoresHierarchy(res)
+	nw := d.setNetworksHierarchy(res)
+	sp := d.setStoragePodsHierarchy(res)
 	rp := d.setResourcePoolsHierarchy(res)
 
-	d.Infof("discovering : hierarchy : set %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, %d/%d resource pools, process took %s",
+	d.Infof("discovering : hierarchy : set %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, %d/%d networks, %d/%d datastore clusters, %d/%d resource pools, process took %s",
 		c, len(res.Clusters),
 		h, len(res.Hosts),
 		v, len(res.VMs),
 		ds, len(res.Datastores),
+		nw, len(res.Networks),
+		sp, len(res.StoragePods),
 		rp, len(res.ResourcePools),
 		time.Since(t),
 	)
@@ -82,6 +88,13 @@ func setHostHierarchy(host *rs.Host, res *rs.Resources) bool {
 }
 
 func setVMHierarchy(vm *rs.VM, res *rs.Resources) bool {
+	if setVMHostHierarchy(vm, res) {
+		return true
+	}
+	return setVMFolderHierarchy(vm, res)
+}
+
+func setVMHostHierarchy(vm *rs.VM, res *rs.Resources) bool {
 	h := res.Hosts.Get(vm.ParentID)
 	if h == nil {
 		return false
@@ -100,6 +113,20 @@ func setVMHierarchy(vm *rs.VM, res *rs.Resources) bool {
 	}
 	vm.Hier.DC.Set(dc.ID, dc.Name)
 	return vm.Hier.IsSet()
+}
+
+func setVMFolderHierarchy(vm *rs.VM, res *rs.Resources) bool {
+	dcID := findVMDcID(vm.FolderParentID, res.Folders)
+	dc := res.DataCenters.Get(dcID)
+	if dc == nil {
+		return false
+	}
+	vm.Hier.DC.Set(dc.ID, dc.Name)
+	return vm.Hier.DC.IsSet()
+}
+
+func findVMDcID(parentID string, folders rs.Folders) string {
+	return findFolderRootID(parentID, folders)
 }
 
 func (d Discoverer) setDatastoresHierarchy(res *rs.Resources) (set int) {
@@ -123,11 +150,68 @@ func setDatastoreHierarchy(ds *rs.Datastore, res *rs.Resources) bool {
 }
 
 func findDatastoreDcID(parentID string, folders rs.Folders) string {
-	f := folders.Get(parentID)
-	if f == nil {
-		return parentID
+	return findFolderRootID(parentID, folders)
+}
+
+func (d Discoverer) setNetworksHierarchy(res *rs.Resources) (set int) {
+	for _, network := range res.Networks {
+		if setNetworkHierarchy(network, res) {
+			set++
+		}
 	}
-	return findDatastoreDcID(f.ParentID, folders)
+	return set
+}
+
+// Network parent is normally a network folder (group-n*) which resolves to a datacenter.
+func setNetworkHierarchy(network *rs.Network, res *rs.Resources) bool {
+	dcID := findNetworkDcID(network.ParentID, res.Folders)
+	dc := res.DataCenters.Get(dcID)
+	if dc == nil {
+		return false
+	}
+	network.Hier.DC.Set(dc.ID, dc.Name)
+	return network.Hier.IsSet()
+}
+
+func findNetworkDcID(parentID string, folders rs.Folders) string {
+	return findFolderRootID(parentID, folders)
+}
+
+func findFolderRootID(parentID string, folders rs.Folders) string {
+	seen := make(map[string]struct{})
+	for depth := 0; parentID != "" && depth < maxHierarchyParentDepth; depth++ {
+		if _, ok := seen[parentID]; ok {
+			return ""
+		}
+		seen[parentID] = struct{}{}
+
+		f := folders.Get(parentID)
+		if f == nil {
+			return parentID
+		}
+		parentID = f.ParentID
+	}
+	return parentID
+}
+
+func (d Discoverer) setStoragePodsHierarchy(res *rs.Resources) (set int) {
+	for _, pod := range res.StoragePods {
+		if setStoragePodHierarchy(pod, res) {
+			set++
+		}
+	}
+	return set
+}
+
+// StoragePod parent is a folder (group-s*) which resolves to a datacenter.
+func setStoragePodHierarchy(pod *rs.StoragePod, res *rs.Resources) bool {
+	dcID := findDatastoreDcID(pod.ParentID, res.Folders)
+	dc := res.DataCenters.Get(dcID)
+	if dc == nil {
+		return false
+	}
+	pod.Hier.DC.Set(dc.ID, dc.Name)
+	return pod.Hier.IsSet()
 }
 
 func (d Discoverer) setResourcePoolsHierarchy(res *rs.Resources) (set int) {

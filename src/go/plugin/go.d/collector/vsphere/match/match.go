@@ -148,7 +148,7 @@ func (vi VMIncludes) Parse() (VMMatcher, error) {
 	for _, v := range vi {
 		m, err := parseVMInclude(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse VM include %q: %w", v, err)
 		}
 		if m == nil {
 			continue
@@ -171,7 +171,7 @@ func (hi HostIncludes) Parse() (HostMatcher, error) {
 	for _, v := range hi {
 		m, err := parseHostInclude(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse host include %q: %w", v, err)
 		}
 		if m == nil {
 			continue
@@ -194,7 +194,7 @@ func (di DatastoreIncludes) Parse() (DatastoreMatcher, error) {
 	for _, v := range di {
 		m, err := parseDatastoreInclude(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse datastore include %q: %w", v, err)
 		}
 		if m == nil {
 			continue
@@ -225,7 +225,7 @@ func cleanInclude(include string) string {
 
 func parseHostInclude(include string) (HostMatcher, error) {
 	if !isIncludeFormatValid(include) {
-		return nil, fmt.Errorf("bad include format: %s", include)
+		return nil, fmt.Errorf("bad host include format %q: expected /<datacenter>/<cluster>/<host>", include)
 	}
 
 	include = cleanInclude(include)
@@ -235,7 +235,7 @@ func parseHostInclude(include string) (HostMatcher, error) {
 	for i, v := range parts {
 		m, err := parseSubInclude(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse host include segment index=%d value=%q: %w", i, v, err)
 		}
 		switch i {
 		case datacenterIdx:
@@ -260,7 +260,7 @@ func parseHostInclude(include string) (HostMatcher, error) {
 
 func parseVMInclude(include string) (VMMatcher, error) {
 	if !isIncludeFormatValid(include) {
-		return nil, fmt.Errorf("bad include format: %s", include)
+		return nil, fmt.Errorf("bad VM include format %q: expected /<datacenter>/<cluster>/<host>/<vm>", include)
 	}
 
 	include = cleanInclude(include)
@@ -270,7 +270,7 @@ func parseVMInclude(include string) (VMMatcher, error) {
 	for i, v := range parts {
 		m, err := parseSubInclude(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse VM include segment index=%d value=%q: %w", i, v, err)
 		}
 		switch i {
 		case datacenterIdx:
@@ -314,7 +314,7 @@ func (ci ClusterIncludes) Parse() (ClusterMatcher, error) {
 	for _, v := range ci {
 		m, err := parseClusterInclude(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse cluster include %q: %w", v, err)
 		}
 		if m == nil {
 			continue
@@ -339,7 +339,7 @@ const (
 
 func parseClusterInclude(include string) (ClusterMatcher, error) {
 	if !isIncludeFormatValid(include) {
-		return nil, fmt.Errorf("bad include format: %s", include)
+		return nil, fmt.Errorf("bad cluster include format %q: expected /<datacenter>/<cluster>", include)
 	}
 
 	include = cleanInclude(include)
@@ -349,7 +349,7 @@ func parseClusterInclude(include string) (ClusterMatcher, error) {
 	for i, v := range parts {
 		m, err := parseSubInclude(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse cluster include segment index=%d value=%q: %w", i, v, err)
 		}
 		switch i {
 		case clDCIdx:
@@ -377,7 +377,7 @@ const (
 
 func parseDatastoreInclude(include string) (DatastoreMatcher, error) {
 	if !isIncludeFormatValid(include) {
-		return nil, fmt.Errorf("bad include format: %s", include)
+		return nil, fmt.Errorf("bad datastore include format %q: expected /<datacenter>/<datastore>", include)
 	}
 
 	include = cleanInclude(include)
@@ -387,7 +387,7 @@ func parseDatastoreInclude(include string) (DatastoreMatcher, error) {
 	for i, v := range parts {
 		m, err := parseSubInclude(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse datastore include segment index=%d value=%q: %w", i, v, err)
 		}
 		switch i {
 		case dsDatacenterIdx:

@@ -264,6 +264,12 @@
 	power.energy.summation [J, delta, false] [Total energy used since last stats reset]
 	power.power.average [W, rate, false] [Current power usage]
 	power.powerCap.average [W, absolute, false] [Maximum allowed power usage]
+	power.capacity.usable.average [W, absolute, false] [Current maximum allowed power usage]
+	power.capacity.usage.average [W, absolute, false] [Current power capacity usage]
+	power.capacity.usagePct.average [%, absolute, false] [Current power capacity usage percentage]
+	power.capacity.usageIdle.average [W, absolute, false] [Power capacity used by idle ESXi services]
+	power.capacity.usageSystem.average [W, absolute, false] [Power capacity used by ESXi system services]
+	power.capacity.usageVm.average [W, absolute, false] [Power capacity used by virtual machines]
 
 	rescpu.sampleCount.latest [num, absolute, false] [Group CPU sample count]
 	rescpu.maxLimited5.latest [%, absolute, false] [Amount of CPU resources over the limit that were refused, average over 5 minutes]

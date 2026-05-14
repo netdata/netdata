@@ -38,6 +38,472 @@
         "minimum": 60,
         "default": 300
       },
+      "host_power_states": {
+        "title": "Host power states",
+        "description": "ESXi host power states to discover. The default preserves existing behavior by discovering only powered-on hosts. Non-powered-on hosts are collected as property/status-only resources; real-time performance counters are skipped.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Host power state",
+          "type": "string",
+          "enum": [
+            "poweredOn",
+            "poweredOff",
+            "standBy",
+            "unknown"
+          ]
+        },
+        "default": [
+          "poweredOn"
+        ]
+      },
+      "vm_power_states": {
+        "title": "VM power states",
+        "description": "Virtual machine power states to discover. The default preserves existing behavior by discovering only powered-on VMs. Powered-off and suspended VMs are collected as property/status/snapshot-only resources; real-time performance counters are skipped.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "VM power state",
+          "type": "string",
+          "enum": [
+            "poweredOn",
+            "poweredOff",
+            "suspended"
+          ]
+        },
+        "default": [
+          "poweredOn"
+        ]
+      },
+      "esxi_vnodes": {
+        "title": "Create ESXi virtual nodes",
+        "description": "If enabled, host-owned ESXi metrics are emitted under one Netdata Virtual Node per ESXi host. Disabled by default to preserve existing dashboards and time-series scope.",
+        "type": "boolean",
+        "default": false
+      },
+      "vm_vnodes": {
+        "title": "Create VM virtual nodes",
+        "description": "If enabled, VM-owned metrics are emitted under one Netdata Virtual Node per VM. Disabled by default because VMs normally run their own Netdata Agents, and enabling this can duplicate VM nodes in dashboards.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_inventory_path_label": {
+        "title": "Collect inventory path label",
+        "description": "If enabled, adds an inventory_path chart label to discovered vSphere resources. Disabled by default because inventory paths can expose internal naming schemes.",
+        "type": "boolean",
+        "default": false
+      },
+      "vm_guest_labels": {
+        "title": "VM guest labels",
+        "description": "Optional allowlist of VM guest labels to add to VM charts. Disabled by default because guest hostnames, IP addresses, and OS names can be sensitive and high cardinality.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "VM guest label",
+          "type": "string",
+          "enum": [
+            "guest_hostname",
+            "guest_ip",
+            "guest_os"
+          ]
+        },
+        "default": []
+      },
+      "vsphere_tag_categories": {
+        "title": "vSphere tag categories",
+        "description": "Optional glob-pattern allowlist of vSphere tag category names to expose as chart labels. Each list item is one pattern, so names with spaces are supported. Disabled by default because tags are user-defined metadata and can expose internal names. Use \"*\" only when all tag categories are intentional. Label keys are vsphere_tag_<sanitized_category>; multiple tags in the same category are sorted and joined with \"|\".",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "vSphere tag category",
+          "type": "string",
+          "default": "Environment"
+        },
+        "default": []
+      },
+      "custom_attributes": {
+        "title": "vSphere custom attributes",
+        "description": "Optional glob-pattern allowlist of vSphere custom attribute names to expose as chart labels. Each list item is one pattern, so names with spaces are supported. Disabled by default because custom attributes are user-defined metadata and can expose internal names, ownership data, or secrets stored by administrators. Custom attribute values are sent verbatim as labels; never enable patterns that can match secret values. Use \"*\" only when all custom attributes are intentional. Label keys are vsphere_custom_attribute_<sanitized_name>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "vSphere custom attribute",
+          "type": "string",
+          "default": "Owner"
+        },
+        "default": []
+      },
+      "max_user_metadata_labels": {
+        "title": "Maximum vSphere metadata labels",
+        "description": "Maximum number of vSphere tag and custom-attribute labels to add per discovered resource. Applies only when vsphere_tag_categories or custom_attributes is configured.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 64
+      },
+      "collect_vm_disks": {
+        "title": "Collect VM virtual disks",
+        "description": "If enabled, collects one capacity series per VM virtual disk. Disabled by default because it can create many time series in large vCenters.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_vm_disk_performance": {
+        "title": "Collect VM virtual disk performance",
+        "description": "If enabled, collects per-virtual-disk I/O, IOPS, latency, and outstanding I/O metrics from vSphere virtualDisk performance instances. Disabled by default because it adds high-cardinality per-disk performance series and can increase vCenter query load.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_datastore_clusters": {
+        "title": "Collect datastore clusters",
+        "description": "If enabled, collects aggregate capacity and Storage DRS status for datastore clusters (StoragePod objects). Disabled by default because it adds another discovered resource class.",
+        "type": "boolean",
+        "default": false
+      },
+      "datastore_cluster_include": {
+        "title": "Datastore cluster selector",
+        "description": "Simple-pattern allowlist for datastore clusters when collect_datastore_clusters is enabled. Patterns match /Datacenter/DatastoreCluster, the datastore cluster name, or the vSphere managed object ID.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Datastore cluster selector",
+          "type": "string",
+          "default": "/*"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "max_datastore_clusters": {
+        "title": "Maximum datastore clusters",
+        "description": "Maximum number of datastore clusters to emit when collect_datastore_clusters is enabled.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 256
+      },
+      "vm_disk_include": {
+        "title": "VM virtual disk selector",
+        "description": "Simple-pattern allowlist for VM virtual disks when collect_vm_disks or collect_vm_disk_performance is enabled. Capacity collection patterns match the vSphere disk label, the numeric disk key, or key:<disk_key>. Performance collection patterns match the vSphere performance instance or instance:<disk_instance>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "VM disk selector",
+          "type": "string",
+          "default": "*"
+        },
+        "default": [
+          "*"
+        ]
+      },
+      "max_vm_disks": {
+        "title": "Maximum VM virtual disks",
+        "description": "Maximum number of VM virtual disks to emit when collect_vm_disks or collect_vm_disk_performance is enabled. This bounds high-cardinality disk series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "collect_vm_nic_performance": {
+        "title": "Collect VM network interface performance",
+        "description": "If enabled, collects per-vNIC traffic, packets, drops, broadcast packets, and multicast packets from vSphere net performance instances. Disabled by default because it adds high-cardinality per-interface performance series and can increase vCenter query load.",
+        "type": "boolean",
+        "default": false
+      },
+      "vm_nic_include": {
+        "title": "VM network interface selector",
+        "description": "Simple-pattern allowlist for VM network interfaces when collect_vm_nic_performance is enabled. Patterns match the vSphere performance instance or interface:<interface_instance>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "VM network interface selector",
+          "type": "string",
+          "default": "*"
+        },
+        "default": [
+          "*"
+        ]
+      },
+      "max_vm_nics": {
+        "title": "Maximum VM network interfaces",
+        "description": "Maximum number of VM network interfaces to emit when collect_vm_nic_performance is enabled. This bounds high-cardinality vNIC series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "collect_host_nic_performance": {
+        "title": "Collect host physical network interface performance",
+        "description": "If enabled, collects per-physical-NIC traffic, packets, drops, errors, broadcast packets, multicast packets, unknown protocol frames, and usage from vSphere net performance instances. Disabled by default because it adds high-cardinality per-interface performance series and can increase vCenter query load.",
+        "type": "boolean",
+        "default": false
+      },
+      "host_nic_include": {
+        "title": "Host physical network interface selector",
+        "description": "Simple-pattern allowlist for host physical network interfaces when collect_host_nic_performance is enabled. Patterns match the vSphere performance instance or interface:<interface_instance>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Host physical network interface selector",
+          "type": "string",
+          "default": "*"
+        },
+        "default": [
+          "*"
+        ]
+      },
+      "max_host_nics": {
+        "title": "Maximum host physical network interfaces",
+        "description": "Maximum number of host physical network interfaces to emit when collect_host_nic_performance is enabled. This bounds high-cardinality pNIC series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "collect_host_disk_performance": {
+        "title": "Collect host disk device performance",
+        "description": "If enabled, collects per-host-disk/LUN throughput, IOPS, requests, latency, command events, queue depth, and SCSI reservation conflicts from vSphere disk performance instances. Disabled by default because it adds high-cardinality per-device performance series and can increase vCenter query load.",
+        "type": "boolean",
+        "default": false
+      },
+      "host_disk_include": {
+        "title": "Host disk device selector",
+        "description": "Simple-pattern allowlist for host disk/LUN/device instances when collect_host_disk_performance is enabled. Patterns match the vSphere performance instance or instance:<disk_instance>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Host disk device selector",
+          "type": "string",
+          "default": "*"
+        },
+        "default": [
+          "*"
+        ]
+      },
+      "max_host_disks": {
+        "title": "Maximum host disk devices",
+        "description": "Maximum number of host disk/LUN/device instances to emit when collect_host_disk_performance is enabled. This bounds high-cardinality disk series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "collect_host_storage_adapter_performance": {
+        "title": "Collect host storage adapter performance",
+        "description": "If enabled, collects per-host-storage-adapter I/O, command, latency, queue, outstanding I/O percentage, throughput usage, throughput contention, and aggregate maximum latency metrics from vSphere storageAdapter performance counters. Disabled by default because it adds high-cardinality per-adapter performance series and can increase vCenter query load.",
+        "type": "boolean",
+        "default": false
+      },
+      "host_storage_adapter_include": {
+        "title": "Host storage adapter selector",
+        "description": "Simple-pattern allowlist for host storage adapter instances when collect_host_storage_adapter_performance is enabled. Patterns match the vSphere performance instance, adapter:<adapter_instance>, or instance:<adapter_instance>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Host storage adapter selector",
+          "type": "string",
+          "default": "*"
+        },
+        "default": [
+          "*"
+        ]
+      },
+      "max_host_storage_adapters": {
+        "title": "Maximum host storage adapters",
+        "description": "Maximum number of host storage adapter instances to emit when collect_host_storage_adapter_performance is enabled. This bounds high-cardinality adapter series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "collect_host_storage_path_performance": {
+        "title": "Collect host storage path performance",
+        "description": "If enabled, collects per-host-storage-path I/O, command, latency, command-event, throughput usage, throughput contention, and aggregate maximum latency metrics from vSphere storagePath performance counters. Disabled by default because it adds high-cardinality per-path performance series and can increase vCenter query load.",
+        "type": "boolean",
+        "default": false
+      },
+      "host_storage_path_include": {
+        "title": "Host storage path selector",
+        "description": "Simple-pattern allowlist for host storage path instances when collect_host_storage_path_performance is enabled. Patterns match the vSphere performance instance, path:<path_instance>, or instance:<path_instance>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Host storage path selector",
+          "type": "string",
+          "default": "*"
+        },
+        "default": [
+          "*"
+        ]
+      },
+      "max_host_storage_paths": {
+        "title": "Maximum host storage paths",
+        "description": "Maximum number of host storage path instances to emit when collect_host_storage_path_performance is enabled. This bounds high-cardinality path series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "collect_host_cpu_instance_performance": {
+        "title": "Collect host CPU instance performance",
+        "description": "If enabled, collects per-host CPU instance usage, utilization, core utilization, used time, and idle time from vSphere cpu performance counters. Disabled by default because it adds high-cardinality per-core/logical-CPU performance series and can increase vCenter query load.",
+        "type": "boolean",
+        "default": false
+      },
+      "host_cpu_instance_include": {
+        "title": "Host CPU instance selector",
+        "description": "Simple-pattern allowlist for host CPU instances when collect_host_cpu_instance_performance is enabled. Patterns match the vSphere performance instance, cpu:<cpu_instance>, or instance:<cpu_instance>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Host CPU instance selector",
+          "type": "string",
+          "default": "*"
+        },
+        "default": [
+          "*"
+        ]
+      },
+      "max_host_cpu_instances": {
+        "title": "Maximum host CPU instances",
+        "description": "Maximum number of host CPU instances to emit when collect_host_cpu_instance_performance is enabled. This bounds high-cardinality CPU instance series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "collect_power_metrics": {
+        "title": "Collect power and energy metrics",
+        "description": "If enabled, collects aggregate host and VM power usage, energy usage, and host power-capacity metrics from vSphere power performance counters. Disabled by default to preserve existing collection scope and avoid extra vCenter performance queries.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_vsan": {
+        "title": "Collect vSAN metrics",
+        "description": "If enabled, collects vSAN cluster capacity, vSAN cluster health, and vSAN cluster, host, and VM performance metrics through the vSAN Management API. Disabled by default because it requires vSAN APIs and the vSAN Performance Service, and adds additional vCenter queries. Use the vSAN selectors and max caps to bound the concrete vSAN performance entity refs queried.",
+        "type": "boolean",
+        "default": false
+      },
+      "vsan_cluster_include": {
+        "title": "vSAN cluster selector",
+        "description": "Simple-pattern allowlist for vSAN clusters when collect_vsan is enabled. Patterns match /Datacenter/Cluster, the cluster name, the vSphere managed object ID, or vsan_uuid:<uuid>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "vSAN cluster selector",
+          "type": "string",
+          "default": "/*"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "max_vsan_clusters": {
+        "title": "Maximum vSAN clusters",
+        "description": "Maximum number of vSAN-enabled clusters to query and emit when collect_vsan is enabled. This bounds vSAN cluster capacity, health, and performance series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 256
+      },
+      "vsan_host_include": {
+        "title": "vSAN host selector",
+        "description": "Simple-pattern allowlist for vSAN host performance entities when collect_vsan is enabled. Patterns match /Datacenter/Cluster/Host, the host name, the vSphere managed object ID, or vsan_node_uuid:<uuid>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "vSAN host selector",
+          "type": "string",
+          "default": "/*"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "max_vsan_hosts": {
+        "title": "Maximum vSAN hosts",
+        "description": "Maximum number of vSAN host performance entities to query and emit when collect_vsan is enabled. This bounds high-cardinality vSAN host performance series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "vsan_vm_include": {
+        "title": "vSAN VM selector",
+        "description": "Simple-pattern allowlist for vSAN VM performance entities when collect_vsan is enabled. Patterns match /Datacenter/Cluster/Host/VM, the VM name, the vSphere managed object ID, or instance_uuid:<uuid>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "vSAN VM selector",
+          "type": "string",
+          "default": "/*"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "max_vsan_vms": {
+        "title": "Maximum vSAN VMs",
+        "description": "Maximum number of vSAN VM performance entities to query and emit when collect_vsan is enabled. This bounds high-cardinality vSAN VM performance series.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "collect_network_topology": {
+        "title": "Collect network topology",
+        "description": "If enabled, discovers vSphere Network and Distributed Virtual Port Group objects for the cached vSphere Topology function. Disabled by default to avoid extra vCenter discovery calls for existing users.",
+        "type": "boolean",
+        "default": false
+      },
       "not_follow_redirects": {
         "title": "Not follow redirects",
         "description": "If set, the client will not follow HTTP redirects automatically.",
@@ -61,7 +527,7 @@
           "description": "",
           "type": "string",
           "default": "/*/*/*",
-          "pattern": "^$|^/"
+          "pattern": "^/"
         },
         "default": [
           "/*"
@@ -80,7 +546,7 @@
           "description": "",
           "type": "string",
           "default": "/*/*/*/*",
-          "pattern": "^$|^/"
+          "pattern": "^/"
         },
         "default": [
           "/*"
@@ -99,7 +565,7 @@
           "description": "",
           "type": "string",
           "default": "/*/*",
-          "pattern": "^$|^/"
+          "pattern": "^/"
         },
         "default": [
           "/*"
@@ -118,7 +584,7 @@
           "description": "",
           "type": "string",
           "default": "/*/*",
-          "pattern": "^$|^/"
+          "pattern": "^/"
         },
         "default": [
           "/*"
@@ -209,11 +675,7 @@
     "required": [
       "url",
       "username",
-      "password",
-      "host_include",
-      "vm_include",
-      "datastore_include",
-      "cluster_include"
+      "password"
     ]
   },
   "uiSchema": {
@@ -236,12 +698,110 @@
           ]
         },
         {
-          "title": "Hosts, VMs, Datastores & Clusters selector",
+          "title": "Filters",
           "fields": [
             "host_include",
             "vm_include",
             "datastore_include",
-            "cluster_include"
+            "cluster_include",
+            "host_power_states",
+            "vm_power_states"
+          ]
+        },
+        {
+          "title": "Vnodes",
+          "fields": [
+            "esxi_vnodes",
+            "vm_vnodes"
+          ]
+        },
+        {
+          "title": "Labels",
+          "fields": [
+            "collect_inventory_path_label",
+            "vm_guest_labels",
+            "vsphere_tag_categories",
+            "custom_attributes",
+            "max_user_metadata_labels"
+          ]
+        },
+        {
+          "title": "VMs",
+          "fields": [
+            "collect_vm_disks",
+            "collect_vm_disk_performance",
+            "vm_disk_include",
+            "max_vm_disks",
+            "collect_vm_nic_performance",
+            "vm_nic_include",
+            "max_vm_nics"
+          ]
+        },
+        {
+          "title": "H-Net",
+          "fields": [
+            "collect_host_nic_performance",
+            "host_nic_include",
+            "max_host_nics"
+          ]
+        },
+        {
+          "title": "H-Disk",
+          "fields": [
+            "collect_host_disk_performance",
+            "host_disk_include",
+            "max_host_disks"
+          ]
+        },
+        {
+          "title": "H-Store",
+          "fields": [
+            "collect_host_storage_adapter_performance",
+            "host_storage_adapter_include",
+            "max_host_storage_adapters",
+            "collect_host_storage_path_performance",
+            "host_storage_path_include",
+            "max_host_storage_paths"
+          ]
+        },
+        {
+          "title": "H-CPU",
+          "fields": [
+            "collect_host_cpu_instance_performance",
+            "host_cpu_instance_include",
+            "max_host_cpu_instances"
+          ]
+        },
+        {
+          "title": "Power",
+          "fields": [
+            "collect_power_metrics"
+          ]
+        },
+        {
+          "title": "Stores",
+          "fields": [
+            "collect_datastore_clusters",
+            "datastore_cluster_include",
+            "max_datastore_clusters"
+          ]
+        },
+        {
+          "title": "vSAN",
+          "fields": [
+            "collect_vsan",
+            "vsan_cluster_include",
+            "max_vsan_clusters",
+            "vsan_host_include",
+            "max_vsan_hosts",
+            "vsan_vm_include",
+            "max_vsan_vms"
+          ]
+        },
+        {
+          "title": "Topology",
+          "fields": [
+            "collect_network_topology"
           ]
         },
         {
@@ -307,7 +867,55 @@
     "host_include": {
       "ui:listFlavour": "list"
     },
+    "host_power_states": {
+      "ui:listFlavour": "list"
+    },
     "vm_include": {
+      "ui:listFlavour": "list"
+    },
+    "vm_power_states": {
+      "ui:listFlavour": "list"
+    },
+    "vm_guest_labels": {
+      "ui:listFlavour": "list"
+    },
+    "vsphere_tag_categories": {
+      "ui:listFlavour": "list"
+    },
+    "custom_attributes": {
+      "ui:listFlavour": "list"
+    },
+    "vm_disk_include": {
+      "ui:listFlavour": "list"
+    },
+    "vm_nic_include": {
+      "ui:listFlavour": "list"
+    },
+    "host_nic_include": {
+      "ui:listFlavour": "list"
+    },
+    "host_disk_include": {
+      "ui:listFlavour": "list"
+    },
+    "host_storage_adapter_include": {
+      "ui:listFlavour": "list"
+    },
+    "host_storage_path_include": {
+      "ui:listFlavour": "list"
+    },
+    "host_cpu_instance_include": {
+      "ui:listFlavour": "list"
+    },
+    "vsan_cluster_include": {
+      "ui:listFlavour": "list"
+    },
+    "vsan_host_include": {
+      "ui:listFlavour": "list"
+    },
+    "vsan_vm_include": {
+      "ui:listFlavour": "list"
+    },
+    "datastore_cluster_include": {
       "ui:listFlavour": "list"
     },
     "datastore_include": {

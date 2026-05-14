@@ -87,6 +87,7 @@ def build_path(meta_yaml_link: str) -> str:
         meta_yaml_link.replace("https://github.com/netdata/", "")
         .split("/", 1)[1]
         .replace("edit/master/", "")
+        .replace("blob/master/", "")
         .replace("/metadata.yaml", "")
     )
 

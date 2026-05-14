@@ -3,6 +3,8 @@
 package resources
 
 import (
+	"time"
+
 	"github.com/vmware/govmomi/performance"
 	"github.com/vmware/govmomi/vim25/types"
 )
@@ -50,6 +52,8 @@ type Resources struct {
 	Hosts         Hosts
 	VMs           VMs
 	Datastores    Datastores
+	Networks      Networks
+	StoragePods   StoragePods
 	ResourcePools ResourcePools
 }
 
@@ -73,27 +77,35 @@ type (
 		DC HierarchyValue
 	}
 	Cluster struct {
-		Name              string
-		ID                string
-		ParentID          string
-		Hier              ClusterHierarchy
-		OverallStatus     string
-		NumHosts          int32
-		NumEffectiveHosts int32
-		TotalCpu          int32 // MHz
-		TotalMemory       int64 // bytes
-		EffectiveCpu      int32 // MHz
-		EffectiveMemory   int64 // MB
-		NumCpuCores       int16
-		NumCpuThreads     int16
-		NumVmotions       int32 // cumulative count
-		DrsEnabled        bool
-		DrsMode           string // fullyAutomated/partiallyAutomated/manual
-		DrsScore          int32  // 0-100, vSphere 7.0+, 0 if unavailable
-		CurrentBalance    int32  // thousandths of std dev
-		TargetBalance     int32  // thousandths of std dev
-		HaEnabled         bool
-		HaAdmCtrlEnabled  bool
+		Name                    string
+		ID                      string
+		ParentID                string
+		Hier                    ClusterHierarchy
+		Labels                  map[string]string
+		CustomValues            map[int32]string
+		OverallStatus           string
+		NumHosts                int32
+		NumEffectiveHosts       int32
+		TotalCpu                int32 // MHz
+		TotalMemory             int64 // bytes
+		EffectiveCpu            int32 // MHz
+		EffectiveMemory         int64 // MB
+		NumCpuCores             int16
+		NumCpuThreads           int16
+		NumVmotions             int32 // cumulative count
+		DrsEnabled              bool
+		DrsMode                 string // fullyAutomated/partiallyAutomated/manual
+		DrsVmotionRate          int32  // 1-5 recommendation threshold
+		DrsScore                int32  // 0-100, vSphere 7.0+, 0 if unavailable
+		CurrentBalance          int32  // thousandths of std dev
+		TargetBalance           int32  // thousandths of std dev
+		HaEnabled               bool
+		HaAdmCtrlEnabled        bool
+		HaHostMonitoring        string
+		HaVMMonitoring          string
+		HaVMComponentProtection string
+		VSANEnabled             bool
+		VSANUUID                string
 		// UsageSummary fields (nil when DRS disabled)
 		UsageCpuDemandMhz      int32
 		UsageMemDemandMB       int32
@@ -112,10 +124,12 @@ type (
 		Cluster HierarchyValue
 	}
 	ResourcePool struct {
-		Name     string
-		ID       string
-		ParentID string // owner cluster ref value
-		Hier     ResourcePoolHierarchy
+		Name         string
+		ID           string
+		ParentID     string // owner cluster ref value
+		Hier         ResourcePoolHierarchy
+		Labels       map[string]string
+		CustomValues map[int32]string
 		// QuickStats (polled via PropertyCollector)
 		OverallCpuUsage              int64 // MHz
 		OverallCpuDemand             int64 // MHz
@@ -129,7 +143,7 @@ type (
 		BalloonedMemory              int64 // MB
 		OverheadMemory               int64 // MB
 		ConsumedOverheadMemory       int64 // MB
-		CompressedMemory             int64 // KB
+		CompressedMemory             int64 // KiB
 		// Runtime
 		CpuReservationUsed int64 // MHz
 		CpuMaxUsage        int64 // MHz
@@ -151,13 +165,19 @@ type (
 		Cluster HierarchyValue
 	}
 	Host struct {
-		Name          string
-		ID            string
-		ParentID      string
-		Hier          HostHierarchy
-		OverallStatus string
-		MetricList    performance.MetricList
-		Ref           types.ManagedObjectReference
+		Name              string
+		ID                string
+		ParentID          string
+		Hier              HostHierarchy
+		Labels            map[string]string
+		CustomValues      map[int32]string
+		ConnectionState   string
+		PowerState        string
+		InMaintenanceMode bool
+		OverallStatus     string
+		VSANNodeUUID      string
+		MetricList        performance.MetricList
+		Ref               types.ManagedObjectReference
 	}
 
 	VMHierarchy struct {
@@ -167,30 +187,99 @@ type (
 	}
 
 	VM struct {
-		Name          string
-		ID            string
-		ParentID      string
-		Hier          VMHierarchy
-		OverallStatus string
-		MetricList    performance.MetricList
-		Ref           types.ManagedObjectReference
+		Name                     string
+		ID                       string
+		ParentID                 string
+		FolderParentID           string
+		Hier                     VMHierarchy
+		Labels                   map[string]string
+		CustomValues             map[int32]string
+		ConnectionState          string
+		PowerState               string
+		ToolsRunningStatus       string
+		ToolsVersionStatus       string
+		GuestHostName            string
+		GuestIPAddress           string
+		GuestFullName            string
+		InstanceUUID             string
+		ConsolidationNeeded      bool
+		ConfigCPU                int64
+		ConfigMemory             int64
+		ConfigDisks              int64
+		ConfigNICs               int64
+		StorageCommitted         int64
+		StorageUncommitted       int64
+		StorageUnshared          int64
+		OverallStatus            string
+		SnapshotCount            int64
+		SnapshotMaxChainDepth    int64
+		SnapshotOldestCreateTime time.Time
+		Disks                    []VMDisk
+		MetricList               performance.MetricList
+		Ref                      types.ManagedObjectReference
+	}
+	VMDisk struct {
+		Key           int32
+		Label         string
+		CapacityBytes int64
 	}
 
 	DatastoreHierarchy struct {
 		DC HierarchyValue
 	}
 	Datastore struct {
+		Name               string
+		ID                 string
+		ParentID           string
+		Hier               DatastoreHierarchy
+		Labels             map[string]string
+		CustomValues       map[int32]string
+		OverallStatus      string
+		Type               string // VMFS, NFS, NFS41, vsan, VVOL, PMEM
+		Capacity           int64  // bytes
+		FreeSpace          int64  // bytes
+		Uncommitted        int64  // bytes
+		Accessible         bool
+		MaintenanceMode    string
+		MultipleHostAccess *bool
+		MetricList         performance.MetricList
+		Ref                types.ManagedObjectReference
+	}
+
+	NetworkHierarchy struct {
+		DC HierarchyValue
+	}
+	Network struct {
 		Name          string
 		ID            string
+		Type          string
 		ParentID      string
-		Hier          DatastoreHierarchy
-		OverallStatus string
-		Type          string // VMFS, NFS, NFS41, vsan, VVOL, PMEM
-		Capacity      int64  // bytes
-		FreeSpace     int64  // bytes
+		Hier          NetworkHierarchy
+		Labels        map[string]string
+		CustomValues  map[int32]string
 		Accessible    bool
-		MetricList    performance.MetricList
+		IPPoolName    string
+		HostIDs       []string
+		VMIDs         []string
+		OverallStatus string
 		Ref           types.ManagedObjectReference
+	}
+
+	StoragePodHierarchy struct {
+		DC HierarchyValue
+	}
+	StoragePod struct {
+		Name              string
+		ID                string
+		ParentID          string
+		Hier              StoragePodHierarchy
+		Labels            map[string]string
+		CustomValues      map[int32]string
+		Capacity          int64
+		FreeSpace         int64
+		StorageDRSEnabled bool
+		OverallStatus     string
+		Ref               types.ManagedObjectReference
 	}
 )
 
@@ -201,7 +290,37 @@ func (h ClusterHierarchy) IsSet() bool      { return h.DC.IsSet() }
 func (h HostHierarchy) IsSet() bool         { return h.DC.IsSet() && h.Cluster.IsSet() }
 func (h VMHierarchy) IsSet() bool           { return h.DC.IsSet() && h.Cluster.IsSet() && h.Host.IsSet() }
 func (h DatastoreHierarchy) IsSet() bool    { return h.DC.IsSet() }
+func (h NetworkHierarchy) IsSet() bool      { return h.DC.IsSet() }
+func (h StoragePodHierarchy) IsSet() bool   { return h.DC.IsSet() }
 func (h ResourcePoolHierarchy) IsSet() bool { return h.DC.IsSet() && h.Cluster.IsSet() }
+
+func (h *Host) IsPoweredOn() bool {
+	return h != nil && h.PowerState == string(types.HostSystemPowerStatePoweredOn)
+}
+
+func (v *VM) IsPoweredOn() bool {
+	return v != nil && v.PowerState == string(types.VirtualMachinePowerStatePoweredOn)
+}
+
+func SetClusterVSANInfo(cluster *Cluster, config types.BaseComputeResourceConfigInfo) {
+	if cluster == nil {
+		return
+	}
+
+	cluster.VSANEnabled = false
+	cluster.VSANUUID = ""
+
+	cfg, ok := config.(*types.ClusterConfigInfoEx)
+	if !ok || cfg.VsanConfigInfo == nil {
+		return
+	}
+	if cfg.VsanConfigInfo.Enabled != nil {
+		cluster.VSANEnabled = *cfg.VsanConfigInfo.Enabled
+	}
+	if cfg.VsanConfigInfo.DefaultConfig != nil {
+		cluster.VSANUUID = cfg.VsanConfigInfo.DefaultConfig.Uuid
+	}
+}
 
 type (
 	DataCenters   map[string]*Datacenter
@@ -210,6 +329,8 @@ type (
 	Hosts         map[string]*Host
 	VMs           map[string]*VM
 	Datastores    map[string]*Datastore
+	Networks      map[string]*Network
+	StoragePods   map[string]*StoragePod
 	ResourcePools map[string]*ResourcePool
 )
 
@@ -229,6 +350,12 @@ func (vs VMs) Get(id string) *VM                     { return vs[id] }
 func (ds Datastores) Put(d *Datastore)               { ds[d.ID] = d }
 func (ds Datastores) Remove(id string)               { delete(ds, id) }
 func (ds Datastores) Get(id string) *Datastore       { return ds[id] }
+func (ns Networks) Put(n *Network)                   { ns[n.ID] = n }
+func (ns Networks) Remove(id string)                 { delete(ns, id) }
+func (ns Networks) Get(id string) *Network           { return ns[id] }
+func (sps StoragePods) Put(sp *StoragePod)           { sps[sp.ID] = sp }
+func (sps StoragePods) Remove(id string)             { delete(sps, id) }
+func (sps StoragePods) Get(id string) *StoragePod    { return sps[id] }
 func (rp ResourcePools) Put(p *ResourcePool)         { rp[p.ID] = p }
 func (rp ResourcePools) Remove(id string)            { delete(rp, id) }
 func (rp ResourcePools) Get(id string) *ResourcePool { return rp[id] }

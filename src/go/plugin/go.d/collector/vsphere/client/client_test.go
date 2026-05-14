@@ -3,14 +3,20 @@
 package client
 
 import (
+	"context"
 	"crypto/tls"
+	"errors"
 	"net/url"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/simulator"
+	_ "github.com/vmware/govmomi/vapi/simulator"
+	"github.com/vmware/govmomi/view"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 
@@ -75,6 +81,60 @@ func TestClient_Logout(t *testing.T) {
 	v, err := client.IsSessionActive()
 	assert.NoError(t, err)
 	assert.False(t, v)
+}
+
+func TestClient_Close(t *testing.T) {
+	model, srv := createSim(t)
+	defer model.Remove()
+	defer srv.Close()
+
+	client := newClient(t, srv.URL)
+	_, err := client.tagManager(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, client.rest)
+	require.NotNil(t, client.tags)
+
+	assert.NoError(t, client.Close())
+	assert.Nil(t, client.root)
+	assert.Nil(t, client.rest)
+	assert.Nil(t, client.tags)
+	assert.Nil(t, client.vsan)
+	assert.Nil(t, client.userInfo)
+
+	v, err := client.IsSessionActive()
+	assert.NoError(t, err)
+	assert.False(t, v)
+
+	control := newClient(t, srv.URL)
+	defer func() { _ = control.Close() }()
+	require.Len(t, sessionList(t, control), 1)
+}
+
+func TestNew_LogsOutOnContainerViewFailure(t *testing.T) {
+	model, srv := createSim(t)
+	defer model.Remove()
+	defer srv.Close()
+
+	origCreateContainerView := createContainerView
+	createContainerView = func(context.Context, *govmomi.Client) (*view.ContainerView, error) {
+		return nil, errors.New("create container view failed")
+	}
+	defer func() { createContainerView = origCreateContainerView }()
+
+	client, err := New(Config{
+		URL:       srv.URL.String(),
+		User:      "admin",
+		Password:  "password",
+		Timeout:   time.Second * 3,
+		TLSConfig: tlscfg.TLSConfig{InsecureSkipVerify: true},
+	})
+	require.Nil(t, client)
+	require.ErrorContains(t, err, "create container view failed")
+
+	createContainerView = origCreateContainerView
+	control := newClient(t, srv.URL)
+	defer func() { _ = control.Close() }()
+	require.Len(t, sessionList(t, control), 1)
 }
 
 func TestClient_Datacenters(t *testing.T) {
@@ -151,11 +211,26 @@ func newClient(t *testing.T, vCenterURL *url.URL) *Client {
 	return client
 }
 
+func sessionList(t *testing.T, client *Client) []types.UserSession {
+	t.Helper()
+
+	var sm mo.SessionManager
+	err := property.DefaultCollector(client.client.Client).RetrieveOne(
+		context.Background(),
+		*client.client.ServiceContent.SessionManager,
+		[]string{"sessionList"},
+		&sm,
+	)
+	require.NoError(t, err)
+	return sm.SessionList
+}
+
 func createSim(t *testing.T) (*simulator.Model, *simulator.Server) {
 	model := simulator.VPX()
 	err := model.Create()
 	require.NoError(t, err)
 	model.Service.TLS = new(tls.Config)
+	model.Service.RegisterEndpoints = true
 	return model, model.Service.NewServer()
 }
 

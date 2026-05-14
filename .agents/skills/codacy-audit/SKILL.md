@@ -72,6 +72,26 @@ $ .agents/skills/codacy-audit/scripts/analyze-local.sh
 
 Run this before `git push`. If it returns 0 findings, the Codacy gate on the PR will be green (modulo Codacy server-side patterns the local CLI doesn't bundle). If it returns findings, fix them locally first.
 
+Operational gotcha: when the Dockerized Codacy CLI fails before a tool can emit
+results, the output file may have a `.json` suffix but contain tool-runner logs
+instead of JSON. Always verify with `jq empty <dump>` before treating a local
+dump as finding evidence. If GitHub check-run annotations are empty too, use
+`pr-issues.sh` with `CODACY_TOKEN`; without that token, record the evidence gap
+and re-check after the next push.
+
+Operational gotcha: the public Codacy v3 analysis endpoint can expose PR issue
+details even when GitHub check-run annotations are empty and no `CODACY_TOKEN`
+is available:
+
+```
+curl -fsS \
+  "https://api.codacy.com/api/v3/analysis/organizations/gh/netdata/repositories/netdata/pull-requests/<PR>/issues?limit=100"
+```
+
+Filter for `.data[] | select(.deltaType == "Added")` to identify the issues
+that still block the PR. Treat `commitInfo` fields as sensitive operational
+metadata; do not copy names or email addresses into committed artifacts.
+
 To restrict to a single tool (matches what Codacy reported on a CI run):
 
 ```

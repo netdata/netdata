@@ -81,9 +81,56 @@ const (
 	prioHostNetworkErrors
 	prioHostOverallStatus
 	prioHostSystemUptime
+
+	prioVMSnapshotCount
+	prioVMSnapshotAge
+	prioVMSnapshotChainDepth
+
+	prioDatastoreAccessibilityStatus
+	prioDatastoreMaintenanceStatus
+	prioDatastoreMultipleHostAccess
+	prioVMPowerState
+	prioHostPowerState
+	prioVMConnectionState
+	prioVMToolsRunningStatus
+	prioVMToolsVersionStatus
+	prioVMConsolidationNeeded
+	prioVMConfigCPU
+	prioVMConfigMemory
+	prioVMConfigDevices
+	prioVMStorageUsage
+	prioHostConnectionState
+	prioHostMaintenanceStatus
+	prioClusterDRSMode
+	prioClusterDRSVmotionRate
+	prioClusterHAHostMonitoring
+	prioClusterHAVMMonitoring
+	prioClusterHAVMComponentProtection
+	prioInventoryObjects
 )
 
 var (
+	inventoryChartsTmpl = collectorapi.Charts{
+		inventoryObjectsChartTmpl.Copy(),
+	}
+	inventoryObjectsChartTmpl = collectorapi.Chart{
+		ID:       "inventory_objects",
+		Title:    "vSphere inventory object count",
+		Units:    "objects",
+		Fam:      "inventory",
+		Ctx:      "vsphere.inventory_objects",
+		Priority: prioInventoryObjects,
+		Dims: collectorapi.Dims{
+			{ID: "inventory_datacenters", Name: "datacenters"},
+			{ID: "inventory_folders", Name: "folders"},
+			{ID: "inventory_clusters", Name: "clusters"},
+			{ID: "inventory_hosts", Name: "hosts"},
+			{ID: "inventory_vms", Name: "vms"},
+			{ID: "inventory_datastores", Name: "datastores"},
+			{ID: "inventory_resource_pools", Name: "resource_pools"},
+		},
+	}
+
 	vmChartsTmpl = collectorapi.Charts{
 		vmCPUUtilizationChartTmpl.Copy(),
 
@@ -100,8 +147,22 @@ var (
 		vmNetworkDropsChartTmpl.Copy(),
 
 		vmOverallStatusChartTmpl.Copy(),
+		vmPowerStateChartTmpl.Copy(),
+		vmConnectionStateChartTmpl.Copy(),
+		vmToolsRunningStatusChartTmpl.Copy(),
+		vmToolsVersionStatusChartTmpl.Copy(),
+		vmConsolidationNeededChartTmpl.Copy(),
 
 		vmSystemUptimeChartTmpl.Copy(),
+
+		vmConfigCPUChartTmpl.Copy(),
+		vmConfigMemoryChartTmpl.Copy(),
+		vmConfigDevicesChartTmpl.Copy(),
+		vmStorageUsageChartTmpl.Copy(),
+
+		vmSnapshotCountChartTmpl.Copy(),
+		vmSnapshotAgeChartTmpl.Copy(),
+		vmSnapshotChainDepthChartTmpl.Copy(),
 	}
 
 	vmCPUUtilizationChartTmpl = collectorapi.Chart{
@@ -244,6 +305,80 @@ var (
 			{ID: "%s_overall.status.gray", Name: "gray"},
 		},
 	}
+	vmPowerStateChartTmpl = collectorapi.Chart{
+		ID:       "%s_power_state",
+		Title:    "Virtual Machine power state",
+		Units:    "status",
+		Fam:      "vms status",
+		Ctx:      "vsphere.vm_power_state",
+		Priority: prioVMPowerState,
+		Dims: collectorapi.Dims{
+			{ID: "%s_power_state.poweredOn", Name: "powered_on"},
+			{ID: "%s_power_state.poweredOff", Name: "powered_off"},
+			{ID: "%s_power_state.suspended", Name: "suspended"},
+		},
+	}
+	vmConnectionStateChartTmpl = collectorapi.Chart{
+		ID:       "%s_connection_state",
+		Title:    "Virtual Machine connection state",
+		Units:    "status",
+		Fam:      "vms status",
+		Ctx:      "vsphere.vm_connection_state",
+		Priority: prioVMConnectionState,
+		Dims: collectorapi.Dims{
+			{ID: "%s_connection_state.connected", Name: "connected"},
+			{ID: "%s_connection_state.disconnected", Name: "disconnected"},
+			{ID: "%s_connection_state.orphaned", Name: "orphaned"},
+			{ID: "%s_connection_state.inaccessible", Name: "inaccessible"},
+			{ID: "%s_connection_state.invalid", Name: "invalid"},
+		},
+	}
+	vmToolsRunningStatusChartTmpl = collectorapi.Chart{
+		ID:       "%s_tools_running_status",
+		Title:    "Virtual Machine VMware Tools running status",
+		Units:    "status",
+		Fam:      "vms status",
+		Ctx:      "vsphere.vm_tools_running_status",
+		Priority: prioVMToolsRunningStatus,
+		Dims: collectorapi.Dims{
+			{ID: "%s_tools_running_status.running", Name: "running"},
+			{ID: "%s_tools_running_status.notRunning", Name: "not_running"},
+			{ID: "%s_tools_running_status.executingScripts", Name: "executing_scripts"},
+			{ID: "%s_tools_running_status.unknown", Name: "unknown"},
+		},
+	}
+	vmToolsVersionStatusChartTmpl = collectorapi.Chart{
+		ID:       "%s_tools_version_status",
+		Title:    "Virtual Machine VMware Tools version status",
+		Units:    "status",
+		Fam:      "vms status",
+		Ctx:      "vsphere.vm_tools_version_status",
+		Priority: prioVMToolsVersionStatus,
+		Dims: collectorapi.Dims{
+			{ID: "%s_tools_version_status.current", Name: "current"},
+			{ID: "%s_tools_version_status.needUpgrade", Name: "need_upgrade"},
+			{ID: "%s_tools_version_status.notInstalled", Name: "not_installed"},
+			{ID: "%s_tools_version_status.unmanaged", Name: "unmanaged"},
+			{ID: "%s_tools_version_status.tooOld", Name: "too_old"},
+			{ID: "%s_tools_version_status.supportedOld", Name: "supported_old"},
+			{ID: "%s_tools_version_status.supportedNew", Name: "supported_new"},
+			{ID: "%s_tools_version_status.tooNew", Name: "too_new"},
+			{ID: "%s_tools_version_status.blacklisted", Name: "blacklisted"},
+			{ID: "%s_tools_version_status.unknown", Name: "unknown"},
+		},
+	}
+	vmConsolidationNeededChartTmpl = collectorapi.Chart{
+		ID:       "%s_consolidation_needed",
+		Title:    "Virtual Machine disk consolidation status",
+		Units:    "status",
+		Fam:      "vms status",
+		Ctx:      "vsphere.vm_consolidation_needed",
+		Priority: prioVMConsolidationNeeded,
+		Dims: collectorapi.Dims{
+			{ID: "%s_consolidation_needed.needed", Name: "needed"},
+			{ID: "%s_consolidation_needed.notNeeded", Name: "not_needed"},
+		},
+	}
 
 	vmSystemUptimeChartTmpl = collectorapi.Chart{
 		ID:       "%s_system_uptime",
@@ -254,6 +389,87 @@ var (
 		Priority: prioVmSystemUptime,
 		Dims: collectorapi.Dims{
 			{ID: "%s_sys.uptime.latest", Name: "uptime"},
+		},
+	}
+	vmConfigCPUChartTmpl = collectorapi.Chart{
+		ID:       "%s_config_cpu",
+		Title:    "Virtual Machine configured CPU",
+		Units:    "vCPUs",
+		Fam:      "vms config",
+		Ctx:      "vsphere.vm_config_cpu",
+		Priority: prioVMConfigCPU,
+		Dims: collectorapi.Dims{
+			{ID: "%s_config_cpu", Name: "vcpus"},
+		},
+	}
+	vmConfigMemoryChartTmpl = collectorapi.Chart{
+		ID:       "%s_config_memory",
+		Title:    "Virtual Machine configured memory",
+		Units:    "MiB",
+		Fam:      "vms config",
+		Ctx:      "vsphere.vm_config_memory",
+		Priority: prioVMConfigMemory,
+		Dims: collectorapi.Dims{
+			{ID: "%s_config_memory", Name: "memory"},
+		},
+	}
+	vmConfigDevicesChartTmpl = collectorapi.Chart{
+		ID:       "%s_config_devices",
+		Title:    "Virtual Machine configured devices",
+		Units:    "devices",
+		Fam:      "vms config",
+		Ctx:      "vsphere.vm_config_devices",
+		Priority: prioVMConfigDevices,
+		Dims: collectorapi.Dims{
+			{ID: "%s_config_devices.disks", Name: "disks"},
+			{ID: "%s_config_devices.nics", Name: "nics"},
+		},
+	}
+	vmStorageUsageChartTmpl = collectorapi.Chart{
+		ID:       "%s_storage_usage",
+		Title:    "Virtual Machine storage usage",
+		Units:    "bytes",
+		Fam:      "vms storage",
+		Ctx:      "vsphere.vm_storage_usage",
+		Priority: prioVMStorageUsage,
+		Dims: collectorapi.Dims{
+			{ID: "%s_storage.committed", Name: "committed"},
+			{ID: "%s_storage.uncommitted", Name: "uncommitted"},
+			{ID: "%s_storage.unshared", Name: "unshared"},
+		},
+	}
+
+	vmSnapshotCountChartTmpl = collectorapi.Chart{
+		ID:       "%s_snapshot_count",
+		Title:    "Virtual Machine snapshot count",
+		Units:    "snapshots",
+		Fam:      "vms snapshots",
+		Ctx:      "vsphere.vm_snapshot_count",
+		Priority: prioVMSnapshotCount,
+		Dims: collectorapi.Dims{
+			{ID: "%s_snapshot_count", Name: "count"},
+		},
+	}
+	vmSnapshotAgeChartTmpl = collectorapi.Chart{
+		ID:       "%s_snapshot_max_age",
+		Title:    "Virtual Machine oldest snapshot age",
+		Units:    "seconds",
+		Fam:      "vms snapshots",
+		Ctx:      "vsphere.vm_snapshot_max_age",
+		Priority: prioVMSnapshotAge,
+		Dims: collectorapi.Dims{
+			{ID: "%s_snapshot_max_age", Name: "age"},
+		},
+	}
+	vmSnapshotChainDepthChartTmpl = collectorapi.Chart{
+		ID:       "%s_snapshot_max_chain_depth",
+		Title:    "Virtual Machine maximum snapshot chain depth",
+		Units:    "snapshots",
+		Fam:      "vms snapshots",
+		Ctx:      "vsphere.vm_snapshot_max_chain_depth",
+		Priority: prioVMSnapshotChainDepth,
+		Dims: collectorapi.Dims{
+			{ID: "%s_snapshot_max_chain_depth", Name: "depth"},
 		},
 	}
 )
@@ -275,6 +491,9 @@ var (
 		hostNetworkErrorsChartTmpl.Copy(),
 
 		hostOverallStatusChartTmpl.Copy(),
+		hostPowerStateChartTmpl.Copy(),
+		hostConnectionStateChartTmpl.Copy(),
+		hostMaintenanceStatusChartTmpl.Copy(),
 
 		hostSystemUptimeChartTmpl.Copy(),
 	}
@@ -418,6 +637,45 @@ var (
 			{ID: "%s_overall.status.gray", Name: "gray"},
 		},
 	}
+	hostPowerStateChartTmpl = collectorapi.Chart{
+		ID:       "%s_power_state",
+		Title:    "ESXi Host power state",
+		Units:    "status",
+		Fam:      "hosts status",
+		Ctx:      "vsphere.host_power_state",
+		Priority: prioHostPowerState,
+		Dims: collectorapi.Dims{
+			{ID: "%s_power_state.poweredOn", Name: "powered_on"},
+			{ID: "%s_power_state.poweredOff", Name: "powered_off"},
+			{ID: "%s_power_state.standBy", Name: "standby"},
+			{ID: "%s_power_state.unknown", Name: "unknown"},
+		},
+	}
+	hostConnectionStateChartTmpl = collectorapi.Chart{
+		ID:       "%s_connection_state",
+		Title:    "ESXi Host connection state",
+		Units:    "status",
+		Fam:      "hosts status",
+		Ctx:      "vsphere.host_connection_state",
+		Priority: prioHostConnectionState,
+		Dims: collectorapi.Dims{
+			{ID: "%s_connection_state.connected", Name: "connected"},
+			{ID: "%s_connection_state.notResponding", Name: "not_responding"},
+			{ID: "%s_connection_state.disconnected", Name: "disconnected"},
+		},
+	}
+	hostMaintenanceStatusChartTmpl = collectorapi.Chart{
+		ID:       "%s_maintenance_status",
+		Title:    "ESXi Host maintenance status",
+		Units:    "status",
+		Fam:      "hosts status",
+		Ctx:      "vsphere.host_maintenance_status",
+		Priority: prioHostMaintenanceStatus,
+		Dims: collectorapi.Dims{
+			{ID: "%s_maintenance_status.normal", Name: "normal"},
+			{ID: "%s_maintenance_status.inMaintenance", Name: "in_maintenance"},
+		},
+	}
 	hostSystemUptimeChartTmpl = collectorapi.Chart{
 		ID:       "%s_system_uptime",
 		Title:    "ESXi Host system uptime",
@@ -436,6 +694,9 @@ var (
 		datastoreSpaceUtilizationChartTmpl.Copy(),
 		datastoreSpaceUsageChartTmpl.Copy(),
 		datastoreOverallStatusChartTmpl.Copy(),
+		datastoreAccessibilityStatusChartTmpl.Copy(),
+		datastoreMaintenanceStatusChartTmpl.Copy(),
+		datastoreMultipleHostAccessChartTmpl.Copy(),
 	}
 	datastorePerfChartsTmpl = collectorapi.Charts{
 		datastoreDiskIOChartTmpl.Copy(),
@@ -503,6 +764,7 @@ var (
 			{ID: "%s_capacity", Name: "capacity"},
 			{ID: "%s_free_space", Name: "free"},
 			{ID: "%s_used_space", Name: "used"},
+			{ID: "%s_uncommitted", Name: "uncommitted"},
 		},
 	}
 
@@ -518,6 +780,45 @@ var (
 			{ID: "%s_overall.status.red", Name: "red"},
 			{ID: "%s_overall.status.yellow", Name: "yellow"},
 			{ID: "%s_overall.status.gray", Name: "gray"},
+		},
+	}
+	datastoreAccessibilityStatusChartTmpl = collectorapi.Chart{
+		ID:       "%s_accessibility_status",
+		Title:    "Datastore accessibility status",
+		Units:    "status",
+		Fam:      "datastores status",
+		Ctx:      "vsphere.datastore_accessibility_status",
+		Priority: prioDatastoreAccessibilityStatus,
+		Dims: collectorapi.Dims{
+			{ID: "%s_accessible_status.accessible", Name: "accessible"},
+			{ID: "%s_accessible_status.inaccessible", Name: "inaccessible"},
+		},
+	}
+	datastoreMaintenanceStatusChartTmpl = collectorapi.Chart{
+		ID:       "%s_maintenance_status",
+		Title:    "Datastore maintenance mode status",
+		Units:    "status",
+		Fam:      "datastores status",
+		Ctx:      "vsphere.datastore_maintenance_status",
+		Priority: prioDatastoreMaintenanceStatus,
+		Dims: collectorapi.Dims{
+			{ID: "%s_maintenance.status.normal", Name: "normal"},
+			{ID: "%s_maintenance.status.enteringMaintenance", Name: "entering_maintenance"},
+			{ID: "%s_maintenance.status.inMaintenance", Name: "in_maintenance"},
+			{ID: "%s_maintenance.status.unknown", Name: "unknown"},
+		},
+	}
+	datastoreMultipleHostAccessChartTmpl = collectorapi.Chart{
+		ID:       "%s_multiple_host_access",
+		Title:    "Datastore multi-host access status",
+		Units:    "status",
+		Fam:      "datastores status",
+		Ctx:      "vsphere.datastore_multiple_host_access",
+		Priority: prioDatastoreMultipleHostAccess,
+		Dims: collectorapi.Dims{
+			{ID: "%s_multiple_host_access.enabled", Name: "enabled"},
+			{ID: "%s_multiple_host_access.disabled", Name: "disabled"},
+			{ID: "%s_multiple_host_access.unknown", Name: "unknown"},
 		},
 	}
 )
@@ -737,7 +1038,12 @@ var (
 		clusterMemCapacityChartTmpl.Copy(),
 		clusterCPUTopologyChartTmpl.Copy(),
 		clusterDRSConfigChartTmpl.Copy(),
+		clusterDRSModeChartTmpl.Copy(),
+		clusterDRSVmotionRateChartTmpl.Copy(),
 		clusterHAConfigChartTmpl.Copy(),
+		clusterHAHostMonitoringChartTmpl.Copy(),
+		clusterHAVMMonitoringChartTmpl.Copy(),
+		clusterHAVMComponentProtectionChartTmpl.Copy(),
 		clusterOverallStatusChartTmpl.Copy(),
 		clusterVMotionsChartTmpl.Copy(),
 		clusterDRSScoreChartTmpl.Copy(),
@@ -822,6 +1128,31 @@ var (
 			{ID: "%s_drs_enabled", Name: "enabled"},
 		},
 	}
+	clusterDRSModeChartTmpl = collectorapi.Chart{
+		ID:       "%s_drs_mode",
+		Title:    "Cluster DRS automation mode",
+		Units:    "status",
+		Fam:      "clusters config",
+		Ctx:      "vsphere.cluster_drs_mode",
+		Priority: prioClusterDRSMode,
+		Dims: collectorapi.Dims{
+			{ID: "%s_drs_mode.manual", Name: "manual"},
+			{ID: "%s_drs_mode.partiallyAutomated", Name: "partially_automated"},
+			{ID: "%s_drs_mode.fullyAutomated", Name: "fully_automated"},
+			{ID: "%s_drs_mode.unknown", Name: "unknown"},
+		},
+	}
+	clusterDRSVmotionRateChartTmpl = collectorapi.Chart{
+		ID:       "%s_drs_vmotion_rate",
+		Title:    "Cluster DRS vMotion recommendation threshold",
+		Units:    "level",
+		Fam:      "clusters config",
+		Ctx:      "vsphere.cluster_drs_vmotion_rate",
+		Priority: prioClusterDRSVmotionRate,
+		Dims: collectorapi.Dims{
+			{ID: "%s_drs_vmotion_rate", Name: "rate"},
+		},
+	}
 	clusterHAConfigChartTmpl = collectorapi.Chart{
 		ID:       "%s_ha_config",
 		Title:    "Cluster HA configuration",
@@ -832,6 +1163,46 @@ var (
 		Dims: collectorapi.Dims{
 			{ID: "%s_ha_enabled", Name: "enabled"},
 			{ID: "%s_ha_adm_ctrl_enabled", Name: "admission_control"},
+		},
+	}
+	clusterHAHostMonitoringChartTmpl = collectorapi.Chart{
+		ID:       "%s_ha_host_monitoring",
+		Title:    "Cluster HA host monitoring",
+		Units:    "status",
+		Fam:      "clusters config",
+		Ctx:      "vsphere.cluster_ha_host_monitoring",
+		Priority: prioClusterHAHostMonitoring,
+		Dims: collectorapi.Dims{
+			{ID: "%s_ha_host_monitoring.enabled", Name: "enabled"},
+			{ID: "%s_ha_host_monitoring.disabled", Name: "disabled"},
+			{ID: "%s_ha_host_monitoring.unknown", Name: "unknown"},
+		},
+	}
+	clusterHAVMMonitoringChartTmpl = collectorapi.Chart{
+		ID:       "%s_ha_vm_monitoring",
+		Title:    "Cluster HA VM monitoring",
+		Units:    "status",
+		Fam:      "clusters config",
+		Ctx:      "vsphere.cluster_ha_vm_monitoring",
+		Priority: prioClusterHAVMMonitoring,
+		Dims: collectorapi.Dims{
+			{ID: "%s_ha_vm_monitoring.vmMonitoringDisabled", Name: "disabled"},
+			{ID: "%s_ha_vm_monitoring.vmMonitoringOnly", Name: "vm_monitoring_only"},
+			{ID: "%s_ha_vm_monitoring.vmAndAppMonitoring", Name: "vm_and_app_monitoring"},
+			{ID: "%s_ha_vm_monitoring.unknown", Name: "unknown"},
+		},
+	}
+	clusterHAVMComponentProtectionChartTmpl = collectorapi.Chart{
+		ID:       "%s_ha_vm_component_protection",
+		Title:    "Cluster HA VM component protection",
+		Units:    "status",
+		Fam:      "clusters config",
+		Ctx:      "vsphere.cluster_ha_vm_component_protection",
+		Priority: prioClusterHAVMComponentProtection,
+		Dims: collectorapi.Dims{
+			{ID: "%s_ha_vm_component_protection.enabled", Name: "enabled"},
+			{ID: "%s_ha_vm_component_protection.disabled", Name: "disabled"},
+			{ID: "%s_ha_vm_component_protection.unknown", Name: "unknown"},
 		},
 	}
 	clusterOverallStatusChartTmpl = collectorapi.Chart{

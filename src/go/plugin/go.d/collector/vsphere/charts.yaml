@@ -1,0 +1,3202 @@
+version: v1
+context_namespace: vsphere
+groups:
+  - family: inventory
+    metrics:
+      - inventory_objects_datacenters
+      - inventory_objects_folders
+      - inventory_objects_clusters
+      - inventory_objects_hosts
+      - inventory_objects_vms
+      - inventory_objects_datastores
+      - inventory_objects_resource_pools
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: inventory_objects
+        title: vSphere inventory object count
+        context: inventory_objects
+        units: objects
+        algorithm: absolute
+        type: line
+        priority: 70089
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: inventory_objects_datacenters
+            name: datacenters
+          - selector: inventory_objects_folders
+            name: folders
+          - selector: inventory_objects_clusters
+            name: clusters
+          - selector: inventory_objects_hosts
+            name: hosts
+          - selector: inventory_objects_vms
+            name: vms
+          - selector: inventory_objects_datastores
+            name: datastores
+          - selector: inventory_objects_resource_pools
+            name: resource_pools
+  - family: vms cpu
+    metrics:
+      - vm_cpu_utilization_used
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_cpu_utilization
+        title: Virtual Machine CPU utilization
+        context: vm_cpu_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70042
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_cpu_utilization_used
+            name: used
+            options:
+              divisor: 100
+  - family: vms mem
+    metrics:
+      - vm_mem_utilization_used
+      - vm_mem_usage_granted
+      - vm_mem_usage_consumed
+      - vm_mem_usage_active
+      - vm_mem_usage_shared
+      - vm_mem_swap_usage_swapped
+      - vm_mem_swap_io_in
+      - vm_mem_swap_io_out
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_mem_utilization
+        title: Virtual Machine memory utilization
+        context: vm_mem_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70043
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_mem_utilization_used
+            name: used
+            options:
+              divisor: 100
+      - id: vm_mem_usage
+        title: Virtual Machine memory usage
+        context: vm_mem_usage
+        units: KiB
+        algorithm: absolute
+        type: line
+        priority: 70044
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_mem_usage_granted
+            name: granted
+          - selector: vm_mem_usage_consumed
+            name: consumed
+          - selector: vm_mem_usage_active
+            name: active
+          - selector: vm_mem_usage_shared
+            name: shared
+      - id: vm_mem_swap_usage
+        title: Virtual Machine VMKernel memory swap usage
+        context: vm_mem_swap_usage
+        units: KiB
+        algorithm: absolute
+        type: line
+        priority: 70045
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_mem_swap_usage_swapped
+            name: swapped
+      - id: vm_mem_swap_io
+        title: Virtual Machine VMKernel memory swap IO
+        context: vm_mem_swap_io
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70046
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_mem_swap_io_in
+            name: in
+          - selector: vm_mem_swap_io_out
+            name: out
+  - family: vms disk
+    metrics:
+      - vm_disk_io_read
+      - vm_disk_io_write
+      - vm_disk_max_latency_latency
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_disk_io
+        title: Virtual Machine disk IO
+        context: vm_disk_io
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70047
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_disk_io_read
+            name: read
+          - selector: vm_disk_io_write
+            name: write
+            options:
+              multiplier: -1
+      - id: vm_disk_max_latency
+        title: Virtual Machine disk max latency
+        context: vm_disk_max_latency
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70048
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_disk_max_latency_latency
+            name: latency
+  - family: vms net
+    metrics:
+      - vm_net_traffic_received
+      - vm_net_traffic_sent
+      - vm_net_packets_received
+      - vm_net_packets_sent
+      - vm_net_drops_received
+      - vm_net_drops_sent
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_net_traffic
+        title: Virtual Machine network traffic
+        context: vm_net_traffic
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70049
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_net_traffic_received
+            name: received
+          - selector: vm_net_traffic_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: vm_net_packets
+        title: Virtual Machine network packets
+        context: vm_net_packets
+        units: packets
+        algorithm: absolute
+        type: line
+        priority: 70050
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_net_packets_received
+            name: received
+          - selector: vm_net_packets_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: vm_net_drops
+        title: Virtual Machine network dropped packets
+        context: vm_net_drops
+        units: drops
+        algorithm: absolute
+        type: line
+        priority: 70051
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_net_drops_received
+            name: received
+          - selector: vm_net_drops_sent
+            name: sent
+            options:
+              multiplier: -1
+  - family: vms status
+    metrics:
+      - vm_overall_status_green
+      - vm_overall_status_red
+      - vm_overall_status_yellow
+      - vm_overall_status_gray
+      - vm_power_state_powered_on
+      - vm_power_state_powered_off
+      - vm_power_state_suspended
+      - vm_connection_state_connected
+      - vm_connection_state_disconnected
+      - vm_connection_state_orphaned
+      - vm_connection_state_inaccessible
+      - vm_connection_state_invalid
+      - vm_tools_running_status_running
+      - vm_tools_running_status_not_running
+      - vm_tools_running_status_executing_scripts
+      - vm_tools_running_status_unknown
+      - vm_tools_version_status_current
+      - vm_tools_version_status_need_upgrade
+      - vm_tools_version_status_not_installed
+      - vm_tools_version_status_unmanaged
+      - vm_tools_version_status_too_old
+      - vm_tools_version_status_supported_old
+      - vm_tools_version_status_supported_new
+      - vm_tools_version_status_too_new
+      - vm_tools_version_status_blacklisted
+      - vm_tools_version_status_unknown
+      - vm_consolidation_needed_needed
+      - vm_consolidation_needed_not_needed
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_overall_status
+        title: Virtual Machine overall alarm status
+        context: vm_overall_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70052
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_overall_status_green
+            name: green
+          - selector: vm_overall_status_red
+            name: red
+          - selector: vm_overall_status_yellow
+            name: yellow
+          - selector: vm_overall_status_gray
+            name: gray
+      - id: vm_power_state
+        title: Virtual Machine power state
+        context: vm_power_state
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70072
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_power_state_powered_on
+            name: powered_on
+          - selector: vm_power_state_powered_off
+            name: powered_off
+          - selector: vm_power_state_suspended
+            name: suspended
+      - id: vm_connection_state
+        title: Virtual Machine connection state
+        context: vm_connection_state
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70074
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_connection_state_connected
+            name: connected
+          - selector: vm_connection_state_disconnected
+            name: disconnected
+          - selector: vm_connection_state_orphaned
+            name: orphaned
+          - selector: vm_connection_state_inaccessible
+            name: inaccessible
+          - selector: vm_connection_state_invalid
+            name: invalid
+      - id: vm_tools_running_status
+        title: Virtual Machine VMware Tools running status
+        context: vm_tools_running_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70075
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_tools_running_status_running
+            name: running
+          - selector: vm_tools_running_status_not_running
+            name: not_running
+          - selector: vm_tools_running_status_executing_scripts
+            name: executing_scripts
+          - selector: vm_tools_running_status_unknown
+            name: unknown
+      - id: vm_tools_version_status
+        title: Virtual Machine VMware Tools version status
+        context: vm_tools_version_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70076
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_tools_version_status_current
+            name: current
+          - selector: vm_tools_version_status_need_upgrade
+            name: need_upgrade
+          - selector: vm_tools_version_status_not_installed
+            name: not_installed
+          - selector: vm_tools_version_status_unmanaged
+            name: unmanaged
+          - selector: vm_tools_version_status_too_old
+            name: too_old
+          - selector: vm_tools_version_status_supported_old
+            name: supported_old
+          - selector: vm_tools_version_status_supported_new
+            name: supported_new
+          - selector: vm_tools_version_status_too_new
+            name: too_new
+          - selector: vm_tools_version_status_blacklisted
+            name: blacklisted
+          - selector: vm_tools_version_status_unknown
+            name: unknown
+      - id: vm_consolidation_needed
+        title: Virtual Machine disk consolidation status
+        context: vm_consolidation_needed
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70077
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_consolidation_needed_needed
+            name: needed
+          - selector: vm_consolidation_needed_not_needed
+            name: not_needed
+  - family: vms uptime
+    metrics:
+      - vm_system_uptime_uptime
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_system_uptime
+        title: Virtual Machine system uptime
+        context: vm_system_uptime
+        units: seconds
+        algorithm: absolute
+        type: line
+        priority: 70053
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_system_uptime_uptime
+            name: uptime
+  - family: vms config
+    metrics:
+      - vm_config_cpu_vcpus
+      - vm_config_memory_memory
+      - vm_config_devices_disks
+      - vm_config_devices_nics
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_config_cpu
+        title: Virtual Machine configured CPU
+        context: vm_config_cpu
+        units: vCPUs
+        algorithm: absolute
+        type: line
+        priority: 70078
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_config_cpu_vcpus
+            name: vcpus
+      - id: vm_config_memory
+        title: Virtual Machine configured memory
+        context: vm_config_memory
+        units: MiB
+        algorithm: absolute
+        type: line
+        priority: 70079
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_config_memory_memory
+            name: memory
+      - id: vm_config_devices
+        title: Virtual Machine configured devices
+        context: vm_config_devices
+        units: devices
+        algorithm: absolute
+        type: line
+        priority: 70080
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_config_devices_disks
+            name: disks
+          - selector: vm_config_devices_nics
+            name: nics
+  - family: vms storage
+    metrics:
+      - vm_storage_usage_committed
+      - vm_storage_usage_uncommitted
+      - vm_storage_usage_unshared
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_storage_usage
+        title: Virtual Machine storage usage
+        context: vm_storage_usage
+        units: bytes
+        algorithm: absolute
+        type: line
+        priority: 70081
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_storage_usage_committed
+            name: committed
+          - selector: vm_storage_usage_uncommitted
+            name: uncommitted
+          - selector: vm_storage_usage_unshared
+            name: unshared
+  - family: vms snapshots
+    metrics:
+      - vm_snapshot_count_count
+      - vm_snapshot_max_age_age
+      - vm_snapshot_max_chain_depth_depth
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_snapshot_count
+        title: Virtual Machine snapshot count
+        context: vm_snapshot_count
+        units: snapshots
+        algorithm: absolute
+        type: line
+        priority: 70066
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_snapshot_count_count
+            name: count
+      - id: vm_snapshot_max_age
+        title: Virtual Machine oldest snapshot age
+        context: vm_snapshot_max_age
+        units: seconds
+        algorithm: absolute
+        type: line
+        priority: 70067
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_snapshot_max_age_age
+            name: age
+      - id: vm_snapshot_max_chain_depth
+        title: Virtual Machine maximum snapshot chain depth
+        context: vm_snapshot_max_chain_depth
+        units: snapshots
+        algorithm: absolute
+        type: line
+        priority: 70068
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_snapshot_max_chain_depth_depth
+            name: depth
+  - family: hosts cpu
+    metrics:
+      - host_cpu_utilization_used
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: host_cpu_utilization
+        title: ESXi Host CPU utilization
+        context: host_cpu_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70054
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_cpu_utilization_used
+            name: used
+            options:
+              divisor: 100
+  - family: hosts mem
+    metrics:
+      - host_mem_utilization_used
+      - host_mem_usage_granted
+      - host_mem_usage_consumed
+      - host_mem_usage_active
+      - host_mem_usage_shared
+      - host_mem_usage_sharedcommon
+      - host_mem_swap_io_in
+      - host_mem_swap_io_out
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: host_mem_utilization
+        title: ESXi Host memory utilization
+        context: host_mem_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70055
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_mem_utilization_used
+            name: used
+            options:
+              divisor: 100
+      - id: host_mem_usage
+        title: ESXi Host memory usage
+        context: host_mem_usage
+        units: KiB
+        algorithm: absolute
+        type: line
+        priority: 70056
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_mem_usage_granted
+            name: granted
+          - selector: host_mem_usage_consumed
+            name: consumed
+          - selector: host_mem_usage_active
+            name: active
+          - selector: host_mem_usage_shared
+            name: shared
+          - selector: host_mem_usage_sharedcommon
+            name: sharedcommon
+      - id: host_mem_swap_io
+        title: ESXi Host VMKernel memory swap IO
+        context: host_mem_swap_io
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70057
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_mem_swap_io_in
+            name: in
+          - selector: host_mem_swap_io_out
+            name: out
+  - family: hosts disk
+    metrics:
+      - host_disk_io_read
+      - host_disk_io_write
+      - host_disk_max_latency_latency
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: host_disk_io
+        title: ESXi Host disk IO
+        context: host_disk_io
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70058
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_io_read
+            name: read
+          - selector: host_disk_io_write
+            name: write
+            options:
+              multiplier: -1
+      - id: host_disk_max_latency
+        title: ESXi Host disk max latency
+        context: host_disk_max_latency
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70059
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_max_latency_latency
+            name: latency
+  - family: hosts net
+    metrics:
+      - host_net_traffic_received
+      - host_net_traffic_sent
+      - host_net_packets_received
+      - host_net_packets_sent
+      - host_net_drops_received
+      - host_net_drops_sent
+      - host_net_errors_received
+      - host_net_errors_sent
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: host_net_traffic
+        title: ESXi Host network traffic
+        context: host_net_traffic
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70060
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_traffic_received
+            name: received
+          - selector: host_net_traffic_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: host_net_packets
+        title: ESXi Host network packets
+        context: host_net_packets
+        units: packets
+        algorithm: absolute
+        type: line
+        priority: 70061
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_packets_received
+            name: received
+          - selector: host_net_packets_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: host_net_drops
+        title: ESXi Host network drops
+        context: host_net_drops
+        units: drops
+        algorithm: absolute
+        type: line
+        priority: 70062
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_drops_received
+            name: received
+          - selector: host_net_drops_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: host_net_errors
+        title: ESXi Host network errors
+        context: host_net_errors
+        units: errors
+        algorithm: absolute
+        type: line
+        priority: 70063
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_errors_received
+            name: received
+          - selector: host_net_errors_sent
+            name: sent
+            options:
+              multiplier: -1
+  - family: hosts status
+    metrics:
+      - host_overall_status_green
+      - host_overall_status_red
+      - host_overall_status_yellow
+      - host_overall_status_gray
+      - host_power_state_powered_on
+      - host_power_state_powered_off
+      - host_power_state_standby
+      - host_power_state_unknown
+      - host_connection_state_connected
+      - host_connection_state_not_responding
+      - host_connection_state_disconnected
+      - host_maintenance_status_normal
+      - host_maintenance_status_in_maintenance
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: host_overall_status
+        title: ESXi Host overall alarm status
+        context: host_overall_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70064
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_overall_status_green
+            name: green
+          - selector: host_overall_status_red
+            name: red
+          - selector: host_overall_status_yellow
+            name: yellow
+          - selector: host_overall_status_gray
+            name: gray
+      - id: host_power_state
+        title: ESXi Host power state
+        context: host_power_state
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70073
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_power_state_powered_on
+            name: powered_on
+          - selector: host_power_state_powered_off
+            name: powered_off
+          - selector: host_power_state_standby
+            name: standby
+          - selector: host_power_state_unknown
+            name: unknown
+      - id: host_connection_state
+        title: ESXi Host connection state
+        context: host_connection_state
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70082
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_connection_state_connected
+            name: connected
+          - selector: host_connection_state_not_responding
+            name: not_responding
+          - selector: host_connection_state_disconnected
+            name: disconnected
+      - id: host_maintenance_status
+        title: ESXi Host maintenance status
+        context: host_maintenance_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70083
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_maintenance_status_normal
+            name: normal
+          - selector: host_maintenance_status_in_maintenance
+            name: in_maintenance
+  - family: hosts uptime
+    metrics:
+      - host_system_uptime_uptime
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: host_system_uptime
+        title: ESXi Host system uptime
+        context: host_system_uptime
+        units: seconds
+        algorithm: absolute
+        type: line
+        priority: 70065
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_system_uptime_uptime
+            name: uptime
+  - family: datastores space
+    metrics:
+      - datastore_space_utilization_used
+      - datastore_space_usage_capacity
+      - datastore_space_usage_free
+      - datastore_space_usage_used
+      - datastore_space_usage_uncommitted
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: datastore_space_utilization
+        title: Datastore space utilization
+        context: datastore_space_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70039
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_space_utilization_used
+            name: used
+            options:
+              divisor: 100
+      - id: datastore_space_usage
+        title: Datastore space usage
+        context: datastore_space_usage
+        units: bytes
+        algorithm: absolute
+        type: line
+        priority: 70040
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_space_usage_capacity
+            name: capacity
+          - selector: datastore_space_usage_free
+            name: free
+          - selector: datastore_space_usage_used
+            name: used
+          - selector: datastore_space_usage_uncommitted
+            name: uncommitted
+  - family: datastores status
+    metrics:
+      - datastore_overall_status_green
+      - datastore_overall_status_red
+      - datastore_overall_status_yellow
+      - datastore_overall_status_gray
+      - datastore_accessibility_status_accessible
+      - datastore_accessibility_status_inaccessible
+      - datastore_maintenance_status_normal
+      - datastore_maintenance_status_entering_maintenance
+      - datastore_maintenance_status_in_maintenance
+      - datastore_maintenance_status_unknown
+      - datastore_multiple_host_access_enabled
+      - datastore_multiple_host_access_disabled
+      - datastore_multiple_host_access_unknown
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: datastore_overall_status
+        title: Datastore overall alarm status
+        context: datastore_overall_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70041
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_overall_status_green
+            name: green
+          - selector: datastore_overall_status_red
+            name: red
+          - selector: datastore_overall_status_yellow
+            name: yellow
+          - selector: datastore_overall_status_gray
+            name: gray
+      - id: datastore_accessibility_status
+        title: Datastore accessibility status
+        context: datastore_accessibility_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70069
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_accessibility_status_accessible
+            name: accessible
+          - selector: datastore_accessibility_status_inaccessible
+            name: inaccessible
+      - id: datastore_maintenance_status
+        title: Datastore maintenance mode status
+        context: datastore_maintenance_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70070
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_maintenance_status_normal
+            name: normal
+          - selector: datastore_maintenance_status_entering_maintenance
+            name: entering_maintenance
+          - selector: datastore_maintenance_status_in_maintenance
+            name: in_maintenance
+          - selector: datastore_maintenance_status_unknown
+            name: unknown
+      - id: datastore_multiple_host_access
+        title: Datastore multi-host access status
+        context: datastore_multiple_host_access
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70071
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_multiple_host_access_enabled
+            name: enabled
+          - selector: datastore_multiple_host_access_disabled
+            name: disabled
+          - selector: datastore_multiple_host_access_unknown
+            name: unknown
+  - family: datastores disk
+    metrics:
+      - datastore_disk_io_read
+      - datastore_disk_io_write
+      - datastore_disk_iops_reads
+      - datastore_disk_iops_writes
+      - datastore_disk_latency_read
+      - datastore_disk_latency_write
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: datastore_disk_io
+        title: Datastore disk IO
+        context: datastore_disk_io
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70036
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_disk_io_read
+            name: read
+          - selector: datastore_disk_io_write
+            name: write
+            options:
+              multiplier: -1
+      - id: datastore_disk_iops
+        title: Datastore disk IOPS
+        context: datastore_disk_iops
+        units: operations/s
+        algorithm: absolute
+        type: line
+        priority: 70037
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_disk_iops_reads
+            name: reads
+          - selector: datastore_disk_iops_writes
+            name: writes
+            options:
+              multiplier: -1
+      - id: datastore_disk_latency
+        title: Datastore disk latency
+        context: datastore_disk_latency
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70038
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_disk_latency_read
+            name: read
+          - selector: datastore_disk_latency_write
+            name: write
+  - family: clusters hosts
+    metrics:
+      - cluster_hosts_total
+      - cluster_hosts_effective
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_hosts
+        title: Cluster host count
+        context: cluster_hosts
+        units: hosts
+        algorithm: absolute
+        type: line
+        priority: 70000
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_hosts_total
+            name: total
+          - selector: cluster_hosts_effective
+            name: effective
+  - family: clusters cpu
+    metrics:
+      - cluster_cpu_capacity_total
+      - cluster_cpu_capacity_effective
+      - cluster_cpu_topology_cores
+      - cluster_cpu_topology_threads
+      - cluster_usage_cpu_demand
+      - cluster_usage_cpu_entitled
+      - cluster_usage_cpu_reserved
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_cpu_capacity
+        title: Cluster CPU capacity
+        context: cluster_cpu_capacity
+        units: MHz
+        algorithm: absolute
+        type: line
+        priority: 70001
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_cpu_capacity_total
+            name: total
+          - selector: cluster_cpu_capacity_effective
+            name: effective
+      - id: cluster_cpu_topology
+        title: Cluster CPU topology
+        context: cluster_cpu_topology
+        units: count
+        algorithm: absolute
+        type: line
+        priority: 70003
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_cpu_topology_cores
+            name: cores
+          - selector: cluster_cpu_topology_threads
+            name: threads
+      - id: cluster_usage_cpu
+        title: Cluster DRS CPU usage summary
+        context: cluster_usage_cpu
+        units: MHz
+        algorithm: absolute
+        type: line
+        priority: 70011
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_usage_cpu_demand
+            name: demand
+          - selector: cluster_usage_cpu_entitled
+            name: entitled
+          - selector: cluster_usage_cpu_reserved
+            name: reserved
+  - family: clusters mem
+    metrics:
+      - cluster_mem_capacity_total
+      - cluster_mem_capacity_effective
+      - cluster_usage_mem_demand
+      - cluster_usage_mem_entitled
+      - cluster_usage_mem_reserved
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_mem_capacity
+        title: Cluster memory capacity
+        context: cluster_mem_capacity
+        units: bytes
+        algorithm: absolute
+        type: line
+        priority: 70002
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_mem_capacity_total
+            name: total
+          - selector: cluster_mem_capacity_effective
+            name: effective
+      - id: cluster_usage_mem
+        title: Cluster DRS memory usage summary
+        context: cluster_usage_mem
+        units: MB
+        algorithm: absolute
+        type: line
+        priority: 70012
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_usage_mem_demand
+            name: demand
+          - selector: cluster_usage_mem_entitled
+            name: entitled
+          - selector: cluster_usage_mem_reserved
+            name: reserved
+  - family: clusters config
+    metrics:
+      - cluster_drs_config_enabled
+      - cluster_drs_mode_manual
+      - cluster_drs_mode_partially_automated
+      - cluster_drs_mode_fully_automated
+      - cluster_drs_mode_unknown
+      - cluster_drs_vmotion_rate_rate
+      - cluster_ha_config_enabled
+      - cluster_ha_config_admission_control
+      - cluster_ha_host_monitoring_enabled
+      - cluster_ha_host_monitoring_disabled
+      - cluster_ha_host_monitoring_unknown
+      - cluster_ha_vm_monitoring_disabled
+      - cluster_ha_vm_monitoring_vm_monitoring_only
+      - cluster_ha_vm_monitoring_vm_and_app_monitoring
+      - cluster_ha_vm_monitoring_unknown
+      - cluster_ha_vm_component_protection_enabled
+      - cluster_ha_vm_component_protection_disabled
+      - cluster_ha_vm_component_protection_unknown
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_drs_config
+        title: Cluster DRS enabled
+        context: cluster_drs_config
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70004
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_drs_config_enabled
+            name: enabled
+      - id: cluster_drs_mode
+        title: Cluster DRS automation mode
+        context: cluster_drs_mode
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70084
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_drs_mode_manual
+            name: manual
+          - selector: cluster_drs_mode_partially_automated
+            name: partially_automated
+          - selector: cluster_drs_mode_fully_automated
+            name: fully_automated
+          - selector: cluster_drs_mode_unknown
+            name: unknown
+      - id: cluster_drs_vmotion_rate
+        title: Cluster DRS vMotion recommendation threshold
+        context: cluster_drs_vmotion_rate
+        units: level
+        algorithm: absolute
+        type: line
+        priority: 70085
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_drs_vmotion_rate_rate
+            name: rate
+      - id: cluster_ha_config
+        title: Cluster HA configuration
+        context: cluster_ha_config
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70005
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_ha_config_enabled
+            name: enabled
+          - selector: cluster_ha_config_admission_control
+            name: admission_control
+      - id: cluster_ha_host_monitoring
+        title: Cluster HA host monitoring
+        context: cluster_ha_host_monitoring
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70086
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_ha_host_monitoring_enabled
+            name: enabled
+          - selector: cluster_ha_host_monitoring_disabled
+            name: disabled
+          - selector: cluster_ha_host_monitoring_unknown
+            name: unknown
+      - id: cluster_ha_vm_monitoring
+        title: Cluster HA VM monitoring
+        context: cluster_ha_vm_monitoring
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70087
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_ha_vm_monitoring_disabled
+            name: disabled
+          - selector: cluster_ha_vm_monitoring_vm_monitoring_only
+            name: vm_monitoring_only
+          - selector: cluster_ha_vm_monitoring_vm_and_app_monitoring
+            name: vm_and_app_monitoring
+          - selector: cluster_ha_vm_monitoring_unknown
+            name: unknown
+      - id: cluster_ha_vm_component_protection
+        title: Cluster HA VM component protection
+        context: cluster_ha_vm_component_protection
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70088
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_ha_vm_component_protection_enabled
+            name: enabled
+          - selector: cluster_ha_vm_component_protection_disabled
+            name: disabled
+          - selector: cluster_ha_vm_component_protection_unknown
+            name: unknown
+  - family: clusters status
+    metrics:
+      - cluster_overall_status_green
+      - cluster_overall_status_red
+      - cluster_overall_status_yellow
+      - cluster_overall_status_gray
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_overall_status
+        title: Cluster overall alarm status
+        context: cluster_overall_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70006
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_overall_status_green
+            name: green
+          - selector: cluster_overall_status_red
+            name: red
+          - selector: cluster_overall_status_yellow
+            name: yellow
+          - selector: cluster_overall_status_gray
+            name: gray
+  - family: clusters migrations
+    metrics:
+      - cluster_vmotions_vmotions
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_vmotions
+        title: Cluster cumulative vMotion count
+        context: cluster_vmotions
+        units: migrations
+        algorithm: incremental
+        type: line
+        priority: 70007
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_vmotions_vmotions
+            name: vmotions
+  - family: clusters drs
+    metrics:
+      - cluster_drs_score_score
+      - cluster_drs_balance_current
+      - cluster_drs_balance_target
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_drs_score
+        title: Cluster DRS score
+        context: cluster_drs_score
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70008
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_drs_score_score
+            name: score
+      - id: cluster_drs_balance
+        title: Cluster DRS load balance
+        context: cluster_drs_balance
+        units: score
+        algorithm: absolute
+        type: line
+        priority: 70009
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_drs_balance_current
+            name: current
+            options:
+              divisor: 1000
+          - selector: cluster_drs_balance_target
+            name: target
+            options:
+              divisor: 1000
+  - family: clusters vms
+    metrics:
+      - cluster_vm_count_total
+      - cluster_vm_count_powered_off
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_vm_count
+        title: Cluster VM count
+        context: cluster_vm_count
+        units: VMs
+        algorithm: absolute
+        type: line
+        priority: 70010
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_vm_count_total
+            name: total
+          - selector: cluster_vm_count_powered_off
+            name: powered_off
+  - family: clusters cpu
+    metrics:
+      - cluster_cpu_utilization_used
+      - cluster_cpu_usage_used
+      - cluster_cpu_usage_total
+      - cluster_services_effective_cpu_effective_cpu
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_cpu_utilization
+        title: Cluster CPU utilization
+        context: cluster_cpu_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70013
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_cpu_utilization_used
+            name: used
+            options:
+              divisor: 100
+      - id: cluster_cpu_usage
+        title: Cluster CPU usage
+        context: cluster_cpu_usage
+        units: MHz
+        algorithm: absolute
+        type: line
+        priority: 70014
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_cpu_usage_used
+            name: used
+          - selector: cluster_cpu_usage_total
+            name: total
+      - id: cluster_services_effective_cpu
+        title: Cluster effective CPU capacity
+        context: cluster_services_effective_cpu
+        units: MHz
+        algorithm: absolute
+        type: line
+        priority: 70018
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_services_effective_cpu_effective_cpu
+            name: effective_cpu
+  - family: clusters mem
+    metrics:
+      - cluster_mem_utilization_used
+      - cluster_mem_usage_consumed
+      - cluster_mem_usage_active
+      - cluster_mem_usage_granted
+      - cluster_mem_usage_shared
+      - cluster_mem_usage_overhead
+      - cluster_mem_usage_swap_used
+      - cluster_services_effective_mem_effective_mem
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_mem_utilization
+        title: Cluster memory utilization
+        context: cluster_mem_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70015
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_mem_utilization_used
+            name: used
+            options:
+              divisor: 100
+      - id: cluster_mem_usage
+        title: Cluster memory usage
+        context: cluster_mem_usage
+        units: KiB
+        algorithm: absolute
+        type: line
+        priority: 70016
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_mem_usage_consumed
+            name: consumed
+          - selector: cluster_mem_usage_active
+            name: active
+          - selector: cluster_mem_usage_granted
+            name: granted
+          - selector: cluster_mem_usage_shared
+            name: shared
+          - selector: cluster_mem_usage_overhead
+            name: overhead
+          - selector: cluster_mem_usage_swap_used
+            name: swap_used
+      - id: cluster_services_effective_mem
+        title: Cluster effective memory capacity
+        context: cluster_services_effective_mem
+        units: MB
+        algorithm: absolute
+        type: line
+        priority: 70019
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_services_effective_mem_effective_mem
+            name: effective_mem
+  - family: clusters drs
+    metrics:
+      - cluster_services_fairness_cpu
+      - cluster_services_fairness_memory
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_services_fairness
+        title: Cluster DRS resource distribution fairness
+        context: cluster_services_fairness
+        units: score
+        algorithm: absolute
+        type: line
+        priority: 70017
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_services_fairness_cpu
+            name: cpu
+          - selector: cluster_services_fairness_memory
+            name: memory
+  - family: clusters ha
+    metrics:
+      - cluster_services_failover_failures_tolerable
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_services_failover
+        title: Cluster HA failover capacity
+        context: cluster_services_failover
+        units: failures
+        algorithm: absolute
+        type: line
+        priority: 70020
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_services_failover_failures_tolerable
+            name: failures_tolerable
+  - family: clusters vmop
+    metrics:
+      - cluster_vm_migrations_vmotion
+      - cluster_vm_migrations_svmotion
+      - cluster_vm_migrations_xvmotion
+      - cluster_vm_lifecycle_poweron
+      - cluster_vm_lifecycle_poweroff
+      - cluster_vm_lifecycle_create
+      - cluster_vm_lifecycle_destroy
+      - cluster_vm_lifecycle_clone
+      - cluster_vm_lifecycle_deploy
+      - cluster_vm_management_reconfigure
+      - cluster_vm_management_reset
+      - cluster_vm_management_suspend
+      - cluster_vm_management_register
+      - cluster_vm_management_unregister
+      - cluster_vm_guest_ops_reboot
+      - cluster_vm_guest_ops_shutdown
+      - cluster_vm_guest_ops_standby
+      - cluster_vm_cold_migrations_change_ds
+      - cluster_vm_cold_migrations_change_host
+      - cluster_vm_cold_migrations_change_host_ds
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: cluster_vm_migrations
+        title: Cluster VM migration operations
+        context: cluster_vm_migrations
+        units: operations
+        algorithm: absolute
+        type: line
+        priority: 70021
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_vm_migrations_vmotion
+            name: vmotion
+          - selector: cluster_vm_migrations_svmotion
+            name: svmotion
+          - selector: cluster_vm_migrations_xvmotion
+            name: xvmotion
+      - id: cluster_vm_lifecycle
+        title: Cluster VM lifecycle operations
+        context: cluster_vm_lifecycle
+        units: operations
+        algorithm: absolute
+        type: line
+        priority: 70022
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_vm_lifecycle_poweron
+            name: poweron
+          - selector: cluster_vm_lifecycle_poweroff
+            name: poweroff
+          - selector: cluster_vm_lifecycle_create
+            name: create
+          - selector: cluster_vm_lifecycle_destroy
+            name: destroy
+          - selector: cluster_vm_lifecycle_clone
+            name: clone
+          - selector: cluster_vm_lifecycle_deploy
+            name: deploy
+      - id: cluster_vm_management
+        title: Cluster VM management operations
+        context: cluster_vm_management
+        units: operations
+        algorithm: absolute
+        type: line
+        priority: 70023
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_vm_management_reconfigure
+            name: reconfigure
+          - selector: cluster_vm_management_reset
+            name: reset
+          - selector: cluster_vm_management_suspend
+            name: suspend
+          - selector: cluster_vm_management_register
+            name: register
+          - selector: cluster_vm_management_unregister
+            name: unregister
+      - id: cluster_vm_guest_ops
+        title: Cluster VM guest operations
+        context: cluster_vm_guest_ops
+        units: operations
+        algorithm: absolute
+        type: line
+        priority: 70024
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_vm_guest_ops_reboot
+            name: reboot
+          - selector: cluster_vm_guest_ops_shutdown
+            name: shutdown
+          - selector: cluster_vm_guest_ops_standby
+            name: standby
+      - id: cluster_vm_cold_migrations
+        title: Cluster VM cold migration operations
+        context: cluster_vm_cold_migrations
+        units: operations
+        algorithm: absolute
+        type: line
+        priority: 70025
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: cluster_vm_cold_migrations_change_ds
+            name: change_ds
+          - selector: cluster_vm_cold_migrations_change_host
+            name: change_host
+          - selector: cluster_vm_cold_migrations_change_host_ds
+            name: change_host_ds
+  - family: resource pools cpu
+    metrics:
+      - resource_pool_cpu_usage_usage
+      - resource_pool_cpu_usage_demand
+      - resource_pool_cpu_entitlement_distributed
+      - resource_pool_cpu_allocation_reservation_used
+      - resource_pool_cpu_allocation_unreserved_for_vm
+      - resource_pool_cpu_allocation_max_usage
+      - resource_pool_cpu_config_reservation
+      - resource_pool_cpu_config_limit
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: resource_pool_cpu_usage
+        title: Resource Pool CPU usage vs demand
+        context: resource_pool_cpu_usage
+        units: MHz
+        algorithm: absolute
+        type: line
+        priority: 70026
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_cpu_usage_usage
+            name: usage
+          - selector: resource_pool_cpu_usage_demand
+            name: demand
+      - id: resource_pool_cpu_entitlement
+        title: Resource Pool CPU entitlement
+        context: resource_pool_cpu_entitlement
+        units: MHz
+        algorithm: absolute
+        type: line
+        priority: 70027
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_cpu_entitlement_distributed
+            name: distributed
+      - id: resource_pool_cpu_allocation
+        title: Resource Pool CPU allocation
+        context: resource_pool_cpu_allocation
+        units: MHz
+        algorithm: absolute
+        type: line
+        priority: 70028
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_cpu_allocation_reservation_used
+            name: reservation_used
+          - selector: resource_pool_cpu_allocation_unreserved_for_vm
+            name: unreserved_for_vm
+          - selector: resource_pool_cpu_allocation_max_usage
+            name: max_usage
+      - id: resource_pool_cpu_config
+        title: Resource Pool CPU configured reservation and limit
+        context: resource_pool_cpu_config
+        units: MHz
+        algorithm: absolute
+        type: line
+        priority: 70033
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_cpu_config_reservation
+            name: reservation
+          - selector: resource_pool_cpu_config_limit
+            name: limit
+  - family: resource pools mem
+    metrics:
+      - resource_pool_mem_usage_host
+      - resource_pool_mem_usage_guest
+      - resource_pool_mem_entitlement_distributed
+      - resource_pool_mem_allocation_reservation_used
+      - resource_pool_mem_allocation_unreserved_for_vm
+      - resource_pool_mem_allocation_max_usage
+      - resource_pool_mem_breakdown_private
+      - resource_pool_mem_breakdown_shared
+      - resource_pool_mem_breakdown_swapped
+      - resource_pool_mem_breakdown_ballooned
+      - resource_pool_mem_breakdown_overhead
+      - resource_pool_mem_breakdown_consumed_overhead
+      - resource_pool_mem_breakdown_compressed
+      - resource_pool_mem_config_reservation
+      - resource_pool_mem_config_limit
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: resource_pool_mem_usage
+        title: Resource Pool memory usage
+        context: resource_pool_mem_usage
+        units: MB
+        algorithm: absolute
+        type: line
+        priority: 70029
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_mem_usage_host
+            name: host
+          - selector: resource_pool_mem_usage_guest
+            name: guest
+      - id: resource_pool_mem_entitlement
+        title: Resource Pool memory entitlement
+        context: resource_pool_mem_entitlement
+        units: MB
+        algorithm: absolute
+        type: line
+        priority: 70030
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_mem_entitlement_distributed
+            name: distributed
+      - id: resource_pool_mem_allocation
+        title: Resource Pool memory allocation
+        context: resource_pool_mem_allocation
+        units: bytes
+        algorithm: absolute
+        type: line
+        priority: 70031
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_mem_allocation_reservation_used
+            name: reservation_used
+          - selector: resource_pool_mem_allocation_unreserved_for_vm
+            name: unreserved_for_vm
+          - selector: resource_pool_mem_allocation_max_usage
+            name: max_usage
+      - id: resource_pool_mem_breakdown
+        title: Resource Pool memory state breakdown
+        context: resource_pool_mem_breakdown
+        units: MB
+        algorithm: absolute
+        type: line
+        priority: 70032
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_mem_breakdown_private
+            name: private
+          - selector: resource_pool_mem_breakdown_shared
+            name: shared
+          - selector: resource_pool_mem_breakdown_swapped
+            name: swapped
+          - selector: resource_pool_mem_breakdown_ballooned
+            name: ballooned
+          - selector: resource_pool_mem_breakdown_overhead
+            name: overhead
+          - selector: resource_pool_mem_breakdown_consumed_overhead
+            name: consumed_overhead
+          - selector: resource_pool_mem_breakdown_compressed
+            name: compressed
+            options:
+              divisor: 1024
+      - id: resource_pool_mem_config
+        title: Resource Pool memory configured reservation and limit
+        context: resource_pool_mem_config
+        units: MB
+        algorithm: absolute
+        type: line
+        priority: 70034
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_mem_config_reservation
+            name: reservation
+          - selector: resource_pool_mem_config_limit
+            name: limit
+  - family: resource pools status
+    metrics:
+      - resource_pool_overall_status_green
+      - resource_pool_overall_status_red
+      - resource_pool_overall_status_yellow
+      - resource_pool_overall_status_gray
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: resource_pool_overall_status
+        title: Resource Pool overall alarm status
+        context: resource_pool_overall_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70035
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: resource_pool_overall_status_green
+            name: green
+          - selector: resource_pool_overall_status_red
+            name: red
+          - selector: resource_pool_overall_status_yellow
+            name: yellow
+          - selector: resource_pool_overall_status_gray
+            name: gray
+  - family: datastore clusters space
+    metrics:
+      - datastore_cluster_space_usage_capacity
+      - datastore_cluster_space_usage_free
+      - datastore_cluster_space_usage_used
+      - datastore_cluster_space_utilization_used
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: datastore_cluster_space_utilization
+        title: Datastore Cluster space utilization
+        context: datastore_cluster_space_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70090
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_cluster_space_utilization_used
+            name: used
+            options:
+              divisor: 100
+      - id: datastore_cluster_space_usage
+        title: Datastore Cluster space usage
+        context: datastore_cluster_space_usage
+        units: bytes
+        algorithm: absolute
+        type: line
+        priority: 70091
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_cluster_space_usage_capacity
+            name: capacity
+          - selector: datastore_cluster_space_usage_free
+            name: free
+          - selector: datastore_cluster_space_usage_used
+            name: used
+  - family: datastore clusters status
+    metrics:
+      - datastore_cluster_storage_drs_status_enabled
+      - datastore_cluster_storage_drs_status_disabled
+      - datastore_cluster_overall_status_green
+      - datastore_cluster_overall_status_red
+      - datastore_cluster_overall_status_yellow
+      - datastore_cluster_overall_status_gray
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: datastore_cluster_storage_drs_status
+        title: Datastore Cluster Storage DRS status
+        context: datastore_cluster_storage_drs_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70092
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_cluster_storage_drs_status_enabled
+            name: enabled
+          - selector: datastore_cluster_storage_drs_status_disabled
+            name: disabled
+      - id: datastore_cluster_overall_status
+        title: Datastore Cluster overall status
+        context: datastore_cluster_overall_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70093
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: datastore_cluster_overall_status_green
+            name: green
+          - selector: datastore_cluster_overall_status_red
+            name: red
+          - selector: datastore_cluster_overall_status_yellow
+            name: yellow
+          - selector: datastore_cluster_overall_status_gray
+            name: gray
+  - family: vms disk devices
+    metrics:
+      - vm_disk_capacity_capacity
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+          - disk_key
+    charts:
+      - id: vm_disk_capacity
+        title: Virtual Machine virtual disk capacity
+        context: vm_disk_capacity
+        units: bytes
+        algorithm: absolute
+        type: line
+        priority: 70049
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_disk_capacity_capacity
+            name: capacity
+  - family: vms disk devices
+    metrics:
+      - vm_disk_device_io_read
+      - vm_disk_device_io_write
+      - vm_disk_device_iops_read
+      - vm_disk_device_iops_write
+      - vm_disk_device_latency_read
+      - vm_disk_device_latency_write
+      - vm_disk_device_outstanding_io_read
+      - vm_disk_device_outstanding_io_write
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+          - disk_instance
+    charts:
+      - id: vm_disk_device_io
+        title: Virtual Machine virtual disk I/O
+        context: vm_disk_device_io
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70050
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_disk_device_io_read
+            name: read
+          - selector: vm_disk_device_io_write
+            name: write
+            options:
+              multiplier: -1
+      - id: vm_disk_device_iops
+        title: Virtual Machine virtual disk IOPS
+        context: vm_disk_device_iops
+        units: operations/s
+        algorithm: absolute
+        type: line
+        priority: 70051
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_disk_device_iops_read
+            name: read
+          - selector: vm_disk_device_iops_write
+            name: write
+            options:
+              multiplier: -1
+      - id: vm_disk_device_latency
+        title: Virtual Machine virtual disk latency
+        context: vm_disk_device_latency
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70052
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_disk_device_latency_read
+            name: read
+          - selector: vm_disk_device_latency_write
+            name: write
+      - id: vm_disk_device_outstanding_io
+        title: Virtual Machine virtual disk outstanding I/O
+        context: vm_disk_device_outstanding_io
+        units: operations
+        algorithm: absolute
+        type: line
+        priority: 70053
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_disk_device_outstanding_io_read
+            name: read
+          - selector: vm_disk_device_outstanding_io_write
+            name: write
+            options:
+              multiplier: -1
+  - family: vms network interfaces
+    metrics:
+      - vm_net_interface_traffic_received
+      - vm_net_interface_traffic_sent
+      - vm_net_interface_packets_received
+      - vm_net_interface_packets_sent
+      - vm_net_interface_drops_received
+      - vm_net_interface_drops_sent
+      - vm_net_interface_broadcast_packets_received
+      - vm_net_interface_broadcast_packets_sent
+      - vm_net_interface_multicast_packets_received
+      - vm_net_interface_multicast_packets_sent
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+          - interface_instance
+    charts:
+      - id: vm_net_interface_traffic
+        title: Virtual Machine network interface traffic
+        context: vm_net_interface_traffic
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70050
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_net_interface_traffic_received
+            name: received
+          - selector: vm_net_interface_traffic_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: vm_net_interface_packets
+        title: Virtual Machine network interface packets
+        context: vm_net_interface_packets
+        units: packets
+        algorithm: absolute
+        type: line
+        priority: 70051
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_net_interface_packets_received
+            name: received
+          - selector: vm_net_interface_packets_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: vm_net_interface_drops
+        title: Virtual Machine network interface packet drops
+        context: vm_net_interface_drops
+        units: drops
+        algorithm: absolute
+        type: line
+        priority: 70052
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_net_interface_drops_received
+            name: received
+          - selector: vm_net_interface_drops_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: vm_net_interface_broadcast_packets
+        title: Virtual Machine network interface broadcast packets
+        context: vm_net_interface_broadcast_packets
+        units: packets
+        algorithm: absolute
+        type: line
+        priority: 70053
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_net_interface_broadcast_packets_received
+            name: received
+          - selector: vm_net_interface_broadcast_packets_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: vm_net_interface_multicast_packets
+        title: Virtual Machine network interface multicast packets
+        context: vm_net_interface_multicast_packets
+        units: packets
+        algorithm: absolute
+        type: line
+        priority: 70054
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_net_interface_multicast_packets_received
+            name: received
+          - selector: vm_net_interface_multicast_packets_sent
+            name: sent
+            options:
+              multiplier: -1
+  - family: hosts network interfaces
+    metrics:
+      - host_net_interface_traffic_received
+      - host_net_interface_traffic_sent
+      - host_net_interface_packets_received
+      - host_net_interface_packets_sent
+      - host_net_interface_drops_received
+      - host_net_interface_drops_sent
+      - host_net_interface_errors_received
+      - host_net_interface_errors_sent
+      - host_net_interface_broadcast_packets_received
+      - host_net_interface_broadcast_packets_sent
+      - host_net_interface_multicast_packets_received
+      - host_net_interface_multicast_packets_sent
+      - host_net_interface_unknown_protocol_frames_unknown
+      - host_net_interface_usage_usage
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+          - interface_instance
+    charts:
+      - id: host_net_interface_traffic
+        title: ESXi Host network interface traffic
+        context: host_net_interface_traffic
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70061
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_interface_traffic_received
+            name: received
+          - selector: host_net_interface_traffic_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: host_net_interface_packets
+        title: ESXi Host network interface packets
+        context: host_net_interface_packets
+        units: packets
+        algorithm: absolute
+        type: line
+        priority: 70062
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_interface_packets_received
+            name: received
+          - selector: host_net_interface_packets_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: host_net_interface_drops
+        title: ESXi Host network interface packet drops
+        context: host_net_interface_drops
+        units: drops
+        algorithm: absolute
+        type: line
+        priority: 70063
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_interface_drops_received
+            name: received
+          - selector: host_net_interface_drops_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: host_net_interface_errors
+        title: ESXi Host network interface packet errors
+        context: host_net_interface_errors
+        units: errors
+        algorithm: absolute
+        type: line
+        priority: 70064
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_interface_errors_received
+            name: received
+          - selector: host_net_interface_errors_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: host_net_interface_broadcast_packets
+        title: ESXi Host network interface broadcast packets
+        context: host_net_interface_broadcast_packets
+        units: packets
+        algorithm: absolute
+        type: line
+        priority: 70065
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_interface_broadcast_packets_received
+            name: received
+          - selector: host_net_interface_broadcast_packets_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: host_net_interface_multicast_packets
+        title: ESXi Host network interface multicast packets
+        context: host_net_interface_multicast_packets
+        units: packets
+        algorithm: absolute
+        type: line
+        priority: 70066
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_interface_multicast_packets_received
+            name: received
+          - selector: host_net_interface_multicast_packets_sent
+            name: sent
+            options:
+              multiplier: -1
+      - id: host_net_interface_unknown_protocol_frames
+        title: ESXi Host network interface unknown protocol frames
+        context: host_net_interface_unknown_protocol_frames
+        units: frames
+        algorithm: absolute
+        type: line
+        priority: 70067
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_interface_unknown_protocol_frames_unknown
+            name: unknown
+      - id: host_net_interface_usage
+        title: ESXi Host network interface usage
+        context: host_net_interface_usage
+        units: KiB/s
+        algorithm: absolute
+        type: line
+        priority: 70068
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_net_interface_usage_usage
+            name: usage
+  - family: hosts disk devices
+    metrics:
+      - host_disk_device_io_read
+      - host_disk_device_io_write
+      - host_disk_device_iops_read
+      - host_disk_device_iops_write
+      - host_disk_device_requests_read
+      - host_disk_device_requests_write
+      - host_disk_device_latency_total
+      - host_disk_device_latency_read
+      - host_disk_device_latency_write
+      - host_disk_device_latency_breakdown_device
+      - host_disk_device_latency_breakdown_kernel
+      - host_disk_device_latency_breakdown_queue
+      - host_disk_device_read_latency_breakdown_device
+      - host_disk_device_read_latency_breakdown_kernel
+      - host_disk_device_read_latency_breakdown_queue
+      - host_disk_device_write_latency_breakdown_device
+      - host_disk_device_write_latency_breakdown_kernel
+      - host_disk_device_write_latency_breakdown_queue
+      - host_disk_device_commands_issued
+      - host_disk_device_command_events_issued
+      - host_disk_device_command_events_aborted
+      - host_disk_device_command_events_bus_resets
+      - host_disk_device_queue_depth_max
+      - host_disk_device_scsi_reservation_conflicts_conflicts
+      - host_disk_device_scsi_reservation_conflicts_percentage_conflicts
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+          - disk_instance
+    charts:
+      - id: host_disk_device_io
+        title: ESXi Host disk device I/O
+        context: host_disk_device_io
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70060
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_io_read
+            name: read
+          - selector: host_disk_device_io_write
+            name: write
+            options:
+              multiplier: -1
+      - id: host_disk_device_iops
+        title: ESXi Host disk device IOPS
+        context: host_disk_device_iops
+        units: operations/s
+        algorithm: absolute
+        type: line
+        priority: 70061
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_iops_read
+            name: read
+          - selector: host_disk_device_iops_write
+            name: write
+            options:
+              multiplier: -1
+      - id: host_disk_device_requests
+        title: ESXi Host disk device requests
+        context: host_disk_device_requests
+        units: requests
+        algorithm: absolute
+        type: line
+        priority: 70062
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_requests_read
+            name: read
+          - selector: host_disk_device_requests_write
+            name: write
+            options:
+              multiplier: -1
+      - id: host_disk_device_latency
+        title: ESXi Host disk device latency
+        context: host_disk_device_latency
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70063
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_latency_total
+            name: total
+          - selector: host_disk_device_latency_read
+            name: read
+          - selector: host_disk_device_latency_write
+            name: write
+      - id: host_disk_device_latency_breakdown
+        title: ESXi Host disk device latency breakdown
+        context: host_disk_device_latency_breakdown
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70064
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_latency_breakdown_device
+            name: device
+          - selector: host_disk_device_latency_breakdown_kernel
+            name: kernel
+          - selector: host_disk_device_latency_breakdown_queue
+            name: queue
+      - id: host_disk_device_read_latency_breakdown
+        title: ESXi Host disk device read latency breakdown
+        context: host_disk_device_read_latency_breakdown
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70065
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_read_latency_breakdown_device
+            name: device
+          - selector: host_disk_device_read_latency_breakdown_kernel
+            name: kernel
+          - selector: host_disk_device_read_latency_breakdown_queue
+            name: queue
+      - id: host_disk_device_write_latency_breakdown
+        title: ESXi Host disk device write latency breakdown
+        context: host_disk_device_write_latency_breakdown
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70066
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_write_latency_breakdown_device
+            name: device
+          - selector: host_disk_device_write_latency_breakdown_kernel
+            name: kernel
+          - selector: host_disk_device_write_latency_breakdown_queue
+            name: queue
+      - id: host_disk_device_commands
+        title: ESXi Host disk device commands
+        context: host_disk_device_commands
+        units: commands/s
+        algorithm: absolute
+        type: line
+        priority: 70067
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_commands_issued
+            name: issued
+      - id: host_disk_device_command_events
+        title: ESXi Host disk device command events
+        context: host_disk_device_command_events
+        units: events
+        algorithm: absolute
+        type: line
+        priority: 70068
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_command_events_issued
+            name: issued
+          - selector: host_disk_device_command_events_aborted
+            name: aborted
+          - selector: host_disk_device_command_events_bus_resets
+            name: bus_resets
+      - id: host_disk_device_queue_depth
+        title: ESXi Host disk device maximum queue depth
+        context: host_disk_device_queue_depth
+        units: queue depth
+        algorithm: absolute
+        type: line
+        priority: 70069
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_queue_depth_max
+            name: max
+      - id: host_disk_device_scsi_reservation_conflicts
+        title: ESXi Host disk device SCSI reservation conflicts
+        context: host_disk_device_scsi_reservation_conflicts
+        units: conflicts
+        algorithm: absolute
+        type: line
+        priority: 70070
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_scsi_reservation_conflicts_conflicts
+            name: conflicts
+      - id: host_disk_device_scsi_reservation_conflicts_percentage
+        title: ESXi Host disk device SCSI reservation conflicts percentage
+        context: host_disk_device_scsi_reservation_conflicts_percentage
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70071
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_disk_device_scsi_reservation_conflicts_percentage_conflicts
+            name: conflicts
+            options:
+              divisor: 100
+  - family: hosts storage adapters
+    metrics:
+      - host_storage_adapter_io_read
+      - host_storage_adapter_io_write
+      - host_storage_adapter_commands_issued
+      - host_storage_adapter_commands_read
+      - host_storage_adapter_commands_write
+      - host_storage_adapter_latency_read
+      - host_storage_adapter_latency_write
+      - host_storage_adapter_latency_queue
+      - host_storage_adapter_queue_outstanding
+      - host_storage_adapter_queue_queued
+      - host_storage_adapter_queue_depth
+      - host_storage_adapter_outstanding_io_percentage_outstanding
+      - host_storage_adapter_throughput_usage
+      - host_storage_adapter_throughput_contention_contention
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+          - adapter_instance
+    charts:
+      - id: host_storage_adapter_io
+        title: ESXi Host storage adapter I/O
+        context: host_storage_adapter_io
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70072
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_adapter_io_read
+            name: read
+          - selector: host_storage_adapter_io_write
+            name: write
+            options:
+              multiplier: -1
+      - id: host_storage_adapter_commands
+        title: ESXi Host storage adapter commands
+        context: host_storage_adapter_commands
+        units: commands/s
+        algorithm: absolute
+        type: line
+        priority: 70073
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_adapter_commands_issued
+            name: issued
+          - selector: host_storage_adapter_commands_read
+            name: read
+          - selector: host_storage_adapter_commands_write
+            name: write
+            options:
+              multiplier: -1
+      - id: host_storage_adapter_latency
+        title: ESXi Host storage adapter latency
+        context: host_storage_adapter_latency
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70074
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_adapter_latency_read
+            name: read
+          - selector: host_storage_adapter_latency_write
+            name: write
+          - selector: host_storage_adapter_latency_queue
+            name: queue
+      - id: host_storage_adapter_queue
+        title: ESXi Host storage adapter queue
+        context: host_storage_adapter_queue
+        units: I/O requests
+        algorithm: absolute
+        type: line
+        priority: 70075
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_adapter_queue_outstanding
+            name: outstanding
+          - selector: host_storage_adapter_queue_queued
+            name: queued
+          - selector: host_storage_adapter_queue_depth
+            name: depth
+      - id: host_storage_adapter_outstanding_io_percentage
+        title: ESXi Host storage adapter outstanding I/O percentage
+        context: host_storage_adapter_outstanding_io_percentage
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70076
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_adapter_outstanding_io_percentage_outstanding
+            name: outstanding
+            options:
+              divisor: 100
+      - id: host_storage_adapter_throughput
+        title: ESXi Host storage adapter throughput usage
+        context: host_storage_adapter_throughput
+        units: KiB/s
+        algorithm: absolute
+        type: line
+        priority: 70077
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_adapter_throughput_usage
+            name: usage
+      - id: host_storage_adapter_throughput_contention
+        title: ESXi Host storage adapter throughput contention
+        context: host_storage_adapter_throughput_contention
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70078
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_adapter_throughput_contention_contention
+            name: contention
+  - family: hosts storage adapters
+    metrics:
+      - host_storage_adapter_max_latency_max
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: host_storage_adapter_max_latency
+        title: ESXi Host storage adapter maximum latency
+        context: host_storage_adapter_max_latency
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70079
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_adapter_max_latency_max
+            name: max
+  - family: hosts storage paths
+    metrics:
+      - host_storage_path_io_read
+      - host_storage_path_io_write
+      - host_storage_path_commands_issued
+      - host_storage_path_commands_read
+      - host_storage_path_commands_write
+      - host_storage_path_latency_read
+      - host_storage_path_latency_write
+      - host_storage_path_command_events_aborted
+      - host_storage_path_command_events_bus_resets
+      - host_storage_path_throughput_usage
+      - host_storage_path_throughput_contention_contention
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+          - path_instance
+    charts:
+      - id: host_storage_path_io
+        title: ESXi Host storage path I/O
+        context: host_storage_path_io
+        units: KiB/s
+        algorithm: absolute
+        type: area
+        priority: 70080
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_path_io_read
+            name: read
+          - selector: host_storage_path_io_write
+            name: write
+            options:
+              multiplier: -1
+      - id: host_storage_path_commands
+        title: ESXi Host storage path commands
+        context: host_storage_path_commands
+        units: commands/s
+        algorithm: absolute
+        type: line
+        priority: 70081
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_path_commands_issued
+            name: issued
+          - selector: host_storage_path_commands_read
+            name: read
+          - selector: host_storage_path_commands_write
+            name: write
+            options:
+              multiplier: -1
+      - id: host_storage_path_latency
+        title: ESXi Host storage path latency
+        context: host_storage_path_latency
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70082
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_path_latency_read
+            name: read
+          - selector: host_storage_path_latency_write
+            name: write
+      - id: host_storage_path_command_events
+        title: ESXi Host storage path command events
+        context: host_storage_path_command_events
+        units: events
+        algorithm: absolute
+        type: line
+        priority: 70083
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_path_command_events_aborted
+            name: aborted
+          - selector: host_storage_path_command_events_bus_resets
+            name: bus_resets
+      - id: host_storage_path_throughput
+        title: ESXi Host storage path throughput usage
+        context: host_storage_path_throughput
+        units: KiB/s
+        algorithm: absolute
+        type: line
+        priority: 70084
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_path_throughput_usage
+            name: usage
+      - id: host_storage_path_throughput_contention
+        title: ESXi Host storage path throughput contention
+        context: host_storage_path_throughput_contention
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70085
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_path_throughput_contention_contention
+            name: contention
+  - family: hosts storage paths
+    metrics:
+      - host_storage_path_max_latency_max
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: host_storage_path_max_latency
+        title: ESXi Host storage path maximum latency
+        context: host_storage_path_max_latency
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70086
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_storage_path_max_latency_max
+            name: max
+  - family: hosts cpu instances
+    metrics:
+      - host_cpu_instance_utilization_usage
+      - host_cpu_instance_utilization_utilization
+      - host_cpu_instance_utilization_core
+      - host_cpu_instance_time_used
+      - host_cpu_instance_time_idle
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+          - cpu_instance
+    charts:
+      - id: host_cpu_instance_utilization
+        title: ESXi Host CPU instance utilization
+        context: host_cpu_instance_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70087
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_cpu_instance_utilization_usage
+            name: usage
+            options:
+              divisor: 100
+          - selector: host_cpu_instance_utilization_utilization
+            name: utilization
+            options:
+              divisor: 100
+          - selector: host_cpu_instance_utilization_core
+            name: core_utilization
+            options:
+              divisor: 100
+      - id: host_cpu_instance_time
+        title: ESXi Host CPU instance time
+        context: host_cpu_instance_time
+        units: milliseconds
+        algorithm: absolute
+        type: line
+        priority: 70088
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_cpu_instance_time_used
+            name: used
+          - selector: host_cpu_instance_time_idle
+            name: idle
+  - family: hosts power
+    metrics:
+      - host_power_usage_power
+      - host_power_usage_cap
+      - host_power_capacity_usage_used
+      - host_power_capacity_usage_usable
+      - host_power_capacity_usage_idle
+      - host_power_capacity_usage_system
+      - host_power_capacity_usage_vm
+      - host_power_capacity_utilization_used
+      - host_energy_usage_energy
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: host_power_usage
+        title: ESXi Host power usage
+        context: host_power_usage
+        units: watts
+        algorithm: absolute
+        type: line
+        priority: 70089
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_power_usage_power
+            name: power
+          - selector: host_power_usage_cap
+            name: cap
+      - id: host_power_capacity_usage
+        title: ESXi Host power capacity usage
+        context: host_power_capacity_usage
+        units: watts
+        algorithm: absolute
+        type: line
+        priority: 70090
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_power_capacity_usage_used
+            name: used
+          - selector: host_power_capacity_usage_usable
+            name: usable
+          - selector: host_power_capacity_usage_idle
+            name: idle
+          - selector: host_power_capacity_usage_system
+            name: system
+          - selector: host_power_capacity_usage_vm
+            name: vm
+      - id: host_power_capacity_utilization
+        title: ESXi Host power capacity utilization
+        context: host_power_capacity_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70091
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_power_capacity_utilization_used
+            name: used
+            options:
+              divisor: 100
+      - id: host_energy_usage
+        title: ESXi Host energy usage
+        context: host_energy_usage
+        units: joules
+        algorithm: absolute
+        type: line
+        priority: 70092
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: host_energy_usage_energy
+            name: energy
+  - family: vms power
+    metrics:
+      - vm_power_usage_power
+      - vm_energy_usage_energy
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vm_power_usage
+        title: Virtual Machine power usage
+        context: vm_power_usage
+        units: watts
+        algorithm: absolute
+        type: line
+        priority: 70055
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_power_usage_power
+            name: power
+      - id: vm_energy_usage
+        title: Virtual Machine energy usage
+        context: vm_energy_usage
+        units: joules
+        algorithm: absolute
+        type: line
+        priority: 70056
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vm_energy_usage_energy
+            name: energy
+  - family: vSAN clusters space
+    metrics:
+      - vsan_cluster_space_usage_total
+      - vsan_cluster_space_usage_free
+      - vsan_cluster_space_usage_used
+      - vsan_cluster_space_utilization_used
+      - vsan_cluster_health_status_green
+      - vsan_cluster_health_status_yellow
+      - vsan_cluster_health_status_red
+      - vsan_cluster_health_status_unknown
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vsan_cluster_space_utilization
+        title: vSAN Cluster space utilization
+        context: vsan_cluster_space_utilization
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70105
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_cluster_space_utilization_used
+            name: used
+            options:
+              divisor: 100
+      - id: vsan_cluster_space_usage
+        title: vSAN Cluster space usage
+        context: vsan_cluster_space_usage
+        units: bytes
+        algorithm: absolute
+        type: stacked
+        priority: 70106
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_cluster_space_usage_used
+            name: used
+          - selector: vsan_cluster_space_usage_free
+            name: free
+          - selector: vsan_cluster_space_usage_total
+            name: total
+            options:
+              hidden: true
+      - id: vsan_cluster_health_status
+        title: vSAN Cluster health status
+        context: vsan_cluster_health_status
+        units: status
+        algorithm: absolute
+        type: line
+        priority: 70107
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_cluster_health_status_green
+            name: green
+          - selector: vsan_cluster_health_status_yellow
+            name: yellow
+          - selector: vsan_cluster_health_status_red
+            name: red
+          - selector: vsan_cluster_health_status_unknown
+            name: unknown
+  - family: vSAN clusters performance
+    metrics:
+      - vsan_cluster_operations_read
+      - vsan_cluster_operations_write
+      - vsan_cluster_throughput_read
+      - vsan_cluster_throughput_write
+      - vsan_cluster_latency_read
+      - vsan_cluster_latency_write
+      - vsan_cluster_congestions
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vsan_cluster_operations
+        title: vSAN Cluster operations
+        context: vsan_cluster_operations
+        units: operations/s
+        algorithm: absolute
+        type: line
+        priority: 70108
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_cluster_operations_read
+            name: read
+          - selector: vsan_cluster_operations_write
+            name: write
+      - id: vsan_cluster_throughput
+        title: vSAN Cluster throughput
+        context: vsan_cluster_throughput
+        units: bytes/s
+        algorithm: absolute
+        type: area
+        priority: 70109
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_cluster_throughput_read
+            name: read
+          - selector: vsan_cluster_throughput_write
+            name: write
+      - id: vsan_cluster_latency
+        title: vSAN Cluster latency
+        context: vsan_cluster_latency
+        units: microseconds
+        algorithm: absolute
+        type: line
+        priority: 70110
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_cluster_latency_read
+            name: read
+          - selector: vsan_cluster_latency_write
+            name: write
+      - id: vsan_cluster_congestions
+        title: vSAN Cluster congestions
+        context: vsan_cluster_congestions
+        units: congestions/s
+        algorithm: absolute
+        type: line
+        priority: 70111
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_cluster_congestions
+            name: congestions
+  - family: vSAN hosts performance
+    metrics:
+      - vsan_host_operations_read
+      - vsan_host_operations_write
+      - vsan_host_throughput_read
+      - vsan_host_throughput_write
+      - vsan_host_latency_read
+      - vsan_host_latency_write
+      - vsan_host_congestions
+      - vsan_host_cache_hit_rate
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vsan_host_operations
+        title: vSAN Host operations
+        context: vsan_host_operations
+        units: operations/s
+        algorithm: absolute
+        type: line
+        priority: 70112
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_host_operations_read
+            name: read
+          - selector: vsan_host_operations_write
+            name: write
+      - id: vsan_host_throughput
+        title: vSAN Host throughput
+        context: vsan_host_throughput
+        units: bytes/s
+        algorithm: absolute
+        type: area
+        priority: 70113
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_host_throughput_read
+            name: read
+          - selector: vsan_host_throughput_write
+            name: write
+      - id: vsan_host_latency
+        title: vSAN Host latency
+        context: vsan_host_latency
+        units: microseconds
+        algorithm: absolute
+        type: line
+        priority: 70114
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_host_latency_read
+            name: read
+          - selector: vsan_host_latency_write
+            name: write
+      - id: vsan_host_congestions
+        title: vSAN Host congestions
+        context: vsan_host_congestions
+        units: congestions/s
+        algorithm: absolute
+        type: line
+        priority: 70115
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_host_congestions
+            name: congestions
+      - id: vsan_host_cache_hit_rate
+        title: vSAN Host client cache hit rate
+        context: vsan_host_cache_hit_rate
+        units: percentage
+        algorithm: absolute
+        type: line
+        priority: 70116
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_host_cache_hit_rate
+            name: hit_rate
+  - family: vSAN VMs performance
+    metrics:
+      - vsan_vm_operations_read
+      - vsan_vm_operations_write
+      - vsan_vm_throughput_read
+      - vsan_vm_throughput_write
+      - vsan_vm_latency_read
+      - vsan_vm_latency_write
+    chart_defaults:
+      instances:
+        by_labels:
+          - id
+    charts:
+      - id: vsan_vm_operations
+        title: vSAN Virtual Machine operations
+        context: vsan_vm_operations
+        units: operations/s
+        algorithm: absolute
+        type: line
+        priority: 70117
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_vm_operations_read
+            name: read
+          - selector: vsan_vm_operations_write
+            name: write
+      - id: vsan_vm_throughput
+        title: vSAN Virtual Machine throughput
+        context: vsan_vm_throughput
+        units: bytes/s
+        algorithm: absolute
+        type: area
+        priority: 70118
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_vm_throughput_read
+            name: read
+          - selector: vsan_vm_throughput_write
+            name: write
+      - id: vsan_vm_latency
+        title: vSAN Virtual Machine latency
+        context: vsan_vm_latency
+        units: microseconds
+        algorithm: absolute
+        type: line
+        priority: 70119
+        lifecycle:
+          expire_after_cycles: 10
+        dimensions:
+          - selector: vsan_vm_latency_read
+            name: read
+          - selector: vsan_vm_latency_write
+            name: write

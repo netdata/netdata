@@ -3,7 +3,6 @@
 package vsphere
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -18,27 +17,155 @@ import (
 // ManagedEntityStatus
 var overallStatuses = []string{"green", "red", "yellow", "gray"}
 
+var vmPowerStates = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.VirtualMachinePowerStatePoweredOn), key: "poweredOn"},
+	{value: string(types.VirtualMachinePowerStatePoweredOff), key: "poweredOff"},
+	{value: string(types.VirtualMachinePowerStateSuspended), key: "suspended"},
+}
+
+var vmConnectionStates = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.VirtualMachineConnectionStateConnected), key: "connected"},
+	{value: string(types.VirtualMachineConnectionStateDisconnected), key: "disconnected"},
+	{value: string(types.VirtualMachineConnectionStateOrphaned), key: "orphaned"},
+	{value: string(types.VirtualMachineConnectionStateInaccessible), key: "inaccessible"},
+	{value: string(types.VirtualMachineConnectionStateInvalid), key: "invalid"},
+}
+
+var vmToolsRunningStatuses = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.VirtualMachineToolsRunningStatusGuestToolsRunning), key: "running"},
+	{value: string(types.VirtualMachineToolsRunningStatusGuestToolsNotRunning), key: "notRunning"},
+	{value: string(types.VirtualMachineToolsRunningStatusGuestToolsExecutingScripts), key: "executingScripts"},
+}
+
+var vmToolsVersionStatuses = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.VirtualMachineToolsVersionStatusGuestToolsCurrent), key: "current"},
+	{value: string(types.VirtualMachineToolsVersionStatusGuestToolsNeedUpgrade), key: "needUpgrade"},
+	{value: string(types.VirtualMachineToolsVersionStatusGuestToolsNotInstalled), key: "notInstalled"},
+	{value: string(types.VirtualMachineToolsVersionStatusGuestToolsUnmanaged), key: "unmanaged"},
+	{value: string(types.VirtualMachineToolsVersionStatusGuestToolsTooOld), key: "tooOld"},
+	{value: string(types.VirtualMachineToolsVersionStatusGuestToolsSupportedOld), key: "supportedOld"},
+	{value: string(types.VirtualMachineToolsVersionStatusGuestToolsSupportedNew), key: "supportedNew"},
+	{value: string(types.VirtualMachineToolsVersionStatusGuestToolsTooNew), key: "tooNew"},
+	{value: string(types.VirtualMachineToolsVersionStatusGuestToolsBlacklisted), key: "blacklisted"},
+}
+
+var hostPowerStates = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.HostSystemPowerStatePoweredOn), key: "poweredOn"},
+	{value: string(types.HostSystemPowerStatePoweredOff), key: "poweredOff"},
+	{value: string(types.HostSystemPowerStateStandBy), key: "standBy"},
+	{value: string(types.HostSystemPowerStateUnknown), key: "unknown"},
+}
+
+var hostConnectionStates = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.HostSystemConnectionStateConnected), key: "connected"},
+	{value: string(types.HostSystemConnectionStateNotResponding), key: "notResponding"},
+	{value: string(types.HostSystemConnectionStateDisconnected), key: "disconnected"},
+}
+
+var datastoreMaintenanceModes = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.DatastoreSummaryMaintenanceModeStateNormal), key: "normal"},
+	{value: string(types.DatastoreSummaryMaintenanceModeStateEnteringMaintenance), key: "enteringMaintenance"},
+	{value: string(types.DatastoreSummaryMaintenanceModeStateInMaintenance), key: "inMaintenance"},
+}
+
+var clusterDRSModes = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.DrsBehaviorManual), key: "manual"},
+	{value: string(types.DrsBehaviorPartiallyAutomated), key: "partiallyAutomated"},
+	{value: string(types.DrsBehaviorFullyAutomated), key: "fullyAutomated"},
+}
+
+var clusterHAServiceStates = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.ClusterDasConfigInfoServiceStateEnabled), key: "enabled"},
+	{value: string(types.ClusterDasConfigInfoServiceStateDisabled), key: "disabled"},
+}
+
+var clusterHAVMMonitoringStates = []struct {
+	value string
+	key   string
+}{
+	{value: string(types.ClusterDasConfigInfoVmMonitoringStateVmMonitoringDisabled), key: "vmMonitoringDisabled"},
+	{value: string(types.ClusterDasConfigInfoVmMonitoringStateVmMonitoringOnly), key: "vmMonitoringOnly"},
+	{value: string(types.ClusterDasConfigInfoVmMonitoringStateVmAndAppMonitoring), key: "vmAndAppMonitoring"},
+}
+
+const (
+	recurringLogEvery = time.Hour
+
+	logKeyHostNoPerfSamples             = "vsphere:host-no-perf-samples"
+	logKeyVMNoPerfSamples               = "vsphere:vm-no-perf-samples"
+	logKeyDatastorePropertyRefreshError = "vsphere:datastore-property-refresh-error"
+	logKeyClusterPropertyRefreshError   = "vsphere:cluster-property-refresh-error"
+	logKeyResourcePoolRefreshError      = "vsphere:resource-pool-property-refresh-error"
+	logKeyDiscoveryError                = "vsphere:periodic-discovery-error"
+)
+
 func (c *Collector) collect() (map[string]int64, error) {
 	c.collectionLock.Lock()
 	defer c.collectionLock.Unlock()
 
+	return c.collectLocked()
+}
+
+func (c *Collector) collectLocked() (map[string]int64, error) {
 	c.Debug("starting collection process")
 	t := time.Now()
 	mx := make(map[string]int64)
+	c.vmDiskPerfSamples = nil
+	c.vmNICPerfSamples = nil
+	c.hostNICPerfSamples = nil
+	c.hostDiskPerfSamples = nil
+	c.hostStorageAdapterPerfSamples = nil
+	c.hostStorageAdapterAggregatePerfSamples = nil
+	c.hostStoragePathPerfSamples = nil
+	c.hostStoragePathAggregatePerfSamples = nil
+	c.hostCPUInstancePerfSamples = nil
+	c.hostPowerPerfSamples = nil
+	c.vmPowerPerfSamples = nil
+	c.vsanMetrics = nil
+
+	c.collectInventory(mx)
 
 	err := c.collectHosts(mx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("collect host metrics from vSphere resources: %w", err)
 	}
 
 	err = c.collectVMs(mx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("collect VM metrics from vSphere resources: %w", err)
 	}
 
 	c.collectDatastores(mx)
 	c.collectClusters(mx)
 	c.collectResourcePools(mx)
+	c.collectVSAN()
 
 	c.updateCharts()
 
@@ -47,14 +174,45 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
+func (c *Collector) collectVSAN() {
+	if !c.CollectVSAN || c.resources == nil {
+		return
+	}
+	clusters, hosts, vms := c.vsanResources()
+	c.vsanMetrics = c.ScrapeVSAN(clusters, hosts, vms)
+}
+
+func (c *Collector) collectInventory(mx map[string]int64) {
+	if c.resources == nil {
+		return
+	}
+
+	mx["inventory_datacenters"] = int64(len(c.resources.DataCenters))
+	mx["inventory_folders"] = int64(len(c.resources.Folders))
+	mx["inventory_clusters"] = int64(len(c.resources.Clusters))
+	mx["inventory_hosts"] = int64(len(c.resources.Hosts))
+	mx["inventory_vms"] = int64(len(c.resources.VMs))
+	mx["inventory_datastores"] = int64(len(c.resources.Datastores))
+	mx["inventory_resource_pools"] = int64(len(c.resources.ResourcePools))
+}
+
 func (c *Collector) collectHosts(mx map[string]int64) error {
 	if len(c.resources.Hosts) == 0 {
 		return nil
 	}
+	c.collectHostsPropertyMetrics(mx)
+
+	poweredOnHosts := numPoweredOnHosts(c.resources.Hosts)
+	if poweredOnHosts == 0 {
+		return nil
+	}
+
 	// NOTE: returns unsorted if at least one types.PerfMetricId Instance is not ""
 	metrics := c.ScrapeHosts(c.resources.Hosts)
 	if len(metrics) == 0 {
-		return errors.New("failed to scrape hosts metrics")
+		c.Limit(logKeyHostNoPerfSamples, 1, recurringLogEvery).
+			Warningf("collect host performance metrics: vSphere returned no samples for %d powered-on host(s) out of %d discovered host(s)", poweredOnHosts, len(c.resources.Hosts))
+		return nil
 	}
 
 	c.collectHostsMetrics(mx, metrics)
@@ -62,41 +220,100 @@ func (c *Collector) collectHosts(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectHostsMetrics(mx map[string]int64, metrics []performance.EntityMetric) {
+func (c *Collector) collectHostsPropertyMetrics(mx map[string]int64) {
 	for k := range c.discoveredHosts {
 		c.discoveredHosts[k]++
 	}
 
+	for _, host := range c.resources.Hosts {
+		c.discoveredHosts[host.ID] = 0
+		writeHostPropertyMetrics(mx, host)
+	}
+}
+
+func (c *Collector) collectHostsMetrics(mx map[string]int64, metrics []performance.EntityMetric) {
 	for _, metric := range metrics {
 		if host := c.resources.Hosts.Get(metric.Entity.Value); host != nil {
 			c.discoveredHosts[host.ID] = 0
-			writeHostMetrics(mx, host, metric.Value)
+			writeHostPerfMetrics(mx, host, metric.Value)
+			if c.CollectHostNICPerformance {
+				c.collectHostNICPerformanceMetrics(host, metric.Value)
+			}
+			if c.CollectHostDiskPerformance {
+				c.collectHostDiskPerformanceMetrics(host, metric.Value)
+			}
+			if c.CollectHostStorageAdapterPerformance {
+				c.collectHostStorageAdapterPerformanceMetrics(host, metric.Value)
+			}
+			if c.CollectHostStoragePathPerformance {
+				c.collectHostStoragePathPerformanceMetrics(host, metric.Value)
+			}
+			if c.CollectHostCPUInstancePerformance {
+				c.collectHostCPUInstancePerformanceMetrics(host, metric.Value)
+			}
+			if c.CollectPowerMetrics {
+				c.collectHostPowerMetrics(host, metric.Value)
+			}
 		}
 	}
 }
 
-func writeHostMetrics(mx map[string]int64, host *rs.Host, metrics []performance.MetricSeries) {
+func numPoweredOnHosts(hosts rs.Hosts) (num int) {
+	for _, host := range hosts {
+		if host.IsPoweredOn() {
+			num++
+		}
+	}
+	return num
+}
+
+func writeHostPerfMetrics(mx map[string]int64, host *rs.Host, metrics []performance.MetricSeries) {
 	for _, metric := range metrics {
+		if metric.Instance != "" {
+			continue
+		}
 		if len(metric.Value) == 0 || metric.Value[0] == -1 {
 			continue
 		}
 		key := fmt.Sprintf("%s_%s", host.ID, metric.Name)
 		mx[key] = metric.Value[0]
 	}
+}
+
+func writeHostPropertyMetrics(mx map[string]int64, host *rs.Host) {
 	for _, v := range overallStatuses {
 		key := fmt.Sprintf("%s_overall.status.%s", host.ID, v)
 		mx[key] = oldmetrix.Bool(host.OverallStatus == v)
 	}
+	for _, v := range hostPowerStates {
+		key := fmt.Sprintf("%s_power_state.%s", host.ID, v.key)
+		mx[key] = oldmetrix.Bool(host.PowerState == v.value)
+	}
+	for _, v := range hostConnectionStates {
+		key := fmt.Sprintf("%s_connection_state.%s", host.ID, v.key)
+		mx[key] = oldmetrix.Bool(host.ConnectionState == v.value)
+	}
+	mx[fmt.Sprintf("%s_maintenance_status.inMaintenance", host.ID)] = oldmetrix.Bool(host.InMaintenanceMode)
+	mx[fmt.Sprintf("%s_maintenance_status.normal", host.ID)] = oldmetrix.Bool(!host.InMaintenanceMode)
 }
 
 func (c *Collector) collectVMs(mx map[string]int64) error {
 	if len(c.resources.VMs) == 0 {
 		return nil
 	}
+	c.collectVMsPropertyMetrics(mx)
+
+	poweredOnVMs := numPoweredOnVMs(c.resources.VMs)
+	if poweredOnVMs == 0 {
+		return nil
+	}
+
 	// NOTE: returns unsorted if at least one types.PerfMetricId Instance is not ""
 	ems := c.ScrapeVMs(c.resources.VMs)
 	if len(ems) == 0 {
-		return errors.New("failed to scrape vms metrics")
+		c.Limit(logKeyVMNoPerfSamples, 1, recurringLogEvery).
+			Warningf("collect VM performance metrics: vSphere returned no samples for %d powered-on VM(s) out of %d discovered VM(s)", poweredOnVMs, len(c.resources.VMs))
+		return nil
 	}
 
 	c.collectVMsMetrics(mx, ems)
@@ -104,31 +321,111 @@ func (c *Collector) collectVMs(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectVMsMetrics(mx map[string]int64, metrics []performance.EntityMetric) {
+func (c *Collector) collectVMsPropertyMetrics(mx map[string]int64) {
 	for id := range c.discoveredVMs {
 		c.discoveredVMs[id]++
 	}
 
+	for _, vm := range c.resources.VMs {
+		c.discoveredVMs[vm.ID] = 0
+		writeVMPropertyMetrics(mx, vm)
+	}
+}
+
+func (c *Collector) collectVMsMetrics(mx map[string]int64, metrics []performance.EntityMetric) {
 	for _, metric := range metrics {
 		if vm := c.resources.VMs.Get(metric.Entity.Value); vm != nil {
-			writeVMMetrics(mx, vm, metric.Value)
+			writeVMPerfMetrics(mx, vm, metric.Value)
+			if c.CollectVMDiskPerformance {
+				c.collectVMDiskPerformanceMetrics(vm, metric.Value)
+			}
+			if c.CollectVMNICPerformance {
+				c.collectVMNICPerformanceMetrics(vm, metric.Value)
+			}
+			if c.CollectPowerMetrics {
+				c.collectVMPowerMetrics(vm, metric.Value)
+			}
 			c.discoveredVMs[vm.ID] = 0
 		}
 	}
 }
 
-func writeVMMetrics(mx map[string]int64, vm *rs.VM, metrics []performance.MetricSeries) {
+func numPoweredOnVMs(vms rs.VMs) (num int) {
+	for _, vm := range vms {
+		if vm.IsPoweredOn() {
+			num++
+		}
+	}
+	return num
+}
+
+func writeVMPerfMetrics(mx map[string]int64, vm *rs.VM, metrics []performance.MetricSeries) {
 	for _, metric := range metrics {
+		if metric.Instance != "" || isVMDiskPerformanceMetric(metric.Name) {
+			continue
+		}
 		if len(metric.Value) == 0 || metric.Value[0] == -1 {
 			continue
 		}
 		key := fmt.Sprintf("%s_%s", vm.ID, metric.Name)
 		mx[key] = metric.Value[0]
 	}
+}
+
+func writeVMPropertyMetrics(mx map[string]int64, vm *rs.VM) {
 	for _, v := range overallStatuses {
 		key := fmt.Sprintf("%s_overall.status.%s", vm.ID, v)
 		mx[key] = oldmetrix.Bool(vm.OverallStatus == v)
 	}
+	for _, v := range vmPowerStates {
+		key := fmt.Sprintf("%s_power_state.%s", vm.ID, v.key)
+		mx[key] = oldmetrix.Bool(vm.PowerState == v.value)
+	}
+	for _, v := range vmConnectionStates {
+		key := fmt.Sprintf("%s_connection_state.%s", vm.ID, v.key)
+		mx[key] = oldmetrix.Bool(vm.ConnectionState == v.value)
+	}
+	toolsRunningStatusKnown := false
+	for _, v := range vmToolsRunningStatuses {
+		ok := vm.ToolsRunningStatus == v.value
+		key := fmt.Sprintf("%s_tools_running_status.%s", vm.ID, v.key)
+		mx[key] = oldmetrix.Bool(ok)
+		toolsRunningStatusKnown = toolsRunningStatusKnown || ok
+	}
+	mx[fmt.Sprintf("%s_tools_running_status.unknown", vm.ID)] = oldmetrix.Bool(!toolsRunningStatusKnown)
+
+	toolsVersionStatusKnown := false
+	for _, v := range vmToolsVersionStatuses {
+		ok := vm.ToolsVersionStatus == v.value
+		key := fmt.Sprintf("%s_tools_version_status.%s", vm.ID, v.key)
+		mx[key] = oldmetrix.Bool(ok)
+		toolsVersionStatusKnown = toolsVersionStatusKnown || ok
+	}
+	mx[fmt.Sprintf("%s_tools_version_status.unknown", vm.ID)] = oldmetrix.Bool(!toolsVersionStatusKnown)
+
+	mx[fmt.Sprintf("%s_consolidation_needed.needed", vm.ID)] = oldmetrix.Bool(vm.ConsolidationNeeded)
+	mx[fmt.Sprintf("%s_consolidation_needed.notNeeded", vm.ID)] = oldmetrix.Bool(!vm.ConsolidationNeeded)
+	mx[fmt.Sprintf("%s_config_cpu", vm.ID)] = vm.ConfigCPU
+	mx[fmt.Sprintf("%s_config_memory", vm.ID)] = vm.ConfigMemory
+	mx[fmt.Sprintf("%s_config_devices.disks", vm.ID)] = vm.ConfigDisks
+	mx[fmt.Sprintf("%s_config_devices.nics", vm.ID)] = vm.ConfigNICs
+	mx[fmt.Sprintf("%s_storage.committed", vm.ID)] = vm.StorageCommitted
+	mx[fmt.Sprintf("%s_storage.uncommitted", vm.ID)] = vm.StorageUncommitted
+	mx[fmt.Sprintf("%s_storage.unshared", vm.ID)] = vm.StorageUnshared
+	mx[fmt.Sprintf("%s_snapshot_count", vm.ID)] = vm.SnapshotCount
+	mx[fmt.Sprintf("%s_snapshot_max_chain_depth", vm.ID)] = vm.SnapshotMaxChainDepth
+	mx[fmt.Sprintf("%s_snapshot_max_age", vm.ID)] = snapshotMaxAgeSeconds(vm.SnapshotOldestCreateTime)
+}
+
+func snapshotMaxAgeSeconds(oldest time.Time) int64 {
+	if oldest.IsZero() {
+		return 0
+	}
+	age := time.Since(oldest).Seconds()
+	if age < 0 {
+		return 0
+	}
+	return int64(age)
 }
 
 func (c *Collector) collectDatastores(mx map[string]int64) {
@@ -156,9 +453,11 @@ func (c *Collector) refreshDatastoreProperties() map[string]bool {
 		refs = append(refs, ds.Ref)
 	}
 
-	dsList, err := c.dsPropertyCollector.DatastoresByRef(refs, "summary", "overallStatus")
+	pathSet := []string{"summary", "overallStatus"}
+	dsList, err := c.dsPropertyCollector.DatastoresByRef(refs, pathSet...)
 	if err != nil {
-		c.Warningf("failed to refresh datastore properties: %v", err)
+		c.Limit(logKeyDatastorePropertyRefreshError, 1, recurringLogEvery).
+			Warningf("collect vSphere datastore properties refresh: refs=%d pathSet=%v: %v", len(refs), pathSet, err)
 		return refreshed
 	}
 
@@ -168,9 +467,13 @@ func (c *Collector) refreshDatastoreProperties() map[string]bool {
 			continue
 		}
 		refreshed[ds.ID] = true
+		ds.Type = raw.Summary.Type
 		ds.Capacity = raw.Summary.Capacity
 		ds.FreeSpace = raw.Summary.FreeSpace
+		ds.Uncommitted = raw.Summary.Uncommitted
 		ds.Accessible = raw.Summary.Accessible
+		ds.MaintenanceMode = raw.Summary.MaintenanceMode
+		ds.MultipleHostAccess = raw.Summary.MultipleHostAccess
 		ds.OverallStatus = string(raw.OverallStatus)
 	}
 
@@ -200,16 +503,18 @@ func (c *Collector) collectDatastoresMetrics(mx map[string]int64, metrics []perf
 
 func writeDatastoreMetrics(mx map[string]int64, ds *rs.Datastore) {
 	// VMware docs: Capacity and FreeSpace are guaranteed valid only when Accessible is true.
-	var capacity, freeSpace, used int64
+	var capacity, freeSpace, used, uncommitted int64
 	if ds.Accessible {
 		capacity = ds.Capacity
 		freeSpace = ds.FreeSpace
 		used = max(capacity-freeSpace, 0)
+		uncommitted = ds.Uncommitted
 	}
 
 	mx[fmt.Sprintf("%s_capacity", ds.ID)] = capacity
 	mx[fmt.Sprintf("%s_free_space", ds.ID)] = freeSpace
 	mx[fmt.Sprintf("%s_used_space", ds.ID)] = used
+	mx[fmt.Sprintf("%s_uncommitted", ds.ID)] = uncommitted
 
 	if capacity > 0 {
 		// use float64 to avoid int64 overflow on datastores larger than 922 TB
@@ -222,6 +527,21 @@ func writeDatastoreMetrics(mx map[string]int64, ds *rs.Datastore) {
 		key := fmt.Sprintf("%s_overall.status.%s", ds.ID, v)
 		mx[key] = oldmetrix.Bool(ds.OverallStatus == v)
 	}
+
+	mx[fmt.Sprintf("%s_accessible_status.accessible", ds.ID)] = oldmetrix.Bool(ds.Accessible)
+	mx[fmt.Sprintf("%s_accessible_status.inaccessible", ds.ID)] = oldmetrix.Bool(!ds.Accessible)
+
+	maintenanceModeKnown := false
+	for _, mode := range datastoreMaintenanceModes {
+		ok := ds.MaintenanceMode == mode.value
+		maintenanceModeKnown = maintenanceModeKnown || ok
+		mx[fmt.Sprintf("%s_maintenance.status.%s", ds.ID, mode.key)] = oldmetrix.Bool(ok)
+	}
+	mx[fmt.Sprintf("%s_maintenance.status.unknown", ds.ID)] = oldmetrix.Bool(!maintenanceModeKnown)
+
+	mx[fmt.Sprintf("%s_multiple_host_access.enabled", ds.ID)] = oldmetrix.Bool(ds.MultipleHostAccess != nil && *ds.MultipleHostAccess)
+	mx[fmt.Sprintf("%s_multiple_host_access.disabled", ds.ID)] = oldmetrix.Bool(ds.MultipleHostAccess != nil && !*ds.MultipleHostAccess)
+	mx[fmt.Sprintf("%s_multiple_host_access.unknown", ds.ID)] = oldmetrix.Bool(ds.MultipleHostAccess == nil)
 }
 
 func writeDatastorePerfMetrics(mx map[string]int64, ds *rs.Datastore, metrics []performance.MetricSeries) {
@@ -257,9 +577,11 @@ func (c *Collector) refreshClusterProperties() map[string]bool {
 		refs = append(refs, cl.Ref)
 	}
 
-	clusters, err := c.clusterPropertyCollector.ClustersByRef(refs, "name", "summary", "configurationEx", "overallStatus")
+	pathSet := []string{"name", "summary", "configurationEx", "overallStatus"}
+	clusters, err := c.clusterPropertyCollector.ClustersByRef(refs, pathSet...)
 	if err != nil {
-		c.Warningf("failed to refresh cluster properties: %v", err)
+		c.Limit(logKeyClusterPropertyRefreshError, 1, recurringLogEvery).
+			Warningf("collect vSphere cluster properties refresh: refs=%d pathSet=%v: %v", len(refs), pathSet, err)
 		return refreshed
 	}
 
@@ -308,8 +630,12 @@ func updateClusterFromProperties(cl *rs.Cluster, raw mo.ClusterComputeResource) 
 	cl.UsagePoweredOffVmCount = 0
 	cl.DrsEnabled = false
 	cl.DrsMode = ""
+	cl.DrsVmotionRate = 0
 	cl.HaEnabled = false
 	cl.HaAdmCtrlEnabled = false
+	cl.HaHostMonitoring = ""
+	cl.HaVMMonitoring = ""
+	cl.HaVMComponentProtection = ""
 
 	// Cluster-specific summary fields
 	if cs, ok := raw.Summary.(*types.ClusterComputeResourceSummary); ok {
@@ -331,16 +657,21 @@ func updateClusterFromProperties(cl *rs.Cluster, raw mo.ClusterComputeResource) 
 
 	// DRS and HA config from configurationEx
 	if cfg, ok := raw.ConfigurationEx.(*types.ClusterConfigInfoEx); ok {
+		rs.SetClusterVSANInfo(cl, cfg)
 		if cfg.DrsConfig.Enabled != nil {
 			cl.DrsEnabled = *cfg.DrsConfig.Enabled
 		}
 		cl.DrsMode = string(cfg.DrsConfig.DefaultVmBehavior)
+		cl.DrsVmotionRate = cfg.DrsConfig.VmotionRate
 		if cfg.DasConfig.Enabled != nil {
 			cl.HaEnabled = *cfg.DasConfig.Enabled
 		}
 		if cfg.DasConfig.AdmissionControlEnabled != nil {
 			cl.HaAdmCtrlEnabled = *cfg.DasConfig.AdmissionControlEnabled
 		}
+		cl.HaHostMonitoring = cfg.DasConfig.HostMonitoring
+		cl.HaVMMonitoring = cfg.DasConfig.VmMonitoring
+		cl.HaVMComponentProtection = cfg.DasConfig.VmComponentProtecting
 	}
 }
 
@@ -381,8 +712,20 @@ func writeClusterPropertyMetrics(mx map[string]int64, cl *rs.Cluster) {
 	mx[fmt.Sprintf("%s_target_balance", cl.ID)] = int64(cl.TargetBalance)
 
 	mx[fmt.Sprintf("%s_drs_enabled", cl.ID)] = oldmetrix.Bool(cl.DrsEnabled)
+	drsModeKnown := false
+	for _, v := range clusterDRSModes {
+		ok := cl.DrsMode == v.value
+		mx[fmt.Sprintf("%s_drs_mode.%s", cl.ID, v.key)] = oldmetrix.Bool(ok)
+		drsModeKnown = drsModeKnown || ok
+	}
+	mx[fmt.Sprintf("%s_drs_mode.unknown", cl.ID)] = oldmetrix.Bool(!drsModeKnown)
+	mx[fmt.Sprintf("%s_drs_vmotion_rate", cl.ID)] = int64(cl.DrsVmotionRate)
+
 	mx[fmt.Sprintf("%s_ha_enabled", cl.ID)] = oldmetrix.Bool(cl.HaEnabled)
 	mx[fmt.Sprintf("%s_ha_adm_ctrl_enabled", cl.ID)] = oldmetrix.Bool(cl.HaAdmCtrlEnabled)
+	writeClusterHAServiceState(mx, cl.ID, "ha_host_monitoring", cl.HaHostMonitoring)
+	writeClusterHAVMMonitoringState(mx, cl.ID, cl.HaVMMonitoring)
+	writeClusterHAServiceState(mx, cl.ID, "ha_vm_component_protection", cl.HaVMComponentProtection)
 
 	mx[fmt.Sprintf("%s_usage_cpu_demand_mhz", cl.ID)] = int64(cl.UsageCpuDemandMhz)
 	mx[fmt.Sprintf("%s_usage_mem_demand_mb", cl.ID)] = int64(cl.UsageMemDemandMB)
@@ -397,6 +740,26 @@ func writeClusterPropertyMetrics(mx map[string]int64, cl *rs.Cluster) {
 		key := fmt.Sprintf("%s_overall.status.%s", cl.ID, v)
 		mx[key] = oldmetrix.Bool(cl.OverallStatus == v)
 	}
+}
+
+func writeClusterHAServiceState(mx map[string]int64, id, prefix, state string) {
+	known := false
+	for _, v := range clusterHAServiceStates {
+		ok := state == v.value
+		mx[fmt.Sprintf("%s_%s.%s", id, prefix, v.key)] = oldmetrix.Bool(ok)
+		known = known || ok
+	}
+	mx[fmt.Sprintf("%s_%s.unknown", id, prefix)] = oldmetrix.Bool(!known)
+}
+
+func writeClusterHAVMMonitoringState(mx map[string]int64, id, state string) {
+	known := false
+	for _, v := range clusterHAVMMonitoringStates {
+		ok := state == v.value
+		mx[fmt.Sprintf("%s_ha_vm_monitoring.%s", id, v.key)] = oldmetrix.Bool(ok)
+		known = known || ok
+	}
+	mx[fmt.Sprintf("%s_ha_vm_monitoring.unknown", id)] = oldmetrix.Bool(!known)
 }
 
 func writeClusterPerfMetrics(mx map[string]int64, cl *rs.Cluster, metrics []performance.MetricSeries) {
@@ -431,9 +794,11 @@ func (c *Collector) refreshResourcePoolProperties() map[string]bool {
 		refs = append(refs, rp.Ref)
 	}
 
-	pools, err := c.rpPropertyCollector.ResourcePoolsByRef(refs, "name", "summary", "config", "runtime", "overallStatus")
+	pathSet := []string{"name", "summary", "config", "runtime", "overallStatus"}
+	pools, err := c.rpPropertyCollector.ResourcePoolsByRef(refs, pathSet...)
 	if err != nil {
-		c.Warningf("failed to refresh resource pool properties: %v", err)
+		c.Limit(logKeyResourcePoolRefreshError, 1, recurringLogEvery).
+			Warningf("collect vSphere resource pool properties refresh: refs=%d pathSet=%v: %v", len(refs), pathSet, err)
 		return refreshed
 	}
 
@@ -489,7 +854,8 @@ func updateResourcePoolFromProperties(rp *rs.ResourcePool, raw mo.ResourcePool) 
 		rp.CompressedMemory = qs.CompressedMemory
 	}
 
-	// Runtime resource usage (full "runtime" property requested)
+	// Runtime and Config are value structs in mo.ResourcePool; missing properties
+	// decode as zero values rather than nil pointers.
 	rp.CpuReservationUsed = raw.Runtime.Cpu.ReservationUsed
 	rp.CpuMaxUsage = raw.Runtime.Cpu.MaxUsage
 	rp.CpuUnreservedForVm = raw.Runtime.Cpu.UnreservedForVm
@@ -545,6 +911,7 @@ func writeResourcePoolMetrics(mx map[string]int64, rp *rs.ResourcePool) {
 	mx[fmt.Sprintf("%s_mem_ballooned", rp.ID)] = rp.BalloonedMemory
 	mx[fmt.Sprintf("%s_mem_overhead", rp.ID)] = rp.OverheadMemory
 	mx[fmt.Sprintf("%s_mem_consumed_overhead", rp.ID)] = rp.ConsumedOverheadMemory
+	// vSphere reports CompressedMemory in KiB; the chart keeps V1's MB display scale.
 	mx[fmt.Sprintf("%s_mem_compressed", rp.ID)] = rp.CompressedMemory
 
 	mx[fmt.Sprintf("%s_cpu_reservation_used", rp.ID)] = rp.CpuReservationUsed

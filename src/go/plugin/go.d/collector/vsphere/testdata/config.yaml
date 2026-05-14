@@ -20,6 +20,84 @@ tls_key: "ok"
 tls_skip_verify: yes
 force_http2: yes
 discovery_interval: 123.123
+host_power_states:
+  - "poweredOn"
+  - "poweredOff"
+  - "standBy"
+  - "unknown"
+vm_power_states:
+  - "poweredOn"
+  - "poweredOff"
+  - "suspended"
+esxi_vnodes: yes
+vm_vnodes: yes
+collect_inventory_path_label: yes
+vm_guest_labels:
+  - "guest_hostname"
+  - "guest_ip"
+  - "guest_os"
+vsphere_tag_categories:
+  - "Environment"
+  - "Business*"
+custom_attributes:
+  - "Owner"
+  - "Cost Center"
+max_user_metadata_labels: 123
+collect_vm_disks: yes
+collect_vm_disk_performance: yes
+collect_datastore_clusters: yes
+datastore_cluster_include:
+  - "/*"
+max_datastore_clusters: 123
+vm_disk_include:
+  - "Hard*"
+  - "key:2000"
+max_vm_disks: 123
+collect_vm_nic_performance: yes
+vm_nic_include:
+  - "Network adapter*"
+  - "interface:4000"
+max_vm_nics: 123
+collect_host_nic_performance: yes
+host_nic_include:
+  - "vmnic*"
+  - "interface:vmnic0"
+max_host_nics: 123
+collect_host_disk_performance: yes
+host_disk_include:
+  - "naa.*"
+  - "instance:naa.123"
+max_host_disks: 123
+collect_host_storage_adapter_performance: yes
+host_storage_adapter_include:
+  - "vmhba*"
+  - "adapter:vmhba0"
+max_host_storage_adapters: 123
+collect_host_storage_path_performance: yes
+host_storage_path_include:
+  - "vmhba*:C0:T0:L0"
+  - "path:vmhba0:C0:T0:L0"
+max_host_storage_paths: 123
+collect_host_cpu_instance_performance: yes
+host_cpu_instance_include:
+  - "0"
+  - "cpu:1"
+max_host_cpu_instances: 123
+collect_power_metrics: yes
+collect_vsan: yes
+vsan_cluster_include:
+  - "/DC1/Cluster*"
+  - "vsan_uuid:cluster-uuid"
+max_vsan_clusters: 123
+vsan_host_include:
+  - "/DC1/Cluster*/Host*"
+  - "vsan_node_uuid:host-uuid"
+max_vsan_hosts: 123
+vsan_vm_include:
+  - "/DC1/Cluster*/Host*/VM*"
+  - "instance_uuid:vm-uuid"
+max_vsan_vms: 123
+collect_network_topology: yes
 host_include:
   - "ok"
 vm_include:
