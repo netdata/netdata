@@ -178,7 +178,7 @@ func emitCachestatGlobalChart(api *netdataapi.API, chart cachestatGlobalChart, u
 	})
 }
 
-func (p cachestatGlobalPublish) write(api *netdataapi.API, msSince int) {
+func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 	if api == nil {
 		return
 	}
@@ -196,7 +196,7 @@ func (p cachestatGlobalPublish) write(api *netdataapi.API, msSince int) {
 		{chart: "cachestat_hits", dim: "hit", value: p.Hit},
 		{chart: "cachestat_misses", dim: "miss", value: p.Miss},
 	} {
-		api.BEGIN(cachestatGlobalGroup, item.chart, msSince)
+		api.BEGIN(cachestatGlobalGroup, item.chart, usecSince)
 		api.SET(item.dim, item.value)
 		api.END()
 	}
@@ -215,7 +215,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 
 	state := &cachestatGlobalState{}
 	lastCollection := time.Now()
-	collectAndPublish := func(msSince int) {
+	collectAndPublish := func(usecSince int) {
 		snapshot, err := handle.Runtime.Snapshot(true)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat snapshot failed: %v\n", err)
@@ -232,7 +232,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 			return
 		}
 
-		publish.write(api, msSince)
+		publish.write(api, usecSince)
 	}
 
 	collectAndPublish(0)
@@ -249,12 +249,12 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		}
 
 		now := time.Now()
-		msSince := int(now.Sub(lastCollection).Milliseconds())
-		if msSince < 0 {
-			msSince = 0
+		usecSince := int(now.Sub(lastCollection).Microseconds())
+		if usecSince < 0 {
+			usecSince = 0
 		}
 		lastCollection = now
-		collectAndPublish(msSince)
+		collectAndPublish(usecSince)
 	}
 }
 
