@@ -29,6 +29,39 @@ input series, so `__name__` is preserved. Our implementation
 correct Prometheus semantic is to preserve it; this is a real bug
 and should be fixed in a follow-up.
 
+## Category: rate-on-cumulative-counters (SOW-0038 attempted, reverted)
+
+Prometheus `.test` fixtures load counter samples as cumulative
+values (`0+10x1000` -> `[0, 10, 20, ..., 10000]`); Prometheus' rate
+computes `(last - first) / range`. Netdata stores INCREMENTAL
+counter dimensions pre-differentiated as deltas; our rate computes
+`sum(values) / span`. The two are mathematically equivalent only
+when the input format matches the algorithm.
+
+This affects ~30-40 compliance cases across `selectors.test`,
+`functions.test`, `operators.test`, `subquery.test`, and
+`name_label_dropping.test` (every test that calls
+`rate(metric_total[...])` on cumulative input).
+
+SOW-0038 attempted to fix this by (a) differentiating
+counter-suffixed series at load time in the compliance harness,
+and (b) switching our rate denominator from sample span to the
+matrix selector's `range_ms`. Both changes were reverted:
+
+- Load-time differentiation broke direct-selector queries on
+  counter-named metrics (which expect cumulative values, e.g.
+  `metric_total + rate(metric_total[1m]) * 60` in
+  `operators.test`).
+- The denominator switch alone didn't help (still very wrong
+  numbers on cumulative input) and regressed one functions.test
+  case.
+
+The proper fix is a full Prometheus-style rate algorithm
+(`last - first / range_ms` with counter-reset detection and
+extrapolation, accepting cumulative input) -- a substantial
+change that conflicts with Netdata's delta-storage convention,
+requiring dual-mode rate. Not yet pursued.
+
 ## Category: counter-reset & staleness divergences
 
 Several tests in `staleness.test` and counter-family tests in
