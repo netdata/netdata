@@ -123,11 +123,12 @@ fn apply_collapsing(
 }
 
 /// topk(k, expr) / bottomk(k, expr): at each grid position, bucket by
-/// grouping, sort by value, keep top or bottom k. Output preserves the
-/// **original** input series labels minus `__name__`. A series that
-/// ranked at some positions but not others gets NaN at the missing
-/// positions; the per-position drop-NaN rule does not collapse the
-/// series across positions.
+/// grouping, sort by value, keep top or bottom k. Output preserves
+/// **all** original input labels including `__name__` (SOW-0035 --
+/// distinct from the general aggregation convention which strips
+/// `__name__`). A series that ranked at some positions but not others
+/// gets NaN at the missing positions; the per-position drop-NaN rule
+/// does not collapse the series across positions.
 fn apply_topk_bottomk(
     op: AggrKind,
     grouping: Option<&Grouping>,
@@ -150,20 +151,6 @@ fn apply_topk_bottomk(
         .iter()
         .map(|s| labels_signature(&project_labels(&s.labels, grouping)))
         .collect();
-    let stripped_labels: Vec<Vec<(String, String)>> = series
-        .iter()
-        .map(|s| {
-            s.labels
-                .iter()
-                .filter(|(n, _)| n != "__name__")
-                .cloned()
-                .collect()
-        })
-        .collect();
-    let stripped_signatures: Vec<u64> = stripped_labels
-        .iter()
-        .map(|l| labels_signature(l))
-        .collect();
 
     // Pre-group input indices by bucket (same for every position).
     let mut by_bucket_template: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
@@ -171,10 +158,11 @@ fn apply_topk_bottomk(
         by_bucket_template.entry(b).or_default().push(j);
     }
 
-    // accum: output signature -> (labels, values), one f64 per grid position.
-    // Output series get NaN at positions where the input series did not
-    // rank in the top/bottom-k for its bucket. NaN-filtered on output
-    // serialization.
+    // accum: input-series signature -> (labels, values), one f64 per
+    // grid position. Output series get NaN at positions where the
+    // input series did not rank in the top/bottom-k for its bucket.
+    // SOW-0035: use the input series' own signature/labels so that
+    // `__name__` is preserved on the output (Prometheus semantics).
     let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<f64>)> = BTreeMap::new();
 
     for i in 0..n {
@@ -204,11 +192,11 @@ fn apply_topk_bottomk(
             }
         }
 
-        for (j, _) in series.iter().enumerate() {
+        for (j, s) in series.iter().enumerate() {
             let value = ranked_value.get(&j).copied();
             let entry = accum
-                .entry(stripped_signatures[j])
-                .or_insert_with(|| (stripped_labels[j].clone(), Vec::with_capacity(n)));
+                .entry(s.signature)
+                .or_insert_with(|| (s.labels.clone(), Vec::with_capacity(n)));
             entry.1.push(value.unwrap_or(f64::NAN));
         }
     }
@@ -839,7 +827,10 @@ mod tests {
     }
 
     #[test]
-    fn topk_returns_top_k() {
+    fn topk_returns_top_k_preserving_name() {
+        // SOW-0035: topk/bottomk preserve `__name__` (and every other
+        // input label) on output, unlike sum/avg which collapse to
+        // the grouping projection.
         let input = EvalResult::InstantVector(vec![
             s("foo", "a", 1.0),
             s("foo", "b", 4.0),
@@ -850,7 +841,11 @@ mod tests {
         assert_eq!(v.len(), 2);
         assert_eq!(values_sorted(&v), vec![3.0, 4.0]);
         for s in &v {
-            assert!(s.labels.iter().all(|(n, _)| n != "__name__"));
+            assert!(
+                s.labels.iter().any(|(n, v)| n == "__name__" && v == "foo"),
+                "__name__ must be preserved on topk/bottomk output: labels = {:?}",
+                s.labels
+            );
             assert!(s.labels.iter().any(|(n, _)| n == "dimension"));
         }
     }

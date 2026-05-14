@@ -629,11 +629,12 @@ check_discovery "bottomk(3,...) returns exactly 3 series" \
     "/api/v1/query" \
     "--data-urlencode query=bottomk(3,system_cpu)" 200 \
     "len(d['data']['result'])==3"
-# Label preservation: topk keeps original `dimension`, drops `__name__`.
-check_discovery "topk preserves dimension, strips __name__" \
+# Label preservation: topk keeps every original input label, including
+# __name__ (SOW-0035, matches Prometheus semantics).
+check_discovery "topk preserves __name__ and dimension" \
     "/api/v1/query" \
     "--data-urlencode query=topk(3,system_cpu)" 200 \
-    "all('__name__' not in s['metric'] and 'dimension' in s['metric'] for s in d['data']['result'])"
+    "all(s['metric'].get('__name__')=='system_cpu' and 'dimension' in s['metric'] for s in d['data']['result'])"
 # Quantile correctness: quantile(1, x) == max(x). Floating-point exact
 # match because the implementation returns the sorted max directly when
 # phi == 1.
