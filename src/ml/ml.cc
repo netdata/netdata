@@ -47,6 +47,17 @@ void ml_db_mark_corrupt(int rc)
     }
 }
 
+// Flag ml.db as corrupt if `rc` is a corruption signal (SQLITE_CORRUPT or
+// SQLITE_NOTADB). Returns true when the rc indicated corruption (regardless
+// of whether the sentinel was successfully written).
+static inline bool ml_db_mark_if_corrupt(int rc)
+{
+    if (rc != SQLITE_CORRUPT && rc != SQLITE_NOTADB)
+        return false;
+    ml_db_mark_corrupt(rc);
+    return true;
+}
+
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&db_mutex);
 }
@@ -270,8 +281,7 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
         rc = prepare_statement(ml_db, db_models_add_model, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store model, rc = %d", rc);
-            if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
-                ml_db_mark_corrupt(rc);
+            ml_db_mark_if_corrupt(rc);
             return 1;
         }
     }
@@ -311,8 +321,7 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to store model, rc = %d", rc);
-        if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
-            ml_db_mark_corrupt(rc);
+        ml_db_mark_if_corrupt(rc);
         return rc;
     }
 
@@ -352,8 +361,7 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
         rc = prepare_statement(ml_db, db_models_delete, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to delete models, rc = %d", rc);
-            if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
-                ml_db_mark_corrupt(rc);
+            ml_db_mark_if_corrupt(rc);
             return rc;
         }
     }
@@ -369,8 +377,7 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to delete models, rc = %d", rc);
-        if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
-            ml_db_mark_corrupt(rc);
+        ml_db_mark_if_corrupt(rc);
         return rc;
     }
 
@@ -410,8 +417,7 @@ ml_prune_old_models(size_t num_models_to_prune)
         rc = prepare_statement(ml_db, db_models_prune, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to prune models, rc = %d", rc);
-            if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
-                ml_db_mark_corrupt(rc);
+            ml_db_mark_if_corrupt(rc);
             return rc;
         }
     }
@@ -429,8 +435,7 @@ ml_prune_old_models(size_t num_models_to_prune)
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to prune old models, rc = %d", rc);
-        if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
-            ml_db_mark_corrupt(rc);
+        ml_db_mark_if_corrupt(rc);
         return rc;
     }
 
@@ -482,8 +487,7 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         rc = sqlite3_prepare_v2(ml_db, db_models_load, -1, &res, NULL);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to load models, rc = %d", rc);
-            if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
-                ml_db_mark_corrupt(rc);
+            ml_db_mark_if_corrupt(rc);
             return 1;
         }
         if (active_stmt)
@@ -566,10 +570,9 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (unlikely(rc != SQLITE_OK && rc != step_rc))
         error_report("Failed to %s statement when loading models, rc = %d", active_stmt ? "reset" : "finalize", rc);
 
-    if (step_rc == SQLITE_CORRUPT || step_rc == SQLITE_NOTADB) {
-        ml_db_mark_corrupt(step_rc);
-        return 1; // trip skip_models in metadata_scan_host so we stop hammering the bad DB
-    }
+    // trip skip_models in metadata_scan_host so we stop hammering the bad DB
+    if (ml_db_mark_if_corrupt(step_rc))
+        return 1;
 
     return 0;
 
