@@ -690,22 +690,44 @@ impl Bucket {
     }
 }
 
-/// Project a series's labels onto (or away from) the grouping clause's
-/// label list. Always drops `__name__` -- aggregation output never carries
-/// a metric name.
+/// Project a series's labels onto (or away from) the grouping
+/// clause's label list. Drops `__name__` *unless the user explicitly
+/// names it* in `by (__name__, ...)`; for `without (...)`, drops
+/// `__name__` only when it appears in the `without` list. SOW-0037
+/// brought this in line with Prometheus -- aggregation output
+/// normally has no metric name, but `by (__name__, ...)` is a
+/// deliberate request to keep it.
 fn project_labels(labels: &[(String, String)], grouping: Option<&Grouping>) -> Vec<(String, String)> {
     let kept: Vec<(String, String)> = match grouping {
         None => Vec::new(),
-        Some(Grouping::By(names)) => labels
-            .iter()
-            .filter(|(n, _)| n != "__name__" && names.iter().any(|k| k == n))
-            .cloned()
-            .collect(),
-        Some(Grouping::Without(names)) => labels
-            .iter()
-            .filter(|(n, _)| n != "__name__" && !names.iter().any(|k| k == n))
-            .cloned()
-            .collect(),
+        Some(Grouping::By(names)) => {
+            let explicit_name = names.iter().any(|k| k == "__name__");
+            labels
+                .iter()
+                .filter(|(n, _)| {
+                    if n == "__name__" {
+                        explicit_name
+                    } else {
+                        names.iter().any(|k| k == n)
+                    }
+                })
+                .cloned()
+                .collect()
+        }
+        Some(Grouping::Without(names)) => {
+            let drop_name = names.iter().any(|k| k == "__name__");
+            labels
+                .iter()
+                .filter(|(n, _)| {
+                    if n == "__name__" {
+                        !drop_name
+                    } else {
+                        !names.iter().any(|k| k == n)
+                    }
+                })
+                .cloned()
+                .collect()
+        }
     };
     kept
 }
@@ -1302,6 +1324,120 @@ mod tests {
             apply_aggregate(AggrKind::LimitRatio, None, Some(f64::NAN), None, input).unwrap(),
         );
         assert!(v.is_empty());
+    }
+
+    // -----------------------------------------------------------------
+    // SOW-0037: explicit `by (__name__, ...)` keeps __name__
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn sum_by_explicit_name_keeps_name() {
+        // Two series with the same __name__ but different dimensions.
+        // `sum by (__name__)` should collapse them into one bucket
+        // keyed by __name__, preserving "foo" on the output.
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", 2.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::Sum,
+                Some(&Grouping::By(vec!["__name__".to_string()])),
+                None,
+                None,
+                input,
+            )
+            .unwrap(),
+        );
+        assert_eq!(v.len(), 1);
+        assert!((v[0].values[0] - 3.0).abs() < 1e-9);
+        let name = v[0]
+            .labels
+            .iter()
+            .find(|(n, _)| n == "__name__")
+            .map(|(_, v)| v.as_str());
+        assert_eq!(name, Some("foo"));
+    }
+
+    #[test]
+    fn sum_by_explicit_name_and_dim_keeps_both() {
+        let input = EvalResult::InstantVector(vec![s("foo", "a", 5.0)]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::Sum,
+                Some(&Grouping::By(vec![
+                    "__name__".to_string(),
+                    "dimension".to_string(),
+                ])),
+                None,
+                None,
+                input,
+            )
+            .unwrap(),
+        );
+        assert_eq!(v.len(), 1);
+        assert!(v[0]
+            .labels
+            .iter()
+            .any(|(n, v)| n == "__name__" && v == "foo"));
+        assert!(v[0]
+            .labels
+            .iter()
+            .any(|(n, v)| n == "dimension" && v == "a"));
+    }
+
+    #[test]
+    fn sum_without_dim_keeps_name_by_default() {
+        // `sum without (dimension)` drops `dimension` and keeps
+        // everything else -- including `__name__` (since the user
+        // didn't list it in `without`).
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "b", 2.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::Sum,
+                Some(&Grouping::Without(vec!["dimension".to_string()])),
+                None,
+                None,
+                input,
+            )
+            .unwrap(),
+        );
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].values[0], 3.0);
+        assert!(v[0]
+            .labels
+            .iter()
+            .any(|(n, v)| n == "__name__" && v == "foo"));
+    }
+
+    #[test]
+    fn sum_without_explicit_name_drops_name() {
+        // `sum without (__name__)` drops `__name__` and keeps
+        // everything else.
+        let input = EvalResult::InstantVector(vec![
+            s("foo", "a", 1.0),
+            s("foo", "a", 4.0),
+        ]);
+        let v = unwrap_vec(
+            apply_aggregate(
+                AggrKind::Sum,
+                Some(&Grouping::Without(vec!["__name__".to_string()])),
+                None,
+                None,
+                input,
+            )
+            .unwrap(),
+        );
+        assert_eq!(v.len(), 1);
+        assert!((v[0].values[0] - 5.0).abs() < 1e-9);
+        assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
+        assert!(v[0]
+            .labels
+            .iter()
+            .any(|(n, v)| n == "dimension" && v == "a"));
     }
 
     #[test]

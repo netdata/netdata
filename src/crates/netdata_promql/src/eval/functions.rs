@@ -34,6 +34,7 @@ pub fn apply_call(
         FuncKind::MaxOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Max),
         FuncKind::CountOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Count),
         FuncKind::LastOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Last),
+        FuncKind::FirstOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::First),
         FuncKind::PresentOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Present),
         FuncKind::StddevOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Stddev),
         FuncKind::StdvarOverTime => apply_over_time(ctx, args, range_ms, OverTimeOp::Stdvar),
@@ -122,6 +123,7 @@ pub(crate) enum OverTimeOp {
     Max,
     Count,
     Last,
+    First,
     Present,
     Stddev,
     Stdvar,
@@ -136,6 +138,7 @@ impl OverTimeOp {
             OverTimeOp::Max => "max_over_time",
             OverTimeOp::Count => "count_over_time",
             OverTimeOp::Last => "last_over_time",
+            OverTimeOp::First => "first_over_time",
             OverTimeOp::Present => "present_over_time",
             OverTimeOp::Stddev => "stddev_over_time",
             OverTimeOp::Stdvar => "stdvar_over_time",
@@ -150,7 +153,7 @@ impl OverTimeOp {
     /// `present_over_time` strips because the result is always 1 or
     /// nothing -- structurally a different quantity.
     fn keep_name(self) -> bool {
-        matches!(self, OverTimeOp::Last)
+        matches!(self, OverTimeOp::Last | OverTimeOp::First)
     }
 }
 
@@ -219,11 +222,17 @@ pub(crate) fn compute_over_time(
     let mut max_val: f64 = f64::NEG_INFINITY;
     let mut last_val: f64 = 0.0;
     let mut last_ts: i64 = 0;
+    let mut first_val: f64 = 0.0;
+    let mut first_ts: i64 = 0;
 
     for i in 0..values.len() {
         let v = values[i];
         if v.is_nan() {
             continue;
+        }
+        if count == 0 {
+            first_val = v;
+            first_ts = timestamps[i];
         }
         count += 1;
         sum += v;
@@ -249,14 +258,11 @@ pub(crate) fn compute_over_time(
         OverTimeOp::Max => max_val,
         OverTimeOp::Count => count as f64,
         OverTimeOp::Last => last_val,
+        OverTimeOp::First => first_val,
         OverTimeOp::Present => 1.0,
         OverTimeOp::Stdvar => {
-            // Population variance: E[X^2] - (E[X])^2. Simple form;
-            // catastrophic cancellation only matters on highly
-            // concentrated distributions which are atypical for PromQL.
             let mean = sum / (count as f64);
             let var = sum_sq / (count as f64) - mean * mean;
-            // Clamp negative results (round-off) to zero.
             if var < 0.0 {
                 0.0
             } else {
@@ -273,7 +279,15 @@ pub(crate) fn compute_over_time(
             }
         }
     };
-    Some((value, last_ts))
+    // Output timestamp: first sample's ts for First, last sample's ts
+    // for everything else (matches Prometheus stamping for last_over_time
+    // and the aggregating variants).
+    let ts = if matches!(op, OverTimeOp::First) {
+        first_ts
+    } else {
+        last_ts
+    };
+    Some((value, ts))
 }
 
 /// Distinguish rate (per-second) from increase (absolute) -- the inner
@@ -1796,6 +1810,7 @@ mod tests {
             OverTimeOp::Max => FuncKind::MaxOverTime,
             OverTimeOp::Count => FuncKind::CountOverTime,
             OverTimeOp::Last => FuncKind::LastOverTime,
+            OverTimeOp::First => FuncKind::FirstOverTime,
             OverTimeOp::Present => FuncKind::PresentOverTime,
             OverTimeOp::Stddev => FuncKind::StddevOverTime,
             OverTimeOp::Stdvar => FuncKind::StdvarOverTime,

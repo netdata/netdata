@@ -378,11 +378,15 @@ fn parse_expected_line(line: &str) -> Option<ExpectedSeries> {
     };
     let (metric, labels) = if head.starts_with('{') {
         (None, parse_labelset(head)?)
-    } else {
-        let brace = head.find('{')?;
+    } else if let Some(brace) = head.find('{') {
         let m = head[..brace].to_string();
         let labels = parse_labelset(&head[brace..])?;
         (Some(m), labels)
+    } else {
+        // Metric name without a labelset, e.g. `metric_total 10`
+        // means an empty-labels series carrying that __name__.
+        // SOW-0037.
+        (Some(head.to_string()), Vec::new())
     };
     let mut values = Vec::new();
     for t in tail.split_whitespace() {
