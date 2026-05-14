@@ -39,17 +39,19 @@ Prometheus' semantics by design (documented in the contract spec);
 the harness surfaces these as failures so we can decide case by
 case which to fix and which to accept.
 
-## Category: result comparison artefacts
+## Category: result comparison artefacts (PARTIALLY CLOSED, SOW-0036)
 
-A few tests fail because our `same_labelset` comparator doesn't yet
-handle:
+SOW-0036 fixed the bare-scalar expected-line parser; `literals.test`
+went from 0/25 to 20/5. The remaining 5 `literals.test` failures
+are top-level string literals (`"Foo"`, `""`) that our lowering
+layer rejects -- tracked as a separate follow-up.
 
-* the `{} value` shape (labelless result series in
-  `literals.test`) -- 0/25 pass rate on that file is almost
-  certainly a comparator bug, not 25 real semantic deviations
-* expected results with `__name__` in the labelset
-
-These are bugs in the comparator, not in the evaluator.
+The original note attributed this to the `same_labelset`
+comparator. The actual bug lived in `parse_expected_line`: it
+returned `None` for inputs without `{` or whitespace (a bare
+`12340000` token), so the expected list ended up empty and the
+comparator reported "expected 0 labelled series" against the
+correct scalar actual.
 
 ## Category: range queries
 

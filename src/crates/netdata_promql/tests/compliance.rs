@@ -337,9 +337,16 @@ fn parse_series_line(line: &str) -> Option<SeriesSpec> {
     })
 }
 
-/// Parse one expected-output line under an `eval` block. Form:
-///   `<labelset> val1 val2 ...` or `<metric>{...} val ...`
-/// or `{} val` for a labelless result.
+/// Parse one expected-output line under an `eval` block. Forms:
+///   `<labelset> val1 val2 ...`         -- labeled vector
+///   `<metric>{...} val1 ...`           -- labeled vector with name
+///   `{} val`                           -- labelless vector
+///   `<scalar>`                         -- scalar literal (`1.5`,
+///                                         `NaN`, `+Inf`, `-Inf`).
+///                                         The whole line is the
+///                                         value; no labelset
+///                                         markers are present.
+///                                         SOW-0036.
 fn parse_expected_line(line: &str) -> Option<ExpectedSeries> {
     let line = line.trim();
     let (head, tail) = if line.starts_with('{') {
@@ -348,11 +355,26 @@ fn parse_expected_line(line: &str) -> Option<ExpectedSeries> {
     } else if let Some(brace) = line.find('{') {
         let close = brace + 1 + line[brace + 1..].find('}')?;
         (&line[..=close], line[close + 1..].trim())
-    } else {
-        // No labelset; whole token before whitespace is the metric
-        // name with no labels (rare).
-        let ws = line.find(char::is_whitespace)?;
+    } else if let Some(ws) = line.find(char::is_whitespace) {
+        // No labelset, but there's whitespace -- whole token before
+        // whitespace is the metric name with no labels (rare).
         (&line[..ws], line[ws..].trim())
+    } else {
+        // Bare scalar literal: the entire line is the value.
+        // Parsing falls through the value-parsing block below by
+        // pretending we saw an empty labelset and the line itself
+        // is the value list. SOW-0036.
+        let v: f64 = match line {
+            "NaN" => f64::NAN,
+            "+Inf" | "Inf" => f64::INFINITY,
+            "-Inf" => f64::NEG_INFINITY,
+            other => other.parse().ok()?,
+        };
+        return Some(ExpectedSeries {
+            metric: None,
+            labels: Vec::new(),
+            values: vec![v],
+        });
     };
     let (metric, labels) = if head.starts_with('{') {
         (None, parse_labelset(head)?)
