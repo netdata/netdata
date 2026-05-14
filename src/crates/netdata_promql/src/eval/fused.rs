@@ -249,60 +249,60 @@ impl RollupKind {
             ),
             RollupKind::Delta => super::functions::compute_delta(values),
             RollupKind::IRate => super::functions::compute_irate(timestamps, values),
-            RollupKind::AvgOverTime => super::functions::compute_over_time(
-                timestamps,
-                values,
-                super::functions::OverTimeOp::Avg,
-            )
-            .map(|(v, _)| v),
-            RollupKind::SumOverTime => super::functions::compute_over_time(
-                timestamps,
-                values,
-                super::functions::OverTimeOp::Sum,
-            )
-            .map(|(v, _)| v),
-            RollupKind::MinOverTime => super::functions::compute_over_time(
-                timestamps,
-                values,
-                super::functions::OverTimeOp::Min,
-            )
-            .map(|(v, _)| v),
-            RollupKind::MaxOverTime => super::functions::compute_over_time(
-                timestamps,
-                values,
-                super::functions::OverTimeOp::Max,
-            )
-            .map(|(v, _)| v),
-            RollupKind::CountOverTime => super::functions::compute_over_time(
-                timestamps,
-                values,
-                super::functions::OverTimeOp::Count,
-            )
-            .map(|(v, _)| v),
-            RollupKind::LastOverTime => super::functions::compute_over_time(
-                timestamps,
-                values,
-                super::functions::OverTimeOp::Last,
-            )
-            .map(|(v, _)| v),
-            RollupKind::PresentOverTime => super::functions::compute_over_time(
-                timestamps,
-                values,
-                super::functions::OverTimeOp::Present,
-            )
-            .map(|(v, _)| v),
-            RollupKind::StddevOverTime => super::functions::compute_over_time(
-                timestamps,
-                values,
-                super::functions::OverTimeOp::Stddev,
-            )
-            .map(|(v, _)| v),
-            RollupKind::StdvarOverTime => super::functions::compute_over_time(
-                timestamps,
-                values,
-                super::functions::OverTimeOp::Stdvar,
-            )
-            .map(|(v, _)| v),
+            RollupKind::AvgOverTime => {
+                super::functions::compute_over_time::<super::functions::AvgReducer>(
+                    timestamps, values,
+                )
+                .map(|(v, _)| v)
+            }
+            RollupKind::SumOverTime => {
+                super::functions::compute_over_time::<super::functions::SumReducer>(
+                    timestamps, values,
+                )
+                .map(|(v, _)| v)
+            }
+            RollupKind::MinOverTime => {
+                super::functions::compute_over_time::<super::functions::MinReducer>(
+                    timestamps, values,
+                )
+                .map(|(v, _)| v)
+            }
+            RollupKind::MaxOverTime => {
+                super::functions::compute_over_time::<super::functions::MaxReducer>(
+                    timestamps, values,
+                )
+                .map(|(v, _)| v)
+            }
+            RollupKind::CountOverTime => {
+                super::functions::compute_over_time::<super::functions::CountReducer>(
+                    timestamps, values,
+                )
+                .map(|(v, _)| v)
+            }
+            RollupKind::LastOverTime => {
+                super::functions::compute_over_time::<super::functions::LastReducer>(
+                    timestamps, values,
+                )
+                .map(|(v, _)| v)
+            }
+            RollupKind::PresentOverTime => {
+                super::functions::compute_over_time::<super::functions::PresentReducer>(
+                    timestamps, values,
+                )
+                .map(|(v, _)| v)
+            }
+            RollupKind::StddevOverTime => {
+                super::functions::compute_over_time::<super::functions::StddevReducer>(
+                    timestamps, values,
+                )
+                .map(|(v, _)| v)
+            }
+            RollupKind::StdvarOverTime => {
+                super::functions::compute_over_time::<super::functions::StdvarReducer>(
+                    timestamps, values,
+                )
+                .map(|(v, _)| v)
+            }
         }
     }
 }

@@ -163,21 +163,40 @@ fn apply_over_time(
     range_ms: Option<i64>,
     op: OverTimeOp,
 ) -> Result<EvalResult, EvalError> {
-    let range = expect_one_range_vector(args, op.name())?;
+    match op {
+        OverTimeOp::Avg => apply_over_time_typed::<AvgReducer>(ctx, args, range_ms),
+        OverTimeOp::Sum => apply_over_time_typed::<SumReducer>(ctx, args, range_ms),
+        OverTimeOp::Min => apply_over_time_typed::<MinReducer>(ctx, args, range_ms),
+        OverTimeOp::Max => apply_over_time_typed::<MaxReducer>(ctx, args, range_ms),
+        OverTimeOp::Count => apply_over_time_typed::<CountReducer>(ctx, args, range_ms),
+        OverTimeOp::Last => apply_over_time_typed::<LastReducer>(ctx, args, range_ms),
+        OverTimeOp::First => apply_over_time_typed::<FirstReducer>(ctx, args, range_ms),
+        OverTimeOp::Present => apply_over_time_typed::<PresentReducer>(ctx, args, range_ms),
+        OverTimeOp::Stddev => apply_over_time_typed::<StddevReducer>(ctx, args, range_ms),
+        OverTimeOp::Stdvar => apply_over_time_typed::<StdvarReducer>(ctx, args, range_ms),
+    }
+}
+
+fn apply_over_time_typed<R: OverTimeReducer>(
+    ctx: &EvalContext,
+    args: Vec<EvalResult>,
+    range_ms: Option<i64>,
+) -> Result<EvalResult, EvalError> {
+    let range = expect_one_range_vector(args, R::NAME)?;
     let Some(window_ms) = range_ms else {
-        return apply_over_time_legacy(range, op);
+        return apply_over_time_legacy::<R>(range);
     };
     let grid = &ctx.grid;
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
         let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |ts, vals| {
-            compute_over_time(ts, vals, op).map(|(v, _)| v)
+            compute_over_time::<R>(ts, vals).map(|(v, _)| v)
         });
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
-        let labels = if op.keep_name() {
+        let labels = if R::KEEP_NAME {
             s.labels
         } else {
             strip_name(&s.labels).0
@@ -188,13 +207,13 @@ fn apply_over_time(
     Ok(EvalResult::InstantVector(out))
 }
 
-fn apply_over_time_legacy(range: Vec<Series>, op: OverTimeOp) -> Result<EvalResult, EvalError> {
+fn apply_over_time_legacy<R: OverTimeReducer>(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some((value, ts_ms)) = compute_over_time(&s.timestamps, &s.values, op) else {
+        let Some((value, ts_ms)) = compute_over_time::<R>(&s.timestamps, &s.values) else {
             continue;
         };
-        let labels = if op.keep_name() {
+        let labels = if R::KEEP_NAME {
             s.labels
         } else {
             strip_name(&s.labels).0
@@ -205,89 +224,373 @@ fn apply_over_time_legacy(range: Vec<Series>, op: OverTimeOp) -> Result<EvalResu
     Ok(EvalResult::InstantVector(out))
 }
 
-/// Compute the windowed aggregate for one series. Returns the result and
-/// the timestamp the output sample should carry (the most recent non-NaN
-/// timestamp in the window). NaN samples are skipped; if no non-NaN
-/// sample exists in the window, returns `None` so the caller drops the
-/// series.
-pub(crate) fn compute_over_time(
+// ---------------------------------------------------------------------------
+// OverTimeReducer trait + per-op accumulators. SOW-0039.
+//
+// Each `*_over_time` operator is a separate impl with its own Acc shape,
+// so the per-sample fold touches only the state that operator actually
+// reads. Compared to the pre-SOW-0039 unified loop, this drops dead
+// accumulator updates (e.g. `avg_over_time` no longer maintains
+// min/max/sum_sq) and gives LLVM enough static information per impl to
+// inline `step` into the calling loop and, where the reducer permits,
+// auto-vectorize the value-side reduction.
+//
+// `step` handles NaN per the reducer's own semantic (every existing
+// reducer skips NaN samples). `finalize` returns the (value, ts) pair
+// the caller stamps onto the output sample; `None` means "no non-NaN
+// sample was observed in the window" -- the caller drops that
+// position. The (f64, i64) shape is uniform across reducers because
+// `apply_over_time_legacy` consumes the `i64` to stamp single-window
+// output series; ten of the eleven call sites discard it.
+// ---------------------------------------------------------------------------
+
+pub(crate) trait OverTimeReducer {
+    type Acc: Default;
+    /// Function name for error messages.
+    const NAME: &'static str;
+    /// True if the output series should preserve `__name__`.
+    const KEEP_NAME: bool;
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64);
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)>;
+}
+
+#[derive(Default)]
+pub(crate) struct AvgAcc {
+    sum: f64,
+    count: u64,
+    last_ts: i64,
+}
+pub(crate) struct AvgReducer;
+impl OverTimeReducer for AvgReducer {
+    type Acc = AvgAcc;
+    const NAME: &'static str = "avg_over_time";
+    const KEEP_NAME: bool = false;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        acc.sum += value;
+        acc.count += 1;
+        acc.last_ts = ts;
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.count == 0 {
+            None
+        } else {
+            Some((acc.sum / acc.count as f64, acc.last_ts))
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct SumAcc {
+    sum: f64,
+    count: u64,
+    last_ts: i64,
+}
+pub(crate) struct SumReducer;
+impl OverTimeReducer for SumReducer {
+    type Acc = SumAcc;
+    const NAME: &'static str = "sum_over_time";
+    const KEEP_NAME: bool = false;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        acc.sum += value;
+        acc.count += 1;
+        acc.last_ts = ts;
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.count == 0 {
+            None
+        } else {
+            Some((acc.sum, acc.last_ts))
+        }
+    }
+}
+
+pub(crate) struct MinAcc {
+    value: f64,
+    last_ts: i64,
+    seen: bool,
+}
+impl Default for MinAcc {
+    fn default() -> Self {
+        Self {
+            value: 0.0,
+            last_ts: 0,
+            seen: false,
+        }
+    }
+}
+pub(crate) struct MinReducer;
+impl OverTimeReducer for MinReducer {
+    type Acc = MinAcc;
+    const NAME: &'static str = "min_over_time";
+    const KEEP_NAME: bool = false;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        if !acc.seen || value < acc.value {
+            acc.value = value;
+        }
+        acc.seen = true;
+        acc.last_ts = ts;
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.seen {
+            Some((acc.value, acc.last_ts))
+        } else {
+            None
+        }
+    }
+}
+
+pub(crate) struct MaxAcc {
+    value: f64,
+    last_ts: i64,
+    seen: bool,
+}
+impl Default for MaxAcc {
+    fn default() -> Self {
+        Self {
+            value: 0.0,
+            last_ts: 0,
+            seen: false,
+        }
+    }
+}
+pub(crate) struct MaxReducer;
+impl OverTimeReducer for MaxReducer {
+    type Acc = MaxAcc;
+    const NAME: &'static str = "max_over_time";
+    const KEEP_NAME: bool = false;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        if !acc.seen || value > acc.value {
+            acc.value = value;
+        }
+        acc.seen = true;
+        acc.last_ts = ts;
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.seen {
+            Some((acc.value, acc.last_ts))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct CountAcc {
+    count: u64,
+    last_ts: i64,
+}
+pub(crate) struct CountReducer;
+impl OverTimeReducer for CountReducer {
+    type Acc = CountAcc;
+    const NAME: &'static str = "count_over_time";
+    const KEEP_NAME: bool = false;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        acc.count += 1;
+        acc.last_ts = ts;
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.count == 0 {
+            None
+        } else {
+            Some((acc.count as f64, acc.last_ts))
+        }
+    }
+}
+
+pub(crate) struct LastAcc {
+    value: f64,
+    ts: i64,
+    seen: bool,
+}
+impl Default for LastAcc {
+    fn default() -> Self {
+        Self {
+            value: 0.0,
+            ts: 0,
+            seen: false,
+        }
+    }
+}
+pub(crate) struct LastReducer;
+impl OverTimeReducer for LastReducer {
+    type Acc = LastAcc;
+    const NAME: &'static str = "last_over_time";
+    const KEEP_NAME: bool = true;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        acc.value = value;
+        acc.ts = ts;
+        acc.seen = true;
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.seen {
+            Some((acc.value, acc.ts))
+        } else {
+            None
+        }
+    }
+}
+
+pub(crate) struct FirstAcc {
+    value: f64,
+    ts: i64,
+    seen: bool,
+}
+impl Default for FirstAcc {
+    fn default() -> Self {
+        Self {
+            value: 0.0,
+            ts: 0,
+            seen: false,
+        }
+    }
+}
+pub(crate) struct FirstReducer;
+impl OverTimeReducer for FirstReducer {
+    type Acc = FirstAcc;
+    const NAME: &'static str = "first_over_time";
+    const KEEP_NAME: bool = true;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        if !acc.seen {
+            acc.value = value;
+            acc.ts = ts;
+            acc.seen = true;
+        }
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.seen {
+            Some((acc.value, acc.ts))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct PresentAcc {
+    last_ts: i64,
+    seen: bool,
+}
+pub(crate) struct PresentReducer;
+impl OverTimeReducer for PresentReducer {
+    type Acc = PresentAcc;
+    const NAME: &'static str = "present_over_time";
+    const KEEP_NAME: bool = false;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        acc.seen = true;
+        acc.last_ts = ts;
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.seen {
+            Some((1.0, acc.last_ts))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct StddevAcc {
+    sum: f64,
+    sum_sq: f64,
+    count: u64,
+    last_ts: i64,
+}
+pub(crate) struct StddevReducer;
+impl OverTimeReducer for StddevReducer {
+    type Acc = StddevAcc;
+    const NAME: &'static str = "stddev_over_time";
+    const KEEP_NAME: bool = false;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        acc.sum += value;
+        acc.sum_sq += value * value;
+        acc.count += 1;
+        acc.last_ts = ts;
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.count == 0 {
+            return None;
+        }
+        let mean = acc.sum / acc.count as f64;
+        let var = acc.sum_sq / acc.count as f64 - mean * mean;
+        Some((if var < 0.0 { 0.0 } else { var.sqrt() }, acc.last_ts))
+    }
+}
+
+pub(crate) struct StdvarReducer;
+impl OverTimeReducer for StdvarReducer {
+    type Acc = StddevAcc;
+    const NAME: &'static str = "stdvar_over_time";
+    const KEEP_NAME: bool = false;
+    #[inline]
+    fn step(acc: &mut Self::Acc, ts: i64, value: f64) {
+        if value.is_nan() {
+            return;
+        }
+        acc.sum += value;
+        acc.sum_sq += value * value;
+        acc.count += 1;
+        acc.last_ts = ts;
+    }
+    fn finalize(acc: &Self::Acc) -> Option<(f64, i64)> {
+        if acc.count == 0 {
+            return None;
+        }
+        let mean = acc.sum / acc.count as f64;
+        let var = acc.sum_sq / acc.count as f64 - mean * mean;
+        Some((if var < 0.0 { 0.0 } else { var }, acc.last_ts))
+    }
+}
+
+/// Compute the windowed aggregate for one series, generic over the
+/// per-op reducer. Returns the (value, ts) pair the output should carry,
+/// or `None` when no non-NaN sample was observed.
+#[inline]
+pub(crate) fn compute_over_time<R: OverTimeReducer>(
     timestamps: &[i64],
     values: &[f64],
-    op: OverTimeOp,
 ) -> Option<(f64, i64)> {
-    let mut count: u64 = 0;
-    let mut sum: f64 = 0.0;
-    let mut sum_sq: f64 = 0.0;
-    let mut min_val: f64 = f64::INFINITY;
-    let mut max_val: f64 = f64::NEG_INFINITY;
-    let mut last_val: f64 = 0.0;
-    let mut last_ts: i64 = 0;
-    let mut first_val: f64 = 0.0;
-    let mut first_ts: i64 = 0;
-
+    debug_assert_eq!(timestamps.len(), values.len());
+    let mut acc = <R::Acc as Default>::default();
     for i in 0..values.len() {
-        let v = values[i];
-        if v.is_nan() {
-            continue;
-        }
-        if count == 0 {
-            first_val = v;
-            first_ts = timestamps[i];
-        }
-        count += 1;
-        sum += v;
-        sum_sq += v * v;
-        if v < min_val {
-            min_val = v;
-        }
-        if v > max_val {
-            max_val = v;
-        }
-        last_val = v;
-        last_ts = timestamps[i];
+        R::step(&mut acc, timestamps[i], values[i]);
     }
-
-    if count == 0 {
-        return None;
-    }
-
-    let value = match op {
-        OverTimeOp::Avg => sum / (count as f64),
-        OverTimeOp::Sum => sum,
-        OverTimeOp::Min => min_val,
-        OverTimeOp::Max => max_val,
-        OverTimeOp::Count => count as f64,
-        OverTimeOp::Last => last_val,
-        OverTimeOp::First => first_val,
-        OverTimeOp::Present => 1.0,
-        OverTimeOp::Stdvar => {
-            let mean = sum / (count as f64);
-            let var = sum_sq / (count as f64) - mean * mean;
-            if var < 0.0 {
-                0.0
-            } else {
-                var
-            }
-        }
-        OverTimeOp::Stddev => {
-            let mean = sum / (count as f64);
-            let var = sum_sq / (count as f64) - mean * mean;
-            if var < 0.0 {
-                0.0
-            } else {
-                var.sqrt()
-            }
-        }
-    };
-    // Output timestamp: first sample's ts for First, last sample's ts
-    // for everything else (matches Prometheus stamping for last_over_time
-    // and the aggregating variants).
-    let ts = if matches!(op, OverTimeOp::First) {
-        first_ts
-    } else {
-        last_ts
-    };
-    Some((value, ts))
+    R::finalize(&acc)
 }
 
 /// Distinguish rate (per-second) from increase (absolute) -- the inner
