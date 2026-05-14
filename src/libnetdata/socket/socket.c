@@ -387,11 +387,18 @@ inline int wait_on_socket_or_cancel_with_timeout(
                     return 0;
                 }
 
-                const int sleep_ms = (timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
-                                     ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms;
-                Sleep(sleep_ms);
-                if(!forever)
-                    timeout_ms -= sleep_ms;
+                // Block until data arrives or the cancellability window expires.
+                // WaitForSingleObject signals immediately when data is written to the pipe,
+                // avoiding the worst-case Sleep() latency on every read.
+                const DWORD wait_ms = (DWORD)((timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
+                                               ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms);
+                DWORD wret = WaitForSingleObject(h, wait_ms);
+                if(wret == WAIT_FAILED) {
+                    if(revents) *revents = POLLHUP;
+                    return 2;
+                }
+                if(!forever && wret == WAIT_TIMEOUT)
+                    timeout_ms -= (int)wait_ms;
             }
             errno = ETIMEDOUT;
             return 1;
