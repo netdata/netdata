@@ -6,9 +6,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
+
+func (c *Collector) initNVMeCLIExec() (nvmeCli, error) {
+	if runtime.GOOS == "windows" {
+		return c.initDirectNvmeCliExec()
+	}
+	return c.initNdsudoNvmeCliExec()
+}
 
 func (c *Collector) initNdsudoNvmeCliExec() (nvmeCli, error) {
 	nvmeExec := &ndsudoNvmeCliExec{timeout: c.Timeout.Duration()}

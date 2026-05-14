@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Regression fixed 2026-05-13 by making the Windows compile/run helper refresh CMake configuration for existing build directories; service install validation confirmed `go.d.plugin.exe` and stock SMART/NVMe configs are installed.
+Sub-state: Completed 2026-05-14 after removing the unnecessary native Windows NVMe backend and keeping the existing `nvme.exe` collection path.
 
 ## Requirements
 
@@ -22,14 +22,14 @@ Facts:
 
 - Netdata already has go.d `smartctl` and `nvme` collectors with storage health, NVMe critical-warning, temperature, and thermal-management metrics.
 - The `smartctl` collector has a Windows direct-execution path for `smartctl.exe`, but its README/metadata are Linux/ndsudo-centric and the direct scan-open path currently builds conflicting scan arguments.
-- The `nvme` collector has a Windows direct-execution path for an external `nvme.exe`, but Windows has native storage protocol APIs that can query NVMe health logs without requiring Linux `nvme-cli` semantics.
+- The `nvme` collector already has a Windows direct-execution path for an external `nvme.exe`, so this PR should keep that path instead of adding a second native Windows backend.
 - `windows.plugin` has a Sensor API collector and a thermal-zone collector, but the standard Sensor API headers used by this tree do not define a standard fan RPM data field.
 - WMI has `Win32_Fan`, but it exposes platform-dependent fan device metadata and desired/requested speed when available; it is not a reliable cross-machine source of actual tachometer RPM.
 
 Inferences:
 
 - SMART disk health should reuse the existing `smartctl` collector instead of duplicating SMART parsing in `windows.plugin`.
-- Native Windows NVMe support should reuse the existing `nvme` collector charts, dimensions, metadata, and alert context, adding a Windows backend that maps Windows NVMe health log data into the existing model.
+- Windows NVMe support should reuse the existing `nvme` collector charts, dimensions, metadata, alert context, and direct `nvme.exe` execution path.
 - Fan support needed a product decision: either ship best-effort Windows fan metadata/requested speed with explicit caveats, or leave true actual fan RPM out until there is a reliable source such as vendor, EC/Super I/O, IPMI, or a supported third-party provider.
 
 Unknowns:
@@ -39,7 +39,7 @@ Unknowns:
 ### Acceptance Criteria
 
 - Windows SMART disk health support is documented and validated through the existing `smartctl` collector path.
-- Windows NVMe devices can be discovered and report health, temperature, and thermal throttling metrics through a native Windows backend or a documented fallback.
+- Windows NVMe devices can report health, temperature, and thermal throttling metrics through an installed `nvme.exe` on Windows.
 - Fan telemetry behavior is implemented according to the explicit fan semantics decision.
 - Integration metadata, README/config/alert surfaces, and SOW artifacts are consistent with the implementation.
 - Targeted tests or equivalent validation pass for every changed collector path.
@@ -59,19 +59,19 @@ Sources checked:
 - `src/go/plugin/go.d/collector/smartctl/`
 - `src/go/plugin/go.d/collector/nvme/`
 - `src/health/health.d/nvme.conf`
-- Local Windows Sensor API and NVMe/storage protocol headers available in the build environment.
+- Local Windows Sensor API headers available in the build environment.
 
 Current state:
 
 - `windows.plugin` reports disk performance through perflib and CPU/thermal sensor data through existing Windows APIs, but not SMART disk health or NVMe SMART health.
 - `smartctl` already has Windows executable discovery but needs a direct scan argument fix and Windows documentation/metadata alignment.
-- `nvme` already has the required chart and metric vocabulary for thermal throttling, but its Windows path depends on an external CLI and does not handle native Windows physical-drive paths.
+- `nvme` already has the required chart and metric vocabulary for thermal throttling, and its Windows path already executes an installed `nvme.exe` directly.
 - Fan RPM is not represented in the existing Sensor API collector because the standard Windows sensor data fields available here do not include fan RPM.
 
 Risks:
 
 - Presenting WMI `Win32_Fan.DesiredSpeed` as actual fan speed would mislead users and create false monitoring confidence.
-- Native NVMe querying touches Windows storage IOCTL code, so struct layout, permissions, and device-access handling must be conservative and well tested.
+- Adding a second native NVMe backend would increase maintenance risk and duplicate the existing `nvme.exe` command contract.
 - Duplicating SMART or NVMe parsing in `windows.plugin` would create parallel behavior and long-term maintenance risk.
 
 ## Pre-Implementation Gate
@@ -80,7 +80,7 @@ Status: ready
 
 Problem / root-cause model:
 
-- Windows storage health support is incomplete because existing Netdata storage health collectors are present but their Windows support is only partial: `smartctl` can execute `smartctl.exe` directly but has a scan-open argument bug and Linux-focused docs, while `nvme` depends on an external CLI rather than the native Windows NVMe health-log path.
+- Windows storage health support is incomplete because existing Netdata storage health collectors are present but their Windows support is only partial: `smartctl` can execute `smartctl.exe` directly but has a scan-open argument bug and Linux-focused docs, while `nvme` needs accurate Windows documentation around its existing direct `nvme.exe` path.
 - Windows fan RPM support is not merely missing code; the standard APIs already used by `windows.plugin` do not expose reliable actual fan tachometer RPM. WMI can expose fan objects and desired/requested speed on some systems, but that does not satisfy a strict actual-speed contract.
 
 Evidence reviewed:
@@ -88,11 +88,11 @@ Evidence reviewed:
 - Existing SOW/spec review found no current SOW overlap with Windows storage/fan monitoring.
 - `src/go/plugin/go.d/collector/smartctl/init.go` contains Windows `smartctl.exe` discovery.
 - `src/go/plugin/go.d/collector/smartctl/exec.go` appends `--scan-open` to an argument list that already contains `--scan`.
-- `src/go/plugin/go.d/collector/nvme/init.go` contains Windows `nvme.exe` discovery but no native Windows storage backend.
+- `src/go/plugin/go.d/collector/nvme/init.go` contains Windows `nvme.exe` discovery and should remain the Windows NVMe execution path.
 - `src/go/plugin/go.d/collector/nvme/charts.go`, `collect.go`, and sample tests already model NVMe critical warnings, composite temperature, warning/critical temperature time, and thermal-management transition/time counters.
 - `src/collectors/windows.plugin/GetSensors.c` supports Sensor API temperature and custom values but not a standard fan RPM field.
 - Local Windows headers expose Sensor API mechanical categories but no standard fan RPM data type.
-- Local Windows storage classes expose generic physical-disk health surfaces; native NVMe health-log querying is the more precise match for thermal throttling metrics.
+- The existing `nvme smart-log` parser already maps the thermal-throttling fields needed for this PR.
 
 Affected contracts and surfaces:
 
@@ -107,13 +107,13 @@ Existing patterns to reuse:
 
 - Reuse `smartctl` for SMART health instead of adding SMART parsing to `windows.plugin`.
 - Reuse `nvme` collector chart IDs, contexts, metric names, health alert, and sample-driven tests.
-- Reuse existing go.d executable discovery and direct command runner patterns where fallback CLI behavior remains useful.
+- Reuse existing go.d executable discovery and direct command runner patterns for Windows `nvme.exe`.
 - Reuse Windows plugin WMI helper patterns only if fan telemetry is selected.
 
 Risk and blast radius:
 
 - SMART change is low risk if limited to direct-scan argument construction and documentation.
-- Native NVMe backend is moderate risk because Windows storage IOCTL layouts and permissions vary by platform; implementation should fail closed and fall back gracefully.
+- NVMe risk is lower when limited to the existing command runner, but the PR must not overclaim support without an installed `nvme.exe`.
 - Fan telemetry is product-risky: a best-effort metric may be sparse or semantically weaker than users expect. Naming and docs must make the limitation visible.
 - No data loss or destructive storage operations are planned. Queries must be read-only.
 
@@ -126,8 +126,8 @@ Sensitive data handling plan:
 Implementation plan:
 
 1. Fix and test the `smartctl` Windows direct scan-open path; update metadata/README wording to state Windows uses installed smartmontools directly.
-2. Add a native Windows backend for the `nvme` collector that discovers physical NVMe drives, queries the NVMe SMART / health information log, and maps temperature, warning, critical, and thermal-management fields into existing metrics.
-3. Fix any discovered NVMe Windows path handling or chart-label issues needed for native physical-drive paths.
+2. Keep the existing Windows `nvme.exe` direct execution path and remove the duplicate native backend from the PR.
+3. Keep any NVMe chart-label or metadata fixes that apply to the existing `nvme smart-log` data model.
 4. Apply the fan decision: either add explicitly named best-effort WMI fan requested-speed/status telemetry, or track true fan RPM source support separately and keep this PR honest.
 5. Update docs, metadata, alerts/config surfaces, specs or project skills only where changed behavior requires it.
 
@@ -143,7 +143,7 @@ Artifact impact plan:
 
 - AGENTS.md: No expected update; repository-wide workflow does not change.
 - Runtime project skills: No expected update unless this work exposes a reusable collector-authoring rule not already covered.
-- Specs: Expected update only if native Windows NVMe behavior establishes a durable collector contract beyond docs/metadata.
+- Specs: Update the Windows storage/fan monitoring spec to state that Windows NVMe uses `nvme.exe`, not a native backend.
 - End-user/operator docs: Expected updates for collector README/metadata and generated integration docs if regeneration is performed.
 - End-user/operator skills: No expected update unless public/operator AI skill docs are affected, which is unlikely.
 - SOW lifecycle: This SOW remains in `current/` while in progress and will move to `done/` with `Status: completed` only in the same commit as implementation and artifact updates.
@@ -164,7 +164,7 @@ Open decisions:
 ## Plan
 
 1. Implement the SMART scan fix and documentation alignment.
-2. Implement native Windows NVMe health-log discovery and parsing.
+2. Keep the existing Windows `nvme.exe` path for NVMe health-log collection and avoid adding a duplicate native backend.
 3. Implement best-effort WMI fan requested-speed/status telemetry with conservative names and docs.
 4. Update collector metadata/docs and any affected alerts/config surfaces.
 5. Run targeted validation, review same-failure searches, and close artifact gates.
@@ -181,20 +181,26 @@ Open decisions:
 ### 2026-05-13
 
 - Fixed direct `smartctl.exe` scan-open argument construction so Windows direct execution uses either `--scan` or `--scan-open`, not both.
-- Added native Windows NVMe discovery and SMART / health log collection through Windows storage protocol IOCTLs, with optional `nvme.exe` fallback.
-- Added Windows physical-drive path handling and tests to the `nvme` collector.
+- Initially added native Windows NVMe discovery and SMART / health log collection, then removed it on 2026-05-14 after maintainer/user review confirmed the existing `nvme.exe` path is the desired Windows implementation.
+- Removed Windows physical-drive path handling and tests from the `nvme` collector with the native backend.
 - Added `windows.plugin` `GetFans` WMI collection for requested fan speed and fan state, wired it into the Windows plugin module list, build file list, metadata, README, and generated integration docs.
-- Updated NVMe and SMART collector metadata/generated docs for Windows support and updated NVMe config schema wording for the Windows native path.
+- Updated NVMe and SMART collector metadata/generated docs for Windows support and updated NVMe config schema wording for the Windows `nvme.exe` path.
 - Added `.agents/sow/specs/windows-storage-fan-monitoring.md` to record the durable Windows SMART/NVMe/fan contracts.
 - Reopened after live service validation showed the Windows compile/run helper did not install `go.d.plugin.exe`, then enabled `ENABLE_PLUGIN_GO=On` in that helper so SMART/NVMe go.d collectors are reachable in Windows service installs.
 - Reopened again after identifying that existing build directories would keep cached `ENABLE_PLUGIN_GO=Off`; changed the helper to always run the CMake configure step before building.
+
+### 2026-05-14
+
+- Removed the native Windows NVMe backend files from the PR.
+- Restored the `nvme` collector initialization to use the existing Windows direct `nvme.exe` path and the existing non-Windows `ndsudo` path.
+- Updated NVMe metadata, generated integration docs, config schema wording, and the Windows storage/fan spec to state that Windows NVMe requires an installed `nvme.exe`.
 
 ## Validation
 
 Acceptance criteria evidence:
 
 - Windows SMART disk health support is documented in `smartctl` metadata/generated docs, and the direct scan-open bug is covered by `TestDirectSmartctlScanArgs`.
-- Windows NVMe devices are supported by a native backend that enumerates `\\.\PhysicalDriveN`, filters NVMe drives, and maps NVMe health-log fields into existing health, temperature, and thermal-management metrics.
+- Windows NVMe devices are supported through the existing direct `nvme.exe` execution path, which maps `nvme smart-log` JSON into existing health, temperature, and thermal-management metrics.
 - Fan telemetry is implemented as best-effort WMI `Win32_Fan` requested-speed/status telemetry and documented as not guaranteed actual tachometer RPM.
 - Collector consistency artifacts were updated: code, metadata, config schema where affected, stock README pointers/generated integration docs, and Windows plugin README.
 
@@ -202,14 +208,19 @@ Tests or equivalent validation:
 
 - `go test ./plugin/go.d/collector/nvme` from `src/go`: passed.
 - `go test ./plugin/go.d/collector/smartctl` from `src/go`: passed.
+- `go test ./plugin/go.d/collector/nvme` from `src/go` after removing the native backend: passed.
+- `go test ./plugin/go.d/collector/smartctl` from `src/go` after removing the native backend: passed.
 - Direct compile of `src/collectors/windows.plugin/GetFans.c` using its `build-cygwin-MSYS/compile_commands.json` command: passed.
 - Direct compile of `src/collectors/windows.plugin/windows_plugin.c` using its `build-cygwin-MSYS/compile_commands.json` command: passed.
 - `PYTHONUTF8=1 python integrations/gen_integrations.py`: passed.
 - Targeted integration doc generation for `go.d.plugin/nvme`, `go.d.plugin/smartctl`, and `windows.plugin/GetFans`: passed.
 - `git diff --check`: passed with only existing Windows line-ending conversion warnings.
 - `bash -n packaging/utils/compile-and-run-windows.sh`: passed after enabling `ENABLE_PLUGIN_GO=On`.
+- `C:\msys64\usr\bin\bash.exe -n packaging/utils/compile-and-run-windows.sh` after removing the native backend: passed.
+- `rg 'native Windows|native backend|IOCTL|PhysicalDrive|StorageDeviceProtocolSpecificProperty|IOCTL_STORAGE|exec_windows|init_windows|init_nonwindows|optional Windows CLI fallback' src/go/plugin/go.d/collector/nvme .agents/sow/specs/windows-storage-fan-monitoring.md` after removing the native backend: no matches.
+- `git diff --check` after removing the native backend: passed with only existing Windows line-ending conversion warnings.
 - `MSYSTEM=MSYS ./packaging/utils/compile-and-run-windows.sh service`: reconfigured the existing `build-cygwin-MSYS` tree with `ENABLE_PLUGIN_GO=On`, built, and installed `go.d.plugin.exe` plus stock `nvme.conf` / `smartctl.conf`; the command exited non-zero at the pre-existing Windows Event Log manifest import step with `Access is denied`, before service restart.
-- `.agents/sow/audit.sh`: this SOW passed status/directory and sensitive-data checks; the audit also reported pre-existing unrelated repository warnings for cross-tool bridges, legacy non-project skill classification, and `SOW-0015-20260508-snmp-bgp-typed-projection.md` already living in `done/` with `Status: in-progress`.
+- `.agents/sow/audit.sh`: this SOW passed pre-implementation gate, regression placement, and sensitive-data checks; the audit also reported pre-existing unrelated repository warnings for cross-tool bridges, legacy non-project skill classification, and `SOW-0015-20260508-snmp-bgp-typed-projection.md` already living in `done/` with `Status: in-progress`.
 - `cmake --build build-cygwin-MSYS --target netdata.exe`: blocked before changed code by the existing build-tree issue `build-cygwin-MSYS/include/json-c` being a directory where the Ninja rule expects to create a symlink.
 
 Real-use evidence:
@@ -222,14 +233,15 @@ Real-use evidence:
 
 Reviewer findings:
 
-- Self-review fixed the Windows NVMe device open order to try read-only access before read/write fallback.
-- Self-review fixed native NVMe open error propagation, 128-bit counter clamping before subsequent collector multipliers, the existing NVMe temp2 chart title typo, and NVMe config schema wording.
+- Self-review removed the duplicate native Windows NVMe backend so the PR keeps only the existing `nvme.exe` path.
+- Self-review kept the existing NVMe temp2 chart title correction, 128-bit counter clamping before subsequent collector multipliers, and NVMe config schema wording where they apply to the existing parser.
 - No external reviewer findings were available in this local pre-PR pass.
 
 Same-failure scan:
 
 - `rg -- '--scan-open|scan\(open bool\)|directSmartctlScanArgs' src/go/plugin/go.d/collector` found the intended `smartctl` scan-open paths and no other direct scan argument construction requiring the same fix.
-- `rg 'PhysicalDrive|StorageDeviceProtocolSpecificProperty|Win32_Fan|fan_requested_speed|Thermal management temp[12]' ...` found only the intended new Windows NVMe/fan paths plus the corrected NVMe chart titles/metadata.
+- `rg 'PhysicalDrive|StorageDeviceProtocolSpecificProperty|IOCTL_STORAGE|exec_windows|init_windows|init_nonwindows' src/go/plugin/go.d/collector/nvme` found no remaining native Windows NVMe backend code.
+- `rg 'Win32_Fan|fan_requested_speed|Thermal management temp[12]' ...` found only the intended fan path plus the corrected NVMe chart titles/metadata.
 
 Sensitive data gate:
 
@@ -246,7 +258,7 @@ Artifact maintenance gate:
 
 Specs update:
 
-- Added `.agents/sow/specs/windows-storage-fan-monitoring.md` for the Windows SMART, native NVMe, thermal-signal, and fan telemetry contracts.
+- Added `.agents/sow/specs/windows-storage-fan-monitoring.md` for the Windows SMART, `nvme.exe` NVMe, thermal-signal, and fan telemetry contracts.
 
 Project skills update:
 
@@ -274,7 +286,7 @@ Follow-up mapping:
 
 ## Outcome
 
-Implemented Windows SMART documentation/fix, native Windows NVMe health and thermal-signal collection, best-effort Windows WMI fan telemetry, Windows helper build enablement for `go.d.plugin.exe`, and helper reconfiguration for existing Windows build directories.
+Implemented Windows SMART documentation/fix, Windows NVMe `nvme.exe` documentation/metadata alignment for health and thermal-signal collection, best-effort Windows WMI fan telemetry, Windows helper build enablement for `go.d.plugin.exe`, and helper reconfiguration for existing Windows build directories.
 
 ## Lessons Extracted
 
@@ -360,3 +372,42 @@ Artifact updates:
 
 - Updated this SOW after the service install validation.
 - No new end-user docs were needed; this changes the Windows developer/helper build path so already-documented SMART/NVMe support is reachable.
+
+## Regression - 2026-05-14 Native NVMe Backend Removed
+
+What changed:
+
+- Maintainer/user review identified that the native Windows NVMe backend was unnecessary because the go.d `nvme` collector already supports Windows by executing an installed `nvme.exe`.
+- The PR should keep the `nvme.exe` path and remove the duplicate native backend implementation.
+
+Evidence:
+
+- `src/go/plugin/go.d/collector/nvme/exec.go` already implements direct `nvme list --output-format=json` and `nvme smart-log <device> --output-format=json` execution.
+- `src/go/plugin/go.d/collector/nvme/init.go` already discovers `nvme`/`nvme-cli` plus `Program Files\nvme-cli\nvme.exe` locations for Windows direct execution.
+- The existing `nvme smart-log` parser already maps critical warnings, composite temperature, warning/critical temperature time, and thermal-management counters.
+
+Why previous validation missed it:
+
+- The initial root-cause pass focused on filling a perceived Windows-native gap, but did not weight the existing Windows `nvme.exe` command path as the intended maintainer-preferred implementation.
+
+Repair plan:
+
+- Delete native Windows NVMe backend files and tests.
+- Restore unified `initNVMeCLIExec()` selection in `init.go`: Windows direct `nvme.exe`, non-Windows `ndsudo`.
+- Remove Windows physical-drive path handling that only existed for the native backend.
+- Update metadata, config schema, generated integration docs, and specs to describe the `nvme.exe` contract.
+
+Validation:
+
+- `go test ./plugin/go.d/collector/nvme`: passed.
+- `go test ./plugin/go.d/collector/smartctl`: passed.
+- `C:\msys64\usr\bin\bash.exe -n packaging/utils/compile-and-run-windows.sh`: passed.
+- `git diff --check`: passed with only existing Windows line-ending conversion warnings.
+- Native-backend same-failure search confirmed no `exec_windows`, `init_windows`, `init_nonwindows`, `IOCTL_STORAGE`, or `StorageDeviceProtocolSpecificProperty` references remain in the `nvme` collector.
+- `.agents/sow/audit.sh` through an MSYS login shell: passed this SOW's gates; it continued to report pre-existing unrelated repository warnings.
+
+Artifact updates:
+
+- Updated `.agents/sow/specs/windows-storage-fan-monitoring.md`.
+- Updated NVMe metadata, config schema, and generated integration docs.
+- Updated this SOW to record the scope correction and removal.

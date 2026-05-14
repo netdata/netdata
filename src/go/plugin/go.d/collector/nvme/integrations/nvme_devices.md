@@ -21,7 +21,7 @@ Module: nvme
 
 ## Overview
 
-This collector monitors the health of NVMe devices. On Linux and BSD, it relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli) CLI tool through `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment. On Windows, it queries locally attached NVMe devices through the native Windows storage protocol API and uses an installed `nvme.exe` only as a fallback when available. The collector reports NVMe health, composite temperature, critical warnings, warning/critical temperature time, and thermal-management transition/time counters.
+This collector monitors the health of NVMe devices. On Linux and BSD, it relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli) CLI tool through `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment. On Windows, it executes an installed `nvme.exe` directly from `PATH` or the default `nvme-cli` installation directories. The collector reports NVMe health, composite temperature, critical warnings, warning/critical temperature time, and thermal-management transition/time counters.
 
 
 
@@ -73,7 +73,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 On Linux and BSD, see [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support) and install `nvme-cli` using your distribution's package manager.
 
-On Windows, `nvme-cli` is not required for the native backend. If the native backend cannot discover a device, Netdata can fall back to an installed `nvme.exe` when it is available in `PATH` or under `Program Files\nvme-cli\nvme.exe`.
+On Windows, install `nvme.exe` and make it available in `PATH` or under `Program Files\nvme-cli\nvme.exe`.
 
 
 #### For Netdata running in a Docker container: grant NVMe device access
@@ -116,7 +116,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| timeout | nvme binary execution timeout. This applies to the Linux/BSD `ndsudo` path and the optional Windows CLI fallback. | 2 | no |
+| timeout | nvme binary execution timeout. This applies to the Linux/BSD `ndsudo` path and the Windows direct `nvme.exe` path. | 2 | no |
 
 
 </details>

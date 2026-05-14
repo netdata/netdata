@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -64,6 +66,8 @@ func TestCollector_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			prepareHostNVMeBinary(t)
+
 			collr := New()
 
 			if test.wantFail {
@@ -73,6 +77,18 @@ func TestCollector_Init(t *testing.T) {
 			}
 		})
 	}
+}
+
+func prepareHostNVMeBinary(t *testing.T) {
+	t.Helper()
+
+	if runtime.GOOS != "windows" {
+		return
+	}
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "nvme.exe"), nil, 0o755))
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -91,10 +107,6 @@ func TestExtractControllerPathFromDevicePath(t *testing.T) {
 		"linux controller": {
 			input: "/dev/nvme10",
 			want:  "/dev/nvme10",
-		},
-		"windows physical drive": {
-			input: `\\.\PhysicalDrive3`,
-			want:  `\\.\PhysicalDrive3`,
 		},
 		"non NVMe": {
 			input: "/dev/sda",
@@ -116,10 +128,6 @@ func TestExtractDeviceFromPath(t *testing.T) {
 		"linux": {
 			input: "/dev/nvme0",
 			want:  "nvme0",
-		},
-		"windows": {
-			input: `\\.\PhysicalDrive3`,
-			want:  "PhysicalDrive3",
 		},
 	}
 

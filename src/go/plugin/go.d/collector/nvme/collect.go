@@ -113,11 +113,7 @@ func (c *Collector) listNVMeDevices() error {
 }
 
 func extractControllerPathFromDevicePath(devicePath string) string {
-	if isWindowsPhysicalDrivePath(devicePath) {
-		return devicePath
-	}
-
-	if !strings.Contains(strings.ToLower(devicePath), "nvme") {
+	if !strings.Contains(devicePath, "nvme") {
 		return ""
 	}
 
@@ -140,19 +136,8 @@ func extractControllerPathFromDevicePath(devicePath string) string {
 }
 
 func extractDeviceFromPath(devicePath string) string {
-	if isWindowsPhysicalDrivePath(devicePath) {
-		return devicePath[len(windowsDevicePathPrefix):]
-	}
-
 	_, name := filepath.Split(devicePath)
 	return name
-}
-
-const windowsPhysicalDrivePrefix = `\\.\PhysicalDrive`
-const windowsDevicePathPrefix = `\\.\`
-
-func isWindowsPhysicalDrivePath(path string) bool {
-	return strings.HasPrefix(strings.ToLower(path), strings.ToLower(windowsPhysicalDrivePrefix))
 }
 
 func parseValue(s nvmeNumber) int64 {
