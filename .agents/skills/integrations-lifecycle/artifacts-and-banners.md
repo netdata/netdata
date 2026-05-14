@@ -20,6 +20,10 @@ banner conventions and edit rules.
 | `src/go/plugin/ibm.d/modules/<m>/config_schema.json` | ibm.d `docgen` | **YES** | as above |
 | `src/go/plugin/ibm.d/modules/<m>/contexts/zz_generated_contexts.go` | ibm.d `metricgen` | **YES** | as above |
 | Hand-written `metadata.yaml` (non-ibm.d), `config_schema.json`, stock `.conf`, `health.d/<...>.conf`, hand-written `README.md` | collector author | **YES** | none -- author edits + commits manually |
+| `<collector-dir>/taxonomy.yaml` | collector author / `gen_taxonomy_seed.py` starter output | **YES** | validated by `check-markdown.yml`; not auto-authored |
+| `integrations/taxonomy/sections.yaml` | taxonomy framework author | **YES** | validated by `gen_taxonomy.py` |
+| `integrations/taxonomy/icons.yaml` | taxonomy framework author | **YES** | validated by `gen_taxonomy.py` |
+| `integrations/taxonomy.json` | `gen_taxonomy.py` | NO -- gitignored | generated locally/CI; downstream cloud-frontend contract |
 
 ## Banner conventions per file kind
 
@@ -129,7 +133,7 @@ adjustments:
 ### `src/health/notifications/<dir>/README.md` (direct case)
 
 Same banner as above. Written DIRECTLY, not as a symlink. Keep
-in mind for the five-file consistency rule -- the README.md is
+in mind for the collector consistency rule -- the README.md is
 the generated artifact.
 
 ### `src/collectors/COLLECTORS.md`, `SECRETS.md`, `SERVICE-DISCOVERY.md`

@@ -1,0 +1,169 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: snmp
+placements:
+  - id: snmp
+    section_id: remote-devices.snmp
+    title: SNMP-enabled devices
+    short_name: SNMP
+    icon: snmp
+    families: true
+    properties:
+      important: false
+      grouping: false
+    single_node:
+      properties:
+        grouping: true
+    items:
+      - type: grid
+        id: network-interfaces-heads
+        items:
+          - type: context
+            title: Traffic In
+            contexts:
+              - context_prefix:
+                  - snmp.device_prof_ifTotalTraffic
+            chart_library: gauge
+            group_by:
+              - selected
+            selected_dimensions:
+              - in
+            value_range: [0, null]
+            colors:
+              - "#0099C6"
+              - "#990099"
+            layout: { left: 0, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Traffic Out
+            contexts:
+              - context_prefix:
+                  - snmp.device_prof_ifTotalTraffic
+            chart_library: gauge
+            group_by:
+              - selected
+            selected_dimensions:
+              - out
+            value_range: [0, null]
+            colors:
+              - "#990099"
+              - "#0099C6"
+            layout: { left: 3, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Errors
+            contexts:
+              - context_prefix:
+                  - snmp.device_prof_ifTotalErrors
+            chart_library: gauge
+            group_by:
+              - selected
+            colors:
+              - "#990099"
+              - "#0099C6"
+            layout: { left: 6, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Discards
+            contexts:
+              - context_prefix:
+                  - snmp.device_prof_ifTotalDiscards
+            chart_library: gauge
+            group_by:
+              - selected
+            colors:
+              - "#990099"
+              - "#0099C6"
+            layout: { left: 9, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Unicast
+            contexts:
+              - context_prefix:
+                  - snmp.device_prof_ifTotalPacketsUcast
+            chart_library: bars
+            layout: { left: 0, top: 4, width: 3, height: 2.5 }
+          - type: context
+            title: Multicast
+            contexts:
+              - context_prefix:
+                  - snmp.device_prof_ifTotalPacketsMulticast
+            chart_library: bars
+            layout: { left: 3, top: 4, width: 3, height: 2.5 }
+          - type: context
+            title: Broadcast
+            contexts:
+              - context_prefix:
+                  - snmp.device_prof_ifTotalPacketsBroadcast
+            chart_library: bars
+            layout: { left: 6, top: 4, width: 3, height: 2.5 }
+          - type: context
+            title: Uptime
+            contexts:
+              - context_prefix:
+                  - snmp.device_prof_systemUptime
+            chart_library: number
+            group_by:
+              - selected
+            aggregation_method: min
+            layout: { left: 9, top: 4, width: 3, height: 2.5 }
+      - type: view_switch
+        id: snmp-devices-table
+        multi_node:
+          type: context
+          title: List SNMP devices
+          contexts:
+            - context_prefix:
+                - snmp.device_prof_ifTotalTraffic
+            - context_prefix:
+                - snmp.device_prof_ifTotalPacketsUcast
+            - context_prefix:
+                - snmp.device_prof_ifTotalErrors
+          chart_library: table
+          group_by:
+            - dimension
+            - label
+            - node
+            - context
+          group_by_label:
+            - _collect_job
+            - vendor
+          table_columns:
+            - context
+            - dimension
+          table_sort_by:
+            - id: snmp.device_prof_ifTotalTraffic
+              desc: true
+          labels:
+            snmp.device_prof_ifTotalTraffic: Traffic
+            snmp.device_prof_ifTotalPacketsUcast: Packets
+            snmp.device_prof_ifTotalErrors: Errors
+        single_node:
+          type: context
+          title: List SNMP devices
+          contexts:
+            - context_prefix:
+                - snmp.device_prof_ifTraffic
+            - context_prefix:
+                - snmp.device_prof_ifPacketsUcast
+            - context_prefix:
+                - snmp.device_prof_ifErrors
+          chart_library: table
+          group_by:
+            - dimension
+            - label
+            - context
+          group_by_label:
+            - interface
+            - if_type
+          table_columns:
+            - context
+            - dimension
+          table_sort_by:
+            - id: snmp.device_prof_ifTraffic
+              desc: true
+          labels:
+            snmp.device_prof_ifTraffic: Traffic
+            snmp.device_prof_ifPacketsUcast: Packets
+            snmp.device_prof_ifErrors: Errors
+      - type: selector
+        id: snmp-contexts
+        title: SNMP profile metrics
+        context_prefix:
+          - snmp.

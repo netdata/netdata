@@ -5,6 +5,63 @@ anchor, custom Jinja delimiter, undocumented behavior, and
 edge case the integrations pipeline carries today. Read this
 before assuming the code does the obvious thing.
 
+## Taxonomy authoring gotchas
+
+### `grid.items` and `view_switch` branches do not accept string shorthand
+
+- Wrong shape: `type: grid` with `items: ["mysql.queries"]`.
+- Failure: schema validation rejects the string because grid children
+  are display-only objects.
+- Correct shape: use `type: context` with `contexts:` and
+  `chart_library:` inside the grid; own the context elsewhere in a
+  structural item.
+
+### Dynamic selectors need explicit metadata opt-in
+
+- Wrong shape: `context_prefix: [snmp.device_prof_]` without
+  `metrics.dynamic_context_prefixes:` in the sibling `metadata.yaml`.
+- Failure: TAX031 fatal.
+- Correct shape: declare the safe namespace in metadata, for example
+  `dynamic_context_prefixes: [{prefix: snmp., reason: ...}]`.
+
+### Taxonomy fields use snake_case, not legacy FE camelCase
+
+- Wrong shape: `chartLibrary`, `groupByLabel`, `tableSortBy`.
+- Failure: closed-schema `additionalProperties` rejection.
+- Correct shape: `chart_library`, `group_by_label`, `table_sort_by`.
+
+### Structural containers need stable `id:` values
+
+- Wrong shape: `type: group` with only `title:` and `items:`.
+- Failure: schema validation rejects the missing `id`.
+- Correct shape: choose a stable kebab-case `id` that does not change
+  when the display `title` is renamed.
+
+### `single_node:` is a sparse override, `view_switch` is replacement
+
+- Wrong shape: putting `multi_node:` next to ordinary placement or item
+  fields.
+- Failure: TAX022 fatal unless `multi_node` is inside
+  `type: view_switch`.
+- Correct shape: use `single_node:` only for small same-kind field
+  deltas; use `type: view_switch` when the whole body differs.
+
+### `unresolved:` is only for staged literal widget references
+
+- Wrong shape: a bare unknown literal context in widget `contexts:`.
+- Failure: TAX003 fatal.
+- Correct shape: either own/reference a real metadata context, use a
+  selector object, or use `{context, unresolved: {reason, owner,
+  expires}}` when the missing context is an intentional staged rollout.
+  `expires` must be `YYYY-MM-DD`.
+
+### Removed structural-only shapes stay rejected
+
+- Wrong shape: top-level or placement `contexts:` / `subsections:`, or
+  old list-merge fields ending in `_extend`.
+- Failure: TAX001/TAX023 fatal.
+- Correct shape: use recursive `items:` with the v1 item kinds.
+
 ## Dead / broken code in the pipeline
 
 ### `integrations/check_collector_metadata.py` is broken

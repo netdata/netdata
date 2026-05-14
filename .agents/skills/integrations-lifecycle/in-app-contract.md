@@ -2,7 +2,9 @@
 
 The Netdata cloud-frontend dashboard (the React app that powers
 `app.netdata.cloud`) renders the Integrations page from the
-`integrations.js` artifact this repo produces. This guide
+`integrations.js` artifact this repo produces. Collector dashboard
+taxonomy is published separately as `integrations/taxonomy.json`.
+This guide
 documents the contract between the two repositories so
 maintainers know what is and is NOT in scope when working on
 integrations-lifecycle changes.
@@ -17,13 +19,18 @@ SCOPE for this skill; only the artifact contract matters.
 **This repo produces:** `integrations/integrations.js` (and
 `integrations/integrations.json`) on every CI run of
 `generate-integrations.yml` (or local run of
-`gen_integrations.py`). Both files are gitignored in this
-repo.
+`gen_integrations.py`). It also produces
+`integrations/taxonomy.json` from `gen_taxonomy.py`. All three
+files are gitignored in this repo.
 
 **The cloud-frontend repo consumes:**
 `integrations/integrations.js` -- specifically, it copies the
 file into `src/domains/integrations/data/integrations.js` in
 its own source tree.
+
+`integrations/taxonomy.json` is a new opt-in downstream contract.
+This repo validates and emits it, but cloud-frontend consumption is
+owned by the dashboard team and may land independently.
 
 ## How the consumption works
 
@@ -48,6 +55,11 @@ A third script, `scripts/checkLinks.js`, validates that links
 in `src/domains/integrations/data/integrations.js` and
 `src/domains/integrations/utils/integrations.js` resolve.
 
+At the time this skill was updated, cloud-frontend had not yet
+consumed `taxonomy.json`; its CI needs an explicit follow-up change
+to run `python3 integrations/gen_taxonomy.py` and copy the JSON
+artifact if/when the dashboard switches chart TOC ownership.
+
 ## The artifact shape
 
 `integrations/integrations.js`:
@@ -71,6 +83,45 @@ export const integrations = [
      clean_alerts) */
 ];
 ```
+
+`integrations/taxonomy.json`:
+
+```json
+{
+  "taxonomy_schema_version": 1,
+  "source": {
+    "netdata_commit": "...",
+    "generated_at": "..."
+  },
+  "sections": [],
+  "placements": [],
+  "opted_out_collectors": []
+}
+```
+
+Each taxonomy placement keeps the ordered recursive `items:` tree and
+snapshot fields generated from current metadata for CI/review
+diffing. `resolved_contexts` contains owned contexts;
+`referenced_contexts` contains display/widget references, and
+`unresolved_references` carries explicit unresolved-reference escape
+hatches for downstream consumers. The schema lives at
+`integrations/schemas/taxonomy_output.json`.
+
+FE adapters must discriminate these v1 taxonomy node kinds:
+
+- `owned_context` -- structural leaf that owns one literal context.
+- `group` -- structural container.
+- `flatten` -- structural container whose children flatten into the
+  parent menu level.
+- `selector` -- structural dynamic owner from `context_prefix` or
+  `collect_plugin`.
+- `context` -- display widget that references contexts.
+- `grid` -- display container with positioned child widgets.
+- `first_available` -- ordered display alternatives.
+- `view_switch` -- whole-body replacement for multi-node vs
+  single-node rendering.
+- string shorthand appears only in authoring; generated output
+  normalizes it to `owned_context`.
 
 All public content sections consumed by downstream renderers must be
 markdown strings in the generated artifacts, even when the source
@@ -118,6 +169,10 @@ In practice this means:
   removed top-level field) WILL break the dashboard on the
   next sync. There is no shape-versioning today; both repos
   assume the JS export shape is stable.
+- A breaking change to `taxonomy.json` must bump
+  `taxonomy_schema_version` and coordinate with downstream
+  consumers. Additive fields are acceptable only when old
+  consumers can ignore them safely.
 
 ## What is OUT of scope for integrations-lifecycle
 
@@ -138,13 +193,19 @@ In practice this means:
    keys) is a contract. Avoid breaking changes; coordinate
    with the cloud-frontend team if a key must be renamed or
    removed.
-2. **Render structured metadata before publication**. A new
+2. **Treat `taxonomy.json` as a versioned published artifact
+   once consumed.** Keep v1 authoring closed: `section_id:`,
+   ordered `items:`, explicit item `type` values, selector keys
+   (`context_prefix:`, `context_prefix_exclude:`,
+   `collect_plugin:`), widget `contexts:`, and sparse
+   `single_node:` overrides.
+3. **Render structured metadata before publication**. A new
    integration type that reuses collector-style sections must
    include every structured content key in its render-key list.
    Do not publish raw `metrics` objects, `alerts` arrays, or
    similar YAML structures under the public markdown section
    names.
-3. **Custom Jinja markers in metadata** (`{% details %}`,
+4. **Custom Jinja markers in metadata** (`{% details %}`,
    `{% relatedResource %}`, `{% if %}`) are part of the
    contract. The dashboard's renderer interprets them. Test
    any new marker against both surfaces before relying on it.
