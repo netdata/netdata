@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: implementation and validation complete; ready to move to done with the storage-health commit.
+Sub-state: completed again on 2026-05-15 after Mac mini storage validation, native NVMe retry bounding, and storage documentation corrections.
 
 ## Requirements
 
@@ -294,4 +294,114 @@ None.
 
 ## Regression Log
 
-None yet.
+### Regression - 2026-05-15 - Mac mini storage validation
+
+What broke:
+
+- The completed SOW claimed native macOS NVMe SMART support, but local installed validation on a Mac mini shows the internal Apple storage does not expose the expected native NVMe SMART user client to Netdata.
+- The completed SOW also treated `smartctl` macOS support as operator-ready, but the installed `ndsudo` helper cannot find the Homebrew `smartctl` path on Apple Silicon.
+
+Evidence:
+
+- Installed collector logs report that native NVMe SMART data cannot be read through IOKit, and NVMe health charts will appear only when macOS exposes readable NVMe SMART data.
+- Homebrew `smartctl` is installed and reports version 7.5.
+- Installed `ndsudo --test smartctl-json-scan-open` as the `netdata` user fails with `smartctl : not available in PATH`.
+- `smartctl --scan-open` sees an Apple internal NVMe path but fails to open it through the smartmontools path.
+- IOKit registry evidence shows Apple internal NVMe controller classes on this host, but the native SMART collector does not produce NVMe health charts.
+
+Why previous validation missed it:
+
+- Earlier validation ran on a host without `smartctl` installed and without readable NVMe SMART-capable services, so the implementation was validated mainly by compile/API checks and no-device behavior.
+- It did not validate Apple Silicon Homebrew command discovery through the installed setuid `ndsudo` path.
+- It did not classify Apple internal ANS NVMe storage separately from generic NVMe devices that expose standard SMART paths.
+
+User decision:
+
+- 2026-05-15: user accepted fixing non-logs regressions first, then requested identification of the Mac mini storage type and how it should be monitored.
+
+Repair and investigation plan:
+
+- Identify the Mac mini storage stack using sanitized local system evidence.
+- Determine whether the internal Apple storage should be monitored through native NVMe SMART, smartctl, generic disk I/O, powermetrics disk data, IOReport, or some combination.
+- Fix only safe, production-quality issues found in the generic storage path; do not add unsafe setuid search paths for user-writable Homebrew binaries.
+- Update specs/docs/SOW with the resulting storage monitoring contract and validation evidence.
+
+Investigation results:
+
+- Local storage identity:
+  - Internal storage is an Apple internal SSD model `APPLE SSD AP0512Z`.
+  - Capacity is about 500.3 GB.
+  - Primary whole disk is `disk0`.
+  - macOS reports protocol `Apple Fabric`, fixed internal solid-state media, 4096-byte device block size, and TRIM support.
+- Local health API evidence:
+  - `system_profiler SPNVMeDataType` reports the device SMART status as `Verified`.
+  - `diskutil info disk0` reports SMART status as `Not Supported`.
+  - IOKit exposes Apple internal NVMe classes including `AppleANS3CGv2Controller`, `IOEmbeddedNVMeBlockDevice`, and an `AppleNVMeSMARTUserClient` child.
+  - IOKit also exposes an `NVMe SMART Capable` marker on the block device, but a scratch probe could not open the native SMART plugin interface for the service.
+  - `smartctl --json --scan-open` finds one NVMe device through an IOService path, but `smartctl --json --all ... --device nvme` returns exit status `2` with `IOCreatePlugInInterfaceForService failed`.
+  - `powermetrics -s disk -f plist` exposes aggregate read/write throughput counters, not storage-health data.
+- Local Netdata evidence:
+  - Generic disk I/O charts are present for `disk0`: bandwidth, operations, utilization, and total I/O time.
+  - Filesystem space and inode charts are present for the mounted APFS volumes.
+  - Per-application disk logical I/O charts are present through the apps collector.
+  - Native NVMe health charts are absent, which is correct for this host because detailed public NVMe health fields are not readable through IOKit.
+  - The Homebrew `smartctl` binary is installed, but the default Apple Silicon Homebrew prefix is not a safe setuid helper search path because it is user/admin-owned and group-writable on this host.
+
+Repair outcome:
+
+- Updated native macOS NVMe discovery to require a successful native SMART read before adding a device to the active NVMe health set.
+- Added a runtime guard that removes NVMe devices from the active set after repeated read failures so an unreadable Apple internal device does not keep retrying every ten seconds.
+- Kept detailed NVMe health charts absent on this Mac mini instead of fabricating metrics from unavailable fields.
+- Did not add the Homebrew prefix to `ndsudo` search paths because that would allow a setuid-root helper to find binaries from a user-writable package-manager location.
+- Updated macOS storage specs, macOS integration metadata/docs, and smartctl metadata/docs to state the readable-user-client requirement and the trusted-path requirement for `smartctl`.
+
+How this Mac mini should be monitored:
+
+- Monitor the internal Apple Fabric SSD with existing generic disk and filesystem charts:
+  - `disk.disk0`
+  - `disk_ops.disk0`
+  - `disk_util.disk0`
+  - `disk_iotime.disk0`
+  - APFS disk space and inode charts
+  - per-application disk logical I/O charts
+- Do not expect detailed NVMe health charts on this host unless macOS exposes a readable native SMART user client in a future OS/hardware combination.
+- Do not expect the `smartctl` collector to provide internal Apple SSD health on this host; smartmontools can see the IOService-backed NVMe device but cannot open it.
+- A coarse `system_profiler` SMART-status chart is not implemented in this repair. It would be a separate product decision because it is an external command, exposes only a coarse health state, and conflicts with `diskutil` on this host.
+
+Regression validation:
+
+- `cmake --build ./build-macmini --parallel 10 --target netdata`: passed.
+- Regenerated integration artifacts using a fresh arm64 local venv because the existing `.local/integrations-venv` contained an x86_64 wheel incompatible with this Mac mini.
+- `git diff --check`: passed.
+- Scratch native NVMe probe under `.local/macos-storage-probes/` produced sanitized JSON only: class names, IOReturn codes, counts, hashes, and booleans; no serials, raw SMART data, or IORegistry paths were written to durable artifacts.
+- Installed changed `netdata` into `/opt/netdata` and restarted `system/com.github.netdata`.
+- Runtime API check: `http://localhost:19999/api/v1/info` returned macOS from the local Agent.
+- Runtime chart check after restart:
+  - `disk.disk0`, `disk_ops.disk0`, `disk_util.disk0`, and `disk_iotime.disk0` are present.
+  - NVMe health charts are absent on this host.
+- Runtime collector-log check after waiting across several ten-second NVMe sample periods showed at most one bounded native NVMe read-failure class message for the unreadable Apple internal device, not continuous retries.
+- Installed `ndsudo --test smartctl-json-scan-open` as the `netdata` user still reports `smartctl : not available in PATH`; this is intentionally not fixed by adding Homebrew paths because the local Homebrew prefix is not root-controlled.
+- Direct `smartctl` validation with sanitized output:
+  - `smartctl --json --scan-open` found one NVMe IOService-backed device.
+  - `smartctl --json --all ... --device nvme` returned exit status `2` with `IOCreatePlugInInterfaceForService failed`.
+- `.agents/sow/audit.sh`: this SOW is status/directory consistent. The audit still reports unrelated pre-existing repository hygiene issues: one older SOW status/directory mismatch and non-project skill classification warnings.
+
+Same-failure search:
+
+- `rg -n "IORegistryCreateIterator|IOCreatePlugInInterfaceForService|SMARTReadData|smartctl|/opt/homebrew" src/collectors/macos.plugin/macos_nvme.c src/collectors/utils/ndsudo.c src/go/plugin/go.d/collector/smartctl .agents/sow/specs/macos-storage-health.md`: verified that no Homebrew path was added to `ndsudo`, native NVMe still uses in-process IOKit, and docs/specs contain the trusted-path warning.
+- `curl ... /api/v1/charts | jq ... nvme`: no NVMe health charts were emitted on this Mac mini after the patch.
+
+Artifact maintenance gate for regression:
+
+- AGENTS.md: no update needed; workflow, responsibilities, and project-wide guardrails did not change.
+- Runtime project skills: no update needed; `project-writing-collectors` and `integrations-lifecycle` already cover the workflow used.
+- Specs: updated `.agents/sow/specs/macos-storage-health.md`.
+- End-user/operator docs: updated `src/collectors/macos.plugin/metadata.yaml`, generated `src/collectors/macos.plugin/integrations/macos.md`, `src/go/plugin/go.d/collector/smartctl/metadata.yaml`, and generated `src/go/plugin/go.d/collector/smartctl/integrations/s.m.a.r.t..md`.
+- End-user/operator skills: no update needed; no public/operator AI skill behavior changed.
+- SOW lifecycle: reopened from `done/`, marked completed after validation, and moved back to `done/` with the repair.
+
+Regression lessons:
+
+- Apple internal Apple Fabric storage is not equivalent to a generic NVMe device even when IORegistry contains NVMe class names and a SMART-capable marker.
+- Detailed native NVMe health requires successful access to the native SMART user client, not just service discovery.
+- The setuid `ndsudo` helper must not search user-writable package-manager prefixes to find tools such as Homebrew `smartctl`.

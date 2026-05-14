@@ -79,7 +79,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 Install `smartmontools` version 7.0 or later using your operating system's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
 
-On macOS, install `smartmontools` with your preferred package manager, such as Homebrew or MacPorts.
+On macOS, Netdata runs `smartctl` through the setuid `ndsudo` helper. The `smartctl` binary must be available from a root-controlled trusted path searched by `ndsudo`; do not add user-writable package-manager prefixes to the setuid helper path. Apple internal NVMe/Apple Fabric storage may still not expose detailed SMART data through smartmontools even when the tool is installed.
 
 
 #### For Netdata running in a Docker container
@@ -109,7 +109,7 @@ Netdata requires the `SYS_RAWIO` capability and access to the storage devices to
 
 > **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
 
-> **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvme#readme) to monitor NVMe devices on Linux/BSD. On macOS, `macos.plugin` provides native NVMe health metrics when IOKit exposes SMART-capable NVMe services.
+> **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvme#readme) to monitor NVMe devices on Linux/BSD. On macOS, `macos.plugin` provides native NVMe health metrics when IOKit exposes readable SMART-capable NVMe services.
 
 
 

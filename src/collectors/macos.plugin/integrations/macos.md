@@ -29,7 +29,7 @@ The plugin uses six different methods to collect data:
   - The function `IOServiceGetMatchingServices` is called to collect storage information.
   - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
   - The native Apple `powermetrics` command is sampled in the background to collect thermal pressure, plus SMC temperatures and fan speed when the macOS sampler is available.
-  - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes SMART-capable NVMe services.
+  - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
 
 
 This collector is only supported on the following platforms:
@@ -44,7 +44,7 @@ Battery, UPS power-source, and native NVMe SMART metrics use public IOKit APIs a
 
 #### Auto-Detection
 
-The collector auto-detects macOS power sources and NVMe SMART-capable services, and only creates charts for values exposed by the hardware and operating system.
+The collector auto-detects macOS power sources and readable NVMe SMART-capable services, and only creates charts for values exposed by the hardware and operating system.
 
 #### Limits
 
@@ -424,6 +424,6 @@ Battery and UPS power-source charts do not depend on `powermetrics` and should s
 
 ### NVMe health charts are missing
 
-Native NVMe health charts appear only when macOS exposes NVMe SMART-capable services through IOKit. The collector does not use `nvme-cli` or any external NVMe tool on macOS.
+Native NVMe health charts appear only when macOS exposes NVMe SMART-capable services through IOKit and allows the native SMART user client to open them. The collector does not use `nvme-cli` or any external NVMe tool on macOS.
 
-If generic disk I/O charts are present but NVMe health charts are absent, the device, controller, or macOS driver may not expose the native NVMe SMART user client.
+If generic disk I/O charts are present but NVMe health charts are absent, the device, controller, or macOS driver may not expose a readable native NVMe SMART user client. Some Apple internal Apple Fabric SSDs expose disk I/O and filesystem metrics but not detailed public NVMe health fields.
