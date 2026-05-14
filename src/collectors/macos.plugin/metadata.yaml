@@ -27,7 +27,7 @@ modules:
             - The function `host_statistics` is called to collect CPU and virtual memory data.
             - The function `IOServiceGetMatchingServices` is called to collect storage information.
             - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
-            - The native Apple `powermetrics` command is sampled in the background to collect thermal pressure, SMC temperatures, and fan speed when available.
+            - The native Apple `powermetrics` command is sampled in the background to collect thermal pressure, plus SMC temperatures and fan speed when the macOS sampler is available.
             - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes SMART-capable NVMe services.
       supported_platforms:
         include:
@@ -35,7 +35,7 @@ modules:
         exclude: []
       multi_instance: false
       additional_permissions:
-        description: "Battery, UPS power-source, and native NVMe SMART metrics use public IOKit APIs and do not require external tools. Exact thermal and fan readings use the native Apple `powermetrics` command, which requires `netdata` to run with sufficient macOS privileges; without those privileges, the thermal/fan sampler disables itself after repeated failures."
+        description: "Battery, UPS power-source, and native NVMe SMART metrics use public IOKit APIs and do not require external tools. Exact thermal pressure, fan, and sensor readings use the native Apple `powermetrics` command, which requires `netdata` to run with sufficient macOS privileges. The default sampler falls back to thermal-pressure-only data when macOS does not expose the SMC sampler; without required privileges, the thermal/fan sampler disables itself after repeated failures."
       default_behavior:
         auto_detection:
           description: "The collector auto-detects macOS power sources and NVMe SMART-capable services, and only creates charts for values exposed by the hardware and operating system."
@@ -383,7 +383,7 @@ modules:
         list:
           - name: Thermal and fan charts are missing
             description: |
-              The thermal and fan charts depend on the native Apple `powermetrics` command. On macOS, `powermetrics` requires superuser privileges, so the default installation runs it through Netdata's setuid `ndsudo` helper with a hard-coded allow-list. If `ndsudo` is missing, not setuid root, or the allow-list rejects the command, the sampler disables itself after repeated failures to avoid log noise.
+              The thermal and fan charts depend on the native Apple `powermetrics` command. On macOS, `powermetrics` requires superuser privileges, so the default installation runs it through Netdata's setuid `ndsudo` helper with hard-coded allow-list entries for thermal/SMC and thermal-only sampling. Some Macs expose thermal pressure but no SMC sampler; in that case, thermal pressure can still appear while fan and SMC temperature charts remain absent. If `ndsudo` is missing, not setuid root, or the allow-list rejects the command, the sampler disables itself after repeated failures to avoid log noise.
 
               Battery and UPS power-source charts do not depend on `powermetrics` and should still appear when macOS exposes power-source data.
           - name: NVMe health charts are missing

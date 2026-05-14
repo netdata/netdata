@@ -48,8 +48,10 @@ monitoring in the Netdata Agent.
 - Per-metric and sampler options live under `[plugin:macos:powermetrics]`.
 - The data source is the native Apple `/usr/bin/powermetrics` command.
 - The default installed path runs the command through Netdata's setuid
-  `ndsudo` helper with a hard-coded allow-list for the thermal/SMC plist
-  sampler.
+  `ndsudo` helper with hard-coded allow-list entries for thermal/SMC and
+  thermal-only plist samplers.
+- The collector tries the thermal/SMC sampler first and falls back to
+  thermal-only sampling when macOS does not expose the SMC sampler.
 - Direct command execution remains configurable for debugging or custom local
   privilege models, but must use Netdata spawn wrappers with an argv vector,
   not a shell.
@@ -70,14 +72,16 @@ monitoring in the Netdata Agent.
 - `macos.thermal_pressure`: one-hot macOS thermal pressure state, dimensions
   `nominal`, `moderate`, `heavy`, `sleeping`, `trapping`, and `undefined`.
 - `system.hw.sensor.fan.input`: fan speed in rotations per minute, dimension
-  `input`, with `source=powermetrics` and `sensor=fan` labels.
+  `input`, with `source=powermetrics` and `sensor=fan` labels, only when
+  `powermetrics` exposes SMC fan data.
 - `system.hw.sensor.temperature.input`: CPU and GPU die temperatures in
   degrees Celsius, dimension `input`, with `source=powermetrics` and
-  `sensor=cpu_die` or `sensor=gpu_die` labels.
+  `sensor=cpu_die` or `sensor=gpu_die` labels, only when `powermetrics`
+  exposes SMC temperature data.
 - `macos.smc_thermal_level`: SMC thermal levels, dimensions `cpu`, `gpu`, and
-  `io`.
+  `io`, only when `powermetrics` exposes SMC thermal-level data.
 - `macos.smc_prochot`: processor-hot assertion flags, dimensions `cpu` and
-  `smc`.
+  `smc`, only when `powermetrics` exposes SMC prochot data.
 
 ## Configuration Contract
 
