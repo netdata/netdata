@@ -492,6 +492,33 @@ void ml_init()
     // open sqlite db
     char path[FILENAME_MAX];
     snprintfz(path, FILENAME_MAX - 1, "%s/%s", netdata_configured_cache_dir, "ml.db");
+
+    // Consume the quarantine sentinel dropped by ml_db_mark_corrupt() in a
+    // prior session: rename the corrupt ml.db to ml.db.bad and drop the WAL
+    // siblings so sqlite3_open recreates a fresh DB. No .recover variant --
+    // ml.db only holds k-means models and is cheap to rebuild.
+    char sentinel[FILENAME_MAX + 1];
+    snprintfz(sentinel, FILENAME_MAX, "%s/.ml.db.delete", netdata_configured_cache_dir);
+    if (unlink(sentinel) == 0) {
+        char bad_path[FILENAME_MAX + 1];
+        snprintfz(bad_path, FILENAME_MAX, "%s/ml.db.bad", netdata_configured_cache_dir);
+        if (rename(path, bad_path) == 0) {
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "ML: quarantined corrupt %s as %s; a fresh ml.db will be created. "
+                   "Inspect or remove the .bad file manually.",
+                   path, bad_path);
+        } else if (errno != ENOENT) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "ML: failed to rename %s to %s (errno=%d); leaving as-is.",
+                   path, bad_path, errno);
+        }
+        char wal_path[FILENAME_MAX + 1];
+        snprintfz(wal_path, FILENAME_MAX, "%s-wal", path);
+        (void) unlink(wal_path);
+        snprintfz(wal_path, FILENAME_MAX, "%s-shm", path);
+        (void) unlink(wal_path);
+    }
+
     int rc = sqlite3_open(path, &ml_db);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", path, sqlite3_errstr(rc));

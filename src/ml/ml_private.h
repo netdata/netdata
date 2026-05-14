@@ -22,7 +22,16 @@ bool ml_should_publish_model_update(bool host_running,
                                     bool *training_in_progress);
 
 extern sqlite3 *ml_db;
+extern bool ml_db_unusable;
 extern const char *db_models_create_table;
+
+// Mark ml.db as corrupt: drops a `.ml.db.delete` sentinel in the cache dir
+// (best-effort, idempotent) and latches `ml_db_unusable` so subsequent ml.db
+// access short-circuits for the rest of the session. The sentinel is consumed
+// at next startup, which renames ml.db -> ml.db.bad and creates a fresh DB.
+// `rc` is the SQLite error code that triggered the call (SQLITE_CORRUPT or
+// SQLITE_NOTADB); logged for diagnostics.
+void ml_db_mark_corrupt(int rc);
 
 
 #endif /* NETDATA_ML_PRIVATE_H */

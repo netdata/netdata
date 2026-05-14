@@ -18,7 +18,34 @@
 #define WORKER_TRAIN_FLUSH_MODELS      7
 
 sqlite3 *ml_db = NULL;
+bool ml_db_unusable = false;
 static netdata_mutex_t db_mutex;
+
+void ml_db_mark_corrupt(int rc)
+{
+    // Latch the flag first so concurrent callers stop hitting the bad DB
+    // even if the sentinel write fails. Use __ATOMIC_RELAXED -- this is a
+    // best-effort poison flag, not a synchronization primitive.
+    if (__atomic_exchange_n(&ml_db_unusable, true, __ATOMIC_RELAXED))
+        return; // already flagged, sentinel already attempted
+
+    char sentinel[FILENAME_MAX + 1];
+    snprintfz(sentinel, FILENAME_MAX, "%s/.ml.db.delete", netdata_configured_cache_dir);
+    int fd = open(sentinel, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    if (fd >= 0) {
+        close(fd);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "ML: ml.db reported corruption (rc=%d); sentinel %s created. "
+               "ml.db will be renamed to ml.db.bad and recreated at next agent start. "
+               "Stored anomaly-detection models will be lost; ML will retrain.",
+               rc, sentinel);
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "ML: ml.db reported corruption (rc=%d) but failed to create sentinel %s (errno=%d). "
+               "Operator must remove ml.db manually.", rc, sentinel, errno);
+    }
+}
 
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&db_mutex);
@@ -236,10 +263,15 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
         return 1;
     }
 
+    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED)))
+        return 1;
+
     if (unlikely(!res)) {
         rc = prepare_statement(ml_db, db_models_add_model, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store model, rc = %d", rc);
+            if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
+                ml_db_mark_corrupt(rc);
             return 1;
         }
     }
@@ -279,6 +311,8 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to store model, rc = %d", rc);
+        if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
+            ml_db_mark_corrupt(rc);
         return rc;
     }
 
@@ -311,10 +345,15 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
         return 1;
     }
 
+    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED)))
+        return 1;
+
     if (unlikely(!res)) {
         rc = prepare_statement(ml_db, db_models_delete, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to delete models, rc = %d", rc);
+            if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
+                ml_db_mark_corrupt(rc);
             return rc;
         }
     }
@@ -330,6 +369,8 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to delete models, rc = %d", rc);
+        if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
+            ml_db_mark_corrupt(rc);
         return rc;
     }
 
@@ -362,10 +403,15 @@ ml_prune_old_models(size_t num_models_to_prune)
         return 1;
     }
 
+    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED)))
+        return 1;
+
     if (unlikely(!res)) {
         rc = prepare_statement(ml_db, db_models_prune, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to prune models, rc = %d", rc);
+            if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
+                ml_db_mark_corrupt(rc);
             return rc;
         }
     }
@@ -383,6 +429,8 @@ ml_prune_old_models(size_t num_models_to_prune)
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to prune old models, rc = %d", rc);
+        if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
+            ml_db_mark_corrupt(rc);
         return rc;
     }
 
@@ -419,6 +467,7 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     sqlite3_stmt *res = active_stmt ? *active_stmt : NULL;
     int rc = 0;
     int param = 0;
+    int step_rc = 0;
 
     if (unlikely(!ml_db)) {
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -426,10 +475,15 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         return 1;
     }
 
+    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED)))
+        return 1;
+
     if (unlikely(!res)) {
         rc = sqlite3_prepare_v2(ml_db, db_models_load, -1, &res, NULL);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to load models, rc = %d", rc);
+            if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
+                ml_db_mark_corrupt(rc);
             return 1;
         }
         if (active_stmt)
@@ -499,15 +553,23 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
 
     spinlock_unlock(&dim->slock);
 
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to load models, rc = %d", rc);
+    step_rc = rc;
+    if (unlikely(step_rc != SQLITE_DONE))
+        error_report("Failed to load models, rc = %d", step_rc);
 
     if (active_stmt)
         rc = sqlite3_reset(res);
     else
         rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    // sqlite3_reset returns the prior step error if step failed; only log if
+    // reset reports a new error beyond what we already logged for step.
+    if (unlikely(rc != SQLITE_OK && rc != step_rc))
         error_report("Failed to %s statement when loading models, rc = %d", active_stmt ? "reset" : "finalize", rc);
+
+    if (step_rc == SQLITE_CORRUPT || step_rc == SQLITE_NOTADB) {
+        ml_db_mark_corrupt(step_rc);
+        return 1; // trip skip_models in metadata_scan_host so we stop hammering the bad DB
+    }
 
     return 0;
 
@@ -1207,6 +1269,11 @@ void ml_detect_main(void *arg)
 static void ml_flush_pending_models(ml_worker_t *worker) {
     static time_t next_vacuum_run = 0;
     int op_no = 1;
+
+    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED))) {
+        worker->pending_model_info.clear();
+        return;
+    }
 
     // begin transaction
     int rc = db_execute(ml_db, "BEGIN TRANSACTION;", NULL);
