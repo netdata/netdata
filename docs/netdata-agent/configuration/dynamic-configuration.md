@@ -1,13 +1,5 @@
 # Dynamic Configuration Manager
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Quick Access Methods](#quick-access-methods)
-- [Getting Started](#getting-started)
-- [Collectors](#collectors)
-- [Multi-Node Deployment](#multi-node-deployment)
-
 ## Overview
 
 :::important
@@ -272,6 +264,36 @@ For teams using Infrastructure as Code solutions, the Dynamic Configuration Mana
 This feature is particularly valuable for managing large infrastructures where manual configuration of individual nodes would be time-consuming and error-prone.
 
 :::
+
+## Troubleshooting
+
+### HTTP 412 Error When Editing Alert Configurations
+
+If you receive an **HTTP 412 error** with a message like "Request failed with status 412" when editing alert configurations, this indicates an **authentication issue**, not a schema validation error.
+
+:::important
+
+In Netdata, HTTP 412 is used to indicate that an authorization bearer token was required but was not present in the request. This differs from the generic HTTP 412 "Precondition Failed" response.
+
+:::
+
+**Common causes:**
+
+1. **Bearer token protection enabled** - Your agent requires Cloud authentication for API access
+2. **Cloud connection lost** - Agent disconnected from Netdata Cloud
+3. **Session expired** - Bearer token has expired (tokens expire after 24 hours)
+4. **Missing browser authentication state** - Your browser is no longer sending a valid Cloud bearer token with the request
+
+**Resolution steps:**
+
+1. **Verify claim and Cloud connection**: Check `http://IP:19999/api/v3/info` and inspect the `cloud` section. Use `cloud.status` to verify whether the Agent is connected to Netdata Cloud, and if it is not `online`, inspect `cloud.reason` for the failure details.
+2. **Re-authenticate**: Log out and log back into Netdata Cloud to refresh your bearer token.
+3. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing the agent through a Cloud-authenticated session.
+4. **Check permissions only if you get HTTP 403**: If the request changes from HTTP 412 to HTTP 403 after re-authenticating, ensure you have Admin or Manager role in the space containing the agent.
+
+For more information, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
+
+---
 
 Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
 

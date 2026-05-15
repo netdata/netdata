@@ -58,6 +58,8 @@ type (
 		PrivacyProtocol string `yaml:"priv_protocol,omitempty" json:"priv_protocol,omitempty"`
 		// PrivacyPassphrase is the privacy passphrase (for SNMPv3)
 		PrivacyPassphrase string `yaml:"priv_password,omitempty" json:"priv_password,omitempty"`
+		// ContextName is the SNMPv3 context name. Empty means the default context.
+		ContextName string `yaml:"context_name,omitempty" json:"context_name,omitempty"`
 	}
 )
 
@@ -143,5 +145,6 @@ func setCredential(client gosnmp.Handler, cred CredentialConfig) {
 			PrivacyProtocol:          snmputils.ParseSNMPv3PrivProtocol(cred.PrivacyProtocol),
 			PrivacyPassphrase:        cred.PrivacyPassphrase,
 		})
+		client.SetContextName(cred.ContextName)
 	}
 }

@@ -46,9 +46,3 @@ A `failed state` indicates that there was an issue with mounting the filesystem,
 - Seek technical support
 
   If the issue persists, consider reaching out to support, as there might be an underlying issue that needs to be addressed.
-
-### Useful resources
-
-1. [systemd.mount - Mount unit configuration](https://www.freedesktop.org/software/systemd/man/systemd.mount.html)
-2. [systemctl - Control the systemd system and service manager](https://www.freedesktop.org/software/systemd/man/systemctl.html)
-3. [journalctl - Query the systemd journal](https://www.freedesktop.org/software/systemd/man/journalctl.html)

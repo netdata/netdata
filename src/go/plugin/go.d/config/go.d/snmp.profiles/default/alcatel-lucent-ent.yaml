@@ -1,5 +1,6 @@
 extends:
   - alcatel-lucent.yaml
+  - _alcatel-bgp.yaml
 
 selector:
   - sysobjectid:

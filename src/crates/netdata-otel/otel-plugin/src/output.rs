@@ -27,20 +27,29 @@ impl fmt::Display for ChartType {
 /// it back out for display: `displayed = SET_value * 1 / DIVISOR`.
 pub const PRECISION_DIVISOR: i64 = 1000;
 
-/// Wrapper that writes a string with single quotes replaced by double quotes.
+/// Wrapper that sanitizes a string for use inside single-quoted plugin protocol fields.
 ///
 /// The Netdata plugin protocol uses single quotes to delimit fields in CHART
-/// and CLABEL lines. If a value contains a literal single quote, it breaks
-/// the agent's parser. There is no escape mechanism, so we replace `'` with `"`.
+/// and CLABEL lines, and is line-based (`\n`-delimited). Two characters can
+/// break the agent's parser:
+///
+/// - `'` — breaks the quote-delimited field boundaries.
+/// - `\n` / `\r` — breaks line-based parsing; the agent's buffered reader
+///   splits on `\n`, so an embedded newline turns one command into two
+///   malformed lines, causing the agent to kill the plugin.
+///
+/// There is no escape mechanism, so we replace `'` with `"` and newlines
+/// with their escaped representation (`\n`, `\r`).
 struct SanitizedQuote<'a>(&'a str);
 
 impl fmt::Display for SanitizedQuote<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for ch in self.0.chars() {
-            if ch == '\'' {
-                f.write_char('"')?;
-            } else {
-                f.write_char(ch)?;
+            match ch {
+                '\'' => f.write_char('"')?,
+                '\n' => f.write_str("\\n")?,
+                '\r' => f.write_str("\\r")?,
+                _ => f.write_char(ch)?,
             }
         }
         Ok(())
@@ -153,7 +162,7 @@ pub fn write_data_slot(
                 let scaled = (v * PRECISION_DIVISOR as f64) as i64;
                 writeln!(f, "SET {} = {}", dim.name, scaled)?;
             }
-            None => writeln!(f, "SET {} = U", dim.name)?,
+            None => writeln!(f, "SET {} =", dim.name)?,
         }
     }
 

@@ -1,0 +1,6 @@
+---
+# JSON parsing with inclusion filter
+pattern: 'json'
+
+filter:
+  include: '^(OBJECT_|STRING|BOOLEAN|NUMERIC|FLOAT|SCIENTIFIC)'

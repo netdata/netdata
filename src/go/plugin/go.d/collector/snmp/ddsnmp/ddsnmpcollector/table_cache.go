@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"maps"
 	"math/rand"
 	"sort"
 	"strings"
@@ -119,18 +120,14 @@ func (tc *tableCache) cacheData(cfg ddprofiledefinition.MetricsConfig, oidMap ma
 	oidsCopy := make(map[string]map[string]string, len(oidMap))
 	for index, columns := range oidMap {
 		columnsCopy := make(map[string]string, len(columns))
-		for colOID, fullOID := range columns {
-			columnsCopy[colOID] = fullOID
-		}
+		maps.Copy(columnsCopy, columns)
 		oidsCopy[index] = columnsCopy
 	}
 
 	tagsCopy := make(map[string]map[string]string, len(tagValues))
 	for index, tags := range tagValues {
 		tagCopy := make(map[string]string, len(tags))
-		for name, value := range tags {
-			tagCopy[name] = value
-		}
+		maps.Copy(tagCopy, tags)
 		tagsCopy[index] = tagCopy
 	}
 
@@ -308,6 +305,11 @@ func (tc *tableCache) isConfigCached(cfg ddprofiledefinition.MetricsConfig) bool
 // generateConfigID creates a unique identifier for a MetricsConfig
 func (tc *tableCache) generateConfigID(cfg ddprofiledefinition.MetricsConfig) string {
 	var sb strings.Builder
+
+	if cfg.MIB != "" {
+		sb.WriteString(cfg.MIB)
+		sb.WriteString("|")
+	}
 
 	if cfg.Table.Name != "" {
 		sb.WriteString(cfg.Table.Name)

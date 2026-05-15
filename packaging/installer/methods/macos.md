@@ -16,7 +16,7 @@ The Netdata Homebrew package is community-created and -maintained.
 
 :::note
 
-Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](/docs/netdata-agent/versions-and-platforms.md).
+Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](/packaging/PLATFORM_SUPPORT.md).
 
 :::
 

@@ -10,20 +10,20 @@ A dedicated process correlates anomalies across all metrics within each node, ge
 
 ## System Characteristics
 
-| Aspect | Implementation | Benefit |
-|--------|----------------|---------|
-| **Algorithm** | Unsupervised k-means clustering (k=2) via [dlib](https://github.com/davisking/dlib) | No manual training or labeled data required |
-| **Model Architecture** | rolling 18 models per metric, 3-hour staggered training | Eliminates 99% of false positives through consensus |
-| **Processing Location** | Edge computation on each Netdata agent | No cloud dependency, no data egress |
-| **Resource Usage** | ~18KB RAM per metric, 2-4% of a single CPU for 10k metrics | Predictable linear scaling |
-| **Configuration** | Zero-configuration with automatic adaptation | Works instantly on any metric type |
-| **Detection Latency** | Real-time during data collection | Anomalies flagged within 1 second |
-| **Historical Storage** | Anomaly bit embedded in metric storage | No additional storage overhead |
-| **Query Performance** | On-the-fly anomaly rate calculation | No pre-aggregation needed |
-| **Time-series Integrity** | Immutable anomaly history | No hindsight bias - shows what was detectable THEN |
-| **Coverage** | Every metric, every dimension | No sampling, no blind spots |
-| **Correlation Engine** | Real-time anomaly correlation across metrics | Powers Anomaly Advisor for root cause analysis |
-| **Alert Philosophy** | Investigation aid, not alert source | Reduces alert fatigue |
+| Aspect                    | Implementation                                                                      | Benefit                                                     |
+|---------------------------|-------------------------------------------------------------------------------------|-------------------------------------------------------------|
+| **Algorithm**             | Unsupervised k-means clustering (k=2) via [dlib](https://github.com/davisking/dlib) | No manual training or labeled data required                 |
+| **Model Architecture**    | rolling 18 models per metric, 3-hour staggered training                             | Eliminates 99% of false positives through consensus         |
+| **Processing Location**   | Edge computation on each Netdata agent                                              | No cloud dependency, no data egress                         |
+| **Resource Usage**        | ~18KB RAM per metric, 2-4% of a single CPU for 10k metrics                          | Predictable linear scaling                                  |
+| **Configuration**         | Zero-configuration with automatic adaptation                                        | Works instantly on any metric type                          |
+| **Detection Latency**     | Real-time during data collection                                                    | Anomalies flagged within 1 second                           |
+| **Historical Storage**    | Anomaly bit embedded in metric storage                                              | No additional storage overhead                              |
+| **Query Performance**     | On-the-fly anomaly rate calculation                                                 | No pre-aggregation needed                                   |
+| **Time-series Integrity** | Immutable anomaly history                                                           | No hindsight bias - shows what was detectable THEN          |
+| **Coverage**              | Every metric, every dimension                                                       | No sampling, no blind spots                                 |
+| **Correlation Engine**    | Real-time anomaly correlation across metrics                                        | Powers Anomaly Advisor for root cause analysis              |
+| **Alert Philosophy**      | Primary: investigation aid; also supports Anomaly Rate alerts                       | Reduces alert fatigue while enabling proactive notification |
 
 :::note
 Netdata avoids deep learning models to maintain lightweight operation on any Linux system. The entire ML system is designed to run efficiently without specialized hardware or dependencies.
@@ -158,6 +158,15 @@ You can see **Node Anomaly Rate (NAR)** and **Dimension Anomaly Rate (DAR)** cal
 
 Netdata tracks the percentage of anomaly bits over time for you. When the **Node Anomaly Rate (NAR)** exceeds a set threshold and remains high for a period, a **node anomaly event** is triggered. These events are recorded in the `new_anomaly_event` dimension on the `anomaly_detection.anomaly_detection` chart.
 
+## Alerting on Anomaly Rates
+
+Netdata supports creating alerts based on ML anomaly rates, so you can be notified when anomaly rates exceed thresholds. There are two patterns:
+
+- **Chart-level anomaly rate alerts**: Use `anomaly-bit` in the `lookup` line to calculate the anomaly rate for a specific chart's dimensions. For example, `lookup: average -5m anomaly-bit of *` computes the rolling 5-minute anomaly rate for a chart.
+- **Node-level anomaly rate alerts**: Use the `anomaly_detection.anomaly_rate` chart to monitor the overall anomaly rate across all ML-enabled dimensions on a node.
+
+You can create Anomaly Rate alerts through the [Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md) UI wizard, or write them manually. The [Alert Configuration Reference](/src/health/REFERENCE.md) includes complete working examples for both patterns (Examples 6 and 7).
+
 ## Available Documentation
 
 - **[ML Configuration](/src/ml/ml-configuration.md)** - Configuration and tuning guide
@@ -256,5 +265,6 @@ ML is enabled by default in recent Netdata versions. To use anomaly detection:
 1. **View anomaly ribbons** - Purple overlays on all charts show anomaly rates
 2. **Access Anomaly Advisor** - Click the Anomalies tab for guided troubleshooting
 3. **Query historical anomalies** - Use the query engine to analyze past incidents
+4. **Create Anomaly Rate alerts** - Get notified when anomaly rates exceed thresholds
 
 [Learn more about the Anomaly Advisor →](/docs/ml-ai/anomaly-advisor.md)

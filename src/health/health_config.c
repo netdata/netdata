@@ -523,8 +523,12 @@ static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
                                                                                                     \
     if(value) {                                                                                     \
         typeof(ax->member) _old = ax->member;                                                       \
-        char _buf[strlen(value) + string_strlen(_old) + (_label ? strlen(_label) : 0) + 3];         \
-        snprintfz(_buf, sizeof(_buf), "%s%s%s%s%s",                                                 \
+        size_t _label_len = _label ? strlen(_label) : 0;                                            \
+        size_t _value_len = strlen(value);                                                          \
+        size_t _old_len = _old ? string_strlen(_old) : 0;                                           \
+        size_t _buf_len = _label_len + (_label ? 1 : 0) + _value_len + (_old ? 1 : 0) + _old_len + 1; \
+        char *_buf = mallocz(_buf_len);                                                             \
+        snprintfz(_buf, _buf_len, "%s%s%s%s%s",                                                     \
                       _label ? _label : "",                                                         \
                       _label ? "=" : "",                                                            \
                       value,                                                                        \
@@ -532,6 +536,7 @@ static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
                       _old ? string2str(_old) : "");                                                \
         string_freez(_old);                                                                         \
         ax->member = string_strdupz(_buf);                                                          \
+        freez(_buf);                                                                                \
     }                                                                                               \
 } while(0)
 

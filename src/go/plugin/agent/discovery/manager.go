@@ -64,11 +64,9 @@ func (m *Manager) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 		}(d)
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		m.sendLoop(ctx, in)
-	}()
+	})
 
 	wg.Wait()
 	<-ctx.Done()

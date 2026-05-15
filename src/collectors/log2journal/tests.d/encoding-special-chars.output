@@ -1,0 +1,9 @@
+ACCENTED=Accented: café, naïve, résumé, piñata
+CONTENT=Special content
+CONTROL_CHARS=Tab:	 Newline:
+ Carriage: Null handling
+MATHEMATICAL=Math: ∑∏∆√∞≠≤≥±×÷
+MESSAGE=Encoded[] = 
+PREFIX=Prefix
+SYMBOLS=Symbols: @#$%^&*()+=[]{}|\:;"'<>?/~`
+

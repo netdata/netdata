@@ -67,6 +67,30 @@ func (s *Scraper) ScrapeVMs(vms rs.VMs) []performance.EntityMetric {
 	return ms
 }
 
+func (s *Scraper) ScrapeDatastores(datastores rs.Datastores) []performance.EntityMetric {
+	t := time.Now()
+	pqs := newDatastoresPerfQuerySpecs(datastores)
+	ms := s.scrapeMetrics(pqs)
+	s.Debugf("scraping : scraped metrics for %d/%d datastores, process took %s",
+		len(ms),
+		len(datastores),
+		time.Since(t),
+	)
+	return ms
+}
+
+func (s *Scraper) ScrapeClusters(clusters rs.Clusters) []performance.EntityMetric {
+	t := time.Now()
+	pqs := newClustersPerfQuerySpecs(clusters)
+	ms := s.scrapeMetrics(pqs)
+	s.Debugf("scraping : scraped metrics for %d/%d clusters, process took %s",
+		len(ms),
+		len(clusters),
+		time.Since(t),
+	)
+	return ms
+}
+
 func (s *Scraper) scrapeMetrics(pqs []types.PerfQuerySpec) []performance.EntityMetric {
 	tc := newThrottledCaller(5)
 	var ms []performance.EntityMetric
@@ -99,10 +123,7 @@ func (s *Scraper) scrape(metrics *[]performance.EntityMetric, lock *sync.Mutex, 
 
 func chunkify(pqs []types.PerfQuerySpec, chunkSize int) (chunks [][]types.PerfQuerySpec) {
 	for i := 0; i < len(pqs); i += chunkSize {
-		end := i + chunkSize
-		if end > len(pqs) {
-			end = len(pqs)
-		}
+		end := min(i+chunkSize, len(pqs))
 		chunks = append(chunks, pqs[i:end])
 	}
 	return chunks
@@ -137,6 +158,46 @@ func newVMsPerfQuerySpecs(vms rs.VMs) []types.PerfQuerySpec {
 			MaxSample:  pqsMaxSample,
 			MetricId:   vm.MetricList,
 			IntervalId: pqsIntervalID,
+			Format:     pqsFormat,
+		}
+		pqs = append(pqs, pq)
+	}
+	return pqs
+}
+
+// Datastores, clusters, and resource pools do not support real-time (20s) collection.
+// Minimum supported interval is 300s (5 min historical).
+const pqsHistoricalIntervalID = 300
+
+func newDatastoresPerfQuerySpecs(datastores rs.Datastores) []types.PerfQuerySpec {
+	pqs := make([]types.PerfQuerySpec, 0, len(datastores))
+	for _, ds := range datastores {
+		if len(ds.MetricList) == 0 {
+			continue
+		}
+		pq := types.PerfQuerySpec{
+			Entity:     ds.Ref,
+			MaxSample:  pqsMaxSample,
+			MetricId:   ds.MetricList,
+			IntervalId: pqsHistoricalIntervalID,
+			Format:     pqsFormat,
+		}
+		pqs = append(pqs, pq)
+	}
+	return pqs
+}
+
+func newClustersPerfQuerySpecs(clusters rs.Clusters) []types.PerfQuerySpec {
+	pqs := make([]types.PerfQuerySpec, 0, len(clusters))
+	for _, c := range clusters {
+		if len(c.MetricList) == 0 {
+			continue
+		}
+		pq := types.PerfQuerySpec{
+			Entity:     c.Ref,
+			MaxSample:  pqsMaxSample,
+			MetricId:   c.MetricList,
+			IntervalId: pqsHistoricalIntervalID,
 			Format:     pqsFormat,
 		}
 		pqs = append(pqs, pq)

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 )
 
@@ -126,9 +127,15 @@ func (a *API) EMPTYLINE() error {
 func (a *API) HOSTINFO(info HostInfo) {
 	var buf bytes.Buffer
 
-	buf.WriteString(fmt.Sprintf("HOST_DEFINE '%s' '%s'\n", info.GUID, info.Hostname))
-	for k, v := range info.Labels {
-		buf.WriteString(fmt.Sprintf("HOST_LABEL '%s' '%s'\n", k, v))
+	_, _ = fmt.Fprintf(&buf, "HOST_DEFINE '%s' '%s'\n", info.GUID, info.Hostname)
+	keys := make([]string, 0, len(info.Labels))
+	for k := range info.Labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := info.Labels[k]
+		_, _ = fmt.Fprintf(&buf, "HOST_LABEL '%s' '%s'\n", k, v)
 	}
 	buf.WriteString("HOST_DEFINE_END\n\n")
 

@@ -16,8 +16,10 @@ const (
 	prioProfileChart = collectorapi.Priority + iota
 	prioPingRtt
 	prioPingStdDev
+)
 
-	prioInternalStatsTimings
+const (
+	prioInternalStatsTimings = prioLicenseState + 1 + iota
 	prioInternalStatsSnmpOps
 	prioInternalStatsMetrics
 	prioInternalStatsTableCache
@@ -91,6 +93,8 @@ var (
 		Dims: collectorapi.Dims{
 			{ID: "snmp_device_prof_%s_stats_timings_scalar", Name: "scalar"},
 			{ID: "snmp_device_prof_%s_stats_timings_table", Name: "table"},
+			{ID: "snmp_device_prof_%s_stats_timings_licensing", Name: "licensing"},
+			{ID: "snmp_device_prof_%s_stats_timings_bgp", Name: "bgp"},
 			{ID: "snmp_device_prof_%s_stats_timings_virtual", Name: "virtual"},
 		},
 	}
@@ -123,6 +127,8 @@ var (
 			{ID: "snmp_device_prof_%s_stats_metrics_scalar", Name: "scalar"},
 			{ID: "snmp_device_prof_%s_stats_metrics_table", Name: "table"},
 			{ID: "snmp_device_prof_%s_stats_metrics_virtual", Name: "virtual"},
+			{ID: "snmp_device_prof_%s_stats_metrics_licensing", Name: "licensing"},
+			{ID: "snmp_device_prof_%s_stats_metrics_bgp", Name: "bgp"},
 			{ID: "snmp_device_prof_%s_stats_metrics_tables", Name: "tables"},
 			{ID: "snmp_device_prof_%s_stats_metrics_rows", Name: "rows"},
 		},
@@ -152,6 +158,8 @@ var (
 			{ID: "snmp_device_prof_%s_stats_errors_snmp", Name: "snmp"},
 			{ID: "snmp_device_prof_%s_stats_errors_processing_scalar", Name: "processing_scalar"},
 			{ID: "snmp_device_prof_%s_stats_errors_processing_table", Name: "processing_table"},
+			{ID: "snmp_device_prof_%s_stats_errors_processing_licensing", Name: "processing_licensing"},
+			{ID: "snmp_device_prof_%s_stats_errors_processing_bgp", Name: "processing_bgp"},
 		},
 	}
 )
@@ -187,12 +195,12 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	}
 
 	chart := &collectorapi.Chart{
-		ID:       fmt.Sprintf("snmp_device_prof_%s", cleanMetricName.Replace(m.Name)),
+		ID:       chartIDFromName(m.Name),
 		Title:    m.Description,
 		Type:     collectorapi.ChartType(m.ChartType),
 		Units:    m.Unit,
 		Fam:      m.Family,
-		Ctx:      fmt.Sprintf("snmp.device_prof_%s", cleanMetricName.Replace(m.Name)),
+		Ctx:      chartContextID(m.Name),
 		Priority: prioProfileChart,
 	}
 	if chart.Title == "" {
@@ -211,6 +219,7 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	tags := c.chartBaseLabels()
 
 	maps.Copy(tags, m.Profile.Tags)
+	addMetricTagLabels(tags, m.Tags)
 	for k, v := range tags {
 		chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
 	}
@@ -220,12 +229,12 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 		for k := range m.MultiValue {
 			if !seen[k] {
 				seen[k] = true
-				id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, k)
+				id := metricIDFromName(m.Name, k)
 				chart.Dims = append(chart.Dims, &collectorapi.Dim{ID: id, Name: k, Algo: dimAlgoFromDdSnmpType(m)})
 			}
 		}
 	} else {
-		id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
+		id := metricIDFromName(m.Name)
 		chart.Dims = collectorapi.Dims{
 			{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)},
 		}
@@ -244,11 +253,11 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	key := tableMetricKey(m)
 
 	chart := &collectorapi.Chart{
-		ID:       fmt.Sprintf("snmp_device_prof_%s", cleanMetricName.Replace(key)),
+		ID:       chartIDFromKey(key),
 		Title:    m.Description,
 		Units:    m.Unit,
 		Fam:      m.Family,
-		Ctx:      fmt.Sprintf("snmp.device_prof_%s", cleanMetricName.Replace(m.Name)),
+		Ctx:      chartContextID(m.Name),
 		Priority: prioProfileChart,
 	}
 	if chart.Title == "" {
@@ -267,10 +276,7 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	tags := c.chartBaseLabels()
 
 	maps.Copy(tags, m.Profile.Tags)
-	for k, v := range m.Tags {
-		newKey := strings.TrimPrefix(k, "_")
-		tags[newKey] = v
-	}
+	addMetricTagLabels(tags, m.Tags)
 
 	for k, v := range tags {
 		chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
@@ -281,12 +287,12 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 		for k := range m.MultiValue {
 			if !seen[k] {
 				seen[k] = true
-				id := fmt.Sprintf("snmp_device_prof_%s_%s", key, k)
+				id := metricIDFromKey(key, k)
 				chart.Dims = append(chart.Dims, &collectorapi.Dim{ID: id, Name: k, Algo: dimAlgoFromDdSnmpType(m)})
 			}
 		}
 	} else {
-		id := fmt.Sprintf("snmp_device_prof_%s", key)
+		id := metricIDFromKey(key)
 		chart.Dims = collectorapi.Dims{
 			{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)},
 		}
@@ -298,7 +304,7 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 }
 
 func (c *Collector) removeProfileTableMetricChart(key string) {
-	id := fmt.Sprintf("snmp_device_prof_%s", cleanMetricName.Replace(key))
+	id := chartIDFromKey(key)
 	if chart := c.Charts().Get(id); chart != nil {
 		chart.MarkRemove()
 		chart.MarkNotCreated()
@@ -326,6 +332,31 @@ func (c *Collector) chartBaseLabels() map[string]string {
 	}
 
 	return labels
+}
+
+func addMetricTagLabels(labels, tags map[string]string) {
+	for k, v := range tags {
+		if strings.HasPrefix(k, "_") {
+			continue
+		}
+		addMetricTagLabel(labels, k, v)
+	}
+	for k, v := range tags {
+		if !strings.HasPrefix(k, "_") {
+			continue
+		}
+		key := strings.TrimPrefix(k, "_")
+		if key == "" {
+			continue
+		}
+		addMetricTagLabel(labels, key, v)
+	}
+}
+
+func addMetricTagLabel(labels map[string]string, key, value string) {
+	if existing, ok := labels[key]; !ok || existing == "" {
+		labels[key] = value
+	}
 }
 
 func dimAlgoFromDdSnmpType(m ddsnmp.Metric) collectorapi.DimAlgo {

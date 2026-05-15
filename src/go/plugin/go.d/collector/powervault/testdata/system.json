@@ -1,0 +1,26 @@
+{
+  "system": [
+    {
+      "system-name": "ME4024-LAB",
+      "product-id": "ME4024",
+      "health-numeric": 0,
+      "health": "OK",
+      "midplane-serial-number": "CX12345678",
+      "vendor-name": "DELL",
+      "platform-brand": "Dell Storage",
+      "enclosure-count": 1,
+      "system-location": "Lab Rack A",
+      "system-contact": "admin@example.com",
+      "scsi-product-id": "ME4024",
+      "current-node-wwn": "500c0ff0123456ab"
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

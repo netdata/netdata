@@ -1,0 +1,7 @@
+pattern: '(?P<MESSAGE>.*)'
+
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: 'large-line-test'
+  - key: LINE_LENGTH
+    value: '${#MESSAGE}'

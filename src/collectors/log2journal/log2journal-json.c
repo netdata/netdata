@@ -635,10 +635,13 @@ bool json_parse_document(LOG_JSON_STATE *js, const char *txt) {
 }
 
 void json_test(void) {
-    LOG_JOB jb = { .prefix = "NIGNX_" };
+    LOG_JOB jb = { 0 };
+    log_job_init(&jb);
+    log_job_key_prefix_set(&jb, "NGINX_", 6);
     LOG_JSON_STATE *json = json_parser_create(&jb);
 
     json_parse_document(json, "{\"value\":\"\\u\\u039A\\u03B1\\u03BB\\u03B7\\u03BC\\u03AD\\u03C1\\u03B1\"}");
 
     json_parser_destroy(json);
+    log_job_cleanup(&jb);
 }

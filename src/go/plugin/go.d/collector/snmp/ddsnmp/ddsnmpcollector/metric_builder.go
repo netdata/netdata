@@ -38,6 +38,15 @@ func (mb *metricBuilder) withTags(tags map[string]string) *metricBuilder {
 func (mb *metricBuilder) withStaticTags(tags map[string]string) *metricBuilder {
 	if len(tags) > 0 {
 		mb.metric.StaticTags = maps.Clone(tags)
+		if mb.metric.Tags == nil {
+			mb.metric.Tags = maps.Clone(tags)
+		} else {
+			for k, v := range tags {
+				if current, ok := mb.metric.Tags[k]; !ok || current == "" {
+					mb.metric.Tags[k] = v
+				}
+			}
+		}
 	}
 	return mb
 }
@@ -62,8 +71,9 @@ func (mb *metricBuilder) build() ddsnmp.Metric {
 	return mb.metric
 }
 
-func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, staticTags map[string]string) (*ddsnmp.Metric, error) {
+func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string) (*ddsnmp.Metric, error) {
 	metric := newMetricBuilder(cfg.Name, value).
+		withTags(tags).
 		withStaticTags(staticTags).
 		fromSymbol(cfg, pdu).
 		build()
@@ -94,14 +104,18 @@ func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, 
 	return &metric, nil
 }
 
-func buildMultiValue(value int64, mappings map[string]string) map[string]int64 {
-	if len(mappings) == 0 {
+func buildMultiValue(value int64, mapping ddprofiledefinition.MappingConfig) map[string]int64 {
+	if !mapping.HasItems() {
 		return nil
+	}
+
+	if mapping.EffectiveMode() == ddprofiledefinition.MappingModeBitmask {
+		return buildBitmaskMultiValue(value, mapping.Items)
 	}
 
 	// Check if this is an int→int mapping (value transformation)
 	if isIntToIntMapping := func() bool {
-		for k, v := range mappings {
+		for k, v := range mapping.Items {
 			if !isInt(k) || !isInt(v) {
 				return false
 			}
@@ -112,7 +126,7 @@ func buildMultiValue(value int64, mappings map[string]string) map[string]int64 {
 	}
 
 	isMappingKeysNumeric := func() bool {
-		for k := range mappings {
+		for k := range mapping.Items {
 			if !isInt(k) {
 				return false
 			}
@@ -124,7 +138,7 @@ func buildMultiValue(value int64, mappings map[string]string) map[string]int64 {
 
 	if isMappingKeysNumeric {
 		// int→string mapping (e.g., 1→"up", 2→"down")
-		for k, v := range mappings {
+		for k, v := range mapping.Items {
 			intKey, _ := strconv.ParseInt(k, 10, 64)
 			// Only set the value if:
 			// 1. We haven't seen this state name before (!ok), OR
@@ -139,10 +153,37 @@ func buildMultiValue(value int64, mappings map[string]string) map[string]int64 {
 		// string→int mapping (e.g., "OK"→"0", "WARNING"→"1", "CRITICAL"→"2")
 		// value has already been converted from string to int by the value processor
 		// We need to find which original string maps to our current value
-		for k, v := range mappings {
+		for k, v := range mapping.Items {
 			if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
 				multiValue[k] = oldmetrix.Bool(value == intVal)
 			}
+		}
+	}
+
+	return multiValue
+}
+
+func buildBitmaskMultiValue(value int64, mappings map[string]string) map[string]int64 {
+	multiValue := make(map[string]int64)
+
+	for k, v := range mappings {
+		bit, err := strconv.ParseInt(k, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		active := false
+		// Bitmask mappings are intended for non-negative flag values. If multiple
+		// bits map to the same dimension, we OR them by keeping the active state.
+		switch {
+		case bit == 0:
+			active = value == 0
+		default:
+			active = value&bit == bit
+		}
+
+		if _, ok := multiValue[v]; !ok || active {
+			multiValue[v] = oldmetrix.Bool(active)
 		}
 	}
 

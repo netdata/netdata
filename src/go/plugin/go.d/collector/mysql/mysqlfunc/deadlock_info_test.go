@@ -312,7 +312,7 @@ func TestFuncDeadlockInfo_Handle_CleanupConcurrent(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		for i := 0; i < iterations; i++ {
+		for range iterations {
 			resp := handler.Handle(context.Background(), deadlockInfoMethodID, nil)
 			require.NotNil(t, resp)
 		}
@@ -320,7 +320,7 @@ func TestFuncDeadlockInfo_Handle_CleanupConcurrent(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		for i := 0; i < iterations; i++ {
+		for range iterations {
 			deps.cleanup()
 		}
 	}()

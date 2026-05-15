@@ -21,8 +21,10 @@ func (d Discoverer) build(raw *resources) *rs.Resources {
 	fixClustersParentID(&res)
 	res.Hosts = d.buildHosts(raw.hosts)
 	res.VMs = d.buildVMs(raw.vms)
+	res.Datastores = d.buildDatastores(raw.datastores)
+	res.ResourcePools = d.buildResourcePools(raw.resourcePools, res.Clusters)
 
-	d.Infof("discovering : building : built %d/%d dcs, %d/%d folders, %d/%d clusters, %d/%d hosts, %d/%d vms, process took %s",
+	d.Infof("discovering : building : built %d/%d dcs, %d/%d folders, %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, %d/%d resource pools, process took %s",
 		len(res.DataCenters),
 		len(raw.dcs),
 		len(res.Folders),
@@ -33,6 +35,10 @@ func (d Discoverer) build(raw *resources) *rs.Resources {
 		len(raw.hosts),
 		len(res.VMs),
 		len(raw.vms),
+		len(res.Datastores),
+		len(raw.datastores),
+		len(res.ResourcePools),
+		len(raw.resourcePools),
 		time.Since(t),
 	)
 	return &res
@@ -106,6 +112,7 @@ func newCluster(raw mo.ComputeResource) *rs.Cluster {
 		Name:     raw.Name,
 		ID:       raw.Reference().Value,
 		ParentID: raw.Parent.Value,
+		Ref:      raw.Reference(),
 	}
 }
 
@@ -176,5 +183,62 @@ func newVM(raw mo.VirtualMachine) *rs.VM {
 		ParentID:      raw.Runtime.Host.Value,
 		OverallStatus: string(raw.Summary.OverallStatus),
 		Ref:           raw.Reference(),
+	}
+}
+
+func (d Discoverer) buildDatastores(raw []mo.Datastore) rs.Datastores {
+	var num int
+	datastores := make(rs.Datastores)
+	for _, ds := range raw {
+		if !ds.Summary.Accessible {
+			num++
+			continue
+		}
+		datastores.Put(newDatastore(ds))
+	}
+	if num > 0 {
+		d.Infof("discovering : building : removed %d datastores (not accessible)", num)
+	}
+	return datastores
+}
+
+func newDatastore(raw mo.Datastore) *rs.Datastore {
+	return &rs.Datastore{
+		Name:          raw.Name,
+		ID:            raw.Reference().Value,
+		ParentID:      raw.Parent.Value,
+		OverallStatus: string(raw.OverallStatus),
+		Type:          raw.Summary.Type,
+		Capacity:      raw.Summary.Capacity,
+		FreeSpace:     raw.Summary.FreeSpace,
+		Accessible:    raw.Summary.Accessible,
+		Ref:           raw.Reference(),
+	}
+}
+
+func (d Discoverer) buildResourcePools(raw []mo.ResourcePool, clusters rs.Clusters) rs.ResourcePools {
+	pools := make(rs.ResourcePools)
+	for _, rp := range raw {
+		// owner is the cluster that owns this pool
+		ownerID := rp.Owner.Value
+		// skip pools whose owner is a dummy cluster (standalone host)
+		if isDummyCluster(ownerID) {
+			continue
+		}
+		// skip pools whose owner cluster wasn't discovered
+		if clusters.Get(ownerID) == nil {
+			continue
+		}
+		pools.Put(newResourcePool(rp))
+	}
+	return pools
+}
+
+func newResourcePool(raw mo.ResourcePool) *rs.ResourcePool {
+	return &rs.ResourcePool{
+		Name:     raw.Name,
+		ID:       raw.Reference().Value,
+		ParentID: raw.Owner.Value, // owner cluster ref
+		Ref:      raw.Reference(),
 	}
 }

@@ -28,6 +28,43 @@ static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&db_mutex);
 }
 
+namespace {
+
+// Guard against silent truncation when time_t is narrower than sqlite3_int64
+// (e.g. 32-bit builds). if constexpr ensures the dead branches are elided at
+// compile time on 64-bit platforms, avoiding constant-expression warnings.
+static inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
+{
+    if constexpr (!std::numeric_limits<time_t>::is_signed ||
+                  std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - on 64-bit, Coverity still analyzes
+        // this dead branch; reachable only on 32-bit or unsigned time_t builds.
+        if (value < (sqlite3_int64) std::numeric_limits<time_t>::min())
+            return false;
+    }
+    if constexpr (std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - dead on same-width 64-bit time_t;
+        // reachable only when time_t is narrower than sqlite3_int64, but Coverity
+        // still analyzes this discarded if constexpr branch.
+        if (value > (sqlite3_int64) std::numeric_limits<time_t>::max())
+            return false;
+    }
+    return true;
+}
+
+}
+
+static inline size_t ml_dimension_smoothing_window(const ml_dimension_t *dim)
+{
+    unsigned chart_update_every = dim->rd->rrdset->update_every;
+    if (chart_update_every > nd_profile.update_every)
+        return 1;
+
+    // max_samples_to_smooth == 0 is normalized to an effective smoothing window
+    // of 1 for feature extraction.
+    return std::max<size_t>(Cfg.max_samples_to_smooth, 1);
+}
+
 typedef struct {
     // First/last entry of the dimension in DB when generating the response
     time_t first_entry_on_response;
@@ -57,7 +94,7 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim)
     training_response.last_entry_on_response = rrddim_last_entry_s_of_tier(dim->rd, 0);
 
     unsigned chart_update_every = dim->rd->rrdset->update_every;
-    size_t smoothing_window = (chart_update_every > nd_profile.update_every) ? 1 : Cfg.max_samples_to_smooth;
+    size_t smoothing_window = ml_dimension_smoothing_window(dim);
     size_t min_required_samples = Cfg.diff_n + smoothing_window + Cfg.lag_n;
 
     auto round_up_div = [](time_t window, unsigned step) -> size_t {
@@ -170,8 +207,13 @@ const char *db_models_add_model =
 const char *db_models_load =
     "SELECT after, before, min_dist, max_dist, "
     "c00, c01, c02, c03, c04, c05, "
+    "c10, c11, c12, c13, c14, c15 FROM ("
+    "SELECT after, before, min_dist, max_dist, "
+    "c00, c01, c02, c03, c04, c05, "
     "c10, c11, c12, c13, c14, c15 FROM models "
-    "WHERE dim_id = @dim_id AND after >= @after ORDER BY before ASC;";
+    "WHERE dim_id = @dim_id AND after >= @after "
+    "ORDER BY after DESC LIMIT @n"
+    ") ORDER BY after ASC;";
 
 const char *db_models_delete =
     "DELETE FROM models "
@@ -206,11 +248,11 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) inlined_km->after);
+    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) inlined_km->after);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) inlined_km->before);
+    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) inlined_km->before);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -281,7 +323,7 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) before);
+    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) before);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -328,9 +370,9 @@ ml_prune_old_models(size_t num_models_to_prune)
         }
     }
 
-    int after = (int) (now_realtime_sec() - Cfg.delete_models_older_than);
+    time_t after = now_realtime_sec() - (time_t) Cfg.delete_models_older_than;
 
-    rc = sqlite3_bind_int(res, ++param, after);
+    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) after);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -403,14 +445,29 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
+    rc = sqlite3_bind_int64(res, ++param, Cfg.num_models_to_use);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
     spinlock_lock(&dim->slock);
 
     dim->km_contexts.reserve(Cfg.num_models_to_use);
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
         ml_kmeans_t km;
 
-        km.after = sqlite3_column_int(res, 0);
-        km.before = sqlite3_column_int(res, 1);
+        sqlite3_int64 raw_after  = sqlite3_column_int64(res, 0);
+        sqlite3_int64 raw_before = sqlite3_column_int64(res, 1);
+        // Protect against silent truncation when time_t is narrower than int64_t
+        // (e.g. 32-bit builds, corrupted DB, or far-future timestamps).
+        if (!ml_sqlite_int64_fits_time_t(raw_after) ||
+            !ml_sqlite_int64_fits_time_t(raw_before)) {
+            error_report("Skipping ML model row with out-of-range timestamps: after=%" PRId64 " before=%" PRId64,
+                         (int64_t) raw_after, (int64_t) raw_before);
+            continue;
+        }
+
+        km.after  = (time_t) raw_after;
+        km.before = (time_t) raw_before;
 
         km.min_dist = sqlite3_column_double(res, 2);
         km.max_dist = sqlite3_column_double(res, 3);
@@ -614,11 +671,72 @@ static void ml_dimension_stream_kmeans(ml_worker_t *worker, const ml_dimension_t
     pulse_ml_models_sent();
 }
 
-static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
+bool ml_dimension_train_model_precheck(enum ml_metric_type mt,
+                                       bool has_received_downstream_model,
+                                       bool training_in_progress,
+                                       enum ml_worker_result *worker_res)
+{
+    if (has_received_downstream_model) {
+        *worker_res = ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED;
+        return true;
+    }
+
+    if (mt == METRIC_TYPE_CONSTANT) {
+        *worker_res = ML_WORKER_RESULT_OK;
+        return true;
+    }
+
+    if (training_in_progress) {
+        *worker_res = ML_WORKER_RESULT_TRAINING_IN_PROGRESS;
+        return true;
+    }
+
+    return false;
+}
+
+bool ml_should_requeue_create_new_model(enum ml_worker_result worker_res)
+{
+    // TRAINING_IN_PROGRESS keeps requeueing so the dim stays in the periodic
+    // retrain cycle; the worker loop is paced by Cfg.train_every, so this is
+    // not a tight CPU spin.
+    return worker_res != ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION &&
+           worker_res != ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED;
+}
+
+bool ml_should_publish_model_update(bool host_running,
+                                    uint32_t current_generation,
+                                    uint32_t expected_generation,
+                                    bool *training_in_progress)
+{
+    if (!host_running || current_generation != expected_generation) {
+        if (training_in_progress)
+            *training_in_progress = false;
+        return false;
+    }
+
+    return true;
+}
+
+static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
     spinlock_lock(&dim->slock);
+
+    ml_host_t *host = (ml_host_t *) dim->rd->rrdset->rrdhost->ml_host;
+    if (!ml_should_publish_model_update(host && host->ml_running,
+                                        dim->reset_generation,
+                                        expected_generation,
+                                        &dim->training_in_progress)) {
+        spinlock_unlock(&dim->slock);
+        return false;
+    }
+
+    // Mark the dim as downstream-supplied only after the publish-check passes
+    // and under the same slock as the install. Setting it earlier would risk
+    // suppressing local training if the install was cancelled.
+    if (from_downstream)
+        dim->has_received_downstream_model = true;
 
     if (dim->km_contexts.size() < Cfg.num_models_to_use) {
         dim->km_contexts.emplace_back(dim->kmeans);
@@ -648,7 +766,7 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
     dim->suppression_anomaly_counter = 0;
     dim->suppression_window_counter = 0;
 
-    // Add the newly generated model to the list of pending models to flush
+    // Add the latest model to the list of pending models to flush.
     ml_model_info_t model_info;
     nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(dim->rd->uuid);
     uuid_copy(model_info.metric_uuid, *rd_uuid);
@@ -661,6 +779,7 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
     dim->training_in_progress = false;
 
     spinlock_unlock(&dim->slock);
+    return true;
 }
 
 static enum ml_worker_result
@@ -669,20 +788,22 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
     worker_is_busy(WORKER_TRAIN_QUERY);
 
     spinlock_lock(&dim->slock);
-    if (dim->mt == METRIC_TYPE_CONSTANT) {
+    ml_worker_result precheck;
+    if (ml_dimension_train_model_precheck(dim->mt,
+                                          dim->has_received_downstream_model,
+                                          dim->training_in_progress,
+                                          &precheck)) {
+        if (precheck == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED)
+            dim->create_new_model_queued = false;
         spinlock_unlock(&dim->slock);
-        return ML_WORKER_RESULT_OK;
+        return precheck;
     }
 
-    // Check if training is already in progress for this dimension
-    // If so, skip this training request to prevent concurrent access to dim->kmeans
-    if (dim->training_in_progress) {
-        spinlock_unlock(&dim->slock);
-        return ML_WORKER_RESULT_OK;
-    }
-
-    // Mark training as in progress
+    // Mark training as in progress and snapshot the generation so that
+    // ml_dimension_update_models() can detect a stop/reset that happened
+    // while training was running.
     dim->training_in_progress = true;
+    uint32_t generation = dim->reset_generation;
     spinlock_unlock(&dim->slock);
 
     auto P = ml_dimension_calculated_numbers(worker, dim);
@@ -708,36 +829,35 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         memcpy(worker->scratch_training_cns, worker->training_cns,
                training_response.total_values * sizeof(calculated_number_t));
 
-        size_t smoothing_window = (dim->rd->rrdset->update_every > nd_profile.update_every) ? 1 : Cfg.max_samples_to_smooth;
+        size_t smoothing_window = ml_dimension_smoothing_window(dim);
 
         ml_features_t features = {
             Cfg.diff_n, smoothing_window, Cfg.lag_n,
             worker->scratch_training_cns, training_response.total_values,
-            worker->training_cns, training_response.total_values,
-            worker->training_samples
+            worker->training_cns, training_response.total_values
         };
-        
+
         // Calculate dynamic sampling ratio based on expected output size
         // After diff and smooth, we'll have approximately this many vectors
         size_t expected_vectors = training_response.total_values;
         if (Cfg.diff_n > 0) expected_vectors--;
         if (smoothing_window > 1) expected_vectors = expected_vectors - smoothing_window + 1;
         expected_vectors = expected_vectors - Cfg.lag_n;
-        
+
         double sampling_ratio = 1.0;
         if (expected_vectors > Cfg.max_training_vectors) {
             sampling_ratio = (double)Cfg.max_training_vectors / expected_vectors;
         }
 
         // Apply sampling during lag feature extraction
-        ml_features_preprocess(&features, sampling_ratio);
+        ml_features_preprocess(&features, worker->training_samples, sampling_ratio);
 
         ml_kmeans_init(&dim->kmeans);
-        ml_kmeans_train(&dim->kmeans, &features,  Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+        ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
     }
 
     // update models
-    ml_dimension_update_models(worker, dim);
+    (void) ml_dimension_update_models(worker, dim, generation, /*from_downstream=*/false);
 
     return worker_result;
 }
@@ -756,42 +876,79 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     // Don't treat values that don't exist as anomalous
     if (!exists) {
         dim->cns.clear();
+        dim->cns_head = 0;
         spinlock_unlock(&dim->slock);
         return false;
     }
 
     // Save the value and return if we don't have enough values for a sample
-    unsigned n = Cfg.diff_n + Cfg.max_samples_to_smooth + Cfg.lag_n;
-    if (dim->cns.size() < n) {
+    size_t smoothing_window = ml_dimension_smoothing_window(dim);
+    unsigned n = Cfg.diff_n + smoothing_window + Cfg.lag_n;
+
+    size_t cns_size = dim->cns.size();
+
+    // The ring buffer modulus is derived from the current effective smoothing
+    // window. When the effective window changes, the existing history is only
+    // reusable if it is still a linear chronological prefix, which in this
+    // representation means cns_head == 0. Wrapped ring state from the old
+    // modulus must be discarded before warmup/indexing/linearization continue.
+    bool invalid_head = (cns_size > 0 && dim->cns_head >= cns_size);
+    bool size_changed_with_wrapped_state = (cns_size != n && dim->cns_head != 0);
+    bool shrunk_below_existing_history = (cns_size > n);
+    if (invalid_head || size_changed_with_wrapped_state || shrunk_below_existing_history) {
+        dim->cns.clear();
+        dim->cns_head = 0;
+        cns_size = 0;
+    }
+
+    if (cns_size < n) {
         dim->cns.push_back(value);
         spinlock_unlock(&dim->slock);
         return false;
     }
 
-    // Push the value and check if it's different from the last one
-    bool same_value = true;
-    std::rotate(std::begin(dim->cns), std::begin(dim->cns) + 1, std::end(dim->cns));
-    if (dim->cns[n - 1] != value)
-        same_value = false;
-    dim->cns[n - 1] = value;
+    // Compare incoming value against the most recent sample (newest_idx).
+    //
+    // The old std::rotate code compared against the oldest element being dropped — that
+    // was a side effect of rotate mechanics, not intentional design.
+    //
+    // Downstream effect: when same_value is false, we set dim->mt = METRIC_TYPE_VARIABLE.
+    // This controls two things:
+    //   1. ml_dimension_train_model() skips training when mt == METRIC_TYPE_CONSTANT.
+    //   2. Statistics reporting counts constant vs variable dimensions.
+    //
+    // Comparing against newest is safe (and more correct) because:
+    //   - For truly constant series, all elements are equal — either comparison works.
+    //   - For changing series, comparing against newest detects the transition on the
+    //     first differing tick. The old oldest-comparison could miss transitions when
+    //     the oldest element happened to equal the new value by coincidence.
+    //   - mt is reset to METRIC_TYPE_CONSTANT after each training cycle,
+    //     so a single false negative cannot cause a permanent misclassification.
+    size_t newest_idx = (dim->cns_head + n - 1) % n;
+    bool same_value = (dim->cns[newest_idx] == value);
+    dim->cns[dim->cns_head] = value;
+    dim->cns_head = (dim->cns_head + 1) % n;
 
     // Create the sample
-    assert((n * (Cfg.lag_n + 1) <= 128) &&
-           "Static buffers too small to perform prediction. "
-           "This should not be possible with the default clamping of feature extraction options");
     calculated_number_t src_cns[128];
     calculated_number_t dst_cns[128];
+    constexpr size_t src_cns_capacity = sizeof(src_cns) / sizeof(src_cns[0]);
+    constexpr size_t dst_cns_capacity = sizeof(dst_cns) / sizeof(dst_cns[0]);
+    fatal_assert((n <= src_cns_capacity && n <= dst_cns_capacity) &&
+                 "Static buffers too small to perform prediction. "
+                 "This should not be possible with the default clamping of feature extraction options");
 
-    memset(src_cns, 0, n * (Cfg.lag_n + 1) * sizeof(calculated_number_t));
-    memcpy(src_cns, dim->cns.data(), n * sizeof(calculated_number_t));
-    memcpy(dst_cns, dim->cns.data(), n * sizeof(calculated_number_t));
+    size_t first_chunk = n - dim->cns_head;
+    memcpy(src_cns, dim->cns.data() + dim->cns_head, first_chunk * sizeof(calculated_number_t));
+    if (dim->cns_head)
+        memcpy(src_cns + first_chunk, dim->cns.data(), dim->cns_head * sizeof(calculated_number_t));
+    memcpy(dst_cns, src_cns, n * sizeof(calculated_number_t));
 
     ml_features_t features = {
-        Cfg.diff_n, Cfg.max_samples_to_smooth, Cfg.lag_n,
-        dst_cns, n, src_cns, n,
-        dim->feature
+        Cfg.diff_n, smoothing_window, Cfg.lag_n,
+        dst_cns, n, src_cns, n
     };
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess_predict(&features, dim->feature);
 
     // Mark the metric time as variable if we received different values
     if (!same_value)
@@ -815,7 +972,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     for (const auto &km_ctx : dim->km_contexts) {
         models_consulted++;
 
-        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, features.preprocessed_features[0]);
+        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, dim->feature);
         if (std::isnan(anomaly_score))
             continue;
 
@@ -906,7 +1063,7 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
 #define WORKER_JOB_DETECTION_STATS 3
 
 static void
-ml_host_detect_once(ml_host_t *host)
+ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 {
     worker_is_busy(WORKER_JOB_DETECTION_COLLECT_STATS);
 
@@ -953,12 +1110,15 @@ ml_host_detect_once(ml_host_t *host)
                 auto &um = host->context_anomaly_rate;
                 auto it = um.find(key);
                 if (it == um.end()) {
-                    um[key] = ml_context_anomaly_rate_t {
+                    STRING *owned_key = string_dup(key);
+                    auto insert_result = um.emplace(owned_key, ml_context_anomaly_rate_t {
                         .rd = NULL,
                         .normal_dimensions = 0,
                         .anomalous_dimensions = 0
-                    };
-                    it = um.find(key);
+                    });
+                    if (!insert_result.second)
+                        string_freez(owned_key);
+                    it = insert_result.first;
                 }
 
                 it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
@@ -981,18 +1141,9 @@ ml_host_detect_once(ml_host_t *host)
         ml_update_dimensions_chart(host, mls_copy);
 
         worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0);
+        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0, owa);
     } else {
         host->host_anomaly_rate = 0.0;
-
-        auto &um = host->context_anomaly_rate;
-        for (auto &entry: um) {
-            entry.second = ml_context_anomaly_rate_t {
-                .rd = NULL,
-                .normal_dimensions = 0,
-                .anomalous_dimensions = 0
-            };
-        }
     }
 }
 
@@ -1009,6 +1160,13 @@ void ml_detect_main(void *arg)
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
 
+    // Single onewayalloc arena reused across every host and loop iteration
+    // for the whole detect thread lifetime — one mmap/munmap pair instead
+    // of one per host per second. The arena is reset between hosts inside
+    // ml_update_host_and_detection_rate_charts, so peak memory stays bounded
+    // by a single host's anomaly-rate query scratch.
+    ONEWAYALLOC *detect_owa = onewayalloc_create(0);
+
     while (!Cfg.detection_stop && service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb);
@@ -1022,7 +1180,7 @@ void ml_detect_main(void *arg)
             if (!service_running(SERVICE_COLLECTORS))
                 break;
 
-            ml_host_detect_once((ml_host_t *) rh->ml_host);
+            ml_host_detect_once((ml_host_t *) rh->ml_host, detect_owa);
         }
         rrd_rdunlock();
 
@@ -1039,6 +1197,9 @@ void ml_detect_main(void *arg)
             }
         }
     }
+
+    onewayalloc_destroy(detect_owa);
+
     Cfg.training_stop = true;
     finalize_self_prepared_sql_statements();
 }
@@ -1109,9 +1270,6 @@ static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_
 }
 
 static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, ml_request_add_existing_model_t req) {
-    UNUSED(worker);
-    UNUSED(req);
-
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
@@ -1124,18 +1282,55 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         return ML_WORKER_RESULT_OK;
     }
 
-    // Check if training is in progress and skip if so to avoid race condition
+    ml_host_t *host = (ml_host_t *) Dim->rd->rrdset->rrdhost->ml_host;
+    if (!host || !host->ml_running) {
+        pulse_ml_models_ignored();
+        return ML_WORKER_RESULT_OK;
+    }
+
     spinlock_lock(&Dim->slock);
+
+    // Loop detection: skip if we already have this exact model.
+    // The (after, before) pair uniquely identifies a model per dimension and is
+    // preserved across hops, so a model that loops back is detected as a duplicate.
+    for (const auto &km : Dim->km_contexts) {
+        if (km.after == req.inlined_km.after && km.before == req.inlined_km.before) {
+            spinlock_unlock(&Dim->slock);
+            pulse_ml_models_ignored();
+            return ML_WORKER_RESULT_OK;
+        }
+    }
+
+    // Reject models that are not newer than the newest accepted model. This
+    // prevents an older model from being re-accepted after it has been evicted
+    // from km_contexts and later loops back from downstream.
+    if (!Dim->km_contexts.empty()) {
+        const auto &latest_km = Dim->km_contexts.back();
+        if (req.inlined_km.before <= latest_km.before) {
+            spinlock_unlock(&Dim->slock);
+            pulse_ml_models_ignored();
+            return ML_WORKER_RESULT_OK;
+        }
+    }
+
+    // Skip if training is in progress to avoid race condition.
     if (Dim->training_in_progress) {
         spinlock_unlock(&Dim->slock);
         pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;
     }
-    spinlock_unlock(&Dim->slock);
 
+    // Stage the incoming kmeans into the dim's working buffer; the actual
+    // install into km_contexts and the has_received_downstream_model flag-set
+    // happen inside ml_dimension_update_models() under the same slock as the
+    // publish-check, so a concurrent ml_host_stop() either commits both or
+    // cancels both.
     Dim->kmeans = req.inlined_km;
-    ml_dimension_update_models(worker, Dim);
-    pulse_ml_models_received();
+    uint32_t generation = Dim->reset_generation;
+    spinlock_unlock(&Dim->slock);
+    if (ml_dimension_update_models(worker, Dim, generation, /*from_downstream=*/true))
+        pulse_ml_models_received();
+
     return ML_WORKER_RESULT_OK;
 }
 
@@ -1184,7 +1379,7 @@ void ml_train_main(void *arg) {
         switch (item.type) {
             case ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL: {
                 worker_res = ml_worker_create_new_model(worker, item.create_new_model);
-                if (worker_res != ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION) {
+                if (ml_should_requeue_create_new_model(worker_res)) {
                     ml_queue_push(worker->queue, item);
                 }
                 break;
@@ -1233,6 +1428,12 @@ void ml_train_main(void *arg) {
                     break;
                 case ML_WORKER_RESULT_CHART_UNDER_REPLICATION:
                     loop_stats.item_result_chart_under_replication = 1;
+                    break;
+                case ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED:
+                    loop_stats.item_result_ok = 1;
+                    break;
+                case ML_WORKER_RESULT_TRAINING_IN_PROGRESS:
+                    loop_stats.item_result_ok = 1;
                     break;
             }
 

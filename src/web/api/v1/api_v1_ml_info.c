@@ -6,7 +6,7 @@ int api_v1_ml_info(RRDHOST *host, struct web_client *w, char *url) {
     (void) url;
 #if defined(ENABLE_ML)
 
-    if (!netdata_ready)
+    if (!netdata_ready_load())
         return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;

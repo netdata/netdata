@@ -49,8 +49,7 @@ func TestPipelineManager_Start(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			var sentGroups []*confgroup.Group
 			var mu sync.Mutex
@@ -83,8 +82,7 @@ func TestPipelineManager_Start(t *testing.T) {
 
 func TestPipelineManager_Stop(t *testing.T) {
 	t.Run("stop sends removal for tracked sources", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		var sentGroups []*confgroup.Group
 		var mu sync.Mutex
@@ -146,8 +144,7 @@ func TestPipelineManager_Stop(t *testing.T) {
 
 func TestPipelineManager_Restart(t *testing.T) {
 	t.Run("restart uses grace period for overlapping sources", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		var sentGroups []*confgroup.Group
 		var mu sync.Mutex
@@ -226,8 +223,7 @@ func TestPipelineManager_Restart(t *testing.T) {
 	})
 
 	t.Run("restart with invalid config keeps old pipeline", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		callCount := 0
 		m := NewPipelineManager(
@@ -258,8 +254,7 @@ func TestPipelineManager_Restart(t *testing.T) {
 
 func TestPipelineManager_StopAll(t *testing.T) {
 	t.Run("stops all pipelines and sends removals", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		var sentGroups []*confgroup.Group
 		var mu sync.Mutex
@@ -300,8 +295,7 @@ func TestPipelineManager_StopAll(t *testing.T) {
 
 func TestPipelineManager_RunGracePeriodCleanup(t *testing.T) {
 	t.Run("expired pending removals are cleaned up", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		var sentGroups []*confgroup.Group
 		var mu sync.Mutex
@@ -349,8 +343,7 @@ func TestPipelineManager_RunGracePeriodCleanup(t *testing.T) {
 	})
 
 	t.Run("non-expired pending removals are preserved", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		var sentGroups []*confgroup.Group
 		var mu sync.Mutex
@@ -398,8 +391,7 @@ func TestPipelineManager_RunGracePeriodCleanup(t *testing.T) {
 }
 
 func TestPipelineManager_IsRunning(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	m := NewPipelineManager(
 		logger.New(),
@@ -418,8 +410,7 @@ func TestPipelineManager_IsRunning(t *testing.T) {
 }
 
 func TestPipelineManager_Keys(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	m := NewPipelineManager(
 		logger.New(),
@@ -442,8 +433,7 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 	// happen in production (ServiceDiscovery.run() processes events sequentially).
 	// This test verifies concurrent operations on DIFFERENT keys work correctly.
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Track created and stopped pipelines to detect leaks
 	var created, stopped atomic.Int64
@@ -462,7 +452,7 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Concurrent starts for different keys
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -472,7 +462,7 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 	}
 
 	// Concurrent IsRunning checks
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -481,19 +471,17 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 	}
 
 	// Concurrent Keys checks
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			_ = m.Keys()
-		}()
+		})
 	}
 
 	wg.Wait()
 
 	// Should have 10 pipelines running (one per unique key)
 	assert.Len(t, m.Keys(), 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		assert.True(t, m.IsRunning(fmt.Sprintf("pipeline-%d", i)))
 	}
 

@@ -1,0 +1,15 @@
+pattern: json
+
+rename:
+  - new_key: MESSAGE
+    old_key: LOG
+  - new_key: CONTAINER_STREAM
+    old_key: STREAM
+  - new_key: CONTAINER_TIME
+    old_key: TIME
+
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: docker-container
+  - key: PRIORITY
+    value: 6

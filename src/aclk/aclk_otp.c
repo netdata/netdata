@@ -17,18 +17,20 @@ static https_client_resp_t aclk_https_request(https_req_t *request, https_req_re
         (char **)&proxy_conf.proxy_destination,
         &proxy_conf.type);
 
-    if (proxy_conf.type == MQTT_WSS_PROXY_HTTP) {
+    if (proxy_conf.type != MQTT_WSS_DIRECT) {
         request->proxy_host = (char *)proxy_conf.host;
         request->proxy_port = proxy_conf.port;
         request->proxy_username = proxy_conf.username;
         request->proxy_password = proxy_conf.password;
         request->proxy = proxy_conf.proxy_destination;
+        request->proxy_type = proxy_conf.type;
     }
 
     rc = https_request(request, response, fallback_ipv4);
     freez((char*)proxy_conf.host);
     freez((char*)proxy_conf.username);
-    freez((char*)proxy_conf.password);
+    char *proxy_password = (char *)proxy_conf.password;
+    aclk_sensitive_free(&proxy_password);
     return rc;
 }
 

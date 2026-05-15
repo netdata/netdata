@@ -5,7 +5,9 @@ package logger
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
@@ -19,11 +21,22 @@ var isJournal = isStderrConnectedToJournal()
 var pluginAttr = slog.String("plugin", executable.Name)
 
 func New() *Logger {
-	if isTerm {
-		// skip 2 slog pkg calls, 2 this pkg calls
-		return &Logger{sl: slog.New(withTerminalCallDepth(4, newTerminalHandler())), rl: newRateLimiter()}
+	return newLogger(os.Stderr, isTerm, 4)
+}
+
+func NewWithWriter(w io.Writer) *Logger {
+	if w == nil {
+		w = os.Stderr
 	}
-	return &Logger{sl: slog.New(newTextHandler()).With(pluginAttr), rl: newRateLimiter()}
+	return newLogger(w, false, 4)
+}
+
+func newLogger(w io.Writer, isTerminal bool, depth int) *Logger {
+	if isTerminal {
+		// skip 2 slog pkg calls, 2 this pkg calls
+		return &Logger{sl: slog.New(withTerminalCallDepth(depth, newTerminalHandler(w))), rl: newRateLimiter()}
+	}
+	return &Logger{sl: slog.New(newTextHandler(w)).With(pluginAttr), rl: newRateLimiter()}
 }
 
 type Logger struct {

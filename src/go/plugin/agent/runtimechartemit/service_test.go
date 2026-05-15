@@ -117,8 +117,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 
 				job.runOnce(2)
 				result := out.String()
-				assert.Contains(t, result, "CHART")
-				assert.Contains(t, result, "BEGIN")
+				requireInOrder(t, result, "HOST ''", "CHART", "BEGIN")
 			},
 		},
 		"runtime job observes all visible runtime series (not only latest seq)": {
@@ -152,6 +151,36 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 				assert.Contains(t, result, "DIMENSION 'b' 'b' 'absolute'")
 			},
 		},
+		"runtime job keeps emitting on no-write ticks": {
+			run: func(t *testing.T) {
+				reg := newComponentRegistry()
+				store := metrix.NewRuntimeStore()
+				store.Write().StatefulMeter("component").Gauge("load").Set(7)
+
+				reg.upsert(componentSpec{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
+					UpdateEvery:  1,
+					EmitEnv: chartemit.EmitEnv{
+						TypeID:      "netdata.go.d.internal.component",
+						UpdateEvery: 1,
+						Plugin:      "go.d",
+						Module:      "internal",
+						JobName:     "component",
+					},
+				})
+
+				var out bytes.Buffer
+				job := newRuntimeMetricsJob(&out, reg, nil)
+				job.runOnce(1)
+				require.Contains(t, out.String(), "BEGIN")
+
+				out.Reset()
+				job.runOnce(2)
+				assert.Contains(t, out.String(), "BEGIN")
+			},
+		},
 		"runtime job emits obsolete chart when component is removed": {
 			run: func(t *testing.T) {
 				reg := newComponentRegistry()
@@ -181,8 +210,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 				reg.remove("component")
 				job.runOnce(2)
 				result := out.String()
-				assert.Contains(t, result, "CHART 'netdata.go.d.internal.component.component_load'")
-				assert.Contains(t, result, "'obsolete'")
+				requireInOrder(t, result, "HOST ''", "CHART 'netdata.go.d.internal.component.component_load'", "'obsolete'")
 			},
 		},
 	}

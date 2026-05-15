@@ -1,5 +1,9 @@
 extends:
   - _system-base.yaml
+  - _std-lldp-mib.yaml
+  - _std-topology-fdb-arp-mib.yaml
+  - _std-topology-q-bridge-mib.yaml
+  - _std-topology-stp-mib.yaml
 
 metadata:
   device:

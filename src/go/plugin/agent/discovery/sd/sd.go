@@ -55,6 +55,11 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
 	}
+	if provider, ok := cfg.FnReg.(interface {
+		TerminalFinalizer() functions.TerminalFinalizer
+	}); ok {
+		d.dyncfgApi.SetTerminalFinalizer(provider.TerminalFinalizer())
+	}
 	d.newPipeline = func(config pipeline.Config) (sdPipeline, error) {
 		return pipeline.New(config, d.newDiscoverersFromRegistry)
 	}
@@ -118,6 +123,9 @@ type (
 
 // SetDyncfgResponder allows overriding the default responder (e.g., to silence output in tests).
 func (d *ServiceDiscovery) SetDyncfgResponder(api *dyncfg.Responder) {
+	if api != nil && d.dyncfgApi != nil {
+		api.SetTerminalFinalizer(d.dyncfgApi.TerminalFinalizer())
+	}
 	dyncfg.BindResponder(&d.dyncfgApi, d.handler, api)
 }
 
@@ -149,14 +157,11 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() { defer wg.Done(); d.confProv.run(ctx) }()
+	wg.Go(func() { d.confProv.run(ctx) })
 
-	wg.Add(1)
-	go func() { defer wg.Done(); d.run(ctx) }()
+	wg.Go(func() { d.run(ctx) })
 
-	wg.Add(1)
-	go func() { defer wg.Done(); d.mgr.RunGracePeriodCleanup(ctx) }()
+	wg.Go(func() { d.mgr.RunGracePeriodCleanup(ctx) })
 
 	wg.Wait()
 
@@ -167,12 +172,13 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 func (d *ServiceDiscovery) run(ctx context.Context) {
 	for {
 		if d.handler.WaitingForDecision() {
-			// Waiting for enable/disable command - only process dyncfg commands
-			select {
-			case <-ctx.Done():
+			step, ok := d.handler.NextWaitDecisionStep(ctx, d.dyncfgCh)
+			if !ok {
 				return
-			case fn := <-d.dyncfgCh:
-				d.dyncfgSeqExec(fn)
+			}
+			if step.HasCommand {
+				d.dyncfgSeqExec(step.Command)
+				continue
 			}
 		} else {
 			select {

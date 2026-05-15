@@ -340,7 +340,7 @@ func TestFuncTable_Handle(t *testing.T) {
 			functionID: "test",
 			prepareMock: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows([]string{"n"})
-				for i := 0; i < 150; i++ {
+				for i := range 150 {
 					rows.AddRow(i)
 				}
 				m.ExpectQuery("SELECT n").WillReturnRows(rows)

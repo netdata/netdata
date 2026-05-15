@@ -13,8 +13,8 @@ type Collector struct {
 
 	Config             Config
 	State              *CollectorState
-	registeredContexts []interface{} // All contexts from generated code
-	contextMap         map[string]interface{}
+	registeredContexts []any // All contexts from generated code
+	contextMap         map[string]any
 	charts             *collectorapi.Charts
 	impl               CollectorImpl        // The actual collector implementation
 	globalLabels       []collectorapi.Label // Job-level labels applied to all charts
@@ -26,7 +26,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	// Initialize state
 	c.State = NewCollectorState()
 	c.State.collector = &c.Base // Set logger reference
-	c.contextMap = make(map[string]interface{})
+	c.contextMap = make(map[string]any)
 	c.charts = &collectorapi.Charts{}
 	c.globalLabels = make([]collectorapi.Label, 0)
 	c.instanceCharts = make(map[string]struct{})
@@ -216,7 +216,7 @@ func cleanLabelValue(value string) string {
 }
 
 // createChartFromContext creates a go.d chart from a Context[T]
-func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, instance *Instance) *collectorapi.Chart {
+func (c *Collector) createChartFromContext(ctx any, instanceID string, instance *Instance) *collectorapi.Chart {
 	// Use reflection to extract context metadata
 	contextMeta := extractContextMetadata(ctx)
 	if contextMeta == nil {
@@ -308,11 +308,11 @@ func (c *Collector) markChartsObsolete(instanceKey string) {
 }
 
 // Helper method for collectors to register generated contexts
-func (c *Collector) RegisterContexts(contexts ...interface{}) {
+func (c *Collector) RegisterContexts(contexts ...any) {
 	c.registeredContexts = append(c.registeredContexts, contexts...)
 	// Build context map for quick lookup
 	if c.contextMap == nil {
-		c.contextMap = make(map[string]interface{})
+		c.contextMap = make(map[string]any)
 	}
 	for _, ctx := range contexts {
 		name := extractContextName(ctx)

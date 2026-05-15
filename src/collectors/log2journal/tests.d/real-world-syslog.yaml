@@ -1,0 +1,20 @@
+pattern: |
+  (?x)
+  ^(?P<SYSLOG_TIMESTAMP>\w{3} \s+ \d{1,2} \s+ \d{2}:\d{2}:\d{2}) \s+
+  (?P<SYSLOG_HOSTNAME>[^ ]+) \s+
+  (?P<SYSLOG_TAG>[^:\[\]]+)(?:\[(?P<SYSLOG_PID>\d+)\])?: \s+
+  (?P<MESSAGE>.*)
+
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: '${SYSLOG_TAG}'
+  - key: PRIORITY
+    value: 6
+
+rewrite:
+  - key: PRIORITY
+    match: '.*[Ff]ailed.*|.*[Ee]rror.*'
+    value: 3
+  - key: PRIORITY
+    match: '.*[Ww]arn.*'
+    value: 4

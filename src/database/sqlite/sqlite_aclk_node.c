@@ -26,7 +26,7 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
 
 static void build_node_collectors(RRDHOST *host)
 {
-    struct aclk_sync_cfg_t *aclk_host_config = host->aclk_host_config;
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
     struct update_node_collectors upd_node_collectors;
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
@@ -49,7 +49,7 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
 {
     struct update_node_info node_info;
 
-    struct aclk_sync_cfg_t *aclk_host_config = host->aclk_host_config;
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
     CLAIM_ID claim_id = claim_id_get();
 
@@ -71,11 +71,13 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
     if (host != localhost && !is_virtual_host)
         host_version = stream_receiver_program_version_strdupz(host);
 
+    RRDHOST_TZ host_tz = rrdhost_tz_get(host);
+
     node_info.data.name = rrdhost_hostname(host);
     node_info.data.os = rrdhost_os(host);
     node_info.data.version = host_version ? host_version : NETDATA_VERSION;
     node_info.data.release_channel = get_release_channel();
-    node_info.data.timezone = rrdhost_abbrev_timezone(host);
+    node_info.data.timezone = host_tz.abbrev_timezone;
     node_info.data.custom_info = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
     node_info.data.machine_guid = host->machine_guid;
     node_info.node_capabilities = (struct capability *)aclk_get_agent_capas();
@@ -94,6 +96,7 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
         host == localhost ? "parent" : "child");
 
     rrd_rdunlock();
+    rrdhost_tz_free(&host_tz);
     freez(node_info.node_instance_capabilities);
     freez(host_version);
 
@@ -102,7 +105,7 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
 
 void send_node_info_with_wait(RRDHOST *host)
 {
-    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
+    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE)))
         return;
 
     // No node_id means cloud doesn't know about this node - nothing to update
@@ -127,7 +130,7 @@ void send_node_info_with_wait(RRDHOST *host)
 
 void send_node_update_with_wait(RRDHOST *host, int live, int queryable)
 {
-    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
+    if (unlikely(!host || !__atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE)))
         return;
 
     // No node_id means cloud doesn't know about this node - nothing to update
@@ -174,7 +177,7 @@ void aclk_check_node_info_and_collectors(void)
     time_t now = now_realtime_sec();
     dfe_start_reentrant(rrdhost_root_index, host)
     {
-        struct aclk_sync_cfg_t *aclk_host_config = host->aclk_host_config;
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (unlikely(!aclk_host_config))
             continue;
 

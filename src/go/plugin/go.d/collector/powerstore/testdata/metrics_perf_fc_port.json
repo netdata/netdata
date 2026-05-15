@@ -1,0 +1,1 @@
+[{"fe_port_id":"FC1","appliance_id":"A1","node_id":"N1","read_iops":300.0,"write_iops":200.0,"total_iops":500.0,"read_bandwidth":31457280,"write_bandwidth":20971520,"total_bandwidth":52428800,"avg_read_latency":180.0,"avg_write_latency":250.0,"avg_latency":210.0}]

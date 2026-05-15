@@ -46,8 +46,8 @@
             description: "You can change `EMAIL_SENDER` to the email address sending the notifications."
             required: false
           - name: 'SEND_EMAIL'
-            default_value: 'YES'
-            description: "Set `SEND_EMAIL` to YES"
+            default_value: 'AUTO'
+            description: "Set `SEND_EMAIL` to YES, NO, or AUTO (enables email when sendmail is available)."
             required: true
           - name: 'DEFAULT_RECIPIENT_EMAIL'
             default_value: 'root'

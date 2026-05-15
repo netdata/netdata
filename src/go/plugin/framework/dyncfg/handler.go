@@ -3,8 +3,10 @@
 package dyncfg
 
 import (
+	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -18,6 +20,10 @@ type Callbacks[C Config] interface {
 	// ParseAndValidate parses payload into a config with dyncfg metadata set.
 	// Includes all validation (including heavy checks like module instantiation).
 	ParseAndValidate(fn Function, name string) (C, error)
+
+	// ValidateJobName enforces the domain's job-name policy. Called before
+	// ParseAndValidate so cheap name-format rejections happen without parsing payload.
+	ValidateJobName(name string) error
 
 	// Start creates a work unit and starts it. Owns the full start lifecycle
 	// including pre-start cleanup and post-fail retry scheduling.
@@ -48,14 +54,21 @@ type CodedError interface {
 	Code() int
 }
 
+// CommandMessageSource optionally provides a success/warning message
+// for the command that just completed.
+type CommandMessageSource interface {
+	TakeCommandMessage() string
+}
+
 // HandlerOpts configures the handler with component-specific settings.
 type HandlerOpts[C Config] struct {
-	Logger    *logger.Logger
-	API       *Responder
-	Seen      *SeenCache[C]
-	Exposed   *ExposedCache[C]
-	Callbacks Callbacks[C]
-	WaitKey   func(cfg C) string // optional key used to gate config processing until enable/disable
+	Logger      *logger.Logger
+	API         *Responder
+	Seen        *SeenCache[C]
+	Exposed     *ExposedCache[C]
+	Callbacks   Callbacks[C]
+	WaitKey     func(cfg C) string // optional key used to gate config processing until enable/disable
+	WaitTimeout time.Duration      // optional timeout for decision wait; zero keeps wait open until matching command
 
 	Path                    string    // dyncfg path (e.g. "/collectors/go.d/Jobs")
 	EnableFailCode          int       // response code for enable failure (jobmgr: 200, SD: 422)
@@ -76,9 +89,195 @@ type Handler[C Config] struct {
 	enableFailCode          int
 	removeStockOnEnableFail bool
 	jobCommands             []Command
-	waitKeyFn               func(cfg C) string
-	waitKey                 string
-	waitMu                  sync.RWMutex
+	waitGate                *waitGate[C]
+}
+
+func takeCommandMessage[C Config](cb Callbacks[C]) string {
+	msgSrc, ok := any(cb).(CommandMessageSource)
+	if !ok {
+		return ""
+	}
+	return msgSrc.TakeCommandMessage()
+}
+
+// WaitTimeoutEvent describes a wait gate timeout transition.
+type WaitTimeoutEvent struct {
+	Key       string
+	Elapsed   time.Duration
+	Threshold time.Duration
+}
+
+// WaitDecisionStep is one serialized wait-loop transition.
+type WaitDecisionStep struct {
+	Command    Function
+	HasCommand bool
+	Timeout    WaitTimeoutEvent
+	TimedOut   bool
+}
+
+// waitGate encapsulates wait-for-decision state and timing orchestration.
+type waitGate[C Config] struct {
+	keyFn    func(cfg C) string
+	timeout  time.Duration
+	key      string
+	since    time.Time
+	deadline time.Time
+	mu       sync.RWMutex
+	now      func() time.Time
+}
+
+func newWaitGate[C Config](keyFn func(cfg C) string, timeout time.Duration) *waitGate[C] {
+	return &waitGate[C]{
+		keyFn:   keyFn,
+		timeout: timeout,
+		now:     time.Now,
+	}
+}
+
+func (wg *waitGate[C]) waitForDecision(cfg C) {
+	if wg.keyFn == nil {
+		return
+	}
+	key := wg.keyFn(cfg)
+	if key == "" {
+		return
+	}
+
+	wg.mu.Lock()
+	wg.key = key
+	wg.since = time.Time{}
+	wg.deadline = time.Time{}
+	if wg.timeout > 0 {
+		now := wg.nowTime()
+		wg.since = now
+		wg.deadline = now.Add(wg.timeout)
+	}
+	wg.mu.Unlock()
+}
+
+func (wg *waitGate[C]) waitingForDecision() bool {
+	wg.mu.RLock()
+	defer wg.mu.RUnlock()
+	return wg.key != ""
+}
+
+func (wg *waitGate[C]) decisionRemaining() (time.Duration, bool) {
+	wg.mu.RLock()
+	defer wg.mu.RUnlock()
+
+	if wg.timeout <= 0 || wg.key == "" || wg.deadline.IsZero() {
+		return 0, false
+	}
+	now := wg.nowTime()
+	if now.After(wg.deadline) || now.Equal(wg.deadline) {
+		return 0, true
+	}
+	return wg.deadline.Sub(now), true
+}
+
+func (wg *waitGate[C]) nextStep(ctx context.Context, dyncfgCh <-chan Function) (WaitDecisionStep, bool) {
+	var step WaitDecisionStep
+
+	waitFor, hasTimeout := wg.decisionRemaining()
+	if !hasTimeout {
+		select {
+		case <-ctx.Done():
+			return step, false
+		case fn := <-dyncfgCh:
+			step.Command = fn
+			step.HasCommand = true
+			return step, true
+		}
+	}
+
+	timer := time.NewTimer(waitFor)
+	defer func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return step, false
+	case fn := <-dyncfgCh:
+		step.Command = fn
+		step.HasCommand = true
+		return step, true
+	case <-timer.C:
+		step.Timeout, step.TimedOut = wg.expireDecision()
+		return step, true
+	}
+}
+
+func (wg *waitGate[C]) expireDecision() (WaitTimeoutEvent, bool) {
+	var event WaitTimeoutEvent
+
+	if wg.timeout <= 0 {
+		return event, false
+	}
+	now := wg.nowTime()
+
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+
+	if wg.key == "" || wg.deadline.IsZero() || now.Before(wg.deadline) {
+		return event, false
+	}
+
+	event.Key = wg.key
+	event.Threshold = wg.timeout
+	if !wg.since.IsZero() && now.After(wg.since) {
+		event.Elapsed = now.Sub(wg.since)
+	} else {
+		event.Elapsed = wg.timeout
+	}
+
+	wg.clearLocked()
+	return event, true
+}
+
+func (wg *waitGate[C]) currentKey() string {
+	wg.mu.RLock()
+	defer wg.mu.RUnlock()
+	return wg.key
+}
+
+func (wg *waitGate[C]) keyFor(cfg C) string {
+	if wg.keyFn == nil {
+		return ""
+	}
+	return wg.keyFn(cfg)
+}
+
+func (wg *waitGate[C]) clearIfMatch(key string) {
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+	if wg.key == key {
+		wg.clearLocked()
+	}
+}
+
+func (wg *waitGate[C]) clearLocked() {
+	wg.key = ""
+	wg.since = time.Time{}
+	wg.deadline = time.Time{}
+}
+
+func (wg *waitGate[C]) nowTime() time.Time {
+	if wg.now != nil {
+		return wg.now()
+	}
+	return time.Now()
+}
+
+func (wg *waitGate[C]) setNow(now func() time.Time) {
+	wg.mu.Lock()
+	wg.now = now
+	wg.mu.Unlock()
 }
 
 func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
@@ -92,7 +291,7 @@ func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
 		enableFailCode:          opts.EnableFailCode,
 		removeStockOnEnableFail: opts.RemoveStockOnEnableFail,
 		jobCommands:             opts.JobCommands,
-		waitKeyFn:               opts.WaitKey,
+		waitGate:                newWaitGate(opts.WaitKey, opts.WaitTimeout),
 	}
 }
 
@@ -138,40 +337,40 @@ func (h *Handler[C]) RemoveDiscoveredConfig(cfg C) (*Entry[C], bool) {
 // WaitForDecision blocks non-dyncfg config processing until a matching
 // enable/disable command is observed for the provided config.
 func (h *Handler[C]) WaitForDecision(cfg C) {
-	if h.waitKeyFn == nil {
-		return
-	}
-	key := h.waitKeyFn(cfg)
-	if key == "" {
-		return
-	}
-	h.waitMu.Lock()
-	h.waitKey = key
-	h.waitMu.Unlock()
+	h.waitGate.waitForDecision(cfg)
 }
 
 // WaitingForDecision reports whether config processing should currently wait
 // for a matching enable/disable command.
 func (h *Handler[C]) WaitingForDecision() bool {
-	h.waitMu.RLock()
-	defer h.waitMu.RUnlock()
-	return h.waitKey != ""
+	return h.waitGate.waitingForDecision()
+}
+
+// WaitDecisionRemaining returns time until wait gate timeout.
+func (h *Handler[C]) WaitDecisionRemaining() (time.Duration, bool) {
+	return h.waitGate.decisionRemaining()
+}
+
+// NextWaitDecisionStep blocks until either a dyncfg command arrives, wait timeout fires, or context is canceled.
+// It centralizes wait-loop orchestration so caller logic stays minimal.
+func (h *Handler[C]) NextWaitDecisionStep(ctx context.Context, dyncfgCh <-chan Function) (WaitDecisionStep, bool) {
+	return h.waitGate.nextStep(ctx, dyncfgCh)
+}
+
+// ExpireWaitDecision clears the current wait gate when it exceeds configured timeout.
+func (h *Handler[C]) ExpireWaitDecision() (WaitTimeoutEvent, bool) {
+	return h.waitGate.expireDecision()
 }
 
 // SyncDecision updates wait-state based on the incoming command.
 // Only a matching enable/disable command clears the current wait key.
 func (h *Handler[C]) SyncDecision(fn Function) {
-	if h.waitKeyFn == nil {
-		return
-	}
 	cmd := fn.Command()
 	if cmd != CommandEnable && cmd != CommandDisable {
 		return
 	}
 
-	h.waitMu.RLock()
-	waitKey := h.waitKey
-	h.waitMu.RUnlock()
+	waitKey := h.waitGate.currentKey()
 	if waitKey == "" {
 		return
 	}
@@ -184,15 +383,11 @@ func (h *Handler[C]) SyncDecision(fn Function) {
 	if !ok {
 		return
 	}
-	if h.waitKeyFn(entry.Cfg) != waitKey {
+	if h.waitGate.keyFor(entry.Cfg) != waitKey {
 		return
 	}
 
-	h.waitMu.Lock()
-	if h.waitKey == waitKey {
-		h.waitKey = ""
-	}
-	h.waitMu.Unlock()
+	h.waitGate.clearIfMatch(waitKey)
 }
 
 // NotifyJobCreate registers/updates a config in the dyncfg API (upsert).
@@ -246,7 +441,7 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 		return
 	}
 
-	if err := ValidateJobName(name); err != nil {
+	if err := h.cb.ValidateJobName(name); err != nil {
 		h.api.SendCodef(fn, 400, "invalid job name '%s': %v.", name, err)
 		return
 	}
@@ -329,7 +524,7 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 	}
 
 	entry.Status = StatusRunning
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobStatus(entry.Cfg, StatusRunning)
 	h.cb.OnStatusChange(entry, oldStatus, fn)
 }
@@ -360,7 +555,7 @@ func (h *Handler[C]) CmdDisable(fn Function) {
 	h.cb.Stop(entry.Cfg)
 
 	entry.Status = StatusDisabled
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobStatus(entry.Cfg, StatusDisabled)
 	h.cb.OnStatusChange(entry, oldStatus, fn)
 }
@@ -388,7 +583,7 @@ func (h *Handler[C]) CmdRemove(fn Function) {
 	h.exposed.Remove(entry.Cfg)
 	h.cb.Stop(entry.Cfg)
 
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobRemove(entry.Cfg)
 }
 
@@ -455,7 +650,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 		if isConversion {
 			h.NotifyJobCreate(newCfg, StatusDisabled)
 		}
-		h.api.SendCodef(fn, 200, "")
+		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 		h.NotifyJobStatus(newCfg, StatusDisabled)
 		h.cb.OnStatusChange(newEntry, oldStatus, fn)
 		return
@@ -469,6 +664,18 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	}
 
 	if err != nil {
+		if !isConversion && errors.Is(err, ErrNonDisruptiveUpdate) {
+			// Update failed before runtime disruption; rollback to old cache state.
+			h.seen.Remove(newCfg)
+			h.seen.Add(oldCfg)
+			h.exposed.Add(entry)
+
+			h.api.SendCodef(fn, 200, "%v", err)
+			h.NotifyJobStatus(oldCfg, oldStatus)
+			// No OnStatusChange call here: effective state did not change.
+			return
+		}
+
 		newEntry.Status = StatusFailed
 		if isConversion {
 			h.NotifyJobCreate(newCfg, StatusFailed)
@@ -483,7 +690,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	if isConversion {
 		h.NotifyJobCreate(newCfg, StatusRunning)
 	}
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobStatus(newCfg, StatusRunning)
 	h.cb.OnStatusChange(newEntry, oldStatus, fn)
 }

@@ -1,0 +1,1 @@
+[{"volume_id":"V1","appliance_id":"A1","read_iops":500.2,"write_iops":300.1,"total_iops":800.3,"read_bandwidth":52428800,"write_bandwidth":31457280,"total_bandwidth":83886080,"avg_read_latency":200.0,"avg_write_latency":300.0,"avg_latency":240.0}]

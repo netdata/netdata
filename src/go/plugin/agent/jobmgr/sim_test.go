@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,14 +39,56 @@ type runSim struct {
 	wantDyncfg     string
 }
 
+const funcResultEndMarker = "FUNCTION_RESULT_END\n\n"
+
+type simOutput struct {
+	mu sync.Mutex
+
+	buf             bytes.Buffer
+	funcResultCount int
+	tail            string
+}
+
+func (o *simOutput) Write(p []byte) (int, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	n, err := o.buf.Write(p)
+	if n > 0 {
+		data := o.tail + string(p[:n])
+		o.funcResultCount += strings.Count(data, funcResultEndMarker)
+
+		tailLen := len(funcResultEndMarker) - 1
+		if len(data) > tailLen {
+			o.tail = data[len(data)-tailLen:]
+		} else {
+			o.tail = data
+		}
+	}
+
+	return n, err
+}
+
+func (o *simOutput) String() string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.String()
+}
+
+func (o *simOutput) FuncResultCount() int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.funcResultCount
+}
+
 func (s *runSim) run(t *testing.T) {
 	t.Helper()
 
 	require.NotNil(t, s.do, "s.do is nil")
 
-	var buf bytes.Buffer
+	var out simOutput
 	mgr := New(Config{PluginName: testPluginName})
-	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
 	mgr.modules = prepareMockRegistry()
 
 	done := make(chan struct{})
@@ -63,6 +106,21 @@ func (s *runSim) run(t *testing.T) {
 	}
 
 	s.do(mgr, grpCh)
+
+	expectedResults := strings.Count(s.wantDyncfg, "FUNCTION_RESULT_END")
+	require.Eventually(t, func() bool {
+		return countDiscovered(mgr) == len(s.wantDiscovered) &&
+			mgr.collectorSeen.Count() == len(s.wantSeen) &&
+			mgr.collectorExposed.Count() == len(s.wantExposed) &&
+			runningSetMatches(mgr.runningJobs.snapshot(), s.wantRunning) &&
+			out.FuncResultCount() >= expectedResults
+	}, timeout, 10*time.Millisecond, "manager state did not settle before shutdown")
+
+	runningBeforeShutdown := make(map[string]struct{})
+	for _, job := range mgr.runningJobs.snapshot() {
+		runningBeforeShutdown[job.FullName()] = struct{}{}
+	}
+
 	cancel()
 
 	select {
@@ -72,13 +130,21 @@ func (s *runSim) run(t *testing.T) {
 	}
 
 	var lines []string
-	for _, s := range strings.Split(buf.String(), "\n") {
+	skipNextEmpty := false
+	for s := range strings.SplitSeq(out.String(), "\n") {
 		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
+			skipNextEmpty = false
 			continue
 		}
 		if strings.HasPrefix(s, "FUNCTION GLOBAL") {
+			skipNextEmpty = true
 			continue
 		}
+		if skipNextEmpty && s == "" {
+			skipNextEmpty = false
+			continue
+		}
+		skipNextEmpty = false
 		if strings.HasPrefix(s, "FUNCTION_RESULT_BEGIN") {
 			parts := strings.Fields(s)
 			s = strings.Join(parts[:len(parts)-1], " ") // remove timestamp
@@ -106,27 +172,27 @@ func (s *runSim) run(t *testing.T) {
 		require.Truef(t, ok, "discoveredConfigs: source %s config %d is not found", cfg.Source(), cfg.Hash())
 	}
 
-	wantLen, gotLen = len(s.wantSeen), mgr.seen.Count()
+	wantLen, gotLen = len(s.wantSeen), mgr.collectorSeen.Count()
 	require.Equalf(t, wantLen, gotLen, "seen: different len (want %d got %d)", wantLen, gotLen)
 
 	for _, cfg := range s.wantSeen {
-		_, ok := mgr.seen.Lookup(cfg)
+		_, ok := mgr.collectorSeen.Lookup(cfg)
 		require.Truef(t, ok, "seen: config '%s' is not found", cfg.UID())
 	}
 
-	wantLen, gotLen = len(s.wantExposed), mgr.exposed.Count()
+	wantLen, gotLen = len(s.wantExposed), mgr.collectorExposed.Count()
 	require.Equalf(t, wantLen, gotLen, "exposed: different len (want %d got %d)", wantLen, gotLen)
 
 	for _, we := range s.wantExposed {
-		entry, ok := mgr.exposed.LookupByKey(we.cfg.ExposedKey())
+		entry, ok := mgr.collectorExposed.LookupByKey(we.cfg.ExposedKey())
 		require.Truef(t, ok && we.cfg.UID() == entry.Cfg.UID(), "exposed: config '%s' is not found", we.cfg.UID())
 		require.Truef(t, we.status == entry.Status, "exposed: wrong status for '%s', want %s got %s", we.cfg.UID(), we.status, entry.Status)
 	}
 
-	wantLen, gotLen = len(s.wantRunning), len(mgr.runningJobs.items)
+	wantLen, gotLen = len(s.wantRunning), len(runningBeforeShutdown)
 	require.Equalf(t, wantLen, gotLen, "runningJobs: different len (want %d got %d)", wantLen, gotLen)
 	for _, name := range s.wantRunning {
-		_, ok := mgr.runningJobs.lookup(name)
+		_, ok := runningBeforeShutdown[name]
 		require.Truef(t, ok, "runningJobs: job '%s' is not found", name)
 	}
 }
@@ -202,4 +268,31 @@ func prepareMockRegistry() collectorapi.Registry {
 	})
 
 	return reg
+}
+
+func countDiscovered(mgr *Manager) int {
+	var n int
+	for _, cfgs := range mgr.discoveredConfigs.items {
+		n += len(cfgs)
+	}
+	return n
+}
+
+func runningSetMatches(jobs []runtimeJob, want []string) bool {
+	if len(jobs) != len(want) {
+		return false
+	}
+
+	wantSet := make(map[string]struct{}, len(want))
+	for _, name := range want {
+		wantSet[name] = struct{}{}
+	}
+
+	for _, job := range jobs {
+		if _, ok := wantSet[job.FullName()]; !ok {
+			return false
+		}
+	}
+
+	return true
 }

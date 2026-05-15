@@ -162,8 +162,12 @@ static void rrdhost_load_auto_labels(void) {
     if (localhost->stream.snd.destination)
         rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
 
-    rrdlabels_add(labels, "_timezone", rrdhost_timezone(localhost), RRDLABEL_SRC_AUTO);
-    rrdlabels_add(labels, "_abbrev_timezone", rrdhost_abbrev_timezone(localhost), RRDLABEL_SRC_AUTO);
+    {
+        RRDHOST_TZ host_tz = rrdhost_tz_get(localhost);
+        rrdlabels_add(labels, "_timezone", host_tz.timezone, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(labels, "_abbrev_timezone", host_tz.abbrev_timezone, RRDLABEL_SRC_AUTO);
+        rrdhost_tz_free(&host_tz);
+    }
 }
 
 void reload_host_labels(void) {

@@ -40,6 +40,12 @@ logs:
   # Maximum file size for individual journal files (e.g., "100MB", "1.5GB").
   size_of_journal_file: "100MB"
 
+  # Maximum number of entries per journal file.
+  entries_of_journal_file: 50000
+
+  # Maximum time span that entries in a single journal file can cover (e.g., "2 hours", "1h", "30m").
+  duration_of_journal_file: "2 hours"
+
   # Maximum number of journal files to keep.
   number_of_journal_files: 10
 
@@ -48,9 +54,6 @@ logs:
 
   # Maximum age for journal entries (e.g., "7 days", "1 week", "168h").
   duration_of_journal_files: "7 days"
-
-  # Maximum time span that entries in a single journal file can cover (e.g., "2 hours", "1h", "30m").
-  duration_of_journal_file: "2 hours"
 
   # Store the complete OTLP JSON representation in the OTLP_JSON field.
   # When enabled, each log entry includes the full original JSON message for debugging and reprocessing.

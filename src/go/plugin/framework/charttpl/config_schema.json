@@ -54,9 +54,6 @@
         "enabled": {
           "type": "boolean"
         },
-        "type_id": {
-          "type": "string"
-        },
         "max_type_id_len": {
           "oneOf": [
             {
@@ -105,6 +102,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "chart_defaults": {
+          "$ref": "#/$defs/chart_defaults"
         },
         "groups": {
           "type": "array",
@@ -170,7 +170,8 @@
         "label_promotion": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "\\S"
           }
         },
         "instances": {
@@ -185,6 +186,22 @@
           "items": {
             "$ref": "#/$defs/dimension"
           }
+        }
+      }
+    },
+    "chart_defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label_promotion": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "instances": {
+          "$ref": "#/$defs/instances"
         }
       }
     },

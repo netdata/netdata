@@ -47,6 +47,7 @@ struct websocket_thread;
 #define WS_MAX_INCOMING_FRAME_SIZE  (20ULL * 1024 * 1024) // 20MB max incoming frame size (browsers have ~16MiB)
 #define WS_MAX_OUTGOING_FRAME_SIZE  (4ULL * 1024 * 1024)  // 4MB max outgoing frame size for browser compatibility
 #define WS_MAX_DECOMPRESSED_SIZE    (200ULL * 1024 * 1024) // 200MB max inbound uncompressed message
+#define WS_DEBUG_DUMP_BYTES         32                     // max payload bytes captured in debug hex dumps
 
 // WebSocket timeout constants (in seconds)
 #define WS_PERIODIC_PING_INTERVAL   60   // Send periodic ping every 60 seconds
@@ -170,6 +171,8 @@ typedef struct websocket_thread {
 
     struct {
         int pipe[2];                 // Command pipe [0] = read, [1] = write
+        char *buffer;                // Reusable scratch buffer for command payloads
+        size_t buffer_size;
     } cmd;
 
 } WEBSOCKET_THREAD;

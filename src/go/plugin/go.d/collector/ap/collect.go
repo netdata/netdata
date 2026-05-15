@@ -70,7 +70,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			c.addInterfaceCharts(iface)
 		}
 
-		px := fmt.Sprintf("ap_%s_%s_", iface.name, iface.ssid)
+		px := fmt.Sprintf("ap_%s_%s_", iface.name, cleanSSID(iface.ssid))
 
 		if stats.clients != nil {
 			mx[px+"clients"] = *stats.clients
@@ -139,11 +139,11 @@ func parseIwDevices(resp []byte) ([]*iwInterface, error) {
 				ifaces[name] = iface
 			}
 		case strings.HasPrefix(line, "ssid") && iface != nil:
-			parts := strings.Fields(line)
-			if len(parts) != 2 {
+			ssid := strings.TrimSpace(strings.TrimPrefix(line, "ssid"))
+			if ssid == "" {
 				return nil, fmt.Errorf("invalid ssid line: '%s'", line)
 			}
-			iface.ssid = parts[1]
+			iface.ssid = ssid
 		case strings.HasPrefix(line, "type") && iface != nil:
 			parts := strings.Fields(line)
 			if len(parts) != 2 {

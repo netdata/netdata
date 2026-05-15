@@ -3,6 +3,7 @@
 package chartengine
 
 import (
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -55,7 +56,11 @@ type runtimeMetrics struct {
 	lifecycleRemovedDimensionByExpiry metrix.StatefulCounter
 }
 
-type planRuntimeSample struct {
+// PlanRuntimeSample is an opaque snapshot of one planner build used by
+// chartengine runtime observers and RuntimeAggregator. Its fields are
+// intentionally package-private so chartengine remains the owner of runtime
+// metric semantics while callers can pass samples between chartengine APIs.
+type PlanRuntimeSample struct {
 	startedAt time.Time
 
 	buildErr      bool
@@ -102,7 +107,7 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 	if store == nil {
 		return nil
 	}
-	meter := store.Write().StatefulMeter("netdata.go.plugin.chartengine")
+	meter := store.Write().StatefulMeter("netdata.go.plugin.framework.chartengine")
 	phaseDuration := meter.Vec("phase").Summary(
 		"build_phase_duration_seconds",
 		metrix.WithSummaryQuantiles(0.5, 0.9, 0.99),
@@ -135,19 +140,19 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 		metrix.WithUnit("transitions"),
 	)
 	return &runtimeMetrics{
-		buildSuccessTotal: meter.Counter(
+		buildSuccessTotal: metrix.SeededCounter(meter,
 			"build_success_total",
 			metrix.WithDescription("Successful BuildPlan calls"),
 			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("builds"),
 		),
-		buildErrorTotal: meter.Counter(
+		buildErrorTotal: metrix.SeededCounter(meter,
 			"build_error_total",
 			metrix.WithDescription("Failed BuildPlan calls"),
 			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("builds"),
 		),
-		buildSkippedFailedTotal: meter.Counter(
+		buildSkippedFailedTotal: metrix.SeededCounter(meter,
 			"build_skipped_failed_collect_total",
 			metrix.WithDescription("BuildPlan calls skipped due failed collect cycle"),
 			metrix.WithChartFamily("ChartEngine/Build"),
@@ -171,69 +176,69 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 
 		buildSeqBrokenTotal:    buildSeqTransitions.WithLabelValues("broken"),
 		buildSeqRecoveredTotal: buildSeqTransitions.WithLabelValues("recovered"),
-		buildSeqViolation: meter.Gauge(
+		buildSeqViolation: metrix.SeededGauge(meter,
 			"build_seq_violation_active",
 			metrix.WithDescription("1 when build sequence monotonicity is currently violated"),
 			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("state"),
 		),
 
-		routeCacheHitsTotal: meter.Counter(
+		routeCacheHitsTotal: metrix.SeededCounter(meter,
 			"route_cache_hits_total",
 			metrix.WithDescription("Route cache lookup hits"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("hits"),
 		),
-		routeCacheMissesTotal: meter.Counter(
+		routeCacheMissesTotal: metrix.SeededCounter(meter,
 			"route_cache_misses_total",
 			metrix.WithDescription("Route cache lookup misses"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("misses"),
 		),
-		routeCacheEntries: meter.Gauge(
+		routeCacheEntries: metrix.SeededGauge(meter,
 			"route_cache_entries",
-			metrix.WithDescription("Current number of route cache entries"),
+			metrix.WithDescription("Route cache entries in the latest successful build rollup"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("entries"),
 		),
-		routeCacheRetainedTotal: meter.Counter(
+		routeCacheRetainedTotal: metrix.SeededCounter(meter,
 			"route_cache_retained_total",
 			metrix.WithDescription("Route cache entries retained after prune"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("entries"),
 		),
-		routeCachePrunedTotal: meter.Counter(
+		routeCachePrunedTotal: metrix.SeededCounter(meter,
 			"route_cache_pruned_total",
 			metrix.WithDescription("Route cache entries pruned"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("entries"),
 		),
-		routeCacheFullDropsTotal: meter.Counter(
+		routeCacheFullDropsTotal: metrix.SeededCounter(meter,
 			"route_cache_full_drops_total",
 			metrix.WithDescription("Route cache full-drop prune events"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("events"),
 		),
 
-		seriesScannedTotal: meter.Counter(
+		seriesScannedTotal: metrix.SeededCounter(meter,
 			"series_scanned_total",
 			metrix.WithDescription("Series scanned by planner"),
 			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
-		seriesMatchedTotal: meter.Counter(
+		seriesMatchedTotal: metrix.SeededCounter(meter,
 			"series_matched_total",
 			metrix.WithDescription("Series matched by template or autogen"),
 			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
-		seriesUnmatchedTotal: meter.Counter(
+		seriesUnmatchedTotal: metrix.SeededCounter(meter,
 			"series_unmatched_total",
 			metrix.WithDescription("Series left unmatched after routing"),
 			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
-		seriesAutogenMatchedTotal: meter.Counter(
+		seriesAutogenMatchedTotal: metrix.SeededCounter(meter,
 			"series_autogen_matched_total",
 			metrix.WithDescription("Series matched by autogen fallback"),
 			metrix.WithChartFamily("ChartEngine/Series"),
@@ -242,15 +247,15 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 		seriesFilteredBySeq:      seriesFiltered.WithLabelValues("by_seq"),
 		seriesFilteredBySelector: seriesFiltered.WithLabelValues("by_selector"),
 
-		planChartInstances: meter.Gauge(
+		planChartInstances: metrix.SeededGauge(meter,
 			"plan_chart_instances",
-			metrix.WithDescription("Chart instances in last successful build plan"),
+			metrix.WithDescription("Chart instances in the latest successful build rollup"),
 			metrix.WithChartFamily("ChartEngine/Plan"),
 			metrix.WithUnit("charts"),
 		),
-		planInferredDimensions: meter.Gauge(
+		planInferredDimensions: metrix.SeededGauge(meter,
 			"plan_inferred_dimensions",
-			metrix.WithDescription("Inferred dimensions in last successful build plan"),
+			metrix.WithDescription("Inferred dimensions in the latest successful build rollup"),
 			metrix.WithChartFamily("ChartEngine/Plan"),
 			metrix.WithUnit("dimensions"),
 		),
@@ -268,7 +273,7 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 	}
 }
 
-func (m *runtimeMetrics) observeBuild(sample planRuntimeSample) {
+func (m *runtimeMetrics) observeBuild(sample PlanRuntimeSample) {
 	if m == nil {
 		return
 	}
@@ -384,9 +389,12 @@ func (e *Engine) RuntimeStore() metrix.RuntimeStore {
 	return e.state.runtimeStore
 }
 
-func (e *Engine) observeBuildSample(sample planRuntimeSample) {
+func (e *Engine) observeBuildSample(sample PlanRuntimeSample) {
 	if e == nil {
 		return
+	}
+	if e.state.cfg.runtimeObserver != nil {
+		e.state.cfg.runtimeObserver(sample)
 	}
 	if e.state.runtimeStats == nil {
 		return
@@ -394,8 +402,195 @@ func (e *Engine) observeBuildSample(sample planRuntimeSample) {
 	e.state.runtimeStats.observeBuild(sample)
 }
 
-func actionKindCounts(actions []EngineAction) planRuntimeSample {
-	out := planRuntimeSample{}
+// RuntimeAggregator records runtime samples from multiple engines and emits one
+// rolled-up chartengine runtime stream.
+type RuntimeAggregator struct {
+	mu      sync.Mutex
+	metrics *runtimeMetrics
+	samples []PlanRuntimeSample
+}
+
+// NewRuntimeAggregator creates a runtime sample aggregator backed by store.
+func NewRuntimeAggregator(store metrix.RuntimeStore) *RuntimeAggregator {
+	return &RuntimeAggregator{metrics: newRuntimeMetrics(store)}
+}
+
+// Observe records one engine build sample.
+func (a *RuntimeAggregator) Observe(sample PlanRuntimeSample) {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	a.samples = append(a.samples, sample)
+	a.mu.Unlock()
+}
+
+// Reset drops accumulated samples without writing them.
+func (a *RuntimeAggregator) Reset() {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	a.samples = nil
+	a.mu.Unlock()
+}
+
+// Flush emits accumulated samples into the aggregate runtime store.
+func (a *RuntimeAggregator) Flush() {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	samples := a.samples
+	a.samples = nil
+	a.mu.Unlock()
+	if len(samples) == 0 || a.metrics == nil {
+		return
+	}
+	a.metrics.observeBuildRollup(samples)
+}
+
+func (m *runtimeMetrics) observeBuildRollup(samples []PlanRuntimeSample) {
+	if m == nil || len(samples) == 0 {
+		return
+	}
+
+	var buildSuccess, skippedFailed, buildErr int
+	var routeCacheHits, routeCacheMisses uint64
+	var routeCacheRetained, routeCachePruned, routeCacheFullDrops int
+	var seriesScanned, seriesMatched, seriesUnmatched, seriesAutogenMatched uint64
+	var seriesFilteredBySeq, seriesFilteredBySel uint64
+	var actionCreateChart, actionCreateDimension, actionUpdateChart, actionRemoveDimension, actionRemoveChart int
+	var lifecycleRemovedChartByCap, lifecycleRemovedChartByExpiry int
+	var lifecycleRemovedDimensionByCap, lifecycleRemovedDimensionByExpiry int
+	var routeCacheEntries, planChartInstances, planInferredDimensions int
+	var buildSeqBroken, buildSeqRecovered int
+	var buildSeqViolation, buildSeqObserved bool
+
+	for _, sample := range samples {
+		if sample.startedAt.IsZero() {
+			sample.startedAt = time.Now()
+		}
+		switch {
+		case sample.buildSuccess:
+			buildSuccess++
+		case sample.skippedFailed:
+			skippedFailed++
+		case sample.buildErr:
+			buildErr++
+		}
+
+		m.buildDurationSeconds.Observe(time.Since(sample.startedAt).Seconds())
+		observeDurationSeconds(m.buildPhasePrepareSec, sample.phasePrepareSeconds)
+		observeDurationSeconds(m.buildPhaseValidateSec, sample.phaseValidateSeconds)
+		observeDurationSeconds(m.buildPhaseScanSec, sample.phaseScanSeconds)
+		observeDurationSeconds(m.buildPhaseRetainSec, sample.phaseRetainSeconds)
+		observeDurationSeconds(m.buildPhaseCapsSec, sample.phaseLifecycleCapsSec)
+		observeDurationSeconds(m.buildPhaseMaterializeSec, sample.phaseMaterializeSeconds)
+		observeDurationSeconds(m.buildPhaseExpirySec, sample.phaseExpirySeconds)
+		observeDurationSeconds(m.buildPhaseSortSec, sample.phaseSortSeconds)
+
+		if sample.buildSeqObserved {
+			buildSeqObserved = true
+			if sample.buildSeqBroken {
+				buildSeqBroken++
+			}
+			if sample.buildSeqRecovered {
+				buildSeqRecovered++
+			}
+			if sample.buildSeqViolation {
+				buildSeqViolation = true
+			}
+		}
+
+		routeCacheHits += sample.routeCacheHits
+		routeCacheMisses += sample.routeCacheMisses
+		routeCacheRetained += sample.routeCacheRetained
+		routeCachePruned += sample.routeCachePruned
+		if sample.routeCacheFullDrop {
+			routeCacheFullDrops++
+		}
+		if sample.buildSuccess {
+			routeCacheEntries += sample.routeCacheEntries
+			planChartInstances += sample.planChartInstances
+			planInferredDimensions += sample.planInferredDimensions
+		}
+
+		seriesScanned += sample.seriesScanned
+		seriesMatched += sample.seriesMatched
+		seriesUnmatched += sample.seriesUnmatched
+		seriesAutogenMatched += sample.seriesAutogenMatched
+		seriesFilteredBySeq += sample.seriesFilteredBySeq
+		seriesFilteredBySel += sample.seriesFilteredBySel
+
+		actionCreateChart += sample.actionCreateChart
+		actionCreateDimension += sample.actionCreateDimension
+		actionUpdateChart += sample.actionUpdateChart
+		actionRemoveDimension += sample.actionRemoveDimension
+		actionRemoveChart += sample.actionRemoveChart
+
+		lifecycleRemovedChartByCap += sample.lifecycleRemovedChartByCap
+		lifecycleRemovedChartByExpiry += sample.lifecycleRemovedChartByExpiry
+		lifecycleRemovedDimensionByCap += sample.lifecycleRemovedDimensionByCap
+		lifecycleRemovedDimensionByExpiry += sample.lifecycleRemovedDimensionByExpiry
+	}
+
+	addIfPositive(m.buildSuccessTotal, float64(buildSuccess))
+	addIfPositive(m.buildSkippedFailedTotal, float64(skippedFailed))
+	addIfPositive(m.buildErrorTotal, float64(buildErr))
+	addIfPositive(m.buildSeqBrokenTotal, float64(buildSeqBroken))
+	addIfPositive(m.buildSeqRecoveredTotal, float64(buildSeqRecovered))
+	if buildSeqObserved {
+		if buildSeqViolation {
+			m.buildSeqViolation.Set(1)
+		} else {
+			m.buildSeqViolation.Set(0)
+		}
+	} else {
+		m.buildSeqViolation.Set(0)
+	}
+
+	addIfPositive(m.routeCacheHitsTotal, float64(routeCacheHits))
+	addIfPositive(m.routeCacheMissesTotal, float64(routeCacheMisses))
+	addIfPositive(m.routeCacheRetainedTotal, float64(routeCacheRetained))
+	addIfPositive(m.routeCachePrunedTotal, float64(routeCachePruned))
+	addIfPositive(m.routeCacheFullDropsTotal, float64(routeCacheFullDrops))
+	if buildSuccess > 0 {
+		m.routeCacheEntries.Set(float64(routeCacheEntries))
+	}
+
+	addIfPositive(m.seriesScannedTotal, float64(seriesScanned))
+	addIfPositive(m.seriesMatchedTotal, float64(seriesMatched))
+	addIfPositive(m.seriesUnmatchedTotal, float64(seriesUnmatched))
+	addIfPositive(m.seriesAutogenMatchedTotal, float64(seriesAutogenMatched))
+	addIfPositive(m.seriesFilteredBySeq, float64(seriesFilteredBySeq))
+	addIfPositive(m.seriesFilteredBySelector, float64(seriesFilteredBySel))
+
+	addIfPositive(m.actionCreateChart, float64(actionCreateChart))
+	addIfPositive(m.actionCreateDimension, float64(actionCreateDimension))
+	addIfPositive(m.actionUpdateChart, float64(actionUpdateChart))
+	addIfPositive(m.actionRemoveDimension, float64(actionRemoveDimension))
+	addIfPositive(m.actionRemoveChart, float64(actionRemoveChart))
+
+	addIfPositive(m.lifecycleRemovedChartByCap, float64(lifecycleRemovedChartByCap))
+	addIfPositive(m.lifecycleRemovedChartByExpiry, float64(lifecycleRemovedChartByExpiry))
+	addIfPositive(m.lifecycleRemovedDimensionByCap, float64(lifecycleRemovedDimensionByCap))
+	addIfPositive(m.lifecycleRemovedDimensionByExpiry, float64(lifecycleRemovedDimensionByExpiry))
+
+	if buildSuccess > 0 {
+		m.planChartInstances.Set(float64(planChartInstances))
+		m.planInferredDimensions.Set(float64(planInferredDimensions))
+	}
+}
+
+func addIfPositive(metric metrix.StatefulCounter, value float64) {
+	if value > 0 {
+		metric.Add(value)
+	}
+}
+
+func actionKindCounts(actions []EngineAction) PlanRuntimeSample {
+	out := PlanRuntimeSample{}
 	for _, action := range actions {
 		switch action.Kind() {
 		case ActionCreateChart:

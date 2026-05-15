@@ -6,12 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"maps"
-	"path/filepath"
 	"slices"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/google/uuid"
@@ -19,34 +16,43 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if err := c.ensureInitialized(); err != nil {
 		return nil, err
 	}
 
-	mx, err := c.collectMetrics()
-	if err != nil {
+	if c.PingOnly {
+		return c.collectPingOnly(ctx)
+	}
+	return c.collectDeviceMetrics(ctx)
+}
+
+func (c *Collector) collectPingOnly(ctx context.Context) (map[string]int64, error) {
+	mx := make(map[string]int64)
+
+	if err := c.collectPing(ctx, mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (c *Collector) collectMetrics() (map[string]int64, error) {
+func (c *Collector) collectDeviceMetrics(ctx context.Context) (map[string]int64, error) {
 	var (
 		snmpMx map[string]int64
 		pingMx map[string]int64
 	)
 
-	ctx := context.Background()
-
-	g, _ := errgroup.WithContext(ctx)
+	g, groupCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		m := make(map[string]int64)
@@ -57,13 +63,13 @@ func (c *Collector) collectMetrics() (map[string]int64, error) {
 		return nil
 	})
 
-	if c.Ping.Enabled && c.prober != nil {
+	if c.Ping.Enabled && c.pingClient != nil {
 		g.Go(func() error {
 			m := make(map[string]int64)
-			if err := c.collectPing(m); err != nil {
+			if err := c.collectPing(groupCtx, m); err != nil {
 				c.Errorf("ping: %v", err)
 				if isPingUnrecoverableError(err) {
-					c.prober = nil
+					c.pingClient = nil
 				}
 				return nil
 			}
@@ -112,7 +118,7 @@ func (c *Collector) ensureInitialized() error {
 		})
 	}
 
-	if c.ddSnmpColl == nil && !c.Ping.Enabled {
+	if c.ddSnmpColl == nil && !c.PingOnly && !c.Ping.Enabled {
 		return errors.New("no profiles found and ping disabled")
 	}
 
@@ -130,9 +136,11 @@ func (c *Collector) ensureInitialized() error {
 
 	c.sysInfo = si
 
-	if c.Ping.Enabled {
+	if c.PingOnly || c.Ping.Enabled {
 		c.addPingCharts()
 	}
+
+	c.registerDeviceForTopology(si)
 
 	return nil
 }
@@ -193,30 +201,6 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 		Labels:   labels,
 	}
 }
-
-func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
-	snmpProfiles := ddsnmp.FindProfiles(si.SysObjectID, si.Descr, c.ManualProfiles)
-	var profInfo []string
-
-	for _, prof := range snmpProfiles {
-		if logger.Level.Enabled(slog.LevelDebug) {
-			profInfo = append(profInfo, prof.SourceTree())
-		} else {
-			name := strings.TrimSuffix(filepath.Base(prof.SourceFile), filepath.Ext(prof.SourceFile))
-			profInfo = append(profInfo, name)
-		}
-	}
-
-	msg := fmt.Sprintf("device matched %d profile(s): %s (sysObjectID: '%s')", len(snmpProfiles), strings.Join(profInfo, ", "), si.SysObjectID)
-	if len(snmpProfiles) == 0 {
-		c.Warning(msg)
-	} else {
-		c.Info(msg)
-	}
-
-	return snmpProfiles
-}
-
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	snmpClient, err := c.initSNMPClient()
 	if err != nil {
@@ -228,6 +212,11 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	}
 
 	if snmpClient.Version() == gosnmp.Version1 {
+		return snmpClient, nil
+	}
+
+	if c.Options.MaxRepetitions == 0 {
+		c.disableBulkWalk = true
 		return snmpClient, nil
 	}
 
@@ -258,8 +247,8 @@ func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error
 		return false, nil
 	}
 
-	orig := c.Config.Options.MaxRepetitions
-	maxReps := c.Config.Options.MaxRepetitions
+	orig := c.Options.MaxRepetitions
+	maxReps := c.Options.MaxRepetitions
 	attempts := 0
 	const maxAttempts = 20 // Prevent infinite loops
 

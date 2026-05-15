@@ -1,0 +1,6 @@
+FULL_MESSAGE=[] : 
+HOSTNAME=testhost
+LEVEL=test
+MESSAGE=message
+SERVICE=testservice
+

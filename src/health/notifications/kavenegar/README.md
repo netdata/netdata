@@ -47,8 +47,9 @@ The following options can be defined for this notification
 | SEND_KAVENEGAR | Set `SEND_KAVENEGAR` to YES | YES | yes |
 | KAVENEGAR_API_KEY | Set `KAVENEGAR_API_KEY` to your API key. |  | yes |
 | KAVENEGAR_SENDER | Set `KAVENEGAR_SENDER` to the value of your Sender. |  | yes |
-| DEFAULT_RECIPIENT_KAVENEGAR | Set `DEFAULT_RECIPIENT_KAVENEGAR` to the SMS recipient you want the alert notifications to be sent to. You can define multiple recipients like this: 09155555555 09177777777. |  | yes |
+| [DEFAULT_RECIPIENT_KAVENEGAR](#option-default-recipient-kavenegar) | Set `DEFAULT_RECIPIENT_KAVENEGAR` to the SMS recipient you want the alert notifications to be sent to. You can define multiple recipients like this: 09155555555 09177777777. |  | yes |
 
+<a id="option-default-recipient-kavenegar"></a>
 ##### DEFAULT_RECIPIENT_KAVENEGAR
 
 All roles will default to this variable if lest unconfigured.

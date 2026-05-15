@@ -1,0 +1,3 @@
+MESSAGE=# Test maximum line length (1MB) - this will be generated programmatically
+SYSLOG_IDENTIFIER=large-line-test
+

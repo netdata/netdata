@@ -109,13 +109,16 @@ Choose the option that fits your needs:
 | Fine-tuned control per system/service | Netdata Agent |
 | Want both simplicity and flexibility  | Use **both**  |
 
+## Creating and configuring alerts
+
+Netdata ships with hundreds of pre-configured alerts. You can also create your own or tune existing ones:
+
+- **[Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md)** — Describe what you want in plain English; AI suggests alerts, generates the configuration, and tests it against historical data before deployment
+- **[Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md)** — Visual UI wizard for creating and editing alerts
+- **[Manual configuration](/src/health/REFERENCE.md)** — Edit `health.d/*.conf` files directly for full control over alert syntax
+
 ## Next Steps
 
-- 🔧 [Set up Cloud Notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md)
-- ⚙️ [Set up Agent Notifications](/src/health/notifications/README.md)
-
-:::info
-
-For additional alert customization options including threshold adjustments, custom conditions, and notification routing, check out our [alert configuration reference](https://learn.netdata.cloud/docs/alerts-&-notifications/alert-configuration-reference).
-
-:::
+- [Set up Cloud Notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md)
+- [Set up Agent Notifications](/src/health/notifications/README.md)
+- [Create alerts with AI](/docs/netdata-ai/alerts-automation/alerts-automation.md)

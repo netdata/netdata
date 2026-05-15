@@ -581,18 +581,21 @@ void wevt_sources_scan(void) {
                 provider = "Netdata";
 
             if(provider && *provider) {
-                char buf[sizeof(WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX) + strlen(provider)]; // sizeof() includes terminator
-                snprintf(buf, sizeof(buf), WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX "%s", provider);
+                size_t buf_size = sizeof(WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX) + strlen(provider); // sizeof() includes terminator
+                char *buf = mallocz(buf_size);
+                snprintf(buf, buf_size, WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX "%s", provider);
 
                 trim_all(buf);
                 if(buf[0]) {
-                    for (size_t i = 0; i < sizeof(buf) - 1 && buf[i]; i++) {
+                    for (size_t i = 0; i < buf_size - 1 && buf[i]; i++) {
                         // remove character that may interfere with our parsing
                         if (isspace((uint8_t) buf[i]) || buf[i] == '%' || buf[i] == '+' || buf[i] == '|' || buf[i] == ':')
                             buf[i] = '_';
                     }
                     src.provider = string_strdupz(buf);
                 }
+
+                freez(buf);
             }
 
             dictionary_set(wevt_sources, src.fullname, &src, sizeof(src));

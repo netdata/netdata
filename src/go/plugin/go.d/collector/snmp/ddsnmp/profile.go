@@ -12,52 +12,61 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+type scalarMetricKey struct {
+	name string
+	oid  string
+}
+
+type columnMetricKey struct {
+	table      string
+	symbolName string
+}
+
+type topologyScalarMetricKey struct {
+	kind ddprofiledefinition.TopologyKind
+	name string
+	oid  string
+}
+
+type topologyColumnMetricKey struct {
+	kind       ddprofiledefinition.TopologyKind
+	table      string
+	symbolName string
+}
+
+type topologyScalarConflictKey struct {
+	name string
+	oid  string
+}
+
+type topologyColumnConflictKey struct {
+	table      string
+	symbolName string
+}
+
 // FindProfiles returns profiles matching the given sysObjectID.
 // Profiles are sorted by match specificity: most specific first.
 func FindProfiles(sysObjID, sysDescr string, manualProfiles []string) []*Profile {
-	loadProfiles()
+	return DefaultCatalog().Resolve(ResolveRequest{
+		SysObjectID:    sysObjID,
+		SysDescr:       sysDescr,
+		ManualProfiles: manualProfiles,
+		ManualPolicy:   ManualProfileFallback,
+	}).Profiles()
+}
 
-	finalize := func(profiles []*Profile) []*Profile {
-		if len(profiles) == 0 {
-			return nil
-		}
-		enrichProfiles(profiles)
-		deduplicateMetricsAcrossProfiles(profiles)
-		return profiles
+// FinalizeProfiles applies load-time profile preparation and deduplicates metrics for a
+// given profile list. This mirrors the post-processing performed by FindProfiles.
+func FinalizeProfiles(profiles []*Profile) []*Profile {
+	if len(profiles) == 0 {
+		return nil
 	}
-
-	// Fallback/manual path (no sysObjectID)
-	if sysObjID == "" {
-		if len(manualProfiles) == 0 {
-			log.Warning("No sysObjectID found and no manual_profiles configured. Either ensure the device provides sysObjectID or configure manual_profiles option.")
-			return nil
-		}
-
-		var selected []*Profile
-		for _, prof := range ddProfiles {
-			name := stripFileNameExt(prof.SourceFile)
-			if slices.ContainsFunc(manualProfiles, func(p string) bool { return stripFileNameExt(p) == name }) {
-				selected = append(selected, prof.clone())
-			}
-		}
-
-		return finalize(selected)
+	for _, prof := range profiles {
+		enrichProfile(prof)
+		handleCrossTableTagsWithoutMetrics(prof)
 	}
-
-	// Auto-detect path
-	matchedOIDs := make(map[*Profile]string)
-	var selected []*Profile
-
-	for _, prof := range ddProfiles {
-		if ok, matchedOid := prof.Definition.Selector.Matches(sysObjID, sysDescr); ok {
-			cloned := prof.clone()
-			selected = append(selected, cloned)
-			matchedOIDs[cloned] = matchedOid
-		}
-	}
-
-	sortProfilesBySpecificity(selected, matchedOIDs)
-	return finalize(selected)
+	deduplicateMetricsAcrossProfiles(profiles)
+	return profiles
 }
 
 type (
@@ -85,6 +94,36 @@ func (p *Profile) SourceTree() string {
 
 	extensions := formatExtensions(p.extensionHierarchy)
 	return fmt.Sprintf("%s: %s", rootName, extensions)
+}
+
+// HasExtension returns true if the profile extends the given profile name
+// (matches either full filename or filename without extension).
+func (p *Profile) HasExtension(name string) bool {
+	if p == nil {
+		return false
+	}
+	target := stripFileNameExt(name)
+	for _, ext := range p.extensionHierarchy {
+		if extensionHas(ext, target) {
+			return true
+		}
+	}
+	return false
+}
+
+func extensionHas(ext *extensionInfo, target string) bool {
+	if ext == nil {
+		return false
+	}
+	if stripFileNameExt(ext.name) == target || stripFileNameExt(ext.sourceFile) == target {
+		return true
+	}
+	for _, child := range ext.extensions {
+		if extensionHas(child, target) {
+			return true
+		}
+	}
+	return false
 }
 
 func formatExtensions(extensions []*extensionInfo) string {
@@ -132,24 +171,33 @@ func cloneExtensionHierarchy(extensions []*extensionInfo) []*extensionInfo {
 	return cloned
 }
 
-func (p *Profile) merge(base *Profile) {
+func (p *Profile) merge(base *Profile) error {
 	p.mergeMetadata(base)
 	p.mergeMetrics(base)
+	if err := p.mergeTopology(base); err != nil {
+		return err
+	}
+	p.mergeLicensing(base)
+	p.mergeBGP(base)
 	// Append other fields as before (these likely don't need deduplication)
 	p.Definition.MetricTags = append(p.Definition.MetricTags, base.Definition.MetricTags...)
-	p.Definition.StaticTags = append(p.Definition.StaticTags, base.Definition.StaticTags...)
+	p.Definition.StaticTags = append(slices.Clone(base.Definition.StaticTags), p.Definition.StaticTags...)
+	return nil
 }
 
 func (p *Profile) mergeMetrics(base *Profile) {
-	seen := make(map[string]bool)
+	seenScalars := make(map[scalarMetricKey]bool)
+	seenColumns := make(map[columnMetricKey]bool)
+	seenTableOIDs := make(map[string]string)
 
 	for _, m := range p.Definition.Metrics {
 		switch {
 		case m.IsScalar():
-			seen[m.Symbol.Name+"|"+m.Symbol.OID] = true
+			seenScalars[scalarMetricKey{name: m.Symbol.Name, oid: m.Symbol.OID}] = true
 		case m.IsColumn():
+			seenTableOIDs[columnMetricTableIdentity(m.Table)] = m.Table.OID
 			for _, sym := range m.Symbols {
-				seen[sym.Name] = true
+				seenColumns[columnMetricSymbolKey(m.Table, sym)] = true
 			}
 		}
 	}
@@ -157,19 +205,29 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	for _, bm := range base.Definition.Metrics {
 		switch {
 		case bm.IsScalar():
-			key := bm.Symbol.Name + "|" + bm.Symbol.OID
-			if !seen[key] {
+			key := scalarMetricKey{name: bm.Symbol.Name, oid: bm.Symbol.OID}
+			if !seenScalars[key] {
 				p.Definition.Metrics = append(p.Definition.Metrics, bm)
-				seen[key] = true
+				seenScalars[key] = true
 			}
 		case bm.IsColumn():
-			bm.Symbols = slices.DeleteFunc(bm.Symbols, func(sym ddprofiledefinition.SymbolConfig) bool {
-				v := seen[sym.Name]
-				seen[sym.Name] = true
-				return v
-			})
+			tableID := columnMetricTableIdentity(bm.Table)
+			if tableOID, ok := seenTableOIDs[tableID]; ok && tableOID != bm.Table.OID {
+				continue
+			}
+
+			symbols := make([]ddprofiledefinition.SymbolConfig, 0, len(bm.Symbols))
+			for _, sym := range bm.Symbols {
+				key := columnMetricSymbolKey(bm.Table, sym)
+				if seenColumns[key] {
+					continue
+				}
+				symbols = append(symbols, sym)
+			}
+			bm.Symbols = symbols
 			if len(bm.Symbols) > 0 {
 				p.Definition.Metrics = append(p.Definition.Metrics, bm)
+				seenTableOIDs[tableID] = bm.Table.OID
 			}
 		}
 	}
@@ -185,6 +243,151 @@ func (p *Profile) mergeMetrics(base *Profile) {
 			seenVmetrics[bm.Name] = true
 		}
 	}
+}
+
+func columnMetricSymbolKey(table ddprofiledefinition.SymbolConfig, sym ddprofiledefinition.SymbolConfig) columnMetricKey {
+	return columnMetricKey{
+		table:      columnMetricTableIdentity(table),
+		symbolName: sym.Name,
+	}
+}
+
+func columnMetricTableIdentity(table ddprofiledefinition.SymbolConfig) string {
+	if table.Name != "" {
+		return table.Name
+	}
+	return table.OID
+}
+
+func (p *Profile) mergeTopology(base *Profile) error {
+	seenScalars := make(map[topologyScalarMetricKey]bool)
+	seenColumns := make(map[topologyColumnMetricKey]bool)
+	seenTableOIDs := make(map[string]string)
+	scalarKinds := make(map[topologyScalarConflictKey]ddprofiledefinition.TopologyKind)
+	columnKinds := make(map[topologyColumnConflictKey]ddprofiledefinition.TopologyKind)
+
+	for _, topo := range p.Definition.Topology {
+		if err := indexTopologyMergeConflicts(topo, scalarKinds, columnKinds); err != nil {
+			return err
+		}
+		switch {
+		case topo.IsScalar():
+			seenScalars[topologyScalarMetricKey{kind: topo.Kind, name: topo.Symbol.Name, oid: topo.Symbol.OID}] = true
+		case topo.IsColumn():
+			seenTableOIDs[topologyColumnTableIdentity(topo.Kind, topo.Table)] = topo.Table.OID
+			for _, sym := range topo.Symbols {
+				seenColumns[topologyColumnSymbolKey(topo.Kind, topo.Table, sym)] = true
+			}
+		}
+	}
+
+	for _, baseTopo := range base.Definition.Topology {
+		if err := indexTopologyMergeConflicts(baseTopo, scalarKinds, columnKinds); err != nil {
+			return err
+		}
+		switch {
+		case baseTopo.IsScalar():
+			key := topologyScalarMetricKey{kind: baseTopo.Kind, name: baseTopo.Symbol.Name, oid: baseTopo.Symbol.OID}
+			if !seenScalars[key] {
+				p.Definition.Topology = append(p.Definition.Topology, baseTopo)
+				seenScalars[key] = true
+			}
+		case baseTopo.IsColumn():
+			tableID := topologyColumnTableIdentity(baseTopo.Kind, baseTopo.Table)
+			if tableOID, ok := seenTableOIDs[tableID]; ok && tableOID != baseTopo.Table.OID {
+				continue
+			}
+
+			symbols := make([]ddprofiledefinition.SymbolConfig, 0, len(baseTopo.Symbols))
+			for _, sym := range baseTopo.Symbols {
+				key := topologyColumnSymbolKey(baseTopo.Kind, baseTopo.Table, sym)
+				if seenColumns[key] {
+					continue
+				}
+				symbols = append(symbols, sym)
+			}
+			baseTopo.Symbols = symbols
+			if len(baseTopo.Symbols) > 0 {
+				p.Definition.Topology = append(p.Definition.Topology, baseTopo)
+				seenTableOIDs[tableID] = baseTopo.Table.OID
+			}
+		}
+	}
+
+	return nil
+}
+
+func (p *Profile) mergeLicensing(base *Profile) {
+	overridden := make(map[string]bool, len(p.Definition.Licensing))
+	for _, row := range p.Definition.Licensing {
+		overridden[ddprofiledefinition.LicenseMergeIdentity(row)] = true
+	}
+
+	for _, row := range base.Definition.Licensing {
+		if overridden[ddprofiledefinition.LicenseMergeIdentity(row)] {
+			continue
+		}
+		p.Definition.Licensing = append(p.Definition.Licensing, row)
+	}
+}
+
+func (p *Profile) mergeBGP(base *Profile) {
+	overridden := make(map[string]bool, len(p.Definition.BGP))
+	for _, row := range p.Definition.BGP {
+		overridden[ddprofiledefinition.BGPMergeIdentity(row)] = true
+	}
+
+	for _, row := range base.Definition.BGP {
+		if overridden[ddprofiledefinition.BGPMergeIdentity(row)] {
+			continue
+		}
+		p.Definition.BGP = append(p.Definition.BGP, row)
+	}
+}
+
+func indexTopologyMergeConflicts(
+	topo ddprofiledefinition.TopologyConfig,
+	scalarKinds map[topologyScalarConflictKey]ddprofiledefinition.TopologyKind,
+	columnKinds map[topologyColumnConflictKey]ddprofiledefinition.TopologyKind,
+) error {
+	switch {
+	case topo.IsScalar():
+		key := topologyScalarConflictKey{name: topo.Symbol.Name, oid: topo.Symbol.OID}
+		return indexTopologyKindConflict(fmt.Sprintf("scalar %q/%q", topo.Symbol.Name, topo.Symbol.OID), key, topo.Kind, scalarKinds)
+	case topo.IsColumn():
+		for _, sym := range topo.Symbols {
+			key := topologyColumnConflictKey{table: columnMetricTableIdentity(topo.Table), symbolName: sym.Name}
+			if err := indexTopologyKindConflict(fmt.Sprintf("table %q symbol %q", columnMetricTableIdentity(topo.Table), sym.Name), key, topo.Kind, columnKinds); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func indexTopologyKindConflict[K comparable](
+	label string,
+	key K,
+	kind ddprofiledefinition.TopologyKind,
+	seen map[K]ddprofiledefinition.TopologyKind,
+) error {
+	if existingKind, ok := seen[key]; ok && existingKind != kind {
+		return fmt.Errorf("conflicting topology kinds for %s: %q and %q", label, existingKind, kind)
+	}
+	seen[key] = kind
+	return nil
+}
+
+func topologyColumnSymbolKey(kind ddprofiledefinition.TopologyKind, table ddprofiledefinition.SymbolConfig, sym ddprofiledefinition.SymbolConfig) topologyColumnMetricKey {
+	return topologyColumnMetricKey{
+		kind:       kind,
+		table:      columnMetricTableIdentity(table),
+		symbolName: sym.Name,
+	}
+}
+
+func topologyColumnTableIdentity(kind ddprofiledefinition.TopologyKind, table ddprofiledefinition.SymbolConfig) string {
+	return string(kind) + "|" + columnMetricTableIdentity(table)
 }
 
 func (p *Profile) mergeMetadata(base *Profile) {
@@ -294,29 +497,35 @@ func sortProfilesBySpecificity(profiles []*Profile, matchedOIDs map[*Profile]str
 	})
 }
 
-func enrichProfiles(profiles []*Profile) {
-	for _, prof := range profiles {
-		if prof.Definition == nil {
+func enrichProfile(prof *Profile) {
+	if prof.Definition == nil {
+		return
+	}
+
+	for i := range prof.Definition.Metrics {
+		enrichMetricTagMappingRefs(prof.Definition.Metrics[i].MetricTags)
+	}
+	for i := range prof.Definition.Topology {
+		enrichMetricTagMappingRefs(prof.Definition.Topology[i].MetricTags)
+	}
+	for i := range prof.Definition.BGP {
+		enrichMetricTagMappingRefs(prof.Definition.BGP[i].MetricTags)
+	}
+}
+
+func enrichMetricTagMappingRefs(tags ddprofiledefinition.MetricTagConfigList) {
+	for j := range tags {
+		tagCfg := &tags[j]
+
+		if tagCfg.Mapping.HasItems() {
 			continue
 		}
 
-		for i := range prof.Definition.Metrics {
-			metric := &prof.Definition.Metrics[i]
-
-			for j := range metric.MetricTags {
-				tagCfg := &metric.MetricTags[j]
-
-				if tagCfg.Mapping != nil {
-					continue
-				}
-
-				switch tagCfg.MappingRef {
-				case "ifType":
-					tagCfg.Mapping = sharedMappings.ifType
-				case "ifTypeGroup":
-					tagCfg.Mapping = sharedMappings.ifTypeGroup
-				}
-			}
+		switch tagCfg.MappingRef {
+		case "ifType":
+			tagCfg.Mapping = ddprofiledefinition.NewExactMapping(sharedMappings.ifType)
+		case "ifTypeGroup":
+			tagCfg.Mapping = ddprofiledefinition.NewExactMapping(sharedMappings.ifTypeGroup)
 		}
 	}
 }
@@ -330,6 +539,8 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 	// Just deduplicate metrics, keeping the first occurrence (most specific)
 	seenMetrics := make(map[string]bool)
 	seenVmetrics := make(map[string]bool)
+	seenLicenseSignals := make(map[string]bool)
+	seenBGPSignals := make(map[string]bool)
 
 	for _, prof := range profiles {
 		if prof.Definition == nil {
@@ -358,7 +569,165 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 				return false
 			},
 		)
+
+		deduplicateTopologyInProfile(prof, seenMetrics)
+		deduplicateLicensingInProfile(prof, seenLicenseSignals)
+		deduplicateBGPInProfile(prof, seenBGPSignals)
 	}
+}
+
+func deduplicateTopologyInProfile(prof *Profile, seenMetrics map[string]bool) {
+	filtered := prof.Definition.Topology[:0]
+	for _, topo := range prof.Definition.Topology {
+		if topo.IsScalar() {
+			key := generateTopologyScalarMetricKey(topo)
+			if seenMetrics[key] {
+				continue
+			}
+			seenMetrics[key] = true
+			filtered = append(filtered, topo)
+			continue
+		}
+
+		if topo.IsColumn() {
+			symbols := topo.Symbols[:0]
+			for _, sym := range topo.Symbols {
+				key := generateTopologyColumnMetricKey(topo, sym)
+				if seenMetrics[key] {
+					continue
+				}
+				seenMetrics[key] = true
+				symbols = append(symbols, sym)
+			}
+			topo.Symbols = symbols
+			if len(topo.Symbols) == 0 {
+				continue
+			}
+		}
+
+		filtered = append(filtered, topo)
+	}
+	if len(filtered) == 0 {
+		prof.Definition.Topology = nil
+		return
+	}
+	prof.Definition.Topology = filtered
+}
+
+func deduplicateLicensingInProfile(prof *Profile, seenSignals map[string]bool) {
+	filtered := prof.Definition.Licensing[:0]
+	for _, row := range prof.Definition.Licensing {
+		keys := generateLicenseSignalKeys(row)
+		if len(keys) == 0 {
+			filtered = append(filtered, row)
+			continue
+		}
+
+		duplicate := false
+		for _, key := range keys {
+			if seenSignals[key] {
+				duplicate = true
+				break
+			}
+		}
+		if duplicate {
+			continue
+		}
+		for _, key := range keys {
+			seenSignals[key] = true
+		}
+		filtered = append(filtered, row)
+	}
+	if len(filtered) == 0 {
+		prof.Definition.Licensing = nil
+		return
+	}
+	prof.Definition.Licensing = filtered
+}
+
+func generateLicenseSignalKeys(row ddprofiledefinition.LicensingConfig) []string {
+	identity := ddprofiledefinition.LicenseStructuralIdentity(row)
+	var keys []string
+	add := func(value ddprofiledefinition.LicenseValueConfig) {
+		if value.IsSet() && value.Kind != "" {
+			keys = append(keys, strings.Join([]string{identity, string(value.Kind)}, "|"))
+		}
+	}
+	add(row.State.LicenseValueConfig)
+	addLicenseTimerSignalKeys(row.Signals.Expiry, add)
+	addLicenseTimerSignalKeys(row.Signals.Authorization, add)
+	addLicenseTimerSignalKeys(row.Signals.Certificate, add)
+	addLicenseTimerSignalKeys(row.Signals.Grace, add)
+	add(row.Signals.Usage.Used)
+	add(row.Signals.Usage.Capacity)
+	add(row.Signals.Usage.Available)
+	add(row.Signals.Usage.Percent)
+	return keys
+}
+
+func deduplicateBGPInProfile(prof *Profile, seenSignals map[string]bool) {
+	filtered := prof.Definition.BGP[:0]
+	for _, row := range prof.Definition.BGP {
+		keys := generateBGPSignalKeys(row)
+		if len(keys) == 0 {
+			filtered = append(filtered, row)
+			continue
+		}
+
+		duplicate := false
+		for _, key := range keys {
+			if seenSignals[key] {
+				duplicate = true
+				break
+			}
+		}
+		if duplicate {
+			continue
+		}
+		for _, key := range keys {
+			seenSignals[key] = true
+		}
+		filtered = append(filtered, row)
+	}
+	if len(filtered) == 0 {
+		prof.Definition.BGP = nil
+		return
+	}
+	prof.Definition.BGP = filtered
+}
+
+func generateBGPSignalKeys(row ddprofiledefinition.BGPConfig) []string {
+	identity := ddprofiledefinition.BGPStructuralIdentity(row)
+	var keys []string
+	ddprofiledefinition.ForEachBGPSignalValue(row, func(path string, _ ddprofiledefinition.BGPValueConfig) {
+		keys = append(keys, strings.Join([]string{identity, path}, "|"))
+	})
+	return keys
+}
+
+func addLicenseTimerSignalKeys(cfg ddprofiledefinition.LicenseTimerSignalsConfig, add func(ddprofiledefinition.LicenseValueConfig)) {
+	add(cfg.LicenseValueConfig)
+	add(cfg.Timestamp)
+	add(cfg.Remaining)
+}
+
+func generateTopologyScalarMetricKey(topo ddprofiledefinition.TopologyConfig) string {
+	return strings.Join([]string{
+		"topology-scalar",
+		string(topo.Kind),
+		topo.Symbol.OID,
+		topo.Symbol.Name,
+	}, "|")
+}
+
+func generateTopologyColumnMetricKey(topo ddprofiledefinition.TopologyConfig, sym ddprofiledefinition.SymbolConfig) string {
+	return strings.Join([]string{
+		"topology-table",
+		string(topo.Kind),
+		topo.Table.OID,
+		columnMetricTableIdentity(topo.Table),
+		sym.Name,
+	}, "|")
 }
 
 func generateMetricKey(metric ddprofiledefinition.MetricsConfig) string {

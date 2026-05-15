@@ -37,6 +37,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [ap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ap)                                 |          Wireless AP          |
 | [apache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/apache)                         |            Apache             |
 | [apcupsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/apcupsd)                       |           UPS (APC)           |
+| [azure_monitor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/azure_monitor)           |         Azure Monitor         |
 | [beanstalk](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/beanstalk)                   |           Beanstalk           |
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/bind)                             |           ISC Bind            |
 | [boinc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/boinc)                           |             BOINC             |

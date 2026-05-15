@@ -120,6 +120,15 @@ struct worker_utilization {
     RRDDIM *rd_memory_calls[WORKERS_MEMORY_CALL_MAX];
 };
 
+static inline size_t workers_chart_context_job_name_max_length(const char *worker_name_lowercase, const char *metric_type) {
+    size_t fixed_length = strlen("netdata.workers.") + strlen(worker_name_lowercase) + strlen(metric_type);
+
+    if(fixed_length >= RRD_ID_LENGTH_MAX)
+        return 0;
+
+    return RRD_ID_LENGTH_MAX - fixed_length - 1;
+}
+
 static struct worker_utilization all_workers_utilization[] = {
     { .name = "PULSE",       .family = "workers pulse",                   .priority = 1000000 },
     { .name = "HEALTH",      .family = "workers health alerts",           .priority = 1000000 },
@@ -750,16 +759,18 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
             if(!wu->per_job_type[i].st) {
                 size_t job_name_len = string_strlen(wu->per_job_type[i].name);
-                if(job_name_len > RRD_ID_LENGTH_MAX) job_name_len = RRD_ID_LENGTH_MAX;
+                size_t job_name_max_len = workers_chart_context_job_name_max_length(wu->name_lowercase, ".value.");
+                if(job_name_len > job_name_max_len) job_name_len = job_name_max_len;
 
-                char job_name_sanitized[job_name_len + 1];
+                char job_name_sanitized[RRD_ID_LENGTH_MAX + 1];
                 rrdset_strncpyz_name(job_name_sanitized, string2str(wu->per_job_type[i].name), job_name_len);
 
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "workers_%s_value_%s", wu->name_lowercase, job_name_sanitized);
 
                 char context[RRD_ID_LENGTH_MAX + 1];
-                snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.value.%s", wu->name_lowercase, job_name_sanitized);
+                size_t context_len = (size_t)snprintfz(context, RRD_ID_LENGTH_MAX + 1, "netdata.workers.%s.value.", wu->name_lowercase);
+                strcatz(context, context_len, job_name_sanitized, sizeof(context));
 
                 char title[1000 + 1];
                 snprintf(title, 1000, "Netdata Workers %s value of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
@@ -806,16 +817,18 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
             if(!wu->per_job_type[i].st) {
                 size_t job_name_len = string_strlen(wu->per_job_type[i].name);
-                if(job_name_len > RRD_ID_LENGTH_MAX) job_name_len = RRD_ID_LENGTH_MAX;
+                size_t job_name_max_len = workers_chart_context_job_name_max_length(wu->name_lowercase, ".rate.");
+                if(job_name_len > job_name_max_len) job_name_len = job_name_max_len;
 
-                char job_name_sanitized[job_name_len + 1];
+                char job_name_sanitized[RRD_ID_LENGTH_MAX + 1];
                 rrdset_strncpyz_name(job_name_sanitized, string2str(wu->per_job_type[i].name), job_name_len);
 
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "workers_%s_rate_%s", wu->name_lowercase, job_name_sanitized);
 
                 char context[RRD_ID_LENGTH_MAX + 1];
-                snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.rate.%s", wu->name_lowercase, job_name_sanitized);
+                size_t context_len = (size_t)snprintfz(context, RRD_ID_LENGTH_MAX + 1, "netdata.workers.%s.rate.", wu->name_lowercase);
+                strcatz(context, context_len, job_name_sanitized, sizeof(context));
 
                 char title[1000 + 1];
                 snprintf(title, 1000, "Netdata Workers %s rate of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));

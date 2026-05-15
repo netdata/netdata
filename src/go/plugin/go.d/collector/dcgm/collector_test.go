@@ -651,9 +651,9 @@ func TestClassifier_AllKnownFieldsAvoidOtherContexts(t *testing.T) {
 }
 
 func TestClassifier_NIDLInterconnectAndVGPUSplits(t *testing.T) {
-	lines := strings.Split(string(dataAllFieldsList), "\n")
+	lines := strings.SplitSeq(string(dataAllFieldsList), "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		name := strings.TrimSpace(line)
 		if name == "" || strings.HasPrefix(name, "#") {
 			continue

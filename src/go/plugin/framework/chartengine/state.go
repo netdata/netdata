@@ -14,12 +14,19 @@ type engineState struct {
 	matchIndex   matchIndex
 	routeCache   *routeCache
 	materialized materializedState
+	engineEpoch  uint64
+	commitSeq    uint64
+	nextAttempt  uint64
+	outstanding  uint64
 	hints        plannerSizingHints
 	buildSeq     buildSeqState
-	stats        engineStats
-	runtimeStore metrix.RuntimeStore
-	runtimeStats *runtimeMetrics
-	log          *logger.Logger
+	// plannerBuildSeq is runtime-mode build-cycle sequence used only by
+	// per-build dedupe/scratch bookkeeping.
+	plannerBuildSeq uint64
+	stats           engineStats
+	runtimeStore    metrix.RuntimeStore
+	runtimeStats    *runtimeMetrics
+	log             *logger.Logger
 }
 
 type plannerSizingHints struct {

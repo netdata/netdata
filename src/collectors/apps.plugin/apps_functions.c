@@ -75,6 +75,818 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     buffer_json_add_array_item_double(wb, _tmp);                                                                \
 } while(0)
 
+// Holds per-field maximums computed during the data collection loop.
+// Passed to fp_emit_columns() so that section can live in its own function,
+// keeping function_processes() below GCC's -fvar-tracking-assignments limit.
+struct fp_maxvals {
+    NETDATA_DOUBLE UserCPU_max;
+    NETDATA_DOUBLE SysCPU_max;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    NETDATA_DOUBLE GuestCPU_max;
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+    NETDATA_DOUBLE CUserCPU_max;
+    NETDATA_DOUBLE CSysCPU_max;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    NETDATA_DOUBLE CGuestCPU_max;
+#endif
+#endif
+    NETDATA_DOUBLE CPU_max;
+    NETDATA_DOUBLE VMSize_max;
+    NETDATA_DOUBLE RSS_max;
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    NETDATA_DOUBLE Estimated_max;
+    NETDATA_DOUBLE Pss_max;
+    NETDATA_DOUBLE PssAge_max;
+    NETDATA_DOUBLE SharedRatio_max;
+#endif
+#if (PROCESSES_HAVE_VMSHARED == 1)
+    NETDATA_DOUBLE Shared_max;
+#endif
+    NETDATA_DOUBLE Swap_max;
+#if (PROCESSES_HAVE_FDS == 1) && (PROCESSES_HAVE_PID_LIMITS == 1)
+    NETDATA_DOUBLE FDsLimitPercent_max;
+#endif
+    unsigned long long Processes_max;
+    unsigned long long Threads_max;
+#if (PROCESSES_HAVE_VOLCTX == 1)
+    unsigned long long VoluntaryCtxtSwitches_max;
+#endif
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+    unsigned long long NonVoluntaryCtxtSwitches_max;
+#endif
+    unsigned long long Uptime_max;
+    unsigned long long MinFlt_max;
+#if (PROCESSES_HAVE_MAJFLT == 1)
+    unsigned long long MajFlt_max;
+#endif
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+    unsigned long long CMinFlt_max;
+    unsigned long long CMajFlt_max;
+    unsigned long long TMinFlt_max;
+    unsigned long long TMajFlt_max;
+#endif
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+    unsigned long long LReads_max;
+    unsigned long long LWrites_max;
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+    unsigned long long PReads_max;
+    unsigned long long PWrites_max;
+#endif
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+    unsigned long long ROps_max;
+    unsigned long long WOps_max;
+#endif
+#if (PROCESSES_HAVE_FDS == 1)
+    unsigned long long Files_max;
+    unsigned long long Pipes_max;
+    unsigned long long Sockets_max;
+    unsigned long long iNotiFDs_max;
+    unsigned long long EventFDs_max;
+    unsigned long long TimerFDs_max;
+    unsigned long long SigFDs_max;
+    unsigned long long EvPollFDs_max;
+    unsigned long long OtherFDs_max;
+    unsigned long long FDs_max;
+#endif
+#if (PROCESSES_HAVE_HANDLES == 1)
+    unsigned long long Handles_max;
+#endif
+};
+
+static void fp_emit_columns(BUFFER *wb, struct fp_maxvals *mv, bool show_cmdline, uint64_t total_memory_bytes) {
+    buffer_json_member_add_object(wb, "columns");
+    {
+        int field_id = 0;
+
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
+        // wb, key, name, visible, type, visualization, transform, decimal_points, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range
+        buffer_rrdf_table_add_field(wb, field_id++, "PID", "Process ID", RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY |
+                                        RRDF_FIELD_OPTS_UNIQUE_KEY, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Cmd", "Process Name", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+#if (PROCESSES_HAVE_COMM_AND_NAME == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "Name", "Process Friendly Name", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+#endif
+
+        if (show_cmdline) {
+            buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_STRING,
+                                        RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
+                                        NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                        RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+        }
+
+        buffer_rrdf_table_add_field(wb, field_id++, "PPID", "Parent Process ID", RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL,
+                                    NAN, RRDF_FIELD_SORT_ASCENDING, "PID", RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Category", "Category (apps_groups.conf)", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "User", "User Owner", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+#endif
+#if (PROCESSES_HAVE_UID == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "Uid", "User ID", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+#if (PROCESSES_HAVE_GID == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "Group", "Group Owner", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Gid", "Group ID", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+        // CPU utilization
+        buffer_rrdf_table_add_field(wb, field_id++, "CPU", "Total CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", mv->CPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "UserCPU", "User CPU time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", mv->UserCPU_max,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "SysCPU", "System CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", mv->SysCPU_max,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "GuestCPU", "Guest CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", mv->GuestCPU_max,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "CUserCPU", "Children User CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", mv->CUserCPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "CSysCPU", "Children System CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", mv->CSysCPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "CGuestCPU", "Children Guest CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", mv->CGuestCPU_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+#endif
+
+#if (PROCESSES_HAVE_VOLCTX == 1)
+        // CPU context switches
+        buffer_rrdf_table_add_field(wb, field_id++, "vCtxSwitch", "Voluntary Context Switches",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "switches/s",
+                                    mv->VoluntaryCtxtSwitches_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "iCtxSwitch", "Involuntary Context Switches",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "switches/s",
+                                    mv->NonVoluntaryCtxtSwitches_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+        // memory
+        if (total_memory_bytes)
+            buffer_rrdf_table_add_field(wb, field_id++, "Memory", "Memory Percentage", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Resident", "Resident Set Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "MiB", mv->RSS_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+        if(pss_refresh_period > 0) {
+            buffer_rrdf_table_add_field(wb, field_id++, "Estimated", "Estimated Memory Usage", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "MiB", mv->Estimated_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                        RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_VISIBLE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "Pss", "Proportional Set Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "MiB", mv->Pss_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                        RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "PssAge", "Time since last smaps sample", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "s", mv->PssAge_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
+                                        RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "SharedRatio", "Shared Memory Ratio", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "%", mv->SharedRatio_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MEAN,
+                                        RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+        }
+#endif
+#if (PROCESSES_HAVE_VMSHARED == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "Shared", "Shared Pages", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
+                                    "MiB", mv->Shared_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+#endif
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Virtual", "Virtual Memory Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "MiB", mv->VMSize_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+#if (PROCESSES_HAVE_VMSWAP == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "Swap", "Swap Memory", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
+                                    "MiB",
+                                    mv->Swap_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+        // Physical I/O
+        buffer_rrdf_table_add_field(wb, field_id++, "PReads", "Physical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "KiB/s", mv->PReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "PWrites", "Physical I/O Writes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "KiB/s", mv->PWrites_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+#endif
+
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+        RRDF_FIELD_OPTIONS logical_io_options = RRDF_FIELD_OPTS_NONE;
+#else
+        RRDF_FIELD_OPTIONS logical_io_options = RRDF_FIELD_OPTS_VISIBLE;
+#endif
+        // Logical I/O
+        buffer_rrdf_table_add_field(wb, field_id++, "LReads", "Logical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "KiB/s", mv->LReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    logical_io_options, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "LWrites", "Logical I/O Writes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "KiB/s", mv->LWrites_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    logical_io_options, NULL);
+#endif
+
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+        // I/O calls
+        buffer_rrdf_table_add_field(wb, field_id++, "ROps", "I/O Read Operations", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
+                                    "ops/s", mv->ROps_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "WOps", "I/O Write Operations", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
+                                    "ops/s", mv->WOps_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+        // minor page faults
+        buffer_rrdf_table_add_field(wb, field_id++, "MinFlt", "Minor Page Faults/s", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "pgflts/s", mv->MinFlt_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+
+#if (PROCESSES_HAVE_MAJFLT == 1)
+        // major page faults
+        buffer_rrdf_table_add_field(wb, field_id++, "MajFlt", "Major Page Faults/s", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "pgflts/s", mv->MajFlt_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "CMinFlt", "Children Minor Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", mv->CMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "CMajFlt", "Children Major Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", mv->CMajFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "TMinFlt", "Total Minor Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", mv->TMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "TMajFlt", "Total Major Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", mv->TMajFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+#if (PROCESSES_HAVE_FDS == 1)
+        // open file descriptors
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "FDsLimitPercent", "Percentage of Open Descriptors vs Limits",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", mv->FDsLimitPercent_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+        buffer_rrdf_table_add_field(wb, field_id++, "FDs", "All Open File Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", mv->FDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Files", "Open Files", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "fds",
+                                    mv->Files_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Pipes", "Open Pipes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "fds",
+                                    mv->Pipes_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Sockets", "Open Sockets", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "fds", mv->Sockets_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "iNotiFDs", "Open iNotify Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", mv->iNotiFDs_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "EventFDs", "Open Event Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", mv->EventFDs_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "TimerFDs", "Open Timer Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", mv->TimerFDs_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "SigFDs", "Open Signal Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", mv->SigFDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "EvPollFDs", "Open Event Poll Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", mv->EvPollFDs_max,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "OtherFDs", "Other Open Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", mv->OtherFDs_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+#if (PROCESSES_HAVE_HANDLES == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "Handles", "Open Handles", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "handles",
+                                    mv->Handles_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+#endif
+
+        // processes, threads, uptime
+        buffer_rrdf_table_add_field(wb, field_id++, "Processes", "Processes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "processes", mv->Processes_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Threads", "Threads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "threads", mv->Threads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Uptime", "Uptime in seconds", RRDF_FIELD_TYPE_DURATION,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION_S, 2,
+                                    "seconds", mv->Uptime_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+    }
+    buffer_json_object_close(wb); // columns
+}
+
+static void fp_emit_charts(BUFFER *wb, uint64_t total_memory_bytes) {
+    buffer_json_member_add_object(wb, "charts");
+    {
+        // CPU chart
+        buffer_json_member_add_object(wb, "CPU");
+        {
+            buffer_json_member_add_string(wb, "name", "CPU Utilization");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "UserCPU");
+                buffer_json_add_array_item_string(wb, "SysCPU");
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+                buffer_json_add_array_item_string(wb, "GuestCPU");
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+                buffer_json_add_array_item_string(wb, "CUserCPU");
+                buffer_json_add_array_item_string(wb, "CSysCPU");
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+                buffer_json_add_array_item_string(wb, "CGuestCPU");
+#endif
+#endif
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+#if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
+        buffer_json_member_add_object(wb, "CPUCtxSwitches");
+        {
+            buffer_json_member_add_string(wb, "name", "CPU Context Switches");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+#if (PROCESSES_HAVE_VOLCTX == 1)
+                buffer_json_add_array_item_string(wb, "vCtxSwitch");
+#endif
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+                buffer_json_add_array_item_string(wb, "iCtxSwitch");
+#endif
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+
+        // Memory chart
+        buffer_json_member_add_object(wb, "Memory");
+        {
+            buffer_json_member_add_string(wb, "name", "Memory");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Virtual");
+                buffer_json_add_array_item_string(wb, "Resident");
+                buffer_json_add_array_item_string(wb, "Shared");
+                buffer_json_add_array_item_string(wb, "Swap");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        if(total_memory_bytes) {
+            buffer_json_member_add_object(wb, "MemoryPercent");
+            {
+                buffer_json_member_add_string(wb, "name", "Memory Percentage");
+                buffer_json_member_add_string(wb, "type", "stacked-bar");
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    buffer_json_add_array_item_string(wb, "Memory");
+                }
+                buffer_json_array_close(wb);
+            }
+            buffer_json_object_close(wb);
+        }
+
+#if (PROCESSES_HAVE_LOGICAL_IO == 1) || (PROCESSES_HAVE_PHYSICAL_IO == 1)
+        // I/O Reads chart
+        buffer_json_member_add_object(wb, "Reads");
+        {
+            buffer_json_member_add_string(wb, "name", "I/O Reads");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+                buffer_json_add_array_item_string(wb, "LReads");
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+                buffer_json_add_array_item_string(wb, "PReads");
+#endif
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // I/O Writes chart
+        buffer_json_member_add_object(wb, "Writes");
+        {
+            buffer_json_member_add_string(wb, "name", "I/O Writes");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+                buffer_json_add_array_item_string(wb, "LWrites");
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+                buffer_json_add_array_item_string(wb, "PWrites");
+#endif
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+        // Logical I/O chart
+        buffer_json_member_add_object(wb, "LogicalIO");
+        {
+            buffer_json_member_add_string(wb, "name", "Logical I/O");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "LReads");
+                buffer_json_add_array_item_string(wb, "LWrites");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+        // Physical I/O chart
+        buffer_json_member_add_object(wb, "PhysicalIO");
+        {
+            buffer_json_member_add_string(wb, "name", "Physical I/O");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PReads");
+                buffer_json_add_array_item_string(wb, "PWrites");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+        // I/O Calls chart
+        buffer_json_member_add_object(wb, "IOCalls");
+        {
+            buffer_json_member_add_string(wb, "name", "I/O Calls");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "ROps");
+                buffer_json_add_array_item_string(wb, "WOps");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+
+        // Minor Page Faults chart
+        buffer_json_member_add_object(wb, "MinFlt");
+        {
+            buffer_json_member_add_string(wb, "name", "Minor Page Faults");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "MinFlt");
+                buffer_json_add_array_item_string(wb, "CMinFlt");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Major Page Faults chart
+        buffer_json_member_add_object(wb, "MajFlt");
+        {
+            buffer_json_member_add_string(wb, "name", "Major Page Faults");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "MajFlt");
+                buffer_json_add_array_item_string(wb, "CMajFlt");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Threads chart
+        buffer_json_member_add_object(wb, "Threads");
+        {
+            buffer_json_member_add_string(wb, "name", "Threads");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Threads");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Processes chart
+        buffer_json_member_add_object(wb, "Processes");
+        {
+            buffer_json_member_add_string(wb, "name", "Processes");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Processes");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+#if (PROCESSES_HAVE_FDS == 1)
+        // FDs chart
+        buffer_json_member_add_object(wb, "FDs");
+        {
+            buffer_json_member_add_string(wb, "name", "File Descriptors");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Files");
+                buffer_json_add_array_item_string(wb, "Pipes");
+                buffer_json_add_array_item_string(wb, "Sockets");
+                buffer_json_add_array_item_string(wb, "iNotiFDs");
+                buffer_json_add_array_item_string(wb, "EventFDs");
+                buffer_json_add_array_item_string(wb, "TimerFDs");
+                buffer_json_add_array_item_string(wb, "SigFDs");
+                buffer_json_add_array_item_string(wb, "EvPollFDs");
+                buffer_json_add_array_item_string(wb, "OtherFDs");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+
+#if (PROCESSES_HAVE_HANDLES == 1)
+        // Handles chart
+        buffer_json_member_add_object(wb, "Handles");
+        {
+            buffer_json_member_add_string(wb, "name", "Handles");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Handles");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+    }
+    buffer_json_object_close(wb); // charts
+}
+
+static void fp_emit_groupby(BUFFER *wb) {
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "CPU");
+        buffer_json_add_array_item_string(wb, "Category");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Memory");
+        buffer_json_add_array_item_string(wb, "Category");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        // group by PID
+        buffer_json_member_add_object(wb, "PID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by PID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PPID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Category
+        buffer_json_member_add_object(wb, "Category");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by Category");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Category");
+                buffer_json_add_array_item_string(wb, "PPID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by PPID
+        buffer_json_member_add_object(wb, "PPID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by Parent PID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PPID");
+                buffer_json_add_array_item_string(wb, "PID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
+        // group by User
+        buffer_json_member_add_object(wb, "User");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by User");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "User");
+                buffer_json_add_array_item_string(wb, "PPID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+
+#if (PROCESSES_HAVE_GID == 1)
+        // group by Group
+        buffer_json_member_add_object(wb, "Group");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by Group");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Group");
+                buffer_json_add_array_item_string(wb, "PPID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+    }
+    buffer_json_object_close(wb); // group_by
+}
+
 void function_processes(const char *transaction, char *function,
                                usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                                BUFFER *payload __maybe_unused, HTTP_ACCESS access,
@@ -483,718 +1295,91 @@ void function_processes(const char *transaction, char *function,
     }
 
     buffer_json_array_close(wb); // data
-    buffer_json_member_add_object(wb, "columns");
 
-    {
-        int field_id = 0;
-
-        // IMPORTANT!
-        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
-        // wb, key, name, visible, type, visualization, transform, decimal_points, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range
-        buffer_rrdf_table_add_field(wb, field_id++, "PID", "Process ID", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY |
-                                        RRDF_FIELD_OPTS_UNIQUE_KEY, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "Cmd", "Process Name", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-#if (PROCESSES_HAVE_COMM_AND_NAME == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "Name", "Process Friendly Name", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-#endif
-
-        if (show_cmdline) {
-            buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_STRING,
-                                        RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
-                                        NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                        RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-        }
-
-        buffer_rrdf_table_add_field(wb, field_id++, "PPID", "Parent Process ID", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL,
-                                    NAN, RRDF_FIELD_SORT_ASCENDING, "PID", RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "Category", "Category (apps_groups.conf)", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE,
-                                    RRDF_FIELD_TRANSFORM_NONE,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "User", "User Owner", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
-#endif
-#if (PROCESSES_HAVE_UID == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "Uid", "User ID", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-#endif
-
-#if (PROCESSES_HAVE_GID == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "Group", "Group Owner", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Gid", "Group ID", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-#endif
-
-        // CPU utilization
-        buffer_rrdf_table_add_field(wb, field_id++, "CPU", "Total CPU Time (100% = 1 core)",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "UserCPU", "User CPU time (100% = 1 core)",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", UserCPU_max,
-                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "SysCPU", "System CPU Time (100% = 1 core)",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", SysCPU_max,
-                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+    struct fp_maxvals mv = {
+        .UserCPU_max = UserCPU_max,
+        .SysCPU_max = SysCPU_max,
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "GuestCPU", "Guest CPU Time (100% = 1 core)",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", GuestCPU_max,
-                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+        .GuestCPU_max = GuestCPU_max,
 #endif
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "CUserCPU", "Children User CPU Time (100% = 1 core)",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CUserCPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "CSysCPU", "Children System CPU Time (100% = 1 core)",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CSysCPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+        .CUserCPU_max = CUserCPU_max,
+        .CSysCPU_max = CSysCPU_max,
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "CGuestCPU", "Children Guest CPU Time (100% = 1 core)",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CGuestCPU_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+        .CGuestCPU_max = CGuestCPU_max,
 #endif
 #endif
-
-#if (PROCESSES_HAVE_VOLCTX == 1)
-        // CPU context switches
-        buffer_rrdf_table_add_field(wb, field_id++, "vCtxSwitch", "Voluntary Context Switches",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "switches/s",
-                                    VoluntaryCtxtSwitches_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
-#endif
-#if (PROCESSES_HAVE_NVOLCTX == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "iCtxSwitch", "Involuntary Context Switches",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "switches/s",
-                                    NonVoluntaryCtxtSwitches_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
-#endif
-
-        // memory
-        if (total_memory_bytes)
-            buffer_rrdf_table_add_field(wb, field_id++, "Memory", "Memory Percentage", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                        RRDF_FIELD_VISUAL_BAR,
-                                        RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "Resident", "Resident Set Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER,
-                                    2, "MiB", RSS_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        .CPU_max = CPU_max,
+        .VMSize_max = VMSize_max,
+        .RSS_max = RSS_max,
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
-        if(pss_refresh_period > 0) {
-            buffer_rrdf_table_add_field(wb, field_id++, "Estimated", "Estimated Memory Usage", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                        RRDF_FIELD_VISUAL_BAR,
-                                        RRDF_FIELD_TRANSFORM_NUMBER,
-                                        2, "MiB", Estimated_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                        RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_VISIBLE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "Pss", "Proportional Set Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                        RRDF_FIELD_VISUAL_BAR,
-                                        RRDF_FIELD_TRANSFORM_NUMBER,
-                                        2, "MiB", Pss_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                        RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "PssAge", "Time since last smaps sample", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                        RRDF_FIELD_VISUAL_BAR,
-                                        RRDF_FIELD_TRANSFORM_NUMBER,
-                                        2, "s", PssAge_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
-                                        RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-            buffer_rrdf_table_add_field(wb, field_id++, "SharedRatio", "Shared Memory Ratio", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                        RRDF_FIELD_VISUAL_BAR,
-                                        RRDF_FIELD_TRANSFORM_NUMBER,
-                                        2, "%", SharedRatio_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MEAN,
-                                        RRDF_FIELD_FILTER_RANGE,
-                                        RRDF_FIELD_OPTS_NONE, NULL);
-        }
+        .Estimated_max = Estimated_max,
+        .Pss_max = Pss_max,
+        .PssAge_max = PssAge_max,
+        .SharedRatio_max = SharedRatio_max,
 #endif
 #if (PROCESSES_HAVE_VMSHARED == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "Shared", "Shared Pages", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
-                                    "MiB", Shared_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        .Shared_max = Shared_max,
 #endif
-
-        buffer_rrdf_table_add_field(wb, field_id++, "Virtual", "Virtual Memory Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "MiB", VMSize_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-#if (PROCESSES_HAVE_VMSWAP == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "Swap", "Swap Memory", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
-                                    "MiB",
-                                    Swap_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+        .Swap_max = Swap_max,
+#if (PROCESSES_HAVE_FDS == 1) && (PROCESSES_HAVE_PID_LIMITS == 1)
+        .FDsLimitPercent_max = FDsLimitPercent_max,
 #endif
-
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-        // Physical I/O
-        buffer_rrdf_table_add_field(wb, field_id++, "PReads", "Physical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    2, "KiB/s", PReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "PWrites", "Physical I/O Writes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "KiB/s", PWrites_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        .Processes_max = Processes_max,
+        .Threads_max = Threads_max,
+#if (PROCESSES_HAVE_VOLCTX == 1)
+        .VoluntaryCtxtSwitches_max = VoluntaryCtxtSwitches_max,
 #endif
-
-#if (PROCESSES_HAVE_LOGICAL_IO == 1)
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-        RRDF_FIELD_OPTIONS logical_io_options = RRDF_FIELD_OPTS_NONE;
-#else
-        RRDF_FIELD_OPTIONS logical_io_options = RRDF_FIELD_OPTS_VISIBLE;
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+        .NonVoluntaryCtxtSwitches_max = NonVoluntaryCtxtSwitches_max,
 #endif
-        // Logical I/O
-        buffer_rrdf_table_add_field(wb, field_id++, "LReads", "Logical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    2, "KiB/s", LReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    logical_io_options, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "LWrites", "Logical I/O Writes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER,
-                                    2, "KiB/s", LWrites_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    logical_io_options, NULL);
-#endif
-
-#if (PROCESSES_HAVE_IO_CALLS == 1)
-        // I/O calls
-        buffer_rrdf_table_add_field(wb, field_id++, "ROps", "I/O Read Operations", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
-                                    "ops/s", ROps_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "WOps", "I/O Write Operations", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
-                                    "ops/s", WOps_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-#endif
-
-        // minor page faults
-        buffer_rrdf_table_add_field(wb, field_id++, "MinFlt", "Minor Page Faults/s", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER,
-                                    2, "pgflts/s", MinFlt_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-
+        .Uptime_max = Uptime_max,
+        .MinFlt_max = MinFlt_max,
 #if (PROCESSES_HAVE_MAJFLT == 1)
-        // major page faults
-        buffer_rrdf_table_add_field(wb, field_id++, "MajFlt", "Major Page Faults/s", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER,
-                                    2, "pgflts/s", MajFlt_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+        .MajFlt_max = MajFlt_max,
 #endif
-
 #if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "CMinFlt", "Children Minor Page Faults/s",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", CMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "CMajFlt", "Children Major Page Faults/s",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", CMajFlt_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "TMinFlt", "Total Minor Page Faults/s",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", TMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "TMajFlt", "Total Major Page Faults/s",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", TMajFlt_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+        .CMinFlt_max = CMinFlt_max,
+        .CMajFlt_max = CMajFlt_max,
+        .TMinFlt_max = TMinFlt_max,
+        .TMajFlt_max = TMajFlt_max,
 #endif
-
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+        .LReads_max = LReads_max,
+        .LWrites_max = LWrites_max,
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+        .PReads_max = PReads_max,
+        .PWrites_max = PWrites_max,
+#endif
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+        .ROps_max = ROps_max,
+        .WOps_max = WOps_max,
+#endif
 #if (PROCESSES_HAVE_FDS == 1)
-        // open file descriptors
-#if (PROCESSES_HAVE_PID_LIMITS == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "FDsLimitPercent", "Percentage of Open Descriptors vs Limits",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", FDsLimitPercent_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+        .Files_max = Files_max,
+        .Pipes_max = Pipes_max,
+        .Sockets_max = Sockets_max,
+        .iNotiFDs_max = iNotiFDs_max,
+        .EventFDs_max = EventFDs_max,
+        .TimerFDs_max = TimerFDs_max,
+        .SigFDs_max = SigFDs_max,
+        .EvPollFDs_max = EvPollFDs_max,
+        .OtherFDs_max = OtherFDs_max,
+        .FDs_max = FDs_max,
 #endif
-        buffer_rrdf_table_add_field(wb, field_id++, "FDs", "All Open File Descriptors",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", FDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "Files", "Open Files", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
-                                    "fds",
-                                    Files_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Pipes", "Open Pipes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
-                                    "fds",
-                                    Pipes_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Sockets", "Open Sockets", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
-                                    "fds", Sockets_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "iNotiFDs", "Open iNotify Descriptors",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", iNotiFDs_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "EventFDs", "Open Event Descriptors",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", EventFDs_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "TimerFDs", "Open Timer Descriptors",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", TimerFDs_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "SigFDs", "Open Signal Descriptors",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", SigFDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "EvPollFDs", "Open Event Poll Descriptors",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", EvPollFDs_max,
-                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "OtherFDs", "Other Open Descriptors",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", OtherFDs_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-#endif
-
 #if (PROCESSES_HAVE_HANDLES == 1)
-        buffer_rrdf_table_add_field(wb, field_id++, "Handles", "Open Handles", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
-                                    "handles",
-                                    Handles_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        .Handles_max = Handles_max,
 #endif
+    };
 
-        // processes, threads, uptime
-        buffer_rrdf_table_add_field(wb, field_id++, "Processes", "Processes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
-                                    "processes", Processes_max, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Threads", "Threads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
-                                    "threads", Threads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Uptime", "Uptime in seconds", RRDF_FIELD_TYPE_DURATION,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION_S, 2,
-                                    "seconds", Uptime_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
-                                    RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
-    }
-    buffer_json_object_close(wb); // columns
+    fp_emit_columns(wb, &mv, show_cmdline, total_memory_bytes);
 
     buffer_json_member_add_string(wb, "default_sort_column", "CPU");
 
-    buffer_json_member_add_object(wb, "charts");
-    {
-        // CPU chart
-        buffer_json_member_add_object(wb, "CPU");
-        {
-            buffer_json_member_add_string(wb, "name", "CPU Utilization");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "UserCPU");
-                buffer_json_add_array_item_string(wb, "SysCPU");
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-                buffer_json_add_array_item_string(wb, "GuestCPU");
-#endif
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-                buffer_json_add_array_item_string(wb, "CUserCPU");
-                buffer_json_add_array_item_string(wb, "CSysCPU");
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-                buffer_json_add_array_item_string(wb, "CGuestCPU");
-#endif
-#endif
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
+    fp_emit_charts(wb, total_memory_bytes);
 
-#if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
-        buffer_json_member_add_object(wb, "CPUCtxSwitches");
-        {
-            buffer_json_member_add_string(wb, "name", "CPU Context Switches");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-#if (PROCESSES_HAVE_VOLCTX == 1)
-                buffer_json_add_array_item_string(wb, "vCtxSwitch");
-#endif
-#if (PROCESSES_HAVE_NVOLCTX == 1)
-                buffer_json_add_array_item_string(wb, "iCtxSwitch");
-#endif
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-#endif
-
-        // Memory chart
-        buffer_json_member_add_object(wb, "Memory");
-        {
-            buffer_json_member_add_string(wb, "name", "Memory");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Virtual");
-                buffer_json_add_array_item_string(wb, "Resident");
-                buffer_json_add_array_item_string(wb, "Shared");
-                buffer_json_add_array_item_string(wb, "Swap");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        if(total_memory_bytes) {
-            // Memory chart
-            buffer_json_member_add_object(wb, "MemoryPercent");
-            {
-                buffer_json_member_add_string(wb, "name", "Memory Percentage");
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Memory");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-        }
-
-#if (PROCESSES_HAVE_LOGICAL_IO == 1) || (PROCESSES_HAVE_PHYSICAL_IO == 1)
-        // I/O Reads chart
-        buffer_json_member_add_object(wb, "Reads");
-        {
-            buffer_json_member_add_string(wb, "name", "I/O Reads");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-#if (PROCESSES_HAVE_LOGICAL_IO == 1)
-                buffer_json_add_array_item_string(wb, "LReads");
-#endif
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-                buffer_json_add_array_item_string(wb, "PReads");
-#endif
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // I/O Writes chart
-        buffer_json_member_add_object(wb, "Writes");
-        {
-            buffer_json_member_add_string(wb, "name", "I/O Writes");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-#if (PROCESSES_HAVE_LOGICAL_IO == 1)
-                buffer_json_add_array_item_string(wb, "LWrites");
-#endif
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-                buffer_json_add_array_item_string(wb, "PWrites");
-#endif
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-#endif
-
-#if (PROCESSES_HAVE_LOGICAL_IO == 1)
-        // Logical I/O chart
-        buffer_json_member_add_object(wb, "LogicalIO");
-        {
-            buffer_json_member_add_string(wb, "name", "Logical I/O");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "LReads");
-                buffer_json_add_array_item_string(wb, "LWrites");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-#endif
-
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-        // Physical I/O chart
-        buffer_json_member_add_object(wb, "PhysicalIO");
-        {
-            buffer_json_member_add_string(wb, "name", "Physical I/O");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "PReads");
-                buffer_json_add_array_item_string(wb, "PWrites");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-#endif
-
-#if (PROCESSES_HAVE_IO_CALLS == 1)
-        // I/O Calls chart
-        buffer_json_member_add_object(wb, "IOCalls");
-        {
-            buffer_json_member_add_string(wb, "name", "I/O Calls");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "ROps");
-                buffer_json_add_array_item_string(wb, "WOps");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-#endif
-
-        // Minor Page Faults chart
-        buffer_json_member_add_object(wb, "MinFlt");
-        {
-            buffer_json_member_add_string(wb, "name", "Minor Page Faults");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "MinFlt");
-                buffer_json_add_array_item_string(wb, "CMinFlt");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Major Page Faults chart
-        buffer_json_member_add_object(wb, "MajFlt");
-        {
-            buffer_json_member_add_string(wb, "name", "Major Page Faults");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "MajFlt");
-                buffer_json_add_array_item_string(wb, "CMajFlt");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Threads chart
-        buffer_json_member_add_object(wb, "Threads");
-        {
-            buffer_json_member_add_string(wb, "name", "Threads");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Threads");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Processes chart
-        buffer_json_member_add_object(wb, "Processes");
-        {
-            buffer_json_member_add_string(wb, "name", "Processes");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Processes");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // FDs chart
-        buffer_json_member_add_object(wb, "FDs");
-        {
-            buffer_json_member_add_string(wb, "name", "File Descriptors");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Files");
-                buffer_json_add_array_item_string(wb, "Pipes");
-                buffer_json_add_array_item_string(wb, "Sockets");
-                buffer_json_add_array_item_string(wb, "iNotiFDs");
-                buffer_json_add_array_item_string(wb, "EventFDs");
-                buffer_json_add_array_item_string(wb, "TimerFDs");
-                buffer_json_add_array_item_string(wb, "SigFDs");
-                buffer_json_add_array_item_string(wb, "EvPollFDs");
-                buffer_json_add_array_item_string(wb, "OtherFDs");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-    }
-    buffer_json_object_close(wb); // charts
-
-    buffer_json_member_add_array(wb, "default_charts");
-    {
-        buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "CPU");
-        buffer_json_add_array_item_string(wb, "Category");
-        buffer_json_array_close(wb);
-
-        buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "Memory");
-        buffer_json_add_array_item_string(wb, "Category");
-        buffer_json_array_close(wb);
-    }
-    buffer_json_array_close(wb);
-
-    buffer_json_member_add_object(wb, "group_by");
-    {
-        // group by PID
-        buffer_json_member_add_object(wb, "PID");
-        {
-            buffer_json_member_add_string(wb, "name", "Process Tree by PID");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "PPID");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // group by Category
-        buffer_json_member_add_object(wb, "Category");
-        {
-            buffer_json_member_add_string(wb, "name", "Process Tree by Category");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Category");
-                buffer_json_add_array_item_string(wb, "PPID");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // group by PPID
-        buffer_json_member_add_object(wb, "PPID");
-        {
-            buffer_json_member_add_string(wb, "name", "Process Tree by Parent PID");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "PPID");
-                buffer_json_add_array_item_string(wb, "PID");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
-        // group by User
-        buffer_json_member_add_object(wb, "User");
-        {
-            buffer_json_member_add_string(wb, "name", "Process Tree by User");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "User");
-                buffer_json_add_array_item_string(wb, "PPID");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-#endif
-
-#if (PROCESSES_HAVE_GID == 1)
-        // group by Group
-        buffer_json_member_add_object(wb, "Group");
-        {
-            buffer_json_member_add_string(wb, "name", "Process Tree by Group");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Group");
-                buffer_json_add_array_item_string(wb, "PPID");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-#endif
-    }
-    buffer_json_object_close(wb); // group_by
+    fp_emit_groupby(wb);
 
     netdata_mutex_unlock(&apps_and_stdout_mutex);
 

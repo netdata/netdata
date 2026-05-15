@@ -81,6 +81,14 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     // Watch configured journal directories
     for path in &config.journal.paths {
+        // Create the directory if it doesn't exist so inotify can watch it.
+        // The otel plugin creates it too (via create_dir_all), but it may start later.
+        if !std::path::Path::new(path).exists() {
+            if let Err(e) = std::fs::create_dir_all(path) {
+                error!("failed to create directory {}: {}", path, e);
+            }
+        }
+
         if let Err(e) = catalog_function.watch_directory(path) {
             error!("failed to watch directory {}: {:#?}", path, e);
         }

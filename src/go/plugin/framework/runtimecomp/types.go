@@ -9,9 +9,6 @@ import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 type AutogenPolicy struct {
 	Enabled bool
 
-	// TypeID is the chart-type prefix used by Netdata runtime checks
-	// (`type.id` length guard). Typically this is `<plugin>.<job>`.
-	TypeID string
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
 	MaxTypeIDLen int
@@ -42,4 +39,5 @@ type Service interface {
 	RegisterComponent(cfg ComponentConfig) error
 	UnregisterComponent(name string)
 	RegisterProducer(name string, tickFn func() error) error
+	UnregisterProducer(name string)
 }

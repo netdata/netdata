@@ -45,8 +45,9 @@ The following options can be defined for this notification
 |:-----|:------------|:--------|:---------:|
 | SEND_FLOCK | Set `SEND_FLOCK` to YES | YES | yes |
 | FLOCK_WEBHOOK_URL | set `FLOCK_WEBHOOK_URL` to your webhook URL. |  | yes |
-| DEFAULT_RECIPIENT_FLOCK | Set `DEFAULT_RECIPIENT_FLOCK` to  the Flock channel you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | yes |
+| [DEFAULT_RECIPIENT_FLOCK](#option-default-recipient-flock) | Set `DEFAULT_RECIPIENT_FLOCK` to  the Flock channel you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | yes |
 
+<a id="option-default-recipient-flock"></a>
 ##### DEFAULT_RECIPIENT_FLOCK
 
 You can have different channels per role, by editing DEFAULT_RECIPIENT_FLOCK with the channel you want, in the following entries at the bottom of the same file:

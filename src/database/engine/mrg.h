@@ -41,6 +41,7 @@ struct mrg_statistics {
 };
 
 MRG *mrg_create(void);
+MRG *mrg_create_for_unittest(void);
 
 // returns the number of metrics that were freed, but were still referenced
 size_t mrg_destroy(MRG *mrg);
@@ -97,5 +98,7 @@ void mrg_update_metric_retention_and_granularity_by_uuid(
 bool mrg_save(MRG *mrg);
 bool mrg_load(MRG *mrg);
 void mrg_metric_prepopulate_cleanup(MRG *mrg);
+
+int mrg_retention_benchmark(void);
 
 #endif // DBENGINE_METRIC_H

@@ -530,6 +530,8 @@ CONFIG test:collector:fail:name delete
 }
 
 func TestManager_Run_Dyncfg_Get(t *testing.T) {
+	t.Setenv("DYNCFG_GET_SECRET", "resolved-secret-value")
+
 	tests := map[string]struct {
 		createSim func() *runSim
 	}{
@@ -595,6 +597,48 @@ CONFIG test:collector:success:test create accepted job /collectors/test/Jobs dyn
 
 FUNCTION_RESULT_BEGIN 2-get 200 application/json
 {"option_str":"1","option_int":1}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"[get] existing with secret ref remains unresolved": {
+			createSim: func() *runSim {
+				cfg := prepareDyncfgCfg("success", "test").
+					Set("option_str", "${env:DYNCFG_GET_SECRET}")
+				bs, _ := json.Marshal(cfg)
+
+				return &runSim{
+					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
+							UID:     "1-add",
+							Source:  "type=dyncfg",
+							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
+							Payload: bs,
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
+							UID:  "2-get",
+							Args: []string{mgr.dyncfgJobID(cfg), "get"},
+						}))
+					},
+					wantDiscovered: nil,
+					wantSeen: []confgroup.Config{
+						cfg,
+					},
+					wantExposed: []wantExposedEntry{
+						{cfg: cfg, status: dyncfg.StatusAccepted},
+					},
+					wantRunning: nil,
+					wantDyncfg: `
+
+FUNCTION_RESULT_BEGIN 1-add 202 application/json
+{"status":202,"message":""}
+FUNCTION_RESULT_END
+
+CONFIG test:collector:success:test create accepted job /collectors/test/Jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
+
+FUNCTION_RESULT_BEGIN 2-get 200 application/json
+{"option_str":"${env:DYNCFG_GET_SECRET}","option_int":0}
 FUNCTION_RESULT_END
 `,
 				}

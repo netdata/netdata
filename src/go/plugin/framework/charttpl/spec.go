@@ -25,9 +25,6 @@ type Engine struct {
 type EngineAutogen struct {
 	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 
-	// TypeID is the chart-type prefix used by Netdata runtime checks
-	// (`type.id` length guard). Typically this is `<plugin>.<job>`.
-	TypeID string `yaml:"type_id,omitempty" json:"type_id,omitempty"`
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
 	MaxTypeIDLen int `yaml:"max_type_id_len,omitempty" json:"max_type_id_len,omitempty"`
@@ -39,12 +36,19 @@ type EngineAutogen struct {
 
 // Group is a recursive chart-group container.
 type Group struct {
-	Family           string   `yaml:"family" json:"family"`
-	ContextNamespace string   `yaml:"context_namespace,omitempty" json:"context_namespace,omitempty"`
-	Metrics          []string `yaml:"metrics,omitempty" json:"metrics,omitempty"`
+	Family           string         `yaml:"family" json:"family"`
+	ContextNamespace string         `yaml:"context_namespace,omitempty" json:"context_namespace,omitempty"`
+	Metrics          []string       `yaml:"metrics,omitempty" json:"metrics,omitempty"`
+	ChartDefaults    *ChartDefaults `yaml:"chart_defaults,omitempty" json:"chart_defaults,omitempty"`
 
 	Groups []Group `yaml:"groups,omitempty" json:"groups,omitempty"`
 	Charts []Chart `yaml:"charts,omitempty" json:"charts,omitempty"`
+}
+
+// ChartDefaults defines inheritable chart fields on a group.
+type ChartDefaults struct {
+	LabelPromoted []string   `yaml:"label_promotion,omitempty" json:"label_promotion,omitempty"`
+	Instances     *Instances `yaml:"instances,omitempty" json:"instances,omitempty"`
 }
 
 // Chart describes one chart template in compact DSL form.

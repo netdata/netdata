@@ -25,22 +25,6 @@ void json_escape_string(char *dst, const char *src, size_t size) {
     *d = '\0';
 }
 
-void json_fix_string(char *s) {
-    unsigned char c;
-    while((c = (unsigned char)*s)) {
-        if(unlikely(c == '\\'))
-            *s++ = '/';
-        else if(unlikely(c == '"'))
-            *s++ = '\'';
-        else if(unlikely(isspace(c) || iscntrl(c)))
-            *s++ = ' ';
-        else if(unlikely(!isprint(c) || c > 127))
-            *s++ = '_';
-        else
-            s++;
-    }
-}
-
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
     char *s = fgets(buf, (int)buf_size, fp);
     if (!s) return NULL;
@@ -160,12 +144,25 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     return value;
 }
 
+static inline bool run_command_validate_max_line_length(const char *command, int max_line_length) {
+    if (likely(max_line_length > 0))
+        return true;
+
+    netdata_log_error("Invalid max_line_length %d for command '%s'.",
+                      max_line_length, command ? command : "(null)");
+    return false;
+}
+
 BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_length) {
+    if (unlikely(!run_command_validate_max_line_length(command, max_line_length)))
+        return NULL;
+
     BUFFER *wb = buffer_create(0, NULL);
 
     POPEN_INSTANCE *pi = spawn_popen_run(command);
     if(pi) {
-        char buffer[max_line_length + 1];
+        size_t buffer_size = (size_t)max_line_length + 1;
+        CLEAN_CHAR_P *buffer = mallocz(buffer_size);
         while (fgets(buffer, max_line_length, spawn_popen_stdout(pi))) {
             buffer[max_line_length] = '\0';
             buffer_strcat(wb, buffer);
@@ -182,9 +179,13 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
 }
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
+    if (unlikely(!run_command_validate_max_line_length(command, max_line_length)))
+        return false;
+
     POPEN_INSTANCE *pi = spawn_popen_run(command);
     if(pi) {
-        char buffer[max_line_length + 1];
+        size_t buffer_size = (size_t)max_line_length + 1;
+        CLEAN_CHAR_P *buffer = mallocz(buffer_size);
 
         while (fgets(buffer, max_line_length, spawn_popen_stdout(pi)))
             fprintf(stdout, "%s", buffer);

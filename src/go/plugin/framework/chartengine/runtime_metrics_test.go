@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,33 +30,33 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				cc.BeginCycle()
 				c.ObserveTotal(20)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				rs := e.RuntimeStore()
 				require.NotNil(t, rs)
 				r := rs.Read(metrix.ReadRaw())
 
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.build_success_total", nil, 2)
-				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.chartengine.build_duration_seconds", nil, 2)
-				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.chartengine.build_phase_duration_seconds", metrix.Labels{"phase": "scan"}, 2)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_misses_total", nil, 1)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_hits_total", nil, 1)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_entries", nil, 1)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_retained_total", nil, 1)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.series_scanned_total", nil, 2)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.planner_actions_total", metrix.Labels{"kind": "update_chart"}, 2)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.plan_chart_instances", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_success_total", nil, 2)
+				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_duration_seconds", nil, 2)
+				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_phase_duration_seconds", metrix.Labels{"phase": "scan"}, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_misses_total", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_hits_total", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_entries", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_retained_total", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.series_scanned_total", nil, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.planner_actions_total", metrix.Labels{"kind": "update_chart"}, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.plan_chart_instances", nil, 1)
 				assertMetricMeta(
 					t,
 					r,
-					"netdata.go.plugin.chartengine.build_success_total",
+					"netdata.go.plugin.framework.chartengine.build_success_total",
 					metrix.MetricMeta{
 						Description: "Successful BuildPlan calls",
 						ChartFamily: "ChartEngine/Build",
@@ -65,7 +66,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assertMetricMeta(
 					t,
 					r,
-					"netdata.go.plugin.chartengine.planner_actions_total",
+					"netdata.go.plugin.framework.chartengine.planner_actions_total",
 					metrix.MetricMeta{
 						Description: "Planner actions by kind",
 						ChartFamily: "ChartEngine/Actions",
@@ -87,24 +88,24 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				before := e.RuntimeStore().Read(metrix.ReadRaw())
-				beforeCharts, ok := before.Value("netdata.go.plugin.chartengine.plan_chart_instances", nil)
+				beforeCharts, ok := before.Value("netdata.go.plugin.framework.chartengine.plan_chart_instances", nil)
 				require.True(t, ok)
 				require.GreaterOrEqual(t, beforeCharts, float64(1))
 
 				cc.BeginCycle()
 				cc.AbortCycle()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				after := e.RuntimeStore().Read(metrix.ReadRaw())
-				assertMetricValueAtLeast(t, after, "netdata.go.plugin.chartengine.build_skipped_failed_collect_total", nil, 1)
-				assertMetricValueAtLeast(t, after, "netdata.go.plugin.chartengine.build_success_total", nil, 1)
+				assertMetricValueAtLeast(t, after, "netdata.go.plugin.framework.chartengine.build_skipped_failed_collect_total", nil, 1)
+				assertMetricValueAtLeast(t, after, "netdata.go.plugin.framework.chartengine.build_success_total", nil, 1)
 
-				afterCharts, ok := after.Value("netdata.go.plugin.chartengine.plan_chart_instances", nil)
+				afterCharts, ok := after.Value("netdata.go.plugin.framework.chartengine.plan_chart_instances", nil)
 				require.True(t, ok)
 				assert.Equal(t, beforeCharts, afterCharts)
 			},
@@ -125,11 +126,11 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				r := e.RuntimeStore().Read(metrix.ReadRaw())
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.series_filtered_total", metrix.Labels{"reason": "by_selector"}, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.series_filtered_total", metrix.Labels{"reason": "by_selector"}, 1)
 			},
 		},
 		"expiry removals are counted by scope and reason": {
@@ -149,20 +150,20 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				total.Observe(100)
 				modeMetric.Observe(1, modeOK)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				cc.BeginCycle()
 				total.Observe(101)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				r := e.RuntimeStore().Read(metrix.ReadRaw())
 				assertMetricValueAtLeast(
 					t,
 					r,
-					"netdata.go.plugin.chartengine.lifecycle_removed_total",
+					"netdata.go.plugin.framework.chartengine.lifecycle_removed_total",
 					metrix.Labels{"scope": "dimension", "reason": "expiry"},
 					1,
 				)
@@ -178,11 +179,15 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				component := rs.Write().StatefulMeter("component").Counter("jobs_total")
 				component.Add(7)
 
-				observer, err := New(WithRuntimeStore(nil))
+				observer, err := New(
+					WithRuntimeStore(nil),
+					WithSeriesSelectionAllVisible(),
+					WithRuntimePlannerMode(),
+				)
 				require.NoError(t, err)
 				require.NoError(t, observer.LoadYAML([]byte(runtimeComponentTemplateYAML()), 1))
 
-				plan, err := observer.BuildPlan(rs.Read(metrix.ReadFlatten()))
+				plan, err := buildPlan(observer, rs.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 				assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
 
@@ -207,18 +212,19 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = producer.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(producer, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				observer, err := New(
 					WithRuntimeStore(nil),
-					WithAutogenPolicy(AutogenPolicy{Enabled: true}),
+					WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}),
 					WithSeriesSelectionAllVisible(),
+					WithRuntimePlannerMode(),
 				)
 				require.NoError(t, err)
 				require.NoError(t, observer.LoadYAML([]byte(runtimeDummyTemplateYAML()), 1))
 
-				plan, err := observer.BuildPlan(producer.RuntimeStore().Read(metrix.ReadFlatten()))
+				plan, err := buildPlan(observer, producer.RuntimeStore().Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 				create := findCreateChartByTitle(plan.Actions, "Successful BuildPlan calls")
 				require.NotNil(t, create)
@@ -226,17 +232,155 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assert.Equal(t, "ChartEngine/Build", create.Meta.Family)
 				assert.Equal(t, "builds/s", create.Meta.Units)
 
-				duration := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds")
+				duration := findCreateChartByID(plan.Actions, "netdata.go.plugin.framework.chartengine.build_duration_seconds")
 				require.NotNil(t, duration)
 				assert.Equal(t, "BuildPlan duration in seconds", duration.Meta.Title)
 				assert.Equal(t, "ChartEngine/Build", duration.Meta.Family)
 				assert.Equal(t, "seconds", duration.Meta.Units)
 
-				durationSum := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds_sum")
+				durationSum := findCreateChartByID(plan.Actions, "netdata.go.plugin.framework.chartengine.build_duration_seconds_sum")
 				require.NotNil(t, durationSum)
 				assert.Equal(t, "BuildPlan duration in seconds", durationSum.Meta.Title)
 				assert.Equal(t, "ChartEngine/Build", durationSum.Meta.Family)
 				assert.Equal(t, "seconds", durationSum.Meta.Units)
+			},
+		},
+		"runtime aggregator rolls up multiple engine samples": {
+			run: func(t *testing.T) {
+				store := metrix.NewRuntimeStore()
+				agg := NewRuntimeAggregator(store)
+				now := testNow()
+				agg.Observe(PlanRuntimeSample{
+					startedAt:              now,
+					buildSuccess:           true,
+					planRouteStats:         planRouteStats{routeCacheHits: 2, seriesScanned: 3},
+					routeCacheEntries:      4,
+					planChartInstances:     5,
+					planInferredDimensions: 6,
+					buildSeqObserved:       true,
+					buildSeqViolation:      true,
+				})
+				agg.Observe(PlanRuntimeSample{
+					startedAt:              now,
+					buildSuccess:           true,
+					planRouteStats:         planRouteStats{routeCacheHits: 7, seriesScanned: 11},
+					routeCacheEntries:      13,
+					planChartInstances:     17,
+					planInferredDimensions: 19,
+					buildSeqObserved:       true,
+				})
+
+				agg.Flush()
+
+				r := store.Read(metrix.ReadRaw())
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_success_total", nil, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_hits_total", nil, 9)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.series_scanned_total", nil, 14)
+				routeCacheEntries, ok := r.Value("netdata.go.plugin.framework.chartengine.route_cache_entries", nil)
+				require.True(t, ok)
+				assert.Equal(t, float64(17), routeCacheEntries)
+				planChartInstances, ok := r.Value("netdata.go.plugin.framework.chartengine.plan_chart_instances", nil)
+				require.True(t, ok)
+				assert.Equal(t, float64(22), planChartInstances)
+				planInferredDimensions, ok := r.Value("netdata.go.plugin.framework.chartengine.plan_inferred_dimensions", nil)
+				require.True(t, ok)
+				assert.Equal(t, float64(25), planInferredDimensions)
+				seqViolation, ok := r.Value("netdata.go.plugin.framework.chartengine.build_seq_violation_active", nil)
+				require.True(t, ok)
+				assert.Equal(t, float64(1), seqViolation)
+				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_duration_seconds", nil, 2)
+			},
+		},
+		"runtime sample observer fires without direct runtime store": {
+			run: func(t *testing.T) {
+				observed := 0
+				e, err := New(
+					WithRuntimeStore(nil),
+					WithRuntimeSampleObserver(func(PlanRuntimeSample) {
+						observed++
+					}),
+				)
+				require.NoError(t, err)
+				require.NoError(t, e.LoadYAML([]byte(runtimeObservabilityTemplateYAML()), 1))
+
+				store := metrix.NewCollectorStore()
+				cc := mustCycleController(t, store)
+				c := store.Write().SnapshotMeter("mysql").Counter("queries_total")
+				cc.BeginCycle()
+				c.ObserveTotal(10)
+				cc.CommitCycleSuccess()
+
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
+				require.NoError(t, err)
+				assert.Equal(t, 1, observed)
+				assert.Nil(t, e.RuntimeStore())
+			},
+		},
+		"outstanding attempt does not fire runtime sample observer": {
+			run: func(t *testing.T) {
+				observed := 0
+				e, err := New(
+					WithRuntimeStore(nil),
+					WithRuntimeSampleObserver(func(PlanRuntimeSample) {
+						observed++
+					}),
+				)
+				require.NoError(t, err)
+				require.NoError(t, e.LoadYAML([]byte(runtimeObservabilityTemplateYAML()), 1))
+
+				store := metrix.NewCollectorStore()
+				cc := mustCycleController(t, store)
+				c := store.Write().SnapshotMeter("mysql").Counter("queries_total")
+				cc.BeginCycle()
+				c.ObserveTotal(10)
+				cc.CommitCycleSuccess()
+				reader := store.Read(metrix.ReadFlatten())
+
+				attempt, err := e.PreparePlan(reader)
+				require.NoError(t, err)
+				defer attempt.Abort()
+				assert.Equal(t, 1, observed)
+
+				_, err = e.PreparePlan(reader)
+				require.ErrorIs(t, err, ErrOutstandingPlanAttempt)
+				assert.Equal(t, 1, observed)
+			},
+		},
+		"runtime aggregator nil store and empty flush are no-ops": {
+			run: func(t *testing.T) {
+				agg := NewRuntimeAggregator(nil)
+				require.NotPanics(t, func() {
+					agg.Flush()
+					agg.Observe(PlanRuntimeSample{startedAt: testNow(), buildSuccess: true})
+					agg.Reset()
+					agg.Flush()
+				})
+			},
+		},
+		"runtime aggregator clears build sequence violation on skipped-only rollup": {
+			run: func(t *testing.T) {
+				store := metrix.NewRuntimeStore()
+				agg := NewRuntimeAggregator(store)
+
+				agg.Observe(PlanRuntimeSample{
+					startedAt:         testNow(),
+					buildSuccess:      true,
+					buildSeqObserved:  true,
+					buildSeqViolation: true,
+				})
+				agg.Flush()
+				r := store.Read(metrix.ReadRaw())
+				seqViolation, ok := r.Value("netdata.go.plugin.framework.chartengine.build_seq_violation_active", nil)
+				require.True(t, ok)
+				assert.Equal(t, float64(1), seqViolation)
+
+				agg.Observe(PlanRuntimeSample{startedAt: testNow(), skippedFailed: true})
+				agg.Flush()
+				r = store.Read(metrix.ReadRaw())
+				seqViolation, ok = r.Value("netdata.go.plugin.framework.chartengine.build_seq_violation_active", nil)
+				require.True(t, ok)
+				assert.Equal(t, float64(0), seqViolation)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_skipped_failed_collect_total", nil, 1)
 			},
 		},
 	}
@@ -244,6 +388,10 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, tc.run)
 	}
+}
+
+func testNow() time.Time {
+	return time.Now().Add(-time.Second)
 }
 
 func assertMetricValueAtLeast(t *testing.T, reader metrix.Reader, name string, labels metrix.Labels, min float64) {

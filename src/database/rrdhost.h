@@ -347,8 +347,8 @@ extern RRDHOST *localhost;
 #define rrdhost_hostname(host) string2str((host)->hostname)
 #define rrdhost_registry_hostname(host) string2str((host)->registry_hostname)
 #define rrdhost_os(host) string2str((host)->os)
-#define rrdhost_timezone(host) string2str((host)->timezone)
-#define rrdhost_abbrev_timezone(host) string2str((host)->abbrev_timezone)
+// Timezone fields are mutable at runtime (DST refresh); use rrdhost_tz_get() for thread-safe access.
+// Do NOT access host->timezone or host->abbrev_timezone directly outside of rrdhost_update_lock.
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
 
@@ -456,6 +456,7 @@ RRDHOST *rrdhost_find_or_create(
 void rrdhost_free_all(void);
 
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host);
+void rrdhost_free___without_having_rrd_wrlock(RRDHOST *host);
 void rrdhost_cleanup_data_collection_and_health(RRDHOST *host);
 
 bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
@@ -466,6 +467,19 @@ void set_host_properties(
     RRD_DB_MODE memory_mode, const char *registry_hostname,
     const char *os, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *prog_name, const char *prog_version);
+
+bool rrdhost_update_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset);
+
+// Thread-safe timezone snapshot from an RRDHOST.
+// The returned struct owns strdup'd copies; release with rrdhost_tz_free().
+typedef struct {
+    char *timezone;        // IANA timezone name (owned, strdup'd)
+    char *abbrev_timezone; // abbreviated timezone (owned, strdup'd)
+    int32_t utc_offset;    // offset from UTC in seconds
+} RRDHOST_TZ;
+
+RRDHOST_TZ rrdhost_tz_get(RRDHOST *host);
+void rrdhost_tz_free(RRDHOST_TZ *tz);
 
 static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, time_t *from, time_t *to) {
     time_t first_time_s = 0, last_time_s = 0;

@@ -63,16 +63,21 @@ func TestCloneMetricTagConfig(t *testing.T) {
 		},
 		OID:    "2.4",
 		Symbol: SymbolConfigCompat{},
+		LookupSymbol: SymbolConfigCompat{
+			OID:                  "2.4.6.8",
+			ExtractValue:         ".*",
+			ExtractValueCompiled: regexp.MustCompile(".*"),
+		},
 		IndexTransform: []MetricIndexTransform{
 			{
 				Start: 0,
 				End:   1,
 			},
 		},
-		Mapping: map[string]string{
+		Mapping: NewExactMapping(map[string]string{
 			"1": "bar",
 			"2": "baz",
-		},
+		}),
 		Match:   ".*",
 		Pattern: regexp.MustCompile(".*"),
 		Tags: map[string]string{
@@ -83,8 +88,8 @@ func TestCloneMetricTagConfig(t *testing.T) {
 	c2 := c.Clone()
 	assert.Equal(t, c, c2)
 	c2.Tags["bar"] = "$2"
-	c2.IndexTransform = append(c2.IndexTransform, MetricIndexTransform{1, 3})
-	c2.Mapping["3"] = "foo"
+	c2.IndexTransform = append(c2.IndexTransform, MetricIndexTransform{Start: 1, End: 3})
+	c2.Mapping.Items["3"] = "foo"
 	c2.Tag = "bar"
 	assert.NotEqual(t, c, c2)
 	// Validate that c has not changed
@@ -98,16 +103,21 @@ func TestCloneMetricTagConfig(t *testing.T) {
 		},
 		OID:    "2.4",
 		Symbol: SymbolConfigCompat{},
+		LookupSymbol: SymbolConfigCompat{
+			OID:                  "2.4.6.8",
+			ExtractValue:         ".*",
+			ExtractValueCompiled: regexp.MustCompile(".*"),
+		},
 		IndexTransform: []MetricIndexTransform{
 			{
 				Start: 0,
 				End:   1,
 			},
 		},
-		Mapping: map[string]string{
+		Mapping: NewExactMapping(map[string]string{
 			"1": "bar",
 			"2": "baz",
-		},
+		}),
 		Match:   ".*",
 		Pattern: regexp.MustCompile(".*"),
 		Tags: map[string]string{
@@ -161,7 +171,7 @@ func TestCloneMetricsConfig(t *testing.T) {
 	conf2 := conf.Clone()
 	assert.Equal(t, conf, conf2)
 	conf2.StaticTags[0] = StaticMetricTagConfig{Tag: "bar", Value: "baz"}
-	conf2.MetricTags[0].IndexTransform = []MetricIndexTransform{{5, 7}}
+	conf2.MetricTags[0].IndexTransform = []MetricIndexTransform{{Start: 5, End: 7}}
 	conf2.Options.Placement = 2
 	conf2.Options.MetricSuffix = ".bar"
 	assert.Equal(t, unchanged, conf)

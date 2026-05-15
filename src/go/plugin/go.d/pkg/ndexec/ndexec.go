@@ -5,6 +5,7 @@ package ndexec
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -104,6 +105,20 @@ func RunUnprivilegedWithOptionsUsage(log *logger.Logger, timeout time.Duration, 
 	return defaultRunner.run(log, timeout, opts.Dir, defaultRunner.ndRunPath, "RunUnprivileged", opts.Env, argv...)
 }
 
+// RunUnprivilegedWithOptionsUsageContext runs binPath via nd-run using the caller
+// context as the ownership boundary for cancellation and stop/reload propagation.
+func RunUnprivilegedWithOptionsUsageContext(
+	ctx context.Context,
+	log *logger.Logger,
+	timeout time.Duration,
+	opts RunOptions,
+	binPath string,
+	args ...string,
+) ([]byte, string, ResourceUsage, error) {
+	argv := append([]string{binPath}, args...)
+	return defaultRunner.runContext(ctx, log, timeout, opts.Dir, defaultRunner.ndRunPath, "RunUnprivileged", opts.Env, argv...)
+}
+
 // SetRunnerPathsForTests overrides the nd-run and ndsudo helper paths.
 // It is intended for test environments that need to stub the helpers.
 func SetRunnerPathsForTests(ndRunPath, ndSudoPath string) {
@@ -118,28 +133,24 @@ func SetRunnerPathsForTests(ndRunPath, ndSudoPath string) {
 // RunDirect runs binPath directly with a timeout, without any wrapper (nd-run/ndsudo).
 // Returns stdout. On error, includes the command string and a trimmed stderr snippet.
 func RunDirect(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, binPath, args...)
-
-	if log != nil {
-		log.Debugf("executing '%s'", cmd)
-	}
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	bs, err := cmd.Output()
+	out, cmd, _, err := RunDirectWithOptionsUsageContext(context.Background(), log, timeout, RunOptions{}, binPath, args...)
 	if err != nil {
-		s := stderr.String()
-		if len(s) > stderrLimit {
-			s = s[:stderrLimit] + "… (truncated)"
-		}
-		return nil, fmt.Errorf("'%s' execution failed: %w (stderr: %s)", cmd, err, strings.TrimSpace(s))
+		return out, fmt.Errorf("'%s' execution failed: %w", cmd, err)
 	}
+	return out, nil
+}
 
-	return bs, nil
+// RunDirectWithOptionsUsageContext runs binPath directly using the caller context
+// while honoring the provided environment and working-directory options.
+func RunDirectWithOptionsUsageContext(
+	ctx context.Context,
+	log *logger.Logger,
+	timeout time.Duration,
+	opts RunOptions,
+	binPath string,
+	args ...string,
+) ([]byte, string, ResourceUsage, error) {
+	return defaultRunner.runContext(ctx, log, timeout, opts.Dir, binPath, "RunDirect", opts.Env, args...)
 }
 
 // FindBinary searches for a binary by trying names in PATH first,
@@ -165,10 +176,29 @@ func FindBinary(names []string, defaultPaths []string) (string, error) {
 }
 
 func (r *runner) run(log *logger.Logger, timeout time.Duration, dir string, helperPath, label string, env []string, argv ...string) ([]byte, string, ResourceUsage, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	return r.runContext(context.Background(), log, timeout, dir, helperPath, label, env, argv...)
+}
+
+func (r *runner) runContext(
+	ctx context.Context,
+	log *logger.Logger,
+	timeout time.Duration,
+	dir string,
+	helperPath, label string,
+	env []string,
+	argv ...string,
+) ([]byte, string, ResourceUsage, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	ex := exec.CommandContext(ctx, helperPath, argv...) // argv comes from trusted sources; no shell, args passed separately
+	configureCommandCancellation(ex)
 	if dir != "" {
 		ex.Dir = dir
 	}
@@ -176,7 +206,9 @@ func (r *runner) run(log *logger.Logger, timeout time.Duration, dir string, help
 		ex.Env = env
 	}
 
-	log.Debugf("executing: %v", ex)
+	if log != nil {
+		log.Debugf("executing: %v", ex)
+	}
 
 	var stderr bytes.Buffer
 	ex.Stderr = &stderr
@@ -190,9 +222,15 @@ func (r *runner) run(log *logger.Logger, timeout time.Duration, dir string, help
 		if len(s) > stderrLimit {
 			s = s[:stderrLimit] + "… (truncated)"
 		}
-		// Normalize context-related errors so callers can errors.Is(..., context.DeadlineExceeded)
+		// Normalize context-related errors so callers can distinguish the
+		// execution timeout cause from caller-owned cancellation.
 		if ctx.Err() != nil {
-			err = ctx.Err()
+			cause := context.Cause(ctx)
+			if cause != nil && !errors.Is(cause, ctx.Err()) {
+				err = cause
+			} else {
+				err = ctx.Err()
+			}
 		}
 
 		return out, cmdStr, usage, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, err, strings.TrimSpace(s))

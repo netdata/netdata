@@ -25,7 +25,7 @@ typedef struct softirq_ebpf_val {
 #define NETDATA_EBPF_MODULE_NAME_SOFTIRQ "softirq"
 #define NETDATA_SOFTIRQ_CONFIG_FILE "softirq.conf"
 
-typedef struct sofirq_val {
+typedef struct softirq_val {
     uint64_t latency;
     char *name;
 } softirq_val_t;

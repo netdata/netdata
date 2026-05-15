@@ -1,0 +1,30 @@
+{
+  "controllers": [
+    {
+      "durable-id": "controller_a",
+      "description": "Controller A",
+      "status": "Operational",
+      "health": "OK",
+      "health-numeric": 0,
+      "serial-number": "SN-CTRL-A-001",
+      "redundancy-status": "Redundant"
+    },
+    {
+      "durable-id": "controller_b",
+      "description": "Controller B",
+      "status": "Operational",
+      "health": "OK",
+      "health-numeric": 0,
+      "serial-number": "SN-CTRL-B-001",
+      "redundancy-status": "Redundant"
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

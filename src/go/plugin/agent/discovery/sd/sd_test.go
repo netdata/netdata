@@ -16,7 +16,7 @@ func TestServiceDiscovery_Run(t *testing.T) {
 	tests := map[string]discoverySim{
 		"add pipeline": {
 			configs: []confFile{
-				prepareConfigFile("source", "name"),
+				prepareConfigFile("name.conf", "name"),
 			},
 			wantPipelines: []*mockPipeline{
 				{name: "name", started: true, stopped: false},
@@ -24,14 +24,30 @@ func TestServiceDiscovery_Run(t *testing.T) {
 		},
 		"add disabled pipeline": {
 			configs: []confFile{
-				prepareDisabledConfigFile("source", "name"),
+				prepareDisabledConfigFile("name.conf", "name"),
 			},
 			wantPipelines: nil,
 		},
+		"add pipeline without raw name uses basename": {
+			configs: []confFile{
+				prepareUnnamedConfigFile("basename.conf"),
+			},
+			wantPipelines: []*mockPipeline{
+				{name: "basename", started: true, stopped: false},
+			},
+		},
+		"raw file name overrides basename": {
+			configs: []confFile{
+				prepareConfigFile("basename.conf", "custom-name"),
+			},
+			wantPipelines: []*mockPipeline{
+				{name: "custom-name", started: true, stopped: false},
+			},
+		},
 		"remove pipeline": {
 			configs: []confFile{
-				prepareConfigFile("source", "name"),
-				prepareEmptyConfigFile("source"),
+				prepareConfigFile("name.conf", "name"),
+				prepareEmptyConfigFile("name.conf"),
 			},
 			wantPipelines: []*mockPipeline{
 				{name: "name", started: true, stopped: true},
@@ -41,9 +57,9 @@ func TestServiceDiscovery_Run(t *testing.T) {
 			// With the new stability logic, re-adding the same config from the same source
 			// when it's already running is a no-op. Only 1 pipeline should be created.
 			configs: []confFile{
-				prepareConfigFile("source", "name"),
-				prepareConfigFile("source", "name"),
-				prepareConfigFile("source", "name"),
+				prepareConfigFile("name.conf", "name"),
+				prepareConfigFile("name.conf", "name"),
+				prepareConfigFile("name.conf", "name"),
 			},
 			wantPipelines: []*mockPipeline{
 				{name: "name", started: true, stopped: false},
@@ -51,8 +67,9 @@ func TestServiceDiscovery_Run(t *testing.T) {
 		},
 		"restart pipeline": {
 			configs: []confFile{
-				prepareConfigFile("source", "name1"),
-				prepareConfigFile("source", "name2"),
+				prepareConfigFile("name1.conf", "name1"),
+				prepareEmptyConfigFile("name1.conf"),
+				prepareConfigFile("name2.conf", "name2"),
 			},
 			wantPipelines: []*mockPipeline{
 				{name: "name1", started: true, stopped: true},
@@ -61,17 +78,17 @@ func TestServiceDiscovery_Run(t *testing.T) {
 		},
 		"invalid pipeline config": {
 			configs: []confFile{
-				prepareConfigFile("source", "invalid"),
+				prepareInvalidConfigFile("invalid.conf"),
 			},
 			wantPipelines: nil,
 		},
-		"invalid config for running pipeline": {
+		"invalid config for running pipeline with same basename is ignored": {
 			configs: []confFile{
-				prepareConfigFile("source", "name"),
-				prepareConfigFile("source", "invalid"),
+				prepareConfigFile("name.conf", "name"),
+				prepareInvalidConfigFile("name.conf"),
 			},
 			wantPipelines: []*mockPipeline{
-				{name: "name", started: true, stopped: true},
+				{name: "name", started: true, stopped: false},
 			},
 		},
 	}
@@ -99,6 +116,7 @@ func prepareConfigFile(source, name string) confFile {
 	cfg := pipeline.Config{
 		Name:       name,
 		Discoverer: disc,
+		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
 
@@ -113,6 +131,21 @@ func prepareUnsupportedDiscovererConfigFile(source, name string) confFile {
 	cfg := pipeline.Config{
 		Name:       name,
 		Discoverer: disc,
+		Services:   defaultTestServices(),
+	}
+	bs, _ := yaml.Marshal(cfg)
+
+	return confFile{
+		source:  source,
+		content: bs,
+	}
+}
+
+func prepareUnnamedConfigFile(source string) confFile {
+	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
+	cfg := pipeline.Config{
+		Discoverer: disc,
+		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
 
@@ -133,6 +166,20 @@ func prepareDisabledConfigFile(source, name string) confFile {
 	cfg := pipeline.Config{
 		Name:       name,
 		Disabled:   true,
+		Discoverer: disc,
+		Services:   defaultTestServices(),
+	}
+	bs, _ := yaml.Marshal(cfg)
+
+	return confFile{
+		source:  source,
+		content: bs,
+	}
+}
+
+func prepareInvalidConfigFile(source string) confFile {
+	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
+	cfg := pipeline.Config{
 		Discoverer: disc,
 	}
 	bs, _ := yaml.Marshal(cfg)
@@ -191,8 +238,8 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			// Two stock configs with same name from different files
 			// Same priority + running = keep existing
 			configs: []confFile{
-				prepareConfigFile("/usr/lib/netdata/conf.d/sd/file1.conf", "myconfig"),
-				prepareConfigFile("/usr/lib/netdata/conf.d/sd/file2.conf", "myconfig"),
+				prepareConfigFile("/usr/lib/netdata/conf.d/sd/dir1/myconfig.conf", "myconfig"),
+				prepareConfigFile("/usr/lib/netdata/conf.d/sd/dir2/myconfig.conf", "myconfig"),
 			},
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // first stock keeps running
@@ -206,8 +253,8 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			// Two user configs with same name from different files
 			// Same priority + running = keep existing
 			configs: []confFile{
-				prepareConfigFile("/etc/netdata/sd.d/file1.conf", "myconfig"),
-				prepareConfigFile("/etc/netdata/sd.d/file2.conf", "myconfig"),
+				prepareConfigFile("/etc/netdata/sd.d/dir1/myconfig.conf", "myconfig"),
+				prepareConfigFile("/etc/netdata/sd.d/dir2/myconfig.conf", "myconfig"),
 			},
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // first user keeps running

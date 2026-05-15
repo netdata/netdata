@@ -8,6 +8,7 @@
 typedef enum aclk_proxy_type {
     PROXY_TYPE_UNKNOWN = 0,
     PROXY_TYPE_SOCKS5,
+    PROXY_TYPE_SOCKS5H,
     PROXY_TYPE_HTTP,
     PROXY_DISABLED,
     PROXY_NOT_SET,
@@ -25,6 +26,7 @@ static inline const char *aclk_proxy_type_to_url(ACLK_PROXY_TYPE type) {
     switch (type) {
         case PROXY_TYPE_HTTP: return "http://";
         case PROXY_TYPE_SOCKS5: return "socks5://";
+        case PROXY_TYPE_SOCKS5H: return "socks5h://";
         default: return "";
     }
 }

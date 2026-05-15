@@ -43,14 +43,15 @@ The following options can be defined for this notification
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| nc path | Set the path for nc, otherwise Netdata will search for it in your system $PATH |  | yes |
+| [nc path](#option-nc-path) | Set the path for nc, otherwise Netdata will search for it in your system $PATH |  | yes |
 | SEND_IRC | Set `SEND_IRC` YES. | YES | yes |
 | IRC_NETWORK | Set `IRC_NETWORK` to the IRC network which your preferred channels belong to. |  | yes |
 | IRC_PORT | Set `IRC_PORT` to the IRC port to which a connection will occur. |  | no |
 | IRC_NICKNAME | Set `IRC_NICKNAME` to the IRC nickname which is required to send the notification. It must not be an already registered name as the connection's MODE is defined as a guest. |  | yes |
 | IRC_REALNAME | Set `IRC_REALNAME` to the IRC realname which is required in order to make the connection. |  | yes |
-| DEFAULT_RECIPIENT_IRC | You can have different channels per role, by editing `DEFAULT_RECIPIENT_IRC` with the channel you want |  | yes |
+| [DEFAULT_RECIPIENT_IRC](#option-default-recipient-irc) | You can have different channels per role, by editing `DEFAULT_RECIPIENT_IRC` with the channel you want |  | yes |
 
+<a id="option-nc-path"></a>
 ##### nc path
 
 ```sh
@@ -64,6 +65,7 @@ nc="/usr/bin/nc"
 ```
 
 
+<a id="option-default-recipient-irc"></a>
 ##### DEFAULT_RECIPIENT_IRC
 
 The `DEFAULT_RECIPIENT_IRC` can be edited in the following entries at the bottom of the same file:

@@ -186,10 +186,6 @@ metrics:
         2: powerSupplyOneFailed
         3: powerSupplyTwoFailed
         4: powerSupplyOneandTwoFailed
-    metric_tags:
-      - symbol:
-          OID:
-          name: ePDUOutletBankIndex
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.3.5.2

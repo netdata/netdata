@@ -1,0 +1,10 @@
+ACTION=DANGEROUS_delete
+ACTION_LEVEL=DANGEROUS_delete
+BASE_MSG=User admin performed delete
+FULL_MSG=User admin performed delete on /file
+LINE_VAR=Original: admin delete /file
+RESOURCE=/file
+SUMMARY=admin:DANGEROUS_delete:/file
+UNDEFINED_VAR= should be empty
+USER=admin
+

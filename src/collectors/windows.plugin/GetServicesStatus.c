@@ -7,6 +7,7 @@
 struct win_service {
     char *service_name;
     DWORD pid;
+    bool present;
 
     RRDSET *st_service_state;
     RRDDIM *rd_service_state_running;
@@ -25,6 +26,8 @@ static DICTIONARY *win_services = NULL;
 
 static void win_service_cleanup(struct win_service *s)
 {
+    if (s->st_service_state)
+        rrdset_is_obsolete___safe_from_collector_thread(s->st_service_state);
     freez(s->service_name);
     s->service_name = NULL;
 }
@@ -60,6 +63,16 @@ static void initialize(void)
     dictionary_register_delete_callback(win_services, dict_win_service_delete_cb, NULL);
 }
 
+static int dict_win_services_mark_missing_cb(
+    const DICTIONARY_ITEM *item __maybe_unused,
+    void *value,
+    void *data __maybe_unused)
+{
+    struct win_service *p = value;
+    p->present = false;
+    return 1;
+}
+
 static BOOL fill_dictionary_with_content()
 {
     PVOID buffer = NULL;
@@ -86,6 +99,7 @@ static BOOL fill_dictionary_with_content()
         NULL);
 
     if (ret) {
+        dictionary_walkthrough_write(win_services, dict_win_services_mark_missing_cb, NULL);
         // This only happens if there are truly 0 services in the system (a valid edge case).
         goto endServiceCollection;
     }
@@ -117,6 +131,7 @@ static BOOL fill_dictionary_with_content()
         goto endServiceCollection;
     }
 
+    dictionary_walkthrough_write(win_services, dict_win_services_mark_missing_cb, NULL);
     services = (LPENUM_SERVICE_STATUS_PROCESS)buffer;
 
     for (ULONG i = 0; i < total_services; i++) {
@@ -130,6 +145,7 @@ static BOOL fill_dictionary_with_content()
 
         p->ServiceState.current.Data = service->ServiceStatusProcess.dwCurrentState;
         p->pid = service->ServiceStatusProcess.dwProcessId;
+        p->present = true;
     }
 
     ret = TRUE;
@@ -231,6 +247,16 @@ static int dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unuse
     return 1;
 }
 
+static int dict_win_services_delete_missing_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused)
+{
+    struct win_service *p = value;
+
+    if (!p->present)
+        dictionary_del(win_services, dictionary_acquired_item_name(item));
+
+    return 1;
+}
+
 int do_GetServicesStatus(int update_every, usec_t dt __maybe_unused)
 {
 #define NETDATA_SERVICE_MAX_TRY (5)
@@ -255,6 +281,7 @@ int do_GetServicesStatus(int update_every, usec_t dt __maybe_unused)
     }
 
     limit = 0;
+    dictionary_walkthrough_write(win_services, dict_win_services_delete_missing_cb, NULL);
     dictionary_sorted_walkthrough_read(win_services, dict_win_services_charts_cb, &update_every);
 
     return 0;

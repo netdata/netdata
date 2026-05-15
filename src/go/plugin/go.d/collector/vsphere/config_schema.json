@@ -33,7 +33,7 @@
       },
       "discovery_interval": {
         "title": "Discovery interval",
-        "description": "Hosts and VMs discovery interval in seconds.",
+        "description": "Hosts, VMs, datastores, clusters, and resource pools discovery interval in seconds.",
         "type": "number",
         "minimum": 60,
         "default": 300
@@ -80,6 +80,44 @@
           "description": "",
           "type": "string",
           "default": "/*/*/*/*",
+          "pattern": "^$|^/"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "datastore_include": {
+        "title": "Datastore selectors",
+        "description": "Configuration for monitoring specific datastores. The selector format follows the pattern `/Datacenter/Datastore`, where each value can be set using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme).",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "Datastore selector",
+          "description": "",
+          "type": "string",
+          "default": "/*/*",
+          "pattern": "^$|^/"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "cluster_include": {
+        "title": "Cluster selectors",
+        "description": "Configuration for monitoring specific clusters and their resource pools. The selector format follows the pattern `/Datacenter/Cluster`, where each value can be set using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). Resource pools follow their owning cluster.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "Cluster selector",
+          "description": "",
+          "type": "string",
+          "default": "/*/*",
           "pattern": "^$|^/"
         },
         "default": [
@@ -173,7 +211,9 @@
       "username",
       "password",
       "host_include",
-      "vm_include"
+      "vm_include",
+      "datastore_include",
+      "cluster_include"
     ]
   },
   "uiSchema": {
@@ -196,10 +236,12 @@
           ]
         },
         {
-          "title": "Hosts & VMs selector",
+          "title": "Hosts, VMs, Datastores & Clusters selector",
           "fields": [
             "host_include",
-            "vm_include"
+            "vm_include",
+            "datastore_include",
+            "cluster_include"
           ]
         },
         {
@@ -266,6 +308,12 @@
       "ui:listFlavour": "list"
     },
     "vm_include": {
+      "ui:listFlavour": "list"
+    },
+    "datastore_include": {
+      "ui:listFlavour": "list"
+    },
+    "cluster_include": {
       "ui:listFlavour": "list"
     },
     "username": {

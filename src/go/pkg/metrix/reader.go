@@ -3,19 +3,22 @@
 package metrix
 
 import (
+	"maps"
 	"math"
+	"slices"
 	"sort"
 	"sync"
 )
 
 type storeReader struct {
-	snap       *readSnapshot
-	raw        bool // true => ReadRaw semantics (no freshness filtering)
-	flattened  bool
-	seriesOnce sync.Once
-	series     map[string]*committedSeries
-	indexOnce  sync.Once
-	index      map[string][]*committedSeries
+	snap         *readSnapshot
+	raw          bool // true => ReadRaw semantics (no freshness filtering)
+	flattened    bool
+	hostScopeKey string
+	seriesOnce   sync.Once
+	series       map[string]*committedSeries
+	indexOnce    sync.Once
+	index        map[string][]*committedSeries
 }
 
 type familyView struct {
@@ -135,6 +138,24 @@ func (r *storeReader) StateSet(name string, labels Labels) (StateSetPoint, bool)
 	return StateSetPoint{States: cloneStateMap(s.stateSetValues)}, true
 }
 
+func (r *storeReader) MeasureSet(name string, labels Labels) (MeasureSetPoint, bool) {
+	if r.flattened {
+		return MeasureSetPoint{}, false
+	}
+
+	s, ok := r.lookup(name, labels)
+	if !ok || !r.visible(s) {
+		return MeasureSetPoint{}, false
+	}
+	if s.desc == nil || s.desc.kind != kindMeasureSet || s.desc.measureSet == nil {
+		return MeasureSetPoint{}, false
+	}
+	if len(s.measureSetValues) != len(s.desc.measureSet.fields) {
+		return MeasureSetPoint{}, false
+	}
+	return MeasureSetPoint{Values: append([]SampleValue(nil), s.measureSetValues...)}, true
+}
+
 func (r *storeReader) SeriesMeta(name string, labels Labels) (SeriesMeta, bool) {
 	s, ok := r.lookup(name, labels)
 	if !ok || !r.visible(s) {
@@ -169,6 +190,16 @@ func (r *storeReader) CollectMeta() CollectMeta {
 	return r.snap.collectMeta
 }
 
+func (r *storeReader) HostScopes() []HostScope {
+	// Scope discovery intentionally ignores this reader's active scope filter so
+	// jobruntime can enumerate all host partitions from one snapshot.
+	scopes := make(map[string]HostScope)
+	for _, s := range r.seriesView() {
+		scopes[s.hostScopeKey] = cloneHostScope(s.hostScope)
+	}
+	return sortedHostScopes(scopes)
+}
+
 func flattenSnapshot(src *readSnapshot) *readSnapshot {
 	series := snapshotSeriesView(src)
 	dst := &readSnapshot{
@@ -190,6 +221,8 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 			appendFlattenedSummarySeries(dst, s)
 		case kindStateSet:
 			appendFlattenedStateSetSeries(dst, s)
+		case kindMeasureSet:
+			appendFlattenedMeasureSetSeries(dst, s)
 		}
 	}
 
@@ -213,7 +246,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		for _, lbl := range src.labels {
 			labelsMap[lbl.Key] = lbl.Value
 		}
-		labelsMap[histogramBucketLabel] = formatHistogramBucketLabel(ub)
+		labelsMap[HistogramBucketLabel] = formatHistogramBucketLabel(ub)
 
 		labels, labelsKey, err := canonicalizeLabels(labelsMap)
 		if err != nil {
@@ -221,14 +254,16 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		}
 
 		name := src.name + "_bucket"
-		key := makeSeriesKey(name, labelsKey)
+		key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
 		dst.series[key] = &committedSeries{
-			id:        SeriesID(key),
-			hash64:    seriesIDHash(SeriesID(key)),
-			key:       key,
-			name:      name,
-			labels:    labels,
-			labelsKey: labelsKey,
+			id:           SeriesID(key),
+			hash64:       seriesIDHash(SeriesID(key)),
+			key:          key,
+			name:         name,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       labels,
+			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
 				name:      name,
 				kind:      kindCounter,
@@ -251,18 +286,20 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	for _, lbl := range src.labels {
 		infMap[lbl.Key] = lbl.Value
 	}
-	infMap[histogramBucketLabel] = formatHistogramBucketLabel(math.Inf(1))
+	infMap[HistogramBucketLabel] = formatHistogramBucketLabel(math.Inf(1))
 	infLabels, infLabelsKey, err := canonicalizeLabels(infMap)
 	if err == nil {
 		infName := src.name + "_bucket"
-		infKey := makeSeriesKey(infName, infLabelsKey)
+		infKey := makeSeriesKey(src.hostScopeKey, infName, infLabelsKey)
 		dst.series[infKey] = &committedSeries{
-			id:        SeriesID(infKey),
-			hash64:    seriesIDHash(SeriesID(infKey)),
-			key:       infKey,
-			name:      infName,
-			labels:    infLabels,
-			labelsKey: infLabelsKey,
+			id:           SeriesID(infKey),
+			hash64:       seriesIDHash(SeriesID(infKey)),
+			key:          infKey,
+			name:         infName,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       infLabels,
+			labelsKey:    infLabelsKey,
 			desc: &instrumentDescriptor{
 				name:      infName,
 				kind:      kindCounter,
@@ -283,6 +320,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 
 	appendFlattenedHistogramScalar(
 		dst,
+		src,
 		src.name+"_count",
 		src.labels,
 		src.histogramCount,
@@ -291,6 +329,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	)
 	appendFlattenedHistogramScalar(
 		dst,
+		src,
 		src.name+"_sum",
 		src.labels,
 		src.histogramSum,
@@ -299,7 +338,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	)
 }
 
-func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Label, value SampleValue, meta SeriesMeta, desc *instrumentDescriptor) {
+func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, name string, labels []Label, value SampleValue, meta SeriesMeta, desc *instrumentDescriptor) {
 	labelsMap := make(map[string]string, len(labels))
 	for _, lbl := range labels {
 		labelsMap[lbl.Key] = lbl.Value
@@ -308,14 +347,16 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 	if err != nil {
 		return
 	}
-	key := makeSeriesKey(name, labelsKey)
+	key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
 	dst.series[key] = &committedSeries{
-		id:        SeriesID(key),
-		hash64:    seriesIDHash(SeriesID(key)),
-		key:       key,
-		name:      name,
-		labels:    items,
-		labelsKey: labelsKey,
+		id:           SeriesID(key),
+		hash64:       seriesIDHash(SeriesID(key)),
+		key:          key,
+		name:         name,
+		hostScopeKey: src.hostScopeKey,
+		hostScope:    cloneHostScope(src.hostScope),
+		labels:       items,
+		labelsKey:    labelsKey,
 		desc: &instrumentDescriptor{
 			name:      name,
 			kind:      kindCounter,
@@ -332,6 +373,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 	appendFlattenedHistogramScalar(
 		dst,
+		src,
 		src.name+"_count",
 		src.labels,
 		src.summaryCount,
@@ -340,6 +382,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 	)
 	appendFlattenedHistogramScalar(
 		dst,
+		src,
 		src.name+"_sum",
 		src.labels,
 		src.summarySum,
@@ -360,20 +403,22 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 		for _, lbl := range src.labels {
 			labelsMap[lbl.Key] = lbl.Value
 		}
-		labelsMap[summaryQuantileLabel] = formatSummaryQuantileLabel(q)
+		labelsMap[SummaryQuantileLabel] = formatSummaryQuantileLabel(q)
 
 		labels, labelsKey, err := canonicalizeLabels(labelsMap)
 		if err != nil {
 			continue
 		}
-		key := makeSeriesKey(src.name, labelsKey)
+		key := makeSeriesKey(src.hostScopeKey, src.name, labelsKey)
 		dst.series[key] = &committedSeries{
-			id:        SeriesID(key),
-			hash64:    seriesIDHash(SeriesID(key)),
-			key:       key,
-			name:      src.name,
-			labels:    labels,
-			labelsKey: labelsKey,
+			id:           SeriesID(key),
+			hash64:       seriesIDHash(SeriesID(key)),
+			key:          key,
+			name:         src.name,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       labels,
+			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
 				name:      src.name,
 				kind:      kindGauge,
@@ -416,14 +461,16 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 			continue
 		}
 
-		key := makeSeriesKey(src.name, labelsKey)
+		key := makeSeriesKey(src.hostScopeKey, src.name, labelsKey)
 		dst.series[key] = &committedSeries{
-			id:        SeriesID(key),
-			hash64:    seriesIDHash(SeriesID(key)),
-			key:       key,
-			name:      src.name,
-			labels:    labels,
-			labelsKey: labelsKey,
+			id:           SeriesID(key),
+			hash64:       seriesIDHash(SeriesID(key)),
+			key:          key,
+			name:         src.name,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       labels,
+			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
 				name:      src.name,
 				kind:      kindGauge,
@@ -443,12 +490,80 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 	}
 }
 
+func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
+	schema := src.desc.measureSet
+	if schema == nil || len(src.measureSetValues) != len(schema.fields) {
+		return
+	}
+
+	kind := MetricKindGauge
+	descKind := kindGauge
+	if schema.semantics == MeasureSetSemanticsCounter {
+		kind = MetricKindCounter
+		descKind = kindCounter
+	}
+
+	for i, field := range schema.fields {
+		labelsMap := make(map[string]string, len(src.labels)+1)
+		for _, lbl := range src.labels {
+			labelsMap[lbl.Key] = lbl.Value
+		}
+		labelsMap[MeasureSetFieldLabel] = field.Name
+
+		labels, labelsKey, err := canonicalizeLabels(labelsMap)
+		if err != nil {
+			continue
+		}
+
+		name := src.name + "_" + field.Name
+		key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
+		meta := src.desc.meta
+		meta.Float = field.Float
+
+		series := &committedSeries{
+			id:           SeriesID(key),
+			hash64:       seriesIDHash(SeriesID(key)),
+			key:          key,
+			name:         name,
+			hostScopeKey: src.hostScopeKey,
+			hostScope:    cloneHostScope(src.hostScope),
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc: &instrumentDescriptor{
+				name:      name,
+				kind:      descKind,
+				mode:      src.desc.mode,
+				freshness: src.desc.freshness,
+				window:    src.desc.window,
+				meta:      meta,
+			},
+			value: src.measureSetValues[i],
+			meta: flattenedSeriesMeta(
+				src.meta,
+				kind,
+				MetricKindMeasureSet,
+				FlattenRoleMeasureSetField,
+			),
+		}
+		if schema.semantics == MeasureSetSemanticsCounter {
+			series.counterCurrent = src.measureSetValues[i]
+			series.counterCurrentSeq = src.measureSetCurrentSeq
+			if src.measureSetHasPrev && len(src.measureSetPreviousValues) == len(schema.fields) {
+				series.counterHasPrev = true
+				series.counterPrevious = src.measureSetPreviousValues[i]
+				series.counterPreviousSeq = src.measureSetPreviousSeq
+			}
+		}
+		dst.series[key] = series
+	}
+}
+
 func (r *storeReader) Family(name string) (FamilyView, bool) {
 	index := r.byNameIndex()
-	if len(index[name]) == 0 {
-		return nil, false
+	if slices.ContainsFunc(index[name], r.visible) {
+		return familyView{name: name, reader: r}, true
 	}
-	return familyView{name: name, reader: r}, true
+	return nil, false
 }
 
 func (r *storeReader) ForEachByName(name string, fn func(labels LabelView, v SampleValue)) {
@@ -522,7 +637,7 @@ func (r *storeReader) lookup(name string, labels Labels) (*committedSeries, bool
 		_ = items
 		return nil, false
 	}
-	key := makeSeriesKey(name, labelsKey)
+	key := makeSeriesKey(r.hostScopeKey, name, labelsKey)
 	return lookupSnapshotSeries(r.snap, key)
 }
 
@@ -573,15 +688,16 @@ func materializeRuntimeSeries(snap *readSnapshot) map[string]*committedSeries {
 	// Chain is leaf->root; root map gives the best starting capacity hint.
 	series := make(map[string]*committedSeries, len(chain[len(chain)-1].series))
 	for i := len(chain) - 1; i >= 0; i-- {
-		for key, s := range chain[i].series {
-			series[key] = s
-		}
+		maps.Copy(series, chain[i].series)
 	}
 	return series
 }
 
 // visible applies freshness policy for Read(); Read(ReadRaw()) bypasses it.
 func (r *storeReader) visible(s *committedSeries) bool {
+	if s.hostScopeKey != r.hostScopeKey {
+		return false
+	}
 	if r.raw {
 		return true
 	}

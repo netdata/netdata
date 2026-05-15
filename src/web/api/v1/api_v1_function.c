@@ -3,7 +3,7 @@
 #include "api_v1_calls.h"
 
 int api_v1_function(RRDHOST *host, struct web_client *w, char *url) {
-    if (!netdata_ready)
+    if (!netdata_ready_load())
         return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     int timeout = 0;

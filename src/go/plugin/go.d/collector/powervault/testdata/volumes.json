@@ -1,0 +1,36 @@
+{
+  "volumes": [
+    {
+      "durable-id": "V001",
+      "volume-name": "prod-db-01",
+      "health": "OK",
+      "health-numeric": 0,
+      "total-size": "2.0TB",
+      "owner-numeric": 0
+    },
+    {
+      "durable-id": "V002",
+      "volume-name": "prod-app-01",
+      "health": "OK",
+      "health-numeric": 0,
+      "total-size": "500.0GB",
+      "owner-numeric": 1
+    },
+    {
+      "durable-id": "V003",
+      "volume-name": "test-backup",
+      "health": "OK",
+      "health-numeric": 0,
+      "total-size": "1.0TB",
+      "owner-numeric": 0
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Complex log: user@example.com accessed /api/v1/users?limit=50&offset=100 with IP 192.168.1.100 at 2024-01-15T10:30:25Z status=200 time=150ms

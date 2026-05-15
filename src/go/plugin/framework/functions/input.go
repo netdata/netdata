@@ -9,7 +9,7 @@ import (
 )
 
 type input interface {
-	lines() chan string
+	lines() <-chan string
 }
 
 func newStdinInput() input {
@@ -22,6 +22,7 @@ type stdinReader struct {
 }
 
 func (in *stdinReader) run() {
+	defer close(in.linesCh)
 	sc := bufio.NewScanner(bufio.NewReader(os.Stdin))
 
 	for sc.Scan() {
@@ -29,7 +30,7 @@ func (in *stdinReader) run() {
 	}
 }
 
-func (in *stdinReader) lines() chan string {
+func (in *stdinReader) lines() <-chan string {
 	in.once.Do(func() {
 		in.linesCh = make(chan string)
 		go in.run()

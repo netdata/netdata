@@ -75,6 +75,15 @@ flowchart TB
 - **Scalability**: Add more Child nodes or additional Parent nodes as your infrastructure grows
 - **Flexibility**: Configure retention, alerts, and dashboards according to your specific needs
 
+### Protocol Architecture
+
+Netdata streaming uses a **custom binary protocol over TCP**, not HTTP/HTTPS. This is an important distinction:
+
+- **Custom binary protocol**: Streaming uses Netdata's own protocol designed for efficient metrics transfer, not HTTP
+- **TLS encryption**: When you enable `:SSL` in the destination, it adds TLS encryption as a security layer on top of the custom streaming protocol (this is not HTTPS)
+- **Port multiplexing**: The same port (19999 by default) handles both web API requests and streaming connections—the server automatically detects which protocol is being used based on the initial handshake
+- **Destination requirement**: This is why streaming requires a Netdata server at the destination, not just any HTTP server
+
 ## Quick Reference
 
 | Task                                     | Configuration                             | Example                                                        |

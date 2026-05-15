@@ -1,6 +1,8 @@
 package logger
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,4 +27,24 @@ func TestNew(t *testing.T) {
 			assert.NotPanics(t, f)
 		})
 	}
+}
+
+func TestNewWithWriter(t *testing.T) {
+	var buf bytes.Buffer
+
+	log := NewWithWriter(&buf)
+	log.Info("captured")
+
+	assert.Contains(t, buf.String(), "captured")
+}
+
+func TestNewWithWriter_WithKeepsWriter(t *testing.T) {
+	var buf bytes.Buffer
+
+	log := NewWithWriter(&buf).With("component", "test")
+	log.Info("captured")
+
+	out := buf.String()
+	assert.Contains(t, out, "captured")
+	assert.True(t, strings.Contains(out, "component=test") || strings.Contains(out, "\"component\":\"test\""))
 }

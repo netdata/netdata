@@ -1,0 +1,4 @@
+MESSAGE=Log with control chars: 	tab and
+
+MESSAGE=newline and null
+

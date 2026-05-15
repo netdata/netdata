@@ -25,14 +25,9 @@ enum mount_counters {
     NETDATA_MOUNT_END
 };
 
-enum mount_tables { NETDATA_KEY_MOUNT_TABLE };
+#define NETDATA_KEY_MOUNT_TABLE 0
 
-enum netdata_mount_syscalls {
-    NETDATA_MOUNT_SYSCALL,
-    NETDATA_UMOUNT_SYSCALL,
-
-    NETDATA_MOUNT_SYSCALLS_END
-};
+enum netdata_mount_syscalls { NETDATA_MOUNT_SYSCALL, NETDATA_UMOUNT_SYSCALL };
 
 extern struct config mount_config;
 void ebpf_mount_thread(void *ptr);

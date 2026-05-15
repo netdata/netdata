@@ -71,7 +71,7 @@ void mark_pending_req_cancel_all()
     spinlock_lock(&pending_req_list_lock);
     struct pending_req_list *curr = pending_req_list_head;
     while (curr) {
-        curr->canceled = 1;
+        __atomic_store_n(&curr->canceled, 1, __ATOMIC_RELAXED);
         curr = curr->next;
     }
     spinlock_unlock(&pending_req_list_lock);
@@ -86,7 +86,7 @@ int mark_pending_req_cancelled(const char *msg_id)
 
     while (curr) {
         if (curr->hash == hash && strcmp(curr->msg_id, msg_id) == 0) {
-            curr->canceled = 1;
+            __atomic_store_n(&curr->canceled, 1, __ATOMIC_RELAXED);
             spinlock_unlock(&pending_req_list_lock);
             return 0;
         }
@@ -100,7 +100,7 @@ int mark_pending_req_cancelled(const char *msg_id)
 static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, void *data)
 {
     struct pending_req_list *req = (struct pending_req_list *)data;
-    return req->canceled;
+    return __atomic_load_n(&req->canceled, __ATOMIC_RELAXED);
 }
 
 int http_api_v2(mqtt_wss_client client, aclk_query_t *query)

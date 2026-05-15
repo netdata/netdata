@@ -50,8 +50,9 @@ The following options can be defined for this notification
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | SEND_PROWL | Set `SEND_PROWL` to YES | YES | yes |
-| DEFAULT_RECIPIENT_PROWL | Set `DEFAULT_RECIPIENT_PROWL` to  the Prowl API key you want the alert notifications to be sent to. You can define multiple API keys like this: `APIKEY1`, `APIKEY2`. |  | yes |
+| [DEFAULT_RECIPIENT_PROWL](#option-default-recipient-prowl) | Set `DEFAULT_RECIPIENT_PROWL` to  the Prowl API key you want the alert notifications to be sent to. You can define multiple API keys like this: `APIKEY1`, `APIKEY2`. |  | yes |
 
+<a id="option-default-recipient-prowl"></a>
 ##### DEFAULT_RECIPIENT_PROWL
 
 All roles will default to this variable if left unconfigured.

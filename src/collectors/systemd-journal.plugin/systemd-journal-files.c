@@ -313,29 +313,35 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
 
 static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix)
 {
-    char buf[max_len];
+    size_t buf_size = max_len;
+    size_t remaining = max_len;
+    char *buf = mallocz(buf_size);
     size_t len;
     char *dst = buf;
 
     if (prefix) {
         len = strlen(prefix);
+        if (len >= remaining)
+            len = remaining - 1;
         memcpy(buf, prefix, len);
         dst = &buf[len];
-        max_len -= len;
+        remaining -= len;
     }
 
     len = e - s;
-    if (len >= max_len)
-        len = max_len - 1;
+    if (len >= remaining)
+        len = remaining - 1;
     memcpy(dst, s, len);
     dst[len] = '\0';
-    buf[max_len - 1] = '\0';
+    buf[buf_size - 1] = '\0';
 
     for (size_t i = 0; buf[i]; i++)
         if (!is_netdata_api_valid_character(buf[i]))
             buf[i] = '_';
 
-    return string_strdupz(buf);
+    STRING *copy = string_strdupz(buf);
+    freez(buf);
+    return copy;
 }
 
 static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused)
@@ -365,9 +371,10 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
                         ;
                     if (d == e) {
                         // a valid IP address
-                        char ip[e - s + 1];
-                        memcpy(ip, s, e - s);
-                        ip[e - s] = '\0';
+                        size_t ip_len = (size_t)(e - s);
+                        char *ip = mallocz(ip_len + 1);
+                        memcpy(ip, s, ip_len);
+                        ip[ip_len] = '\0';
                         char buf[ND_SD_JOURNAL_MAX_SOURCE_LEN];
                         if (ip_to_hostname(ip, buf, sizeof(buf)))
                             njf->source =
@@ -376,6 +383,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
                             internal_error(true, "Cannot find the hostname for IP '%s'", ip);
                             njf->source = string_strdupz_source(s, e, ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                         }
+                        freez(ip);
                     } else
                         njf->source = string_strdupz_source(s, e, ND_SD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                 }
@@ -617,8 +625,15 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
 
     bool existing = false;
     bool *found = dictionary_set(dirs, dirname, &existing, sizeof(existing));
-    if (*found)
+    if (unlikely(!found)) {
+        netdata_log_error("Cannot track visited directory '%s' (dictionary_set failed); stopping recursion", dirname);
+        closedir(dir);
         return;
+    }
+    if (*found) {
+        closedir(dir);
+        return;
+    }
     *found = true;
 
     // Read each entry in the directory.
@@ -629,7 +644,7 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
         ssize_t len = snprintfz(full_path, sizeof(full_path), "%s/%s", dirname, entry->d_name);
 
         if (entry->d_type == DT_DIR) {
-            nd_journal_directory_scan_recursively(files, dirs, full_path, depth++);
+            nd_journal_directory_scan_recursively(files, dirs, full_path, depth + 1);
         } else if (entry->d_type == DT_REG && is_journal_file(full_path, len, NULL)) {
             if (files)
                 dictionary_set(files, full_path, NULL, 0);
@@ -644,7 +659,7 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
                 // The symbolic link points to a directory
                 char resolved_path[FILENAME_MAX + 1];
                 if (realpath(full_path, resolved_path) != NULL) {
-                    nd_journal_directory_scan_recursively(files, dirs, resolved_path, depth++);
+                    nd_journal_directory_scan_recursively(files, dirs, resolved_path, depth + 1);
                 }
             } else if (S_ISREG(info.st_mode) && is_journal_file(full_path, len, NULL)) {
                 if (files)

@@ -292,3 +292,16 @@ is ephemeral node = no    # Revert to permanent (default)
 Changes apply immediately. Ephemerality is stored as a host label and propagates to Parents and Netdata Cloud.
 
 </details>
+
+<details>
+<summary>Does renaming a virtual node change its identity?</summary>
+
+A virtual node's identity is determined by its **`guid`** field — not its `hostname` or `name`. The fields behave as follows:
+
+- **`guid`** — This is the vnode's identity. Changing it creates an entirely new node in Netdata Cloud. The old vnode's historical data remains under the old GUID but is no longer associated with the new one.
+- **`hostname`** — This is used as the internal lookup key in the Agent and as the display name in dashboards. Changing `hostname` while keeping the same `guid` renames the display without creating a new node identity.
+- **`name`** — The Agent ignores this field. When set to a value different from `hostname`, the Agent logs a warning and overrides it with `hostname`.
+
+**To preserve data continuity when renaming a vnode**, change only the `hostname` field in the YAML config file under `/etc/netdata/vnodes/` and keep the `guid` unchanged. If a true identity change is needed, accept that historical data belongs to the old identity.
+
+</details>

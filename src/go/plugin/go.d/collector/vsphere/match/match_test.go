@@ -17,6 +17,10 @@ var (
 	falseHostDC = hostDCMatcher{matcher.FALSE()}
 	trueVMDC    = vmDCMatcher{matcher.TRUE()}
 	falseVMDC   = vmDCMatcher{matcher.FALSE()}
+	trueDSDC    = dsDCMatcher{matcher.TRUE()}
+	falseDSDC   = dsDCMatcher{matcher.FALSE()}
+	trueClDC    = clusterDCMatcher{matcher.TRUE()}
+	falseClDC   = clusterDCMatcher{matcher.FALSE()}
 )
 
 func TestOrHostMatcher_Match(t *testing.T) {
@@ -267,6 +271,226 @@ func TestVMIncludes_Parse(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			includes := prepareIncludes(name)
 			m, err := VMIncludes(includes).Parse()
+
+			if !test.valid {
+				assert.Error(t, err)
+			} else {
+				assert.Equal(t, test.expected, m)
+			}
+		})
+	}
+}
+
+func TestOrDSMatcher_Match(t *testing.T) {
+	tests := map[string]struct {
+		expected bool
+		lhs      DatastoreMatcher
+		rhs      DatastoreMatcher
+	}{
+		"true, true":   {expected: true, lhs: trueDSDC, rhs: trueDSDC},
+		"true, false":  {expected: true, lhs: trueDSDC, rhs: falseDSDC},
+		"false, true":  {expected: true, lhs: falseDSDC, rhs: trueDSDC},
+		"false, false": {expected: false, lhs: falseDSDC, rhs: falseDSDC},
+	}
+
+	var ds resources.Datastore
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := orDSMatcher{lhs: test.lhs, rhs: test.rhs}
+			assert.Equal(t, test.expected, m.Match(&ds))
+		})
+	}
+}
+
+func TestAndDSMatcher_Match(t *testing.T) {
+	tests := map[string]struct {
+		expected bool
+		lhs      DatastoreMatcher
+		rhs      DatastoreMatcher
+	}{
+		"true, true":   {expected: true, lhs: trueDSDC, rhs: trueDSDC},
+		"true, false":  {expected: false, lhs: trueDSDC, rhs: falseDSDC},
+		"false, true":  {expected: false, lhs: falseDSDC, rhs: trueDSDC},
+		"false, false": {expected: false, lhs: falseDSDC, rhs: falseDSDC},
+	}
+
+	var ds resources.Datastore
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := andDSMatcher{lhs: test.lhs, rhs: test.rhs}
+			assert.Equal(t, test.expected, m.Match(&ds))
+		})
+	}
+}
+
+func TestDatastoreIncludes_Parse(t *testing.T) {
+	tests := map[string]struct {
+		valid    bool
+		expected DatastoreMatcher
+	}{
+		"":      {valid: false},
+		"*/DS1": {valid: false},
+		"/":     {valid: true, expected: falseDSDC},
+		"/*":    {valid: true, expected: trueDSDC},
+		"/!*":   {valid: true, expected: falseDSDC},
+		"/!*/":  {valid: true, expected: falseDSDC},
+		"/!*/ ": {
+			valid: true,
+			expected: andDSMatcher{
+				lhs: falseDSDC,
+				rhs: dsDSMatcher{matcher.FALSE()},
+			},
+		},
+		"/DC1*/DS*": {
+			valid: true,
+			expected: andDSMatcher{
+				lhs: dsDCMatcher{mustSP("DC1*")},
+				rhs: dsDSMatcher{mustSP("DS*")},
+			},
+		},
+		"/*/*/extra": {
+			valid: true,
+			expected: andDSMatcher{
+				lhs: trueDSDC,
+				rhs: dsDSMatcher{matcher.TRUE()},
+			},
+		},
+		"[/DC1*,/DC2*]": {
+			valid: true,
+			expected: orDSMatcher{
+				lhs: dsDCMatcher{mustSP("DC1*")},
+				rhs: dsDCMatcher{mustSP("DC2*")},
+			},
+		},
+		"[/DC1*,/DC2*,/DC3*/DS*]": {
+			valid: true,
+			expected: orDSMatcher{
+				lhs: orDSMatcher{
+					lhs: dsDCMatcher{mustSP("DC1*")},
+					rhs: dsDCMatcher{mustSP("DC2*")},
+				},
+				rhs: andDSMatcher{
+					lhs: dsDCMatcher{mustSP("DC3*")},
+					rhs: dsDSMatcher{mustSP("DS*")},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			includes := prepareIncludes(name)
+			m, err := DatastoreIncludes(includes).Parse()
+
+			if !test.valid {
+				assert.Error(t, err)
+			} else {
+				assert.Equal(t, test.expected, m)
+			}
+		})
+	}
+}
+
+func TestOrClusterMatcher_Match(t *testing.T) {
+	tests := map[string]struct {
+		expected bool
+		lhs      ClusterMatcher
+		rhs      ClusterMatcher
+	}{
+		"true, true":   {expected: true, lhs: trueClDC, rhs: trueClDC},
+		"true, false":  {expected: true, lhs: trueClDC, rhs: falseClDC},
+		"false, true":  {expected: true, lhs: falseClDC, rhs: trueClDC},
+		"false, false": {expected: false, lhs: falseClDC, rhs: falseClDC},
+	}
+
+	var cl resources.Cluster
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := orClusterMatcher{lhs: test.lhs, rhs: test.rhs}
+			assert.Equal(t, test.expected, m.Match(&cl))
+		})
+	}
+}
+
+func TestAndClusterMatcher_Match(t *testing.T) {
+	tests := map[string]struct {
+		expected bool
+		lhs      ClusterMatcher
+		rhs      ClusterMatcher
+	}{
+		"true, true":   {expected: true, lhs: trueClDC, rhs: trueClDC},
+		"true, false":  {expected: false, lhs: trueClDC, rhs: falseClDC},
+		"false, true":  {expected: false, lhs: falseClDC, rhs: trueClDC},
+		"false, false": {expected: false, lhs: falseClDC, rhs: falseClDC},
+	}
+
+	var cl resources.Cluster
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := andClusterMatcher{lhs: test.lhs, rhs: test.rhs}
+			assert.Equal(t, test.expected, m.Match(&cl))
+		})
+	}
+}
+
+func TestClusterIncludes_Parse(t *testing.T) {
+	tests := map[string]struct {
+		valid    bool
+		expected ClusterMatcher
+	}{
+		"":     {valid: false},
+		"*/C1": {valid: false},
+		"/":    {valid: true, expected: falseClDC},
+		"/*":   {valid: true, expected: trueClDC},
+		"/!*":  {valid: true, expected: falseClDC},
+		"/!*/": {valid: true, expected: falseClDC},
+		"/!*/ ": {
+			valid: true,
+			expected: andClusterMatcher{
+				lhs: falseClDC,
+				rhs: clusterNameMatcher{matcher.FALSE()},
+			},
+		},
+		"/DC1*/Cluster*": {
+			valid: true,
+			expected: andClusterMatcher{
+				lhs: clusterDCMatcher{mustSP("DC1*")},
+				rhs: clusterNameMatcher{mustSP("Cluster*")},
+			},
+		},
+		"/*/*/extra": {
+			valid: true,
+			expected: andClusterMatcher{
+				lhs: trueClDC,
+				rhs: clusterNameMatcher{matcher.TRUE()},
+			},
+		},
+		"[/DC1*,/DC2*]": {
+			valid: true,
+			expected: orClusterMatcher{
+				lhs: clusterDCMatcher{mustSP("DC1*")},
+				rhs: clusterDCMatcher{mustSP("DC2*")},
+			},
+		},
+		"[/DC1*,/DC2*,/DC3*/Cluster*]": {
+			valid: true,
+			expected: orClusterMatcher{
+				lhs: orClusterMatcher{
+					lhs: clusterDCMatcher{mustSP("DC1*")},
+					rhs: clusterDCMatcher{mustSP("DC2*")},
+				},
+				rhs: andClusterMatcher{
+					lhs: clusterDCMatcher{mustSP("DC3*")},
+					rhs: clusterNameMatcher{mustSP("Cluster*")},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			includes := prepareIncludes(name)
+			m, err := ClusterIncludes(includes).Parse()
 
 			if !test.valid {
 				assert.Error(t, err)

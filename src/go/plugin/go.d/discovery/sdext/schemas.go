@@ -13,5 +13,8 @@ var schemaDocker string
 //go:embed "config_schema_k8s.json"
 var schemaK8s string
 
+//go:embed "config_schema_http.json"
+var schemaHTTP string
+
 //go:embed "config_schema_snmp.json"
 var schemaSNMP string

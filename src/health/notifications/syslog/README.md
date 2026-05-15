@@ -44,9 +44,10 @@ The following options can be defined for this notification
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | SYSLOG_FACILITY | Set `SYSLOG_FACILITY` to the facility used for logging, by default this value is set to `local6`. |  | yes |
-| DEFAULT_RECIPIENT_SYSLOG | Set `DEFAULT_RECIPIENT_SYSLOG` to the recipient you want the alert notifications to be sent to. |  | yes |
-| SEND_SYSLOG | Set SEND_SYSLOG to YES, make sure you have everything else configured before turning this on. |  | yes |
+| [DEFAULT_RECIPIENT_SYSLOG](#option-default-recipient-syslog) | Set `DEFAULT_RECIPIENT_SYSLOG` to the recipient you want the alert notifications to be sent to. |  | yes |
+| [SEND_SYSLOG](#option-send-syslog) | Set SEND_SYSLOG to YES, make sure you have everything else configured before turning this on. |  | yes |
 
+<a id="option-default-recipient-syslog"></a>
 ##### DEFAULT_RECIPIENT_SYSLOG
 
 Targets are defined as follows:
@@ -65,6 +66,7 @@ You can define multiple recipients like this: daemon.notice@loghost:514/netdata 
 All roles will default to this variable if left unconfigured.
 
 
+<a id="option-send-syslog"></a>
 ##### SEND_SYSLOG 
 
 You can then have different recipients per role, by editing DEFAULT_RECIPIENT_SYSLOG with the recipient you want, in the following entries at the bottom of the same file:

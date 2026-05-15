@@ -210,6 +210,7 @@ func TestHOSTINFO(t *testing.T) {
 		GUID:     "test-guid",
 		Hostname: "test-host",
 		Labels: map[string]string{
+			"label2": "value2",
 			"label1": "value1",
 		},
 	}
@@ -219,6 +220,7 @@ func TestHOSTINFO(t *testing.T) {
 	expected := `
 HOST_DEFINE 'test-guid' 'test-host'
 HOST_LABEL 'label1' 'value1'
+HOST_LABEL 'label2' 'value2'
 HOST_DEFINE_END
 
 `[1:]

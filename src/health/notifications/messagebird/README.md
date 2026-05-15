@@ -46,8 +46,9 @@ The following options can be defined for this notification
 | SEND_MESSAGEBIRD | Set `SEND_MESSAGEBIRD` to YES | YES | yes |
 | MESSAGEBIRD_ACCESS_KEY | Set `MESSAGEBIRD_ACCESS_KEY` to your API key. |  | yes |
 | MESSAGEBIRD_NUMBER | Set `MESSAGEBIRD_NUMBER` to the MessageBird number you want to use for the alert. |  | yes |
-| DEFAULT_RECIPIENT_MESSAGEBIRD | Set `DEFAULT_RECIPIENT_MESSAGEBIRD` to the number you want the alert notification to be sent as an SMS. You can define multiple recipients like this: +15555555555 +17777777777. |  | yes |
+| [DEFAULT_RECIPIENT_MESSAGEBIRD](#option-default-recipient-messagebird) | Set `DEFAULT_RECIPIENT_MESSAGEBIRD` to the number you want the alert notification to be sent as an SMS. You can define multiple recipients like this: +15555555555 +17777777777. |  | yes |
 
+<a id="option-default-recipient-messagebird"></a>
 ##### DEFAULT_RECIPIENT_MESSAGEBIRD
 
 All roles will default to this variable if left unconfigured.

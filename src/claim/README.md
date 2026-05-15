@@ -40,6 +40,20 @@ Create `/INSTALL_PREFIX/etc/netdata/claim.conf`:
    insecure = no
 ```
 
+:::info 
+
+**File Permissions and Ownership:**
+
+The `claim.conf` file contains sensitive claiming tokens and must be properly secured:
+
+- **Required permissions:** `0640` (owner read/write, group read, no world access)
+- **Required ownership:** `root:netdata` (owner root, group netdata)
+
+The claiming script automatically sets these permissions when creating or updating `claim.conf`. If you create the file manually, ensure it follows these same security standards to prevent unauthorized access to your claiming tokens.
+
+:::
+
+
 **Configuration Options:**
 
 |  option  | description                                                                            | required |
@@ -93,32 +107,36 @@ You can set the `proxy` option at the `[global]` section in `claim.conf` to:
 Netdata uses the `http_proxy` environment variable only when you set the `proxy` option to `env` (which is the default). You can set the `http_proxy` environment variable to:
 
 - `http://[user:pass@]host:port`, to connect via an HTTP proxy
-- `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5h proxy
+- `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5H proxy
 
 #### Proxy Security Considerations
 
 :::note
 
-Netdata does not support secure connections to proxies. **Data between Netdata Agents and Netdata Cloud remains end-to-end encrypted** since the Agent requests a TCP tunnel (HTTP `CONNECT`) from the proxy and handles all encryption directly, however initial Agent-to-proxy communication is not encrypted.
+Netdata does not support secure connections to proxies. **Data between Netdata Agents and Netdata Cloud remains end-to-end encrypted** since the Agent establishes a TCP tunnel through the proxy (HTTP `CONNECT` for HTTP proxies, SOCKS5 `CONNECT` for SOCKS proxies) and handles all encryption directly, however initial Agent-to-proxy communication is not encrypted.
 
 :::
 
 **How End-to-End Encryption Works with Proxies:**
 
-1. **Proxy Connection**: The Agent connects to the HTTP proxy using a plain HTTP connection.
-2. **TCP Tunneling Request**: The Agent sends an HTTP CONNECT request to the proxy, asking it to establish a TCP tunnel to the Netdata Cloud server.
-3. **Proxy Tunneling**: Once the proxy accepts the CONNECT request (responds with HTTP 200), it creates a TCP tunnel between the Agent and the Netdata Cloud server. At this point, the proxy simply forwards raw TCP data in both directions without interpreting it.
+1. **Proxy Connection**: The Agent connects to the configured proxy using a plain TCP connection.
+2. **TCP Tunneling Request**: The Agent asks the proxy to establish a TCP tunnel to the Netdata Cloud server (HTTP `CONNECT` for HTTP proxy, SOCKS5 `CONNECT` for SOCKS5/SOCKS5H).
+3. **Proxy Tunneling**: Once accepted, the proxy forwards raw TCP data in both directions without interpreting application-layer traffic.
 4. **Encrypted Communication**: The Agent then establishes a TLS/SSL connection through this tunnel directly with the Netdata Cloud server. All subsequent data (including the WebSocket handshake and MQTT protocol data) is encrypted end-to-end.
 
 :::note
 
-The proxy only sees encrypted TLS traffic flowing through the tunnel it established, never the decrypted content. This standard method is called "TCP tunneling" or "HTTP CONNECT tunneling."
+The proxy only sees encrypted TLS traffic flowing through the tunnel it established, never the decrypted content.
 
 :::
 
 :::info
 
 Netdata uses **two connection libraries**: **libcurl for claiming and MQTToWSoHTTPS for the actual Cloud connection**. While libcurl supports encrypted proxy connections, MQTToWSoHTTPS does not - so encrypted proxy connections will fail during the Cloud connection phase. The proxy configuration patterns above work for both libraries and provide end-to-end encryption for Netdata Cloud communication.
+
+For SOCKS proxies:
+- `socks5://` resolves target hostnames locally on the Agent and sends IP to the proxy.
+- `socks5h://` sends hostname to the proxy and resolves DNS remotely on the proxy side.
 
 :::
 
@@ -189,9 +207,33 @@ To remove a node from your Space and connect it to another, follow these steps:
 
 4. **Connect to new Space**
 
-   Go to your new Space, copy the installation command with the new claim token and run it. If you're using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token. The node should now appear online in that Space.
+    Go to your new Space, copy the installation command with the new claim token and run it. If you're using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token. The node should now appear online in that Space.
 
 </details>
+
+### `cloud.d` Directory Contents
+
+When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in your Netdata library directory, typically `/var/lib/netdata/cloud.d/`) stores the credentials and identity information for the Agent-Cloud Link (ACLK). The directory typically includes the following core files:
+
+| File | Description |
+|------|-------------|
+| `cloud.conf` | Primary Cloud configuration file, including the canonical `claimed_id` and other ACLK settings |
+| `private.pem` | RSA private key for ACLK authentication |
+| `public.pem` | RSA public key for ACLK authentication |
+| `claimed_id` | Legacy file duplicating the `claimed_id` from `cloud.conf`, kept mainly for backwards compatibility and fallback |
+
+In addition to these, depending on your configuration and features in use, you may also see the following optional files:
+
+- `token` / `rooms`: Used for split-file auto-claiming workflows.
+- `trusted.pem` / `cloud_fullchain.pem`: Optional custom CA bundle files used to validate the TLS connection to Netdata Cloud.
+
+:::note
+
+The `claimed_id` is separate from the Machine GUID. It uniquely identifies the connection between the Agent and Cloud, while the Machine GUID identifies the node itself.
+
+:::
+
+For detailed explanations of all identity types and their relationships, see [Node Identities](/docs/learn/node-identities.md).
 
 ### Regenerate Claiming Token
 

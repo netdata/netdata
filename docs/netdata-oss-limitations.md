@@ -37,7 +37,7 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Multi-node views | 5 nodes | 5 nodes | Unlimited |
 | Custom dashboards | 1 per agent | 1 per room | Unlimited |
 
-### Functions (Top Tab)
+### Functions (Live Tab)
 
 Functions provide on-demand, detailed information beyond standard metrics.
 
@@ -88,7 +88,7 @@ Functions provide on-demand, detailed information beyond standard metrics.
 
 Netdata provides MCP in two ways:
 
-- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — infrastructure-wide access to all your nodes (requires Business or Homelab plan)
+- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — infrastructure-wide access to all your nodes (requires a Paid plan)
 - **Agent/Parent MCP** — available directly at Netdata Agents and Parents, free and open-source
 
 When accessing Netdata via Agent/Parent MCP:

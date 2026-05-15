@@ -169,13 +169,9 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 
     // signal them to stop
     size_t last_running = 0;
-    size_t stale_time_ut = 0;
     usec_t sleep_ut = 50 * USEC_PER_MS;
     size_t log_countdown_ut = sleep_ut;
     do {
-        if(running != last_running)
-            stale_time_ut = 0;
-
         last_running = running;
         running = 0;
         running_services = 0;
@@ -214,11 +210,10 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
             }
 
             sleep_usec(sleep_ut);
-            stale_time_ut += sleep_ut;
         }
 
         ended_ut = now_monotonic_usec();
-    } while(running && (ended_ut - started_ut < timeout_ut || stale_time_ut < timeout_ut));
+    } while(running && ((ended_ut - started_ut) < timeout_ut));
 
     if(running) {
         buffer_flush(service_list);

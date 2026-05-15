@@ -111,16 +111,20 @@ async fn run_internal() -> Result<()> {
     // 7. Tick loop for periodic metric emission
     let writer_for_tick = Arc::clone(&writer);
     let tick_handle = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
         let mut buf = String::new();
 
-        loop {
-            interval.tick().await;
+        // Wait until the next second boundary before starting the loop.
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before UNIX epoch");
+        let next_sec = std::time::Duration::from_secs(now.as_secs() + 1);
+        tokio::time::sleep(next_sec.saturating_sub(now)).await;
 
-            let slot_timestamp = SystemTime::now()
+        loop {
+            let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .expect("system clock before UNIX epoch")
-                .as_secs();
+                .expect("system clock before UNIX epoch");
+            let slot_timestamp = now.as_secs();
 
             buf.clear();
             {
@@ -135,6 +139,13 @@ async fn run_internal() -> Result<()> {
                     break;
                 }
             }
+
+            // Sleep until the next second boundary, compensating for work duration and jitter.
+            let elapsed = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock before UNIX epoch");
+            let next_sec = std::time::Duration::from_secs(elapsed.as_secs() + 1);
+            tokio::time::sleep(next_sec.saturating_sub(elapsed)).await;
         }
     });
 

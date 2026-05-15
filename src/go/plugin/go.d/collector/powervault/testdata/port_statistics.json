@@ -1,0 +1,26 @@
+{
+  "host-port-statistics": [
+    {
+      "durable-id": "hostport_A0",
+      "number-of-reads": 8500000,
+      "number-of-writes": 4200000,
+      "data-read-numeric": 180388626432,
+      "data-write-numeric": 90194313216
+    },
+    {
+      "durable-id": "hostport_A1",
+      "number-of-reads": 6200000,
+      "number-of-writes": 3100000,
+      "data-read-numeric": 128849018880,
+      "data-write-numeric": 64424509440
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

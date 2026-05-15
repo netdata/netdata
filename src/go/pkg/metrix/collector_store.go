@@ -3,7 +3,9 @@
 package metrix
 
 import (
+	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"sort"
 	"strings"
@@ -21,6 +23,7 @@ const (
 	kindHistogram
 	kindSummary
 	kindStateSet
+	kindMeasureSet
 )
 
 const (
@@ -29,15 +32,16 @@ const (
 )
 
 type instrumentDescriptor struct {
-	name      string
-	kind      metricKind
-	mode      metricMode
-	freshness FreshnessPolicy // visibility policy used by Read()
-	window    MetricWindow
-	histogram *histogramSchema // set for kindHistogram only
-	summary   *summarySchema   // set for kindSummary only
-	stateSet  *stateSetSchema  // set for kindStateSet only
-	meta      MetricMeta
+	name       string
+	kind       metricKind
+	mode       metricMode
+	freshness  FreshnessPolicy // visibility policy used by Read()
+	window     MetricWindow
+	histogram  *histogramSchema  // set for kindHistogram only
+	summary    *summarySchema    // set for kindSummary only
+	stateSet   *stateSetSchema   // set for kindStateSet only
+	measureSet *measureSetSchema // set for kindMeasureSet only
+	meta       MetricMeta
 }
 
 type histogramSchema struct {
@@ -55,11 +59,20 @@ type stateSetSchema struct {
 	index  map[string]struct{}
 }
 
+type measureSetSchema struct {
+	semantics MeasureSetSemantics
+	fields    []MeasureFieldSpec
+	index     map[string]int
+}
+
 type committedSeries struct {
 	id     SeriesID
 	hash64 uint64
 	key    string
 	name   string
+	// hostScope is immutable after publish and partitions otherwise-identical series.
+	hostScopeKey string
+	hostScope    HostScope
 	// labels are immutable after series publish and can be safely shared across snapshots.
 	labels    []Label
 	labelsKey string
@@ -91,6 +104,13 @@ type committedSeries struct {
 	// StateSet current sample (used by StateSet()).
 	stateSetValues map[string]bool
 
+	// MeasureSet current sample (used by MeasureSet()).
+	measureSetValues         []SampleValue
+	measureSetPreviousValues []SampleValue
+	measureSetHasPrev        bool
+	measureSetCurrentSeq     uint64
+	measureSetPreviousSeq    uint64
+
 	meta SeriesMeta
 }
 
@@ -105,12 +125,16 @@ type readSnapshot struct {
 }
 
 type cycleFrame struct {
-	seq        uint64
-	gauges     map[string]*stagedGauge
-	counters   map[string]*stagedCounter
-	histograms map[string]*stagedHistogram
-	summaries  map[string]*stagedSummary
-	stateSet   map[string]*stagedStateSet
+	seq                uint64
+	err                error
+	hostScopes         map[string]HostScope
+	gauges             map[string]*stagedGauge
+	counters           map[string]*stagedCounter
+	histograms         map[string]*stagedHistogram
+	summaries          map[string]*stagedSummary
+	stateSet           map[string]*stagedStateSet
+	measureSetGauges   map[string]*stagedMeasureSet
+	measureSetCounters map[string]*stagedMeasureSet
 }
 
 type storeCore struct {
@@ -187,7 +211,7 @@ func (s *storeView) Read(opts ...ReadOption) Reader {
 	if cfg.flatten {
 		snap = flattenSnapshot(snap)
 	}
-	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten}
+	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten, hostScopeKey: cfg.hostScopeKey}
 }
 
 func (s *storeView) Write() Writer {
@@ -217,17 +241,20 @@ func (c *storeCycleController) BeginCycle() {
 
 	c.core.sequence++
 	c.core.active = &cycleFrame{
-		seq:        c.core.sequence,
-		gauges:     make(map[string]*stagedGauge),
-		counters:   make(map[string]*stagedCounter),
-		histograms: make(map[string]*stagedHistogram),
-		summaries:  make(map[string]*stagedSummary),
-		stateSet:   make(map[string]*stagedStateSet),
+		seq:                c.core.sequence,
+		hostScopes:         make(map[string]HostScope),
+		gauges:             make(map[string]*stagedGauge),
+		counters:           make(map[string]*stagedCounter),
+		histograms:         make(map[string]*stagedHistogram),
+		summaries:          make(map[string]*stagedSummary),
+		stateSet:           make(map[string]*stagedStateSet),
+		measureSetGauges:   make(map[string]*stagedMeasureSet),
+		measureSetCounters: make(map[string]*stagedMeasureSet),
 	}
 }
 
 // CommitCycleSuccess publishes staged writes into a new committed snapshot.
-func (c *storeCycleController) CommitCycleSuccess() {
+func (c *storeCycleController) CommitCycleSuccess() error {
 	c.core.mu.Lock()
 	defer c.core.mu.Unlock()
 
@@ -236,25 +263,39 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	oldSnap := c.core.snapshot.Load()
+	if c.core.active.err != nil {
+		abortSnap := &readSnapshot{
+			collectMeta: oldSnap.collectMeta,
+			series:      oldSnap.series,
+			byName:      oldSnap.byName,
+		}
+		abortSnap.collectMeta.LastAttemptSeq = c.core.active.seq
+		abortSnap.collectMeta.LastAttemptStatus = CollectStatusFailed
+		c.core.snapshot.Store(abortSnap)
+		err := c.core.active.err
+		c.core.active = nil
+		return err
+	}
 	successSeq := c.core.successSeq + 1
 	next := &readSnapshot{
 		collectMeta: oldSnap.collectMeta,
 		series:      make(map[string]*committedSeries, len(oldSnap.series)),
 		byName:      nil,
 	}
+	commitHostScopes := make(map[string]HostScope)
 
-	for k, s := range oldSnap.series {
-		next.series[k] = s
-	}
+	maps.Copy(next.series, oldSnap.series)
 
 	for key, staged := range c.core.active.gauges {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 		series.value = staged.value
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.counters {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
 		if hadCurrent {
@@ -274,7 +315,8 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.histograms {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		if series.desc == nil {
 			panic("metrix: missing histogram descriptor")
@@ -301,7 +343,8 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.summaries {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		if staged.desc.mode == modeStateful && len(staged.desc.summaryQuantiles()) > 0 {
 			if staged.sketch != nil {
@@ -328,12 +371,40 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.stateSet {
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 
 		series.stateSetValues = cloneStateMap(staged.states)
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
+	for key, staged := range c.core.active.measureSetGauges {
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
+		series.measureSetValues = append(series.measureSetValues[:0], staged.values...)
+		markSeriesSeen(series, c.core.active.seq, successSeq)
+	}
+
+	for key, staged := range c.core.active.measureSetCounters {
+		commitHostScopes[staged.hostScopeKey] = staged.hostScope
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
+
+		if series.desc != nil && series.desc.kind == kindMeasureSet && series.desc.measureSet != nil && series.desc.measureSet.semantics == MeasureSetSemanticsCounter && series.measureSetCurrentSeq > 0 {
+			series.measureSetPreviousValues = append(series.measureSetPreviousValues[:0], series.measureSetValues...)
+			series.measureSetPreviousSeq = series.measureSetCurrentSeq
+			series.measureSetHasPrev = true
+		} else {
+			series.measureSetPreviousValues = nil
+			series.measureSetPreviousSeq = 0
+			series.measureSetHasPrev = false
+		}
+
+		series.measureSetValues = append(series.measureSetValues[:0], staged.values...)
+		series.measureSetCurrentSeq = c.core.active.seq
+		markSeriesSeen(series, c.core.active.seq, successSeq)
+	}
+
+	refreshCommittedHostScopes(oldSnap, next, commitHostScopes)
 	applyCollectorRetention(next.series, c.core.retention, successSeq)
 	next.collectMeta.LastAttemptSeq = c.core.active.seq
 	next.collectMeta.LastAttemptStatus = CollectStatusSuccess
@@ -342,18 +413,21 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	c.core.snapshot.Store(next)
 	c.core.successSeq = successSeq
 	c.core.active = nil
+	return nil
 }
 
-func newCommittedSeries(key, name string, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+func newCommittedSeries(key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
 	return &committedSeries{
-		id:        SeriesID(key),
-		hash64:    seriesIDHash(SeriesID(key)),
-		key:       key,
-		name:      name,
-		labels:    append([]Label(nil), labels...),
-		labelsKey: labelsKey,
-		desc:      desc,
-		meta:      baseSeriesMeta(desc),
+		id:           SeriesID(key),
+		hash64:       seriesIDHash(SeriesID(key)),
+		key:          key,
+		name:         name,
+		hostScopeKey: hostScopeKey,
+		hostScope:    cloneHostScope(hostScope),
+		labels:       append([]Label(nil), labels...),
+		labelsKey:    labelsKey,
+		desc:         desc,
+		meta:         baseSeriesMeta(desc),
 	}
 }
 
@@ -370,14 +444,31 @@ func ensureCommitSeriesMutable(old, next *readSnapshot, key string) *committedSe
 	return series
 }
 
-func getOrCreateCommitSeries(old, next *readSnapshot, key, name string, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+func getOrCreateCommitSeries(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
 	series := ensureCommitSeriesMutable(old, next, key)
 	if series != nil {
 		return series
 	}
-	series = newCommittedSeries(key, name, labels, labelsKey, desc)
+	series = newCommittedSeries(key, name, hostScopeKey, hostScope, labels, labelsKey, desc)
 	next.series[key] = series
 	return series
+}
+
+func refreshCommittedHostScopes(old, next *readSnapshot, scopes map[string]HostScope) {
+	if len(scopes) == 0 {
+		return
+	}
+	for key, series := range next.series {
+		scope, ok := scopes[series.hostScopeKey]
+		if !ok || hostScopeEqual(series.hostScope, scope) {
+			continue
+		}
+		series = ensureCommitSeriesMutable(old, next, key)
+		if series == nil {
+			continue
+		}
+		series.hostScope = cloneHostScope(scope)
+	}
 }
 
 func markSeriesSeen(series *committedSeries, attemptSeq, successSeq uint64) {
@@ -421,6 +512,9 @@ func buildByName(series map[string]*committedSeries) map[string][]*committedSeri
 	}
 	for _, lst := range byName {
 		sort.Slice(lst, func(i, j int) bool {
+			if lst[i].hostScopeKey != lst[j].hostScopeKey {
+				return lst[i].hostScopeKey < lst[j].hostScopeKey
+			}
 			return lst[i].labelsKey < lst[j].labelsKey
 		})
 	}
@@ -475,6 +569,9 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	if (len(cfg.states) > 0 || cfg.stateSetMode != nil) && kind != kindStateSet {
 		return nil, fmt.Errorf("metrix: stateset options are invalid for this instrument kind")
 	}
+	if (len(cfg.measureSetFields) > 0 || cfg.measureSetSemantics != nil) && kind != kindMeasureSet {
+		return nil, fmt.Errorf("metrix: measureset options are invalid for this instrument kind")
+	}
 
 	window := WindowCumulative
 	if cfg.windowSet {
@@ -496,10 +593,11 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	}
 
 	metricMeta := MetricMeta{
-		Description: strings.TrimSpace(cfg.description),
-		ChartFamily: strings.TrimSpace(cfg.chartFamily),
-		Unit:        strings.TrimSpace(cfg.unit),
-		Float:       cfg.float,
+		Description:   strings.TrimSpace(cfg.description),
+		ChartFamily:   strings.TrimSpace(cfg.chartFamily),
+		ChartPriority: cfg.chartPriority,
+		Unit:          strings.TrimSpace(cfg.unit),
+		Float:         cfg.float,
 	}
 
 	var histogram *histogramSchema
@@ -529,6 +627,15 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		schema = s
 	}
 
+	var measureSet *measureSetSchema
+	if kind == kindMeasureSet {
+		s, err := buildMeasureSetSchema(cfg)
+		if err != nil {
+			return nil, err
+		}
+		measureSet = s
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -556,11 +663,17 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		if kind == kindStateSet && !equalStateSetSchema(d.stateSet, schema) {
 			return nil, fmt.Errorf("metrix: stateset schema mismatch for %s", name)
 		}
+		if kind == kindMeasureSet && !equalMeasureSetSchema(d.measureSet, measureSet) {
+			return nil, fmt.Errorf("metrix: measureset schema mismatch for %s", name)
+		}
 		if cfg.descriptionSet && d.meta.Description != metricMeta.Description {
 			return nil, fmt.Errorf("metrix: metric description mismatch for %s", name)
 		}
 		if cfg.chartFamilySet && d.meta.ChartFamily != metricMeta.ChartFamily {
 			return nil, fmt.Errorf("metrix: metric chart family mismatch for %s", name)
+		}
+		if cfg.chartPrioritySet && d.meta.ChartPriority != metricMeta.ChartPriority {
+			return nil, fmt.Errorf("metrix: metric chart priority mismatch for %s", name)
 		}
 		if cfg.unitSet && d.meta.Unit != metricMeta.Unit {
 			return nil, fmt.Errorf("metrix: metric unit mismatch for %s", name)
@@ -572,35 +685,72 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	}
 
 	d := &instrumentDescriptor{
-		name:      name,
-		kind:      kind,
-		mode:      mode,
-		freshness: fresh,
-		window:    window,
-		histogram: histogram,
-		summary:   summary,
-		stateSet:  schema,
-		meta:      metricMeta,
+		name:       name,
+		kind:       kind,
+		mode:       mode,
+		freshness:  fresh,
+		window:     window,
+		histogram:  histogram,
+		summary:    summary,
+		stateSet:   schema,
+		measureSet: measureSet,
+		meta:       metricMeta,
 	}
 	c.instruments[name] = d
 	return d, nil
 }
 
-// makeSeriesKey joins metric name and canonical label key into one stable identity key.
-func makeSeriesKey(name, labelsKey string) string {
-	if labelsKey == "" {
-		return name
+func (c *storeCore) prepareHostScopeForWriteLocked(scope HostScope) (HostScope, bool) {
+	scope = mustNormalizeHostScope(scope)
+	if c.active == nil {
+		return scope, true
 	}
-	return name + "\xfe" + labelsKey
+	if existing, ok := c.active.hostScopes[scope.ScopeKey]; ok {
+		if hostScopeEqual(existing, scope) {
+			return existing, true
+		}
+		c.recordCycleErrorLocked(fmt.Errorf("%w: scope_key=%q", ErrHostScopeConflict, scope.ScopeKey))
+		return scope, false
+	}
+	c.active.hostScopes[scope.ScopeKey] = cloneHostScope(scope)
+	return scope, true
+}
+
+func (c *storeCore) recordCycleErrorLocked(err error) {
+	if err == nil || c.active == nil {
+		return
+	}
+	c.active.err = errors.Join(c.active.err, err)
+}
+
+// makeSeriesKey joins host scope, metric name, and canonical label key into one stable identity key.
+func makeSeriesKey(hostScopeKey, name, labelsKey string) string {
+	base := name
+	if labelsKey == "" {
+		base = name
+	} else {
+		base = name + "\xfe" + labelsKey
+	}
+	if hostScopeKey == "" {
+		return base
+	}
+	return hostScopeKey + "\xff" + base
 }
 
 func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	cp := *s
 	ensureSeriesMeta(cp.desc, &cp.meta)
+	cp.hostScope = cloneHostScope(s.hostScope)
 	// cp.labels intentionally reuses the original immutable label slice.
 	// Label identity is part of the series key and is never mutated after publish.
 	if s.stateSetValues != nil {
 		cp.stateSetValues = cloneStateMap(s.stateSetValues)
+	}
+	if len(s.measureSetValues) > 0 {
+		cp.measureSetValues = append([]SampleValue(nil), s.measureSetValues...)
+	}
+	if len(s.measureSetPreviousValues) > 0 {
+		cp.measureSetPreviousValues = append([]SampleValue(nil), s.measureSetPreviousValues...)
 	}
 	if len(s.histogramCumulative) > 0 {
 		cp.histogramCumulative = append([]SampleValue(nil), s.histogramCumulative...)
@@ -625,9 +775,7 @@ func cloneStateMap(in map[string]bool) map[string]bool {
 		return nil
 	}
 	out := make(map[string]bool, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
+	maps.Copy(out, in)
 	return out
 }
 
@@ -713,6 +861,51 @@ func equalStateSetSchema(a, b *stateSetSchema) bool {
 	}
 	for i := range a.states {
 		if a.states[i] != b.states[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func buildMeasureSetSchema(cfg instrumentConfig) (*measureSetSchema, error) {
+	if len(cfg.measureSetFields) == 0 {
+		return nil, fmt.Errorf("metrix: measureset requires WithMeasureSetFields")
+	}
+	if cfg.measureSetSemantics == nil {
+		return nil, fmt.Errorf("metrix: measureset semantics are missing")
+	}
+
+	fields := make([]MeasureFieldSpec, 0, len(cfg.measureSetFields))
+	index := make(map[string]int, len(cfg.measureSetFields))
+	for i, field := range cfg.measureSetFields {
+		name := strings.TrimSpace(field.Name)
+		if name == "" {
+			return nil, fmt.Errorf("metrix: measureset field name cannot be empty")
+		}
+		if _, ok := index[name]; ok {
+			return nil, fmt.Errorf("metrix: duplicate measureset field %q", name)
+		}
+		field.Name = name
+		fields = append(fields, field)
+		index[name] = i
+	}
+
+	return &measureSetSchema{
+		semantics: *cfg.measureSetSemantics,
+		fields:    fields,
+		index:     index,
+	}, nil
+}
+
+func equalMeasureSetSchema(a, b *measureSetSchema) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.semantics != b.semantics || len(a.fields) != len(b.fields) {
+		return false
+	}
+	for i := range a.fields {
+		if a.fields[i].Name != b.fields[i].Name || a.fields[i].Float != b.fields[i].Float {
 			return false
 		}
 	}

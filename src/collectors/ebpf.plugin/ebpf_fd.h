@@ -3,6 +3,10 @@
 #ifndef NETDATA_EBPF_FD_H
 #define NETDATA_EBPF_FD_H 1
 
+#include "libnetdata/libnetdata.h"
+#include "collectors/collectors-ipc/ebpf-ipc.h"
+#include "libbpf_api/ebpf.h"
+
 // Module name & File description
 #define NETDATA_EBPF_MODULE_NAME_FD "filedescriptor"
 #define NETDATA_EBPF_FD_MODULE_DESC                                                                                    \
@@ -38,6 +42,22 @@
 #define NETDATA_SYSTEMD_FD_CLOSE_CONTEXT "systemd.service.fd_close"
 #define NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT "systemd.service.fd_close_error"
 
+// Chart priorities
+#define NETDATA_EBPF_FD_CHART_PRIORITY_OPEN 20270
+#define NETDATA_EBPF_FD_CHART_PRIORITY_OPEN_ERR 20271
+#define NETDATA_EBPF_FD_CHART_PRIORITY_CLOSE 20272
+#define NETDATA_EBPF_FD_CHART_PRIORITY_CLOSE_ERR 20273
+
+#define NETDATA_EBPF_FD_CHART_PRIORITY_CGROUP_OPEN 5400
+#define NETDATA_EBPF_FD_CHART_PRIORITY_CGROUP_OPEN_ERR 5401
+#define NETDATA_EBPF_FD_CHART_PRIORITY_CGROUP_CLOSE 5402
+#define NETDATA_EBPF_FD_CHART_PRIORITY_CGROUP_CLOSE_ERR 5403
+
+#define NETDATA_EBPF_FD_CHART_PRIORITY_APPS_OPEN 20220
+#define NETDATA_EBPF_FD_CHART_PRIORITY_APPS_OPEN_ERR 20221
+#define NETDATA_EBPF_FD_CHART_PRIORITY_APPS_CLOSE 20222
+#define NETDATA_EBPF_FD_CHART_PRIORITY_APPS_CLOSE_ERR 20223
+
 // ARAL name
 #define NETDATA_EBPF_FD_ARAL_NAME "ebpf_fd"
 
@@ -64,7 +84,7 @@ enum fd_syscalls {
     NETDATA_FD_SYSCALL_OPEN,
     NETDATA_FD_SYSCALL_CLOSE,
 
-    // Do not insert nothing after this value
+    // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_FD_SYSCALL_END
 };
 
@@ -72,6 +92,7 @@ enum fd_close_syscall {
     NETDATA_FD_CLOSE_FD,
     NETDATA_FD___CLOSE_FD,
 
+    // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_FD_CLOSE_END
 };
 
@@ -79,7 +100,6 @@ enum fd_close_syscall {
 
 void ebpf_fd_thread(void *ptr);
 void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_fd_release(netdata_fd_stat_t *stat);
 extern struct config fd_config;
 extern netdata_ebpf_targets_t fd_targets[];
 

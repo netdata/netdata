@@ -1,0 +1,34 @@
+{
+  "power-supplies": [
+    {
+      "durable-id": "psu_0.0",
+      "name": "PSU 0",
+      "location": "Enclosure 0, Left",
+      "health": "OK",
+      "health-numeric": 0,
+      "status": "Up",
+      "serial-number": "PSU-SN-001",
+      "model": "PWR-580W",
+      "position": "Left"
+    },
+    {
+      "durable-id": "psu_0.1",
+      "name": "PSU 1",
+      "location": "Enclosure 0, Right",
+      "health": "OK",
+      "health-numeric": 0,
+      "status": "Up",
+      "serial-number": "PSU-SN-002",
+      "model": "PWR-580W",
+      "position": "Right"
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

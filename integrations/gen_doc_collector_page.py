@@ -3,7 +3,8 @@ Generate the integrations section in COLLECTORS.md from integrations/integration
 
 This script:
 - Reads category tree and integrations from integrations.js
-- Uses second-level categories (children of 'data-collection') as section headings
+- Uses data-collection section categories, plus the top-level flows category,
+  as section headings
 - Groups integrations by their section-level category
 - Generates markdown tables with integration name, link, and description
 """
@@ -56,7 +57,7 @@ class CategoryMapper:
     def __init__(self, categories: List[Dict[str, Any]]):
         self.id_to_parent: Dict[str, Optional[str]] = {}
         self.id_to_title: Dict[str, str] = {}
-        self.section_level_ids: List[str] = []  # Children of 'data-collection'
+        self.section_level_ids: List[str] = []  # Monitor Anything section IDs
         self.default_section_ids: List[str] = []  # Section IDs with collector_default=true
 
         self._build_maps(categories)
@@ -78,8 +79,10 @@ class CategoryMapper:
                 self.id_to_parent[cid] = parent
                 self.id_to_title[cid] = title
 
-                # Track section-level categories (children of 'data-collection')
-                if parent == 'data-collection':
+                # Track Monitor Anything sections. Most are children of
+                # data-collection; Network Flows is a top-level integrations
+                # category because it includes protocols and enrichment inputs.
+                if parent == 'data-collection' or (parent is None and cid == 'flows'):
                     self.section_level_ids.append(cid)
 
                 # Track categories with collector_default=true
@@ -100,12 +103,15 @@ class CategoryMapper:
                 self.default_section_ids.append(section)
 
     def get_section_ancestor(self, cid: str) -> Optional[str]:
-        """Find the section-level ancestor (child of 'data-collection') for a category."""
+        """Find the Monitor Anything section ancestor for a category."""
         cur = cid
         seen = set()
 
         while cur and cur in self.id_to_parent and cur not in seen:
             seen.add(cur)
+            if cur in self.section_level_ids:
+                return cur
+
             parent = self.id_to_parent.get(cur)
 
             if parent == 'data-collection':
@@ -398,7 +404,9 @@ def render_header() -> str:
     tech_nav = _render_tech_navigation()
     generic_section = _render_generic_collectors()
 
-    return f"""# Monitor anything with Netdata
+    return f"""<!-- markdownlint-disable-file -->
+
+# Monitor anything with Netdata
 
 **850+ integrations. Zero configuration. Deploy anywhere.**
 

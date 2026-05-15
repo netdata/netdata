@@ -107,9 +107,16 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
 
         datafile = *PValue;
 
-        struct rrdengine_journalfile *journalfile = datafile ? datafile->journalfile : NULL;
+        if (!datafile || !datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) {
+            datafile = NULL;
+            PValue = NULL;
+            continue;
+        }
 
-        if (!datafile || !journalfile) {
+        struct rrdengine_journalfile *journalfile = datafile->journalfile;
+
+        if (!journalfile) {
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             datafile = NULL;
             PValue = NULL;
             continue;
@@ -121,29 +128,36 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
                                                       s->wanted_end_time_s);
 
         if(rc == PAGE_IS_IN_RANGE) {
-            // this is good to return
-            break;
+            s->j2_header_acquired = journalfile_v2_data_acquire(journalfile, NULL,
+                                                                s->wanted_start_time_s,
+                                                                s->wanted_end_time_s);
+            if(s->j2_header_acquired) {
+                // this is good to return
+                break;
+            }
+
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
+            datafile = NULL;
+            PValue = NULL;
+            continue;
         }
         else if(rc == PAGE_IS_IN_THE_PAST) {
             // continue to get the next
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             datafile = NULL;
             PValue = NULL;
             continue;
         }
         else /* PAGE_IS_IN_THE_FUTURE */ {
             // we finished - no more datafiles
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             datafile = NULL;
             PValue = NULL;
             break;
         }
     }
 
-    struct rrdengine_journalfile *journalfile = datafile ? datafile->journalfile : NULL;
-    if(datafile && journalfile)
-        s->j2_header_acquired = journalfile_v2_data_acquire(journalfile, NULL,
-                                                            s->wanted_start_time_s,
-                                                            s->wanted_end_time_s);
-    else
+    if(!datafile)
         s->j2_header_acquired = NULL;
 
     rw_spinlock_read_unlock(&s->ctx->njfv2idx.spinlock);
@@ -223,14 +237,17 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
             madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
             madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
             // madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
-            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
 
             journalfile->v2.flags |= JOURNALFILE_FLAG_IS_AVAILABLE | JOURNALFILE_FLAG_IS_MOUNTED;
             JOURNALFILE_FLAGS flags = journalfile->v2.flags;
 
             if(flags & JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION) {
-                // we need the entire metrics directory into memory to process it
+                // sequential access pattern during MRG population
+                madvise_sequential(journalfile->mmap.data, journalfile->v2.size_of_directory);
                 madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
+            }
+            else {
+                madvise_random(journalfile->mmap.data, journalfile->mmap.size);
             }
         }
     }
@@ -332,7 +349,9 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     }
 }
 
-ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
+ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile,
+    size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint)
+{
     spinlock_lock(&journalfile->data_spinlock);
 
     bool has_data = (journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
@@ -343,15 +362,31 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrden
         if (!wanted_first_time_s || !wanted_last_time_s ||
             is_page_in_time_range(journalfile->v2.first_time_s, journalfile->v2.last_time_s,
                                   wanted_first_time_s, wanted_last_time_s) == PAGE_IS_IN_RANGE) {
+            bool was_sequential = (journalfile->v2.flags & JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION);
 
             journalfile->v2.refcount++;
 
             do_we_need_it = true;
 
-            if (!wanted_first_time_s && !wanted_last_time_s && !is_mounted)
+            if(hint == JOURNALFILE_V2_ACCESS_AUTO)
+                hint = (!wanted_first_time_s && !wanted_last_time_s) ?
+                    JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY :
+                    JOURNALFILE_V2_ACCESS_RANDOM;
+
+            bool want_sequential = (hint == JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY);
+            if (want_sequential)
                 journalfile->v2.flags |= JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION;
             else
                 journalfile->v2.flags &= ~JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION;
+
+            if (is_mounted && journalfile->mmap.data) {
+                if (!was_sequential && want_sequential) {
+                    madvise_sequential(journalfile->mmap.data, journalfile->v2.size_of_directory);
+                    madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
+                }
+                else if (was_sequential && !want_sequential)
+                    madvise_random(journalfile->mmap.data, journalfile->mmap.size);
+            }
 
         }
     }
@@ -361,6 +396,10 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrden
         return journalfile_v2_mounted_data_get(journalfile, data_size);
 
     return NULL;
+}
+
+ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
+    return journalfile_v2_data_acquire_with_hint(journalfile, data_size, wanted_first_time_s, wanted_last_time_s, JOURNALFILE_V2_ACCESS_AUTO);
 }
 
 ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile) {
@@ -519,10 +558,12 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
     return ret;
 }
 
-int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
+uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
     int ret;
+    uv_fs_t req_v2 = { 0 };
+    uv_fs_t req_v1 = { 0 };
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
 
@@ -538,18 +579,29 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
         journalfile_v2_data_unmap_permanently(journalfile);
 
     // Now safe to delete the files - no threads are accessing them
-    int deleted = 0;
-    UNLINK_FILE(ctx, path_v2, ret);
+    uint8_t deleted = 0;
+
+    ret = uv_fs_unlink(NULL, &req_v2, path_v2, NULL);
     if (ret == 0)
-       deleted++;
+        deleted |= JOURNALFILE_DELETED_V2;
+    else if (ret != UV_ENOENT) {
+        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path_v2, uv_strerror(ret));
+        ctx_fs_error(ctx);
+    }
+    uv_fs_req_cleanup(&req_v2);
 
-    UNLINK_FILE(ctx, path, ret);
+    ret = uv_fs_unlink(NULL, &req_v1, path, NULL);
     if (ret == 0)
-        deleted++;
+        deleted |= JOURNALFILE_DELETED_V1;
+    else if (ret != UV_ENOENT) {
+        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
+        ctx_fs_error(ctx);
+    }
+    uv_fs_req_cleanup(&req_v1);
 
-    __atomic_add_fetch(&ctx->stats.journalfile_deletions, deleted, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->stats.journalfile_deletions, __builtin_popcount(deleted), __ATOMIC_RELAXED);
 
-    return ret;
+    return deleted;
 }
 
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
@@ -650,7 +702,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
     count = jf_metric_data->number_of_pages;
     descr_size = sizeof(*jf_metric_data->descr) * count;
     payload_length = sizeof(*jf_metric_data) + descr_size;
-    if (payload_length > max_size) {
+    if (payload_length > max_size || !rrdeng_valid_extent_disk_size(jf_metric_data->extent_size)) {
         netdata_log_error("DBENGINE: corrupted transaction payload.");
         return;
     }
@@ -993,7 +1045,8 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     usec_t started_ut = now_monotonic_usec();
 
     size_t data_size = 0;
-    struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+    struct journal_v2_header *j2_header = journalfile_v2_data_acquire_with_hint(
+        journalfile, &data_size, 0, 0, JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY);
     if(!j2_header)
         return;
 
@@ -1109,6 +1162,10 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         close(fd);
         return 1;
     }
+
+    // validation reads the file sequentially — hint the kernel to prefetch
+    madvise_sequential(data_start, journal_v2_file_size);
+    madvise_willneed(data_start, journal_v2_file_size);
 
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: checking integrity of \"%s\"", path_v2);
 
@@ -1330,8 +1387,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     journalfile_v2_generate_path(datafile, path, sizeof(path));
 
-    netdata_log_info("DBENGINE: indexing file \"%s\": extents %zu, metrics %zu, pages %zu",
-        path,
+    netdata_log_info("DBENGINE: tier %d: indexing " WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ": extents %zu, metrics %zu, pages %zu",
+        ctx->config.tier, datafile->tier, datafile->fileno,
         number_of_extents,
         number_of_metrics,
         number_of_pages);
@@ -1366,9 +1423,11 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     uint32_t trailer_offset = total_file_size;
     total_file_size  += sizeof(struct journal_v2_block_trailer);
 
-    int fd_v2;
+    int fd_v2 = -1;
     uint8_t *data_start = nd_mmap_advanced(path, total_file_size, MAP_SHARED, 0, false, true, &fd_v2);
     if(!data_start) {
+        if(fd_v2 != -1)
+            close(fd_v2);
         nd_log_daemon(NDLP_WARNING, "DBENGINE: Failed to allocate %"PRIu64" bytes of memory for journal file \"%s\". Will retry later", total_file_size, path);
         return false;
     }
@@ -1524,7 +1583,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
             char size_for_humans[128];
             size_snprintf(size_for_humans, sizeof(size_for_humans), total_file_size, "B", false);
-            netdata_log_info("DBENGINE: migrated journal file \"%s\", file size %zu bytes (%s)", path, total_file_size, size_for_humans);
+            netdata_log_info("DBENGINE: tier %d: migrated " WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ", %s",
+                           ctx->config.tier, datafile->tier, datafile->fileno, size_for_humans);
 
             // msync(data_start, total_file_size, MS_SYNC);
             journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
@@ -1545,6 +1605,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     netdata_log_info("DBENGINE: failed to build index \"%s\", file will be skipped", path);
 
     nd_munmap(data_start, total_file_size);
+    if(fd_v2 != -1)
+        close(fd_v2);
     unlink(path);
     return false;
 }

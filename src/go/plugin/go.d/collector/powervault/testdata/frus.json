@@ -1,0 +1,33 @@
+{
+  "enclosure-fru": [
+    {
+      "name": "RAID Controller Module A",
+      "fru-location": "Enclosure 0, Controller A",
+      "fru-status": "OK",
+      "fru-status-numeric": 0,
+      "part-number": "0F3P10"
+    },
+    {
+      "name": "RAID Controller Module B",
+      "fru-location": "Enclosure 0, Controller B",
+      "fru-status": "OK",
+      "fru-status-numeric": 0,
+      "part-number": "0F3P10"
+    },
+    {
+      "name": "Midplane",
+      "fru-location": "Enclosure 0",
+      "fru-status": "Not Available",
+      "fru-status-numeric": 5,
+      "part-number": "0D3M7X"
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

@@ -220,6 +220,8 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-otel Explicitly disable the Netdata OpenTelemetry plugin.
   --enable-plugin-otel-signal-viewer Enable the OTel signal viewer plugin. Default: disabled
   --disable-plugin-otel-signal-viewer Explicitly disable the OTel signal viewer plugin.
+  --enable-plugin-netflow    Enable the NetFlow/IPFIX/sFlow flow analysis plugin. Default: disabled.
+  --disable-plugin-netflow   Explicitly disable the NetFlow/IPFIX/sFlow flow analysis plugin.
   --enable-plugin-ibm        Enable the IBM ecosystem monitoring plugin. Default: disabled
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
@@ -263,6 +265,7 @@ ENABLE_DBENGINE=1
 ENABLE_GO=1
 ENABLE_PYTHON=1
 ENABLE_CHARTS=1
+ENABLE_NETFLOW=0
 ENABLE_OTEL=0
 ENABLE_OTEL_SIGNAL_VIEWER=0
 ENABLE_IBM=0
@@ -303,6 +306,8 @@ while [ -n "${1}" ]; do
     "--disable-plugin-nfacct") ENABLE_NFACCT=0 ;;
     "--enable-plugin-xenstat") ENABLE_XENSTAT=1 ;;
     "--disable-plugin-xenstat") ENABLE_XENSTAT=0 ;;
+    "--enable-plugin-netflow") ENABLE_NETFLOW=1 ;;
+    "--disable-plugin-netflow") ENABLE_NETFLOW=0 ;;
     "--enable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=1 ;;
     "--disable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=0 ;;
     "--internal-systemd-journal") USE_RUST_JOURNAL_FILE=1 ;;
@@ -729,6 +734,7 @@ NETDATA_WEB_DIR="$(config_option "global" "web files directory" "${NETDATA_PREFI
 NETDATA_LOG_DIR="$(config_option "global" "log directory" "${NETDATA_PREFIX}/var/log/netdata")"
 NETDATA_USER_CONFIG_DIR="$(config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata")"
 NETDATA_STOCK_CONFIG_DIR="$(config_option "global" "stock config directory" "${NETDATA_PREFIX}/usr/lib/netdata/conf.d")"
+NETDATA_STOCK_DATA_DIR="$(config_option "global" "stock data directory" "${NETDATA_PREFIX}/usr/share/netdata")"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 NETDATA_CLAIMING_DIR="${NETDATA_LIB_DIR}/cloud.d"
 
@@ -742,6 +748,7 @@ cat << OPTIONSEOF
     Directories
     - netdata user config dir  : ${NETDATA_USER_CONFIG_DIR}
     - netdata stock config dir : ${NETDATA_STOCK_CONFIG_DIR}
+    - netdata stock data dir   : ${NETDATA_STOCK_DATA_DIR}
     - netdata log dir          : ${NETDATA_LOG_DIR}
     - netdata run dir          : ${NETDATA_RUN_DIR}
     - netdata lib dir          : ${NETDATA_LIB_DIR}
@@ -766,6 +773,7 @@ fi
 # --- stock conf dir ----
 
 [ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"
+[ ! -d "${NETDATA_STOCK_DATA_DIR}" ] && mkdir -p "${NETDATA_STOCK_DATA_DIR}"
 [ -L "${NETDATA_USER_CONFIG_DIR}/orig" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/orig"
 run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/orig"
 
@@ -822,7 +830,7 @@ if [ "$(id -u)" -eq 0 ]; then
     capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
-      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+      if run setcap cap_dac_read_search,cap_audit_control+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"; then
         # if we managed to setcap, but we fail to execute debugfs.plugin setuid to root
         "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin" -t > /dev/null 2>&1 && capabilities=1 || capabilities=0
       fi
@@ -965,6 +973,11 @@ if [ "$(id -u)" -eq 0 ]; then
     if ! iscontainer && command -v setcap 1>/dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-plugin"
     fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/netflow-plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/netflow-plugin"
+    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/netflow-plugin"
   fi
 
 else

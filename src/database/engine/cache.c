@@ -216,12 +216,18 @@ static inline size_t page_size_from_assumed_size(PGC *cache, size_t assumed_size
 // locking
 
 static inline size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
+    static __thread PGC *last_cache = NULL;
+    static __thread size_t last_partitions = 0;
     static __thread Word_t last_metric_id = 0;
     static __thread size_t last_partition = 0;
 
-    if(metric_id == last_metric_id || cache->config.partitions == 1)
+    if(cache == last_cache &&
+       cache->config.partitions == last_partitions &&
+       (metric_id == last_metric_id || cache->config.partitions == 1))
         return last_partition;
 
+    last_cache = cache;
+    last_partitions = cache->config.partitions;
     last_metric_id = metric_id;
     last_partition = indexing_partition(metric_id, cache->config.partitions);
 
@@ -713,8 +719,6 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
                    page_get_status_flags(page),
         q->flags);
 
-    page_flag_clear(page, q->flags);
-
     struct section_pages *sp_to_free = NULL;
 
     if(q->linked_list_in_sections_judy) {
@@ -749,6 +753,15 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(q->base, page, link.prev, link.next);
         q->version++;
     }
+
+    // Clear the queue flag only after the unlink, while still under the queue
+    // lock. This guarantees that "flag cleared" implies "page already unlinked",
+    // so a lockless reader observing "no longer on this queue" cannot race
+    // with an in-progress unlink. The reciprocal (flag set implies on the
+    // list) is intentionally not provided; readers that act on link pointers
+    // must re-validate under the queue lock, as commit 2733e6fc60 (#21793)
+    // does in page_has_been_accessed.
+    page_flag_clear(page, q->flags);
 
     if(!having_lock)
         pgc_queue_unlock(cache, q);
@@ -1388,6 +1401,14 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     internal_fatal(entry->start_time_s < 0 || entry->end_time_s < 0,
                    "DBENGINE CACHE: timestamps are negative");
 
+    // Clamp before the values are copied into the new PGC_PAGE and used as
+    // the Judy index key, so the struct and the index agree.
+    if(unlikely(entry->start_time_s < 0))
+        entry->start_time_s = 0;
+
+    if(unlikely(entry->end_time_s < 0))
+        entry->end_time_s = 0;
+
     p2_add_fetch(&cache->stats.p2_workers_add, 1);
 
     size_t partition = pgc_indexing_partition(cache, entry->metric_id);
@@ -1397,7 +1418,7 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 #else
     PGC_PAGE *allocation = mallocz(sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page);
 #endif
-    
+
     allocation->refcount = 1;
     allocation->accesses = (entry->hot) ? 0 : 1;
     allocation->flags = 0;
@@ -1411,22 +1432,16 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     spinlock_init(&allocation->transition_spinlock);
     allocation->link.prev = NULL;
     allocation->link.next = NULL;
-    
+
     if(cache->config.additional_bytes_per_page) {
         if(entry->custom_data)
             memcpy(allocation->custom_data, entry->custom_data, cache->config.additional_bytes_per_page);
         else
             memset(allocation->custom_data, 0, cache->config.additional_bytes_per_page);
     }
-    
+
     PGC_PAGE *page;
     size_t spins = 0;
-
-    if(unlikely(entry->start_time_s < 0))
-        entry->start_time_s = 0;
-
-    if(unlikely(entry->end_time_s < 0))
-        entry->end_time_s = 0;
 
     do {
         spins++;
@@ -2462,7 +2477,8 @@ void pgc_open_cache_to_journal_v2(
 
     struct section_pages *sp = *section_pages_pptr;
     if(!spinlock_trylock(&sp->migration_to_v2_spinlock)) {
-        netdata_log_info("DBENGINE: migration to journal v2 for datafile %u is postponed, another jv2 indexer is already running for this section", datafile_fileno);
+        netdata_log_info("DBENGINE: migration to journal v2 for datafile %u (section %" PRIu64 ") is postponed, another jv2 indexer is already running for this section",
+                         datafile_fileno, (uint64_t)section);
         pgc_queue_unlock(cache, &cache->hot);
         return;
     }
@@ -3141,6 +3157,32 @@ int pgc_unittest(void) {
     pgc_page_hot_to_dirty_and_release(cache, page3, false);
 
     pgc_destroy(cache, true);
+
+    {
+        PGC *cache_a = pgc_create("partition-cache-a",
+                                  32 * 1024 * 1024, unittest_free_clean_page_callback,
+                                  64, NULL, unittest_save_dirty_page_callback,
+                                  10, 10, 1000, 10,
+                                  PGC_OPTIONS_DEFAULT, 4, 0);
+        PGC *cache_b = pgc_create("partition-cache-b",
+                                  32 * 1024 * 1024, unittest_free_clean_page_callback,
+                                  64, NULL, unittest_save_dirty_page_callback,
+                                  10, 10, 1000, 10,
+                                  PGC_OPTIONS_DEFAULT, 5, 0);
+
+        Word_t metric_id = 5;
+        size_t partition_a = pgc_indexing_partition(cache_a, metric_id);
+        size_t partition_b = pgc_indexing_partition(cache_b, metric_id);
+
+        if(partition_a != indexing_partition(metric_id, cache_a->config.partitions))
+            fatal("pgc_indexing_partition() returned the wrong partition for cache_a");
+
+        if(partition_b != indexing_partition(metric_id, cache_b->config.partitions))
+            fatal("pgc_indexing_partition() returned the wrong partition for cache_b");
+
+        pgc_destroy(cache_a, true);
+        pgc_destroy(cache_b, true);
+    }
 
 #ifdef PGC_STRESS_TEST
     unittest_stress_test();

@@ -1,0 +1,225 @@
+# Juniper IPSec Flow Monitor (JUNIPER-IPSEC-FLOW-MON-MIB)
+# Covers SRX firewalls and MX routers with IPSec capability
+# MIB root: 1.3.6.1.4.1.2636.3.52
+
+metrics:
+  # Global scalars
+  - MIB: JUNIPER-IPSEC-FLOW-MON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2636.3.52.1.1.1.0
+      name: jnxIkeNumOfTunnels
+      chart_meta:
+        description: Total number of active IKE Phase 1 tunnels
+        family: 'Network/VPN/IPSec/Phase1/Tunnel/Active'
+        unit: "{tunnel}"
+  - MIB: JUNIPER-IPSEC-FLOW-MON-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2636.3.52.1.2.1.0
+      name: jnxIpSecNumOfTunnels
+      chart_meta:
+        description: Total number of active IPSec Phase 2 tunnels
+        family: 'Network/VPN/IPSec/Phase2/Tunnel/Active'
+        unit: "{tunnel}"
+
+  # IKE / Phase 1 tunnel table
+  - MIB: JUNIPER-IPSEC-FLOW-MON-MIB
+    table:
+      OID: 1.3.6.1.4.1.2636.3.52.1.1.2
+      name: jnxIkeTunnelMonTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.6
+        name: jnxIkeTunMonState
+        chart_meta:
+          description: Current state of the IKE Phase 1 tunnel
+          family: 'Network/VPN/IPSec/Phase1/Tunnel/Status'
+          unit: "{status}"
+        mapping:
+          1: up
+          2: down
+      - OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.20
+        name: jnxIkeTunMonLifeTime
+        chart_meta:
+          description: Remaining lifetime of the IKE Phase 1 tunnel
+          family: 'Network/VPN/IPSec/Phase1/Tunnel/Lifetime'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.21
+        name: jnxIkeTunMonActiveTime
+        chart_meta:
+          description: Time this IKE Phase 1 tunnel has been active
+          family: 'Network/VPN/IPSec/Phase1/Tunnel/ActiveTime'
+          unit: "s"
+        # TimeTicks in hundredths of seconds
+        scale_factor: 0.01
+      - OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.22
+        name: jnxIkeTunMonInOctets
+        chart_meta:
+          description: Number of bytes received on this IKE Phase 1 tunnel
+          family: 'Network/VPN/IPSec/Phase1/Tunnel/Traffic/In'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.23
+        name: jnxIkeTunMonInPkts
+        chart_meta:
+          description: Number of packets received on this IKE Phase 1 tunnel
+          family: 'Network/VPN/IPSec/Phase1/Tunnel/Packet/In'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.24
+        name: jnxIkeTunMonOutOctets
+        chart_meta:
+          description: Number of bytes sent on this IKE Phase 1 tunnel
+          family: 'Network/VPN/IPSec/Phase1/Tunnel/Traffic/Out'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.25
+        name: jnxIkeTunMonOutPkts
+        chart_meta:
+          description: Number of packets sent on this IKE Phase 1 tunnel
+          family: 'Network/VPN/IPSec/Phase1/Tunnel/Packet/Out'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.27
+        name: jnxIkeTunMonDPDDownCount
+        chart_meta:
+          description: Number of DPD (Dead Peer Detection) down events on this tunnel
+          family: 'Network/VPN/IPSec/Phase1/Tunnel/DPD/Down'
+          unit: "{event}/s"
+    metric_tags:
+      - tag: ike_tunnel_index
+        index: 1
+      - tag: _peer_remote_address
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.2
+          name: jnxIkeTunMonRemoteAddr
+          format: ip_address
+      - tag: _peer_local_address
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.4
+          name: jnxIkeTunMonLocalAddr
+          format: ip_address
+      - tag: _remote_identity
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.14
+          name: jnxIkeTunMonRemoteIdent
+      - tag: _gateway_name
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.43
+          name: jnxIkeTunMonRemoteGwName
+
+  # IPSec / Phase 2 tunnel table
+  - MIB: JUNIPER-IPSEC-FLOW-MON-MIB
+    table:
+      OID: 1.3.6.1.4.1.2636.3.52.1.2.2
+      name: jnxIpSecTunnelMonTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.10
+        name: jnxIpSecTunMonOutEncryptedBytes
+        chart_meta:
+          description: Number of encrypted bytes sent on this IPSec Phase 2 tunnel
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Traffic/Out'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.11
+        name: jnxIpSecTunMonOutEncryptedPkts
+        chart_meta:
+          description: Number of encrypted packets sent on this IPSec Phase 2 tunnel
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Packet/Out'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.12
+        name: jnxIpSecTunMonInDecryptedBytes
+        chart_meta:
+          description: Number of decrypted bytes received on this IPSec Phase 2 tunnel
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Traffic/In'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.13
+        name: jnxIpSecTunMonInDecryptedPkts
+        chart_meta:
+          description: Number of decrypted packets received on this IPSec Phase 2 tunnel
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Packet/In'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.18
+        name: jnxIpSecTunMonReplayDropPkts
+        chart_meta:
+          description: Number of packets dropped due to anti-replay check failure
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Drop/Replay'
+          unit: "{drop}/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.20
+        name: jnxIpSecTunMonEspAuthFails
+        chart_meta:
+          description: Number of ESP authentication failures on this tunnel
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Error/AuthFail'
+          unit: "{failure}/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.21
+        name: jnxIpSecTunMonDecryptFails
+        chart_meta:
+          description: Number of decryption failures on this tunnel
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Error/DecryptFail'
+          unit: "{failure}/s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.26
+        name: jnxIpSecTunMonDroppedPkts
+        chart_meta:
+          description: Total number of packets dropped on this IPSec Phase 2 tunnel
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Drop/Total'
+          unit: "{drop}/s"
+    metric_tags:
+      - tag: ipsec_tunnel_index
+        index: 1
+      - tag: _peer_remote_address
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.2
+          name: jnxIpSecTunMonRemoteGwAddr
+          format: ip_address
+      - tag: _peer_local_address
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.5
+          name: jnxIpSecTunMonLocalAddr
+          format: ip_address
+      - tag: _local_proxy_id
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.6
+          name: jnxIpSecTunMonLocalProxyId
+      - tag: _remote_proxy_id
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.7
+          name: jnxIpSecTunMonRemoteProxyId
+
+  # IPSec SA detail table
+  - MIB: JUNIPER-IPSEC-FLOW-MON-MIB
+    table:
+      OID: 1.3.6.1.4.1.2636.3.52.1.2.3
+      name: jnxIpSecSaMonTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.14
+        name: jnxIpSecSaMonState
+        chart_meta:
+          description: Status of this IPSec Security Association
+          family: 'Network/VPN/IPSec/Phase2/SA/Status'
+          unit: "{status}"
+        mapping:
+          0: unknown
+          1: active
+          2: expiring
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.8
+        name: jnxIpSecSaMonLifeTime
+        chart_meta:
+          description: Remaining lifetime of this IPSec Security Association
+          family: 'Network/VPN/IPSec/Phase2/SA/Lifetime'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.9
+        name: jnxIpSecSaMonActiveTime
+        chart_meta:
+          description: Time this IPSec Security Association has been active
+          family: 'Network/VPN/IPSec/Phase2/SA/ActiveTime'
+          unit: "s"
+        # TimeTicks in hundredths of seconds
+        scale_factor: 0.01
+    metric_tags:
+      - tag: sa_index
+        index: 1
+      - tag: _sa_encap_mode
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.6
+          name: jnxIpSecSaMonEncapMode
+      - tag: _encrypt_algo
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.12
+          name: jnxIpSecSaMonEncryptAlgo
+      - tag: _auth_algo
+        symbol:
+          OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.13
+          name: jnxIpSecSaMonAuthAlgo

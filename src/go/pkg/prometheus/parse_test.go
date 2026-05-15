@@ -1345,7 +1345,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var p promTextParser
 
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				t.Run(fmt.Sprintf("parse num %d", i+1), func(t *testing.T) {
 					mfs, err := p.parseToMetricFamilies(test.input)
 					if len(test.want) > 0 {
@@ -1622,7 +1622,7 @@ test_histogram_no_meta_1_duration_seconds_count{label1="value1"} 6
 		t.Run(name, func(t *testing.T) {
 			var p promTextParser
 
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				t.Run(fmt.Sprintf("parse num %d", i+1), func(t *testing.T) {
 					series, err := p.parseToSeries(test.input)
 

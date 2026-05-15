@@ -42,6 +42,7 @@ func Test_defaultConfigs(t *testing.T) {
 
 		var cfg Config
 		require.NoErrorf(t, yaml.Unmarshal(bs, &cfg), "unmarshal '%s'", e.Name())
+		cfg.Name = strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
 
 		_, err = New(cfg, factory)
 		require.NoErrorf(t, err, "create pipeline '%s'", e.Name())

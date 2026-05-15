@@ -30,7 +30,7 @@ type Collector struct {
 
 const warnThrottleInterval = 10 * time.Minute
 
-func (c *Collector) warnOnce(key string, format string, args ...interface{}) {
+func (c *Collector) warnOnce(key string, format string, args ...any) {
 	c.warnMu.Lock()
 	defer c.warnMu.Unlock()
 

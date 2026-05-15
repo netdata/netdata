@@ -466,7 +466,7 @@ func (f *funcTopQueries) detectProfileFields(ctx context.Context, databases []st
 
 	// Sample documents from system.profile to detect available fields
 	for _, dbName := range databases {
-		queryCtx, cancel := context.WithTimeout(ctx, client.timeout)
+		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 
 		collection := client.client.Database(dbName).Collection("system.profile")
 		opts := options.FindOne().SetSort(bson.D{{Key: "$natural", Value: -1}})
@@ -508,8 +508,7 @@ func (f *funcTopQueries) querySystemProfile(ctx context.Context, dbName, sortCol
 		return nil, false, fmt.Errorf("client not initialized")
 	}
 
-	// Set timeout for the query
-	queryCtx, cancel := context.WithTimeout(ctx, client.timeout)
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 	defer cancel()
 
 	// Check if profiling is enabled for this database

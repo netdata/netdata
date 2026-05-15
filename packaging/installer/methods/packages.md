@@ -2,7 +2,7 @@
 
 :::note
 
-Netdata provides pre-built native packages for most DEB- and RPM-based Linux distributions, following our [platform support policy](/docs/netdata-agent/versions-and-platforms.md).
+Netdata provides pre-built native packages for most DEB- and RPM-based Linux distributions, following our [platform support policy](/packaging/PLATFORM_SUPPORT.md).
 
 :::
 

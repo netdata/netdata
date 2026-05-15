@@ -5,26 +5,22 @@
 void nd_log_limits_reset(void) {
     usec_t now_ut = now_monotonic_usec();
 
-    spinlock_lock(&nd_log.std_output.spinlock);
-    spinlock_lock(&nd_log.std_error.spinlock);
-
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
-        spinlock_lock(&nd_log.sources[i].spinlock);
+        spinlock_lock(&nd_log.sources[i].limits.spinlock);
         nd_log.sources[i].limits.prevented = 0;
         nd_log.sources[i].limits.counter = 0;
         nd_log.sources[i].limits.started_monotonic_ut = now_ut;
         nd_log.sources[i].limits.logs_per_period = nd_log.sources[i].limits.logs_per_period_backup;
-        spinlock_unlock(&nd_log.sources[i].spinlock);
+        spinlock_unlock(&nd_log.sources[i].limits.spinlock);
     }
-
-    spinlock_unlock(&nd_log.std_output.spinlock);
-    spinlock_unlock(&nd_log.std_error.spinlock);
 }
 
 void nd_log_limits_unlimited(void) {
     nd_log_limits_reset();
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        spinlock_lock(&nd_log.sources[i].limits.spinlock);
         nd_log.sources[i].limits.logs_per_period = 0;
+        spinlock_unlock(&nd_log.sources[i].limits.spinlock);
     }
 }
 

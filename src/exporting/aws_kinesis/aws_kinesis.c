@@ -211,7 +211,7 @@ void *aws_kinesis_connector_worker(void *instance_p)
         netdata_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
-        return;
+        break;
 #endif
     }
 

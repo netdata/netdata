@@ -13,7 +13,33 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-func TestBuildScalarAutogenRoute(t *testing.T) {
+func TestAutogenRouteBuilderScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"build scalar autogen route": {
+			run: runTestBuildScalarAutogenRoute,
+		},
+		"build histogram bucket autogen route": {
+			run: runTestBuildHistogramBucketAutogenRoute,
+		},
+		"build summary quantile autogen route": {
+			run: runTestBuildSummaryQuantileAutogenRoute,
+		},
+		"build state-set autogen route": {
+			run: runTestBuildStateSetAutogenRoute,
+		},
+		"build measure-set autogen route": {
+			run: runTestBuildMeasureSetAutogenRoute,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func runTestBuildScalarAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -55,6 +81,7 @@ func TestBuildScalarAutogenRoute(t *testing.T) {
 				sortedLabelView(tc.labels),
 				tc.meta,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -68,7 +95,7 @@ func TestBuildScalarAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
+func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -93,25 +120,27 @@ func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
 				tc.metricName,
 				sortedLabelView(tc.labels),
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
 
 			assert.Equal(t, tc.wantID, route.chartID)
 			assert.Equal(t, tc.wantDim, route.dimensionName)
-			assert.Equal(t, histogramBucketLabel, route.dimensionKeyLabel)
+			assert.Equal(t, metrix.HistogramBucketLabel, route.dimensionKeyLabel)
 			assert.Equal(t, program.AlgorithmIncremental, route.algorithm)
 			assert.False(t, route.staticDimension)
 		})
 	}
 }
 
-func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
+func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
 		wantID     string
 		wantDim    string
+		wantUnits  string
 	}{
 		"summary quantile excludes quantile label and keeps absolute algorithm": {
 			metricName: "svc.request_duration_seconds",
@@ -120,8 +149,9 @@ func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 				"method":   "GET",
 				"quantile": "0.99",
 			},
-			wantID:  "svc.request_duration_seconds-instance=db1-method=GET",
-			wantDim: "quantile_0.99",
+			wantID:    "svc.request_duration_seconds-instance=db1-method=GET",
+			wantDim:   "quantile_0.99",
+			wantUnits: "seconds",
 		},
 	}
 
@@ -131,20 +161,22 @@ func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 				tc.metricName,
 				sortedLabelView(tc.labels),
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
 
 			assert.Equal(t, tc.wantID, route.chartID)
 			assert.Equal(t, tc.wantDim, route.dimensionName)
-			assert.Equal(t, summaryQuantileLabel, route.dimensionKeyLabel)
+			assert.Equal(t, tc.wantUnits, route.units)
+			assert.Equal(t, metrix.SummaryQuantileLabel, route.dimensionKeyLabel)
 			assert.Equal(t, program.AlgorithmAbsolute, route.algorithm)
 			assert.False(t, route.staticDimension)
 		})
 	}
 }
 
-func TestBuildStateSetAutogenRoute(t *testing.T) {
+func runTestBuildStateSetAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -171,6 +203,7 @@ func TestBuildStateSetAutogenRoute(t *testing.T) {
 				sortedLabelView(tc.labels),
 				tc.meta,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -185,37 +218,156 @@ func TestBuildStateSetAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestFitsTypeIDBudget(t *testing.T) {
+func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
-		policy  AutogenPolicy
-		chartID string
-		want    bool
+		metricName string
+		labels     map[string]string
+		meta       metrix.SeriesMeta
+		wantOK     bool
+		wantID     string
+		wantDim    string
+		wantAlg    program.Algorithm
+		wantUnits  string
 	}{
-		"empty type id at exact limit passes": {
-			policy:  AutogenPolicy{MaxTypeIDLen: 5},
-			chartID: "abcde",
-			want:    true,
+		"MeasureSet gauge uses synthetic field label and absolute algorithm": {
+			metricName: "service_latency_seconds_value",
+			labels: map[string]string{
+				"instance":                  "db1",
+				metrix.MeasureSetFieldLabel: "value",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindGauge,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantOK:    true,
+			wantID:    "service_latency_seconds-instance=db1",
+			wantDim:   "value",
+			wantAlg:   program.AlgorithmAbsolute,
+			wantUnits: "seconds",
 		},
-		"empty type id over limit fails": {
-			policy:  AutogenPolicy{MaxTypeIDLen: 5},
-			chartID: "abcdef",
-			want:    false,
+		"MeasureSet counter uses synthetic field label and incremental algorithm": {
+			metricName: "svc_requests_total_ok",
+			labels: map[string]string{
+				"instance":                  "db1",
+				metrix.MeasureSetFieldLabel: "ok",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantOK:    true,
+			wantID:    "svc_requests_total-instance=db1",
+			wantDim:   "ok",
+			wantAlg:   program.AlgorithmIncremental,
+			wantUnits: "requests/s",
 		},
-		"type id includes separator in budget": {
-			policy:  AutogenPolicy{TypeID: "collector.job", MaxTypeIDLen: 16},
-			chartID: "abc",
-			want:    false, // len("collector.job")+1+len("abc") == 17 > 16
+		"MeasureSet ignores unrelated matching labels and uses reserved field label": {
+			metricName: "svc_requests_total_ok",
+			labels: map[string]string{
+				"instance":                  "db1",
+				"svc_requests":              "total_ok",
+				metrix.MeasureSetFieldLabel: "ok",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantOK:    true,
+			wantID:    "svc_requests_total-instance=db1-svc_requests=total_ok",
+			wantDim:   "ok",
+			wantAlg:   program.AlgorithmIncremental,
+			wantUnits: "requests/s",
 		},
-		"type id budget overflow fails": {
-			policy:  AutogenPolicy{TypeID: "collector.job", MaxTypeIDLen: 15},
-			chartID: "abc",
-			want:    false,
+		"MeasureSet without reserved field label does not route": {
+			metricName: "svc_requests_total_ok",
+			labels: map[string]string{
+				"instance":     "db1",
+				"svc_requests": "total_ok",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantOK: false,
+		},
+		"MeasureSet with mismatched reserved field label does not route": {
+			metricName: "svc_requests_total_ok",
+			labels: map[string]string{
+				"instance":                  "db1",
+				metrix.MeasureSetFieldLabel: "failed",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantOK: false,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, fitsTypeIDBudget(tc.policy, tc.chartID))
+			route, ok, err := buildMeasureSetAutogenRoute(
+				tc.metricName,
+				sortedLabelView(tc.labels),
+				tc.meta,
+				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
+			)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantOK, ok)
+			if !tc.wantOK {
+				return
+			}
+
+			assert.Equal(t, tc.wantID, route.chartID)
+			assert.Equal(t, tc.wantDim, route.dimensionName)
+			assert.Equal(t, tc.wantAlg, route.algorithm)
+			assert.Equal(t, tc.wantUnits, route.units)
+			assert.Equal(t, metrix.MeasureSetFieldLabel, route.dimensionKeyLabel)
+			assert.False(t, route.staticDimension)
+		})
+	}
+}
+
+func TestFitsTypeIDBudget(t *testing.T) {
+	tests := map[string]struct {
+		maxLen       int
+		typeIDPrefix string
+		chartID      string
+		want         bool
+	}{
+		"empty type id at exact limit passes": {
+			maxLen:  5,
+			chartID: "abcde",
+			want:    true,
+		},
+		"empty type id over limit fails": {
+			maxLen:  5,
+			chartID: "abcdef",
+			want:    false,
+		},
+		"type id includes separator in budget": {
+			maxLen:       16,
+			typeIDPrefix: "collector.job",
+			chartID:      "abc",
+			want:         false, // len("collector.job")+1+len("abc") == 17 > 16
+		},
+		"type id budget overflow fails": {
+			maxLen:       15,
+			typeIDPrefix: "collector.job",
+			chartID:      "abc",
+			want:         false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, fitsTypeIDBudget(tc.maxLen, tc.typeIDPrefix, tc.chartID))
 		})
 	}
 }
@@ -229,4 +381,47 @@ func sortedLabelView(labels map[string]string) metrix.LabelView {
 		return items[i].Key < items[j].Key
 	})
 	return labelSliceView{items: items}
+}
+
+func TestBuildScalarAutogenRouteSanitizesDotLabelValues(t *testing.T) {
+	route, ok, err := buildScalarAutogenRoute(
+		"svc.requests_total",
+		sortedLabelView(map[string]string{
+			"instance": "db1.eu",
+			"job":      "mysql.prod",
+		}),
+		metrix.SeriesMeta{Kind: metrix.MetricKindCounter},
+		AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+		"",
+	)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "svc.requests_total-instance=db1_eu-job=mysql_prod", route.chartID)
+}
+
+func TestBuildScalarAutogenRouteSanitizesLegacyLabelChars(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "space", value: "a b", want: "a_b"},
+		{name: "backslash", value: "a\\b", want: "a_b"},
+		{name: "apostrophe", value: "a'b", want: "ab"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			route, ok, err := buildScalarAutogenRoute(
+				"svc.requests_total",
+				sortedLabelView(map[string]string{"instance": tc.value}),
+				metrix.SeriesMeta{Kind: metrix.MetricKindCounter},
+				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
+			)
+			require.NoError(t, err)
+			require.True(t, ok)
+			assert.Equal(t, "svc.requests_total-instance="+tc.want, route.chartID)
+		})
+	}
 }

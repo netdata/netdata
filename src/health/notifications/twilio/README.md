@@ -47,8 +47,9 @@ The following options can be defined for this notification
 | TWILIO_ACCOUNT_SID | set `TWILIO_ACCOUNT_SID`  to your account SID. |  | yes |
 | TWILIO_ACCOUNT_TOKEN | Set `TWILIO_ACCOUNT_TOKEN` to your account token. |  | yes |
 | TWILIO_NUMBER | Set `TWILIO_NUMBER` to your account's number. |  | yes |
-| DEFAULT_RECIPIENT_TWILIO | Set DEFAULT_RECIPIENT_TWILIO to the number you want the alert notifications to be sent to. You can define multiple numbers like this: +15555555555 +17777777777. |  | yes |
+| [DEFAULT_RECIPIENT_TWILIO](#option-default-recipient-twilio) | Set DEFAULT_RECIPIENT_TWILIO to the number you want the alert notifications to be sent to. You can define multiple numbers like this: +15555555555 +17777777777. |  | yes |
 
+<a id="option-default-recipient-twilio"></a>
 ##### DEFAULT_RECIPIENT_TWILIO
 
 You can then have different recipients per role, by editing DEFAULT_RECIPIENT_TWILIO with the recipient's number you want, in the following entries at the bottom of the same file:

@@ -34,15 +34,15 @@ type Config struct {
 }
 
 // Command represents a JSON command sent to the helper.
-type Command map[string]interface{}
+type Command map[string]any
 
 // Response represents a generic helper response.
 type Response struct {
-	Status      string                 `json:"status"`
-	Message     string                 `json:"message,omitempty"`
-	Details     string                 `json:"details,omitempty"`
-	Recoverable bool                   `json:"recoverable,omitempty"`
-	Data        map[string]interface{} `json:"data,omitempty"`
+	Status      string         `json:"status"`
+	Message     string         `json:"message,omitempty"`
+	Details     string         `json:"details,omitempty"`
+	Recoverable bool           `json:"recoverable,omitempty"`
+	Data        map[string]any `json:"data,omitempty"`
 }
 
 // Option configures a Client.

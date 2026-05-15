@@ -241,3 +241,46 @@ function(precompile_python dir component)
     COMPONENT ${component}
   )
 endfunction()
+
+# Load the URL and hash for a vendored component
+function(get_vendored_url_and_hash component prefix)
+  set(url_file "${CMAKE_SOURCE_DIR}/packaging/vendor/${component}.url")
+  set(hash_file "${CMAKE_SOURCE_DIR}/packaging/vendor/${component}.sha256")
+
+  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.29)
+    if(NOT IS_READABLE ${url_file})
+      message(FATAL_ERROR "Unable to read data from ${url_file}")
+    endif()
+  else()
+    if(NOT EXISTS ${url_file})
+      message(FATAL_ERROR "Unable to read data from ${url_file}")
+    endif()
+  endif()
+
+  file(READ "${url_file}" "url")
+  string(STRIP "${url}" "url")
+
+  if("${url}" STREQUAL "")
+    message(FATAL_ERROR "${url_file} is empty")
+  endif()
+
+  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.29)
+    if(NOT IS_READABLE ${hash_file})
+      message(FATAL_ERROR "Unable to read data from ${hash_file}")
+    endif()
+  else()
+    if(NOT EXISTS ${hash_file})
+      message(FATAL_ERROR "Unable to read data from ${hash_file}")
+    endif()
+  endif()
+
+  file(READ "${hash_file}" "hash")
+  string(STRIP "${hash}" "hash")
+
+  if("${hash}" STREQUAL "")
+    message(FATAL_ERROR "${hash_file} is empty")
+  endif()
+
+  set("${prefix}_URL" "${url}" PARENT_SCOPE)
+  set("${prefix}_HASH" "${hash}" PARENT_SCOPE)
+endfunction()

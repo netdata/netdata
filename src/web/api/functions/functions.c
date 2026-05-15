@@ -15,7 +15,19 @@ void global_functions_add(void) {
         RRDFUNCTIONS_STREAMING_HELP,
         "top",
         HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-        function_streaming);
+        function_netdata_streaming);
+
+    rrd_function_add_inline(
+        localhost,
+        NULL,
+        "topology:streaming",
+        10,
+        RRDFUNCTIONS_PRIORITY_DEFAULT + 1,
+        RRDFUNCTIONS_VERSION_DEFAULT,
+        RRDFUNCTIONS_STREAMING_TOPOLOGY_HELP,
+        "top",
+        HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+        function_streaming_topology);
 
     rrd_function_add_inline(
         localhost,

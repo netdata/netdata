@@ -14,7 +14,22 @@ typedef struct alarm_log {
     RW_SPINLOCK spinlock;
 } ALARM_LOG;
 
+struct health_alert_status_counts {
+    uint32_t clear;
+    uint32_t warning;
+    uint32_t critical;
+    uint32_t undefined;
+    uint32_t uninitialized;
+};
+
 typedef struct health {
+    // Recomputed on each host health evaluation and read by alerts APIs as a host-level prefilter.
+    struct {
+        uint64_t generation;                         // seqlock-style generation for consistent readers
+        struct health_alert_status_counts counts;
+        uint8_t valid;                               // 1 when snapshot is fully published
+    } alert_status_snapshot;
+
     time_t delay_up_to;                             // a timestamp to delay alarms processing up to
     STRING *default_exec;                           // the full path of the alarms notifications program
     STRING *default_recipient;                      // the default recipient for all alarms

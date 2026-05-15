@@ -567,3 +567,147 @@ modules:
                 - name: min
                 - name: avg
                 - name: max
+  - meta:
+      plugin_name: apps.plugin
+      module_name: services
+      monitored_instance:
+        name: Windows Services
+        link: ""
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - services
+        - processes
+        - os
+        - host monitoring
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors resource utilization grouped by Windows Service."
+        method_description: "It auto-discovers running Windows services via the Service Control Manager and groups each service's process tree to aggregate CPU, memory, I/O, and other metrics per service. Processes not belonging to any service are grouped under 'not-services'."
+      supported_platforms:
+        include:
+          - windows
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "All running Windows services are automatically discovered. No configuration is needed."
+        limits:
+          description: ""
+        performance_impact:
+          description: "No additional SCM query overhead. The service list is already queried by apps.plugin for process naming. Per-iteration work involves walking parent chains to assign service names."
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: "Service charts are enabled by default. Use the `without-services` (or `no-services`) command line option to disable them."
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability:
+        - windows
+      scopes:
+        - name: windows service
+          description: These metrics refer to the Windows Service.
+          labels:
+            - name: service
+              description: The display name of the Windows service.
+          metrics:
+            - name: service.cpu_utilization
+              description: Windows Service CPU utilization (100% = 1 core)
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: user
+                - name: system
+            - name: service.mem_usage
+              description: Windows Service memory RSS usage
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: rss
+            - name: service.vmem_usage
+              description: Windows Service virtual memory size
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: vmem
+            - name: service.mem_page_faults
+              description: Windows Service memory page faults
+              unit: pgfaults/s
+              chart_type: stacked
+              dimensions:
+                - name: minor
+            - name: service.swap_usage
+              description: Windows Service swap usage
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: swap
+            - name: service.disk_logical_io
+              description: Windows Service disk logical IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: service.fds_open
+              description: Windows Service open handles
+              unit: fds
+              chart_type: stacked
+              dimensions:
+                - name: handles
+            - name: service.processes
+              description: Windows Service processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: processes
+            - name: service.threads
+              description: Windows Service threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: service.uptime
+              description: Windows Service uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: service.uptime_summary
+              description: Windows Service uptime summary
+              unit: seconds
+              chart_type: area
+              dimensions:
+                - name: min
+                - name: avg
+                - name: max

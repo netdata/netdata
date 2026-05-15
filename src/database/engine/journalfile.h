@@ -23,6 +23,12 @@ typedef enum __attribute__ ((__packed__)) {
     JOURNALFILE_FLAG_METRIC_CRC_CHECK      = (1 << 3),
 } JOURNALFILE_FLAGS;
 
+typedef enum __attribute__ ((__packed__)) {
+    JOURNALFILE_V2_ACCESS_AUTO = 0,
+    JOURNALFILE_V2_ACCESS_RANDOM,
+    JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY,
+} JOURNALFILE_V2_ACCESS_HINT;
+
 struct rrdengine_journalfile {
     SPINLOCK data_spinlock;
     struct {
@@ -256,7 +262,15 @@ struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafi
 int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, struct wal *wal);
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_unlink(struct rrdengine_journalfile *journalfile);
-int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
+#define JOURNALFILE_DELETED_V1  (1u << 0) // .njf was deleted
+#define JOURNALFILE_DELETED_V2  (1u << 1) // .njfv2 was deleted
+#define JOURNALFILE_DELETED_ALL (JOURNALFILE_DELETED_V1 | JOURNALFILE_DELETED_V2)
+/*
+ * Destroys the journal file and returns a JOURNALFILE_DELETED_* bitmask
+ * indicating which on-disk journal files were deleted. This is not a
+ * 0 / -errno style status code.
+ */
+uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile);
@@ -271,6 +285,7 @@ bool journalfile_v2_data_available(struct rrdengine_journalfile *journalfile);
 size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile);
 void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size);
 struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s);
+struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint);
 void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile);
 void journalfile_v2_data_unmount_cleanup(time_t now_s);
 

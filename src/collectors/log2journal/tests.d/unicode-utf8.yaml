@@ -1,0 +1,19 @@
+---
+# Unicode and UTF-8 encoding test
+# Tests multibyte characters, special encoding, non-ASCII patterns
+
+pattern: "(?P<data>.*)"
+
+inject:
+  - key: UNICODE_TEST
+    value: "Test with émojis 🎉 and üñíçödé"
+  - key: UTF8_CHARS
+    value: "Japanese: こんにちは, Arabic: مرحبا, Russian: Привет"
+  
+filename:
+  key: FILENAME
+  
+rewrite:
+  - key: MESSAGE
+    value: '${data} - UTF8_VALIDATED'
+    inject: yes

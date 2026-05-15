@@ -5,6 +5,7 @@ package pihole
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -61,9 +62,7 @@ func (c *Collector) collectMetrics(mx map[string]int64) error {
 		return fmt.Errorf("unexpected response from %s", req.URL)
 	}
 
-	for k, v := range stm.ToMap(resp) {
-		mx[k] = v
-	}
+	maps.Copy(mx, stm.ToMap(resp))
 
 	// 0 if unknown
 	if resp.Gravity.LastUpdate != 0 {

@@ -386,6 +386,11 @@ static inline bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t nam
 
     dictionary_index_lock_wrlock(dict);
 
+    if(unlikely(is_dictionary_destroyed(dict))) {
+        dictionary_index_wrlock_unlock(dict);
+        return false;
+    }
+
     int ret;
     DICTIONARY_ITEM *item = hashtable_get_unsafe(dict, name, name_len);
     if(unlikely(!item)) {
@@ -440,6 +445,14 @@ static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONA
 
     dictionary_index_lock_wrlock(dict);
 
+    // Re-check under the index lock. This synchronizes with
+    // dictionary_destroy(), which sets the destroyed flag and then takes
+    // this lock before tearing down the index.
+    if(unlikely(is_dictionary_destroyed(dict))) {
+        dictionary_index_wrlock_unlock(dict);
+        return NULL;
+    }
+
     bool added_or_updated = false;
     size_t spins = 0;
     DICTIONARY_ITEM *item = NULL;
@@ -469,6 +482,7 @@ static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONA
 
             if(item_check_and_acquire_advanced(dict, item, true) != RC_ITEM_OK) {
                 spins++;
+                item = NULL;
                 continue;
             }
 
@@ -540,6 +554,14 @@ static inline DICTIONARY_ITEM *dict_item_find_and_acquire(DICTIONARY *dict, cons
     netdata_log_debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
 
     dictionary_index_lock_rdlock(dict);
+
+    // Re-check under the index lock. This synchronizes with
+    // dictionary_destroy(), which sets the destroyed flag and then takes
+    // this lock before tearing down the index.
+    if(unlikely(is_dictionary_destroyed(dict))) {
+        dictionary_index_rdlock_unlock(dict);
+        return NULL;
+    }
 
     DICTIONARY_ITEM *item = hashtable_get_unsafe(dict, name, name_len);
     if(unlikely(item && !item_check_and_acquire(dict, item))) {

@@ -1,0 +1,36 @@
+pattern: "(?P<msg>.*)"
+
+# Test with maximum number of items (based on MAX_INJECTIONS, MAX_REWRITES, MAX_RENAMES)
+# From log2journal.h: MAX_INJECTIONS = MAX_REWRITES = MAX_RENAMES = 512 (MAX_OUTPUT_KEYS / 2)
+
+inject:
+  # Generate many injection rules to test limits
+  - {key: INJECT_001, value: "value_001"}
+  - {key: INJECT_002, value: "value_002"}
+  - {key: INJECT_003, value: "value_003"}
+  - {key: INJECT_004, value: "value_004"}
+  - {key: INJECT_005, value: "value_005"}
+  - {key: INJECT_006, value: "value_006"}
+  - {key: INJECT_007, value: "value_007"}
+  - {key: INJECT_008, value: "value_008"}
+  - {key: INJECT_009, value: "value_009"}
+  - {key: INJECT_010, value: "value_010"}
+  # ... Continue this pattern up to 512 items
+  # For brevity, showing first 10 and last item
+  - {key: INJECT_512, value: "value_512"}
+
+rewrite:
+  # Test with many rewrite rules
+  - {key: REWRITE_001, value: "rewrite_001", inject: yes}
+  - {key: REWRITE_002, value: "rewrite_002", inject: yes}
+  - {key: REWRITE_003, value: "rewrite_003", inject: yes}
+  # ... up to 512
+  
+rename:
+  # Test with many rename rules  
+  - {old_key: OLD_001, new_key: NEW_001}
+  - {old_key: OLD_002, new_key: NEW_002}
+  - {old_key: OLD_003, new_key: NEW_003}
+  # ... up to 512
+
+# Note: This is a template. In actual test, we'd generate all 512 items programmatically

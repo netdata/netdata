@@ -16,13 +16,13 @@ struct bearer_token_request {
 static bool bearer_parse_json_payload(json_object *jobj, void *data, BUFFER *error) {
     const char *path = "";
     struct bearer_token_request *rq = data;
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", rq->claim_id, error, true);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "machine_guid", rq->machine_guid, error, true);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "node_id", rq->node_id, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "user_role", http_user_role2id, rq->user_role, error, true);
-    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "access", http_access2id_one, rq->access, error, true);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "cloud_account_id", rq->cloud_account_id, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "client_name", rq->client_name, error, true);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", rq->claim_id, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "machine_guid", rq->machine_guid, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "node_id", rq->node_id, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "user_role", http_user_role2id, rq->user_role, error, JSONC_REQUIRED);
+    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "access", http_access2id_one, rq->access, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "cloud_account_id", rq->cloud_account_id, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "client_name", rq->client_name, error, JSONC_REQUIRED);
     return true;
 }
 

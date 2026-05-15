@@ -10,7 +10,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEnforceLifecycleCaps_DimensionCapEvictsLRU(t *testing.T) {
+func TestPlannerLifecycleScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"enforce lifecycle caps dimension cap evicts lru": {
+			run: runTestEnforceLifecycleCapsDimensionCapEvictsLRU,
+		},
+		"collect expiry removals dimension and chart expiry": {
+			run: runTestCollectExpiryRemovalsDimensionAndChartExpiry,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func runTestEnforceLifecycleCapsDimensionCapEvictsLRU(t *testing.T) {
 	tests := map[string]struct {
 		currentSeq uint64
 	}{
@@ -83,7 +100,7 @@ func TestEnforceLifecycleCaps_DimensionCapEvictsLRU(t *testing.T) {
 	}
 }
 
-func TestCollectExpiryRemovals_DimensionAndChartExpiry(t *testing.T) {
+func runTestCollectExpiryRemovalsDimensionAndChartExpiry(t *testing.T) {
 	tests := map[string]struct {
 		currentSeq uint64
 	}{

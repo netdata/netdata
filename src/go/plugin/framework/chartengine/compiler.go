@@ -5,14 +5,21 @@ package chartengine
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
-// Compile converts a validated chart template spec into immutable chartengine IR.
+// Compile converts a decoded/default-applied chart template spec into immutable
+// chartengine IR.
+//
+// Callers should prefer charttpl.DecodeYAML, which applies chart_defaults
+// inheritance before validation. Compile validates the provided spec but does
+// not apply charttpl defaults or mutate the input.
 func Compile(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("chartengine: nil template spec")
@@ -158,7 +165,7 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 			Units:     strings.TrimSpace(chart.Units),
 			Algorithm: algorithm,
 			Type:      chartType,
-			Priority:  chart.Priority,
+			Priority:  effectiveChartPriority(chart.Priority),
 		},
 		Identity: identity,
 		Labels: program.LabelPolicy{
@@ -380,7 +387,7 @@ func metricKindsFromNames(names []string) []string {
 func supportsRuntimeInferredDimension(meta metrixselector.Meta) bool {
 	for _, key := range meta.ConstrainedLabelKeys {
 		switch key {
-		case histogramBucketLabel, summaryQuantileLabel:
+		case metrix.HistogramBucketLabel, metrix.SummaryQuantileLabel:
 			return true
 		}
 	}
@@ -432,7 +439,7 @@ func pathIndexes(path []int) string {
 		if i > 0 {
 			b.WriteByte('.')
 		}
-		b.WriteString(fmt.Sprintf("%d", idx))
+		b.WriteString(strconv.Itoa(idx))
 	}
 	return b.String()
 }
@@ -534,4 +541,11 @@ func (v selectorLabelView) CloneMap() map[string]string {
 		return true
 	})
 	return out
+}
+
+func effectiveChartPriority(priority int) int {
+	if priority > 0 {
+		return priority
+	}
+	return Priority
 }

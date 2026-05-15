@@ -1,0 +1,1 @@
+${TESTED_LOG2JOURNAL_BIN} -f tests.d/inject-append.yaml --inject 'CLINEWKEY1=value1' --inject 'CLINEWKEY2=value2'

@@ -1,0 +1,24 @@
+pattern: |
+  (?x)
+  ^(?P<NGINX_TIME_LOCAL>\d{4}/\d{2}/\d{2} \s+ \d{2}:\d{2}:\d{2}) \s+
+  \[(?P<NGINX_LOG_LEVEL>\w+)\] \s+
+  (?P<NGINX_PID>\d+)\#(?P<NGINX_TID>\d+): \s+
+  \*(?P<NGINX_CONNECTION_ID>\d+) \s+
+  (?P<MESSAGE>.*)
+
+prefix: NGINX_
+
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: nginx-error
+
+rewrite:
+  - key: PRIORITY
+    match: 'error'
+    value: 3
+  - key: PRIORITY  
+    match: 'warn'
+    value: 4
+  - key: PRIORITY
+    match: '.*'
+    value: 6

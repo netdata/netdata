@@ -58,8 +58,7 @@ func (d *kubeDiscovery) run(ctx context.Context, in chan<- resource) {
 		go func(dd discoverer) { defer wg.Done(); dd.run(ctx, updates) }(dd)
 	}
 
-	wg.Add(1)
-	go func() { defer wg.Done(); d.runDiscover(ctx, updates, in) }()
+	wg.Go(func() { d.runDiscover(ctx, updates, in) })
 
 	close(d.readyCh)
 	wg.Wait()

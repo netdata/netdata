@@ -61,8 +61,9 @@ static BUFFER *argv_to_windows(const char **argv) {
     BUFFER *wb = buffer_create(0, NULL);
 
     // argv[0] is the path
-    char b[strlen(argv[0]) * 2 + FILENAME_MAX];
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, sizeof(b));
+    size_t b_size = strlen(argv[0]) * 2 + FILENAME_MAX;
+    CLEAN_CHAR_P *b = mallocz(b_size);
+    cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, b_size);
 
     for(size_t i = 0; argv[i] ;i++) {
         const char *s = (i == 0) ? b : argv[i];
@@ -147,6 +148,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
+        return NULL;
+
+    if(!argv || !argv[0] || !*argv[0])
         return NULL;
 
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 }, pipe_stderr[2] = { -1, -1 };

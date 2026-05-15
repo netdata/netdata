@@ -10,7 +10,7 @@ unsigned int system_hz = 100;
 void os_get_system_HZ(void) {
     long ticks;
 
-    if ((ticks = sysconf(_SC_CLK_TCK)) == -1) {
+    if ((ticks = sysconf(_SC_CLK_TCK)) <= 0) {
         netdata_log_error("Cannot get system clock ticks");
         ticks = 100;
     }
@@ -36,4 +36,3 @@ const char *os_type = "macos";
 #if defined(OS_WINDOWS)
 const char *os_type = "windows";
 #endif
-

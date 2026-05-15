@@ -1,0 +1,1 @@
+[{"fe_port_id":"ETH1","appliance_id":"A1","node_id":"N1","bytes_rx_ps":125000000.0,"bytes_tx_ps":62500000.0,"pkt_rx_ps":100000.0,"pkt_tx_ps":50000.0,"pkt_rx_crc_error_ps":0.5,"pkt_rx_no_buffer_error_ps":0.0,"pkt_tx_error_ps":0.0}]

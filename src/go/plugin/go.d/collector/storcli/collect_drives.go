@@ -224,11 +224,11 @@ func getDriveAttrs(driveDetailedInfo map[string]json.RawMessage, id string) (*dr
 
 func getTemperature(temp string) string {
 	// ' 28C (82.40 F)' (drive) or '33C' (bbu)
-	i := strings.IndexByte(temp, 'C')
-	if i == -1 {
+	before, _, ok := strings.Cut(temp, "C")
+	if !ok {
 		return ""
 	}
-	return strings.TrimSpace(temp[:i])
+	return strings.TrimSpace(before)
 }
 
 func parseInt(s string) (int64, bool) {

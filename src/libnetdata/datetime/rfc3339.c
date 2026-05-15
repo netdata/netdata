@@ -34,18 +34,24 @@ static inline size_t print_2digit(char *buffer, size_t size, int value) {
 }
 
 static inline size_t print_fraction(char *buffer, size_t size, usec_t fraction, size_t digits) {
-    if (!buffer || size < digits) return 0;
+    if (!buffer) return 0;
 
     // Validate and cap the number of digits
     digits = digits < 1 ? 1 : (digits > 9 ? 9 : digits);
+    if (size < digits) return 0;
 
-    // Calculate divisor to get correct precision
-    usec_t divisor = 1;
-    for (size_t i = 0; i < 6 - digits; i++)
-        divisor *= 10;
+    // Scale microseconds to the requested precision
+    if (digits < 6) {
+        usec_t divisor = 1;
+        for (size_t i = digits; i < 6; i++)
+            divisor *= 10;
 
-    // Calculate the fraction to print
-    fraction = fraction / divisor;
+        fraction /= divisor;
+    }
+    else if (digits > 6) {
+        for (size_t i = 6; i < digits; i++)
+            fraction *= 10;
+    }
 
     // Ensure fraction won't exceed the requested number of digits
     usec_t max_value = 1;

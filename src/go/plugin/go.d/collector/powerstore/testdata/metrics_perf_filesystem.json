@@ -1,0 +1,1 @@
+[{"file_system_id":"FS1","read_iops":100.0,"write_iops":50.0,"total_iops":150.0,"read_bandwidth":10485760,"write_bandwidth":5242880,"total_bandwidth":15728640,"avg_read_latency":400.0,"avg_write_latency":500.0,"avg_latency":440.0}]

@@ -17,13 +17,17 @@ struct ml_dimension_t {
     SPINLOCK slock;
     uint32_t suppression_window_counter;
     uint32_t suppression_anomaly_counter;
+    uint32_t reset_generation;
     bool training_in_progress;
+    bool has_received_downstream_model;
+    bool create_new_model_queued;
+    size_t cns_head;
 
     std::vector<calculated_number_t> cns;
 
     std::vector<ml_kmeans_inlined_t> km_contexts;
     ml_kmeans_t kmeans;
-    std::vector<DSample> feature;
+    DSample feature;
 };
 
 bool

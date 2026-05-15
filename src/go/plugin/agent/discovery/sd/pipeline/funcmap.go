@@ -3,6 +3,7 @@
 package pipeline
 
 import (
+	"maps"
 	"regexp"
 	"strconv"
 	"text/template"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/bmatcuk/doublestar/v4"
+	"gopkg.in/yaml.v2"
 )
 
 func newFuncMap() template.FuncMap {
@@ -25,11 +27,13 @@ func newFuncMap() template.FuncMap {
 			v, _ := strconv.Atoi(port)
 			return prometheusPortAllocations[v]
 		},
+		"toYaml": func(v any) (string, error) {
+			bs, err := yaml.Marshal(v)
+			return string(bs), err
+		},
 	}
 
-	for name, fn := range extra {
-		fm[name] = fn
-	}
+	maps.Copy(fm, extra)
 
 	return fm
 }

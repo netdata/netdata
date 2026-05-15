@@ -104,7 +104,7 @@ func TestPrometheusGzip(t *testing.T) {
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
 	prom := New(http.DefaultClient, req)
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		res, err := prom.ScrapeSeries()
 		assert.NoError(t, err)
 		verifyTestData(t, res)
@@ -116,7 +116,7 @@ func TestPrometheusReadFromFile(t *testing.T) {
 
 	prom := NewWithSelector(http.DefaultClient, req, nil)
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		res, err := prom.ScrapeSeries()
 		assert.NoError(t, err)
 		verifyTestData(t, res)
@@ -124,7 +124,7 @@ func TestPrometheusReadFromFile(t *testing.T) {
 
 	prom = New(http.DefaultClient, req)
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		res, err := prom.ScrapeSeries()
 		assert.NoError(t, err)
 		verifyTestData(t, res)

@@ -1,0 +1,13 @@
+CIRCULAR_A=A references 
+CIRCULAR_B=B references A references 
+COMPLEX_SUBSTITUTION= performed  on /file at 
+DEEP_4=Final: 
+DYNAMIC_KEY_TEST=Dynamic key based on action: 
+EMPTY_TEST=Value: '' (should be empty)
+RESOURCE=/file
+SELF_REF=Self: Self: 
+SPECIAL_VARS=User: , Action: , Resource: /file
+UNDEFINED_TEST=Before  After
+USERNAME=admin
+USER_ACTION=delete
+

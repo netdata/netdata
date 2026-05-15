@@ -9,6 +9,13 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
+#define CLAIM_RESPONSE_SIZE_LIMIT (10 * 1024 * 1024)
+
+struct claim_response_buffer {
+    BUFFER *wb;
+    bool too_large;
+};
+
 static bool check_and_generate_certificates() {
     FILE *fp;
     EVP_PKEY *pkey = NULL;
@@ -76,10 +83,20 @@ static bool check_and_generate_certificates() {
 }
 
 static size_t response_write_callback(void *ptr, size_t size, size_t nmemb, void *stream) {
-    BUFFER *wb = stream;
+    struct claim_response_buffer *response = stream;
+
+    if (unlikely(nmemb && size > SIZE_MAX / nmemb)) {
+        response->too_large = true;
+        return 0;
+    }
     size_t real_size = size * nmemb;
 
-    buffer_memcat(wb, ptr, real_size);
+    if (unlikely(real_size > CLAIM_RESPONSE_SIZE_LIMIT - buffer_strlen(response->wb))) {
+        response->too_large = true;
+        return 0;
+    }
+
+    buffer_memcat(response->wb, ptr, real_size);
 
     return real_size;
 }
@@ -89,7 +106,7 @@ static const char *curl_add_json_room(BUFFER *wb, const char *start, const char 
     size_t len = end - start;
 
     // copy the item to an new buffer and terminate it
-    char buf[len + 1];
+    char *buf = mallocz(len + 1);
     memcpy(buf, start, len);
     buf[len] = '\0';
 
@@ -97,6 +114,8 @@ static const char *curl_add_json_room(BUFFER *wb, const char *start, const char 
     const char *trimmed = trim(buf); // remove leading and trailing spaces
     if(trimmed)
         buffer_json_add_array_item_string(wb, trimmed);
+
+    freez(buf);
 
     if (last_item)
         return NULL;
@@ -152,11 +171,24 @@ static int debug_callback(CURL *handle, curl_infotype type, char *data, size_t s
     return 0;
 }
 
+static bool cleanup_curl_request_failure(CURL *curl, struct curl_slist *headers, bool *can_retry, CURLcode res,
+                                         const char *option) {
+    claim_agent_failure_reason_set("Cannot configure request (%s failed: %s)", option, curl_easy_strerror(res));
+
+    curl_easy_cleanup(curl);
+    if(headers)
+        curl_slist_free_all(headers);
+
+    *can_retry = false;
+    return false;
+}
+
 static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, bool insecure, bool *can_retry) {
     CURL *curl;
     CURLcode res;
     char target_url[2048];
     char public_key[2048] = "";
+    size_t public_key_bytes_read = 0;
     FILE *fp;
     struct curl_slist *headers = NULL;
 
@@ -173,12 +205,13 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     // Read the public key
     CLEAN_CHAR_P *public_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "public.pem");
     fp = fopen(public_key_file, "r");
-    if (!fp || fread(public_key, 1, sizeof(public_key), fp) == 0) {
+    if (!fp || (public_key_bytes_read = fread(public_key, 1, sizeof(public_key) - 1, fp)) == 0) {
         claim_agent_failure_reason_set("cannot read public key file '%s'", public_key_file);
         if (fp) fclose(fp);
         *can_retry = false;
         return false;
     }
+    public_key[public_key_bytes_read] = '\0';
     fclose(fp);
 
     // check if we have trusted.pem
@@ -224,35 +257,55 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
         return false;
     }
 
+#define CURL_SETOPT_OR_RETURN(option, value)                                                       \
+    do {                                                                                           \
+        res = curl_easy_setopt(curl, option, value);                                               \
+        if(unlikely(res != CURLE_OK))                                                              \
+            return cleanup_curl_request_failure(curl, headers, can_retry, res, #option);          \
+    } while(0)
+
     // curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, debug_callback);
+    CURL_SETOPT_OR_RETURN(CURLOPT_DEBUGFUNCTION, debug_callback);
 
     // we will receive the response in this
     CLEAN_BUFFER *response = buffer_create(0, NULL);
+    struct claim_response_buffer response_buffer = {
+        .wb = response,
+        .too_large = false,
+    };
 
     // configure the request
-    headers = curl_slist_append(headers, "Content-Type: application/json");
-    curl_easy_setopt(curl, CURLOPT_URL, target_url);
-    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, buffer_tostring(wb));
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, response_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, response);
+    struct curl_slist *headers_with_content_type = curl_slist_append(headers, "Content-Type: application/json");
+    if(unlikely(!headers_with_content_type)) {
+        claim_agent_failure_reason_set("Cannot append Content-Type header to the claim request");
+        curl_easy_cleanup(curl);
+        *can_retry = false;
+        return false;
+    }
+    headers = headers_with_content_type;
+
+    CURL_SETOPT_OR_RETURN(CURLOPT_URL, target_url);
+    CURL_SETOPT_OR_RETURN(CURLOPT_CUSTOMREQUEST, "PUT");
+    CURL_SETOPT_OR_RETURN(CURLOPT_POSTFIELDS, buffer_tostring(wb));
+    CURL_SETOPT_OR_RETURN(CURLOPT_HTTPHEADER, headers);
+    CURL_SETOPT_OR_RETURN(CURLOPT_WRITEFUNCTION, response_write_callback);
+    CURL_SETOPT_OR_RETURN(CURLOPT_WRITEDATA, &response_buffer);
+    CURL_SETOPT_OR_RETURN(CURLOPT_MAXFILESIZE_LARGE, (curl_off_t)CLAIM_RESPONSE_SIZE_LIMIT);
 
     if(trusted_key_file)
-        curl_easy_setopt(curl, CURLOPT_CAINFO, trusted_key_file);
+        CURL_SETOPT_OR_RETURN(CURLOPT_CAINFO, trusted_key_file);
 
     // Proxy configuration
     if (proxy) {
         if (!*proxy || strcmp(proxy, "none") == 0) {
             // disable proxy configuration in libcurl
-            curl_easy_setopt(curl, CURLOPT_PROXY, "");
+            CURL_SETOPT_OR_RETURN(CURLOPT_PROXY, "");
             proxy = "none";
         }
 
         else if (strcmp(proxy, "env") != 0) {
             // set the custom proxy for libcurl
-            curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
+            CURL_SETOPT_OR_RETURN(CURLOPT_PROXY, proxy);
         }
 
         else {
@@ -263,30 +316,46 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     // Insecure option
     if (insecure) {
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        CURL_SETOPT_OR_RETURN(CURLOPT_SSL_VERIFYPEER, 0L);
+        CURL_SETOPT_OR_RETURN(CURLOPT_SSL_VERIFYHOST, 0L);
     }
 
     // Set timeout options
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    CURL_SETOPT_OR_RETURN(CURLOPT_TIMEOUT, 10L);
+    CURL_SETOPT_OR_RETURN(CURLOPT_CONNECTTIMEOUT, 5L);
+
+#undef CURL_SETOPT_OR_RETURN
 
     // execute the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        claim_agent_failure_reason_set("Request failed with error: %s\n"
-                                       "proxy: '%s',\n"
-                                       "insecure: %s,\n"
-                                       "public key file: '%s',\n"
-                                       "trusted key file: '%s'",
-                                       curl_easy_strerror(res),
-                                       proxy,
-                                       insecure ? "true" : "false",
-                                       public_key_file ? public_key_file : "none",
-                                       trusted_key_file ? trusted_key_file : "none");
+        bool response_too_large = (res == CURLE_FILESIZE_EXCEEDED || response_buffer.too_large);
+
+        if (response_too_large)
+            claim_agent_failure_reason_set("Request failed: response body exceeded %zu bytes\n"
+                                           "proxy: '%s',\n"
+                                           "insecure: %s,\n"
+                                           "public key file: '%s',\n"
+                                           "trusted key file: '%s'",
+                                           (size_t)CLAIM_RESPONSE_SIZE_LIMIT,
+                                           proxy,
+                                           insecure ? "true" : "false",
+                                           public_key_file ? public_key_file : "none",
+                                           trusted_key_file ? trusted_key_file : "none");
+        else
+            claim_agent_failure_reason_set("Request failed with error: %s\n"
+                                           "proxy: '%s',\n"
+                                           "insecure: %s,\n"
+                                           "public key file: '%s',\n"
+                                           "trusted key file: '%s'",
+                                           curl_easy_strerror(res),
+                                           proxy,
+                                           insecure ? "true" : "false",
+                                           public_key_file ? public_key_file : "none",
+                                           trusted_key_file ? trusted_key_file : "none");
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
-        *can_retry = true;
+        *can_retry = !response_too_large;
         return false;
     }
 
@@ -317,16 +386,20 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
                 if (json_object_object_get_ex(parsed_json, "errorMsgKey", &error_key_obj))
                     error_key = json_object_get_string(error_key_obj);
 
-                if (strcmp(error_key, "ErrInvalidNodeID") == 0)
-                    claim_agent_failure_reason_set("Failed: the node id is invalid");
-                else if (strcmp(error_key, "ErrInvalidNodeName") == 0)
-                    claim_agent_failure_reason_set("Failed: the node name is invalid");
-                else if (strcmp(error_key, "ErrInvalidRoomID") == 0)
-                    claim_agent_failure_reason_set("Failed: one or more room ids are invalid");
-                else if (strcmp(error_key, "ErrInvalidPublicKey") == 0)
-                    claim_agent_failure_reason_set("Failed: the public key is invalid");
+                if(error_key) {
+                    if (strcmp(error_key, "ErrInvalidNodeID") == 0)
+                        claim_agent_failure_reason_set("Failed: the node id is invalid");
+                    else if (strcmp(error_key, "ErrInvalidNodeName") == 0)
+                        claim_agent_failure_reason_set("Failed: the node name is invalid");
+                    else if (strcmp(error_key, "ErrInvalidRoomID") == 0)
+                        claim_agent_failure_reason_set("Failed: one or more room ids are invalid");
+                    else if (strcmp(error_key, "ErrInvalidPublicKey") == 0)
+                        claim_agent_failure_reason_set("Failed: the public key is invalid");
+                    else
+                        claim_agent_failure_reason_set("Failed with description '%s'", error_key);
+                }
                 else
-                    claim_agent_failure_reason_set("Failed with description '%s'", error_key);
+                    claim_agent_failure_reason_set("Failed with a response code %ld", http_status_code);
 
                 json_object_put(parsed_json);
             }
@@ -484,6 +557,9 @@ bool claim_agent_from_split_files(void) {
         snprintfz(filename, sizeof(filename), "%s/rooms", netdata_configured_cloud_dir);
         unlink(filename);
     }
+
+    freez(token);
+    freez(rooms);
 
     return ret;
 }

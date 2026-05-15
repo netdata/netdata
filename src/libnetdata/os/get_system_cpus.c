@@ -100,9 +100,13 @@ size_t os_read_cpuset_cpus(const char *filename, size_t system_cpus) {
     static char *buf = NULL;
     static size_t buf_size = 0;
 
-    if(!buf) {
-        buf_size = 100U + 6 * system_cpus + 1; // taken from kernel/cgroup/cpuset.c
-        buf = mallocz(buf_size);
+    if(unlikely(!system_cpus))
+        system_cpus = os_get_system_cpus_uncached();
+
+    size_t required_buf_size = 100U + 6 * system_cpus + 1; // taken from kernel/cgroup/cpuset.c
+    if(unlikely(buf_size < required_buf_size)) {
+        buf_size = required_buf_size;
+        buf = reallocz(buf, buf_size);
     }
 
     int ret = read_txt_file(filename, buf, buf_size);

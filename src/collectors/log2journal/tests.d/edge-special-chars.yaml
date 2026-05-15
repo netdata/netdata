@@ -1,0 +1,21 @@
+pattern: "(?P<message>.*)"
+
+# Test special characters and escaping
+
+inject:
+  - key: QUOTES_TEST
+    value: 'Single quotes with "double quotes" inside'
+    
+  - key: DOUBLE_QUOTES
+    value: "Double quotes with 'single quotes' inside"
+    
+  - key: BACKSLASHES
+    value: "C:\\\\Windows\\\\System32\\\\cmd.exe"
+    
+  - key: DOLLAR_BRACES
+    value: "test ${message} test"
+
+rewrite:
+  - key: TEST_REWRITE
+    value: "Found: ${message}"
+    inject: yes

@@ -137,9 +137,14 @@ func parseOutput(cmdStr string, bs []byte, log *logger.Logger) (*gjson.Result, e
 		return nil, fmt.Errorf("'%s' returned unexpected data", cmdStr)
 	}
 
-	for _, msg := range res.Get("smartctl.messages").Array() {
-		if msg.Get("severity").String() == "error" {
-			return &res, fmt.Errorf("'%s' reported an error: %s", cmdStr, msg.Get("string"))
+	// https://manpages.debian.org/bullseye/smartmontools/smartctl.8.en.html#EXIT_STATUS
+	// Bits 0-1 indicate fatal conditions (command line error, device open failure).
+	// Bits 2-7 indicate disk health conditions but the output data is still valid.
+	if isExitStatusHasAnyBit(&res, 0, 1) {
+		for _, msg := range res.Get("smartctl.messages").Array() {
+			if msg.Get("severity").String() == "error" {
+				return &res, fmt.Errorf("'%s' reported an error: %s", cmdStr, msg.Get("string"))
+			}
 		}
 	}
 

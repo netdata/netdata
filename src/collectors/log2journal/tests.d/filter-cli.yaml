@@ -1,0 +1,13 @@
+---
+# Config without filter - CLI will set it
+pattern: "(?P<level>\\w+)\\s+(?P<user>\\w+)\\s+(?P<action>\\w+)"
+  
+inject:
+  - key: TEST_FIELD
+    value: "should_be_included"
+  - key: TEMP_FIELD
+    value: "should_be_excluded"
+  - key: TEST_TEMP
+    value: "should_be_excluded"
+  - key: OTHER_FIELD
+    value: "should_be_excluded"

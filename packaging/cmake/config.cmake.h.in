@@ -85,6 +85,9 @@
 #cmakedefine HAVE_GETRANDOM
 #cmakedefine HAVE_SYSINFO
 #cmakedefine HAVE_TIMEGM
+#cmakedefine HAVE_TZALLOC
+#cmakedefine HAVE_LOCALTIME_RZ
+#cmakedefine HAVE_TZFREE
 #cmakedefine HAVE_TM_GMTOFF
 
 #cmakedefine HAVE_LIBBACKTRACE
@@ -174,6 +177,7 @@
 #cmakedefine CACHE_DIR "@CACHE_DIR@"
 #cmakedefine CONFIG_DIR "@CONFIG_DIR@"
 #cmakedefine LIBCONFIG_DIR "@LIBCONFIG_DIR@"
+#cmakedefine STOCK_DATA_DIR "@STOCK_DATA_DIR@"
 #cmakedefine LOG_DIR "@LOG_DIR@"
 #cmakedefine PLUGINS_DIR "@PLUGINS_DIR@"
 #cmakedefine WEB_DIR "@WEB_DIR@"

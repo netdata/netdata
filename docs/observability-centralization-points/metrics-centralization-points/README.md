@@ -21,6 +21,20 @@ flowchart BT
     class P1 parent
 ```
 
+## Installation
+
+A **Netdata Parent** is a regular Netdata Agent configured to receive streaming metrics from Netdata Children (also normal Agents!).
+
+To install a Netdata Parent:
+
+1. Install Netdata on your Parent node.
+
+   For installation instructions, see the [Installation section](/packaging/installer/README.md).
+
+2. After installation, configure `stream.conf` to enable reception from Children.
+
+   See [Configuring Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) for detailed configuration instructions.
+
 ## Key Features
 
 :::important

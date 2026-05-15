@@ -60,8 +60,9 @@ static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *dat
     dyncfg_normalize(df);
 
     const char *id = dictionary_acquired_item_name(item);
-    char buf[strlen(id) + 20];
-    snprintfz(buf, sizeof(buf), PLUGINSD_FUNCTION_CONFIG " %s", id);
+    size_t buf_size = strlen(id) + 20;
+    CLEAN_CHAR_P *buf = mallocz(buf_size);
+    snprintfz(buf, buf_size, PLUGINSD_FUNCTION_CONFIG " %s", id);
     df->function = string_strdupz(buf);
 
     if(df->type == DYNCFG_TYPE_JOB && !df->template) {
@@ -285,8 +286,7 @@ bool dyncfg_is_user_disabled(const char *id) {
 }
 
 bool dyncfg_job_has_registered_template(const char *id) {
-    char buf[strlen(id) + 1];
-    memcpy(buf, id, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(id);
     char *colon = strrchr(buf, ':');
     if(!colon)
         return false;
@@ -467,11 +467,10 @@ void dyncfg_add_streaming(BUFFER *wb) {
 }
 
 bool dyncfg_available_for_rrdhost(RRDHOST *host) {
-    if(host == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+    if(host == localhost)
         return true;
 
     return rrd_function_available(host, PLUGINSD_FUNCTION_CONFIG);
 }
 
 // ----------------------------------------------------------------------------
-

@@ -16,6 +16,9 @@ const (
 	lineFunction           = "FUNCTION"
 	lineFunctionPayload    = "FUNCTION_PAYLOAD"
 	lineFunctionPayloadEnd = "FUNCTION_PAYLOAD_END"
+	lineFunctionCancel     = "FUNCTION_CANCEL"
+	lineFunctionProgress   = "FUNCTION_PROGRESS"
+	lineQuit               = "QUIT"
 )
 
 type Function struct {
@@ -46,8 +49,36 @@ type inputParser struct {
 }
 
 func (p *inputParser) parse(line string) (*Function, error) {
+	event, err := p.parseEvent(line)
+	if err != nil {
+		return nil, err
+	}
+	if event.kind == inputEventCall {
+		return event.fn, nil
+	}
+	return nil, nil
+}
+
+type inputEventKind uint8
+
+const (
+	inputEventNone inputEventKind = iota
+	inputEventCall
+	inputEventCancel
+	inputEventProgress
+	inputEventQuit
+)
+
+type inputEvent struct {
+	kind         inputEventKind
+	fn           *Function
+	uid          string
+	preAdmission bool
+}
+
+func (p *inputParser) parseEvent(line string) (inputEvent, error) {
 	if line = strings.TrimSpace(line); line == "" {
-		return nil, nil
+		return inputEvent{}, nil
 	}
 
 	if p.readingPayload {
@@ -55,36 +86,68 @@ func (p *inputParser) parse(line string) (*Function, error) {
 	}
 
 	switch {
+	case line == lineQuit:
+		return inputEvent{kind: inputEventQuit}, nil
+	case hasLinePrefix(line, lineFunctionCancel):
+		return parseCancelEvent(line)
+	case hasLinePrefix(line, lineFunctionProgress):
+		return parseProgressEvent(line), nil
 	case strings.HasPrefix(line, lineFunction+" "):
-		return p.parseFunction(line)
+		fn, err := p.parseFunction(line)
+		if err != nil {
+			return inputEvent{}, err
+		}
+		return inputEvent{kind: inputEventCall, fn: fn}, nil
 	case strings.HasPrefix(line, lineFunctionPayload+" "):
 		fn, err := p.parseFunction(line)
 		if err != nil {
-			return nil, err
+			return inputEvent{}, err
 		}
 		p.readingPayload = true
 		p.currentFn = fn
 		p.payloadBuf.Reset()
-		return nil, nil
+		return inputEvent{}, nil
 	default:
-		return nil, errors.New("unexpected line format")
+		return inputEvent{}, errors.New("unexpected line format")
 	}
 }
 
-func (p *inputParser) handlePayloadLine(line string) (*Function, error) {
+func (p *inputParser) handlePayloadLine(line string) (inputEvent, error) {
 	if line == lineFunctionPayloadEnd {
 		p.readingPayload = false
 		p.currentFn.Payload = []byte(p.payloadBuf.String())
 		fn := p.currentFn
 		p.currentFn = nil
-		return fn, nil
+		p.payloadBuf.Reset()
+		return inputEvent{kind: inputEventCall, fn: fn}, nil
 	}
 
-	if strings.HasPrefix(line, lineFunction) {
-		p.readingPayload = false
-		p.currentFn = nil
-		p.payloadBuf.Reset()
-		return p.parse(line)
+	if hasLinePrefix(line, lineFunctionCancel) {
+		event, err := parseCancelEvent(line)
+		if err != nil {
+			// Malformed cancel must not affect payload parser state.
+			return inputEvent{}, err
+		}
+
+		if p.currentFn != nil && event.uid == p.currentFn.UID {
+			p.resetPayloadState()
+			event.preAdmission = true
+		}
+		return event, nil
+	}
+
+	if hasLinePrefix(line, lineFunctionProgress) {
+		return parseProgressEvent(line), nil
+	}
+
+	if line == lineQuit {
+		p.resetPayloadState()
+		return inputEvent{kind: inputEventQuit}, nil
+	}
+
+	if hasLinePrefix(line, lineFunction) || strings.HasPrefix(line, lineFunction+"_") {
+		p.resetPayloadState()
+		return p.parseEvent(line)
 	}
 
 	if p.payloadBuf.Len() > 0 {
@@ -92,7 +155,34 @@ func (p *inputParser) handlePayloadLine(line string) (*Function, error) {
 	}
 	p.payloadBuf.WriteString(line)
 
-	return nil, nil
+	return inputEvent{}, nil
+}
+
+func (p *inputParser) resetPayloadState() {
+	p.readingPayload = false
+	p.currentFn = nil
+	p.payloadBuf.Reset()
+}
+
+func hasLinePrefix(line, keyword string) bool {
+	return line == keyword || strings.HasPrefix(line, keyword+" ")
+}
+
+func parseCancelEvent(line string) (inputEvent, error) {
+	parts := strings.Fields(line)
+	if len(parts) != 2 || parts[0] != lineFunctionCancel || parts[1] == "" {
+		return inputEvent{}, errors.New("unexpected FUNCTION_CANCEL format")
+	}
+	return inputEvent{kind: inputEventCancel, uid: parts[1]}, nil
+}
+
+func parseProgressEvent(line string) inputEvent {
+	parts := strings.Fields(line)
+	event := inputEvent{kind: inputEventProgress}
+	if len(parts) >= 2 {
+		event.uid = parts[1]
+	}
+	return event
 }
 
 func (p *inputParser) parseFunction(line string) (*Function, error) {

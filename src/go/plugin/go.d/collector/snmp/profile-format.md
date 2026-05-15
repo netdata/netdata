@@ -15,6 +15,7 @@ It tells the Netdata SNMP collector:
 - which **OIDs** to query
 - how to **interpret** the returned values
 - how to **transform** them into **metrics**, **dimensions**, **tags**, and **metadata**
+- which rows are **regular metrics** and which rows are **SNMP topology** observations
 
 Profiles make it possible to describe _entire device families_ (switches, routers, UPSes, firewalls, printers, etc.) declaratively — so you don’t need to hard-code logic in Go or manually define metrics for each device.
 
@@ -48,6 +49,8 @@ When Netdata connects to an SNMP device, the collector:
 │ metadata             │ → device info (vendor, model, etc.)
 ├──────────────────────┤
 │ metrics              │ → OIDs to collect
+├──────────────────────┤
+│ topology             │ → OIDs to collect for SNMP topology
 ├──────────────────────┤
 │ metric_tags          │ → dynamic tags for all metrics
 ├──────────────────────┤
@@ -146,6 +149,9 @@ selector: <device matching pattern>
 extends: <base profiles to include>
 metadata: <device information>
 metrics: <what to collect>
+topology: <what to collect for topology>
+bgp: <what to collect for typed BGP monitoring>
+licensing: <what to collect for typed licensing>
 metric_tags: <global tags>
 static_tags: <static tags>
 virtual_metrics: <calculated metrics>
@@ -157,6 +163,9 @@ virtual_metrics: <calculated metrics>
 | [**extends**](#2-extends)                 | Inherits and merges other base profiles.                                           |
 | [**metadata**](#3-metadata)               | Collects device-level information (host labels).                                   |
 | [**metrics**](#4-metrics)                 | Defines which OIDs to collect and how to chart them.                               |
+| [**topology**](#41-topology)              | Defines SNMP topology rows and their topology kind.                                |
+| [**bgp**](#bgp-rows)                      | Defines typed BGP device, peer, and peer-family rows.                              |
+| [**licensing**](#licensing-rows)          | Defines typed license rows.                                                        |
 | [**metric_tags**](#5-metric_tags)         | Defines global dynamic tags collected once per device and attached to all metrics. |
 | [**static_tags**](#6-static_tags)         | Defines fixed tags applied to all metrics.                                         |
 | [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others.                          |
@@ -218,6 +227,11 @@ The final profile is the **merged result** of all inherited profiles plus the co
 2. **Metrics are merged** — all metrics from all referenced profiles are included.
 3. **Later overrides earlier** — if the same field is defined multiple times, the last one wins.
 
+Metric override identity depends on metric type:
+
+- **Scalar metrics** use `symbol.name + symbol.OID`. This preserves same-name scalar fallback definitions that try alternative OIDs.
+- **Table metrics** use logical table identity (`table.name` when set, otherwise `table.OID`) + `symbol.name`. If two inherited profiles define the same table metric name, the later profile wins even when the table or symbol OID differs. If the same logical table name is inherited with a different table OID, the later table definition replaces the earlier table definition; symbols from the earlier table OID are not merged into the later table. Different metric names can still read from the same column OID when separate transformations are needed.
+
 **Common base profiles**
 
 | Profile             | Provides                                  | Typical Use        |
@@ -265,6 +279,9 @@ metadata:
 - `model` is collected dynamically. The collector tries the listed OIDs **in order** and uses the **first** one that returns a non-empty value.
 - These values appear as **device (virtual node) host labels** in the Netdata UI.
 - They are **not per-metric tags** and are applied to the device itself, not individual charts.
+- Metadata fields are available to both regular metrics and topology by default.
+  Use `consumers: [metrics]` or `consumers: [topology]` only when a field is
+  intentionally limited to one view.
 
 :::tip
 
@@ -344,7 +361,7 @@ See also
 
 #### Underscore-prefixed metrics
 
-Metric names that start with an underscore (e.g., `_ifHCInOctets`) are **private**: they’re collected but **not** propagated to the SNMP collector output. Use them as internal building blocks (typically as inputs for [virtual_metrics](#7-virtual_metrics)) so the final metric set remains clean. After virtual metrics are computed, the collector drops underscored metrics from the exported set.
+Metric names that start with an underscore (e.g., `_ifHCInOctets`) are **private**: they’re collected but **not** propagated to the SNMP collector output. Use them as internal building blocks (typically as inputs for [virtual_metrics](#7-virtual_metrics)) so the final metric set remains clean. After virtual metrics are computed, the collector drops underscored metrics from the exported set, while preserving them in the internal hidden metric set for collector-level consumers.
 
 ```yaml
 # IF-MIB::ifXTable
@@ -366,9 +383,79 @@ virtual_metrics:
       - { metric: _ifHCOutOctets, table: ifXTable, as: out }
 ```
 
-#### Multiple symbol fallbacks
+### 4.1 topology
 
-You can express “try this OID, otherwise try that OID” by declaring **multiple metrics with the same** `symbol.name`, each pointing to a different OID. At runtime the collector **GETs** all declared scalar OIDs, marks missing ones, and **emits** the metric from whichever OID returns data. Missing OIDs are skipped cleanly.
+The `topology` section defines SNMP rows consumed by the SNMP topology collector.
+Topology rows are collected through the same scalar and table mechanics as
+regular metrics, but they are not exported as charts. Instead, each row is routed
+to a topology handler through its closed `kind` value.
+
+Use top-level `topology:` when the row describes a topology actor, link, VLAN,
+bridge, FDB, ARP, LLDP, CDP, STP, VTP, or interface-mapping observation.
+
+```yaml
+topology:
+  - kind: lldp_rem
+    MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.4.1
+      name: lldpRemTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.4.1.1.6
+        name: lldp_rem
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 2
+      - tag: lldp_rem_index
+        index: 3
+      - tag: lldp_rem_sys_name
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.9
+          name: lldpRemSysName
+```
+
+**Rules**:
+
+- `kind` is required and must be one of the closed topology kinds below.
+- Topology row symbol names must not start with `_`.
+- Topology rows do not use chart/export-only fields such as `chart_meta`,
+  `metric_type`, `mapping`, `transform`, `scale_factor`, `format`, or
+  `constant_value_one` on the row value symbol.
+- `metric_tags` inside a topology row work like table metric tags and identify
+  or enrich the topology row.
+- `systemUptime` stays under `metrics:` for regular SNMP collection. It is not a
+  topology kind and should not be declared under `topology:`.
+
+Valid topology kinds:
+
+```text
+lldp_loc_port
+lldp_loc_man_addr
+lldp_rem
+lldp_rem_man_addr
+lldp_rem_man_addr_compat
+cdp_cache
+if_name
+if_status
+if_duplex
+ip_if_index
+bridge_port_if_index
+fdb_entry
+qbridge_fdb_entry
+qbridge_vlan_entry
+stp_port
+vtp_vlan
+arp_entry
+arp_legacy_entry
+```
+
+Topology mixins can be inherited through `extends` just like metric mixins. When
+two inherited topology rows collide, the identity is `kind + table identity +
+symbol name`, matching regular table metric merge behavior.
+
+#### Scalar symbol fallbacks
+
+You can express “try this OID, otherwise try that OID” by declaring **multiple scalar metrics with the same** `symbol.name`, each pointing to a different OID. At runtime the collector **GETs** all declared scalar OIDs, marks missing ones, and **emits** the metric from whichever OID returns data. Missing OIDs are skipped cleanly.
 
 ```yaml
 metrics:
@@ -422,6 +509,10 @@ metric_tags:
 - Each tag is collected once per device, not per metric or per table row.
 - The resulting tag values are attached to **all metrics** collected by the profile.
 - Tags can be transformed (for example, reformatted or mapped) using the same rules as per-metric tags.
+- Top-level `metric_tags` are available to both regular metrics and topology by
+  default. In topology they become device/profile labels, not per-row dispatch
+  keys. Use `consumers: [metrics]` or `consumers: [topology]` only when a tag is
+  intentionally limited to one view.
 
 :::tip
 
@@ -752,17 +843,16 @@ They let you distinguish between instances (for example, which interface, disk, 
 - Attaches tags to each metric as labels.
 - Uses tags to differentiate rows when building charts.
 - Requires at least one tag for every **table metric** (to identify each row).
-- Ignores tags for **scalar metrics**, which represent a single value per device.
 
 **Key Concepts**:
 
-| Concept                            | Description                                                                                                                                   |
-|------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Table metrics must have tags**   | Each table row must be uniquely identified by at least one tag (for example, interface name or index). Without tags, only one row is emitted. |
-| **Scalar metrics don’t need tags** | Scalars represent one value for the entire device, not per-instance data.                                                                     |
-| **Static tags**                    | Fixed values that never change (for example, datacenter, environment).                                                                        |
-| **Dynamic tags**                   | Extracted from SNMP data — from table columns, related tables, or row indexes.                                                                |
-| **Global tags**                    | Defined in the profile’s top-level `metric_tags` section and applied to all metrics.                                                          |
+| Concept                                         | Description                                                                                                                                   |
+|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Table metrics must have tags**                | Each table row must be uniquely identified by at least one tag (for example, interface name or index). Without tags, only one row is emitted. |
+| **Scalar metrics don’t need tags for identity** | Scalars represent one value for the entire device, so tags are not part of their normal public identity contract.                             |
+| **Static tags**                                 | Fixed values that never change (for example, datacenter, environment).                                                                        |
+| **Dynamic tags**                                | Extracted from SNMP data — from table columns, related tables, or row indexes.                                                                |
+| **Global tags**                                 | Defined in the profile’s top-level `metric_tags` section and applied to all metrics.                                                          |
 
 **Tag Types and Available Transformations**:
 
@@ -778,9 +868,15 @@ They let you distinguish between instances (for example, which interface, disk, 
 
 - Each **table metric** must define at least one **tag source** (`metric_tags`) to distinguish rows.
 - Tags can come from **the same table**, **another table**, or the **row index** itself.
+- Scalar metrics do not use tags for identity. Internal bundled profiles may
+  attach sidecar scalar values to hidden carrier metrics, but that is not a
+  stable public authoring contract.
 - Tag transformations (`mapping`, `extract_value`, `match_pattern`, `match + tags`) can modify or extract parts of raw values.
 - **Static tags** apply globally and are not transformed.
 - **Index transformations** are a special mechanism used only for aligning multi-part indexes between tables.
+- Avoid reusing built-in device label names such as `sysName`, `address`,
+  `vendor`, `model`, and `device_type` for row tags. Those keys are reserved
+  for collector-provided device metadata labels.
 
 **How the Collector Matches Values and Tags**:
 
@@ -947,6 +1043,7 @@ Cross-table tags let you **use data from another SNMP table** as a tag source.
 - Reads tag values from the specified `table:` instead of the current one.
 - Matches rows between tables by their **index**.
 - When index structures differ, an optional `index_transform` can modify the current table’s index to align it with the target.
+- When the target table is keyed differently, an optional `lookup_symbol` can match a transformed index value against a column in the target table and then read tags from the matched row.
 
 #### Same Index
 
@@ -1064,7 +1161,87 @@ metrics:
 - `start` and `end` positions are **zero-based** (0 = first index element).
 - Each range defines which parts of the index to keep.
 - You can list multiple ranges to combine non-contiguous parts.
+- `drop_right` can be used instead of `end` when you need to keep a variable-length prefix of the index and trim a fixed number of trailing elements.
 - The goal is to make the current table’s index **match** the target table’s index so tags align correctly.
+
+Example with `drop_right`:
+
+```yaml
+metric_tags:
+  - tag: peer_index
+    table: peerTable
+    symbol:
+      OID: 1.2.3.4.5
+      name: peerRemoteAs
+    index_transform:
+      - start: 0
+        drop_right: 2
+```
+
+If the current row index is `1.192.0.2.1.1.128`, the transform keeps `1.192.0.2.1` and drops the trailing AFI / SAFI pair.
+
+#### With Value Lookup (`lookup_symbol`)
+
+Some vendor MIBs split related data across tables that do **not** share the same row index.
+
+For example:
+
+- a prefix-counter table may be indexed by `peerIndex.afi.safi`
+- the peer table may be indexed by `routingInstance.localAddr.remoteAddr`
+- but the peer table still contains a `peerIndex` column
+
+In that case, `index_transform` alone is not enough:
+
+- it can extract the current row's `peerIndex`
+- but it cannot guess which peer-table row owns that `peerIndex`
+
+Use `lookup_symbol` to tell the collector:
+
+1. Extract a lookup value from the current row index
+2. Find the row in the target table whose `lookup_symbol` column matches that value
+3. Read the requested `symbol` from that matched row
+
+```yaml
+metrics:
+  - MIB: BGP4-V2-MIB-JUNIPER
+    table:
+      OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2
+      name: jnxBgpM2PrefixCountersTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2.1.8
+        name: bgpPeerPrefixesAccepted
+    metric_tags:
+      - tag: neighbor
+        table: jnxBgpM2PeerTable
+        symbol:
+          OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11
+          name: jnxBgpM2PeerRemoteAddr
+        lookup_symbol:
+          OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14
+          name: jnxBgpM2PeerIndex
+        index_transform:
+          - start: 0
+            end: 0
+```
+
+**What this does**:
+
+- Collects accepted-prefix counters from the Juniper prefix table
+- Takes the first index element from the current row (`peerIndex`)
+- Scans `jnxBgpM2PeerTable.jnxBgpM2PeerIndex` for a matching value
+- Reads `jnxBgpM2PeerRemoteAddr` from the matched peer-table row
+- Produces metrics like:
+    ```text
+    bgpPeerPrefixesAccepted{neighbor="192.0.2.1"} = 1234
+    ```
+
+**Important behavior**:
+
+- `lookup_symbol` is used for **cross-table tags** and typed BGP value fields
+- it works together with `index_transform`, not instead of it
+- if no row matches, the tag lookup fails for that row
+- if one row matches, the collector reads the requested tag from that row
+- if multiple rows match, the lookup succeeds only when all matched rows resolve to the same final tag value; conflicting values fail the lookup
 
 ### Index-Based
 
@@ -1078,6 +1255,7 @@ This is useful when a table encodes identifiers (like method, code, or port numb
 - For each `index:` rule, assigns a tag using the specified position in the index.
 - Converts numeric index components to strings automatically.
 - Attaches all resulting tags to the metric collected from that row.
+- Can also derive tags from the full row index using `index_transform` plus `symbol.format`, `symbol.extract_value`, `symbol.match_pattern`, or `mapping`, even when there is no column OID for that tag.
 
 ```yaml
 metrics:
@@ -1119,6 +1297,98 @@ metrics:
     sipCommonStatusCodeIns{applIndex="1", sipCommonStatusCodeMethod="6", sipCommonStatusCodeValue="200"} = 42
     ```
 
+Derived tag example from a transformed index:
+
+```yaml
+metric_tags:
+  - tag: neighbor
+    symbol:
+      name: peerRemoteAddrIndex
+      format: ip_address
+    index_transform:
+      - start: 1
+        drop_right: 2
+```
+
+If the current row index is `1.192.0.2.1.1.128`, the collector:
+
+- keeps the peer-address part only: `192.0.2.1`
+- formats it as an IP address
+- emits `neighbor="192.0.2.1"`
+
+### Field Accessibility
+
+SNMP profile symbols must only read objects that the source MIB exposes as
+readable columns. Before adding or changing a `symbol.OID`, check the source
+MIB object's `MAX-ACCESS` (SMIv2) or `ACCESS` (SMIv1).
+
+Rules:
+
+- `read-only`, `read-write`, and `read-create` objects can be read as
+  `symbol.OID` values.
+- `not-accessible` objects must not be read as `symbol.OID` values.
+- A `not-accessible` object that is part of a table `INDEX` can be derived from
+  the row OID index using `index` or `index_transform`.
+- Keep SNMP index slicing in the profile YAML; keep format conversion in
+  `symbol.format`.
+
+The two index extraction mechanisms use different counting bases:
+
+- `index: N` is **1-based**: `index: 1` selects the first index component,
+  `index: 2` the second, and so on. Use this to pick a single component.
+- `index_transform: [{start: M, end: K}]` is **0-based** over the row index
+  parts. `start: 0` is the first component. `end` is inclusive. Setting
+  `end: 0` together with `start: N > 0` slices to the tail (`start: N` to the
+  last index part) - useful for length-prefixed `OCTET STRING` index columns
+  whose width depends on a sibling index component (e.g.
+  `LLDP-MIB::lldpLocManAddr`, `IP-MIB::ipNetToPhysicalNetAddress`).
+
+So `index: 1` and `index_transform: [{start: 0, end: 0}]` both extract the
+first index component.
+
+Typed BGP value fields also support `index_from_end: N`, where `N` is
+1-based from the right side of the row index. Use it only when the target
+INDEX component is a trailing component after a variable-length field, such as
+AFI/SAFI after an `InetAddress` peer address.
+
+Use exactly one row-index selector per typed BGP value: `index`,
+`index_from_end`, or `index_transform`. Profile validation rejects typed BGP
+values that set more than one of these selectors.
+
+Typed BGP cross-table value fields can also use `lookup_symbol` with
+`table:` and `index_transform:`. This is needed when a BGP peer-family table is
+indexed by a compact peer ID, but peer identity fields such as neighbor and
+remote AS live in a peer table keyed by a different composite index. The
+collector extracts the lookup value from the current row index, finds the row
+in the referenced table whose `lookup_symbol` column has that value, and then
+reads the requested typed value symbol from the matched row.
+
+Examples:
+
+- `Q-BRIDGE-MIB::dot1qTpFdbAddress` is `not-accessible` and is part of the
+  `dot1qTpFdbEntry` index. Derive it from the row index and use
+  `format: mac_address`.
+- `IP-MIB::ipNetToPhysicalIfIndex`,
+  `IP-MIB::ipNetToPhysicalNetAddressType`, and
+  `IP-MIB::ipNetToPhysicalNetAddress` are `not-accessible` index components.
+  Derive them from the row index. The physical MAC value,
+  `ipNetToPhysicalPhysAddress`, is readable and can stay as a column symbol.
+- `LLDP-MIB::lldpLocManAddrSubtype` and `LLDP-MIB::lldpLocManAddr` are
+  `not-accessible` index components. Anchor the row on a readable column such as
+  `lldpLocManAddrLen`, then derive subtype and address from the row index. Use
+  `format: hex` for the address bytes so non-IP management-address subtypes are
+  preserved; topology normalization converts IP-compatible bytes later.
+
+Audit recipe:
+
+```bash
+rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+not-accessible' path/to/MIB
+rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
+```
+
+Any profile hit for a `not-accessible` object is valid only when the tag is
+index-derived and does not declare a `symbol.OID` for that object.
+
 ## Tag Transformation
 
 Tag transformations let you **modify or extract parts of SNMP values** to produce clear, human-readable tags.
@@ -1132,6 +1402,7 @@ They work the same in **both** places:
 
 | Transformation                   | Purpose                                         | Example Input → Output                                           |
 |----------------------------------|-------------------------------------------------|------------------------------------------------------------------|
+| `format`                         | Convert the raw SNMP value before tag parsing.  | `0x18fd74331a9c → "18fd74331a9c"`                                |
 | `mapping`                        | Replace numeric/string codes with names.        | `1 → "ethernet"`, `161 → "lag"`                                  |
 | `extract_value`                  | Extract a substring via regex (first group).    | `"RouterOS CCR2004-16G-2S+" → "CCR2004-16G-2S+"`                 |
 | `match_pattern` + `match_value`  | Replace the value using regex groups or static. | `"Palo Alto Networks VM-Series firewall" → "VM-Series firewall"` |
@@ -1146,6 +1417,7 @@ They work the same in **both** places:
 | **No match behavior**       | • `extract_value`: keeps the original value.<br/>• `match_pattern`: skips the value (tag not emitted).<br/>• `match` + `tags`: emits no tags. |
 | **Multiple symbols**        | If multiple `symbols` are listed for the same tag, the **first non-empty result** is used.                                                    |
 | **Mapping key consistency** | Keys in a `mapping` must all be the same type — all numeric or all string.                                                                    |
+| **Mapping modes**           | Tags and metadata support only exact-match mapping. Use `mapping.items`; `mapping.mode` is optional and defaults to exact.                    |
 | **Safety**                  | Keep regexes simple and, when possible, **anchor them** (e.g. `^pattern$`) to prevent unwanted matches.                                       |
 
 **Quick Syntax Recap**:
@@ -1153,8 +1425,9 @@ They work the same in **both** places:
 - `mapping`
     ```yaml
     mapping:
-      6: "ethernet"
-      161: "lag"
+      items:
+        6: "ethernet"
+        161: "lag"
     ```
 - `extract_value`
     ```yaml
@@ -1176,9 +1449,55 @@ They work the same in **both** places:
       port: $4
     ```
 
+- `format`
+    ```yaml
+    symbol:
+      OID: 1.3.6.1.2.1.17.1.1
+      name: dot1dBaseBridgeAddress
+      format: hex
+    ```
+
+### Format
+
+Use `format` when the raw SNMP value must be converted before tag or metadata processing.
+
+**The collector**:
+
+- Applies `format` when converting the raw SNMP value to a string.
+- Then applies the configured tag or metadata transformations to that formatted string.
+- Supports the same `format` values accepted by `symbol` definitions elsewhere in the profile.
+
+**Where it can be used**:
+
+- `metadata.device.fields.<field>.symbol`
+- `metadata.device.fields.<field>.symbols[]`
+- `metric_tags[].symbol`
+
+**Currently used by this profile set**:
+
+- `format: hex` for octet-string values such as:
+  - MAC addresses
+  - binary management-address values
+  - capability bitmaps
+
+**Example**:
+
+```yaml
+metadata:
+  device:
+    fields:
+      bridge_base_address:
+        symbol:
+          OID: 1.3.6.1.2.1.17.1.1
+          name: dot1dBaseBridgeAddress
+          format: hex
+```
+
 ### Mapping
 
 Use `mapping` to replace raw tag values with **human-readable text labels**.
+
+`mapping.mode` is optional here and defaults to exact. `bitmask` mode is not supported for tags or metadata.
 
 **The collector**:
 
@@ -1203,11 +1522,12 @@ metrics:
           OID: 1.3.6.1.2.1.2.2.1.3
           name: ifType
         mapping:
-          1: "other"
-          6: "ethernet"
-          24: "loopback"
-          131: "tunnel"
-          161: "lag"
+          items:
+            1: "other"
+            6: "ethernet"
+            24: "loopback"
+            131: "tunnel"
+            161: "lag"
 ```
 
 **What this does**:
@@ -1215,6 +1535,8 @@ metrics:
 - Replaces numeric interface type codes (1, 6, 24, 131, 161) with readable names (`other`, `ethernet`, `loopback`, `tunnel`, `lag`).
 - If a device reports an unknown type, the original numeric value is used.
 - Works identically for `metadata` fields and `metric_tags`.
+- Legacy flat-map syntax remains supported for backward compatibility:
+  `mapping: { 6: "ethernet", 161: "lag" }`
 
 ### Extract Value
 
@@ -1338,9 +1660,15 @@ metric_tags:
 
 ## Value Transformation
 
-Value transformations let you **process or normalize raw SNMP metric values** before they are stored and charted.
+Value transformations let you **decode, process, or normalize raw SNMP symbol values** before they are stored and charted.
 
-They are applied **per symbol (per OID)** during SNMP data collection. They modify only **metric values**, not tags or metadata, and are **not applied to virtual metrics**.
+For metrics, they are applied **per symbol (per OID)** during SNMP data
+collection and are **not applied to virtual metrics**.
+
+`format` is the exception to the "metric values only" rule: it is symbol
+decoding, so it also applies when the same symbol is used for metric tags or
+device metadata. After decoding, metric tags and device metadata follow their
+own supported transformation rules.
 
 These transformations are typically used to:
 
@@ -1350,38 +1678,68 @@ These transformations are typically used to:
 
 **Available Value Transformations**:
 
-| Transformation                  | Purpose                                                           | Example Input → Output              |
-|---------------------------------|-------------------------------------------------------------------|-------------------------------------|
-| `mapping`                       | Convert numeric or string codes into state dimensions.            | `1 → up`, `2 → down`, `3 → testing` |
-| `extract_value`                 | Extract a numeric substring via regex.                            | `"23.8 °C" → "23"`                  |
-| `scale_factor`                  | Multiply values by a constant to adjust units.                    | `"1.5" (MBps) × 8 → 12 (Mbps)`      |
-| `match_pattern` + `match_value` | *Not applicable* for metric values (use `extract_value` instead). | —                                   |
+| Transformation                  | Purpose                                                                                | Example Input → Output              |
+|---------------------------------|----------------------------------------------------------------------------------------|-------------------------------------|
+| `mapping`                       | Convert numeric or string codes into state dimensions.                                 | `1 → up`, `2 → down`, `3 → testing` |
+| `extract_value`                 | Extract a numeric substring via regex.                                                 | `"23.8 °C" → "23"`                  |
+| `format`                        | Decode raw SNMP data into a value shape before other processing.                       | DateAndTime bytes → unix timestamp  |
+| `scale_factor`                  | Multiply values by a constant to adjust units.                                         | `"1.5" (MBps) × 8 → 12 (Mbps)`      |
+| `match_pattern` + `match_value` | Replace string metric values using regex groups or static text before numeric parsing. | `"state=2" → "2"`                   |
 
 **Combination & Behavior**:
 
-| Rule                      | Description                                                                                                               |
-|---------------------------|---------------------------------------------------------------------------------------------------------------------------|
-| **Where**                 | Value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`.                                      |
-| **Order of application**  | 1️⃣ `extract_value` (if present) → 2️⃣ `mapping` → 3️⃣ `scale_factor`.                                                    |
-| **Scale factor position** | `scale_factor` is always applied **last**, after all other transformations.                                               |
-| **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.             |
-| **Error handling**        | If a transformation fails (e.g., regex doesn’t match), the collector keeps the original value.                            |
-| **Applicability**         | Transformations affect metric values only — not metadata or tags.                                                         |
-| **Mapping behavior**      | Always produces a multi-value metric where each mapped entry becomes a dimension; the active one reports `1`, others `0`. |
+| Rule                      | Description                                                                                                                                                                                                                                                                                                                                              |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata.                                                                                                                                                                              |
+| **Order of application**  | For string-decoded metric values: 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. Ordinary numeric PDUs skip the string-only `extract_value` and `match_pattern` steps and use numeric parsing → `mapping` → `scale_factor`. |
+| **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations. It cannot be combined with `mapping.mode: bitmask`.                                                                                                                                                                                                             |
+| **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.                                                                                                                                                                                                                                    |
+| **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.                                                                                                                                                                                                                                            |
+| **Error handling**        | `extract_value` keeps the original value when it does not match; `match_pattern` fails the metric value when it does not match; no-value `format` sentinels are treated as missing.                                                                                                                                                                      |
+| **Applicability**         | Metric value transformations affect metric values only; `format` also decodes tag and metadata symbol values.                                                                                                                                                                                                                                            |
+| **Mapping syntax**        | `mapping.items` defines the lookup table. `mapping.mode` is optional and defaults to exact. Legacy flat-map syntax remains supported for backward compatibility.                                                                                                                                                                                         |
+| **Mapping behavior**      | Exact mode preserves the legacy exact-match/remap behavior. `bitmask` mode is metric-value only: every mapped bit becomes a dimension, the raw numeric value is preserved, key `0` matches only raw value `0`, and unknown bits are ignored.                                                                                                             |
 
 **Quick Syntax Recap**:
 
 - `mapping`
     ```yaml
     mapping:
-      1: up
-      2: down
-      3: testing
-     ``` 
+      items:
+        1: up
+        2: down
+        3: testing
+    ```
+
+- `mapping` (bitmask mode)
+    ```yaml
+    mapping:
+      mode: bitmask
+      items:
+        1: internalError
+        128: processorPresent
+        1024: processorThrottled
+    ```
 
 - `extract_value`
     ```yaml
     extract_value: '(\d+)'   # First capture group is used
+    ```
+
+- `format: hex`
+    ```yaml
+    format: hex
+    extract_value: '^([0-9a-f]{2})'   # First byte of an OCTET STRING
+    ```
+
+- `format: snmp_dateandtime`
+    ```yaml
+    format: snmp_dateandtime   # SNMPv2-TC DateAndTime OCTET STRING -> unix timestamp
+    ```
+
+- `format: text_date`
+    ```yaml
+    format: text_date   # Textual dates such as "2026-12-31" -> unix timestamp
     ```
 
 - `scale_factor`
@@ -1391,17 +1749,27 @@ These transformations are typically used to:
 
 ### Mapping
 
-Use `mapping` to convert raw metric values into **state dimensions**.
+Use `mapping` to convert raw metric values into **state dimensions** or **decoded bitmask dimensions**.
 
-Each mapping entry defines a **dimension name** and the numeric or string value that triggers it.
+`mapping.mode` defaults to exact. Use `mapping.mode: bitmask` when the raw metric value is a flag field where multiple bits may be set at the same time.
+
+In exact mode, the emitted dimension names come from the **string side** of the mapping:
+
+- Numeric key -> string value (`1: up`) emits dimensions named after the mapped string values (`up`, `down`, ...).
+- String key -> numeric value (`OK: 0`) first normalizes the value to the numeric target, then emits dimensions named after the original string keys (`OK`, `WARNING`, ...).
+- Numeric key -> numeric value is treated as value normalization only and does not emit multi-value dimensions.
 
 **The collector**:
 
-- Evaluates the value against the mapping table.
-- For each mapping entry, creates a **dimension** named after the mapped key.
+- Evaluates the value against `mapping.items`.
+- In exact mode, creates dimensions using the mapping's string labels, following the rules above.
 - Sets that dimension to `1` if the current value matches the key, or `0` otherwise.
-- If the value doesn’t match any key, all mapped dimensions are `0`.
-- Works only for **metric values**, not for tags or metadata.
+- In bitmask mode, sets every mapped dimension whose bit is active to `1`, and inactive mapped bits to `0`.
+- If the value doesn’t match any exact key, all exact-mode dimensions are `0`.
+- `mapping.mode: bitmask` works only for **metric values**, not for tags or metadata.
+- `mapping.mode: bitmask` keys must be `0` or a single power-of-two bit (`1`, `2`, `4`, `8`, ...).
+- `scale_factor` cannot be combined with `mapping.mode: bitmask`.
+- If multiple bit keys map to the same dimension, that dimension is active when any mapped bit is active.
 
 ```yaml
 metrics:
@@ -1412,15 +1780,48 @@ metrics:
       family: 'Network/Interface/Status/Admin'
       unit: "{status}"
     mapping:
-      1: up
-      2: down
-      3: testing
+      items:
+        1: up
+        2: down
+        3: testing
 ```
 
 **What this does**:
 
 - Converts SNMP integer values (1, 2, 3) into a **multi-value metric** with dimensions `up`, `down`, and `testing`.
 - The dimension corresponding to the current value reports `1`; all others report `0`.
+- Legacy flat-map syntax remains supported and is equivalent to exact mode.
+- For string -> numeric exact mappings, the emitted dimensions use the original string keys instead of the normalized numeric values.
+
+Bitmask example:
+
+```yaml
+metrics:
+  - table:
+      OID: 1.3.6.1.4.1.674.10892.1.1100.32
+      name: processorDeviceStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.6
+        name: processorDeviceStatusReading
+        mapping:
+          mode: bitmask
+          items:
+            1: internalError
+            2: thermalTrip
+            32: configurationError
+            128: processorPresent
+            256: processorDisabled
+            512: terminatorPresent
+            1024: processorThrottled
+```
+
+**What this does**:
+
+- Treats the raw value as a bitmask where multiple bits can be active at once.
+- Emits a multi-value metric with one dimension per mapped bit.
+- Requires each declared key to represent either `0` or exactly one bit.
+- Preserves the raw numeric metric value alongside the decoded dimensions.
+- Ignores active bits that are not declared in `mapping.items`.
 
 ### Extract Value
 
@@ -1459,6 +1860,51 @@ metrics:
 - Extracts only the numeric part `"23"` and uses it as the metric value.
 - If the value doesn’t match, the original string is retained.
 - Ideal for string metrics that embed numbers, units, or labels.
+- If `format: hex` is also set, the extracted value is interpreted as hexadecimal before being stored as a metric.
+
+### Format
+
+Use `format` to decode raw SNMP values as a symbol is converted into its
+textual or numeric representation.
+
+For metric values, `format` runs before the rest of the value-processing
+pipeline. For metric tags and device metadata, `format` runs before their own
+supported extraction, match, and mapping rules. `scale_factor` remains
+metric-value-only. Ordinary numeric PDUs do not pass through string-only
+processing such as `extract_value` or `match_pattern` unless an explicit
+string-decoding `format` routes them through the string processor first.
+
+If a format yields no value (for example, `text_date` encounters a vendor
+sentinel such as `0`, `4294967295`, `never`, or `n/a`), the result is treated
+as missing. For metrics, no metric value is produced from that symbol. For
+metric tags and device metadata, no tag or metadata value is produced from that
+symbol.
+
+Supported formats:
+
+- `hex`: decodes OCTET STRING bytes to lowercase hexadecimal text.
+- `ip_address`: decodes IP address values.
+- `mac_address`: decodes MAC address values.
+- `snmp_dateandtime`: decodes SNMPv2-TC `DateAndTime` OCTET STRING values
+  into unix timestamps. The 11-octet form uses its embedded UTC offset. The
+  8-octet form has no timezone fields, so the collector interprets it as UTC
+  because the device timezone is unavailable.
+- `text_date`: parses common textual date strings and epoch strings into
+  unix timestamps. Vendor no-value sentinels such as `0`, `4294967295`,
+  `never`, and `n/a` are treated as missing values.
+- `uint32`: interprets integer values as unsigned 32-bit values.
+
+```yaml
+metrics:
+  - MIB: EXAMPLE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.99999.1.1.0
+      name: example.expiry_timestamp
+      format: snmp_dateandtime
+```
+
+The decoded value becomes the metric value seen by later processing steps,
+such as `extract_value`, `mapping`, `scale_factor`, or `transform`.
 
 ### Scale Factor
 
@@ -1511,6 +1957,8 @@ metrics:
 - Virtual metrics are **calculated metrics** built from other metrics in your profile (or inherited ones).
 - They don’t query SNMP; they **reuse existing metric values** to create totals, fallbacks, or per-row aggregations.
 - Once computed, they behave like normal metrics: charted, tagged, and alertable.
+- Virtual metrics are part of the regular metrics view. A virtual metric cannot
+  depend on both regular metric rows and topology rows.
 
 Common use cases:
 
@@ -1538,7 +1986,9 @@ virtual_metrics:
           - { metric: <fallbackMetricB>, table: <tableName>, as: <dimensionName> }
 
     per_row: <true|false>
-    group_by: <label | [labels]>
+    group_by: [<labels>]
+    emit_tags:
+      - { tag: <outputTag>, from: <sourceTag> }
     chart_meta:
       description: ...
       family: ...
@@ -1554,34 +2004,40 @@ The collector evaluates alternatives **in order** and uses the **first** set tha
 
 ### Config reference
 
-| Item               | Field          | Type                 | Required | Default | Applies to               | Description                                                                                                                                                                     |
-|--------------------|----------------|----------------------|----------|---------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Virtual Metric** | `name`         | string               | yes      | —       | all                      | Unique within the profile. Used as metric/chart base name.                                                                                                                      |
-|                    | `sources`      | array\<Source\>      | no*      | —       | totals, per_row, grouped | Direct source set. Ignored if `alternatives` exist (alternatives take precedence).                                                                                              |
-|                    | `alternatives` | array\<Alternative\> | no*      | —       | totals, per_row, grouped | Ordered fallback sets. The first alternative whose sources produce data is used.                                                                                                |
-|                    | `per_row`      | bool                 | no       | false   | per-row/grouped          | When `true`, emits one output per input row; sources become dimensions; row tags attach.                                                                                        |
-|                    | `group_by`     | string / array       | no       | —       | per-row/grouped          | Label(s) used as row-key hints (in order). Missing/empty hints fall back to a full-tag stable key. With `per_row:false`, this acts like PromQL’s `sum by (...)`.                |
-|                    | `chart_meta`   | object               | no       | —       | all                      | Presentation metadata (`description`, `family`, `unit`, `type`).                                                                                                                |
-| **Source**         | `metric`       | string               | yes      | —       | —                        | Name of an existing metric (scalar or table column metric).                                                                                                                     |
-|                    | `table`        | string               | yes      | —       | —                        | Table name for the originating metric. Must match the metric’s table when used in per-row/grouped.                                                                              |
-|                    | `as`           | string               | yes      | —       | —                        | Dimension name within the composite (e.g., `in`, `out`).                                                                                                                        |
-| **Alternative**    | `sources`      | array\<Source\>      | yes      | —       | —                        | All sources in an alternative are evaluated together. If none produce data, the collector tries the next alternative. Per-row/group rules apply within the winning alternative. |
+| Item               | Field          | Type                 | Required | Default | Applies to               | Description                                                                                                                                                                                                     |
+|--------------------|----------------|----------------------|----------|---------|--------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Virtual Metric** | `name`         | string               | yes      | —       | all                      | Unique within the profile. Used as metric/chart base name.                                                                                                                                                      |
+|                    | `sources`      | array\<Source\>      | no*      | —       | totals, per_row, grouped | Direct source set. Ignored if `alternatives` exist (alternatives take precedence).                                                                                                                              |
+|                    | `alternatives` | array\<Alternative\> | no*      | —       | totals, per_row, grouped | Ordered fallback sets. The first alternative whose sources produce data is used.                                                                                                                                |
+|                    | `per_row`      | bool                 | no       | false   | per-row/grouped          | When `true`, emits one output per input row; sources become dimensions; row tags attach.                                                                                                                        |
+|                    | `group_by`     | array\<string\>      | no       | —       | per-row/grouped          | Label(s) used as row-key hints (in order). With `per_row:true`, missing/empty hints fall back to a stable key built from all non-underscore tags. With `per_row:false`, this acts like PromQL’s `sum by (...)`. |
+|                    | `emit_tags`    | array\<EmitTag\>     | no       | —       | per-row/grouped          | Renames or selects which source tags are emitted on the resulting virtual metric. Useful when grouping by private tags such as `_neighbor` but exporting standard tags such as `neighbor`.                      |
+|                    | `chart_meta`   | object               | no       | —       | all                      | Presentation metadata (`description`, `family`, `unit`, `type`).                                                                                                                                                |
+| **Source**         | `metric`       | string               | yes      | —       | —                        | Name of an existing metric (scalar or table column metric).                                                                                                                                                     |
+|                    | `table`        | string               | no*      | —       | —                        | Table name for the originating metric. Required for table-derived grouped/per-row virtual metrics. Scalar sources may omit it.                                                                                  |
+|                    | `as`           | string               | no       | —       | —                        | Optional dimension name within a composite (e.g., `in`, `out`). Single-source virtual metrics do not need it.                                                                                                   |
+|                    | `dim`          | string               | no       | —       | —                        | Selects one dimension from a MultiValue source metric (for example `start` or `established`) before aggregation. Useful when composing virtual metrics from mapped status charts.                               |
+| **EmitTag**        | `tag`          | string               | yes      | —       | —                        | Output tag name to emit on the virtual metric.                                                                                                                                                                  |
+|                    | `from`         | string               | yes      | —       | —                        | Existing source-tag name to copy from the grouped source rows.                                                                                                                                                  |
+| **Alternative**    | `sources`      | array\<Source\>      | yes      | —       | —                        | All sources in an alternative are evaluated together. If none produce data, the collector tries the next alternative. Per-row/group rules apply within the winning alternative.                                 |
 
 > At least one of `sources` or `alternatives` **must be defined**.
 
 #### Rules & Constraints
 
-| Rule                              | Description                                                                                                                                            |
-|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Precedence**                    | If both `sources` and `alternatives` exist, `alternatives` take precedence.                                                                            |
-| **Same-table requirement**        | When `per_row` or `group_by` is used, all sources must originate from the same table. For alternatives, this rule applies within each alternative set. |
-| **per_row: true**                 | One output per input row; multiple sources become chart dimensions (`as`); row tags attach automatically.                                              |
-| **group_by (with per_row:true)**  | Acts as row-key hints (in order). Missing or empty hints fall back to a full-tag composite key.                                                        |
-| **group_by (with per_row:false)** | Aggregates rows by the listed labels, similar to PromQL’s `sum by (...)`.                                                                              |
-| **Alternative evaluation**        | Alternatives are checked in order. The first whose sources produce data becomes the “winner”; others are ignored.                                      |
-| **Parent metadata**               | The virtual metric emits charts using its own `name` and `chart_meta`, even when data comes from an alternative.                                       |
-| **Dimensions**                    | Each `as` value defines a dimension in the resulting chart (e.g., `in`, `out`, `total`).                                                               |
-| **Totals vs per-row**             | Omitting both `per_row` and `group_by` produces a single total chart across all rows (device-wide view).                                               |
+| Rule                              | Description                                                                                                                                                                                                      |
+|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Precedence**                    | If both `sources` and `alternatives` exist, `alternatives` take precedence.                                                                                                                                      |
+| **Same-table requirement**        | When `per_row` or `group_by` is used, all sources must originate from the same table. For alternatives, this rule applies within each alternative set.                                                           |
+| **per_row: true**                 | One output per input row; multiple sources become chart dimensions (`as`); row tags attach automatically.                                                                                                        |
+| **group_by (with per_row:true)**  | Acts as row-key hints (in order). Missing or empty hints fall back to a stable key built from all non-underscore tags.                                                                                           |
+| **group_by (with per_row:false)** | Aggregates rows by the listed labels, similar to PromQL’s `sum by (...)`.                                                                                                                                        |
+| **emit_tags**                     | If omitted, `per_row:true` emits the winning row tags as-is. Grouped non-`per_row` metrics emit the `group_by` labels by default. When set, only the listed tags are emitted, using the `from` source-tag names. |
+| **Alternative evaluation**        | Alternatives are checked in order. The first whose sources produce data becomes the “winner”; others are ignored.                                                                                                |
+| **Parent metadata**               | The virtual metric emits charts using its own `name` and `chart_meta`, even when data comes from an alternative.                                                                                                 |
+| **Dimensions**                    | Each `as` value defines a dimension in the resulting chart (e.g., `in`, `out`, `total`).                                                                                                                         |
+| **Selected source dimension**     | When `dim` is set on a source, the collector reads only that MultiValue dimension from the source metric and ignores the rest.                                                                                   |
+| **Totals vs per-row**             | Omitting both `per_row` and `group_by` produces a single total chart across all rows (device-wide view).                                                                                                         |
 
 ### Examples
 
@@ -1606,7 +2062,7 @@ virtual_metrics:
 - Creates **one output per input row** in `ifXTable`.
 - Each chart represents one interface with two dimensions: `in` and `out`.
 - `group_by: ["interface"]` provides key hints to keep per-interface charts stable.
-- If a hint is missing or empty, a full-tag composite key is used instead.
+- If a hint is missing or empty, a stable key built from all non-underscore tags is used instead.
 - **Constraint**: `per_row` or `group_by` requires all sources to come from the same table.
 
 #### Total aggregation (sum across all interfaces)
@@ -1644,6 +2100,54 @@ virtual_metrics:
       family: 'Network/InterfaceType/Traffic'
       unit: "bit/s"
 ```
+
+#### Per-row availability from mapped status charts
+
+```yaml
+virtual_metrics:
+  - name: bgpPeerAvailability
+    per_row: true
+    sources:
+      - { metric: bgpPeerAdminStatus, table: bgpPeerTable, as: admin_enabled, dim: start }
+      - { metric: bgpPeerState, table: bgpPeerTable, as: established, dim: established }
+    chart_meta:
+      description: BGP peer administrative and established availability
+      family: 'Network/Routing/BGP/Peer/Availability'
+      unit: "{status}"
+```
+
+**What this does**:
+
+- Reuses mapped one-hot status charts instead of adding duplicate raw-code metrics.
+- Reads only the `start` dimension from `bgpPeerAdminStatus`.
+- Reads only the `established` dimension from `bgpPeerState`.
+- Emits one per-peer chart row with stable dimensions `admin_enabled` and `established`.
+
+#### Per-row grouping by private tags, but emitting normalized tags
+
+```yaml
+virtual_metrics:
+  - name: bgpPeerAvailability
+    per_row: true
+    group_by: ["_neighbor", "_address_family", "_subsequent_address_family"]
+    emit_tags:
+      - { tag: neighbor, from: _neighbor }
+      - { tag: address_family, from: _address_family }
+      - { tag: subsequent_address_family, from: _subsequent_address_family }
+    sources:
+      - { metric: hwBgpPeerAdminStatus, table: hwBgpPeerRouteTable, as: admin_enabled, dim: start }
+      - { metric: hwBgpPeerState, table: hwBgpPeerRouteTable, as: established, dim: established }
+    chart_meta:
+      description: BGP peer availability
+      family: 'Network/Routing/BGP/Peer/Availability'
+      unit: "{status}"
+```
+
+**What this does**:
+
+- Groups rows using private helper tags that are not meant to appear in the final chart labels.
+- Emits standard operator-facing tags on the virtual metric (`neighbor`, `address_family`, `subsequent_address_family`).
+- Avoids collapsing multiple AFI/SAFI rows for the same peer into one output row.
 
 **What this does**:
 
@@ -1701,3 +2205,239 @@ What this does
 - Builds a **single total chart** combining multiple related packet counters.
 - Each `as` becomes a **dimension** (`in_ucast`, `out_ucast`, `in_mcast`, …).
 - No `per_row`/`group_by` → totals aggregated across all interfaces.
+
+## BGP rows
+
+The SNMP collector ships a shared BGP pipeline that turns vendor-specific BGP
+MIB rows into typed device, peer, and peer-family rows. Profiles describe this
+telemetry in a top-level `bgp:` section. The collector emits typed BGP rows from
+that section; underscore-prefixed helper tags and `virtual_metrics:` aliases
+are legacy migration mechanisms, not the preferred BGP transport.
+
+### Authoring contract
+
+BGP row `kind` values are closed:
+
+- `device` — device-level BGP summaries with no peer identity.
+- `peer` — peer-level rows identified by `neighbor` and `remote_as`.
+- `peer_family` — address-family rows identified by `neighbor`, `remote_as`,
+  `address_family`, and `subsequent_address_family`.
+
+Peer-state mappings must use the six RFC 4271 state names: `idle`, `connect`,
+`active`, `opensent`, `openconfirm`, and `established`. A complete source must
+map all six states. If a source MIB is intentionally partial, set
+`partial: true` and use `partial_states: [...]` to record which canonical
+states the source can represent.
+
+When a peer or peer-family row does not provide a routing instance, the public
+chart/function label defaults to `default`. Profiles may still set
+`identity.routing_instance` explicitly when a vendor MIB exposes VRF or routing
+instance identity.
+
+Device rows support `device_counts.peers`, `device_counts.ibgp_peers`,
+`device_counts.ebgp_peers`, and per-state counters under
+`device_counts.states`. Peer and peer-family rows support typed groups such as
+`admin`, `state`, `connection`, `traffic`, `transitions`, `timers`,
+`last_error`, `last_notifications`, `reasons`, `graceful_restart`, `routes`,
+and `route_limits`.
+
+For table-backed rows, readable columns use `symbol:`. `not-accessible` index
+objects must be derived from the row index with `index`, `index_from_end`, or
+`index_transform`. Values from related tables use the first-class `table:`
+field on the BGP value, optionally with `lookup_symbol:` when the current row
+must join to another table by value.
+
+Example device-level counts:
+
+```yaml
+bgp:
+  - id: vendor-bgp-device-counts
+    MIB: VENDOR-BGP-MIB
+    kind: device
+    device_counts:
+      peers:
+        symbol: { OID: 1.3.6.1.4.1.99999.1, name: vendor.bgpPeerSessionNum }
+      ibgp_peers:
+        symbol: { OID: 1.3.6.1.4.1.99999.2, name: vendor.iBgpPeerSessionNum }
+      ebgp_peers:
+        symbol: { OID: 1.3.6.1.4.1.99999.3, name: vendor.eBgpPeerSessionNum }
+```
+
+Example peer-family row:
+
+```yaml
+bgp:
+  - id: vendor-bgp-peer-family
+    MIB: VENDOR-BGP-MIB
+    kind: peer_family
+    table:
+      OID: 1.3.6.1.4.1.99999.10
+      name: vendorBgpPeerTable
+    identity:
+      routing_instance: { value: default }
+      neighbor:
+        symbol: { OID: 1.3.6.1.4.1.99999.10.1.4, name: vendorBgpPeerRemoteAddr, format: ip_address }
+      remote_as:
+        symbol: { OID: 1.3.6.1.4.1.99999.10.1.5, name: vendorBgpPeerRemoteAs, format: uint32 }
+      address_family:
+        index: 1
+        mapping: { 1: ipv4, 2: ipv6, 25: l2vpn }
+      subsequent_address_family:
+        index: 2
+        mapping: { 1: unicast, 128: vpn }
+    state:
+      symbol:
+        OID: 1.3.6.1.4.1.99999.10.1.6
+        name: vendorBgpPeerState
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+    traffic:
+      updates:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.99999.10.1.7, name: vendorBgpPeerInUpdates }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.99999.10.1.8, name: vendorBgpPeerOutUpdates }
+```
+
+## Licensing rows
+
+The SNMP collector ships a **shared device-level licensing pipeline** that
+turns vendor-specific licensing telemetry into six common contexts
+(`snmp.license.remaining_time`, `snmp.license.authorization_remaining_time`,
+`snmp.license.certificate_remaining_time`, `snmp.license.grace_remaining_time`,
+`snmp.license.usage_percent`, `snmp.license.state`) plus an interactive
+`snmp:licenses` drill-down function. Profiles describe licensing telemetry in
+a top-level `licensing:` section. The collector emits typed license rows from
+that section; regular `metrics:` rows are not used as a licensing transport.
+
+### Authoring contract
+
+A licensing row describes one vendor license, entitlement, contract, or
+license pool. A row may be table-backed or scalar-backed:
+
+- A table-backed row declares `table:` and produces one typed license row per
+  SNMP table row.
+- A scalar-backed row omits `table:` and produces one typed license row for the
+  scalar values named in the row.
+- Scalar-backed rows that use only literal `value:` fields must declare an
+  explicit stable `id:` because there is no signal OID to use as structural
+  identity.
+
+Each row has:
+
+- `identity:` fields used by the drill-down: `id`, `name`, `feature`,
+  `component`.
+- `descriptors:` fields: `type`, `impact`, `perpetual`, `unlimited`.
+- `state:` for a normalized state severity (`0` healthy, `1` degraded, `2`
+  broken) plus the raw vendor value.
+- `signals:` for timers and usage:
+  - `expiry.timestamp` / `expiry.remaining`
+  - `authorization.timestamp` / `authorization.remaining`
+  - `certificate.timestamp` / `certificate.remaining`
+  - `grace.timestamp` / `grace.remaining`
+  - `usage.used`, `usage.capacity`, `usage.available`, `usage.percent`
+
+Example table-backed row:
+
+```yaml
+licensing:
+  - id: licensing_blades
+    MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.18.1
+      name: licensingTable
+    identity:
+      id:   { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2, name: licensingID }
+      name: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.4, name: licensingBladeName }
+      component: { value: blade }
+    descriptors:
+      type: { value: subscription }
+    state:
+      OID: 1.3.6.1.4.1.2620.1.6.18.1.1.5
+      name: licensingState
+      mapping:
+        valid: "0"
+        "about-to-expire": "1"
+        expired: "2"
+    signals:
+      expiry:
+        timestamp:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.6
+          name: licensingExpirationDate
+          sentinel: [timer_u32_max]
+      usage:
+        used:     { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.10, name: licensingUsedQuota }
+        capacity: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.9,  name: licensingTotalQuota }
+```
+
+Example scalar-backed row:
+
+```yaml
+licensing:
+  - id: routeros_upgrade
+    MIB: MIKROTIK-MIB
+    identity:
+      id: { value: routeros_upgrade }
+      name: { value: RouterOS upgrade entitlement }
+      component: { value: routeros }
+    descriptors:
+      type: { value: upgrade_entitlement }
+    signals:
+      expiry:
+        timestamp:
+          OID: 1.3.6.1.4.1.14988.1.1.4.2.0
+          name: mtxrLicUpgrUntil
+          format: snmp_dateandtime
+          sentinel: [timer_pre_1971]
+```
+
+### Parsing vendor expiry dates
+
+The value-processor format mechanism handles licensing expiry dates directly.
+On each poll, the table collector re-fetches value columns even on table-cache
+hits, so expiry values are decoded from the current poll's PDU instead of from
+cached row metadata.
+
+This does **not** disable the generic SNMP table cache for the surrounding
+table. Same-table `metric_tags` can still come from cached row metadata on
+cache hits. For live licensing state, prefer symbol-based severity and
+timestamp values over same-table text tags whenever the device exposes both.
+Three options are available:
+
+- **No format** — for vendors that publish expiry as a plain integer unix
+  epoch in `Gauge32` / `Counter32` / `Unsigned32`. The numeric value
+  processor reads it directly. Check Point's `licensingExpirationDate` is one
+  example.
+- `format: snmp_dateandtime` — for SNMPv2-TC `DateAndTime` octet strings (8
+  or 11 byte fixed binary). Used by vendors like Blue Coat ProxySG and Cisco
+  `CISCO-LICENSE-MGMT-MIB`.
+- `format: text_date` — for textual date strings (e.g., `2026-12-31`,
+  `Mon Jan 2 2030`, epoch seconds/milliseconds embedded as text). Accepts
+  the same layouts as the licensing pipeline's internal date parser. Used
+  by Fortinet's `DisplayString` expiry columns.
+
+The decoded unix timestamp is stored in the typed timer. The licensing
+projection can drop known "no expiry" sentinels before the consumer sees them.
+Supported sentinel policies are:
+
+- `timer_zero_or_negative`
+- `timer_u32_max`
+- `timer_pre_1971`
+
+### Identity and indexes
+
+For table rows, the collector keeps structural identity from the profile,
+table OID, and SNMP row index. Human-readable identity fields are for display
+and grouping in the drill-down. For `not-accessible` index objects, derive the
+identity from the row index:
+
+```yaml
+identity:
+  id:
+    index: 1
+```
