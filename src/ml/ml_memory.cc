@@ -50,6 +50,25 @@
 // Over-aligned types (alignof(T) > __STDCPP_DEFAULT_NEW_ALIGNMENT__)
 // route through the std::align_val_t-tagged overloads below; without
 // these, such allocations would silently bypass ML accounting.
+//
+// Known limitation: this is a thread-local accounting scheme. Whether an
+// allocation contributes to pulse_ml_memory_* is decided at free time by
+// the freeing thread's ml_alloc_active flag, not by the flag state at
+// the time the matching new ran. The two mismatch directions are:
+//
+//   * alloc under MlAllocScope on thread A, free on thread B outside any
+//     scope -- the allocation was counted, the matching free is not, so
+//     ml_memory_consumption is permanently over-counted.
+//   * alloc outside any scope, free on a thread inside MlAllocScope --
+//     the free attempts a decrement with no matching increment; the
+//     saturating atomic CAS in pulse_ml_memory_freed() clamps to zero.
+//
+// In practice the ML subsystem keeps allocations thread-local (worker
+// threads own their km_contexts, training queues, sample buffers, etc.)
+// and the user-facing entrypoints scope both allocation and destruction.
+// A size-prefix header on every C++ allocation would close this gap
+// fully at the cost of an unconditional per-allocation header; the
+// current implementation accepts the small residual skew instead.
 
 // Helper: posix_memalign requires alignment >= sizeof(void*) and a power
 // of two. std::align_val_t is always a power of two, but in principle
@@ -218,7 +237,7 @@ void operator delete(void *ptr, std::align_val_t /*al*/) noexcept
             pulse_ml_memory_freed(0);
 #endif
         }
-        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
+        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN_FREE);
         free(ptr);
     }
 }
@@ -233,7 +252,7 @@ void operator delete[](void *ptr, std::align_val_t /*al*/) noexcept
             pulse_ml_memory_freed(0);
 #endif
         }
-        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
+        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN_FREE);
         free(ptr);
     }
 }
@@ -248,7 +267,7 @@ void operator delete(void *ptr, [[maybe_unused]] size_t size, std::align_val_t /
             pulse_ml_memory_freed(size);
 #endif
         }
-        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
+        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN_FREE);
         free(ptr);
     }
 }
@@ -263,7 +282,68 @@ void operator delete[](void *ptr, [[maybe_unused]] size_t size, std::align_val_t
             pulse_ml_memory_freed(size);
 #endif
         }
-        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
+        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN_FREE);
         free(ptr);
     }
+}
+
+// std::nothrow_t variants. The standard library would otherwise resolve
+// these to the default implementations and bypass ML accounting. Each
+// wrapper forwards to the corresponding throwing form and translates the
+// std::bad_alloc into a nullptr return.
+
+void *operator new(size_t size, const std::nothrow_t &) noexcept
+{
+    try {
+        return ::operator new(size);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void *operator new[](size_t size, const std::nothrow_t &) noexcept
+{
+    try {
+        return ::operator new[](size);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void operator delete(void *ptr, const std::nothrow_t &) noexcept
+{
+    ::operator delete(ptr);
+}
+
+void operator delete[](void *ptr, const std::nothrow_t &) noexcept
+{
+    ::operator delete[](ptr);
+}
+
+void *operator new(size_t size, std::align_val_t al, const std::nothrow_t &) noexcept
+{
+    try {
+        return ::operator new(size, al);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void *operator new[](size_t size, std::align_val_t al, const std::nothrow_t &) noexcept
+{
+    try {
+        return ::operator new[](size, al);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void operator delete(void *ptr, std::align_val_t al, const std::nothrow_t &) noexcept
+{
+    ::operator delete(ptr, al);
+}
+
+void operator delete[](void *ptr, std::align_val_t al, const std::nothrow_t &) noexcept
+{
+    ::operator delete[](ptr, al);
 }

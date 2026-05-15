@@ -3,6 +3,10 @@
 #ifndef NETDATA_ML_MEMORY_H
 #define NETDATA_ML_MEMORY_H
 
+#ifndef __cplusplus
+#error "ml_memory.h is C++-only (uses thread_local, RAII, deleted special members)."
+#endif
+
 // ml_alloc_active gates the global operator new/delete overrides defined in
 // ml_memory.cc. The override unconditionally calls malloc/free, but only
 // updates the pulse_ml_memory_* counters when this flag is true on the
