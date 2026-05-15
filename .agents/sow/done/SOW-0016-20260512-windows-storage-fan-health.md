@@ -76,7 +76,7 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: ready
+Gate snapshot at implementation start: ready
 
 Problem / root-cause model:
 
@@ -618,3 +618,19 @@ Artifact maintenance gate:
 - End-user/operator docs: added taxonomy authoring files consumed by the integrations/dashboard taxonomy pipeline; generated docs were not changed by this source-only fix.
 - End-user/operator skills: no update needed; no public/operator skill behavior changed.
 - SOW lifecycle: reopened completed SOW for the CI regression, recorded root cause and repair, and will move it back to `done/` with the taxonomy commit.
+
+## Review Follow-up - 2026-05-15 Cubic Comments
+
+Root cause:
+
+- Cubic reviewed commit `5ab827d1da` while the PR body still described the earlier `nvme.exe`-only correction, so one spec finding treated the restored native Windows backend as removed even though the current code includes it.
+- Cubic also found valid documentation issues: the SOW pre-implementation gate used a present-tense `Status: ready`, the direct-agent how-to described `AGENT_HOST` with a port while examples append `:19999`, and the NVMe fallback prerequisite listed only one default Windows install path.
+
+Repair and validation:
+
+- Reworded the SOW gate line as `Gate snapshot at implementation start: ready`.
+- Clarified the Windows storage/fan spec that the current implementation includes the native Windows NVMe backend and that storage access should use query-only handles where possible.
+- Changed the direct-agent how-to input to define `AGENT_HOST` as a hostname/IP without a port.
+- Updated NVMe metadata and regenerated the NVMe integration page to list both `Program Files\nvme-cli\nvme.exe` and `Program Files (x86)\nvme-cli\nvme.exe` fallback locations.
+- `PYTHONUTF8=1 C:\msys64\mingw64\bin\python.exe integrations\gen_integrations.py`: passed.
+- Targeted `gen_docs_integrations.py -c go.d.plugin/nvme` regenerated the NVMe integration doc after applying the same local path-normalization shim previously needed on this Windows checkout; unrelated generated deletions from the symlink step were restored, and the generated banner paths were normalized back to repository-relative POSIX paths.

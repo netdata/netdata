@@ -20,7 +20,8 @@ health, NVMe health, NVMe thermal-throttling signals, and fan telemetry.
 
 - Windows NVMe health is collected by the go.d `nvme` collector so it reuses
   the existing NVMe chart contexts, alert context, labels, and metric names.
-- The native Windows backend discovers local physical drives as
+- This PR's current implementation includes a native Windows backend. It
+  discovers local physical drives as
   `\\.\PhysicalDriveN`, filters for `BusTypeNvme`, and queries the NVMe SMART /
   health information log through `IOCTL_STORAGE_QUERY_PROPERTY` with
   `StorageDeviceProtocolSpecificProperty`.
@@ -30,8 +31,9 @@ health, NVMe health, NVMe thermal-throttling signals, and fan telemetry.
   thermal-management total time.
 - Windows may optionally fall back to an installed `nvme.exe` when native
   discovery does not produce devices and the CLI is available.
-- Native Windows storage access must be read-first and fail closed; the backend
-  must not perform destructive or state-changing storage operations.
+- Native Windows storage access must use query-only handles where possible and
+  fail closed; the backend must not perform destructive or state-changing
+  storage operations.
 
 ## Fan Telemetry
 

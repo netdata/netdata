@@ -69,11 +69,11 @@ UI configuration requires paid Netdata Cloud plan.
 
 ### Prerequisites
 
-#### Install nvme-cli
+#### Install nvme-cli where required
 
 On Linux and BSD, see [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support) and install `nvme-cli` using your distribution's package manager.
 
-On Windows, `nvme-cli` is not required for the native backend. If the native backend cannot discover a device, Netdata can fall back to an installed `nvme.exe` when it is available in `PATH` or under `Program Files\nvme-cli\nvme.exe`.
+On Windows, `nvme-cli` is not required for the native backend. If the native backend cannot discover a device, Netdata can fall back to an installed `nvme.exe` when it is available in `PATH`, `Program Files\nvme-cli\nvme.exe`, or `Program Files (x86)\nvme-cli\nvme.exe`.
 
 
 #### For Netdata running in a Docker container: grant NVMe device access
@@ -116,7 +116,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| timeout | nvme binary execution timeout. This applies to the Linux/BSD `ndsudo` path and the optional Windows CLI fallback. | 2 | no |
+| timeout | External nvme binary execution timeout. This applies to the Linux/BSD `ndsudo` path and the optional Windows CLI fallback. | 2 | no |
 
 
 </details>

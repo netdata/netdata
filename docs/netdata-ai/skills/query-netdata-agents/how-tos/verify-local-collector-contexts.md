@@ -8,7 +8,7 @@ dimensions, and that obsolete contexts are absent?
 
 ## Inputs
 
-- Local agent host, usually `127.0.0.1:19999`.
+- Local agent host without a port, usually `127.0.0.1`.
 - `NODE_UUID` and `MACHINE_GUID` for that local agent.
 - `NETDATA_CLOUD_TOKEN` and `NETDATA_CLOUD_HOSTNAME` in `<repo>/.env`.
 - The expected context names and, when checking a regression, the
