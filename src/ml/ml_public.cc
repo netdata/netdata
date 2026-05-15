@@ -507,7 +507,27 @@ void ml_init()
     // overwrite) and never silently overwrites one on POSIX.
     char sentinel[FILENAME_MAX + 1];
     snprintfz(sentinel, FILENAME_MAX, "%s/.ml.db.delete", netdata_configured_cache_dir);
-    if (unlink(sentinel) == 0) {
+
+    // Attempt to consume the sentinel via unlink(). Three outcomes:
+    //  - unlink() == 0:     sentinel existed, removed -> proceed with quarantine.
+    //  - errno == ENOENT:   no sentinel -> normal startup, no quarantine.
+    //  - any other errno:   sentinel exists but couldn't be removed (EACCES,
+    //                       EROFS, EISDIR, ...). Log loudly and attempt the
+    //                       quarantine anyway -- the rename may still succeed
+    //                       (different file, different perms), and either way
+    //                       the operator gets a clear diagnostic instead of a
+    //                       silent re-open of the corrupt DB.
+    int unlink_rc = unlink(sentinel);
+    int unlink_err = errno;
+    bool sentinel_was_present = (unlink_rc == 0) || (unlink_rc == -1 && unlink_err != ENOENT);
+    if (unlink_rc == -1 && unlink_err != ENOENT) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "ML: sentinel %s exists but unlink() failed (errno=%d). "
+               "Attempting quarantine anyway; if rename also fails the sentinel "
+               "will remain in place and retry next start.",
+               sentinel, unlink_err);
+    }
+    if (sentinel_was_present) {
         char bad_path[FILENAME_MAX + 1];
         // Microsecond resolution so back-to-back restarts within the same
         // wall-clock second don't collide: a second-resolution suffix would

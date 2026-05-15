@@ -343,6 +343,7 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to reset statement when storing model, rc = %d", rc);
+        ml_db_mark_if_corrupt(rc);
         return rc;
     }
 
@@ -399,6 +400,7 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to reset statement when deleting models, rc = %d", rc);
+        ml_db_mark_if_corrupt(rc);
         return rc;
     }
 
@@ -457,6 +459,7 @@ ml_prune_old_models(size_t num_models_to_prune)
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to reset statement when pruning old models, rc = %d", rc);
+        ml_db_mark_if_corrupt(rc);
         return rc;
     }
 
@@ -594,14 +597,17 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     step_corrupt    = ml_db_mark_if_corrupt(step_rc);
     cleanup_corrupt = ml_db_mark_if_corrupt(rc);
 
-    // Partial step results may be polluting dim state -- roll back when step
-    // itself errored. The training-enqueue gate in ml_public.cc only requeues
-    // UNTRAINED dims, so leaving ts=TRAINED with a partial km_contexts locks
-    // the dim onto stale models until the next agent restart. Cleanup-only
-    // corruption (step=DONE, reset/finalize=CORRUPT) does NOT need this:
-    // step returned DONE so the rows already loaded are structurally valid;
-    // only the DB-level flag needs setting for future calls.
-    if (step_corrupt) {
+    // Partial step results may be polluting dim state -- roll back whenever
+    // step did NOT cleanly return SQLITE_DONE, not only on CORRUPT/NOTADB.
+    // SQLITE_BUSY-after-retries, SQLITE_IOERR, SQLITE_INTERRUPT etc. all
+    // leave a partial km_contexts behind, and the training-enqueue gate in
+    // ml_public.cc only requeues UNTRAINED dims -- so leaving ts=TRAINED
+    // with a truncated context locks the dim onto stale models until the
+    // next agent restart. Cleanup-only corruption (step=DONE, reset/
+    // finalize=CORRUPT) does NOT trigger this: step returned DONE so the
+    // rows already loaded are structurally valid; only the DB-level flag
+    // needs setting for future calls.
+    if (step_rc != SQLITE_DONE) {
         spinlock_lock(&dim->slock);
         dim->km_contexts.clear();
         dim->ts = TRAINING_STATUS_UNTRAINED;
