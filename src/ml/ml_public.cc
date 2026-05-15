@@ -491,7 +491,7 @@ void ml_init()
 
     // open sqlite db
     char path[FILENAME_MAX];
-    snprintfz(path, FILENAME_MAX - 1, "%s/%s", netdata_configured_cache_dir, "ml.db");
+    snprintfz(path, sizeof(path), "%s/%s", netdata_configured_cache_dir, "ml.db");
 
     // Consume the quarantine sentinel dropped by ml_db_mark_corrupt() in a
     // prior session: rename the corrupt ml.db to a timestamped ml.db.bad.*
@@ -506,34 +506,33 @@ void ml_init()
     // collides with a pre-existing ml.db.bad on Windows (which refuses to
     // overwrite) and never silently overwrites one on POSIX.
     char sentinel[FILENAME_MAX + 1];
-    snprintfz(sentinel, FILENAME_MAX, "%s/.ml.db.delete", netdata_configured_cache_dir);
+    snprintfz(sentinel, sizeof(sentinel), "%s/.ml.db.delete", netdata_configured_cache_dir);
 
     // Attempt to consume the sentinel via unlink(). Three outcomes:
-    //  - unlink() == 0:     sentinel existed, removed -> proceed with quarantine.
-    //  - errno == ENOENT:   no sentinel -> normal startup, no quarantine.
-    //  - any other errno:   sentinel exists but couldn't be removed (EACCES,
-    //                       EROFS, EISDIR, ...). Log loudly and attempt the
-    //                       quarantine anyway -- the rename may still succeed
-    //                       (different file, different perms), and either way
-    //                       the operator gets a clear diagnostic instead of a
-    //                       silent re-open of the corrupt DB.
+    //  - unlink() == 0:    sentinel existed, removed -> proceed with quarantine.
+    //  - errno == ENOENT:  no sentinel -> normal startup, no quarantine.
+    //  - any other errno:  sentinel exists but couldn't be removed (EACCES,
+    //                      EROFS, EISDIR, ...). DO NOT proceed -- if we
+    //                      quarantine without consuming the sentinel, the next
+    //                      startup would re-quarantine the freshly created
+    //                      ml.db, looping indefinitely. Log loudly and skip;
+    //                      operator must remove the sentinel manually.
     int unlink_rc = unlink(sentinel);
     int unlink_err = errno;
-    bool sentinel_was_present = (unlink_rc == 0) || (unlink_rc == -1 && unlink_err != ENOENT);
     if (unlink_rc == -1 && unlink_err != ENOENT) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "ML: sentinel %s exists but unlink() failed (errno=%d). "
-               "Attempting quarantine anyway; if rename also fails the sentinel "
-               "will remain in place and retry next start.",
-               sentinel, unlink_err);
+               "Skipping quarantine to avoid re-quarantining a healthy ml.db on every restart. "
+               "Operator must remove %s manually.",
+               sentinel, unlink_err, sentinel);
     }
-    if (sentinel_was_present) {
+    if (unlink_rc == 0) {
         char bad_path[FILENAME_MAX + 1];
         // Microsecond resolution so back-to-back restarts within the same
         // wall-clock second don't collide: a second-resolution suffix would
         // either silently overwrite the prior .bad on POSIX (forensic loss)
         // or fail rename() with EEXIST on Windows (sentinel kept restoring).
-        snprintfz(bad_path, FILENAME_MAX, "%s/ml.db.bad.%llu",
+        snprintfz(bad_path, sizeof(bad_path), "%s/ml.db.bad.%llu",
                   netdata_configured_cache_dir, (unsigned long long) now_realtime_usec());
 
         int rename_rc = rename(path, bad_path);
@@ -542,9 +541,9 @@ void ml_init()
             // (ml.db didn't exist). Either way, clean up the WAL/SHM
             // siblings so the fresh sqlite3_open() starts clean.
             char wal_path[FILENAME_MAX + 1];
-            snprintfz(wal_path, FILENAME_MAX, "%s-wal", path);
+            snprintfz(wal_path, sizeof(wal_path), "%s-wal", path);
             (void) unlink(wal_path);
-            snprintfz(wal_path, FILENAME_MAX, "%s-shm", path);
+            snprintfz(wal_path, sizeof(wal_path), "%s-shm", path);
             (void) unlink(wal_path);
             if (rename_rc == 0) {
                 nd_log(NDLS_DAEMON, NDLP_WARNING,

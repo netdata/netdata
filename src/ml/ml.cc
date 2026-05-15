@@ -18,8 +18,15 @@
 #define WORKER_TRAIN_FLUSH_MODELS      7
 
 sqlite3 *ml_db = NULL;
-bool ml_db_unusable = false;
+// File-private. Accessed exclusively via __atomic_* operations -- callers
+// in other TUs must go through ml_db_is_unusable() / ml_db_mark_corrupt().
+static bool ml_db_unusable = false;
 static netdata_mutex_t db_mutex;
+
+bool ml_db_is_unusable(void)
+{
+    return __atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED);
+}
 
 void ml_db_mark_corrupt(int rc)
 {
@@ -30,7 +37,7 @@ void ml_db_mark_corrupt(int rc)
         return; // already flagged, sentinel already attempted
 
     char sentinel[FILENAME_MAX + 1];
-    snprintfz(sentinel, FILENAME_MAX, "%s/.ml.db.delete", netdata_configured_cache_dir);
+    snprintfz(sentinel, sizeof(sentinel), "%s/.ml.db.delete", netdata_configured_cache_dir);
 
     // Use O_CREAT|O_EXCL (atomic create-or-fail) so a malicious symlink at
     // the sentinel path cannot redirect a O_TRUNC write to an attacker-
@@ -65,9 +72,16 @@ void ml_db_mark_corrupt(int rc)
 // Flag ml.db as corrupt if `rc` is a corruption signal (SQLITE_CORRUPT or
 // SQLITE_NOTADB). Returns true when the rc indicated corruption (regardless
 // of whether the sentinel was successfully written).
+//
+// Mask with 0xFF to also catch SQLite extended result codes (e.g.
+// SQLITE_CORRUPT_VTAB, SQLITE_CORRUPT_INDEX, ...) which encode the primary
+// code in the low 8 bits. Extended codes are off by default but can be
+// enabled per-connection via sqlite3_extended_result_codes(); masking is
+// the canonical way to compare regardless of that setting.
 static inline bool ml_db_mark_if_corrupt(int rc)
 {
-    if (rc != SQLITE_CORRUPT && rc != SQLITE_NOTADB)
+    int primary = rc & 0xFF;
+    if (primary != SQLITE_CORRUPT && primary != SQLITE_NOTADB)
         return false;
     ml_db_mark_corrupt(rc);
     return true;
@@ -289,7 +303,7 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
         return 1;
     }
 
-    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED)))
+    if (unlikely(ml_db_is_unusable()))
         return 1;
 
     if (unlikely(!res)) {
@@ -370,7 +384,7 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
         return 1;
     }
 
-    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED)))
+    if (unlikely(ml_db_is_unusable()))
         return 1;
 
     if (unlikely(!res)) {
@@ -427,7 +441,7 @@ ml_prune_old_models(size_t num_models_to_prune)
         return 1;
     }
 
-    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED)))
+    if (unlikely(ml_db_is_unusable()))
         return 1;
 
     if (unlikely(!res)) {
@@ -500,7 +514,7 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         return 1;
     }
 
-    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED)))
+    if (unlikely(ml_db_is_unusable()))
         return 1;
 
     if (unlikely(!res)) {
@@ -1318,7 +1332,7 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     static time_t next_vacuum_run = 0;
     int op_no = 1;
 
-    if (unlikely(__atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED))) {
+    if (unlikely(ml_db_is_unusable())) {
         worker->pending_model_info.clear();
         return;
     }
@@ -1363,7 +1377,7 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     // If corruption was detected mid-loop (add/delete/prune set ml_db_unusable
     // before returning), skip rollback and vacuum -- the DB is already flagged
     // and will be quarantined at next restart; further SQL only spams errors.
-    bool became_unusable = __atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED);
+    bool became_unusable = ml_db_is_unusable();
 
     // rollback transaction on failure
     if (rc && !became_unusable) {
