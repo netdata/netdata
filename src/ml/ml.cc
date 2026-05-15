@@ -912,6 +912,11 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     }
 
     if (cns_size < n) {
+        // Warmup growth is the only allocating path in this function
+        // (steady-state ring-buffer mode below does not allocate). Keep
+        // the MlAllocScope narrow so the per-sample hot path does not
+        // pay the TLS toggle once warmup is complete.
+        MlAllocScope _ml_scope;
         dim->cns.push_back(value);
         spinlock_unlock(&dim->slock);
         return false;

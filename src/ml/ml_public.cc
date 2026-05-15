@@ -441,7 +441,8 @@ ALWAYS_INLINE_ONLY void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomal
     if (!host->ml_running)
         return;
 
-    MlAllocScope _ml_scope;
+    // No MlAllocScope here: ml_chart_update_dimension() only mutates
+    // integer counters on an existing chart struct and never allocates.
 
     ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
 
@@ -460,7 +461,10 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
     if (!host->ml_running)
         return false;
 
-    MlAllocScope _ml_scope;
+    // No MlAllocScope here: this is the per-sample hot path. The only
+    // allocating site inside ml_dimension_predict() is the warmup
+    // push_back on dim->cns, which carries its own narrow MlAllocScope.
+    // ml_chart_update_dimension() does not allocate.
 
     ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
 
