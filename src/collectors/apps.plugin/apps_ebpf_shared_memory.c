@@ -16,7 +16,24 @@ static size_t apps_ebpf_shm_total = 0;
 static size_t apps_ebpf_snapshot_total = 0;
 static int apps_ebpf_shm_fd = -1;
 static sem_t *apps_ebpf_sem = SEM_FAILED;
-static struct ebpf_publish_cachestat apps_ebpf_cachestat_publish = { 0 };
+// Per-PID rows stay compact, but the cycle-wide apps accumulator must not
+// wrap when many rows are summed together on busy hosts.
+struct apps_ebpf_cachestat_totals {
+    uint64_t add_to_page_cache_lru;
+    uint64_t mark_page_accessed;
+    uint64_t account_page_dirtied;
+    uint64_t mark_buffer_dirty;
+};
+
+static struct {
+    uint64_t ct;
+    int64_t ratio;
+    int64_t dirty;
+    int64_t hit;
+    int64_t miss;
+    struct apps_ebpf_cachestat_totals current;
+    struct apps_ebpf_cachestat_totals prev;
+} apps_ebpf_cachestat_publish = { 0 };
 
 static int apps_ebpf_compare_pid(const void *a, const void *b)
 {
@@ -86,7 +103,7 @@ static bool apps_ebpf_copy_snapshot(void)
     return true;
 }
 
-static inline void apps_ebpf_sum_single_cachestat(struct ebpf_cachestat *dst, const struct ebpf_cachestat *src)
+static inline void apps_ebpf_sum_single_cachestat(struct apps_ebpf_cachestat_totals *dst, const struct ebpf_cachestat *src)
 {
     dst->account_page_dirtied += src->account_page_dirtied;
     dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
@@ -104,8 +121,8 @@ static inline int64_t apps_ebpf_diff_counters(uint64_t current, uint64_t previou
 
 void apps_ebpf_accumulate_cachestat(void)
 {
-    struct ebpf_cachestat previous = apps_ebpf_cachestat_publish.current;
-    struct ebpf_cachestat current = { 0 };
+    struct apps_ebpf_cachestat_totals previous = apps_ebpf_cachestat_publish.current;
+    struct apps_ebpf_cachestat_totals current = { 0 };
     uint64_t newest_ct = 0;
     bool have_rows = false;
 
