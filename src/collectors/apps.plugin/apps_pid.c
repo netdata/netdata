@@ -912,6 +912,12 @@ static inline void clear_pid_rates(struct pid_stat *p) {
 }
 
 bool collect_data_for_all_pids(void) {
+    // Pull the latest eBPF snapshot at the start of the cycle so every PID
+    // sees the same shared-memory view before /proc accumulation begins.
+#if defined(OS_LINUX)
+    (void)apps_ebpf_shared_memory_refresh();
+#endif
+
     // mark all pids as unread
 #if (INCREMENTAL_DATA_COLLECTION == 0)
     usec_t now_mon_ut = now_monotonic_usec();

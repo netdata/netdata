@@ -104,6 +104,12 @@ static inline int incrementally_read_pid_io(struct pid_stat *p, void *ptr) {
 int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     if(unlikely(p->read)) return 0;
 
+    // Attach the eBPF row before any /proc accumulation so downstream
+    // aggregation sees the same snapshot as the rest of the cycle.
+#if defined(OS_LINUX)
+    (void)apps_ebpf_sync_pid_stat(p);
+#endif
+
     pid_collection_started(p);
 
     // --------------------------------------------------------------------
@@ -157,10 +163,6 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
 #endif
 
     pid_collection_completed(p);
-
-#if defined(OS_LINUX)
-    (void)apps_ebpf_sync_pid_stat(p);
-#endif
 
     return 1;
 }
