@@ -11,6 +11,13 @@
 #ifndef NETDATA_APP_FAMILY
 #define NETDATA_APP_FAMILY "app"
 #endif
+
+struct apps_ebpf_cachestat_totals {
+    uint64_t account_page_dirtied;
+    uint64_t add_to_page_cache_lru;
+    uint64_t mark_buffer_dirty;
+    uint64_t mark_page_accessed;
+};
 #endif
 
 #define OS_FUNC_CONCAT(a, b) a##b
@@ -429,6 +436,8 @@ struct target {
 
 #if defined(OS_LINUX)
     struct ebpf_publish_cachestat cachestat;
+    struct apps_ebpf_cachestat_totals cachestat_totals;
+    struct apps_ebpf_cachestat_totals cachestat_totals_prev;
 #endif
 
 #if (PROCESSES_HAVE_FDS == 1)

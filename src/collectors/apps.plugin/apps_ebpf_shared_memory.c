@@ -144,8 +144,8 @@ void apps_ebpf_accumulate_cachestat(void)
     bool have_rows = false;
 
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
-        w->cachestat.prev = w->cachestat.current;
-        memset(&w->cachestat.current, 0, sizeof(w->cachestat.current));
+        w->cachestat_totals_prev = w->cachestat_totals;
+        memset(&w->cachestat_totals, 0, sizeof(w->cachestat_totals));
         w->cachestat.ct = 0;
         w->cachestat.ratio = 0;
         w->cachestat.dirty = 0;
@@ -158,26 +158,26 @@ void apps_ebpf_accumulate_cachestat(void)
             continue;
 
         have_rows = true;
-        struct ebpf_publish_cachestat *publish = &p->target->cachestat;
+        struct target *w = p->target;
         const struct ebpf_cachestat *current = &p->ebpf.cachestat.current;
 
-        publish->current.account_page_dirtied += current->account_page_dirtied;
-        publish->current.add_to_page_cache_lru += current->add_to_page_cache_lru;
-        publish->current.mark_buffer_dirty += current->mark_buffer_dirty;
-        publish->current.mark_page_accessed += current->mark_page_accessed;
+        w->cachestat_totals.account_page_dirtied += current->account_page_dirtied;
+        w->cachestat_totals.add_to_page_cache_lru += current->add_to_page_cache_lru;
+        w->cachestat_totals.mark_buffer_dirty += current->mark_buffer_dirty;
+        w->cachestat_totals.mark_page_accessed += current->mark_page_accessed;
 
-        if (p->ebpf.cachestat.ct > publish->ct)
-            publish->ct = p->ebpf.cachestat.ct;
+        if (p->ebpf.cachestat.ct > w->cachestat.ct)
+            w->cachestat.ct = p->ebpf.cachestat.ct;
     }
 
     if (!have_rows)
         return;
 
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
-        int64_t mpa = apps_ebpf_diff_counters(w->cachestat.current.mark_page_accessed, w->cachestat.prev.mark_page_accessed);
-        int64_t mbd = apps_ebpf_diff_counters(w->cachestat.current.mark_buffer_dirty, w->cachestat.prev.mark_buffer_dirty);
-        int64_t apcl = apps_ebpf_diff_counters(w->cachestat.current.add_to_page_cache_lru, w->cachestat.prev.add_to_page_cache_lru);
-        int64_t apd = apps_ebpf_diff_counters(w->cachestat.current.account_page_dirtied, w->cachestat.prev.account_page_dirtied);
+        int64_t mpa = apps_ebpf_diff_counters(w->cachestat_totals.mark_page_accessed, w->cachestat_totals_prev.mark_page_accessed);
+        int64_t mbd = apps_ebpf_diff_counters(w->cachestat_totals.mark_buffer_dirty, w->cachestat_totals_prev.mark_buffer_dirty);
+        int64_t apcl = apps_ebpf_diff_counters(w->cachestat_totals.add_to_page_cache_lru, w->cachestat_totals_prev.add_to_page_cache_lru);
+        int64_t apd = apps_ebpf_diff_counters(w->cachestat_totals.account_page_dirtied, w->cachestat_totals_prev.account_page_dirtied);
 
         w->cachestat.dirty = mbd;
 
