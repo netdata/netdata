@@ -98,7 +98,12 @@ static bool apps_ebpf_refresh_shared_memory_mapping(void)
         return false;
 
     struct stat st;
-    bool changed = fstat(fd, &st) == 0 &&
+    if (fstat(fd, &st) != 0) {
+        close(fd);
+        return false;
+    }
+
+    bool changed =
         (st.st_dev != apps_ebpf_shm_dev || st.st_ino != apps_ebpf_shm_ino ||
          st.st_size <= 0 || (size_t)st.st_size < sizeof(struct ebpf_pid_stat) ||
          (size_t)st.st_size / sizeof(struct ebpf_pid_stat) != apps_ebpf_shm_total);
