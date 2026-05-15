@@ -41,11 +41,13 @@ Restarting the Netdata Agent will cause temporary gaps in your collected metrics
 
 Use the commands above to check whether the Netdata Agent service is running.
 
-You can also verify that the Agent is reachable by opening `http://localhost:19999` in a browser, or by running:
+You can also verify that the Agent is reachable by opening `http://NODE:19999` in a browser, or by running:
 
 ```bash
-curl http://localhost:19999/api/v1/info
+curl http://NODE:19999/api/v1/info
 ```
+
+Replace `NODE` with the IP address or hostname of your Agent.
 
 :::tip
 
@@ -114,7 +116,7 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 | **Start**         | `sudo systemctl start netdata`   | `sudo service netdata start`     | `sudo netdata`                   |
 | **Stop**          | `sudo systemctl stop netdata`    | `sudo service netdata stop`      | `sudo killall netdata`           |
 | **Restart**       | `sudo systemctl restart netdata` | `sudo service netdata restart`   | Stop + Start                     |
-| **Status**        | `sudo systemctl status netdata`  | `sudo service netdata status`    | `curl http://localhost:19999/api/v1/info` |
+| **Status**        | `sudo systemctl status netdata`  | `sudo service netdata status`    | `curl http://NODE:19999/api/v1/info` |
 | **Reload Health** | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  |
 | **Shutdown**      | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` |
 
