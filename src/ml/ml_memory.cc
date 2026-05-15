@@ -1,5 +1,5 @@
 #include <cstdlib>
-#include <memory>
+#include <new>
 
 #if defined(__linux__)
   #include <malloc.h>
@@ -16,13 +16,14 @@
 #include "ml_memory.h"
 #include "daemon/pulse/pulse-ml.h"
 
-// The six operator overrides below replace the global C++ allocator hooks
-// for the netdata binary (only compiled when ENABLE_MIMALLOC is OFF).
-// They unconditionally call malloc/free; the pulse_ml_memory_* counters are
-// updated only when ml_alloc_active is true on the calling thread, so that
-// the ML memory chart reflects ML allocations and not unrelated C++ work
-// (notably ACLK protobuf serialization) that happens to share the same
-// global operator new/delete.
+// The operator overrides below replace the global C++ allocator hooks for
+// the netdata binary (only compiled when ENABLE_MIMALLOC is OFF). They
+// unconditionally call malloc/free (or posix_memalign for over-aligned
+// allocations); the pulse_ml_memory_* counters are updated only when
+// ml_alloc_active is true on the calling thread, so that the ML memory
+// chart reflects ML allocations and not unrelated C++ work (notably ACLK
+// protobuf serialization) that happens to share the same global operator
+// new/delete.
 //
 // On platforms with malloc_usable_size() (Linux/macOS/FreeBSD), every path
 // reports the allocator block size returned by malloc_usable_size(ptr),
@@ -42,10 +43,30 @@
 // overloads have no size to fall back to; they decrement zero and rely
 // on the saturating pulse_ml_memory_freed() to prevent underflow. Net
 // effect on these platforms: a small persistent over-count proportional
-// to the share of frees that route through unsized delete.
+// to the share of frees that route through unsized delete. We accept
+// this over a size-prefix scheme that would impose a per-allocation
+// header on every build.
+//
+// Over-aligned types (alignof(T) > __STDCPP_DEFAULT_NEW_ALIGNMENT__)
+// route through the std::align_val_t-tagged overloads below; without
+// these, such allocations would silently bypass ML accounting.
+
+// Helper: posix_memalign requires alignment >= sizeof(void*) and a power
+// of two. std::align_val_t is always a power of two, but in principle
+// can be smaller than sizeof(void*); clamp upward for safety.
+static inline size_t ml_min_posix_alignment(size_t alignment) noexcept
+{
+    return alignment < sizeof(void *) ? sizeof(void *) : alignment;
+}
 
 void *operator new(size_t size)
 {
+    // C++ requires operator new to return a non-null pointer even for a
+    // zero-byte request; malloc(0) is implementation-defined and may
+    // return nullptr.
+    if (size == 0)
+        size = 1;
+
     void *ptr = malloc(size);
     if (!ptr)
         throw std::bad_alloc();
@@ -63,6 +84,9 @@ void *operator new(size_t size)
 
 void *operator new[](size_t size)
 {
+    if (size == 0)
+        size = 1;
+
     void *ptr = malloc(size);
     if (!ptr)
         throw std::bad_alloc();
@@ -78,13 +102,12 @@ void *operator new[](size_t size)
     return ptr;
 }
 
-void operator delete(void *ptr, size_t size) noexcept
+void operator delete(void *ptr, [[maybe_unused]] size_t size) noexcept
 {
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
             pulse_ml_memory_freed(malloc_usable_size(ptr));
-            (void)size;
 #else
             pulse_ml_memory_freed(size);
 #endif
@@ -94,13 +117,12 @@ void operator delete(void *ptr, size_t size) noexcept
     }
 }
 
-void operator delete[](void *ptr, size_t size) noexcept
+void operator delete[](void *ptr, [[maybe_unused]] size_t size) noexcept
 {
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
             pulse_ml_memory_freed(malloc_usable_size(ptr));
-            (void)size;
 #else
             pulse_ml_memory_freed(size);
 #endif
@@ -133,6 +155,112 @@ void operator delete[](void *ptr) noexcept
             pulse_ml_memory_freed(malloc_usable_size(ptr));
 #else
             pulse_ml_memory_freed(0);
+#endif
+        }
+        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
+        free(ptr);
+    }
+}
+
+// Over-aligned overloads (C++17). Triggered when alignof(T) exceeds
+// __STDCPP_DEFAULT_NEW_ALIGNMENT__ (typically 16). posix_memalign is
+// available on every platform with malloc_usable_size() above and on
+// most POSIX systems otherwise; the resulting pointer is freed with
+// plain free().
+
+void *operator new(size_t size, std::align_val_t al)
+{
+    if (size == 0)
+        size = 1;
+
+    void *ptr = nullptr;
+    if (posix_memalign(&ptr, ml_min_posix_alignment(static_cast<size_t>(al)), size) != 0 || !ptr)
+        throw std::bad_alloc();
+
+    if (ml_alloc_active) {
+#ifdef ML_HAVE_MALLOC_USABLE_SIZE
+        pulse_ml_memory_allocated(malloc_usable_size(ptr));
+#else
+        pulse_ml_memory_allocated(size);
+#endif
+    }
+    workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN);
+    return ptr;
+}
+
+void *operator new[](size_t size, std::align_val_t al)
+{
+    if (size == 0)
+        size = 1;
+
+    void *ptr = nullptr;
+    if (posix_memalign(&ptr, ml_min_posix_alignment(static_cast<size_t>(al)), size) != 0 || !ptr)
+        throw std::bad_alloc();
+
+    if (ml_alloc_active) {
+#ifdef ML_HAVE_MALLOC_USABLE_SIZE
+        pulse_ml_memory_allocated(malloc_usable_size(ptr));
+#else
+        pulse_ml_memory_allocated(size);
+#endif
+    }
+    workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN);
+    return ptr;
+}
+
+void operator delete(void *ptr, std::align_val_t /*al*/) noexcept
+{
+    if (ptr) {
+        if (ml_alloc_active) {
+#ifdef ML_HAVE_MALLOC_USABLE_SIZE
+            pulse_ml_memory_freed(malloc_usable_size(ptr));
+#else
+            pulse_ml_memory_freed(0);
+#endif
+        }
+        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
+        free(ptr);
+    }
+}
+
+void operator delete[](void *ptr, std::align_val_t /*al*/) noexcept
+{
+    if (ptr) {
+        if (ml_alloc_active) {
+#ifdef ML_HAVE_MALLOC_USABLE_SIZE
+            pulse_ml_memory_freed(malloc_usable_size(ptr));
+#else
+            pulse_ml_memory_freed(0);
+#endif
+        }
+        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
+        free(ptr);
+    }
+}
+
+void operator delete(void *ptr, [[maybe_unused]] size_t size, std::align_val_t /*al*/) noexcept
+{
+    if (ptr) {
+        if (ml_alloc_active) {
+#ifdef ML_HAVE_MALLOC_USABLE_SIZE
+            pulse_ml_memory_freed(malloc_usable_size(ptr));
+#else
+            pulse_ml_memory_freed(size);
+#endif
+        }
+        workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
+        free(ptr);
+    }
+}
+
+void operator delete[](void *ptr, [[maybe_unused]] size_t size, std::align_val_t /*al*/) noexcept
+{
+    if (ptr) {
+        if (ml_alloc_active) {
+#ifdef ML_HAVE_MALLOC_USABLE_SIZE
+            pulse_ml_memory_freed(malloc_usable_size(ptr));
+#else
+            pulse_ml_memory_freed(size);
 #endif
         }
         workers_memory_call(WORKERS_MEMORY_CALL_LIBC_FREE);
