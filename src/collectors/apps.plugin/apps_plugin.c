@@ -848,7 +848,9 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
+#if defined(OS_LINUX)
         apps_ebpf_accumulate_cachestat();
+#endif
         aggregate_processes_to_targets();
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)

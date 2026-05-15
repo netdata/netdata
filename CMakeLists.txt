@@ -2709,8 +2709,12 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_incremental_collection.c
             src/collectors/apps.plugin/apps_os_windows_nt.c
             src/collectors/apps.plugin/apps_pid_match.c
-            src/collectors/apps.plugin/apps_ebpf_shared_memory.c
     )
+
+    if(OS_LINUX)
+        list(APPEND APPS_PLUGIN_FILES
+                src/collectors/apps.plugin/apps_ebpf_shared_memory.c)
+    endif()
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
 
@@ -3053,7 +3057,7 @@ if(ENABLE_PLUGIN_EBPF)
     set(EBPF_GO_CGO_LDFLAGS
             "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz")
 
-    if(ENABLE_PLUGIN_EBPF_GO)
+    if(OS_LINUX AND ENABLE_PLUGIN_EBPF_GO)
         add_custom_command(
                 OUTPUT "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
                 COMMAND "${CMAKE_COMMAND}" -E env
