@@ -7,7 +7,7 @@
 #include "libnetdata/libnetdata.h"
 
 #if defined(OS_LINUX)
-#include "apps_ebpf_shared_memory.h"
+#include "../ebpf.plugin/ebpfgo.plugin/apps_ebpf_shared_pid_row.h"
 #endif
 
 #define OS_FUNC_CONCAT(a, b) a##b

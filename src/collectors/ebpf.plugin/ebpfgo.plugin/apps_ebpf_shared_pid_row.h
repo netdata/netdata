@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_APPS_EBPF_SHARED_MEMORY_H
-#define NETDATA_APPS_EBPF_SHARED_MEMORY_H 1
+#ifndef NETDATA_APPS_EBPF_SHARED_PID_ROW_H
+#define NETDATA_APPS_EBPF_SHARED_PID_ROW_H 1
 
-#if defined(OS_LINUX)
+#include <stdint.h>
 
-#include "libnetdata/libnetdata.h"
-
-#include <stdbool.h>
-
+#ifndef EBPF_MAX_COMPARE_NAME
 #define EBPF_MAX_COMPARE_NAME 95
+#endif
+
+#ifndef TASK_COMM_LEN
 #define TASK_COMM_LEN 16
+#endif
 
 #define NETDATA_EBPFGO_INTEGRATION_NAME "netdata_shm_integration_ebpfgo"
 #define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo"
@@ -133,10 +134,4 @@ struct ebpf_pid_stat {
     struct ebpf_publish_vfs vfs;
 };
 
-struct pid_stat;
-bool apps_ebpf_shared_memory_refresh(void);
-bool apps_ebpf_sync_pid_stat(struct pid_stat *p);
-
 #endif
-
-#endif // NETDATA_APPS_EBPF_SHARED_MEMORY_H
