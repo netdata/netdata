@@ -15,4 +15,6 @@ func (p *SharedPidMemoryPublisher) Publish(entries []ebpfPidStat) error {
 }
 
 func (p *SharedPidMemoryPublisher) Close() {
+	// No shared memory or semaphore resources are opened on non-Unix builds.
+	// The publisher is intentionally a no-op here.
 }
