@@ -31,7 +31,7 @@ func TestCachestatGlobalStateUpdate(t *testing.T) {
 				Miss:  70,
 			},
 		},
-		"calculates deltas on second sample": {
+		"keeps dirty monotonic on second sample": {
 			updates: []cachestatGlobalCounters{
 				{
 					MarkPageAccessed:   100,
@@ -49,8 +49,31 @@ func TestCachestatGlobalStateUpdate(t *testing.T) {
 			wantValid: true,
 			want: cachestatGlobalPublish{
 				Ratio: 75,
-				Dirty: 10,
+				Dirty: 30,
 				Hit:   15,
+				Miss:  5,
+			},
+		},
+		"clamps dirty when the raw counter drops": {
+			updates: []cachestatGlobalCounters{
+				{
+					MarkPageAccessed:   100,
+					MarkBufferDirty:    40,
+					AddToPageCacheLru:  80,
+					AccountPageDirtied: 10,
+				},
+				{
+					MarkPageAccessed:   130,
+					MarkBufferDirty:    5,
+					AddToPageCacheLru:  95,
+					AccountPageDirtied: 20,
+				},
+			},
+			wantValid: true,
+			want: cachestatGlobalPublish{
+				Ratio: 83,
+				Dirty: 40,
+				Hit:   25,
 				Miss:  5,
 			},
 		},
