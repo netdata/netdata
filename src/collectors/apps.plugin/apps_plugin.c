@@ -848,6 +848,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
+        apps_ebpf_accumulate_cachestat();
         aggregate_processes_to_targets();
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)

@@ -781,6 +781,7 @@ void function_processes(const char *transaction, char *function,
 #if defined(OS_LINUX)
 bool apps_ebpf_shared_memory_refresh(void);
 bool apps_ebpf_sync_pid_stat(struct pid_stat *p);
+void apps_ebpf_accumulate_cachestat(void);
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
