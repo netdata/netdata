@@ -3055,7 +3055,7 @@ if(ENABLE_PLUGIN_EBPF)
     string(APPEND EBPF_GO_CGO_CFLAGS " -I${ebpf-co-re_SOURCE_DIR}")
     string(STRIP "${EBPF_GO_CGO_CFLAGS}" EBPF_GO_CGO_CFLAGS)
     set(EBPF_GO_CGO_LDFLAGS
-            "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz")
+            "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz -lrt")
 
     if(OS_LINUX AND ENABLE_PLUGIN_EBPF_GO)
         add_custom_command(
