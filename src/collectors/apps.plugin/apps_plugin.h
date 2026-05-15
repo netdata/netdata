@@ -8,6 +8,9 @@
 
 #if defined(OS_LINUX)
 #include "../ebpf.plugin/ebpfgo.plugin/apps_ebpf_shared_pid_row.h"
+#ifndef NETDATA_APP_FAMILY
+#define NETDATA_APP_FAMILY "app"
+#endif
 #endif
 
 #define OS_FUNC_CONCAT(a, b) a##b
@@ -423,6 +426,10 @@ struct target {
 
     kernel_uint_t uptime_min;
     kernel_uint_t uptime_max;
+
+#if defined(OS_LINUX)
+    struct ebpf_publish_cachestat cachestat;
+#endif
 
 #if (PROCESSES_HAVE_FDS == 1)
     struct openfds openfds;

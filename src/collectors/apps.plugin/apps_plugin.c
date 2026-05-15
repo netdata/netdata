@@ -848,10 +848,10 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
+        aggregate_processes_to_targets();
 #if defined(OS_LINUX)
         apps_ebpf_accumulate_cachestat();
 #endif
-        aggregate_processes_to_targets();
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         OS_FUNCTION(apps_os_read_global_cpu_utilization)();

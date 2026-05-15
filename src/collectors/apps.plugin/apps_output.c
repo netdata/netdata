@@ -2,6 +2,10 @@
 
 #include "apps_plugin.h"
 
+#if defined(OS_LINUX)
+static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt);
+#endif
+
 static inline void send_BEGIN(const char *type, const char *name,const char *metric,  usec_t usec) {
     fprintf(stdout, "BEGIN %s.%s_%s %" PRIu64 "\n", type, name, metric, usec);
 }
@@ -110,6 +114,10 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_BEGIN(type, string2str(w->clean_name), "threads", dt);
         send_SET("threads", w->values[PDF_THREADS]);
         send_END();
+
+#if defined(OS_LINUX)
+        send_cachestat_data_to_netdata(w, type, dt);
+#endif
 
         if (unlikely(!w->values[PDF_PROCESSES]))
             continue;
@@ -290,6 +298,62 @@ static void send_file_charts_to_netdata(struct target *w, const char *type, cons
 #endif // PROCESSES_HAVE_FDS || PROCESSES_HAVE_HANDLES
 }
 
+#if defined(OS_LINUX)
+static void send_cachestat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
+    if (strcmp(type, NETDATA_APP_FAMILY) != 0)
+        return;
+
+    fprintf(stdout,
+            "CHART %s.%s_ebpf_cachestat_hit_ratio '' 'Hit ratio' '%%' page_cache %s.ebpf_cachestat_hit_ratio line 20260 %d\n",
+            type, string2str(w->clean_name), type, update_every);
+    fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+    fprintf(stdout, "CLABEL_COMMIT\n");
+    fprintf(stdout, "DIMENSION ratio '' absolute 1 1\n");
+
+    fprintf(stdout,
+            "CHART %s.%s_ebpf_cachestat_dirty_pages '' 'Number of dirty pages' 'page/s' page_cache %s.ebpf_cachestat_dirty_pages stacked 20261 %d\n",
+            type, string2str(w->clean_name), type, update_every);
+    fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+    fprintf(stdout, "CLABEL_COMMIT\n");
+    fprintf(stdout, "DIMENSION pages '' incremental 1 1\n");
+
+    fprintf(stdout,
+            "CHART %s.%s_ebpf_cachestat_access '' 'Number of accessed files' 'hits/s' page_cache %s.ebpf_cachestat_access stacked 20262 %d\n",
+            type, string2str(w->clean_name), type, update_every);
+    fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+    fprintf(stdout, "CLABEL_COMMIT\n");
+    fprintf(stdout, "DIMENSION hits '' absolute 1 1\n");
+
+    fprintf(stdout,
+            "CHART %s.%s_ebpf_cachestat_misses '' 'Files out of page cache' 'misses/s' page_cache %s.ebpf_cachestat_misses stacked 20263 %d\n",
+            type, string2str(w->clean_name), type, update_every);
+    fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+    fprintf(stdout, "CLABEL_COMMIT\n");
+    fprintf(stdout, "DIMENSION misses '' absolute 1 1\n");
+}
+
+static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
+    if (strcmp(type, NETDATA_APP_FAMILY) != 0)
+        return;
+
+    send_BEGIN(type, string2str(w->clean_name), "_ebpf_cachestat_hit_ratio", dt);
+    send_SET("ratio", w->cachestat.ratio);
+    send_END();
+
+    send_BEGIN(type, string2str(w->clean_name), "_ebpf_cachestat_dirty_pages", dt);
+    send_SET("pages", w->cachestat.dirty);
+    send_END();
+
+    send_BEGIN(type, string2str(w->clean_name), "_ebpf_cachestat_access", dt);
+    send_SET("hits", w->cachestat.hit);
+    send_END();
+
+    send_BEGIN(type, string2str(w->clean_name), "_ebpf_cachestat_misses", dt);
+    send_SET("misses", w->cachestat.miss);
+    send_END();
+}
+#endif
+
 void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title) {
     struct target *w;
 
@@ -414,6 +478,10 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 
         if (enable_file_charts)
             send_file_charts_to_netdata(w, type, lbl_name, title, false);
+
+#if defined(OS_LINUX)
+        send_cachestat_charts_to_netdata(w, type, lbl_name);
+#endif
 
         fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);

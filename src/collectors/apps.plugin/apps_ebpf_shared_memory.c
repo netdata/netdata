@@ -18,24 +18,6 @@ static int apps_ebpf_shm_fd = -1;
 static sem_t *apps_ebpf_sem = SEM_FAILED;
 static dev_t apps_ebpf_shm_dev = 0;
 static ino_t apps_ebpf_shm_ino = 0;
-// Per-PID rows stay compact, but the cycle-wide apps accumulator must not
-// wrap when many rows are summed together on busy hosts.
-struct apps_ebpf_cachestat_totals {
-    uint64_t add_to_page_cache_lru;
-    uint64_t mark_page_accessed;
-    uint64_t account_page_dirtied;
-    uint64_t mark_buffer_dirty;
-};
-
-static struct {
-    uint64_t ct;
-    int64_t ratio;
-    int64_t dirty;
-    int64_t hit;
-    int64_t miss;
-    struct apps_ebpf_cachestat_totals current;
-    struct apps_ebpf_cachestat_totals prev;
-} apps_ebpf_cachestat_publish = { 0 };
 
 static int apps_ebpf_compare_pid(const void *a, const void *b)
 {
@@ -144,14 +126,6 @@ static bool apps_ebpf_copy_snapshot(void)
     return true;
 }
 
-static inline void apps_ebpf_sum_single_cachestat(struct apps_ebpf_cachestat_totals *dst, const struct ebpf_cachestat *src)
-{
-    dst->account_page_dirtied += src->account_page_dirtied;
-    dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
-    dst->mark_buffer_dirty += src->mark_buffer_dirty;
-    dst->mark_page_accessed += src->mark_page_accessed;
-}
-
 static inline int64_t apps_ebpf_diff_counters(uint64_t current, uint64_t previous)
 {
     if (current < previous)
@@ -162,58 +136,68 @@ static inline int64_t apps_ebpf_diff_counters(uint64_t current, uint64_t previou
 
 void apps_ebpf_accumulate_cachestat(void)
 {
-    struct apps_ebpf_cachestat_totals previous = apps_ebpf_cachestat_publish.current;
-    struct apps_ebpf_cachestat_totals current = { 0 };
-    uint64_t newest_ct = 0;
     bool have_rows = false;
 
+    for (struct target *w = apps_groups_root_target; w; w = w->next) {
+        w->cachestat.prev = w->cachestat.current;
+        memset(&w->cachestat.current, 0, sizeof(w->cachestat.current));
+        w->cachestat.ct = 0;
+        w->cachestat.ratio = 0;
+        w->cachestat.dirty = 0;
+        w->cachestat.hit = 0;
+        w->cachestat.miss = 0;
+    }
+
     for (struct pid_stat *p = root_of_pids(); p; p = p->next) {
-        if (unlikely(!p->has_ebpf))
+        if (unlikely(!p->has_ebpf || !p->updated || !p->target))
             continue;
 
         have_rows = true;
-        apps_ebpf_sum_single_cachestat(&current, &p->ebpf.cachestat.current);
-        if (p->ebpf.cachestat.ct > newest_ct)
-            newest_ct = p->ebpf.cachestat.ct;
+        struct ebpf_publish_cachestat *publish = &p->target->cachestat;
+        const struct ebpf_cachestat *current = &p->ebpf.cachestat.current;
+
+        publish->current.account_page_dirtied += current->account_page_dirtied;
+        publish->current.add_to_page_cache_lru += current->add_to_page_cache_lru;
+        publish->current.mark_buffer_dirty += current->mark_buffer_dirty;
+        publish->current.mark_page_accessed += current->mark_page_accessed;
+
+        if (p->ebpf.cachestat.ct > publish->ct)
+            publish->ct = p->ebpf.cachestat.ct;
     }
 
-    if (!have_rows) {
-        memset(&apps_ebpf_cachestat_publish, 0, sizeof(apps_ebpf_cachestat_publish));
+    if (!have_rows)
         return;
+
+    for (struct target *w = apps_groups_root_target; w; w = w->next) {
+        int64_t mpa = apps_ebpf_diff_counters(w->cachestat.current.mark_page_accessed, w->cachestat.prev.mark_page_accessed);
+        int64_t mbd = apps_ebpf_diff_counters(w->cachestat.current.mark_buffer_dirty, w->cachestat.prev.mark_buffer_dirty);
+        int64_t apcl = apps_ebpf_diff_counters(w->cachestat.current.add_to_page_cache_lru, w->cachestat.prev.add_to_page_cache_lru);
+        int64_t apd = apps_ebpf_diff_counters(w->cachestat.current.account_page_dirtied, w->cachestat.prev.account_page_dirtied);
+
+        w->cachestat.dirty = mbd;
+
+        int64_t total = mpa - mbd;
+        if (total < 0)
+            total = 0;
+
+        int64_t misses = apcl - apd;
+        if (misses < 0)
+            misses = 0;
+
+        int64_t hits = total - misses;
+        if (hits < 0) {
+            misses = total;
+            hits = 0;
+        }
+
+        if (total > 0)
+            w->cachestat.ratio = (hits * 100) / total;
+        else
+            w->cachestat.ratio = 100;
+
+        w->cachestat.hit = hits;
+        w->cachestat.miss = misses;
     }
-
-    apps_ebpf_cachestat_publish.prev = previous;
-    apps_ebpf_cachestat_publish.current = current;
-    apps_ebpf_cachestat_publish.ct = newest_ct;
-
-    int64_t mpa = apps_ebpf_diff_counters(current.mark_page_accessed, previous.mark_page_accessed);
-    int64_t mbd = apps_ebpf_diff_counters(current.mark_buffer_dirty, previous.mark_buffer_dirty);
-    int64_t apcl = apps_ebpf_diff_counters(current.add_to_page_cache_lru, previous.add_to_page_cache_lru);
-    int64_t apd = apps_ebpf_diff_counters(current.account_page_dirtied, previous.account_page_dirtied);
-
-    apps_ebpf_cachestat_publish.dirty = mbd;
-
-    int64_t total = mpa - mbd;
-    if (total < 0)
-        total = 0;
-
-    int64_t misses = apcl - apd;
-    if (misses < 0)
-        misses = 0;
-
-    int64_t hits = total - misses;
-    if (hits < 0) {
-        misses = total;
-        hits = 0;
-    }
-
-    if (total > 0)
-        apps_ebpf_cachestat_publish.ratio = (hits * 100) / total;
-    else
-        apps_ebpf_cachestat_publish.ratio = 100;
-
-    apps_ebpf_cachestat_publish.hit = hits;
-    apps_ebpf_cachestat_publish.miss = misses;
 }
 
 bool apps_ebpf_shared_memory_refresh(void)

@@ -1605,11 +1605,6 @@ static void cachestat_collector(ebpf_module_t *em)
             continue;
 
         counter = 0;
-        netdata_apps_integration_flags_t apps = em->apps_charts;
-
-        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_cache_send_apps_data(apps_groups_root_target);
-
         if (ebpf_plugin_stop()) {
             break;
         }
