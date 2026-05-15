@@ -56,7 +56,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, fmt.Errorf("querying can execute pg_ls_dir() error: %v", err)
 		}
 		c.canExecutePgLsDir = &v
-		c.Debugf("connected as can execute pg_ls_dir(): %v", *c.canExecutePgLsDir)
+		c.Debugf("can execute pg_ls_dir(): %v", *c.canExecutePgLsDir)
 	}
 
 	if c.pgIsInRecovery == nil {
