@@ -856,6 +856,7 @@ Requires(pre): %{name}-user >= %{version}
 %files plugin-ebpf
 %defattr(4750,root,netdata,4750)
 %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+%{_libexecdir}/%{name}/plugins.d/ebpf-go.plugin
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/ebpf.d.conf
 %{_libdir}/%{name}/conf.d/ebpf.d
