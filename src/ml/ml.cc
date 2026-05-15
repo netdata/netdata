@@ -488,6 +488,8 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     int rc = 0;
     int param = 0;
     int step_rc = 0;
+    bool step_corrupt = false;
+    bool cleanup_corrupt = false;
 
     if (unlikely(!ml_db)) {
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -589,8 +591,8 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     // sqlite3_finalize can surface SQLITE_CORRUPT / SQLITE_NOTADB even when
     // step succeeded; without both checks, cleanup-only corruption would log
     // but never trip ml_db_unusable. Both calls are idempotent.
-    bool step_corrupt    = ml_db_mark_if_corrupt(step_rc);
-    bool cleanup_corrupt = ml_db_mark_if_corrupt(rc);
+    step_corrupt    = ml_db_mark_if_corrupt(step_rc);
+    cleanup_corrupt = ml_db_mark_if_corrupt(rc);
 
     // Partial step results may be polluting dim state -- roll back when step
     // itself errored. The training-enqueue gate in ml_public.cc only requeues
