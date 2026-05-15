@@ -719,6 +719,57 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
+func TestCollector_doQueryReplicationMetrics_replSlotFilesGate(t *testing.T) {
+	boolPtr := func(v bool) *bool { return &v }
+
+	tests := map[string]struct {
+		superUser           *bool
+		canExecutePgLsDir   *bool
+		expectSlotFilesCall bool
+	}{
+		"superuser collects slot files even without pg_ls_dir privilege": {
+			superUser:           boolPtr(true),
+			canExecutePgLsDir:   boolPtr(false),
+			expectSlotFilesCall: true,
+		},
+		"non-superuser with pg_ls_dir privilege collects slot files": {
+			superUser:           boolPtr(false),
+			canExecutePgLsDir:   boolPtr(true),
+			expectSlotFilesCall: true,
+		},
+		"non-superuser without pg_ls_dir privilege skips slot files": {
+			superUser:           boolPtr(false),
+			canExecutePgLsDir:   boolPtr(false),
+			expectSlotFilesCall: false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer func() { _ = db.Close() }()
+
+			collr := New()
+			collr.db = db
+			require.NoError(t, collr.Init(context.Background()))
+
+			collr.pgVersion = 140004
+			collr.superUser = test.superUser
+			collr.canExecutePgLsDir = test.canExecutePgLsDir
+
+			mockExpect(t, mock, queryReplicationStandbyAppDelta(collr.pgVersion), dataVer140004ReplStandbyAppDelta)
+			mockExpect(t, mock, queryReplicationStandbyAppLag(), dataVer140004ReplStandbyAppLag)
+			if test.expectSlotFilesCall {
+				mockExpect(t, mock, queryReplicationSlotFiles(collr.pgVersion), dataVer140004ReplSlotFiles)
+			}
+
+			assert.NoError(t, collr.doQueryReplicationMetrics())
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 func mockExpect(t *testing.T, mock sqlmock.Sqlmock, query string, rows []byte) {
 	mock.ExpectQuery(query).WillReturnRows(mustMockRows(t, rows)).RowsWillBeClosed()
 }

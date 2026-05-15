@@ -11,7 +11,7 @@ func queryIsSuperUser() string {
 }
 
 func queryCanExecutePgLsDir() string {
-	return "SELECT has_function_privilege(current_user, 'pg_ls_dir(text)', 'EXECUTE');"
+	return "SELECT has_function_privilege(current_user, 'pg_catalog.pg_ls_dir(text)', 'EXECUTE');"
 }
 
 func queryPGIsInRecovery() string {
