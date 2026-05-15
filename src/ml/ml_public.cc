@@ -532,12 +532,20 @@ void ml_init()
             // Quarantine failed for a reason other than "source doesn't
             // exist". Restore the sentinel so we retry on next start
             // instead of silently re-opening the same corrupt file.
-            int fd = open(sentinel, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
-            if (fd >= 0)
+            //
+            // Use O_CREAT|O_EXCL (atomic create-or-fail) rather than
+            // O_CREAT|O_TRUNC so a symlink swap between our earlier
+            // unlink() and this open() cannot redirect the write -- if
+            // anything (legitimate or hostile) re-created the path in
+            // that window, open() fails with EEXIST and we leave it
+            // alone. The desired post-condition is "sentinel exists",
+            // which is satisfied either way.
+            int rerr = errno;
+            if (int fd = open(sentinel, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600); fd >= 0)
                 close(fd);
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "ML: failed to quarantine %s to %s (errno=%d); sentinel %s restored, will retry on next start.",
-                   path, bad_path, errno, sentinel);
+                   path, bad_path, rerr, sentinel);
         }
     }
 
