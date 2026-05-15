@@ -31,7 +31,16 @@ void ml_db_mark_corrupt(int rc)
 
     char sentinel[FILENAME_MAX + 1];
     snprintfz(sentinel, FILENAME_MAX, "%s/.ml.db.delete", netdata_configured_cache_dir);
-    int fd = open(sentinel, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+
+    // Use O_CREAT|O_EXCL (atomic create-or-fail) so a malicious symlink at
+    // the sentinel path cannot redirect a O_TRUNC write to an attacker-
+    // chosen target. EEXIST is treated as success-equivalent: the desired
+    // post-condition is "next agent start will see something at this path
+    // and trigger quarantine", and that is satisfied whether the path
+    // holds our sentinel or any other file/symlink (startup unlink()s it
+    // unconditionally before quarantine).
+    int fd = open(sentinel, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    int oerr = errno;
     if (fd >= 0) {
         close(fd);
         nd_log(NDLS_DAEMON, NDLP_WARNING,
@@ -40,10 +49,16 @@ void ml_db_mark_corrupt(int rc)
                "Stored anomaly-detection models will be lost; ML will retrain.",
                rc, sentinel);
     }
+    else if (oerr == EEXIST) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "ML: ml.db reported corruption (rc=%d); sentinel %s already present. "
+               "Quarantine will run at next agent start.",
+               rc, sentinel);
+    }
     else {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "ML: ml.db reported corruption (rc=%d) but failed to create sentinel %s (errno=%d). "
-               "Operator must remove ml.db manually.", rc, sentinel, errno);
+               "Operator must remove ml.db manually.", rc, sentinel, oerr);
     }
 }
 
@@ -1288,8 +1303,13 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
         return;
     }
 
-    // begin transaction
-    int rc = db_execute(ml_db, "BEGIN TRANSACTION;", NULL);
+    // begin transaction. Capture the SQLite rc so we can latch the corrupt
+    // flag if BEGIN/COMMIT/ROLLBACK themselves trip CORRUPT or NOTADB --
+    // db_execute() returns only 0/1, the actual rc is exposed via the
+    // out-param.
+    int sqlite_rc = 0;
+    int rc = db_execute(ml_db, "BEGIN TRANSACTION;", &sqlite_rc);
+    ml_db_mark_if_corrupt(sqlite_rc);
 
     // add/delete models
     if (!rc) {
@@ -1316,7 +1336,8 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     // commit transaction
     if (!rc) {
         op_no++;
-        rc = db_execute(ml_db, "COMMIT TRANSACTION;", NULL);
+        rc = db_execute(ml_db, "COMMIT TRANSACTION;", &sqlite_rc);
+        ml_db_mark_if_corrupt(sqlite_rc);
     }
 
     // If corruption was detected mid-loop (add/delete/prune set ml_db_unusable
@@ -1328,7 +1349,8 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     if (rc && !became_unusable) {
         netdata_log_error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
         op_no++;
-        rc = db_execute(ml_db, "ROLLBACK;", NULL);
+        rc = db_execute(ml_db, "ROLLBACK;", &sqlite_rc);
+        ml_db_mark_if_corrupt(sqlite_rc);
         if (rc)
             netdata_log_error("ML transaction rollback failed with rc=%d", rc);
     }
