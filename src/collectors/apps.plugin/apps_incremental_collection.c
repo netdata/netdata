@@ -158,6 +158,10 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
 
     pid_collection_completed(p);
 
+#if defined(OS_LINUX)
+    (void)apps_ebpf_sync_pid_stat(p);
+#endif
+
     return 1;
 }
 

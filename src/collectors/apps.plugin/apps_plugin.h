@@ -6,6 +6,10 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 
+#if defined(OS_LINUX)
+#include "apps_ebpf_shared_memory.h"
+#endif
+
 #define OS_FUNC_CONCAT(a, b) a##b
 
 #if defined(OS_FREEBSD)
@@ -618,6 +622,9 @@ struct pid_stat {
     size_t last_pss_iteration;
     kernel_uint_t pss_bytes;
 #endif
+
+    struct ebpf_pid_stat ebpf;
+    bool has_ebpf:1;
 #endif
 };
 
@@ -770,6 +777,11 @@ void function_processes(const char *transaction, char *function,
                         usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                         BUFFER *payload __maybe_unused, HTTP_ACCESS access,
                         const char *source __maybe_unused, void *data __maybe_unused);
+
+#if defined(OS_LINUX)
+bool apps_ebpf_shared_memory_refresh(void);
+bool apps_ebpf_sync_pid_stat(struct pid_stat *p);
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // operating system functions

@@ -27,11 +27,19 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 		return nil, err
 	}
 
+	publisher, err := NewSharedPidMemoryPublisher(cfg.PidTableSize)
+	if err != nil {
+		rt.Close()
+		return nil, err
+	}
+
 	return &CachestatLegacyHandle{
 		Plan:        plan,
 		Runtime:     rt,
+		SharedMemory: publisher,
 		UpdateEvery: cfg.UpdateEvery,
 		ConfigFound: cfg.ConfigFound,
+		PidTableSize: cfg.PidTableSize,
 	}, nil
 }
 

@@ -32,17 +32,27 @@ type CachestatLegacyConfig struct {
 type CachestatLegacyHandle struct {
 	Plan        LoadPlan
 	Runtime     *libbpfloader.CachestatRuntime
+	SharedMemory *SharedPidMemoryPublisher
 	UpdateEvery int
 	ConfigFound bool
+	PidTableSize uint32
 }
 
 func (h *CachestatLegacyHandle) Close() {
 	if h == nil || h.Runtime == nil {
+		if h != nil && h.SharedMemory != nil {
+			h.SharedMemory.Close()
+			h.SharedMemory = nil
+		}
 		return
 	}
 
 	h.Runtime.Close()
 	h.Runtime = nil
+	if h.SharedMemory != nil {
+		h.SharedMemory.Close()
+		h.SharedMemory = nil
+	}
 }
 
 func defaultPluginsDir() string {

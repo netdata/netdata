@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -155,5 +157,10 @@ func runCachestatSharedMemoryCollector(handle *CachestatLegacyHandle, stop <-cha
 		}
 
 		store.UpdateApps(apps)
+		if handle.SharedMemory != nil {
+			if err := handle.SharedMemory.Publish(store.Snapshot()); err != nil {
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat shared memory publish failed: %v\n", err)
+			}
+		}
 	}
 }

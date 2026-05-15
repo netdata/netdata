@@ -2709,6 +2709,7 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_incremental_collection.c
             src/collectors/apps.plugin/apps_os_windows_nt.c
             src/collectors/apps.plugin/apps_pid_match.c
+            src/collectors/apps.plugin/apps_ebpf_shared_memory.c
     )
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
