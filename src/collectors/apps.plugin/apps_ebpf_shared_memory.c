@@ -16,6 +16,8 @@ static size_t apps_ebpf_shm_total = 0;
 static size_t apps_ebpf_snapshot_total = 0;
 static int apps_ebpf_shm_fd = -1;
 static sem_t *apps_ebpf_sem = SEM_FAILED;
+static dev_t apps_ebpf_shm_dev = 0;
+static ino_t apps_ebpf_shm_ino = 0;
 // Per-PID rows stay compact, but the cycle-wide apps accumulator must not
 // wrap when many rows are summed together on busy hosts.
 struct apps_ebpf_cachestat_totals {
@@ -48,6 +50,28 @@ static int apps_ebpf_compare_pid(const void *a, const void *b)
     return 0;
 }
 
+static void apps_ebpf_close_shared_memory(void)
+{
+    if (apps_ebpf_sem != SEM_FAILED) {
+        sem_close(apps_ebpf_sem);
+        apps_ebpf_sem = SEM_FAILED;
+    }
+
+    if (apps_ebpf_shm) {
+        nd_munmap(apps_ebpf_shm, apps_ebpf_shm_total * sizeof(struct ebpf_pid_stat));
+        apps_ebpf_shm = NULL;
+    }
+
+    if (apps_ebpf_shm_fd >= 0) {
+        close(apps_ebpf_shm_fd);
+        apps_ebpf_shm_fd = -1;
+    }
+
+    apps_ebpf_shm_total = 0;
+    apps_ebpf_shm_dev = 0;
+    apps_ebpf_shm_ino = 0;
+}
+
 static bool apps_ebpf_open_shared_memory(void)
 {
     if (apps_ebpf_shm)
@@ -61,6 +85,8 @@ static bool apps_ebpf_open_shared_memory(void)
     if (fstat(apps_ebpf_shm_fd, &st) != 0 || st.st_size <= 0 || (size_t)st.st_size < sizeof(struct ebpf_pid_stat))
         goto fail;
 
+    apps_ebpf_shm_dev = st.st_dev;
+    apps_ebpf_shm_ino = st.st_ino;
     apps_ebpf_shm_total = (size_t)st.st_size / sizeof(struct ebpf_pid_stat);
     apps_ebpf_shm = nd_mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_SHARED, apps_ebpf_shm_fd, 0);
     if (apps_ebpf_shm == MAP_FAILED) {
@@ -76,16 +102,31 @@ static bool apps_ebpf_open_shared_memory(void)
     return true;
 
 fail:
-    if (apps_ebpf_shm_fd >= 0) {
-        close(apps_ebpf_shm_fd);
-        apps_ebpf_shm_fd = -1;
-    }
-    if (apps_ebpf_shm) {
-        nd_munmap(apps_ebpf_shm, apps_ebpf_shm_total * sizeof(struct ebpf_pid_stat));
-        apps_ebpf_shm = NULL;
-        apps_ebpf_shm_total = 0;
-    }
+    apps_ebpf_close_shared_memory();
     return false;
+}
+
+static bool apps_ebpf_refresh_shared_memory_mapping(void)
+{
+    if (!apps_ebpf_shm)
+        return apps_ebpf_open_shared_memory();
+
+    int fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_RDONLY, 0);
+    if (fd < 0)
+        return false;
+
+    struct stat st;
+    bool changed = fstat(fd, &st) == 0 &&
+        (st.st_dev != apps_ebpf_shm_dev || st.st_ino != apps_ebpf_shm_ino ||
+         st.st_size <= 0 || (size_t)st.st_size < sizeof(struct ebpf_pid_stat) ||
+         (size_t)st.st_size / sizeof(struct ebpf_pid_stat) != apps_ebpf_shm_total);
+    close(fd);
+
+    if (!changed)
+        return true;
+
+    apps_ebpf_close_shared_memory();
+    return apps_ebpf_open_shared_memory();
 }
 
 static bool apps_ebpf_copy_snapshot(void)
@@ -177,7 +218,7 @@ void apps_ebpf_accumulate_cachestat(void)
 
 bool apps_ebpf_shared_memory_refresh(void)
 {
-    if (!apps_ebpf_open_shared_memory())
+    if (!apps_ebpf_refresh_shared_memory_mapping())
         return false;
 
     bool locked = false;
