@@ -63,6 +63,15 @@ func TestWindowsNvmeHealthLogToSmartLog(t *testing.T) {
 	assert.Equal(t, nvmeNumber("26"), got.ThmTemp2TotalTime)
 }
 
+func TestNewWindowsStoragePropertyQuery(t *testing.T) {
+	query := newWindowsStoragePropertyQuery(storageDeviceProperty)
+
+	require.Len(t, query, storagePropertyQuerySize)
+	assert.Equal(t, uint32(storageDeviceProperty), binary.LittleEndian.Uint32(query[0:4]))
+	assert.Equal(t, uint32(propertyStandardQuery), binary.LittleEndian.Uint32(query[4:8]))
+	assert.Equal(t, make([]byte, storagePropertyQuerySize-storagePropertyQueryHeaderSize), query[storagePropertyQueryHeaderSize:])
+}
+
 func TestLittleEndianUint128ToInt64(t *testing.T) {
 	tests := map[string]struct {
 		prepare func([]byte)

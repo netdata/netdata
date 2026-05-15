@@ -31,7 +31,8 @@ const (
 	nvmeHealthLogPage = 0x02
 	nvmeHealthLogSize = 512
 
-	storagePropertyQuerySize          = 8
+	storagePropertyQueryHeaderSize    = 8
+	storagePropertyQuerySize          = 12
 	storageProtocolSpecificDataSize   = 40
 	storageProtocolDataDescriptorSize = 48
 )
@@ -185,7 +186,7 @@ func openWindowsPhysicalDrive(path string) (windows.Handle, error) {
 	}
 
 	var lastErr error
-	for _, access := range []uint32{windows.GENERIC_READ, windows.GENERIC_READ | windows.GENERIC_WRITE} {
+	for _, access := range []uint32{0, windows.GENERIC_READ, windows.GENERIC_READ | windows.GENERIC_WRITE} {
 		handle, err := windows.CreateFile(
 			name,
 			access,
@@ -212,9 +213,7 @@ func shouldIgnorePhysicalDriveOpenError(err error) bool {
 }
 
 func queryWindowsStorageDeviceDescriptor(handle windows.Handle) (storageDeviceDescriptor, []byte, error) {
-	query := make([]byte, storagePropertyQuerySize)
-	binary.LittleEndian.PutUint32(query[0:4], storageDeviceProperty)
-	binary.LittleEndian.PutUint32(query[4:8], propertyStandardQuery)
+	query := newWindowsStoragePropertyQuery(storageDeviceProperty)
 
 	out := make([]byte, 4096)
 	var returned uint32
@@ -255,12 +254,12 @@ func queryWindowsStorageDeviceDescriptor(handle windows.Handle) (storageDeviceDe
 }
 
 func queryWindowsNvmeHealthLog(handle windows.Handle) ([]byte, error) {
-	buf := make([]byte, storagePropertyQuerySize+storageProtocolSpecificDataSize+nvmeHealthLogSize)
+	buf := make([]byte, storagePropertyQueryHeaderSize+storageProtocolSpecificDataSize+nvmeHealthLogSize)
 
 	binary.LittleEndian.PutUint32(buf[0:4], storageDeviceProtocolSpecificProperty)
 	binary.LittleEndian.PutUint32(buf[4:8], propertyStandardQuery)
 
-	protocolData := buf[storagePropertyQuerySize:]
+	protocolData := buf[storagePropertyQueryHeaderSize:]
 	binary.LittleEndian.PutUint32(protocolData[0:4], protocolTypeNvme)
 	binary.LittleEndian.PutUint32(protocolData[4:8], nvmeDataLogPage)
 	binary.LittleEndian.PutUint32(protocolData[8:12], nvmeHealthLogPage)
@@ -285,20 +284,30 @@ func queryWindowsNvmeHealthLog(handle windows.Handle) ([]byte, error) {
 		return nil, fmt.Errorf("short NVMe protocol descriptor: %d bytes", returned)
 	}
 
-	outProtocolData := buf[storagePropertyQuerySize:]
+	outProtocolData := buf[storagePropertyQueryHeaderSize:]
 	dataOffset := binary.LittleEndian.Uint32(outProtocolData[16:20])
 	dataLength := binary.LittleEndian.Uint32(outProtocolData[20:24])
 	if dataOffset < storageProtocolSpecificDataSize || dataLength < nvmeHealthLogSize {
 		return nil, fmt.Errorf("invalid NVMe health log descriptor: offset=%d length=%d", dataOffset, dataLength)
 	}
 
-	start := storagePropertyQuerySize + int(dataOffset)
+	start := storagePropertyQueryHeaderSize + int(dataOffset)
 	end := start + nvmeHealthLogSize
 	if end > len(buf) || uint32(end) > returned {
 		return nil, fmt.Errorf("short NVMe health log: offset=%d returned=%d", start, returned)
 	}
 
 	return buf[start:end], nil
+}
+
+func newWindowsStoragePropertyQuery(propertyID uint32) []byte {
+	// STORAGE_PROPERTY_QUERY has an 8-byte fixed header plus a 1-byte
+	// AdditionalParameters field padded by the ABI; Windows rejects shorter
+	// descriptor queries with ERROR_BAD_LENGTH on some storage stacks.
+	query := make([]byte, storagePropertyQuerySize)
+	binary.LittleEndian.PutUint32(query[0:4], propertyID)
+	binary.LittleEndian.PutUint32(query[4:8], propertyStandardQuery)
+	return query
 }
 
 func windowsNvmeHealthLogToSmartLog(logPage []byte) (*nvmeDeviceSmartLog, error) {

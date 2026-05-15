@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Reopened on 2026-05-15 because the prior `nvme.exe`-only Windows NVMe correction was wrong; restored native Windows NVMe querying in the go.d `nvme` collector and validated the build/install path.
+Sub-state: Completed again on 2026-05-15 after fixing the installed Windows NVMe runtime regression and validating native NVMe, smartctl, and fan charts through the local Agent API.
 
 ## Requirements
 
@@ -528,3 +528,53 @@ Artifact updates:
 - End-user/operator docs: updated the NVMe collector metadata and generated integration page.
 - End-user/operator skills: no update needed; no public/operator skill behavior changed.
 - SOW lifecycle: reopened this completed SOW for the regression and will move it back to `done/` with the implementation commit.
+
+## Regression - 2026-05-15 Installed Windows NVMe Job Not Live
+
+What broke:
+
+- After native Windows NVMe support was restored, the installed Windows Agent exposed the fan charts but no live `nvme.*` charts.
+- The go.d `nvme` collector was registered, but the native Windows enumerator could not discover local NVMe devices on this host.
+
+Evidence:
+
+- The running service exposed two `system.hw.sensor.fan.alarm` charts and no obsolete fan contexts.
+- Local storage inventory reported two healthy NVMe disks.
+- A temporary live probe showed `IOCTL_STORAGE_QUERY_PROPERTY` for the NVMe health log succeeds on both local physical drives when opened with zero desired access.
+- The same probe showed `CreateFile()` with `GENERIC_READ` or `GENERIC_READ|GENERIC_WRITE` fails with `Access is denied` from a normal shell.
+- The same probe showed the plain storage-device descriptor query fails with `ERROR_BAD_LENGTH` when the input buffer is only the 8-byte fixed header, and succeeds when using the ABI-sized `STORAGE_PROPERTY_QUERY` buffer.
+
+Root cause:
+
+- `openWindowsPhysicalDrive()` required read access before issuing query-only IOCTLs, even though the storage stack allows the relevant property queries through a zero-access handle.
+- `queryWindowsStorageDeviceDescriptor()` passed only the 8-byte fixed query header. On this Windows storage stack, the descriptor query requires the padded `STORAGE_PROPERTY_QUERY` size that includes the `AdditionalParameters` field.
+
+Repair:
+
+- Open Windows physical drives with zero desired access first, retaining the read and read/write attempts as fallbacks for storage stacks that require them.
+- Use a 12-byte `STORAGE_PROPERTY_QUERY` buffer for ordinary storage descriptor queries.
+- Keep the protocol-specific NVMe health-log request payload at offset 8, matching the documented query header plus protocol-specific additional parameters layout.
+
+Validation:
+
+- Installed `smartctl.exe` from smartmontools 7.5 at `C:\Program Files\smartmontools\bin\smartctl.exe`.
+- Local `smartctl --json --scan-open` found two NVMe devices, and detailed `smartctl --json --all` checks succeeded for both. Hardware identifiers are intentionally omitted from this SOW.
+- Temporary native NVMe live test after the patch discovered both local Windows physical-drive NVMe devices and read their SMART / health logs.
+- `go test -count=1 ./plugin/go.d/collector/nvme ./plugin/go.d/collector/smartctl` from `src/go`: passed.
+- `GOOS=linux GOARCH=amd64 go test -c ./plugin/go.d/collector/nvme`: passed compile-only.
+- `GOOS=freebsd GOARCH=amd64 go test -c ./plugin/go.d/collector/nvme`: passed compile-only.
+- `GOOS=darwin GOARCH=amd64 go test -c ./plugin/go.d/collector/nvme`: passed compile-only.
+- `MSYSTEM=MSYS ninja -C build-cygwin-MSYS go-plugin`: passed.
+- `MSYSTEM=MSYS ninja -C build-cygwin-MSYS install`: passed and installed the rebuilt `go.d.plugin.exe`.
+- The user restarted the Windows service from an elevated shell. The restarted Agent showed `go.d` collectors for both `nvme` and `smartctl`.
+- Direct Agent API chart inventory on port 19999 showed 32 `nvme.*` charts across two `PhysicalDrive` devices, 8 `smartctl.*` charts across two NVMe devices, and 2 `system.hw.sensor.fan.alarm` charts.
+- Direct Agent API data queries returned current native NVMe temperatures for both drives, current smartctl NVMe temperatures/status, and fan alarm values with `clear=1` and `fault=0`.
+
+Artifact maintenance gate:
+
+- AGENTS.md: no update needed; repository workflow and guardrails did not change.
+- Runtime project skills: no update needed; the existing collector workflow skill covered the fix and validation path.
+- Specs: no update needed; the existing spec already records native Windows NVMe as the primary Windows contract.
+- End-user/operator docs: no update needed; chart contexts, dimensions, and user-visible collector contract did not change in this repair.
+- End-user/operator skills: no update needed; no public/operator skill behavior changed.
+- SOW lifecycle: reopened completed SOW for this regression, recorded root cause and installed-runtime validation, and moved the SOW back to `done/` with the repair commit.
