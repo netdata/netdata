@@ -113,28 +113,6 @@ Before running the installation script, you can verify its integrity using the f
 
 If the script is valid, this command will return `OK, VALID`. We recommend verifying script integrity before installation, especially in production environments.
 
-## Verify Netdata Is Running
-
-After installation, confirm the Agent is up and collecting data:
-
-1. Check the service status:
-
-   ```bash
-   sudo systemctl status netdata
-   ```
-
-   On non-systemd systems, use `sudo service netdata status` instead.
-
-2. Open `http://localhost:19999` in a browser to access the dashboard.
-
-3. Alternatively, query the Agent API:
-
-   ```bash
-   curl http://localhost:19999/api/v1/info
-   ```
-
-For detailed status-checking options including `netdatacli ping`, see [Service Control](/docs/netdata-agent/start-stop-restart.md#check-status).
-
 ## Notes & Best Practices
 
 - Stop the Agent with `sudo systemctl stop netdata` before reinstalling
