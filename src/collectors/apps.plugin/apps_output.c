@@ -336,19 +336,19 @@ static void send_cachestat_data_to_netdata(struct target *w, const char *type, u
     if (strcmp(type, NETDATA_APP_FAMILY) != 0)
         return;
 
-    send_BEGIN(type, string2str(w->clean_name), "_ebpf_cachestat_hit_ratio", dt);
+    send_BEGIN(type, string2str(w->clean_name), "ebpf_cachestat_hit_ratio", dt);
     send_SET("ratio", w->cachestat.ratio);
     send_END();
 
-    send_BEGIN(type, string2str(w->clean_name), "_ebpf_cachestat_dirty_pages", dt);
+    send_BEGIN(type, string2str(w->clean_name), "ebpf_cachestat_dirty_pages", dt);
     send_SET("pages", w->cachestat.dirty);
     send_END();
 
-    send_BEGIN(type, string2str(w->clean_name), "_ebpf_cachestat_access", dt);
+    send_BEGIN(type, string2str(w->clean_name), "ebpf_cachestat_access", dt);
     send_SET("hits", w->cachestat.hit);
     send_END();
 
-    send_BEGIN(type, string2str(w->clean_name), "_ebpf_cachestat_misses", dt);
+    send_BEGIN(type, string2str(w->clean_name), "ebpf_cachestat_misses", dt);
     send_SET("misses", w->cachestat.miss);
     send_END();
 }
