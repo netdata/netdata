@@ -23,12 +23,16 @@ Enterprise SSO handles authentication only. You must configure user and role man
 | **Subscription**   | Business plan or higher, or Enterprise On-Prem                                                                                                                  |
 | **Access Level**   | Space Administrator permissions                                                                                                                                 |
 
-:::note
+## Self-Hosted (Enterprise On-Prem)
 
-Enterprise On-Prem deployments support OIDC-based SSO integration with identity providers that implement the OpenID Connect protocol. Refer to your On-Prem deployment configuration for OIDC setup details.
+Netdata Cloud On-Prem supports Enterprise SSO through OIDC-compatible identity providers. You can integrate your existing identity management solution (such as Keycloak, Okta, Azure AD, or any OIDC-compliant provider) with your self-hosted Netdata Cloud instance.
+
+:::tip
+
+See the Keycloak addon in the Netdata Cloud On-Prem repository for a reference integration example.
 
 :::
- 
+
 ## Setup
 
 ### Netdata Cloud Configuration
@@ -39,6 +43,12 @@ To configure SSO in your Netdata Cloud space:
 2. Select User Management → Authentication & Authorization
 3. Locate your desired SSO integration
 4. Click "Configure" and fill in the required integration attributes
+
+:::note
+
+For Netdata Cloud On-Prem, OIDC provider details are configured in your Helm values during installation.
+
+:::
 
 ### Domain Verification
 
