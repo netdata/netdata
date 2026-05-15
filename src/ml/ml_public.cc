@@ -509,8 +509,12 @@ void ml_init()
     snprintfz(sentinel, FILENAME_MAX, "%s/.ml.db.delete", netdata_configured_cache_dir);
     if (unlink(sentinel) == 0) {
         char bad_path[FILENAME_MAX + 1];
-        snprintfz(bad_path, FILENAME_MAX, "%s/ml.db.bad.%lld",
-                  netdata_configured_cache_dir, (long long) now_realtime_sec());
+        // Microsecond resolution so back-to-back restarts within the same
+        // wall-clock second don't collide: a second-resolution suffix would
+        // either silently overwrite the prior .bad on POSIX (forensic loss)
+        // or fail rename() with EEXIST on Windows (sentinel kept restoring).
+        snprintfz(bad_path, FILENAME_MAX, "%s/ml.db.bad.%llu",
+                  netdata_configured_cache_dir, (unsigned long long) now_realtime_usec());
 
         int rename_rc = rename(path, bad_path);
         if (rename_rc == 0 || errno == ENOENT) {

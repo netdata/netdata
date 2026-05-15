@@ -45,14 +45,14 @@ void ml_db_mark_corrupt(int rc)
         close(fd);
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "ML: ml.db reported corruption (rc=%d); sentinel %s created. "
-               "ml.db will be renamed to ml.db.bad and recreated at next agent start. "
+               "ml.db will be renamed to a timestamped ml.db.bad.* and recreated at next agent start. "
                "Stored anomaly-detection models will be lost; ML will retrain.",
                rc, sentinel);
     }
     else if (oerr == EEXIST) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "ML: ml.db reported corruption (rc=%d); sentinel %s already present. "
-               "Quarantine will run at next agent start.",
+               "Quarantine to ml.db.bad.* will run at next agent start.",
                rc, sentinel);
     }
     else {

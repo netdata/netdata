@@ -28,7 +28,8 @@ extern const char *db_models_create_table;
 // Mark ml.db as corrupt: drops a `.ml.db.delete` sentinel in the cache dir
 // (best-effort, idempotent) and latches `ml_db_unusable` so subsequent ml.db
 // access short-circuits for the rest of the session. The sentinel is consumed
-// at next startup, which renames ml.db -> ml.db.bad and creates a fresh DB.
+// at next startup, which renames ml.db -> ml.db.bad.<usec-timestamp> and
+// creates a fresh DB.
 // `rc` is the SQLite error code that triggered the call (SQLITE_CORRUPT or
 // SQLITE_NOTADB); logged for diagnostics.
 void ml_db_mark_corrupt(int rc);
