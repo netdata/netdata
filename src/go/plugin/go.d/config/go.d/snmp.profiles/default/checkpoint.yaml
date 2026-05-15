@@ -16,6 +16,7 @@ extends:
   - _checkpoint-hardware.yaml
   - _checkpoint-cluster.yaml
   - _checkpoint-vsx.yaml
+  - _checkpoint-licensing.yaml
 
 selector:
   - sysobjectid:
@@ -66,62 +67,6 @@ metadata:
           #       In this example, the OS Version is 2.6, at the moment it's not possible to add metadata based on 2 OIDs
       type:
         value: "Firewall"
-
-licensing:
-  - id: licensing_blades
-    MIB: CHECKPOINT-MIB
-    table:
-      OID: 1.3.6.1.4.1.2620.1.6.18.1
-      name: licensingTable
-    identity:
-      id:
-        OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2
-        name: licensingID
-      name:
-        OID: 1.3.6.1.4.1.2620.1.6.18.1.1.4
-        name: licensingBladeName
-      component:
-        value: blade
-    descriptors:
-      type:
-        value: subscription
-      impact:
-        OID: 1.3.6.1.4.1.2620.1.6.18.1.1.7
-        name: licensingImpact
-    state:
-      OID: 1.3.6.1.4.1.2620.1.6.18.1.1.5
-      name: licensingState
-      mapping:
-        # MIB-documented hyphenated tokens
-        valid: "0"
-        "up-to-date": "0"
-        "about-to-expire": "1"
-        unknown: "1"
-        expired: "2"
-        "not-associated": "2"
-        # Real on-wire TitleCase variants observed on production gateways
-        Valid: "0"
-        "Up To Date": "0"
-        "About To Expire": "1"
-        Unknown: "1"
-        Expired: "2"
-        "Not Associated": "2"
-        "Not Entitled": "2"
-        Evaluation: "1"
-        Trial: "1"
-    signals:
-      expiry:
-        timestamp:
-          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.6
-          name: licensingExpirationDate
-          sentinel: [timer_u32_max]
-      usage:
-        used:
-          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.10
-          name: licensingUsedQuota
-        capacity:
-          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.9
-          name: licensingTotalQuota
 
 metrics:
   # CPU

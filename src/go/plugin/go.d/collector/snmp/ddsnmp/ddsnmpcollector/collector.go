@@ -214,6 +214,17 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 	pm.Stats.Metrics.Licensing += int64(len(licenseRows))
 	pm.Stats.Timing.Licensing = time.Since(now)
 
+	now = time.Now()
+	bgpRows, err := c.collectBGPRows(ps.profile, &pm.Stats)
+	if err != nil {
+		pm.BGPCollectError = err
+		c.log.Limit(bgpRowsFailedLogKey+ps.profile.SourceFile, 1, bgpRowsErrorLogEvery).
+			Warningf("failed to collect BGP rows for profile %q: %v", ps.profile.SourceFile, err)
+	}
+	pm.BGPRows = append(pm.BGPRows, bgpRows...)
+	pm.Stats.Metrics.BGP += int64(len(bgpRows))
+	pm.Stats.Timing.BGP = time.Since(now)
+
 	for i := range pm.Metrics {
 		pm.Metrics[i].Profile = pm
 	}
@@ -233,6 +244,9 @@ func (c *Collector) updateProfileMetrics(pm *ddsnmp.ProfileMetrics) {
 	}
 	for i := range pm.LicenseRows {
 		sanitizeLicenseRow(&pm.LicenseRows[i])
+	}
+	for i := range pm.BGPRows {
+		sanitizeBGPRow(&pm.BGPRows[i])
 	}
 }
 
@@ -266,6 +280,105 @@ func sanitizeLicenseRow(row *ddsnmp.LicenseRow) {
 		}
 		row.Tags[k] = metricMetaReplacer.Replace(v)
 	}
+}
+
+func sanitizeBGPRow(row *ddsnmp.BGPRow) {
+	row.RowKey = metricMetaReplacer.Replace(row.RowKey)
+	row.Identity.RoutingInstance = metricMetaReplacer.Replace(row.Identity.RoutingInstance)
+	row.Identity.Neighbor = metricMetaReplacer.Replace(row.Identity.Neighbor)
+	row.Identity.RemoteAS = metricMetaReplacer.Replace(row.Identity.RemoteAS)
+	row.Descriptors.LocalAddress = metricMetaReplacer.Replace(row.Descriptors.LocalAddress)
+	row.Descriptors.LocalAS = metricMetaReplacer.Replace(row.Descriptors.LocalAS)
+	row.Descriptors.LocalIdentifier = metricMetaReplacer.Replace(row.Descriptors.LocalIdentifier)
+	row.Descriptors.PeerIdentifier = metricMetaReplacer.Replace(row.Descriptors.PeerIdentifier)
+	row.Descriptors.PeerType = metricMetaReplacer.Replace(row.Descriptors.PeerType)
+	row.Descriptors.BGPVersion = metricMetaReplacer.Replace(row.Descriptors.BGPVersion)
+	row.Descriptors.Description = metricMetaReplacer.Replace(row.Descriptors.Description)
+	sanitizeBGPState(&row.State)
+	sanitizeBGPState(&row.Previous)
+	sanitizeBGPBool(&row.Admin.Enabled)
+	sanitizeBGPInt64(&row.Connection.EstablishedUptime)
+	sanitizeBGPInt64(&row.Connection.LastReceivedUpdateAge)
+	sanitizeBGPDirectional(&row.Traffic.Messages)
+	sanitizeBGPDirectional(&row.Traffic.Updates)
+	sanitizeBGPDirectional(&row.Traffic.Notifications)
+	sanitizeBGPDirectional(&row.Traffic.RouteRefreshes)
+	sanitizeBGPDirectional(&row.Traffic.Opens)
+	sanitizeBGPDirectional(&row.Traffic.Keepalives)
+	sanitizeBGPInt64(&row.Transitions.Established)
+	sanitizeBGPInt64(&row.Transitions.Down)
+	sanitizeBGPInt64(&row.Transitions.Up)
+	sanitizeBGPInt64(&row.Transitions.Flaps)
+	sanitizeBGPTimerPair(&row.Timers.Negotiated)
+	sanitizeBGPTimerPair(&row.Timers.Configured)
+	sanitizeBGPInt64(&row.LastError.Code)
+	sanitizeBGPInt64(&row.LastError.Subcode)
+	sanitizeBGPLastNotification(&row.LastNotify.Received)
+	sanitizeBGPLastNotification(&row.LastNotify.Sent)
+	sanitizeBGPText(&row.Reasons.LastDown)
+	sanitizeBGPText(&row.Reasons.Unavailability)
+	sanitizeBGPText(&row.Restart.State)
+	sanitizeBGPRouteCounters(&row.Routes.Current)
+	sanitizeBGPRouteCounters(&row.Routes.Total)
+	sanitizeBGPInt64(&row.RouteLimits.Limit)
+	sanitizeBGPInt64(&row.RouteLimits.Threshold)
+	sanitizeBGPInt64(&row.RouteLimits.ClearThreshold)
+	sanitizeBGPInt64(&row.Device.Peers)
+	sanitizeBGPInt64(&row.Device.InternalPeers)
+	sanitizeBGPInt64(&row.Device.ExternalPeers)
+	for k, v := range row.Tags {
+		if strings.HasPrefix(k, "rm:") {
+			delete(row.Tags, k)
+			continue
+		}
+		row.Tags[k] = metricMetaReplacer.Replace(v)
+	}
+}
+
+func sanitizeBGPState(value *ddsnmp.BGPState) {
+	value.Raw = metricMetaReplacer.Replace(value.Raw)
+}
+
+func sanitizeBGPInt64(value *ddsnmp.BGPInt64) {
+	value.Raw = metricMetaReplacer.Replace(value.Raw)
+}
+
+func sanitizeBGPText(value *ddsnmp.BGPText) {
+	value.Raw = metricMetaReplacer.Replace(value.Raw)
+	value.Value = metricMetaReplacer.Replace(value.Value)
+}
+
+func sanitizeBGPBool(value *ddsnmp.BGPBool) {
+	value.Raw = metricMetaReplacer.Replace(value.Raw)
+}
+
+func sanitizeBGPDirectional(value *ddsnmp.BGPDirectional) {
+	sanitizeBGPInt64(&value.Received)
+	sanitizeBGPInt64(&value.Sent)
+}
+
+func sanitizeBGPTimerPair(value *ddsnmp.BGPTimerPair) {
+	sanitizeBGPInt64(&value.ConnectRetry)
+	sanitizeBGPInt64(&value.HoldTime)
+	sanitizeBGPInt64(&value.KeepaliveTime)
+	sanitizeBGPInt64(&value.MinASOriginationInterval)
+	sanitizeBGPInt64(&value.MinRouteAdvertisementInterval)
+}
+
+func sanitizeBGPLastNotification(value *ddsnmp.BGPLastNotification) {
+	sanitizeBGPInt64(&value.Code)
+	sanitizeBGPInt64(&value.Subcode)
+	sanitizeBGPText(&value.Reason)
+}
+
+func sanitizeBGPRouteCounters(value *ddsnmp.BGPRouteCounters) {
+	sanitizeBGPInt64(&value.Received)
+	sanitizeBGPInt64(&value.Accepted)
+	sanitizeBGPInt64(&value.Rejected)
+	sanitizeBGPInt64(&value.Active)
+	sanitizeBGPInt64(&value.Advertised)
+	sanitizeBGPInt64(&value.Suppressed)
+	sanitizeBGPInt64(&value.Withdrawn)
 }
 
 var metricMetaReplacer = strings.NewReplacer(

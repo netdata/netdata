@@ -150,6 +150,8 @@ extends: <base profiles to include>
 metadata: <device information>
 metrics: <what to collect>
 topology: <what to collect for topology>
+bgp: <what to collect for typed BGP monitoring>
+licensing: <what to collect for typed licensing>
 metric_tags: <global tags>
 static_tags: <static tags>
 virtual_metrics: <calculated metrics>
@@ -162,6 +164,8 @@ virtual_metrics: <calculated metrics>
 | [**metadata**](#3-metadata)               | Collects device-level information (host labels).                                   |
 | [**metrics**](#4-metrics)                 | Defines which OIDs to collect and how to chart them.                               |
 | [**topology**](#41-topology)              | Defines SNMP topology rows and their topology kind.                                |
+| [**bgp**](#bgp-rows)                      | Defines typed BGP device, peer, and peer-family rows.                              |
+| [**licensing**](#licensing-rows)          | Defines typed license rows.                                                        |
 | [**metric_tags**](#5-metric_tags)         | Defines global dynamic tags collected once per device and attached to all metrics. |
 | [**static_tags**](#6-static_tags)         | Defines fixed tags applied to all metrics.                                         |
 | [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others.                          |
@@ -1233,7 +1237,7 @@ metrics:
 
 **Important behavior**:
 
-- `lookup_symbol` is used only for **cross-table tags**
+- `lookup_symbol` is used for **cross-table tags** and typed BGP value fields
 - it works together with `index_transform`, not instead of it
 - if no row matches, the tag lookup fails for that row
 - if one row matches, the collector reads the requested tag from that row
@@ -1341,6 +1345,23 @@ The two index extraction mechanisms use different counting bases:
 
 So `index: 1` and `index_transform: [{start: 0, end: 0}]` both extract the
 first index component.
+
+Typed BGP value fields also support `index_from_end: N`, where `N` is
+1-based from the right side of the row index. Use it only when the target
+INDEX component is a trailing component after a variable-length field, such as
+AFI/SAFI after an `InetAddress` peer address.
+
+Use exactly one row-index selector per typed BGP value: `index`,
+`index_from_end`, or `index_transform`. Profile validation rejects typed BGP
+values that set more than one of these selectors.
+
+Typed BGP cross-table value fields can also use `lookup_symbol` with
+`table:` and `index_transform:`. This is needed when a BGP peer-family table is
+indexed by a compact peer ID, but peer identity fields such as neighbor and
+remote AS live in a peer table keyed by a different composite index. The
+collector extracts the lookup value from the current row index, finds the row
+in the referenced table whose `lookup_symbol` column has that value, and then
+reads the requested typed value symbol from the matched row.
 
 Examples:
 
@@ -2184,6 +2205,104 @@ What this does
 - Builds a **single total chart** combining multiple related packet counters.
 - Each `as` becomes a **dimension** (`in_ucast`, `out_ucast`, `in_mcast`, …).
 - No `per_row`/`group_by` → totals aggregated across all interfaces.
+
+## BGP rows
+
+The SNMP collector ships a shared BGP pipeline that turns vendor-specific BGP
+MIB rows into typed device, peer, and peer-family rows. Profiles describe this
+telemetry in a top-level `bgp:` section. The collector emits typed BGP rows from
+that section; underscore-prefixed helper tags and `virtual_metrics:` aliases
+are legacy migration mechanisms, not the preferred BGP transport.
+
+### Authoring contract
+
+BGP row `kind` values are closed:
+
+- `device` — device-level BGP summaries with no peer identity.
+- `peer` — peer-level rows identified by `neighbor` and `remote_as`.
+- `peer_family` — address-family rows identified by `neighbor`, `remote_as`,
+  `address_family`, and `subsequent_address_family`.
+
+Peer-state mappings must use the six RFC 4271 state names: `idle`, `connect`,
+`active`, `opensent`, `openconfirm`, and `established`. A complete source must
+map all six states. If a source MIB is intentionally partial, set
+`partial: true` and use `partial_states: [...]` to record which canonical
+states the source can represent.
+
+When a peer or peer-family row does not provide a routing instance, the public
+chart/function label defaults to `default`. Profiles may still set
+`identity.routing_instance` explicitly when a vendor MIB exposes VRF or routing
+instance identity.
+
+Device rows support `device_counts.peers`, `device_counts.ibgp_peers`,
+`device_counts.ebgp_peers`, and per-state counters under
+`device_counts.states`. Peer and peer-family rows support typed groups such as
+`admin`, `state`, `connection`, `traffic`, `transitions`, `timers`,
+`last_error`, `last_notifications`, `reasons`, `graceful_restart`, `routes`,
+and `route_limits`.
+
+For table-backed rows, readable columns use `symbol:`. `not-accessible` index
+objects must be derived from the row index with `index`, `index_from_end`, or
+`index_transform`. Values from related tables use the first-class `table:`
+field on the BGP value, optionally with `lookup_symbol:` when the current row
+must join to another table by value.
+
+Example device-level counts:
+
+```yaml
+bgp:
+  - id: vendor-bgp-device-counts
+    MIB: VENDOR-BGP-MIB
+    kind: device
+    device_counts:
+      peers:
+        symbol: { OID: 1.3.6.1.4.1.99999.1, name: vendor.bgpPeerSessionNum }
+      ibgp_peers:
+        symbol: { OID: 1.3.6.1.4.1.99999.2, name: vendor.iBgpPeerSessionNum }
+      ebgp_peers:
+        symbol: { OID: 1.3.6.1.4.1.99999.3, name: vendor.eBgpPeerSessionNum }
+```
+
+Example peer-family row:
+
+```yaml
+bgp:
+  - id: vendor-bgp-peer-family
+    MIB: VENDOR-BGP-MIB
+    kind: peer_family
+    table:
+      OID: 1.3.6.1.4.1.99999.10
+      name: vendorBgpPeerTable
+    identity:
+      routing_instance: { value: default }
+      neighbor:
+        symbol: { OID: 1.3.6.1.4.1.99999.10.1.4, name: vendorBgpPeerRemoteAddr, format: ip_address }
+      remote_as:
+        symbol: { OID: 1.3.6.1.4.1.99999.10.1.5, name: vendorBgpPeerRemoteAs, format: uint32 }
+      address_family:
+        index: 1
+        mapping: { 1: ipv4, 2: ipv6, 25: l2vpn }
+      subsequent_address_family:
+        index: 2
+        mapping: { 1: unicast, 128: vpn }
+    state:
+      symbol:
+        OID: 1.3.6.1.4.1.99999.10.1.6
+        name: vendorBgpPeerState
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+    traffic:
+      updates:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.99999.10.1.7, name: vendorBgpPeerInUpdates }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.99999.10.1.8, name: vendorBgpPeerOutUpdates }
+```
 
 ## Licensing rows
 

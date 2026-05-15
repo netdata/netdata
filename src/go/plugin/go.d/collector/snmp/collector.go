@@ -101,7 +101,8 @@ type (
 
 		ifaceCache *ifaceCache // interface metrics cache for functions
 		licensing  *licensingIntegration
-		funcRouter *funcRouter // function router for method handlers
+		bgp        *bgpIntegration // BGP metric normalization and function state
+		funcRouter *funcRouter     // function router for method handlers
 
 		pingClient pinger.Client
 		newPinger  func(pinger.Config, *logger.Logger) (pinger.Client, error)

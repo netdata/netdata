@@ -7,7 +7,7 @@ You can remove a node from your Space in Netdata Cloud, but the process depends 
 Before attempting to remove a node, it's important to understand what each status means:
 
 * **Online** (Live): Node is actively connected and streaming data
-* **Stale**: Node is a child that stopped streaming to its parent, but the parent still has its historical data
+* **Stale**: Node disconnected, but a Parent connected to Netdata Cloud has its historical data
 * **Offline** (Unreachable): Node is disconnected and no longer has data available for querying
 
 For a complete explanation of node states, state transitions, and when nodes move between states, see [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
@@ -25,12 +25,18 @@ This is why stale nodes show "Delete is disabled" - the system prevents deletion
 
 ## Quick Decision Guide
 
-**What's your node status?**
+**What type of node is it?**
 
 ```
-🔴 Node shows "Offline" → Use Method 1 (UI Method)
-🟡 Node shows "Stale" → Use Method 2 (CLI Method) ← MOST COMMON ISSUE  
-📦 Multiple nodes to remove → Use Method 3 (Bulk Operations)
+🔴 Standalone node (connects directly to Cloud) → Removing Standalone Nodes
+🟡 Child node (streams through a Parent Agent) → Removing Child Nodes
+```
+
+**Then, what's the node status?**
+
+```
+📴 Node shows "Offline" → Use the UI removal method
+🟡 Node shows "Stale" → Use the CLI method
 ```
 
 :::note
@@ -39,12 +45,20 @@ You need **Admin** role in your Space to remove nodes. The CLI method requires a
 
 :::
 
-## Removal Methods
+## Singular or Standalone Nodes
+
+These are nodes that connect directly to Netdata Cloud without streaming through a Parent Agent.
 
 <details>
-<summary><strong>Method 1: Removing Offline Nodes (UI Method)</strong></summary><br/>
+<summary><strong>Removing Offline Standalone Nodes (UI Method)</strong></summary><br/>
 
-**When to use**: Your node shows as **Offline** status in Netdata Cloud.
+**When to use**: Your standalone node shows as **Offline** status in Netdata Cloud.
+
+:::note
+
+Stale status does not apply to standalone nodes — stale specifically means a child node stopped streaming to its parent.
+
+:::
 
 **Steps**:
 1. Stop the Netdata Agent on the node you want to remove
@@ -60,47 +74,64 @@ The **Remove** option is only available in the **Space Settings** view. It will 
 
 </details>
 
+## Child Nodes
+
+These are nodes that stream metrics through a Parent Agent. When a child node stops streaming to its parent, it becomes **Stale**.
+
 <details>
-<summary><strong>Method 2: Removing Stale Nodes (CLI Method)</strong></summary><br/>
+<summary><strong>Removing Stale Child Nodes (CLI Method)</strong></summary><br/>
 
-**When to use**: Your node shows as **Stale** status and UI shows "Delete is disabled".
+**When to use**: Your child node shows as **Stale** status and UI shows "Delete is disabled".
 
-**Step 1: Get the Node UUID**
+**Step 1: Get the Node Identifier**
 1. In Netdata Cloud, navigate to the stale node
 2. Click the **node information (i)** button 
 3. Click **"View node info in JSON"**
-4. Copy the UUID from the JSON data (it will be copied to your clipboard)
+4. Copy the identifier from the JSON data (node_id, machine_guid, or hostname)
 
 **Step 2: Remove the Stale Node**
-Run this command on any node with Netdata Agent installed:
+Run this command on the **Parent Agent** that holds the stale child's data:
 
 ```bash
-netdatacli remove-stale-node <UUID>
+netdatacli remove-stale-node <identifier>
 ```
 
-Replace `<UUID>` with the node's actual identifier from Step 1.
+Replace `<identifier>` with one of:
+- `node_id` - The node's unique identifier
+- `machine_guid` - The machine GUID from the node info
+- `hostname` - The node's hostname
 
-**What happens next**: The command unregisters and removes the node from the cloud. The node status should change from **Stale → Offline** in Netdata Cloud, then you can remove it via the UI method if needed.
+:::important
+
+This command must be run on the **Parent Agent** that holds the node's metrics data, not on any arbitrary machine with Netdata Agent installed.
+
+:::
+
+:::note
+
+If a node is represented by multiple Parent Agents in an HA setup, this command must be executed on **each** Parent Agent.
+
+:::
+
+**What happens next**: The command marks the node as ephemeral and removes it so it is no longer available for queries, from both the Netdata Agent dashboard and Netdata Cloud. The node is fully removed — it does not transition to Offline status.
 
 </details>
 
 <details>
-<summary><strong>Method 3: Bulk Operations</strong></summary><br/>
+<summary><strong>Removing All Child Nodes from a Parent</strong></summary><br/>
 
-**When to use**: You need to remove multiple nodes at once.
-
-You can use the remove-stale-node command with different identifiers:
+**When to use**: You need to remove all stale child nodes from a Parent Agent at once.
 
 ```bash
-# Using machine GUID
-netdatacli remove-stale-node <machine_guid>
-
-# Using hostname  
-netdatacli remove-stale-node <hostname>
-
-# Remove ALL stale nodes (use with extreme caution)
+# Remove ALL stale child nodes from this Parent (use with extreme caution)
 netdatacli remove-stale-node ALL_NODES
 ```
+
+:::caution
+
+This command affects all disconnected child nodes on the Parent Agent where it is run. Use with caution in production environments.
+
+:::
 
 </details>
 
@@ -128,7 +159,7 @@ To prevent removed nodes from reappearing:
 
 ## Troubleshooting
 
-**"Delete is disabled"**: The node is Stale, not Offline. Use Method 2 (CLI approach).
+**"Delete is disabled"**: The node is Stale, not Offline. Use the CLI approach for child nodes.
 
 **"Command not found"**: Ensure you're running `netdatacli` on a system with Netdata Agent installed.
 

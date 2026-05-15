@@ -14,6 +14,7 @@ const (
 	ConsumerMetrics   = ddprofiledefinition.ConsumerMetrics
 	ConsumerTopology  = ddprofiledefinition.ConsumerTopology
 	ConsumerLicensing = ddprofiledefinition.ConsumerLicensing
+	ConsumerBGP       = ddprofiledefinition.ConsumerBGP
 )
 
 type ManualProfilePolicy int
@@ -197,18 +198,27 @@ func projectProfile(prof *Profile, consumer ProfileConsumer) {
 	case ConsumerMetrics:
 		def.Topology = nil
 		def.Licensing = nil
+		def.BGP = nil
 	case ConsumerTopology:
 		def.Metrics = nil
 		def.Licensing = nil
+		def.BGP = nil
 		def.VirtualMetrics = nil
 	case ConsumerLicensing:
 		def.Metrics = nil
 		def.Topology = nil
+		def.BGP = nil
+		def.VirtualMetrics = nil
+	case ConsumerBGP:
+		def.Metrics = nil
+		def.Topology = nil
+		def.Licensing = nil
 		def.VirtualMetrics = nil
 	default:
 		def.Metrics = nil
 		def.Topology = nil
 		def.Licensing = nil
+		def.BGP = nil
 		def.VirtualMetrics = nil
 		def.Metadata = nil
 		def.SysobjectIDMetadata = nil
@@ -235,6 +245,9 @@ func projectProfileForConsumers(prof *Profile, consumers []ProfileConsumer) {
 	}
 	if !profileConsumersInclude(consumers, ConsumerLicensing) {
 		def.Licensing = nil
+	}
+	if !profileConsumersInclude(consumers, ConsumerBGP) {
+		def.BGP = nil
 	}
 }
 
@@ -346,7 +359,7 @@ func projectSysobjectIDMetadataForConsumers(entries []ddprofiledefinition.Sysobj
 
 func projectMetricTagList(tags []ddprofiledefinition.MetricTagConfig, consumer ProfileConsumer) []ddprofiledefinition.MetricTagConfig {
 	// Metadata id_tags do not carry Consumers today. They inherit metadata defaults.
-	if consumer == ConsumerMetrics || consumer == ConsumerTopology {
+	if consumer == ConsumerMetrics || consumer == ConsumerTopology || consumer == ConsumerBGP {
 		return tags
 	}
 	return nil
@@ -354,7 +367,7 @@ func projectMetricTagList(tags []ddprofiledefinition.MetricTagConfig, consumer P
 
 func projectMetricTagListForConsumers(tags []ddprofiledefinition.MetricTagConfig, consumers []ProfileConsumer) []ddprofiledefinition.MetricTagConfig {
 	// Metadata id_tags do not carry Consumers today. They inherit metadata defaults.
-	if profileConsumersInclude(consumers, ConsumerMetrics) || profileConsumersInclude(consumers, ConsumerTopology) {
+	if profileConsumersInclude(consumers, ConsumerMetrics) || profileConsumersInclude(consumers, ConsumerTopology) || profileConsumersInclude(consumers, ConsumerBGP) {
 		return tags
 	}
 	return nil
@@ -419,6 +432,11 @@ func profileHasProjectedData(def *ddprofiledefinition.ProfileDefinition, consume
 			len(def.SysobjectIDMetadata) > 0
 	case ConsumerLicensing:
 		return len(def.Licensing) > 0 ||
+			len(def.MetricTags) > 0 ||
+			len(def.Metadata) > 0 ||
+			len(def.SysobjectIDMetadata) > 0
+	case ConsumerBGP:
+		return len(def.BGP) > 0 ||
 			len(def.MetricTags) > 0 ||
 			len(def.Metadata) > 0 ||
 			len(def.SysobjectIDMetadata) > 0

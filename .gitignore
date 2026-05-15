@@ -6,6 +6,9 @@ gcs-credentials.json
 # AI agents that follow AGENTS.md treat this as the place to write run-time data.
 /.local/
 
+# Local vendor MIB reference files used during SNMP profile audits.
+/mibs/
+
 # Cross-tool AI agent private overrides (per-user, not for sharing)
 **/AGENTS.local.md
 

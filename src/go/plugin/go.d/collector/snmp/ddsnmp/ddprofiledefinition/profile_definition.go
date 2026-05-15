@@ -16,6 +16,7 @@ type ProfileDefinition struct {
 	Metrics             []MetricsConfig                  `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 	Topology            []TopologyConfig                 `yaml:"topology,omitempty" json:"topology,omitempty"`
 	Licensing           []LicensingConfig                `yaml:"licensing,omitempty" json:"licensing,omitempty"`
+	BGP                 []BGPConfig                      `yaml:"bgp,omitempty" json:"bgp,omitempty"`
 	MetricTags          []GlobalMetricTagConfig          `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 	StaticTags          []StaticMetricTagConfig          `yaml:"static_tags,omitempty" json:"static_tags,omitempty"`
 
@@ -41,6 +42,7 @@ func (p *ProfileDefinition) Clone() *ProfileDefinition {
 		Metrics:             cloneSlice(p.Metrics),
 		Topology:            cloneSlice(p.Topology),
 		Licensing:           cloneSlice(p.Licensing),
+		BGP:                 cloneSlice(p.BGP),
 		VirtualMetrics:      cloneSlice(p.VirtualMetrics),
 	}
 }

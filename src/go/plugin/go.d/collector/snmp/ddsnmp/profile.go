@@ -178,6 +178,7 @@ func (p *Profile) merge(base *Profile) error {
 		return err
 	}
 	p.mergeLicensing(base)
+	p.mergeBGP(base)
 	// Append other fields as before (these likely don't need deduplication)
 	p.Definition.MetricTags = append(p.Definition.MetricTags, base.Definition.MetricTags...)
 	p.Definition.StaticTags = append(slices.Clone(base.Definition.StaticTags), p.Definition.StaticTags...)
@@ -327,6 +328,20 @@ func (p *Profile) mergeLicensing(base *Profile) {
 			continue
 		}
 		p.Definition.Licensing = append(p.Definition.Licensing, row)
+	}
+}
+
+func (p *Profile) mergeBGP(base *Profile) {
+	overridden := make(map[string]bool, len(p.Definition.BGP))
+	for _, row := range p.Definition.BGP {
+		overridden[ddprofiledefinition.BGPMergeIdentity(row)] = true
+	}
+
+	for _, row := range base.Definition.BGP {
+		if overridden[ddprofiledefinition.BGPMergeIdentity(row)] {
+			continue
+		}
+		p.Definition.BGP = append(p.Definition.BGP, row)
 	}
 }
 
@@ -493,6 +508,9 @@ func enrichProfile(prof *Profile) {
 	for i := range prof.Definition.Topology {
 		enrichMetricTagMappingRefs(prof.Definition.Topology[i].MetricTags)
 	}
+	for i := range prof.Definition.BGP {
+		enrichMetricTagMappingRefs(prof.Definition.BGP[i].MetricTags)
+	}
 }
 
 func enrichMetricTagMappingRefs(tags ddprofiledefinition.MetricTagConfigList) {
@@ -522,6 +540,7 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 	seenMetrics := make(map[string]bool)
 	seenVmetrics := make(map[string]bool)
 	seenLicenseSignals := make(map[string]bool)
+	seenBGPSignals := make(map[string]bool)
 
 	for _, prof := range profiles {
 		if prof.Definition == nil {
@@ -553,6 +572,7 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 
 		deduplicateTopologyInProfile(prof, seenMetrics)
 		deduplicateLicensingInProfile(prof, seenLicenseSignals)
+		deduplicateBGPInProfile(prof, seenBGPSignals)
 	}
 }
 
@@ -642,6 +662,46 @@ func generateLicenseSignalKeys(row ddprofiledefinition.LicensingConfig) []string
 	add(row.Signals.Usage.Capacity)
 	add(row.Signals.Usage.Available)
 	add(row.Signals.Usage.Percent)
+	return keys
+}
+
+func deduplicateBGPInProfile(prof *Profile, seenSignals map[string]bool) {
+	filtered := prof.Definition.BGP[:0]
+	for _, row := range prof.Definition.BGP {
+		keys := generateBGPSignalKeys(row)
+		if len(keys) == 0 {
+			filtered = append(filtered, row)
+			continue
+		}
+
+		duplicate := false
+		for _, key := range keys {
+			if seenSignals[key] {
+				duplicate = true
+				break
+			}
+		}
+		if duplicate {
+			continue
+		}
+		for _, key := range keys {
+			seenSignals[key] = true
+		}
+		filtered = append(filtered, row)
+	}
+	if len(filtered) == 0 {
+		prof.Definition.BGP = nil
+		return
+	}
+	prof.Definition.BGP = filtered
+}
+
+func generateBGPSignalKeys(row ddprofiledefinition.BGPConfig) []string {
+	identity := ddprofiledefinition.BGPStructuralIdentity(row)
+	var keys []string
+	ddprofiledefinition.ForEachBGPSignalValue(row, func(path string, _ ddprofiledefinition.BGPValueConfig) {
+		keys = append(keys, strings.Join([]string{identity, path}, "|"))
+	})
 	return keys
 }
 

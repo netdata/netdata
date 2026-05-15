@@ -40,6 +40,17 @@ Use this skill before editing files under:
    license row, declare an explicit stable `id:`. For table licensing rows,
    keep `from:` references inside the same table OID and derive
    `not-accessible` INDEX values from the row index.
+12. Put SNMP BGP rows under top-level `bgp:`. Do not model BGP telemetry as
+   vendor-specific raw metrics, `virtual_metrics`, or underscore-prefixed tag
+   protocols when adding or migrating BGP coverage.
+13. BGP peer-state mappings must use the six RFC 4271 canonical states
+   (`idle`, `connect`, `active`, `opensent`, `openconfirm`, `established`).
+   Use `partial: true` plus `partial_states` only when the source MIB is
+   intentionally partial.
+14. For BGP table rows, derive `not-accessible` INDEX objects with exactly one
+   row-index selector: `index`, `index_from_end`, or `index_transform`. Use
+   `index_from_end` for trailing AFI/SAFI-like components after variable-length
+   indexes such as `InetAddress`.
 
 ## Index Rules
 
@@ -124,6 +135,20 @@ together:
 
 Verify that licensing rows are delivered through `ProfileMetrics.LicenseRows`,
 not through underscore-prefixed `HiddenMetrics`.
+
+When adding or migrating BGP profile coverage, update all related parts
+together:
+
+- profile YAML using `bgp:`;
+- closed BGP row kind, peer-state, AFI/SAFI, and typed field validation when
+  adding new policy names or value domains;
+- typed `ProfileMetrics.BGPRows` producer/consumer tests;
+- MIB evidence for every OID and every `not-accessible` index-derived field;
+- SNMP integration metadata and generated docs when public BGP capability
+  claims change.
+
+Verify that BGP rows are delivered through `ProfileMetrics.BGPRows`, not
+through `metrics:`, `virtual_metrics:`, or underscore-prefixed hidden metrics.
 
 When adding or refactoring SNMP profile, parser, or topology tests, prefer
 table-driven cases using `map[string]struct{}` keyed by test-case name when

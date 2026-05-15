@@ -20,18 +20,36 @@ func newTestFuncInterfaces(cache *ifaceCache) *funcInterfaces {
 func TestSnmpMethods(t *testing.T) {
 	methods := snmpMethods()
 
-	require.Len(t, methods, 2)
-	assert.Equal(t, "interfaces", methods[0].ID)
-	assert.Equal(t, "Network Interfaces", methods[0].Name)
-	require.NotEmpty(t, methods[0].RequiredParams)
-	assert.Equal(t, "licenses", methods[1].ID)
-	assert.Equal(t, "Licenses", methods[1].Name)
+	var ifacesMethod *funcapi.MethodConfig
+	var licensesMethod *funcapi.MethodConfig
+	var bgpMethod *funcapi.MethodConfig
+	for i := range methods {
+		switch methods[i].ID {
+		case "interfaces":
+			ifacesMethod = &methods[i]
+		case "licenses":
+			licensesMethod = &methods[i]
+		case "bgp-peers":
+			bgpMethod = &methods[i]
+		}
+	}
+
+	require.NotNil(t, ifacesMethod)
+	assert.Equal(t, "Network Interfaces", ifacesMethod.Name)
+	require.NotEmpty(t, ifacesMethod.RequiredParams)
+
+	require.NotNil(t, licensesMethod)
+	assert.Equal(t, "Licenses", licensesMethod.Name)
+
+	require.NotNil(t, bgpMethod)
+	assert.Equal(t, "BGP Peers", bgpMethod.Name)
+	require.NotEmpty(t, bgpMethod.RequiredParams)
 
 	// Verify type group param exists
 	var typeGroupParam *funcapi.ParamConfig
-	for i := range methods[0].RequiredParams {
-		if methods[0].RequiredParams[i].ID == "if_type_group" {
-			typeGroupParam = &methods[0].RequiredParams[i]
+	for i := range ifacesMethod.RequiredParams {
+		if ifacesMethod.RequiredParams[i].ID == "if_type_group" {
+			typeGroupParam = &ifacesMethod.RequiredParams[i]
 			break
 		}
 	}
@@ -48,6 +66,18 @@ func TestSnmpMethods(t *testing.T) {
 		}
 	}
 	assert.True(t, hasDefault, "should have a default type group option")
+
+	var bgpViewParam *funcapi.ParamConfig
+	for i := range bgpMethod.RequiredParams {
+		if bgpMethod.RequiredParams[i].ID == "view" {
+			bgpViewParam = &bgpMethod.RequiredParams[i]
+			break
+		}
+	}
+	require.NotNil(t, bgpViewParam, "expected BGP view required param")
+	require.Len(t, bgpViewParam.Options, 3)
+	assert.Equal(t, "peers", bgpViewParam.Options[0].ID)
+	assert.True(t, bgpViewParam.Options[0].Default)
 }
 
 func TestFuncIfacesColumns(t *testing.T) {

@@ -1,34 +1,37 @@
-# SOW-0014 - SNMP licensing unsupported table cache
+# SOW-0014 - SNMP typed unsupported table cache
 
 ## Status
 
 Status: open
 
-Sub-state: follow-up created from SOW-0013 close-out review.
+Sub-state: follow-up created from SOW-0013 close-out review; scope expanded by user on 2026-05-08 to cover both typed licensing and typed BGP table roots.
 
 ## Requirements
 
 ### Purpose
 
-Avoid repeated SNMP licensing table-root walks on Cisco and other devices that explicitly report unsupported licensing tables, without reintroducing broad missing-OID poisoning for ordinary metric tables or empty-but-valid tables.
+Avoid repeated typed SNMP table-root walks on Cisco and other devices that explicitly report unsupported typed licensing or typed BGP tables, without reintroducing broad missing-OID poisoning for ordinary metric tables or empty-but-valid tables.
 
 ### User Request
 
 User accepted broad Cisco licensing coverage through dedicated mixins and agreed that nonexistent licensing table OID caching should be tracked as the solution for unsupported devices.
+
+User later accepted broad Catalyst BGP attachment and clarified that the unsupported table-root cache should apply to both typed licensing and typed BGP table roots.
 
 ### Assistant Understanding
 
 Facts:
 
 - `cisco.yaml` extends `_cisco-licensing-traditional.yaml` and `_cisco-licensing-smart.yaml`.
-- Those mixins add two licensing table roots: `clmgmtLicenseInfoTable` and `ciscoSlaEntitlementInfoTable`.
+- Those licensing mixins add two table roots: `clmgmtLicenseInfoTable` and `ciscoSlaEntitlementInfoTable`.
+- `cisco-catalyst.yaml` extends `_cisco-bgp4-mib.yaml` in the BGP typed projection SOW, so Catalyst devices that do not expose Cisco BGP tables can hit unsupported typed BGP table roots.
 - SOW-0013 intentionally removed the old empty-walk table missing cache write because empty tables and unsupported tables must not be conflated.
-- Explicit `NoSuchObject` / `NoSuchInstance` table-root responses are still a reasonable candidate for a narrowly scoped licensing unsupported-table cache.
+- Explicit `NoSuchObject` / `NoSuchInstance` table-root responses are still a reasonable candidate for a narrowly scoped typed-row unsupported-table cache.
 
 Inferences:
 
-- The follow-up should distinguish unsupported table roots from empty tables with zero rows.
-- The cache should be scoped to typed licensing table roots and must not suppress ordinary metric table OIDs.
+- The follow-up should distinguish unsupported typed table roots from empty typed tables with zero rows.
+- The cache should be scoped to typed licensing and typed BGP table roots and must not suppress ordinary metric table OIDs.
 
 Unknowns:
 
@@ -36,10 +39,10 @@ Unknowns:
 
 ### Acceptance Criteria
 
-- Typed licensing table walks that receive explicit no-such table-root responses are skipped on later collection cycles.
+- Typed licensing and typed BGP table walks that receive explicit no-such table-root responses are skipped on later collection cycles.
 - Empty valid tables with zero rows are not cached as unsupported.
 - Ordinary metrics and topology table collection are unaffected.
-- Tests cover unsupported table root, empty table, and ordinary metric table behavior.
+- Tests cover unsupported typed licensing table root, unsupported typed BGP table root, empty table, and ordinary metric table behavior.
 
 ## Analysis
 
@@ -56,7 +59,7 @@ Current state:
 
 - Missing scalar OIDs are cached exactly.
 - Licensing table roots with no returned PDUs are not cached, by design, because zero rows may mean an empty valid table.
-- Broad Cisco licensing can therefore continue walking unsupported licensing table roots each cycle until this follow-up is implemented.
+- Broad Cisco licensing and broad Catalyst BGP can therefore continue walking unsupported typed table roots each cycle until this follow-up is implemented.
 
 Risks:
 
@@ -69,7 +72,7 @@ Status: blocked
 
 Problem / root-cause model:
 
-- Broad Cisco licensing coverage intentionally trades initial probe breadth for profile simplicity. Unsupported table roots need a precise negative-cache path keyed to explicit no-such table-root responses, not to empty walk results.
+- Broad Cisco licensing and Catalyst BGP coverage intentionally trade initial probe breadth for profile simplicity. Unsupported table roots need a precise negative-cache path keyed to explicit no-such table-root responses, not to empty walk results.
 
 Evidence reviewed:
 
@@ -79,9 +82,10 @@ Evidence reviewed:
 
 Affected contracts and surfaces:
 
-- ddsnmpcollector licensing table collection.
+- ddsnmpcollector typed licensing table collection.
+- ddsnmpcollector typed BGP table collection.
 - Collection stats for missing OIDs and table walks.
-- Cisco SNMP collection overhead on unsupported devices.
+- Cisco SNMP collection overhead on unsupported licensing and BGP devices.
 
 Existing patterns to reuse:
 
@@ -102,7 +106,7 @@ Sensitive data handling plan:
 Implementation plan:
 
 1. Model explicit table-root no-such responses in tests.
-2. Add a licensing-scoped unsupported table-root cache or equivalent filter.
+2. Add a typed-row unsupported table-root cache or equivalent filter for licensing and BGP table roots.
 3. Prove empty valid tables are still retried.
 
 Validation plan:
@@ -131,11 +135,12 @@ Open decisions:
 ## Implications And Decisions
 
 - Follow-up created to satisfy SOW-0013 follow-up discipline; no implementation is part of SOW-0013.
+- Scope expanded on 2026-05-08: the same unsupported table-root handling must apply to typed licensing and typed BGP table roots.
 
 ## Plan
 
-1. Add tests for unsupported licensing table-root no-such handling.
-2. Implement narrowly scoped cache/filter behavior.
+1. Add tests for unsupported typed licensing and typed BGP table-root no-such handling.
+2. Implement narrowly scoped typed-row cache/filter behavior.
 3. Validate narrow and shared SNMP suites.
 
 ## Execution Log

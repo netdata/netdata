@@ -12,10 +12,26 @@ extends:
   - _std-tcp-mib.yaml
   - _std-udp-mib.yaml
   - _std-ospf-mib.yaml
-  - _std-bgp4-mib.yaml
   - _std-ip-mib.yaml
   - _cisco-metadata.yaml
   - _cisco-hardware.yaml
+
+virtual_metrics:
+  # CPU memory: prefer 64-bit HC counters, fallback to 32-bit
+  - name: cpmCPUMemory
+    per_row: true
+    group_by: ["cpu_index"]
+    alternatives:
+      - sources:
+          - {metric: _cpmCPUMemoryHCUsed, table: cpmCPUTotalTable, as: used}
+          - {metric: _cpmCPUMemoryHCFree, table: cpmCPUTotalTable, as: free}
+      - sources:
+          - {metric: _cpmCPUMemoryUsed, table: cpmCPUTotalTable, as: used}
+          - {metric: _cpmCPUMemoryFree, table: cpmCPUTotalTable, as: free}
+    chart_meta:
+      description: CPU wide system memory usage
+      family: 'System/CPU/Memory'
+      unit: "By"
 
 metrics:
   - MIB: CISCO-ENTITY-FRU-CONTROL-MIB
@@ -638,20 +654,3 @@ metrics:
           24: y1731_loss
           25: mcast_jitter
           26: fabric_path_echo
-
-virtual_metrics:
-  # CPU memory: prefer 64-bit HC counters, fallback to 32-bit
-  - name: cpmCPUMemory
-    per_row: true
-    group_by: ["cpu_index"]
-    alternatives:
-      - sources:
-          - {metric: _cpmCPUMemoryHCUsed, table: cpmCPUTotalTable, as: used}
-          - {metric: _cpmCPUMemoryHCFree, table: cpmCPUTotalTable, as: free}
-      - sources:
-          - {metric: _cpmCPUMemoryUsed, table: cpmCPUTotalTable, as: used}
-          - {metric: _cpmCPUMemoryFree, table: cpmCPUTotalTable, as: free}
-    chart_meta:
-      description: CPU wide system memory usage
-      family: 'System/CPU/Memory'
-      unit: "By"

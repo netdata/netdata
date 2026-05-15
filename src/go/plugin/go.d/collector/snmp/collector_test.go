@@ -370,9 +370,11 @@ func TestCollector_Collect(t *testing.T) {
 				"snmp_device_prof_test_stats_errors_processing_scalar":    0,
 				"snmp_device_prof_test_stats_errors_processing_table":     0,
 				"snmp_device_prof_test_stats_errors_processing_licensing": 0,
+				"snmp_device_prof_test_stats_errors_processing_bgp":       0,
 				"snmp_device_prof_test_stats_errors_snmp":                 0,
 				"snmp_device_prof_test_stats_metrics_rows":                0,
 				"snmp_device_prof_test_stats_metrics_licensing":           0,
+				"snmp_device_prof_test_stats_metrics_bgp":                 0,
 				"snmp_device_prof_test_stats_metrics_scalar":              0,
 				"snmp_device_prof_test_stats_metrics_table":               0,
 				"snmp_device_prof_test_stats_metrics_tables":              0,
@@ -388,6 +390,7 @@ func TestCollector_Collect(t *testing.T) {
 				"snmp_device_prof_test_stats_timings_scalar":              0,
 				"snmp_device_prof_test_stats_timings_table":               0,
 				"snmp_device_prof_test_stats_timings_licensing":           0,
+				"snmp_device_prof_test_stats_timings_bgp":                 0,
 				"snmp_device_prof_test_stats_timings_virtual":             0,
 				"snmp_device_prof_uptime":                                 123,
 			},
@@ -431,9 +434,11 @@ func TestCollector_Collect(t *testing.T) {
 				"snmp_device_prof_test_stats_errors_processing_scalar":    0,
 				"snmp_device_prof_test_stats_errors_processing_table":     0,
 				"snmp_device_prof_test_stats_errors_processing_licensing": 0,
+				"snmp_device_prof_test_stats_errors_processing_bgp":       0,
 				"snmp_device_prof_test_stats_errors_snmp":                 0,
 				"snmp_device_prof_test_stats_metrics_rows":                0,
 				"snmp_device_prof_test_stats_metrics_licensing":           0,
+				"snmp_device_prof_test_stats_metrics_bgp":                 0,
 				"snmp_device_prof_test_stats_metrics_scalar":              0,
 				"snmp_device_prof_test_stats_metrics_table":               0,
 				"snmp_device_prof_test_stats_metrics_tables":              0,
@@ -449,6 +454,7 @@ func TestCollector_Collect(t *testing.T) {
 				"snmp_device_prof_test_stats_timings_scalar":              0,
 				"snmp_device_prof_test_stats_timings_table":               0,
 				"snmp_device_prof_test_stats_timings_licensing":           0,
+				"snmp_device_prof_test_stats_timings_bgp":                 0,
 				"snmp_device_prof_test_stats_timings_virtual":             0,
 				"snmp_device_prof_if_octets_eth0_in":                      1,
 				"snmp_device_prof_if_octets_eth0_out":                     2,
@@ -563,7 +569,7 @@ func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
 	assert.Equal(t, "collect", calls[1].ctx.Value(collectKey{}))
 }
 
-func TestCollector_CollectMixedModeAllowsNilContext(t *testing.T) {
+func TestCollector_CollectMixedModeCollectsSNMPAndPingMetrics(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -603,15 +609,17 @@ func TestCollector_CollectMixedModeAllowsNilContext(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 
-	got := collr.Collect(nil)
+	got := collr.Collect(context.Background())
 
 	assert.Equal(t, map[string]int64{
 		"snmp_device_prof_test_stats_errors_processing_scalar":    0,
 		"snmp_device_prof_test_stats_errors_processing_table":     0,
 		"snmp_device_prof_test_stats_errors_processing_licensing": 0,
+		"snmp_device_prof_test_stats_errors_processing_bgp":       0,
 		"snmp_device_prof_test_stats_errors_snmp":                 0,
 		"snmp_device_prof_test_stats_metrics_rows":                0,
 		"snmp_device_prof_test_stats_metrics_licensing":           0,
+		"snmp_device_prof_test_stats_metrics_bgp":                 0,
 		"snmp_device_prof_test_stats_metrics_scalar":              0,
 		"snmp_device_prof_test_stats_metrics_table":               0,
 		"snmp_device_prof_test_stats_metrics_tables":              0,
@@ -627,6 +635,7 @@ func TestCollector_CollectMixedModeAllowsNilContext(t *testing.T) {
 		"snmp_device_prof_test_stats_timings_scalar":              0,
 		"snmp_device_prof_test_stats_timings_table":               0,
 		"snmp_device_prof_test_stats_timings_licensing":           0,
+		"snmp_device_prof_test_stats_timings_bgp":                 0,
 		"snmp_device_prof_test_stats_timings_virtual":             0,
 		"snmp_device_prof_uptime":                                 123,
 		"ping_rtt_min":                                            (10 * time.Millisecond).Microseconds(),

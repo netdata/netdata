@@ -44,6 +44,34 @@ This collector discovers and monitors any SNMP-enabled network device.
 
 > This table highlights common vendors—the **full library includes many more**.
 
+**SNMP BGP monitoring**
+
+Netdata ships BGP monitoring profiles for generic `BGP4-MIB` devices and vendor MIBs including Cisco, Juniper, Nokia SR OS, Huawei, Arista, and Dell.
+
+The operator-facing BGP charts are normalized under:
+
+- `snmp.bgp.peers.*`
+- `snmp.bgp.peer_families.*`
+- `snmp.bgp.devices.peer_counts`
+- `snmp.bgp.devices.peer_states`
+
+Rich per-peer diagnostics such as previous state, last error, graceful-restart state, and vendor unavailability reasons are exposed through the **Live** function `snmp:bgp-peers` instead of being charted as regular time-series.
+
+This SNMP BGP surface is designed for:
+
+- peer/session availability and FSM state
+- established uptime
+- BGP UPDATE and message traffic
+- route-count monitoring where the vendor MIB exposes truthful counts
+- stock alerts for peer down, update churn, transition anomalies, and accepted-prefix drift
+
+**Important limits**
+
+- Standard `BGP4-MIB` gives peer health and message counters, but **not** full route-count coverage.
+- Some route counters are **current gauges**, while others are **cumulative totals**. Netdata keeps them separate instead of flattening unlike semantics into one fake chart.
+- Huawei contributes to device-level **peer/session counts**, but not device-level **peer state counts** in this SNMP batch.
+- SNMP does **not** provide live per-route inventory. If you need “all routes to and from a peer in real time”, that belongs to BMP, not this integration page.
+
 
 :::info
 
@@ -359,6 +387,29 @@ jobs:
 ```
 </details>
 
+###### BGP router with forced profile
+
+Use `manual_profiles` when auto-detection cannot safely distinguish the device, or when you want to force a specific vendor BGP profile during testing.
+
+This example targets a Cisco ASR router and keeps the optional ICMP latency charts enabled.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: edge-router
+    update_every: 10
+    hostname: 192.0.2.10
+    community: public
+    manual_profiles:
+      - cisco-asr
+    options:
+      version: 2
+
+```
+</details>
+
 
 
 ## Alerts
@@ -375,6 +426,13 @@ The following alerts are available:
 | [ snmp_license_state_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are degraded, in grace, or otherwise in warning state. |
 | [ snmp_license_state_critical ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are expired, invalid, unauthorized, or otherwise in critical state. |
 | [ snmp_license_usage_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.usage_percent | The most constrained monitored license pool on this device is nearing exhaustion. |
+| [ snmp_bgp_peer_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.availability | BGP peer is administratively enabled but remains out of Established |
+| [ snmp_bgp_peer_family_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.availability | BGP peer-family is administratively enabled but remains out of Established |
+| [ snmp_bgp_peer_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.established_transitions | ML anomaly detection on per-peer established transition activity |
+| [ snmp_bgp_peer_family_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.established_transitions | ML anomaly detection on per-peer-family established transition activity |
+| [ snmp_bgp_peer_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.update_traffic | ML anomaly detection on per-peer BGP UPDATE traffic |
+| [ snmp_bgp_peer_family_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.update_traffic | ML anomaly detection on per-peer-family BGP UPDATE traffic |
+| [ snmp_bgp_peer_family_prefixes_accepted_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.route_counts.current | ML anomaly detection on accepted-prefix gauges where the vendor MIB exposes them |
 
 
 ## Metrics
@@ -417,6 +475,32 @@ To understand the structure of these profiles (metrics, tags, virtual metrics, e
 :::
 
 If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or exclusively, when `ping_only: true`).
+
+**For BGP-capable profiles, the public chart contract is:**
+
+- `snmp.bgp.peers.*` for one BGP peer/session per chart instance
+- `snmp.bgp.peer_families.*` for one peer plus AFI/SAFI per chart instance
+- `snmp.bgp.devices.peer_counts` for device-level peer/session counts
+- `snmp.bgp.devices.peer_states` for device-level peer-state summaries where the source MIB exposes canonical peer rows
+- Rich peer diagnostics live in the Live function `snmp:bgp-peers`, not in charted time-series
+
+**BGP capability notes**
+
+| Vendor / MIB surface | Peer charts | Peer-family charts | Device peer counts | Device peer states | Route counts |
+|----------------------|-------------|--------------------|--------------------|--------------------|--------------|
+| Standard `BGP4-MIB` | Yes | No | Yes | Yes | No |
+| Cisco ASR | Yes | Yes | Yes | Yes | Yes |
+| Juniper MX | Yes | Yes | Yes | Yes | Yes |
+| Nokia SR OS | Yes | Yes | Yes | Yes | Yes |
+| Arista | Yes | Yes | Yes | Yes | Yes |
+| Dell OS10 | Yes | Yes | Yes | Yes | Yes |
+| Huawei | Partial | Yes | Yes | No | Totals only |
+
+**Interpretation guidance**
+
+- `route_counts.current` contains current gauges such as received, accepted, advertised, active, suppressed, or withdrawn prefixes when the vendor MIB exposes them.
+- `route_totals` contains cumulative counters where the vendor MIB only exposes totals.
+- When the source model is peer-family scoped, alerts and chart labels include AFI/SAFI so operators can distinguish otherwise similar peers.
 
 
 ### Per device licensing
@@ -504,6 +588,65 @@ Network interface metrics from cached SNMP data, including traffic rates, packet
 | Discards Out | float | packets/s |  | Rate of outbound packets deliberately discarded. Can indicate output queue overflows, ACL drops, or security policy rejections. |
 | Multicast In | float | packets/s | hidden | Rate of multicast packets (destined for a group) received per second. Common in video streaming, multicast applications, and routing protocols. |
 | Multicast Out | float | packets/s | hidden | Rate of multicast packets transmitted per second. |
+
+### BGP Peers
+
+Provides detailed current BGP peer and peer-family state from cached SNMP data.
+
+This function uses the normalized BGP surface produced during regular SNMP polling and presents it as a sortable, filterable troubleshooting table. It is designed for details that are useful operationally but should not be charted as regular time-series, such as previous state, last error, last down reason, graceful restart state, and vendor-specific unavailability reasons.
+
+Use cases:
+- Identify exactly which peer or peer-family is unhealthy right now
+- See the most recent BGP NOTIFICATION error as human-readable text
+- Inspect peer identity, AFI/SAFI scope, prefix gauges, and current troubleshooting context in one view
+
+Data is sourced from the last successful SNMP collection cycle. No additional SNMP requests are triggered when calling this function.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Snmp:bgp-peers` |
+| Require Cloud | no |
+| Performance | Uses cached normalized SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many peers or peer-families may return many rows |
+| Security | Exposes current BGP control-plane state and identifiers only:<br/>• No authentication credentials are exposed<br/>• No device configuration changes are triggered<br/>• No packet payloads or full route inventory are exposed |
+| Availability | Available when:<br/>• The collector has completed at least one successful BGP-capable SNMP collection cycle<br/>• BGP peer data exists for the matched profile(s)<br/>• Returns HTTP 503 if no BGP rows are available yet |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| View | select | Choose whether to show peer rows, peer-family rows, or both. | yes | peers | Peers (default), Peer Families, All |
+
+#### Returns
+
+Current BGP peer and peer-family details from cached normalized SNMP data. Each row represents either one peer or one peer plus AFI/SAFI, depending on the selected view. Additional hidden columns provide raw codes, message totals, and threshold fields for deeper inspection in the UI.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Scope | string |  |  | Whether the row represents a peer or a peer-family. |
+| Routing Instance | string |  |  | Routing-instance / VRF identifier when exposed by the source MIB. |
+| Neighbor | string |  |  | Remote peer address. |
+| Local Address | string |  |  | Local address used for the BGP session when exposed by the source MIB. |
+| Remote AS | string |  |  | Remote Autonomous System number. |
+| Peer Description | string |  |  | Peer description or label when exposed by the source MIB. |
+| Family | string |  |  | Address-family / SAFI scope for peer-family rows. |
+| Admin Status | string |  |  | Whether the peer is administratively enabled. |
+| Connection State | string |  |  | Current BGP FSM state. |
+| Previous State | string |  |  | Previous FSM state when the source MIB exposes it. |
+| Established Uptime | integer | seconds |  | Time spent in the Established state. |
+| Last Update Age | integer | seconds |  | Time since the last received UPDATE. |
+| Updates Received | integer | updates |  | Current received UPDATE counter from the latest poll. |
+| Updates Sent | integer | updates |  | Current sent UPDATE counter from the latest poll. |
+| Prefixes Accepted | integer | prefixes |  | Current accepted-prefix gauge where the source MIB exposes it. |
+| Prefixes Advertised | integer | prefixes |  | Current advertised-prefix gauge where the source MIB exposes it. |
+| Last Error | string |  |  | Human-readable BGP last-error text derived from the code/subcode pair when available. |
+| Down Reason | string |  |  | Last peer-down reason when the source MIB exposes it. |
+| GR State | string |  |  | Graceful-restart state for peer-family scoped rows when exposed by the source MIB. |
+| Unavailability Reason | string |  |  | Vendor-specific unavailability reason for peer-family scoped rows when exposed by the source MIB. |
 
 ### Network Topology
 

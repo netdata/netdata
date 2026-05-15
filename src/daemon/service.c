@@ -110,25 +110,34 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     time_t now = now_realtime_sec();
     RRDSET *st;
     rrdset_foreach_reentrant(st, host) {
-        if(rrdset_is_replicating(st))
-            continue;
-
+        bool is_replicating = rrdset_is_replicating(st);
         RRDSET_FLAGS flags = rrdset_flag_get(st);
+
+        // A replicating chart with pending obsolete work must still be
+        // counted as a candidate, even though we cannot archive it this
+        // pass. The PENDING_OBSOLETE_* host flags are cleared up-front;
+        // if we did not count this chart, candidates == archives == 0
+        // for it and the host flag would not be re-armed -- the cleanup
+        // would never retry once replication finishes. Counting it as a
+        // candidate without an archive forces archives != candidates at
+        // end-of-loop, which re-arms the host flag for the next pass.
 
         if(flags & RRDSET_FLAG_OBSOLETE_DIMENSIONS) {
             partial_candidates++;
 
-            archived_items += svc_rrdset_archive_obsolete_dimensions(st, false);
+            if(!is_replicating) {
+                archived_items += svc_rrdset_archive_obsolete_dimensions(st, false);
 
-            // "all candidates archived" -> flag was not re-set inside.
-            if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
-                partial_archives++;
+                // "all candidates archived" -> flag was not re-set inside.
+                if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
+                    partial_archives++;
+            }
         }
 
         if(flags & RRDSET_FLAG_OBSOLETE) {
             full_candidates++;
 
-            if(svc_rrdset_lock_for_deletion(st, now)) {
+            if(!is_replicating && svc_rrdset_lock_for_deletion(st, now)) {
                 archived_items += svc_rrdset_archive_obsolete_dimensions(st, true);
 
                 if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS)) {
@@ -175,9 +184,13 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if(rrdhost_receiver_replicating_charts(host) || rrdhost_sender_replicating_charts(host))
-            continue;
-
+        // Per-chart correctness gate is rrdset_is_replicating(st) inside
+        // svc_rrdhost_cleanup_charts_marked_obsolete. The previous host-level
+        // gate here (rrdhost_*_replicating_charts(host) > 0) was a defensive
+        // holdover from before the sender replication counter was accurate;
+        // on streaming children with continuous chart churn it permanently
+        // tripped and blocked all obsolete-chart cleanup on the host, piling
+        // up obsolete-but-still-live charts and their RAM-mode dim mmaps.
         archived += svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
         if (rrdhost_is_local(host) || IS_VIRTUAL_HOST_OS(host))
