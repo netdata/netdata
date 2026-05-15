@@ -23,9 +23,6 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
     if (!total)
         return NULL;
 
-    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
-    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
-
     struct shared_pid_memory *ctx = calloc(1, sizeof(*ctx));
     if (!ctx)
         return NULL;
