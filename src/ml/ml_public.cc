@@ -541,15 +541,31 @@ void ml_init()
             // O_CREAT|O_TRUNC so a symlink swap between our earlier
             // unlink() and this open() cannot redirect the write -- if
             // anything (legitimate or hostile) re-created the path in
-            // that window, open() fails with EEXIST and we leave it
-            // alone. The desired post-condition is "sentinel exists",
-            // which is satisfied either way.
+            // that window, open() fails with EEXIST.
             int rerr = errno;
-            if (int fd = open(sentinel, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600); fd >= 0)
+            int fd = open(sentinel, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+            int oerr = errno;
+            if (fd >= 0) {
                 close(fd);
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "ML: failed to quarantine %s to %s (errno=%d); sentinel %s restored, will retry on next start.",
-                   path, bad_path, rerr, sentinel);
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "ML: failed to quarantine %s to %s (errno=%d); sentinel %s restored, will retry on next start.",
+                       path, bad_path, rerr, sentinel);
+            } else if (oerr == EEXIST) {
+                // Something occupies the path already (race or stale file).
+                // Next start's unlink() will remove it and trigger quarantine
+                // regardless of what it is, so retry is still effective.
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "ML: failed to quarantine %s to %s (errno=%d); sentinel path %s already occupied, will retry on next start.",
+                       path, bad_path, rerr, sentinel);
+            } else {
+                // Sentinel restore actually failed (permission, ENOSPC,
+                // read-only FS, etc.). Retry on next start is NOT guaranteed
+                // -- be honest with the operator.
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "ML: failed to quarantine %s to %s (rename errno=%d) AND failed to restore sentinel %s (open errno=%d). "
+                       "Retry will NOT happen on next start; remove ml.db or recreate the sentinel manually.",
+                       path, bad_path, rerr, sentinel, oerr);
+            }
         }
     }
 

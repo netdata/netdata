@@ -585,19 +585,31 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (unlikely(rc != SQLITE_OK && rc != step_rc))
         error_report("Failed to %s statement when loading models, rc = %d", active_stmt ? "reset" : "finalize", rc);
 
-    // On corruption: discard whatever partial rows the step loop managed to
-    // pull from the bad DB and put the dimension back into UNTRAINED. The
-    // training-enqueue gate in ml_public.cc only requeues UNTRAINED dims, so
-    // leaving ts=TRAINED with a partial km_contexts locks the dim onto stale
-    // models until the next agent restart. Also trips skip_models in
-    // metadata_scan_host so we stop hammering the bad DB.
-    if (ml_db_mark_if_corrupt(step_rc)) {
+    // Latch on either step-time OR cleanup-time corruption. sqlite3_reset /
+    // sqlite3_finalize can surface SQLITE_CORRUPT / SQLITE_NOTADB even when
+    // step succeeded; without both checks, cleanup-only corruption would log
+    // but never trip ml_db_unusable. Both calls are idempotent.
+    bool step_corrupt    = ml_db_mark_if_corrupt(step_rc);
+    bool cleanup_corrupt = ml_db_mark_if_corrupt(rc);
+
+    // Partial step results may be polluting dim state -- roll back when step
+    // itself errored. The training-enqueue gate in ml_public.cc only requeues
+    // UNTRAINED dims, so leaving ts=TRAINED with a partial km_contexts locks
+    // the dim onto stale models until the next agent restart. Cleanup-only
+    // corruption (step=DONE, reset/finalize=CORRUPT) does NOT need this:
+    // step returned DONE so the rows already loaded are structurally valid;
+    // only the DB-level flag needs setting for future calls.
+    if (step_corrupt) {
         spinlock_lock(&dim->slock);
         dim->km_contexts.clear();
         dim->ts = TRAINING_STATUS_UNTRAINED;
         spinlock_unlock(&dim->slock);
-        return 1;
     }
+
+    // Either signal trips skip_models in metadata_scan_host so we stop
+    // hammering the bad DB.
+    if (step_corrupt || cleanup_corrupt)
+        return 1;
 
     return 0;
 
