@@ -1,0 +1,24 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: nvme
+placements:
+  - id: nvme
+    section_id: system.hardware
+    title: NVMe devices
+    items:
+      - nvme.device_estimated_endurance_perc
+      - nvme.device_available_spare_perc
+      - nvme.device_composite_temperature
+      - nvme.device_io_transferred_count
+      - nvme.device_power_cycles_count
+      - nvme.device_power_on_time
+      - nvme.device_critical_warnings_state
+      - nvme.device_unsafe_shutdowns_count
+      - nvme.device_media_errors_rate
+      - nvme.device_error_log_entries_rate
+      - nvme.device_warning_composite_temperature_time
+      - nvme.device_critical_composite_temperature_time
+      - nvme.device_thermal_mgmt_temp1_transitions_rate
+      - nvme.device_thermal_mgmt_temp2_transitions_rate
+      - nvme.device_thermal_mgmt_temp1_time
+      - nvme.device_thermal_mgmt_temp2_time

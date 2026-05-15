@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: Completed again on 2026-05-15 after fixing the installed Windows NVMe runtime regression and validating native NVMe, smartctl, and fan charts through the local Agent API.
+Sub-state: Completed again on 2026-05-15 after adding collector taxonomy coverage for the PR's metric-bearing metadata changes and fixing the installed Windows NVMe runtime regression.
 
 ## Requirements
 
@@ -508,7 +508,8 @@ Validation:
 - `MSYSTEM=MSYS ninja -C build-cygwin-MSYS go-plugin`: passed and rebuilt `go.d.plugin.exe` after CMake detected the restored Windows NVMe files.
 - `MSYSTEM=MSYS ninja -C build-cygwin-MSYS install`: passed and installed `/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin.exe`.
 - `PYTHONUTF8=1 C:\msys64\mingw64\bin\python.exe integrations\gen_integrations.py`: passed and regenerated `src/go/plugin/go.d/collector/nvme/integrations/nvme_devices.md`.
-- `git diff --check`: passed with only repository-standard Windows line-ending conversion warnings.
+- `git diff --check`: passed.
+- Structural smoke check confirmed all three new taxonomy files declare `taxonomy_version: 1`, `placements`, and `section_id: system.hardware`.
 - Same-failure search over the NVMe collector and Windows storage/fan spec found no remaining active text that says Windows requires `nvme.exe` as the primary NVMe collection path.
 - Local Windows inventory evidence: `Get-PhysicalDisk` reports two healthy NVMe disks, `Samsung SSD 990 PRO 4TB` and `KXG60PNV2T04 NVMe KIOXIA 2048GB`.
 - Direct installed-plugin smoke evidence: `/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin.exe -d -m nvme -j nvme 1` loads the `nvme` module and stock `nvme` job config from the installed tree.
@@ -578,3 +579,42 @@ Artifact maintenance gate:
 - End-user/operator docs: no update needed; chart contexts, dimensions, and user-visible collector contract did not change in this repair.
 - End-user/operator skills: no update needed; no public/operator skill behavior changed.
 - SOW lifecycle: reopened completed SOW for this regression, recorded root cause and installed-runtime validation, and moved the SOW back to `done/` with the repair commit.
+
+## Regression - 2026-05-15 Collector Taxonomy CI Gate
+
+What broke:
+
+- After commit `5ab827d1da`, the PR's `Docs Broken Link Check` workflow failed in the `Check Collector Taxonomy` step.
+- The failure was `TAX030`: collector metrics or taxonomy changed, but `taxonomy.yaml` was missing.
+
+Evidence:
+
+- GitHub Actions job `check-documentation` in run `25913890627` completed with failure.
+- The failing command was `python3 integrations/check_collector_taxonomy.py --pr-diff "43f27e1bbad4944e48b0ebfc6eea1e630e3bbdaa...5ab827d1dad1e239416e827006a8abd0e608ccef"`.
+- The upstream checker fails a PR when a collector `metadata.yaml` metrics block changes without a sibling `taxonomy.yaml`.
+- This PR changed metric-bearing metadata for the go.d `nvme`, go.d `smartctl`, and Windows `GetFans` collectors before the taxonomy gate landed in the upstream workflow.
+
+Root cause:
+
+- The PR predates the new collector taxonomy source contract, so the collector metadata updates did not include taxonomy authoring files.
+
+Repair:
+
+- Added `taxonomy.yaml` for go.d `nvme`, go.d `smartctl`, and Windows `GetFans`.
+- Each taxonomy file uses contexts declared by the sibling `metadata.yaml` and places the collector under the existing `system.hardware` section.
+
+Validation:
+
+- The new files follow the upstream `taxonomy_version: 1` authoring contract: top-level `plugin_name`, `module_name`, and `placements`, with structural context ownership items.
+- `git diff --check`: passed with only repository-standard Windows line-ending conversion warnings.
+- `.agents/sow/audit.sh`: passed this SOW's status/directory and regression-placement checks; it continued to report pre-existing unrelated repository SOW/framework warnings.
+- Post-push GitHub Actions will be rechecked after this taxonomy commit lands.
+
+Artifact maintenance gate:
+
+- AGENTS.md: no update needed; repository workflow and guardrails did not change.
+- Runtime project skills: no update needed; the integrations lifecycle skill already documents the taxonomy pipeline.
+- Specs: no update needed; this is a CI/source-artifact coverage update, not a runtime behavior change.
+- End-user/operator docs: added taxonomy authoring files consumed by the integrations/dashboard taxonomy pipeline; generated docs were not changed by this source-only fix.
+- End-user/operator skills: no update needed; no public/operator skill behavior changed.
+- SOW lifecycle: reopened completed SOW for the CI regression, recorded root cause and repair, and will move it back to `done/` with the taxonomy commit.
