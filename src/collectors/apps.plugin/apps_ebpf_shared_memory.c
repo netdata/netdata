@@ -154,11 +154,14 @@ void apps_ebpf_accumulate_cachestat(void)
     }
 
     for (struct pid_stat *p = root_of_pids(); p; p = p->next) {
-        if (unlikely(!p->has_ebpf || !p->updated || !p->target))
+        if (unlikely(!p->has_ebpf || !p->updated))
+            continue;
+
+        struct target *w = p->target;
+        if (unlikely(!w))
             continue;
 
         have_rows = true;
-        struct target *w = p->target;
         const struct ebpf_cachestat *current = &p->ebpf.cachestat.current;
 
         w->cachestat_totals.account_page_dirtied += current->account_page_dirtied;
