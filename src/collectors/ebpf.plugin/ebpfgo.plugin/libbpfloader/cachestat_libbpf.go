@@ -37,6 +37,10 @@ int netdata_cachestat_runtime_prepare(
     const char *account_function);
 int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt);
 int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *account_function);
+int netdata_cachestat_runtime_update_controller(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    int apps_enabled,
+    int apps_level);
 int netdata_cachestat_runtime_snapshot(
     struct netdata_ebpf_cachestat_runtime *rt,
     int maps_per_core,
@@ -64,6 +68,8 @@ type CachestatRuntimeConfig struct {
 	MapsPerCore     bool
 	AccountFunction string
 }
+
+const cachestatAppsLevelRealParent = 0
 
 func NewCachestatRuntime(path string, useCore bool) (*CachestatRuntime, error) {
 	cpath := C.CString(path)
@@ -124,6 +130,23 @@ func (r *CachestatRuntime) Attach(accountFunction string) error {
 
 	if ret := C.netdata_cachestat_runtime_attach(r.ptr, cfn); ret != 0 {
 		return fmt.Errorf("attach cachestat runtime failed: %d", int(ret))
+	}
+
+	return nil
+}
+
+func (r *CachestatRuntime) UpdateController(appsEnabled bool) error {
+	if r == nil || r.ptr == nil {
+		return ErrDisabled
+	}
+
+	cAppsEnabled := C.int(0)
+	if appsEnabled {
+		cAppsEnabled = 1
+	}
+
+	if ret := C.netdata_cachestat_runtime_update_controller(r.ptr, cAppsEnabled, C.int(cachestatAppsLevelRealParent)); ret != 0 {
+		return fmt.Errorf("update cachestat controller failed: %d", int(ret))
 	}
 
 	return nil

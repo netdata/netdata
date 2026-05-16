@@ -20,6 +20,8 @@ type CachestatLegacyConfig struct {
 	IsDebian        bool
 	HasBTF          bool
 	ConfigFound     bool
+	AppsEnabled     bool
+	CgroupsEnabled  bool
 	BTFPath         string
 	UpdateEvery     int
 	PidTableSize    uint32
@@ -30,12 +32,14 @@ type CachestatLegacyConfig struct {
 }
 
 type CachestatLegacyHandle struct {
-	Plan        LoadPlan
-	Runtime     *libbpfloader.CachestatRuntime
-	SharedMemory *SharedPidMemoryPublisher
-	UpdateEvery int
-	ConfigFound bool
-	PidTableSize uint32
+	Plan           LoadPlan
+	Runtime        *libbpfloader.CachestatRuntime
+	SharedMemory   *SharedPidMemoryPublisher
+	UpdateEvery    int
+	ConfigFound    bool
+	PidTableSize   uint32
+	AppsEnabled    bool
+	CgroupsEnabled bool
 }
 
 func (h *CachestatLegacyHandle) Close() {
@@ -65,17 +69,19 @@ func defaultPluginsDir() string {
 
 func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 	return CachestatLegacyConfig{
-		PluginsDir:   defaultPluginsDir(),
-		Kernels:      cachestatKernelMask,
-		IsRHF:        -1,
-		IsDebian:     IsDebianFlavor(),
-		BTFPath:      cachestatDefaultBTFPath,
-		UpdateEvery:  cachestatDefaultUpdateEvery,
-		HasBTF:       kernelBTFSupported(cachestatDefaultBTFPath),
-		PidTableSize: cachestatDefaultPIDTableSize,
-		MapsPerCore:  true,
-		ObjectFlavor: cachestatDefaultObjectFlavor,
-		Targets:      defaultCachestatTargets(),
+		PluginsDir:     defaultPluginsDir(),
+		Kernels:        cachestatKernelMask,
+		IsRHF:          -1,
+		IsDebian:       IsDebianFlavor(),
+		BTFPath:        cachestatDefaultBTFPath,
+		UpdateEvery:    cachestatDefaultUpdateEvery,
+		HasBTF:         kernelBTFSupported(cachestatDefaultBTFPath),
+		PidTableSize:   cachestatDefaultPIDTableSize,
+		MapsPerCore:    true,
+		ObjectFlavor:   cachestatDefaultObjectFlavor,
+		AppsEnabled:    false,
+		CgroupsEnabled: false,
+		Targets:        defaultCachestatTargets(),
 	}
 }
 
@@ -89,6 +95,12 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	cfg.ConfigFound = found
 	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
 		cfg.UpdateEvery = *fileCfg.UpdateEvery
+	}
+	if fileCfg.AppsEnabled != nil {
+		cfg.AppsEnabled = *fileCfg.AppsEnabled
+	}
+	if fileCfg.Cgroups != nil {
+		cfg.CgroupsEnabled = *fileCfg.Cgroups
 	}
 	if fileCfg.PidTable != nil && *fileCfg.PidTable > 0 {
 		cfg.PidTableSize = *fileCfg.PidTable

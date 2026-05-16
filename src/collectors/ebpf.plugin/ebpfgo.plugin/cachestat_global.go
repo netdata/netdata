@@ -283,6 +283,7 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 	handle.UpdateEvery = updateEvery
 	api := netdataapi.New(os.Stdout)
 
+	collectApps := handle.AppsEnabled || handle.CgroupsEnabled
 	store := NewCachestatSharedMemoryStore()
 	service := NewSharedSnapshotService(
 		"/var/run/netdata",
@@ -303,11 +304,13 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 	}()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		runCachestatSharedMemoryCollector(handle, stop, store, updateEvery)
-	}()
+	if collectApps {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			runCachestatSharedMemoryCollector(handle, stop, store, updateEvery)
+		}()
+	}
 
 	go func() {
 		sigCh := make(chan os.Signal, 1)

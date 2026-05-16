@@ -27,6 +27,11 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 		return nil, err
 	}
 
+	if err := rt.UpdateController(cfg.AppsEnabled || cfg.CgroupsEnabled); err != nil {
+		rt.Close()
+		return nil, err
+	}
+
 	publisher, err := NewSharedPidMemoryPublisher(cfg.PidTableSize)
 	if err != nil {
 		rt.Close()
@@ -34,12 +39,14 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 	}
 
 	return &CachestatLegacyHandle{
-		Plan:        plan,
-		Runtime:     rt,
-		SharedMemory: publisher,
-		UpdateEvery: cfg.UpdateEvery,
-		ConfigFound: cfg.ConfigFound,
-		PidTableSize: cfg.PidTableSize,
+		Plan:           plan,
+		Runtime:        rt,
+		SharedMemory:   publisher,
+		UpdateEvery:    cfg.UpdateEvery,
+		ConfigFound:    cfg.ConfigFound,
+		PidTableSize:   cfg.PidTableSize,
+		AppsEnabled:    cfg.AppsEnabled,
+		CgroupsEnabled: cfg.CgroupsEnabled,
 	}, nil
 }
 

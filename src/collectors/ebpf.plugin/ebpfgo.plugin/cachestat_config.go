@@ -20,6 +20,8 @@ const (
 
 type cachestatConfigFile struct {
 	UpdateEvery  *int
+	AppsEnabled  *bool
+	Cgroups      *bool
 	PidTable     *uint32
 	MapsPerCore  *bool
 	BTFPath      *string
@@ -111,6 +113,20 @@ func parseCachestatConfigFile(path string) (cachestatConfigFile, bool, error) {
 			}
 			cfg.UpdateEvery = intPtr(n)
 			found = true
+		case "apps":
+			b, ok := parseConfigBool(value)
+			if !ok {
+				return cachestatConfigFile{}, false, fmt.Errorf("%s: invalid apps %q", path, value)
+			}
+			cfg.AppsEnabled = boolPtr(b)
+			found = true
+		case "cgroups":
+			b, ok := parseConfigBool(value)
+			if !ok {
+				return cachestatConfigFile{}, false, fmt.Errorf("%s: invalid cgroups %q", path, value)
+			}
+			cfg.Cgroups = boolPtr(b)
+			found = true
 		case "pid table size":
 			n, err := strconv.ParseUint(value, 10, 32)
 			if err != nil {
@@ -155,6 +171,12 @@ func parseCachestatConfigFile(path string) (cachestatConfigFile, bool, error) {
 func (c *cachestatConfigFile) apply(other cachestatConfigFile) {
 	if other.UpdateEvery != nil {
 		c.UpdateEvery = other.UpdateEvery
+	}
+	if other.AppsEnabled != nil {
+		c.AppsEnabled = other.AppsEnabled
+	}
+	if other.Cgroups != nil {
+		c.Cgroups = other.Cgroups
 	}
 	if other.PidTable != nil {
 		c.PidTable = other.PidTable

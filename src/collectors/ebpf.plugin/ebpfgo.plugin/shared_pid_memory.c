@@ -3,12 +3,14 @@
 #include "shared_pid_memory.h"
 
 #include <fcntl.h>
+#include <errno.h>
 #include <semaphore.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 struct shared_pid_memory {
@@ -17,6 +19,34 @@ struct shared_pid_memory {
     int shm_fd;
     sem_t *sem;
 };
+
+static bool shared_pid_memory_sem_wait(sem_t *sem)
+{
+    if (!sem || sem == SEM_FAILED) {
+        errno = EINVAL;
+        return false;
+    }
+
+    while (1) {
+        struct timespec ts;
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+            return false;
+
+        ts.tv_nsec += 200 * 1000 * 1000;
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_sec += ts.tv_nsec / 1000000000L;
+            ts.tv_nsec %= 1000000000L;
+        }
+
+        if (sem_timedwait(sem, &ts) == 0)
+            return true;
+
+        if (errno == ETIMEDOUT || errno == EINTR)
+            continue;
+
+        return false;
+    }
+}
 
 struct shared_pid_memory *shared_pid_memory_open(size_t total)
 {
@@ -67,8 +97,8 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
 
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
-        if (sem_trywait(ctx->sem) != 0)
-            return 0;
+        if (!shared_pid_memory_sem_wait(ctx->sem))
+            return -1;
         locked = true;
     }
 

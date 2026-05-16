@@ -71,6 +71,16 @@ struct netdata_ebpf_cachestat_pid_snapshot_list {
     size_t count;
 };
 
+enum netdata_controller {
+    NETDATA_CONTROLLER_APPS_ENABLED = 0,
+    NETDATA_CONTROLLER_APPS_LEVEL = 1,
+    NETDATA_CONTROLLER_PID_TABLE_ADD = 2,
+    NETDATA_CONTROLLER_PID_TABLE_DEL = 3,
+    NETDATA_CONTROLLER_TEMP_TABLE_ADD = 4,
+    NETDATA_CONTROLLER_TEMP_TABLE_DEL = 5,
+    NETDATA_CONTROLLER_END = 6,
+};
+
 static const char *cachestat_account_program_name(const char *account_function, int flavor)
 {
     if (flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
@@ -405,6 +415,40 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
             cachestat_destroy_links(rt);
             return -1;
         }
+    }
+
+    return 0;
+}
+
+int netdata_cachestat_runtime_update_controller(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    int apps_enabled,
+    int apps_level)
+{
+    struct bpf_object *obj = cachestat_runtime_object(rt);
+    if (!rt || !obj)
+        return -1;
+
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, "cstat_ctrl");
+    if (!map)
+        return -1;
+
+    int fd = bpf_map__fd(map);
+    if (fd < 0)
+        return -1;
+
+    uint32_t values[NETDATA_CONTROLLER_END] = {
+        apps_enabled ? 1U : 0U,
+        (uint32_t)apps_level,
+        0,
+        0,
+        0,
+        0,
+    };
+
+    for (uint32_t key = NETDATA_CONTROLLER_APPS_ENABLED; key < NETDATA_CONTROLLER_PID_TABLE_ADD; key++) {
+        if (bpf_map_update_elem(fd, &key, &values[key], BPF_ANY))
+            return -1;
     }
 
     return 0;

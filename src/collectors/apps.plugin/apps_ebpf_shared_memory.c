@@ -5,9 +5,11 @@
 #if defined(OS_LINUX)
 
 #include <fcntl.h>
+#include <errno.h>
 #include <semaphore.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 static struct ebpf_pid_stat *apps_ebpf_shm = NULL;
@@ -30,6 +32,34 @@ static int apps_ebpf_compare_pid(const void *a, const void *b)
         return 1;
 
     return 0;
+}
+
+static bool apps_ebpf_sem_wait(sem_t *sem)
+{
+    if (!sem || sem == SEM_FAILED) {
+        errno = EINVAL;
+        return false;
+    }
+
+    while (1) {
+        struct timespec ts;
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+            return false;
+
+        ts.tv_nsec += 200 * 1000 * 1000;
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_sec += ts.tv_nsec / 1000000000L;
+            ts.tv_nsec %= 1000000000L;
+        }
+
+        if (sem_timedwait(sem, &ts) == 0)
+            return true;
+
+        if (errno == ETIMEDOUT || errno == EINTR)
+            continue;
+
+        return false;
+    }
 }
 
 static void apps_ebpf_close_shared_memory(void)
@@ -224,7 +254,7 @@ bool apps_ebpf_shared_memory_refresh(void)
 
     bool locked = false;
     if (apps_ebpf_sem != SEM_FAILED) {
-        if (sem_trywait(apps_ebpf_sem) != 0)
+        if (!apps_ebpf_sem_wait(apps_ebpf_sem))
             return false;
         locked = true;
     }
