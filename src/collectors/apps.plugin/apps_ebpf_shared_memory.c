@@ -143,6 +143,20 @@ void apps_ebpf_accumulate_cachestat(void)
 {
     bool have_rows = false;
 
+    for (struct pid_stat *p = root_of_pids(); p; p = p->next) {
+        if (unlikely(!p->has_ebpf || !p->updated))
+            continue;
+
+        if (unlikely(!p->target))
+            continue;
+
+        have_rows = true;
+        break;
+    }
+
+    if (!have_rows)
+        return;
+
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
         w->cachestat_totals_prev = w->cachestat_totals;
         memset(&w->cachestat_totals, 0, sizeof(w->cachestat_totals));
@@ -161,7 +175,6 @@ void apps_ebpf_accumulate_cachestat(void)
         if (unlikely(!w))
             continue;
 
-        have_rows = true;
         const struct ebpf_cachestat *current = &p->ebpf.cachestat.current;
 
         w->cachestat_totals.account_page_dirtied += current->account_page_dirtied;
@@ -172,10 +185,6 @@ void apps_ebpf_accumulate_cachestat(void)
         if (p->ebpf.cachestat.ct > w->cachestat.ct)
             w->cachestat.ct = p->ebpf.cachestat.ct;
     }
-
-    if (!have_rows)
-        return;
-
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
         int64_t mpa = apps_ebpf_diff_counters(w->cachestat_totals.mark_page_accessed, w->cachestat_totals_prev.mark_page_accessed);
         int64_t mbd = apps_ebpf_diff_counters(w->cachestat_totals.mark_buffer_dirty, w->cachestat_totals_prev.mark_buffer_dirty);
@@ -256,11 +265,8 @@ bool apps_ebpf_sync_pid_stat(struct pid_stat *p)
         return false;
 
     const struct ebpf_pid_stat *item = apps_ebpf_lookup_snapshot(p->pid);
-    if (!item) {
-        p->has_ebpf = false;
-        memset(&p->ebpf, 0, sizeof(p->ebpf));
+    if (!item)
         return false;
-    }
 
     memcpy(&p->ebpf, item, sizeof(p->ebpf));
     p->has_ebpf = true;
