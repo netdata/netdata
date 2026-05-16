@@ -201,10 +201,10 @@ void apps_ebpf_accumulate_cachestat(void)
         if (unlikely(!p->has_ebpf || !p->updated))
             continue;
 
-        struct target *w = p->target;
-        if (unlikely(!w))
+        if (unlikely(!p->target))
             continue;
 
+        struct target *w = p->target;
         const struct ebpf_cachestat *current = &p->ebpf.cachestat.current;
 
         w->cachestat_totals.account_page_dirtied += current->account_page_dirtied;
