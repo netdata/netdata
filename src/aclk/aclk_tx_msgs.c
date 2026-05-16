@@ -229,8 +229,9 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
     size_t json_len = strlen(json_str);
 
     const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
+    const int has_payload = (http_headers_len || body_len);
 
-    size_t total = json_len + sep_len + http_headers_len + body_len;
+    size_t total = json_len + (has_payload ? sep_len : 0) + http_headers_len + body_len;
     char *raw = mallocz(total);
 
     size_t pos = 0;
@@ -238,8 +239,10 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
     pos += json_len;
     json_object_put(msg);
 
-    memcpy(raw + pos, V2_BIN_PAYLOAD_SEPARATOR, sep_len);
-    pos += sep_len;
+    if (has_payload) {
+        memcpy(raw + pos, V2_BIN_PAYLOAD_SEPARATOR, sep_len);
+        pos += sep_len;
+    }
 
     if (http_headers_len) {
         memcpy(raw + pos, http_headers, http_headers_len);
