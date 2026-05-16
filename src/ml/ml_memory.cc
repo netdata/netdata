@@ -186,6 +186,16 @@ void operator delete[](void *ptr) noexcept
 // available on every platform with malloc_usable_size() above and on
 // most POSIX systems otherwise; the resulting pointer is freed with
 // plain free().
+//
+// Guarded behind __cpp_aligned_new because some C++17-capable toolchains
+// (older libstdc++ shipped with RHEL/CentOS RPM builds, in particular)
+// declare the language standard as C++17 but ship a <new> header that
+// does not define std::align_val_t. The ML subsystem does not introduce
+// any over-aligned types today, so on those toolchains the aligned
+// overloads simply fall back to the default global new/delete, which
+// matches the pre-existing project behavior on those platforms.
+
+#if defined(__cpp_aligned_new) && __cpp_aligned_new >= 201606L
 
 void *operator new(size_t size, std::align_val_t al)
 {
@@ -287,6 +297,8 @@ void operator delete[](void *ptr, [[maybe_unused]] size_t size, std::align_val_t
     }
 }
 
+#endif // __cpp_aligned_new
+
 // std::nothrow_t variants. The standard library would otherwise resolve
 // these to the default implementations and bypass ML accounting. Each
 // wrapper forwards to the corresponding throwing form and translates the
@@ -320,6 +332,8 @@ void operator delete[](void *ptr, const std::nothrow_t &) noexcept
     ::operator delete[](ptr);
 }
 
+#if defined(__cpp_aligned_new) && __cpp_aligned_new >= 201606L
+
 void *operator new(size_t size, std::align_val_t al, const std::nothrow_t &) noexcept
 {
     try {
@@ -347,3 +361,5 @@ void operator delete[](void *ptr, std::align_val_t al, const std::nothrow_t &) n
 {
     ::operator delete[](ptr, al);
 }
+
+#endif // __cpp_aligned_new
