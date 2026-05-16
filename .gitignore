@@ -161,6 +161,7 @@ python.d/python-modules-installer.sh
 # integration generated files
 integrations/integrations.js
 integrations/integrations.json
+integrations/taxonomy.json
 
 # documentation generated files
 docs/generator/src

@@ -1,0 +1,1302 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Netdata collector taxonomy authoring file.",
+  "additionalProperties": false,
+  "patternProperties": {
+    "^x_": {}
+  },
+  "properties": {
+    "taxonomy_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "plugin_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "module_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inline_dynamic_declarations": {
+      "$ref": "#/$defs/dynamic_declarations"
+    },
+    "taxonomy_optout": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    },
+    "placements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/placement"
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "taxonomy_version",
+    "plugin_name",
+    "module_name"
+  ],
+  "oneOf": [
+    {
+      "required": [
+        "placements"
+      ],
+      "not": {
+        "required": [
+          "taxonomy_optout"
+        ]
+      }
+    },
+    {
+      "required": [
+        "taxonomy_optout"
+      ],
+      "not": {
+        "required": [
+          "placements"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "dynamic_declarations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dynamic_context_prefixes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dynamic_context_prefix"
+          },
+          "minItems": 1
+        },
+        "dynamic_collect_plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dynamic_collect_plugin"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "dynamic_context_prefix": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prefix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "prefix",
+        "reason"
+      ]
+    },
+    "dynamic_collect_plugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plugin": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "plugin",
+        "reason"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "string_list": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "families": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/string_list"
+        }
+      ]
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "important": {
+          "type": "boolean"
+        },
+        "grouping": {
+          "type": "boolean"
+        },
+        "small": {
+          "type": "boolean"
+        },
+        "is_placeholder": {
+          "type": "boolean"
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "type": "number"
+        },
+        "top": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "left",
+        "top",
+        "width",
+        "height"
+      ]
+    },
+    "table_sort_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "desc": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "desc"
+      ]
+    },
+    "context_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "label": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      },
+      "required": [
+        "value",
+        "label"
+      ]
+    },
+    "renderer": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "overlays": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "url_options": {
+          "type": "object"
+        },
+        "toolbox_elements": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/non_empty_string"
+      }
+    },
+    "unresolved_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "owner": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "expires": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      },
+      "required": [
+        "reason",
+        "owner",
+        "expires"
+      ]
+    },
+    "literal_context_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "unresolved": {
+          "$ref": "#/$defs/unresolved_reference"
+        }
+      },
+      "required": [
+        "context",
+        "unresolved"
+      ]
+    },
+    "selector_context_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context_prefix": {
+          "$ref": "#/$defs/string_list"
+        },
+        "context_prefix_exclude": {
+          "$ref": "#/$defs/string_list"
+        },
+        "collect_plugin": {
+          "$ref": "#/$defs/string_list"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "context_prefix"
+          ]
+        },
+        {
+          "required": [
+            "collect_plugin"
+          ]
+        }
+      ]
+    },
+    "context_reference": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        {
+          "$ref": "#/$defs/literal_context_reference"
+        },
+        {
+          "$ref": "#/$defs/selector_context_reference"
+        }
+      ]
+    },
+    "context_references": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/context_reference"
+      },
+      "minItems": 1
+    },
+    "single_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "short_name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {
+          "$ref": "#/$defs/families"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "menu_pattern": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "properties": {
+          "$ref": "#/$defs/properties"
+        },
+        "section_filters": {
+          "type": "object"
+        },
+        "dyncfg": {
+          "type": "object"
+        },
+        "contexts": {
+          "$ref": "#/$defs/context_references"
+        },
+        "context_prefix": {
+          "$ref": "#/$defs/string_list"
+        },
+        "context_prefix_exclude": {
+          "$ref": "#/$defs/string_list"
+        },
+        "collect_plugin": {
+          "$ref": "#/$defs/string_list"
+        },
+        "chart_library": {
+          "$ref": "#/$defs/chart_library"
+        },
+        "group_by": {
+          "$ref": "#/$defs/string_list"
+        },
+        "group_by_label": {
+          "$ref": "#/$defs/string_list"
+        },
+        "aggregation_method": {
+          "type": "string",
+          "enum": [
+            "avg",
+            "max",
+            "min",
+            "sum"
+          ]
+        },
+        "selected_dimensions": {
+          "$ref": "#/$defs/string_list"
+        },
+        "dimensions_sort": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "colors": {
+          "$ref": "#/$defs/string_list"
+        },
+        "layout": {
+          "$ref": "#/$defs/layout"
+        },
+        "table_columns": {
+          "$ref": "#/$defs/string_list"
+        },
+        "table_sort_by": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/table_sort_item"
+          },
+          "minItems": 1
+        },
+        "labels": {
+          "$ref": "#/$defs/labels"
+        },
+        "value_range": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "minItems": 1
+        },
+        "eliminate_zero_dimensions": {
+          "type": "boolean"
+        },
+        "context_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/context_item"
+          },
+          "minItems": 1
+        },
+        "post_group_by": {
+          "$ref": "#/$defs/string_list"
+        },
+        "show_post_aggregations": {
+          "type": "boolean"
+        },
+        "grouping_method": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "sparkline": {
+          "type": "boolean"
+        },
+        "renderer": {
+          "$ref": "#/$defs/renderer"
+        }
+      }
+    },
+    "chart_library": {
+      "type": "string",
+      "enum": [
+        "bars",
+        "d3pie",
+        "dygraph",
+        "easypiechart",
+        "gauge",
+        "groupBoxes",
+        "number",
+        "table"
+      ]
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "section_id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "short_name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {
+          "$ref": "#/$defs/families"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "menu_pattern": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "properties": {
+          "$ref": "#/$defs/properties"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/structural_item"
+          },
+          "minItems": 1
+        },
+        "single_node": {
+          "$ref": "#/$defs/single_node"
+        }
+      },
+      "required": [
+        "id",
+        "section_id",
+        "title",
+        "items"
+      ]
+    },
+    "structural_item": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        {
+          "$ref": "#/$defs/owned_context"
+        },
+        {
+          "$ref": "#/$defs/group"
+        },
+        {
+          "$ref": "#/$defs/flatten"
+        },
+        {
+          "$ref": "#/$defs/selector"
+        },
+        {
+          "$ref": "#/$defs/context_widget"
+        },
+        {
+          "$ref": "#/$defs/grid"
+        },
+        {
+          "$ref": "#/$defs/first_available"
+        },
+        {
+          "$ref": "#/$defs/view_switch"
+        }
+      ]
+    },
+    "non_flatten_structural_item": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        {
+          "$ref": "#/$defs/owned_context"
+        },
+        {
+          "$ref": "#/$defs/group"
+        },
+        {
+          "$ref": "#/$defs/selector"
+        },
+        {
+          "$ref": "#/$defs/context_widget"
+        },
+        {
+          "$ref": "#/$defs/grid"
+        },
+        {
+          "$ref": "#/$defs/first_available"
+        },
+        {
+          "$ref": "#/$defs/view_switch"
+        }
+      ]
+    },
+    "grid_item": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/context_widget"
+        },
+        {
+          "$ref": "#/$defs/first_available"
+        },
+        {
+          "$ref": "#/$defs/view_switch_display"
+        }
+      ]
+    },
+    "first_available_item": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/context_widget"
+        },
+        {
+          "$ref": "#/$defs/grid"
+        },
+        {
+          "$ref": "#/$defs/view_switch_display"
+        }
+      ]
+    },
+    "view_switch_branch_item": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/owned_context"
+        },
+        {
+          "$ref": "#/$defs/group"
+        },
+        {
+          "$ref": "#/$defs/selector"
+        },
+        {
+          "$ref": "#/$defs/context_widget"
+        },
+        {
+          "$ref": "#/$defs/grid"
+        },
+        {
+          "$ref": "#/$defs/first_available"
+        }
+      ]
+    },
+    "view_switch_display_branch_item": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/context_widget"
+        },
+        {
+          "$ref": "#/$defs/grid"
+        },
+        {
+          "$ref": "#/$defs/first_available"
+        }
+      ]
+    },
+    "owned_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "type": {
+          "const": "owned_context"
+        },
+        "context": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "short_name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {
+          "$ref": "#/$defs/families"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "menu_pattern": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "properties": {
+          "$ref": "#/$defs/properties"
+        },
+        "single_node": {
+          "$ref": "#/$defs/single_node"
+        }
+      },
+      "required": [
+        "type",
+        "context"
+      ]
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "type": {
+          "const": "group"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "short_name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {
+          "$ref": "#/$defs/families"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "menu_pattern": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "properties": {
+          "$ref": "#/$defs/properties"
+        },
+        "section_filters": {
+          "type": "object"
+        },
+        "dyncfg": {
+          "type": "object"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/structural_item"
+          },
+          "minItems": 1
+        },
+        "single_node": {
+          "$ref": "#/$defs/single_node"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "title",
+        "items"
+      ]
+    },
+    "flatten": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "type": {
+          "const": "flatten"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "short_name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {
+          "$ref": "#/$defs/families"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "menu_pattern": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "properties": {
+          "$ref": "#/$defs/properties"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/non_flatten_structural_item"
+          },
+          "minItems": 1
+        },
+        "single_node": {
+          "$ref": "#/$defs/single_node"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "title",
+        "items"
+      ]
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "type": {
+          "const": "selector"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "short_name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {
+          "$ref": "#/$defs/families"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "menu_pattern": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "context_prefix": {
+          "$ref": "#/$defs/string_list"
+        },
+        "context_prefix_exclude": {
+          "$ref": "#/$defs/string_list"
+        },
+        "collect_plugin": {
+          "$ref": "#/$defs/string_list"
+        },
+        "single_node": {
+          "$ref": "#/$defs/single_node"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "title"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "context_prefix"
+          ]
+        },
+        {
+          "required": [
+            "collect_plugin"
+          ]
+        }
+      ]
+    },
+    "context_widget": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "type": {
+          "const": "context"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "short_name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {
+          "$ref": "#/$defs/families"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "menu_pattern": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "properties": {
+          "$ref": "#/$defs/properties"
+        },
+        "contexts": {
+          "$ref": "#/$defs/context_references"
+        },
+        "chart_library": {
+          "$ref": "#/$defs/chart_library"
+        },
+        "group_by": {
+          "$ref": "#/$defs/string_list"
+        },
+        "group_by_label": {
+          "$ref": "#/$defs/string_list"
+        },
+        "aggregation_method": {
+          "type": "string",
+          "enum": [
+            "avg",
+            "max",
+            "min",
+            "sum"
+          ]
+        },
+        "selected_dimensions": {
+          "$ref": "#/$defs/string_list"
+        },
+        "dimensions_sort": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "colors": {
+          "$ref": "#/$defs/string_list"
+        },
+        "layout": {
+          "$ref": "#/$defs/layout"
+        },
+        "table_columns": {
+          "$ref": "#/$defs/string_list"
+        },
+        "table_sort_by": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/table_sort_item"
+          },
+          "minItems": 1
+        },
+        "labels": {
+          "$ref": "#/$defs/labels"
+        },
+        "value_range": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "minItems": 1
+        },
+        "eliminate_zero_dimensions": {
+          "type": "boolean"
+        },
+        "context_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/context_item"
+          },
+          "minItems": 1
+        },
+        "post_group_by": {
+          "$ref": "#/$defs/string_list"
+        },
+        "show_post_aggregations": {
+          "type": "boolean"
+        },
+        "grouping_method": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "sparkline": {
+          "type": "boolean"
+        },
+        "renderer": {
+          "$ref": "#/$defs/renderer"
+        },
+        "single_node": {
+          "$ref": "#/$defs/single_node"
+        }
+      },
+      "required": [
+        "type",
+        "contexts",
+        "chart_library"
+      ]
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "type": {
+          "const": "grid"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "short_name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {
+          "$ref": "#/$defs/families"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "menu_pattern": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "renderer": {
+          "$ref": "#/$defs/renderer"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/grid_item"
+          },
+          "minItems": 1
+        },
+        "single_node": {
+          "$ref": "#/$defs/single_node"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "items"
+      ]
+    },
+    "first_available": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "type": {
+          "const": "first_available"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "short_name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {
+          "$ref": "#/$defs/families"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "menu_pattern": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/first_available_item"
+          },
+          "minItems": 1
+        },
+        "single_node": {
+          "$ref": "#/$defs/single_node"
+        }
+      },
+      "required": [
+        "type",
+        "items"
+      ]
+    },
+    "view_switch": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "type": {
+          "const": "view_switch"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "multi_node": {
+          "$ref": "#/$defs/view_switch_branch_item"
+        },
+        "single_node": {
+          "$ref": "#/$defs/view_switch_branch_item"
+        }
+      },
+      "required": [
+        "type",
+        "multi_node",
+        "single_node"
+      ]
+    },
+    "view_switch_display": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "type": {
+          "const": "view_switch"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "multi_node": {
+          "$ref": "#/$defs/view_switch_display_branch_item"
+        },
+        "single_node": {
+          "$ref": "#/$defs/view_switch_display_branch_item"
+        }
+      },
+      "required": [
+        "type",
+        "multi_node",
+        "single_node"
+      ]
+    }
+  }
+}

@@ -671,18 +671,72 @@ static void ml_dimension_stream_kmeans(ml_worker_t *worker, const ml_dimension_t
     pulse_ml_models_sent();
 }
 
-static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
+bool ml_dimension_train_model_precheck(enum ml_metric_type mt,
+                                       bool has_received_downstream_model,
+                                       bool training_in_progress,
+                                       enum ml_worker_result *worker_res)
+{
+    if (has_received_downstream_model) {
+        *worker_res = ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED;
+        return true;
+    }
+
+    if (mt == METRIC_TYPE_CONSTANT) {
+        *worker_res = ML_WORKER_RESULT_OK;
+        return true;
+    }
+
+    if (training_in_progress) {
+        *worker_res = ML_WORKER_RESULT_TRAINING_IN_PROGRESS;
+        return true;
+    }
+
+    return false;
+}
+
+bool ml_should_requeue_create_new_model(enum ml_worker_result worker_res)
+{
+    // TRAINING_IN_PROGRESS keeps requeueing so the dim stays in the periodic
+    // retrain cycle; the worker loop is paced by Cfg.train_every, so this is
+    // not a tight CPU spin.
+    return worker_res != ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION &&
+           worker_res != ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED;
+}
+
+bool ml_should_publish_model_update(bool host_running,
+                                    uint32_t current_generation,
+                                    uint32_t expected_generation,
+                                    bool *training_in_progress)
+{
+    if (!host_running || current_generation != expected_generation) {
+        if (training_in_progress)
+            *training_in_progress = false;
+        return false;
+    }
+
+    return true;
+}
+
+static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
     spinlock_lock(&dim->slock);
 
     ml_host_t *host = (ml_host_t *) dim->rd->rrdset->rrdhost->ml_host;
-    if (!host || !host->ml_running) {
-        dim->training_in_progress = false;
+    if (!ml_should_publish_model_update(host && host->ml_running,
+                                        dim->reset_generation,
+                                        expected_generation,
+                                        &dim->training_in_progress)) {
         spinlock_unlock(&dim->slock);
-        return;
+        return false;
     }
+
+    // Mark the dim as downstream-supplied only after the publish-check passes
+    // and under the same slock as the install. Setting it earlier would risk
+    // suppressing local training if the install was cancelled.
+    if (from_downstream)
+        dim->has_received_downstream_model = true;
 
     if (dim->km_contexts.size() < Cfg.num_models_to_use) {
         dim->km_contexts.emplace_back(dim->kmeans);
@@ -712,7 +766,7 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
     dim->suppression_anomaly_counter = 0;
     dim->suppression_window_counter = 0;
 
-    // Add the newly generated model to the list of pending models to flush
+    // Add the latest model to the list of pending models to flush.
     ml_model_info_t model_info;
     nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(dim->rd->uuid);
     uuid_copy(model_info.metric_uuid, *rd_uuid);
@@ -725,6 +779,7 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
     dim->training_in_progress = false;
 
     spinlock_unlock(&dim->slock);
+    return true;
 }
 
 static enum ml_worker_result
@@ -733,20 +788,22 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
     worker_is_busy(WORKER_TRAIN_QUERY);
 
     spinlock_lock(&dim->slock);
-    if (dim->mt == METRIC_TYPE_CONSTANT) {
+    ml_worker_result precheck;
+    if (ml_dimension_train_model_precheck(dim->mt,
+                                          dim->has_received_downstream_model,
+                                          dim->training_in_progress,
+                                          &precheck)) {
+        if (precheck == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED)
+            dim->create_new_model_queued = false;
         spinlock_unlock(&dim->slock);
-        return ML_WORKER_RESULT_OK;
+        return precheck;
     }
 
-    // Check if training is already in progress for this dimension
-    // If so, skip this training request to prevent concurrent access to dim->kmeans
-    if (dim->training_in_progress) {
-        spinlock_unlock(&dim->slock);
-        return ML_WORKER_RESULT_OK;
-    }
-
-    // Mark training as in progress
+    // Mark training as in progress and snapshot the generation so that
+    // ml_dimension_update_models() can detect a stop/reset that happened
+    // while training was running.
     dim->training_in_progress = true;
+    uint32_t generation = dim->reset_generation;
     spinlock_unlock(&dim->slock);
 
     auto P = ml_dimension_calculated_numbers(worker, dim);
@@ -779,14 +836,14 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
             worker->scratch_training_cns, training_response.total_values,
             worker->training_cns, training_response.total_values
         };
-        
+
         // Calculate dynamic sampling ratio based on expected output size
         // After diff and smooth, we'll have approximately this many vectors
         size_t expected_vectors = training_response.total_values;
         if (Cfg.diff_n > 0) expected_vectors--;
         if (smoothing_window > 1) expected_vectors = expected_vectors - smoothing_window + 1;
         expected_vectors = expected_vectors - Cfg.lag_n;
-        
+
         double sampling_ratio = 1.0;
         if (expected_vectors > Cfg.max_training_vectors) {
             sampling_ratio = (double)Cfg.max_training_vectors / expected_vectors;
@@ -800,7 +857,7 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
     }
 
     // update models
-    ml_dimension_update_models(worker, dim);
+    (void) ml_dimension_update_models(worker, dim, generation, /*from_downstream=*/false);
 
     return worker_result;
 }
@@ -1053,12 +1110,15 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
                 auto &um = host->context_anomaly_rate;
                 auto it = um.find(key);
                 if (it == um.end()) {
-                    um[key] = ml_context_anomaly_rate_t {
+                    STRING *owned_key = string_dup(key);
+                    auto insert_result = um.emplace(owned_key, ml_context_anomaly_rate_t {
                         .rd = NULL,
                         .normal_dimensions = 0,
                         .anomalous_dimensions = 0
-                    };
-                    it = um.find(key);
+                    });
+                    if (!insert_result.second)
+                        string_freez(owned_key);
+                    it = insert_result.first;
                 }
 
                 it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
@@ -1084,15 +1144,6 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0, owa);
     } else {
         host->host_anomaly_rate = 0.0;
-
-        auto &um = host->context_anomaly_rate;
-        for (auto &entry: um) {
-            entry.second = ml_context_anomaly_rate_t {
-                .rd = NULL,
-                .normal_dimensions = 0,
-                .anomalous_dimensions = 0
-            };
-        }
     }
 }
 
@@ -1219,9 +1270,6 @@ static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_
 }
 
 static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, ml_request_add_existing_model_t req) {
-    UNUSED(worker);
-    UNUSED(req);
-
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
@@ -1234,20 +1282,55 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         return ML_WORKER_RESULT_OK;
     }
 
-    // Check if training is in progress and skip if so to avoid race condition
+    ml_host_t *host = (ml_host_t *) Dim->rd->rrdset->rrdhost->ml_host;
+    if (!host || !host->ml_running) {
+        pulse_ml_models_ignored();
+        return ML_WORKER_RESULT_OK;
+    }
+
     spinlock_lock(&Dim->slock);
+
+    // Loop detection: skip if we already have this exact model.
+    // The (after, before) pair uniquely identifies a model per dimension and is
+    // preserved across hops, so a model that loops back is detected as a duplicate.
+    for (const auto &km : Dim->km_contexts) {
+        if (km.after == req.inlined_km.after && km.before == req.inlined_km.before) {
+            spinlock_unlock(&Dim->slock);
+            pulse_ml_models_ignored();
+            return ML_WORKER_RESULT_OK;
+        }
+    }
+
+    // Reject models that are not newer than the newest accepted model. This
+    // prevents an older model from being re-accepted after it has been evicted
+    // from km_contexts and later loops back from downstream.
+    if (!Dim->km_contexts.empty()) {
+        const auto &latest_km = Dim->km_contexts.back();
+        if (req.inlined_km.before <= latest_km.before) {
+            spinlock_unlock(&Dim->slock);
+            pulse_ml_models_ignored();
+            return ML_WORKER_RESULT_OK;
+        }
+    }
+
+    // Skip if training is in progress to avoid race condition.
     if (Dim->training_in_progress) {
         spinlock_unlock(&Dim->slock);
         pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;
     }
-    spinlock_unlock(&Dim->slock);
 
-    // Safe without Dim->slock: per-host work is serialized through a single worker queue,
-    // and stop/reset no longer writes Dim->kmeans from non-worker threads.
+    // Stage the incoming kmeans into the dim's working buffer; the actual
+    // install into km_contexts and the has_received_downstream_model flag-set
+    // happen inside ml_dimension_update_models() under the same slock as the
+    // publish-check, so a concurrent ml_host_stop() either commits both or
+    // cancels both.
     Dim->kmeans = req.inlined_km;
-    ml_dimension_update_models(worker, Dim);
-    pulse_ml_models_received();
+    uint32_t generation = Dim->reset_generation;
+    spinlock_unlock(&Dim->slock);
+    if (ml_dimension_update_models(worker, Dim, generation, /*from_downstream=*/true))
+        pulse_ml_models_received();
+
     return ML_WORKER_RESULT_OK;
 }
 
@@ -1296,7 +1379,7 @@ void ml_train_main(void *arg) {
         switch (item.type) {
             case ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL: {
                 worker_res = ml_worker_create_new_model(worker, item.create_new_model);
-                if (worker_res != ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION) {
+                if (ml_should_requeue_create_new_model(worker_res)) {
                     ml_queue_push(worker->queue, item);
                 }
                 break;
@@ -1345,6 +1428,12 @@ void ml_train_main(void *arg) {
                     break;
                 case ML_WORKER_RESULT_CHART_UNDER_REPLICATION:
                     loop_stats.item_result_chart_under_replication = 1;
+                    break;
+                case ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED:
+                    loop_stats.item_result_ok = 1;
+                    break;
+                case ML_WORKER_RESULT_TRAINING_IN_PROGRESS:
+                    loop_stats.item_result_ok = 1;
                     break;
             }
 

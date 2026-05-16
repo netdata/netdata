@@ -30,11 +30,30 @@ Restarting the Netdata Agent will cause temporary gaps in your collected metrics
 
 ### Using `systemctl`, `service`, or `init.d`
 
-| Action  | Systemd                          | Non-systemd                    |
-|---------|----------------------------------|--------------------------------|
-| start   | `sudo systemctl start netdata`   | `sudo service netdata start`   |
-| stop    | `sudo systemctl stop netdata`    | `sudo service netdata stop`    |
-| restart | `sudo systemctl restart netdata` | `sudo service netdata restart` |
+| Action  | Systemd                          | Non-systemd                                                                   |
+|---------|----------------------------------|-------------------------------------------------------------------------------|
+| start   | `sudo systemctl start netdata`   | `sudo service netdata start` or `sudo /etc/init.d/netdata start`              |
+| stop    | `sudo systemctl stop netdata`    | `sudo service netdata stop` or `sudo /etc/init.d/netdata stop`                |
+| restart | `sudo systemctl restart netdata` | `sudo service netdata restart` or `sudo /etc/init.d/netdata restart`          |
+| status  | `sudo systemctl status netdata`  | `sudo service netdata status` or `sudo /etc/init.d/netdata status`            |
+
+### Check status
+
+Use the commands above to check whether the Netdata Agent service is running.
+
+You can also verify that the Agent is reachable by opening `http://NODE:19999` in a browser, or by running:
+
+```bash
+curl http://NODE:19999/api/v1/info
+```
+
+Replace `NODE` with the IP address or hostname of your Agent.
+
+:::tip
+
+Use `sudo netdatacli ping` to check whether the Agent is ready. It outputs `pong` with exit code `0` when the Agent is ready, exit code `1` while still initializing, and exit code `255` if the Agent is unreachable.
+
+:::
 
 ### Using `netdata`
 
@@ -92,13 +111,14 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 
 ### UNIX Commands Summary
 
-| Task              | Systemd                          | Non-systemd                      | Direct Command                   |
-|-------------------|----------------------------------|----------------------------------|----------------------------------|
-| **Start**         | `sudo systemctl start netdata`   | `sudo service netdata start`     | `sudo netdata`                   |
-| **Stop**          | `sudo systemctl stop netdata`    | `sudo service netdata stop`      | `sudo killall netdata`           |
-| **Restart**       | `sudo systemctl restart netdata` | `sudo service netdata restart`   | Stop + Start                     |
-| **Reload Health** | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  |
-| **Shutdown**      | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` |
+| Task              | Systemd                          | Non-systemd                                                                   | Direct Command                   |
+|-------------------|----------------------------------|-------------------------------------------------------------------------------|----------------------------------|
+| **Start**         | `sudo systemctl start netdata`   | `sudo service netdata start` or `sudo /etc/init.d/netdata start`              | `sudo netdata`                   |
+| **Stop**          | `sudo systemctl stop netdata`    | `sudo service netdata stop` or `sudo /etc/init.d/netdata stop`                | `sudo killall netdata`           |
+| **Restart**       | `sudo systemctl restart netdata` | `sudo service netdata restart` or `sudo /etc/init.d/netdata restart`          | Stop + Start                     |
+| **Status**        | `sudo systemctl status netdata`  | `sudo service netdata status` or `sudo /etc/init.d/netdata status`            | `curl http://NODE:19999/api/v1/info` |
+| **Reload Health** | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`                                               | `sudo netdatacli reload-health`  |
+| **Shutdown**      | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent`                                              | `sudo netdatacli shutdown-agent` |
 
 ### Windows Commands Summary
 

@@ -1,0 +1,256 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: postgres
+placements:
+  - id: postgres
+    section_id: applications.postgres
+    title: Postgres
+    icon: postgres
+    families: true
+    items:
+      - type: grid
+        id: postgres-heads
+        items:
+          - type: context
+            title: Average Connections Utilization
+            contexts:
+              - postgres.connections_utilization
+            chart_library: gauge
+            group_by:
+              - selected
+            aggregation_method: avg
+            value_range: [0, 100]
+            colors:
+              - "#6633CC"
+              - "#905bfd"
+            layout: { left: 0, top: 0, width: 2.5, height: 5 }
+          - type: context
+            title: Avg Fetched Row Ratio
+            contexts:
+              - postgres.db_ops_fetched_rows_ratio
+            chart_library: dygraph
+            group_by:
+              - selected
+            aggregation_method: avg
+            sparkline: true
+            renderer:
+              overlays:
+                - type: latestValue
+            colors:
+              - "#AAAA11"
+              - "#ef0aef"
+            layout: { left: 2.5, top: 0, width: 2, height: 5 }
+          - type: context
+            title: Average Cache Miss Ratio
+            contexts:
+              - postgres.db_cache_io_ratio
+            chart_library: gauge
+            group_by:
+              - selected
+            aggregation_method: avg
+            value_range: [0, 100]
+            colors:
+              - "#DC3912"
+              - "#FE3912"
+            layout: { left: 4.5, top: 0, width: 2.5, height: 5 }
+          - type: context
+            title: Connection State Count
+            contexts:
+              - postgres.connections_state_count
+            chart_library: bars
+            dimensions_sort: valueDesc
+            layout: { left: 7, top: 0, width: 2.5, height: 5 }
+          - type: context
+            title: Minimum Uptime
+            contexts:
+              - postgres.uptime
+            chart_library: number
+            group_by:
+              - selected
+            aggregation_method: min
+            layout: { left: 9.5, top: 0, width: 2.5, height: 1.66 }
+          - type: context
+            title: Total Database count
+            contexts:
+              - postgres.databases_count
+            chart_library: number
+            group_by:
+              - selected
+            layout: { left: 9.5, top: 1.66, width: 2.5, height: 1.66 }
+          - type: context
+            title: Total Database Size
+            contexts:
+              - postgres.db_size
+            chart_library: dygraph
+            sparkline: true
+            renderer:
+              overlays:
+                - type: latestValue
+            layout: { left: 9.5, top: 3.33, width: 2.5, height: 1.66 }
+          - type: context
+            title: Connections Utilization per Database
+            contexts:
+              - postgres.db_connections_utilization
+            chart_library: bars
+            group_by:
+              - label
+            group_by_label:
+              - database
+            dimensions_sort: valueDesc
+            layout: { left: 0, top: 5, width: 2.5, height: 5 }
+          - type: context
+            title: Fetched Row Ratio per DB
+            contexts:
+              - postgres.db_ops_fetched_rows_ratio
+            chart_library: bars
+            group_by:
+              - label
+            group_by_label:
+              - database
+            dimensions_sort: valueDesc
+            layout: { left: 2.5, top: 5, width: 2, height: 5 }
+          - type: context
+            title: Cache Miss Ratio per DB
+            contexts:
+              - postgres.db_cache_io_ratio
+            chart_library: bars
+            group_by:
+              - label
+            group_by_label:
+              - database
+            dimensions_sort: valueDesc
+            layout: { left: 4.5, top: 5, width: 2.5, height: 5 }
+          - type: context
+            title: Rows Written per Database
+            contexts:
+              - postgres.db_ops_write_rows_rate
+            chart_library: bars
+            dimensions_sort: valueDesc
+            layout: { left: 7, top: 5, width: 2.5, height: 5 }
+          - type: context
+            title: Database Sizes
+            contexts:
+              - postgres.db_size
+            chart_library: bars
+            group_by:
+              - label
+            group_by_label:
+              - database
+            dimensions_sort: valueDesc
+            layout: { left: 9.5, top: 5, width: 2.5, height: 5 }
+          - type: context
+            title: Top Queries by Duration
+            contexts:
+              - postgres.queries_duration
+            chart_library: bars
+            dimensions_sort: valueDesc
+            layout: { left: 0, top: 10, width: 4.5, height: 5 }
+          - type: context
+            title: Average Dead Row Ratio
+            contexts:
+              - postgres.table_rows_dead_ratio
+            chart_library: gauge
+            group_by:
+              - selected
+            aggregation_method: avg
+            value_range: [0, 100]
+            colors:
+              - "#AAAA11"
+              - "#ef0aef"
+            layout: { left: 4.5, top: 10, width: 2.5, height: 5 }
+          - type: context
+            title: Average Table Bloat %
+            contexts:
+              - postgres.table_bloat_size_perc
+            chart_library: gauge
+            group_by:
+              - selected
+            aggregation_method: avg
+            value_range: [0, 100]
+            colors:
+              - "#DC3912"
+              - "#FE3912"
+            layout: { left: 7, top: 10, width: 2.5, height: 5 }
+          - type: context
+            title: Average Index Bloat %
+            contexts:
+              - postgres.index_bloat_size_perc
+            chart_library: gauge
+            group_by:
+              - selected
+            aggregation_method: avg
+            value_range: [0, 100]
+            colors:
+              - "#DC3912"
+              - "#FE3912"
+            layout: { left: 9.5, top: 10, width: 2.5, height: 5 }
+      - postgres.connections_utilization
+      - postgres.connections_usage
+      - postgres.connections_state_count
+      - postgres.transactions_duration
+      - postgres.queries_duration
+      - postgres.locks_utilization
+      - postgres.checkpoints_rate
+      - postgres.checkpoints_time
+      - postgres.bgwriter_halts_rate
+      - postgres.buffers_io_rate
+      - postgres.buffers_backend_fsync_rate
+      - postgres.buffers_allocated_rate
+      - postgres.wal_io_rate
+      - postgres.wal_files_count
+      - postgres.wal_archiving_files_count
+      - postgres.autovacuum_workers_count
+      - postgres.txid_exhaustion_towards_autovacuum_perc
+      - postgres.txid_exhaustion_perc
+      - postgres.txid_exhaustion_oldest_txid_num
+      - postgres.catalog_relations_count
+      - postgres.catalog_relations_size
+      - postgres.uptime
+      - postgres.databases_count
+      - postgres.replication_app_wal_lag_size
+      - postgres.replication_app_wal_lag_time
+      - postgres.replication_slot_files_count
+      - postgres.db_transactions_ratio
+      - postgres.db_transactions_rate
+      - postgres.db_connections_utilization
+      - postgres.db_connections_count
+      - postgres.db_cache_io_ratio
+      - postgres.db_io_rate
+      - postgres.db_ops_fetched_rows_ratio
+      - postgres.db_ops_read_rows_rate
+      - postgres.db_ops_write_rows_rate
+      - postgres.db_conflicts_rate
+      - postgres.db_conflicts_reason_rate
+      - postgres.db_deadlocks_rate
+      - postgres.db_locks_held_count
+      - postgres.db_locks_awaited_count
+      - postgres.db_temp_files_created_rate
+      - postgres.db_temp_files_io_rate
+      - postgres.db_size
+      - postgres.table_rows_dead_ratio
+      - postgres.table_rows_count
+      - postgres.table_ops_rows_rate
+      - postgres.table_ops_rows_hot_ratio
+      - postgres.table_ops_rows_hot_rate
+      - postgres.table_cache_io_ratio
+      - postgres.table_io_rate
+      - postgres.table_index_cache_io_ratio
+      - postgres.table_index_io_rate
+      - postgres.table_toast_cache_io_ratio
+      - postgres.table_toast_io_rate
+      - postgres.table_toast_index_cache_io_ratio
+      - postgres.table_toast_index_io_rate
+      - postgres.table_scans_rate
+      - postgres.table_scans_rows_rate
+      - postgres.table_autovacuum_since_time
+      - postgres.table_vacuum_since_time
+      - postgres.table_autoanalyze_since_time
+      - postgres.table_analyze_since_time
+      - postgres.table_null_columns
+      - postgres.table_size
+      - postgres.table_bloat_size_perc
+      - postgres.table_bloat_size
+      - postgres.index_size
+      - postgres.index_bloat_size_perc
+      - postgres.index_bloat_size
+      - postgres.index_usage_status

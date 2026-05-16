@@ -39,7 +39,7 @@ python3 integrations/gen_docs_integrations.py -c go.d/<your-module>
 1. Read `pipeline.md` for the end-to-end flow.
 2. Read `schema-reference.md` for the exact field your
    `metadata.yaml` change needs.
-3. Read `consistency.md` for the five-file rule.
+3. Read `consistency.md` for the collector consistency rule.
 4. Read `gotchas.md` BEFORE assuming the pipeline does the
    obvious thing.
 5. If you encountered a question that this catalog doesn't

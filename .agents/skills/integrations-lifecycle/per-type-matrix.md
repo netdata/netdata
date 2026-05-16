@@ -20,6 +20,15 @@ consume it.
 | `distros` | `.github/data/distros.yml` | `distros.json` (declared but **NOT enforced** -- see `gotchas.md`) | n/a -- consumed only by `render_deploy` | n/a | n/a | n/a | feeds `deploy.platform_info` table |
 | `shared` | n/a -- referenced by other schemas via `./shared.json#/$defs/...` | n/a | n/a | n/a | n/a | n/a | building block (instance, full_setup, troubleshooting, _folding) |
 
+## Collector taxonomy artifact matrix
+
+| Artifact | Source / owner | Schema | Producer / validator | Tracked in git? | Consumer |
+|---|---|---|---|---|---|
+| collector `taxonomy.yaml` | sibling to collector `metadata.yaml` | `taxonomy_collector.json` | `gen_taxonomy.py`, `check_collector_taxonomy.py` | YES | source for dashboard TOC placement |
+| `integrations/taxonomy/sections.yaml` | integrations taxonomy registry | `taxonomy_sections.json` | `gen_taxonomy.py` | YES | global section tree for `taxonomy.json` |
+| `integrations/taxonomy/icons.yaml` | integrations taxonomy registry | inline duplicate/ID checks | `gen_taxonomy.py` | YES | allowed icon IDs for sections and placements |
+| `integrations/taxonomy.json` | generated from taxonomy sources | `taxonomy_output.json` | `gen_taxonomy.py` | NO -- gitignored | downstream cloud-frontend consumer |
+
 ## Slug rules summary
 
 The slug used in the output filename comes from `clean_string`
@@ -110,6 +119,6 @@ file DIRECTLY to `<dir>/README.md` (`:488-496`). No
 `integrations/` subdirectory, no symlink. So
 `src/health/notifications/email/README.md` IS the generated
 artifact, not a symlink. Keep this in mind when checking the
-five-file consistency rule (the README.md you would normally
+collector consistency rule (the README.md you would normally
 not edit is the same physical file as the generated
 integration page).

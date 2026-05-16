@@ -177,6 +177,13 @@
 - Build(deps): bump golang.org/x/text from 0.36.0 to 0.37.0 in /src/go ([#22462](https://github.com/netdata/netdata/issues/22462))
 - Docs: update docs/add-advanced-api-query-example-force ([#22450](https://github.com/netdata/netdata/issues/22450))
 - Fix(ap): handle SSIDs containing whitespace ([#22472](https://github.com/netdata/netdata/issues/22472))
+- Fix DBENGINE PGC races in pgc_page_add and pgc_queue_del ([#22466](https://github.com/netdata/netdata/issues/22466))
+- Remove redundant per-host replication gate from obsolete chart cleanup ([#22467](https://github.com/netdata/netdata/issues/22467))
+- Improve hosts load on agent startup ([#22446](https://github.com/netdata/netdata/issues/22446))
+- Improve child to parent provided ML trained data ([#22156](https://github.com/netdata/netdata/issues/22156))
+- Update bundled static curl to 8.20.0 ([#22473](https://github.com/netdata/netdata/issues/22473))
+- Feat(integrations): add collector taxonomy framework POC ([#22489](https://github.com/netdata/netdata/issues/22489))
+- Docs: task class: improve_docs — add a 'check status' section to the service [surgical_edit] ([#22485](https://github.com/netdata/netdata/issues/22485))
 
 ## [2.10.0] - 2026-04-09
 

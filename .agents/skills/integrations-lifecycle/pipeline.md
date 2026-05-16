@@ -5,7 +5,7 @@ script, every input, every output, every CI workflow. All path
 citations are repo-relative; line citations refer to the file at
 HEAD of `master` at the time this skill was last updated.
 
-## The four-stage pipeline
+## The integration documentation pipeline
 
 ```
 [ YAML sources ]
@@ -19,6 +19,18 @@ HEAD of `master` at the time this skill was last updated.
 +------------------------+
 | integrations.js (gitignored)
 | integrations.json (gitignored)
++------------------------+
+
+[ collector metadata.yaml + taxonomy.yaml + taxonomy registries ]
+         |
+         v
++------------------------+
+| gen_taxonomy.py        |  (taxonomy validator, resolver)
++------------------------+
+         |
+         v
++------------------------+
+| taxonomy.json (gitignored)
 +------------------------+
          |
          v
@@ -184,6 +196,69 @@ Both are gitignored (`.gitignore:159-160`). They are produced
 fresh on every run; in CI, the workflow `rm`s them after the
 downstream scripts read them so they are NOT included in the
 auto-PR.
+
+## Parallel taxonomy stage -- `gen_taxonomy.py`
+
+Repo path: `integrations/gen_taxonomy.py`.
+
+### Inputs
+
+- Collector `metadata.yaml` files from the same collector source
+  roots used by `gen_integrations.py`.
+- Sibling collector `taxonomy.yaml` files discovered as
+  `<collector>/taxonomy.yaml`.
+- `integrations/taxonomy/sections.yaml` -- the stable section
+  registry. Collector files reference only `section_id:`, never
+  `section_path:`.
+- `integrations/taxonomy/icons.yaml` -- allowed icon ids.
+- `integrations/schemas/taxonomy_collector.json`,
+  `taxonomy_sections.json`, and `taxonomy_output.json`.
+
+### Validation behavior
+
+The generator validates closed v1 authoring schemas, checks that
+literal owned contexts and widget references resolve to real contexts
+in the owning collector's `metadata.yaml`, and requires dynamic
+selectors to be declared by the owning collector:
+
+- `context_prefix:` requires
+  `metrics.dynamic_context_prefixes: [{prefix, reason}]`; taxonomy may
+  use a narrower prefix under the declared namespace.
+- `collect_plugin:` requires
+  `metrics.dynamic_collect_plugins: [{plugin, reason}]`.
+
+Findings render as plain text locally and as GitHub Actions
+annotations in CI. Fatal findings fail the run.
+
+### Outputs
+
+`integrations/taxonomy.json` is written by default and validated
+against `integrations/schemas/taxonomy_output.json`. The file is
+gitignored and removed by `generate-integrations.yml` cleanup, just
+like `integrations/integrations.js` and `integrations/integrations.json`.
+
+Run validation only:
+
+```bash
+python3 integrations/gen_taxonomy.py --check-only
+```
+
+Seed a collector taxonomy from existing metadata contexts:
+
+```bash
+python3 integrations/gen_taxonomy_seed.py src/go/plugin/go.d/collector/apache/metadata.yaml --module-name apache --section-id applications.apache --placement-id apache --icon apache
+```
+
+The seed helper emits a flat `items:` tree. For collectors with richer
+dashboard layout needs, convert that flat list into explicit
+`owned_context`, `group`, `flatten`, `selector`, `context`, `grid`,
+`first_available`, or `view_switch` items before opening the PR.
+
+Pull-request coverage is checked by:
+
+```bash
+python3 integrations/check_collector_taxonomy.py --pr-diff origin/master...HEAD
+```
 
 ### Commands a maintainer runs locally
 
@@ -412,12 +487,14 @@ scripts directly during active development.
 ## End-to-end: a single PR's flow
 
 1. Developer edits `src/go/plugin/go.d/collector/foo/metadata.yaml`
-   (and the four other consistency-rule files: `config_schema.json`,
-   stock conf, `health.d/foo.conf`, `README.md`).
+   (and any other affected consistency-rule files:
+   `taxonomy.yaml`, `config_schema.json`, stock conf,
+   `health.d/foo.conf`, `README.md`).
 2. Developer runs locally:
    ```bash
    ./integrations/pip.sh
    python3 integrations/gen_integrations.py
+   python3 integrations/gen_taxonomy.py --check-only
    python3 integrations/gen_docs_integrations.py -c go.d/foo
    python3 integrations/gen_doc_collector_page.py
    python3 integrations/gen_doc_secrets_page.py
@@ -429,7 +506,8 @@ scripts directly during active development.
 4. PR is opened. `check-markdown.yml` runs, regenerates the
    same files in CI, and validates Learn ingest. If the dev's
    committed files differ from CI's regen, the PR fails.
-5. Reviewer checks the five-file consistency.
+5. Reviewer checks collector consistency, including taxonomy
+   coverage for changed chart contexts.
 6. PR merges. `generate-integrations.yml` triggers on master,
    regenerates everything, and opens an `integrations-regen`
    PR if anything is now stale (typically nothing, because the
