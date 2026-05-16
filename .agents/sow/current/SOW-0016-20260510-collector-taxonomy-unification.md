@@ -3,9 +3,9 @@
 
 ## Status
 
-Status: in-progress
+Status: paused
 
-Sub-state: one-PR framework+POC scope locked by user on 2026-05-11 after the audit-phase start. SOW moved from `pending/` to `current/`; on 2026-05-14 the user superseded the "structural taxonomy only" v1 boundary and required v1 to cover full cloud-frontend TOC shapes, including grids, context/table widgets, ordered alternatives, and nested groups. The full-shape v1 contract was redesigned, adversarially reviewed, amended, and re-reviewed as READY TO IMPLEMENT. Implementation has resumed under the full-shape contract. Full collector taxonomy coverage, global all-collector fatality, production ibm.d sweep, and cloud-frontend consumption are follow-up work unless explicitly pulled into the POC by user decision. After each major implementation step, if an external Claude review would add value, provide a focused prompt with exact files and questions.
+Sub-state: paused on 2026-05-17 by user priority switch to SOW-0017. Prior state: one-PR framework+POC scope locked by user on 2026-05-11 after the audit-phase start. SOW moved from `pending/` to `current/`; on 2026-05-14 the user superseded the "structural taxonomy only" v1 boundary and required v1 to cover full cloud-frontend TOC shapes, including grids, context/table widgets, ordered alternatives, and nested groups. The full-shape v1 contract was redesigned, adversarially reviewed, amended, and re-reviewed as READY TO IMPLEMENT. Implementation has resumed under the full-shape contract. Full collector taxonomy coverage, global all-collector fatality, production ibm.d sweep, and cloud-frontend consumption are follow-up work unless explicitly pulled into the POC by user decision. After each major implementation step, if an external Claude review would add value, provide a focused prompt with exact files and questions.
 
 Implementation progress 2026-05-11: framework, schemas, generator/checker/seed tooling, CI wiring, docs/spec/skills updates, and five go.d POC collector taxonomies were implemented locally and committed as a framework POC snapshot. 2026-05-14: structural-only implementation was paused, full-shape v1 was redesigned/reviewed, and the framework/POC files were updated locally to the ordered recursive `items:` contract.
 
