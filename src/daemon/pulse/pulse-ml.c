@@ -47,6 +47,14 @@ void pulse_ml_memory_allocated(size_t n)
 
 void pulse_ml_memory_freed(size_t n)
 {
+    // Skip the CAS loop when there is nothing to subtract. Hit on the
+    // unsized-delete fallback for platforms without malloc_usable_size,
+    // where the size of the freed block is not recoverable.
+    if (n == 0) {
+        __atomic_fetch_add(&ml_statistics.ml_memory_delete, 1, __ATOMIC_RELAXED);
+        return;
+    }
+
     // Clamp at zero: cross-thread allocations whose new/delete happen on
     // different sides of an MlAllocScope guard can produce a free without a
     // matching counted allocation. Saturate so the counter cannot wrap.
