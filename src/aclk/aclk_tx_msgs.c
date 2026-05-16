@@ -198,6 +198,68 @@ short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *ms
     return rc;
 }
 
+static void freez_aclk_publish5c(void *ptr) {
+    freez(ptr);
+}
+
+short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const char *msg_id,
+                               usec_t t_exec, usec_t created, short http_code,
+                               const char *http_headers, size_t http_headers_len,
+                               const char *body, size_t body_len)
+{
+    if (unlikely(!topic || topic[0] != '/')) {
+        netdata_log_error("Full topic required!");
+        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_INTERNAL_SERVER_ERROR, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, NULL, 0);
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+    }
+
+    json_object *msg = create_hdr("http", msg_id);
+    json_object *tmp;
+
+    tmp = json_object_new_int64(t_exec);
+    json_object_object_add(msg, "t-exec", tmp);
+
+    tmp = json_object_new_int64(created);
+    json_object_object_add(msg, "t-rx", tmp);
+
+    tmp = json_object_new_int(http_code);
+    json_object_object_add(msg, "http-code", tmp);
+
+    const char *json_str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
+    size_t json_len = strlen(json_str);
+
+    const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
+
+    size_t total = json_len + sep_len + http_headers_len + body_len;
+    char *raw = mallocz(total);
+
+    size_t pos = 0;
+    memcpy(raw + pos, json_str, json_len);
+    pos += json_len;
+    json_object_put(msg);
+
+    memcpy(raw + pos, V2_BIN_PAYLOAD_SEPARATOR, sep_len);
+    pos += sep_len;
+
+    if (http_headers_len) {
+        memcpy(raw + pos, http_headers, http_headers_len);
+        pos += http_headers_len;
+    }
+
+    if (body_len)
+        memcpy(raw + pos, body, body_len);
+
+    uint16_t packet_id;
+    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, raw, &freez_aclk_publish5c, total, MQTT_WSS_PUB_QOS1, &packet_id);
+
+    if (rc == MQTT_WSS_ERR_MSG_TOO_BIG) {
+        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
+        return HTTP_RESP_CONTENT_TOO_LONG;
+    }
+
+    return http_code;
+}
+
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
     size_t len;
     uint16_t pid;

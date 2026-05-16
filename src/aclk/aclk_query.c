@@ -112,7 +112,6 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     ND_LOG_STACK_PUSH(lgs);
 
     int retval = 0;
-    BUFFER *local_buffer = NULL;
     usec_t dt_ut = 0;
 
     int z_ret;
@@ -191,30 +190,18 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     }
 
     web_client_build_http_header(w);
-    local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    local_buffer->content_type = CT_APPLICATION_JSON;
 
-    buffer_strcat(local_buffer, w->response.header_output->buffer);
-
-    if (w->response.data->len) {
-        if (w->response.zinitialized) {
-            buffer_need_bytes(local_buffer, w->response.data->len);
-            memcpy(&local_buffer->buffer[local_buffer->len], w->response.data->buffer, w->response.data->len);
-            local_buffer->len += w->response.data->len;
-        } else
-            buffer_strcat(local_buffer, w->response.data->buffer);
-    }
-
-    // send msg.
-    w->response.code = (short)aclk_http_msg_v2(
+    w->response.code = (short)aclk_http_msg_v2_direct(
         client,
         query->callback_topic,
         query->msg_id,
         dt_ut,
         query->created,
         w->response.code,
-        local_buffer->buffer,
-        local_buffer->len);
+        w->response.header_output->buffer,
+        w->response.header_output->len,
+        w->response.data->buffer,
+        w->response.data->len);
 
 cleanup:
     web_client_log_completed_request(w, false);
@@ -223,7 +210,6 @@ cleanup:
     pending_req_list_rm(query->msg_id);
 
     buffer_free(z_buffer);
-    buffer_free(local_buffer);
     return retval;
 }
 
