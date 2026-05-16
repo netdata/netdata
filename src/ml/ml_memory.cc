@@ -1,12 +1,19 @@
 #include <cstdlib>
 #include <new>
 
+// libnetdata.h is included first so that, when NETDATA_TRACE_ALLOCATIONS
+// is defined, this translation unit sees the same view of malloc /
+// malloc_usable_size as the rest of the codebase. nd-mallocz.c overrides
+// the libc symbols in that mode and prepends a Netdata header to every
+// allocation; ml_usable_size() below must route through that shim, not
+// through Apple's malloc_size(), to read the correct accounted size.
+#include "libnetdata/libnetdata.h"
+
 #if defined(__linux__)
   #include <malloc.h>
   #define ML_HAVE_MALLOC_USABLE_SIZE 1
 #elif defined(__APPLE__)
   #include <malloc/malloc.h>
-  #define malloc_usable_size(p) malloc_size(p)
   #define ML_HAVE_MALLOC_USABLE_SIZE 1
 #elif defined(__FreeBSD__)
   #include <malloc_np.h>
@@ -15,6 +22,27 @@
 
 #include "ml_memory.h"
 #include "daemon/pulse/pulse-ml.h"
+
+#ifdef ML_HAVE_MALLOC_USABLE_SIZE
+// Return the allocator's view of the block size for ptr. When
+// NETDATA_TRACE_ALLOCATIONS is on, nd-mallocz.c overrides the
+// malloc_usable_size symbol with a shim that reads the Netdata header;
+// we use that on every platform so size reporting stays consistent with
+// the matching malloc() (which is also overridden in that mode). When
+// NETDATA_TRACE_ALLOCATIONS is off, we call the platform-native function
+// directly: malloc_usable_size on Linux/FreeBSD, malloc_size on macOS
+// (Apple does not expose malloc_usable_size).
+static inline size_t ml_usable_size(void *ptr) noexcept
+{
+#if defined(NETDATA_TRACE_ALLOCATIONS)
+    return malloc_usable_size(ptr);
+#elif defined(__APPLE__)
+    return malloc_size(ptr);
+#else
+    return malloc_usable_size(ptr);
+#endif
+}
+#endif
 
 // The operator overrides below replace the global C++ allocator hooks for
 // the netdata binary (only compiled when ENABLE_MIMALLOC is OFF). They
@@ -92,7 +120,7 @@ void *operator new(size_t size)
 
     if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-        pulse_ml_memory_allocated(malloc_usable_size(ptr));
+        pulse_ml_memory_allocated(ml_usable_size(ptr));
 #else
         pulse_ml_memory_allocated(size);
 #endif
@@ -112,7 +140,7 @@ void *operator new[](size_t size)
 
     if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-        pulse_ml_memory_allocated(malloc_usable_size(ptr));
+        pulse_ml_memory_allocated(ml_usable_size(ptr));
 #else
         pulse_ml_memory_allocated(size);
 #endif
@@ -126,7 +154,7 @@ void operator delete(void *ptr, [[maybe_unused]] size_t size) noexcept
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-            pulse_ml_memory_freed(malloc_usable_size(ptr));
+            pulse_ml_memory_freed(ml_usable_size(ptr));
 #else
             pulse_ml_memory_freed(size);
 #endif
@@ -141,7 +169,7 @@ void operator delete[](void *ptr, [[maybe_unused]] size_t size) noexcept
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-            pulse_ml_memory_freed(malloc_usable_size(ptr));
+            pulse_ml_memory_freed(ml_usable_size(ptr));
 #else
             pulse_ml_memory_freed(size);
 #endif
@@ -156,7 +184,7 @@ void operator delete(void *ptr) noexcept
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-            pulse_ml_memory_freed(malloc_usable_size(ptr));
+            pulse_ml_memory_freed(ml_usable_size(ptr));
 #else
             pulse_ml_memory_freed(0);
 #endif
@@ -171,7 +199,7 @@ void operator delete[](void *ptr) noexcept
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-            pulse_ml_memory_freed(malloc_usable_size(ptr));
+            pulse_ml_memory_freed(ml_usable_size(ptr));
 #else
             pulse_ml_memory_freed(0);
 #endif
@@ -208,7 +236,7 @@ void *operator new(size_t size, std::align_val_t al)
 
     if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-        pulse_ml_memory_allocated(malloc_usable_size(ptr));
+        pulse_ml_memory_allocated(ml_usable_size(ptr));
 #else
         pulse_ml_memory_allocated(size);
 #endif
@@ -228,7 +256,7 @@ void *operator new[](size_t size, std::align_val_t al)
 
     if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-        pulse_ml_memory_allocated(malloc_usable_size(ptr));
+        pulse_ml_memory_allocated(ml_usable_size(ptr));
 #else
         pulse_ml_memory_allocated(size);
 #endif
@@ -242,7 +270,7 @@ void operator delete(void *ptr, std::align_val_t /*al*/) noexcept
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-            pulse_ml_memory_freed(malloc_usable_size(ptr));
+            pulse_ml_memory_freed(ml_usable_size(ptr));
 #else
             pulse_ml_memory_freed(0);
 #endif
@@ -257,7 +285,7 @@ void operator delete[](void *ptr, std::align_val_t /*al*/) noexcept
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-            pulse_ml_memory_freed(malloc_usable_size(ptr));
+            pulse_ml_memory_freed(ml_usable_size(ptr));
 #else
             pulse_ml_memory_freed(0);
 #endif
@@ -272,7 +300,7 @@ void operator delete(void *ptr, [[maybe_unused]] size_t size, std::align_val_t /
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-            pulse_ml_memory_freed(malloc_usable_size(ptr));
+            pulse_ml_memory_freed(ml_usable_size(ptr));
 #else
             pulse_ml_memory_freed(size);
 #endif
@@ -287,7 +315,7 @@ void operator delete[](void *ptr, [[maybe_unused]] size_t size, std::align_val_t
     if (ptr) {
         if (ml_alloc_active) {
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-            pulse_ml_memory_freed(malloc_usable_size(ptr));
+            pulse_ml_memory_freed(ml_usable_size(ptr));
 #else
             pulse_ml_memory_freed(size);
 #endif
