@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: ebpf.plugin
+module_name: cachestat
+taxonomy_optout:
+  reason: Collector taxonomy is not yet authored for the ebpf.plugin chart set that still owns the legacy global cachestat metrics.

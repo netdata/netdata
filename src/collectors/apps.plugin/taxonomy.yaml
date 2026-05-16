@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: apps.plugin
+module_name: apps
+taxonomy_optout:
+  reason: Collector taxonomy is not yet authored for the apps.plugin charts that now include ebpf-derived metrics.
