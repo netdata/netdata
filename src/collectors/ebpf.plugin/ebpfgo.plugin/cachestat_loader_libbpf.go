@@ -6,8 +6,14 @@ import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libb
 
 func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, error) {
 	plan := BuildCachestatLegacyPlan(cfg)
+	coreSupported := libbpfloader.SupportsCore()
+	if !coreSupported {
+		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
+		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "cachestat", false, cfg.IsRHF, ObjectFlavorBase)
+		plan.LoadMode = LoadLegacy
+	}
 
-	rt, err := libbpfloader.NewCachestatRuntime(plan.ObjectPath, plan.LoadMode == LoadCore)
+	rt, err := libbpfloader.NewCachestatRuntime(plan.ObjectPath, plan.LoadMode == LoadCore && coreSupported)
 	if err != nil {
 		return nil, err
 	}

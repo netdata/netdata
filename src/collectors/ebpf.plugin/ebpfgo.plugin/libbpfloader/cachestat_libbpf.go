@@ -41,6 +41,7 @@ int netdata_cachestat_runtime_update_controller(
     struct netdata_ebpf_cachestat_runtime *rt,
     int apps_enabled,
     int apps_level);
+int netdata_cachestat_runtime_supports_core(void);
 int netdata_cachestat_runtime_snapshot(
     struct netdata_ebpf_cachestat_runtime *rt,
     int maps_per_core,
@@ -70,6 +71,10 @@ type CachestatRuntimeConfig struct {
 }
 
 const cachestatAppsLevelRealParent = 0
+
+func SupportsCore() bool {
+	return C.netdata_cachestat_runtime_supports_core() != 0
+}
 
 func NewCachestatRuntime(path string, useCore bool) (*CachestatRuntime, error) {
 	cpath := C.CString(path)
