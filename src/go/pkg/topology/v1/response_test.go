@@ -972,6 +972,116 @@ func TestValidateDecodedResponseRejectsInvalidModalPresentationSemantics(t *test
 	}
 }
 
+func TestValidateDecodedResponseRejectsInvalidZeroHeuristicContract(t *testing.T) {
+	basePayload := func() map[string]any {
+		return map[string]any{
+			"status": float64(200),
+			"type":   "topology",
+			"data": map[string]any{
+				"schema_version": SchemaVersion,
+				"dictionaries":   map[string]any{},
+				"types": map[string]any{
+					"actor_types": map[string]any{
+						"node": map[string]any{
+							"layer":    "node",
+							"identity": []any{"id"},
+							"search": map[string]any{
+								"enabled": true,
+								"columns": []any{"name"},
+							},
+							"presentation": map[string]any{
+								"label":  "Node",
+								"size":   map[string]any{"mode": "fixed", "scale": "normal"},
+								"layout": map[string]any{"repulsion": "normal"},
+							},
+						},
+					},
+					"link_types": map[string]any{
+						"dependency": map[string]any{
+							"orientation":    "directed",
+							"direction_role": "dependency",
+							"semantic_role":  "traffic",
+							"aggregation":    map[string]any{"direction": "preserve"},
+						},
+					},
+				},
+				"actors": map[string]any{
+					"rows": float64(1),
+					"columns": []any{
+						map[string]any{"id": "id", "type": "string", "role": "identity"},
+						map[string]any{"id": "type", "type": "string"},
+						map[string]any{"id": "name", "type": "string"},
+					},
+					"values": []any{
+						map[string]any{"codec": "const", "value": "node-a"},
+						map[string]any{"codec": "const", "value": "node"},
+						map[string]any{"codec": "const", "value": "Node A"},
+					},
+				},
+				"links": map[string]any{
+					"rows": float64(1),
+					"columns": []any{
+						map[string]any{"id": "src", "type": "actor_ref"},
+						map[string]any{"id": "dst", "type": "actor_ref"},
+						map[string]any{"id": "type", "type": "string"},
+					},
+					"values": []any{
+						map[string]any{"codec": "const", "value": float64(0)},
+						map[string]any{"codec": "const", "value": float64(0)},
+						map[string]any{"codec": "const", "value": "dependency"},
+					},
+				},
+			},
+		}
+	}
+
+	cases := map[string]struct {
+		mutate func(map[string]any)
+		want   string
+	}{
+		"invalid search column": {
+			mutate: func(payload map[string]any) {
+				actorType := payload["data"].(map[string]any)["types"].(map[string]any)["actor_types"].(map[string]any)["node"].(map[string]any)
+				actorType["search"].(map[string]any)["columns"] = []any{"missing"}
+			},
+			want: "search.columns[0] references unknown actor column",
+		},
+		"invalid size scale": {
+			mutate: func(payload map[string]any) {
+				actorType := payload["data"].(map[string]any)["types"].(map[string]any)["actor_types"].(map[string]any)["node"].(map[string]any)
+				presentation := actorType["presentation"].(map[string]any)
+				presentation["size"].(map[string]any)["scale"] = "huge"
+			},
+			want: "presentation.size.scale has unsupported value",
+		},
+		"invalid layout repulsion": {
+			mutate: func(payload map[string]any) {
+				actorType := payload["data"].(map[string]any)["types"].(map[string]any)["actor_types"].(map[string]any)["node"].(map[string]any)
+				presentation := actorType["presentation"].(map[string]any)
+				presentation["layout"].(map[string]any)["repulsion"] = "huge"
+			},
+			want: "presentation.layout.repulsion has unsupported value",
+		},
+		"invalid semantic role": {
+			mutate: func(payload map[string]any) {
+				linkType := payload["data"].(map[string]any)["types"].(map[string]any)["link_types"].(map[string]any)["dependency"].(map[string]any)
+				linkType["semantic_role"] = "protocol"
+			},
+			want: "semantic_role has unsupported value",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			payload := basePayload()
+			tc.mutate(payload)
+			err := ValidateDecodedResponse(payload)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
 func TestValidateDecodedResponseRejectsEmptyPresentationLabels(t *testing.T) {
 	basePayload := func(types map[string]any) map[string]any {
 		return map[string]any{
@@ -1606,6 +1716,8 @@ func TestPresentationTokenEnumsMatchSchema(t *testing.T) {
 	assert.ElementsMatch(t, widthTokens, schemaEnum(t, schemaDoc, "width_token"))
 	assert.ElementsMatch(t, layoutStrengthTokens, schemaEnum(t, schemaDoc, "layout_strength_token"))
 	assert.ElementsMatch(t, layoutDistanceTokens, schemaEnum(t, schemaDoc, "layout_distance_token"))
+	assert.ElementsMatch(t, actorSizeScaleTokens, schemaEnum(t, schemaDoc, "actor_size_scale_token"))
+	assert.ElementsMatch(t, linkSemanticRoleTokens, schemaEnum(t, schemaDoc, "link_semantic_role"))
 	assert.ElementsMatch(t, iconTokens, schemaEnum(t, schemaDoc, "icon_token"))
 }
 

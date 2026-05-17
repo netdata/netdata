@@ -232,13 +232,19 @@ Actor types define source-local identity and cross-source merge identity:
         "merge_identity": ["node_id", "process_name"],
         "parent_identity": ["node_id"],
         "aggregation_scopes": ["node", "process_name", "container", "k8s_workload"],
+        "search": {
+          "enabled": true,
+          "columns": ["display_name", "process_name"],
+          "label_keys": ["cmdline", "username"]
+        },
         "presentation": {
           "label": "Process",
           "role": "actor",
           "icon": "process",
           "color_slot": "primary",
           "border": {"enabled": true},
-          "size": {"mode": "link_count"},
+          "size": {"mode": "link_count", "scale": "normal"},
+          "layout": {"repulsion": "normal"},
           "label_policy": {
             "columns": ["display_name", "process_name"],
             "fallback": "type_label",
@@ -274,6 +280,14 @@ UI text. If an identity column is not explicitly listed in the actor type
 `presentation.label_policy.columns`, the UI must not use it as a label
 fallback.
 
+Actor type `search` declares exactly what the graph search bar may index for
+that actor type. `search.columns[]` references actor-table scalar columns.
+`search.label_keys[]` references values in the actor label table, normally
+`actor_labels.key`. Set `search.enabled: false` for helper actors that should
+not appear in graph search, such as synthetic segment or grouping actors. The
+UI must not traverse producer-specific `details`, `match`, `attributes`, or
+labels paths when rendering a v1 payload.
+
 ## Required Link Semantics
 
 The `links` table is the renderable graph projection. It must contain:
@@ -296,6 +310,7 @@ Link types define direction and aggregation semantics:
       "socket": {
         "orientation": "directed",
         "direction_role": "flow",
+        "semantic_role": "traffic",
         "aggregation": {
           "direction": "preserve",
           "evidence": "append",
@@ -354,6 +369,53 @@ Direction rules:
 - `ownership`: parent to child or owner to owned;
 - `observation`: discovery direction only;
 - `none`: direction is not meaningful.
+
+When `types.link_types.<id>.presentation.arrow` is `auto` or omitted, the UI
+derives arrows from `orientation` and `direction_role`:
+
+- `undirected` -> no arrow;
+- `observed_bidirectional` -> no arrow;
+- `direction_role: none` -> no arrow;
+- `direction_role: observation` -> no arrow;
+- `directed` with `flow` or `dependency` -> forward from `src_actor` to
+  `dst_actor`;
+- `hierarchical` with `ownership` -> forward from `src_actor` to `dst_actor`;
+- all other combinations -> no arrow and a diagnostic if the combination is
+  schema-valid but semantically unusual.
+
+`observed_bidirectional` does not mean draw arrows at both ends. Producers that
+need reverse or both arrows must set `presentation.arrow` explicitly.
+
+`direction_role` is required. A link type with `orientation: "directed"` and no
+`direction_role` is invalid v1 and must not get an inferred arrow from `auto`.
+Declare `direction_role: "flow"` or `direction_role: "dependency"` for directed
+links that should infer a forward arrow, or set `presentation.arrow`
+explicitly.
+
+For valid values, the `auto` diagnostic boundary is:
+
+- normal: `directed+flow`, `directed+dependency`,
+  `hierarchical+ownership`, `undirected+none`, `undirected+observation`,
+  `observed_bidirectional+none`, `observed_bidirectional+observation`;
+- diagnostic: `directed+none`, `directed+observation`, `directed+ownership`,
+  `hierarchical+none`, `hierarchical+flow`, `hierarchical+dependency`,
+  `hierarchical+observation`, `undirected+flow`, `undirected+dependency`,
+  `undirected+ownership`, `observed_bidirectional+flow`,
+  `observed_bidirectional+dependency`, `observed_bidirectional+ownership`.
+
+`semantic_role` is an optional topology-agnostic link classification used by
+the UI and aggregator when behavior is not just visual:
+
+- `normal`: ordinary relationship;
+- `discovery`: discovery-protocol relationship such as LLDP/CDP;
+- `ownership`: graph-coherence or containment relationship;
+- `traffic`: traffic, socket, or data-path relationship;
+- `correlation`: visible correlation or partial-correlation relationship;
+- `control`: control-plane relationship.
+
+Do not infer this role from link type names, protocols, or labels. If a link
+needs discovery filtering, ownership treatment, traffic emphasis, or
+correlation treatment, the producer must declare the semantic role explicitly.
 
 ## Presentation Plane
 
@@ -447,12 +509,30 @@ Current Netdata topology tuning keeps `strength` at `normal` and varies only
 `strength` tokens for graph polish unless a later product decision explicitly
 re-enables force-strength tuning.
 
+Actor layout is tokenized separately from link layout. Producers may set
+`types.actor_types.<id>.presentation.layout.repulsion` to `weakest`, `weaker`,
+`normal`, `stronger`, or `strongest`. This controls the relative separation of
+actors of that type in the UI force graph. It is not interchangeable with link
+`strength`: actor repulsion pushes nodes apart, while link strength pulls link
+endpoints together. Producers must not emit raw charge or force numbers.
+Initial UI-owned mappings are `weakest=-200`, `weaker=-300`, `normal=-450`,
+`stronger=-700`, and `strongest=-1000`; these numbers are not schema and may be
+tuned after visual QA.
+
 Actor size supports:
 
 - `fixed`: no data-driven size changes;
 - `link_count`: size may reflect graph degree;
 - `metric`: size comes from a numeric actor row column named by
   `metric_column`.
+
+Actor size may also set `scale: "compact"`, `"normal"`, or `"emphasized"` for
+type-level fixed visual emphasis. Use this for deliberate distinctions such as
+self/current node emphasis. Do not force the UI to infer emphasis from actor
+type names or labels. Initial UI-owned mappings are `compact=0.85`,
+`normal=1.0`, and `emphasized=1.18`; these numbers are not schema and may be
+tuned after visual QA. `size.scale` composes with `size.mode`; it does not
+override data-driven sizing.
 
 When `selection.actor_click.mode` is `highlight_path`, the payload must also
 set `path_table`, `path_actor_column`, and `path_order_column`. The path table
@@ -520,10 +600,14 @@ Icon tokens:
 `netdata-agent`, `parent`, `remote-endpoint`, `local-endpoint`, `segment`,
 `self`, `ip`, `cloud`, `container`, `vm`, `database`, `service`, `datacenter`,
 `cluster`, `host`, `network`, `datastore`, `datastore_cluster`,
-`resource_pool`.
+`resource_pool`, `device`, `endpoint`, `correlation`, `interface`, `group`,
+`unknown`.
 
 Producers must not emit tokens outside the schema. The UI should render
 unsupported tokens with a safe fallback and record diagnostics for version skew.
+Producers must not emit raw SVG icons or ask the UI to infer icons from
+capability strings. If a topology needs a new visual concept, add a closed icon
+token to the schema and UI token map first.
 
 ## Evidence Plane
 

@@ -168,6 +168,11 @@ schema rollout depends on it:
   tables from evidence rows, render actor custom tables from typed actor-detail
   tables, and use link-type direction metadata instead of guessing from raw link
   direction strings.
+- zero-heuristic v1 rendering target: read actor size scale, actor repulsion,
+  actor search policy, link semantic role, and closed icon tokens from the v1
+  type registry. Keep `isSelfNode`, `isDerivedSegmentNode`, `isDeviceNode`,
+  LLDP/CDP protocol checks, capability icon inference, and hardcoded search
+  paths inside the temporary legacy adapter only.
 
 ## Producer Migration Scope
 

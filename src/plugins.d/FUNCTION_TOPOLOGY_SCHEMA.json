@@ -384,6 +384,9 @@
           "uniqueItems": true,
           "default": []
         },
+        "search": {
+          "$ref": "#/$defs/actor_search_policy"
+        },
         "presentation": {
           "$ref": "#/$defs/actor_type_presentation"
         }
@@ -416,6 +419,9 @@
             "ownership",
             "observation"
           ]
+        },
+        "semantic_role": {
+          "$ref": "#/$defs/link_semantic_role"
         },
         "aggregation": {
           "$ref": "#/$defs/link_aggregation"
@@ -655,6 +661,9 @@
         "size": {
           "$ref": "#/$defs/actor_size_presentation"
         },
+        "layout": {
+          "$ref": "#/$defs/actor_layout_presentation"
+        },
         "label_policy": {
           "$ref": "#/$defs/label_policy"
         },
@@ -737,6 +746,16 @@
         },
         "distance": {
           "$ref": "#/$defs/layout_distance_token"
+        }
+      }
+    },
+    "actor_layout_presentation": {
+      "type": "object",
+      "description": "Tokenized actor layout hints for the UI force graph. Producers choose relative tokens; the UI owns numeric force values.",
+      "additionalProperties": false,
+      "properties": {
+        "repulsion": {
+          "$ref": "#/$defs/layout_strength_token"
         }
       }
     },
@@ -946,6 +965,9 @@
         },
         "metric_column": {
           "$ref": "#/$defs/id"
+        },
+        "scale": {
+          "$ref": "#/$defs/actor_size_scale_token"
         }
       },
       "allOf": [
@@ -967,6 +989,35 @@
           }
         }
       ]
+    },
+    "actor_search_policy": {
+      "type": "object",
+      "description": "Producer-declared searchable fields for this actor type. This replaces UI hardcoded traversal of domain-specific actor attributes.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "columns": {
+          "type": "array",
+          "description": "Actor-table column ids whose scalar values should be indexed for graph search.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "label_keys": {
+          "type": "array",
+          "description": "actor_labels.key values whose label values should be indexed for graph search.",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
     },
     "label_policy": {
       "type": "object",
@@ -2565,6 +2616,25 @@
         "farthest"
       ]
     },
+    "actor_size_scale_token": {
+      "type": "string",
+      "enum": [
+        "compact",
+        "normal",
+        "emphasized"
+      ]
+    },
+    "link_semantic_role": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "discovery",
+        "ownership",
+        "traffic",
+        "correlation",
+        "control"
+      ]
+    },
     "icon_token": {
       "type": "string",
       "enum": [
@@ -2599,7 +2669,13 @@
         "network",
         "datastore",
         "datastore_cluster",
-        "resource_pool"
+        "resource_pool",
+        "device",
+        "endpoint",
+        "correlation",
+        "interface",
+        "group",
+        "unknown"
       ]
     },
     "id": {

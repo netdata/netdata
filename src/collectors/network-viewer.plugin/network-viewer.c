@@ -2804,6 +2804,8 @@ static void topology_v1_emit_actor_type(
     bool border,
     const char *size_mode,
     const char *size_metric_column,
+    const char *size_scale,
+    const char *layout_repulsion,
     bool show_port_bullets,
     const char *port_table,
     bool detailed,
@@ -2826,6 +2828,27 @@ static void topology_v1_emit_actor_type(
         buffer_json_member_add_array(wb, "aggregation_scopes");
         buffer_json_add_array_item_string(wb, scope);
         buffer_json_array_close(wb);
+        buffer_json_member_add_object(wb, "search");
+        {
+            buffer_json_member_add_array(wb, "columns");
+            if(strcmp(id, "self") == 0) {
+                buffer_json_add_array_item_string(wb, "display_name");
+                buffer_json_add_array_item_string(wb, "hostname");
+            }
+            else if(strcmp(id, "process") == 0) {
+                buffer_json_add_array_item_string(wb, "display_name");
+                buffer_json_add_array_item_string(wb, "process");
+                buffer_json_add_array_item_string(wb, "username");
+                buffer_json_add_array_item_string(wb, "cmdline");
+                buffer_json_add_array_item_string(wb, "local_ip");
+            }
+            else if(strcmp(id, "endpoint") == 0) {
+                buffer_json_add_array_item_string(wb, "display_name");
+                buffer_json_add_array_item_string(wb, "ip");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
         buffer_json_member_add_object(wb, "presentation");
         {
             buffer_json_member_add_string(wb, "label", label);
@@ -2842,8 +2865,17 @@ static void topology_v1_emit_actor_type(
                 buffer_json_member_add_string(wb, "mode", size_mode ? size_mode : "fixed");
                 if(size_metric_column)
                     buffer_json_member_add_string(wb, "metric_column", size_metric_column);
+                if(size_scale)
+                    buffer_json_member_add_string(wb, "scale", size_scale);
             }
             buffer_json_object_close(wb);
+            if(layout_repulsion) {
+                buffer_json_member_add_object(wb, "layout");
+                {
+                    buffer_json_member_add_string(wb, "repulsion", layout_repulsion);
+                }
+                buffer_json_object_close(wb);
+            }
             buffer_json_member_add_object(wb, "label_policy");
             {
                 buffer_json_member_add_array(wb, "columns");
@@ -2976,6 +3008,7 @@ static void topology_v1_emit_link_type(
     const char *id,
     const char *orientation,
     const char *direction_role,
+    const char *semantic_role,
     const char *evidence_type,
     const char *label,
     const char *color_slot,
@@ -2991,6 +3024,8 @@ static void topology_v1_emit_link_type(
     {
         buffer_json_member_add_string(wb, "orientation", orientation);
         buffer_json_member_add_string(wb, "direction_role", direction_role);
+        if(semantic_role)
+            buffer_json_member_add_string(wb, "semantic_role", semantic_role);
         buffer_json_member_add_object(wb, "aggregation");
         {
             buffer_json_member_add_string(wb, "direction", "preserve");
@@ -3058,17 +3093,17 @@ static void topology_v1_emit_type_registry(BUFFER *wb, bool detailed __maybe_unu
         {
             topology_v1_emit_actor_type(
                 wb, "self", "machine_guid", "hostname", "node",
-                "This host", "self", "self", "actor", true, "fixed", NULL, false, NULL,
+                "This host", "self", "self", "actor", true, "fixed", NULL, "emphasized", "strongest", false, NULL,
                 detailed,
                 "display_name", "hostname");
             topology_v1_emit_actor_type(
                 wb, "process", "machine_guid", "process", "process_name",
-                "Process", "primary", "process", "actor", true, "metric", "socket_count", true, "socket_ports",
+                "Process", "primary", "process", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
                 detailed,
                 "display_name", "process");
             topology_v1_emit_actor_type(
                 wb, "endpoint", "ip", "address_space", "endpoint",
-                "Correlation endpoint", "derived", "remote-endpoint", "endpoint", true, "fixed", NULL, false, NULL,
+                "Correlation endpoint", "derived", "remote-endpoint", "endpoint", true, "fixed", NULL, "compact", "weaker", false, NULL,
                 detailed,
                 "display_name", "ip");
         }
@@ -3077,19 +3112,19 @@ static void topology_v1_emit_type_registry(BUFFER *wb, bool detailed __maybe_unu
         buffer_json_member_add_object(wb, "link_types");
         {
             topology_v1_emit_link_type(
-                wb, "socket", "directed", "dependency", "socket",
+                wb, "socket", "directed", "dependency", "traffic", "socket",
                 "Local socket", "gray", "solid", "thin", "forward", NULL,
                 "sockets", "socket_count", "normal", "normal");
             topology_v1_emit_link_type(
-                wb, "endpoint_socket", "directed", "dependency", "socket",
+                wb, "endpoint_socket", "directed", "dependency", "traffic", "socket",
                 "Endpoint connection", "primary", "solid", "thin", "forward", NULL,
                 NULL, NULL, "normal", "normal");
             topology_v1_emit_link_type(
-                wb, "correlated_socket", "directed", "dependency", "socket",
+                wb, "correlated_socket", "directed", "dependency", "traffic", "socket",
                 "Correlated socket", "primary", "solid", "thin", "forward", NULL,
                 "sockets", "socket_count", "normal", "farthest");
             topology_v1_emit_link_type(
-                wb, "ownership", "hierarchical", "ownership", NULL,
+                wb, "ownership", "hierarchical", "ownership", "ownership", NULL,
                 "Process ownership", "dim", "dotted", "thin", "none", "faded",
                 NULL, NULL, "normal", "normal");
         }

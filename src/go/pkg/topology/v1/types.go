@@ -88,12 +88,14 @@ type ActorType struct {
 	MergeIdentity     []string           `json:"merge_identity,omitempty"`
 	ParentIdentity    []string           `json:"parent_identity,omitempty"`
 	AggregationScopes []string           `json:"aggregation_scopes,omitempty"`
+	Search            *ActorSearchPolicy `json:"search,omitempty"`
 	Presentation      *ActorPresentation `json:"presentation,omitempty"`
 }
 
 type LinkType struct {
 	Orientation      string            `json:"orientation"`
 	DirectionRole    string            `json:"direction_role"`
+	SemanticRole     string            `json:"semantic_role,omitempty"`
 	Aggregation      LinkAggregation   `json:"aggregation"`
 	EvidenceTypes    []string          `json:"evidence_types,omitempty"`
 	OverlayTemplates []string          `json:"overlay_templates,omitempty"`
@@ -146,18 +148,19 @@ type ScaleKeyPresentation struct {
 }
 
 type ActorPresentation struct {
-	Label       string                  `json:"label,omitempty"`
-	Role        string                  `json:"role,omitempty"`
-	Icon        string                  `json:"icon,omitempty"`
-	ColorSlot   string                  `json:"color_slot,omitempty"`
-	Opacity     string                  `json:"opacity,omitempty"`
-	Border      *BorderPresentation     `json:"border,omitempty"`
-	Annotation  *AnnotationPresentation `json:"annotation,omitempty"`
-	Size        *ActorSizePresentation  `json:"size,omitempty"`
-	LabelPolicy *LabelPolicy            `json:"label_policy,omitempty"`
-	Ports       *ActorPortsPresentation `json:"ports,omitempty"`
-	Hover       *HoverPresentation      `json:"hover,omitempty"`
-	Modal       *ModalPresentation      `json:"modal,omitempty"`
+	Label       string                   `json:"label,omitempty"`
+	Role        string                   `json:"role,omitempty"`
+	Icon        string                   `json:"icon,omitempty"`
+	ColorSlot   string                   `json:"color_slot,omitempty"`
+	Opacity     string                   `json:"opacity,omitempty"`
+	Border      *BorderPresentation      `json:"border,omitempty"`
+	Annotation  *AnnotationPresentation  `json:"annotation,omitempty"`
+	Size        *ActorSizePresentation   `json:"size,omitempty"`
+	Layout      *ActorLayoutPresentation `json:"layout,omitempty"`
+	LabelPolicy *LabelPolicy             `json:"label_policy,omitempty"`
+	Ports       *ActorPortsPresentation  `json:"ports,omitempty"`
+	Hover       *HoverPresentation       `json:"hover,omitempty"`
+	Modal       *ModalPresentation       `json:"modal,omitempty"`
 }
 
 type LinkPresentation struct {
@@ -199,6 +202,17 @@ type AnnotationPresentation struct {
 type ActorSizePresentation struct {
 	Mode         string `json:"mode"`
 	MetricColumn string `json:"metric_column,omitempty"`
+	Scale        string `json:"scale,omitempty"`
+}
+
+type ActorLayoutPresentation struct {
+	Repulsion string `json:"repulsion,omitempty"`
+}
+
+type ActorSearchPolicy struct {
+	Enabled   *bool    `json:"enabled,omitempty"`
+	Columns   []string `json:"columns,omitempty"`
+	LabelKeys []string `json:"label_keys,omitempty"`
 }
 
 type LabelPolicy struct {

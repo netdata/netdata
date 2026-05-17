@@ -87,8 +87,9 @@ Actor types declare:
 - cross-payload `merge_identity`;
 - optional `parent_identity`;
 - supported `aggregation_scopes`.
+- optional `search` policy over actor table columns and actor label keys.
 - optional `presentation` with UI-owned tokens, safe label policy, size policy,
-  and graph port-bullet policy.
+  actor repulsion policy, and graph port-bullet policy.
 
 Link types declare:
 
@@ -96,6 +97,8 @@ Link types declare:
   `observed_bidirectional`;
 - `direction_role`: `none`, `flow`, `dependency`, `ownership`, or
   `observation`;
+- optional `semantic_role`: `normal`, `discovery`, `ownership`, `traffic`,
+  `correlation`, or `control`;
 - aggregation policy for direction, evidence, metrics, tables, and overlays.
 - optional `presentation` with UI-owned color, line style, width, curve, arrow,
   tokenized layout strength/distance, and one variable visual channel.
@@ -210,12 +213,18 @@ Closed token values are part of the schema contract:
   `strongest`;
 - link layout distance tokens: `closest`, `closer`, `normal`, `farther`,
   `farthest`;
+- actor layout repulsion tokens: `weakest`, `weaker`, `normal`, `stronger`,
+  `strongest`;
+- actor size scale tokens: `compact`, `normal`, `emphasized`;
+- link semantic roles: `normal`, `discovery`, `ownership`, `traffic`,
+  `correlation`, `control`;
 - icons: `router`, `switch`, `firewall`, `access_point`, `server`, `storage`,
   `load_balancer`, `printer`, `phone`, `ups`, `camera`, `process`, `agent`,
   `netdata-agent`, `parent`, `remote-endpoint`, `local-endpoint`, `segment`,
   `self`, `ip`, `cloud`, `container`, `vm`, `database`, `service`,
   `datacenter`, `cluster`, `host`, `network`, `datastore`,
-  `datastore_cluster`, `resource_pool`.
+  `datastore_cluster`, `resource_pool`, `device`, `endpoint`, `correlation`,
+  `interface`, `group`, `unknown`.
 
 The UI owns token rendering and must treat producer labels as plain text. If a
 new producer emits a schema-valid token that an older UI does not know, the UI
@@ -227,6 +236,13 @@ values by default so aggregated identities do not become long actor names.
 Label-policy columns must be safe scalar actor-table columns. Producers must
 not reference secrets, tokens, customer-identifying fields, or unbounded arrays
 from `label_policy.columns`.
+
+Actor `search` is the only approved way to choose graph search content for v1.
+`search.columns[]` references scalar actor-table columns. `search.label_keys[]`
+references values in the actor label table, normally `actor_labels.key`. Set
+`search.enabled: false` for helper actors that should not be searchable. The UI
+must not traverse producer-specific `details`, `match`, `attributes`, or label
+paths when rendering v1.
 
 Link types may define one variable visual channel using `variable.channel`,
 `variable.scale_key`, and `variable.value_column`. Producers emit raw domain
@@ -242,6 +258,64 @@ relative UI-owned tokens, not numeric physics. Current producer tuning keeps
 semantic separation. Do not reintroduce non-normal `strength` tokens for graph
 polish unless a later product decision explicitly re-enables force-strength
 tuning.
+
+Actor types may define tokenized force-layout hints using
+`presentation.layout.repulsion`. Repulsion is separate from link strength:
+repulsion pushes actors apart, while link strength pulls endpoints together.
+Producers must not emit raw charge values. Actor size may define a type-level
+`size.scale` token for deliberate fixed emphasis, such as current/self actors;
+the UI must not infer this from actor type names or labels.
+
+`link_types.<id>.semantic_role` is behavior metadata, not visual styling. It
+drives UI behavior such as discovery-link filtering, ownership/coherence
+treatment, traffic emphasis, and correlation treatment without hardcoded
+protocol or type-name checks. Link appearance still comes from
+`presentation`.
+
+When link `presentation.arrow` is `auto` or omitted, the UI derives arrows from
+`orientation` and `direction_role`:
+
+- `undirected` -> no arrow;
+- `observed_bidirectional` -> no arrow;
+- `direction_role: none` -> no arrow;
+- `direction_role: observation` -> no arrow;
+- `directed` with `flow` or `dependency` -> forward from `src_actor` to
+  `dst_actor`;
+- `hierarchical` with `ownership` -> forward from `src_actor` to `dst_actor`;
+- all other combinations -> no arrow and a diagnostic if the combination is
+  schema-valid but semantically unusual.
+
+`observed_bidirectional` means observation completeness, not "draw both
+arrows". Producers that need reverse or both arrows must set
+`presentation.arrow` explicitly.
+
+`direction_role` is required by the v1 schema. Missing `direction_role` is
+schema-invalid and must not produce an inferred arrow from `orientation` alone.
+The UI should render `auto` as no arrow and emit the normal missing-field
+diagnostic for that invalid input.
+
+For schema-valid values, the `auto` semantic diagnostic boundary is:
+
+- no diagnostic for `directed+flow`, `directed+dependency`,
+  `hierarchical+ownership`, `undirected+none`, `undirected+observation`,
+  `observed_bidirectional+none`, or `observed_bidirectional+observation`;
+- diagnostic for `directed+none`, `directed+observation`,
+  `directed+ownership`, `hierarchical+none`, `hierarchical+flow`,
+  `hierarchical+dependency`, `hierarchical+observation`, `undirected+flow`,
+  `undirected+dependency`, `undirected+ownership`,
+  `observed_bidirectional+flow`, `observed_bidirectional+dependency`, or
+  `observed_bidirectional+ownership`.
+
+Initial UI-owned mappings are:
+
+- `size.scale`: `compact=0.85`, `normal=1.0`, `emphasized=1.18`;
+- `layout.repulsion`: `weakest=-200`, `weaker=-300`, `normal=-450`,
+  `stronger=-700`, `strongest=-1000`.
+
+These numeric values are not schema and may be tuned after visual QA.
+`size.scale` composes with `size.mode`; it does not override data-driven
+sizing. Missing optional fields use neutral defaults (`scale: normal`,
+`repulsion: normal`) and must not trigger v1 UI fallback heuristics.
 
 Actor port bullets require explicit `ports.sources[]` when
 `show_bullets: true`. The source may be `links`, `evidence`, or an

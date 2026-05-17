@@ -44,13 +44,17 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 			Identity:          []string{"id"},
 			MergeIdentity:     []string{"chassis_ids", "mac_addresses", "ip_addresses", "sys_name"},
 			AggregationScopes: []string{"device", "network"},
+			Search: &topologyv1.ActorSearchPolicy{
+				Columns: []string{"display_name", "sys_name", "management_ip", "vendor", "model"},
+			},
 			Presentation: &topologyv1.ActorPresentation{
 				Label:     label,
 				Role:      "actor",
 				Icon:      icon,
 				ColorSlot: colorSlot,
 				Border:    &topologyv1.BorderPresentation{Enabled: topologyv1.Bool(true)},
-				Size:      &topologyv1.ActorSizePresentation{Mode: "link_count"},
+				Size:      &topologyv1.ActorSizePresentation{Mode: "link_count", Scale: "emphasized"},
+				Layout:    &topologyv1.ActorLayoutPresentation{Repulsion: "stronger"},
 				LabelPolicy: &topologyv1.LabelPolicy{
 					Columns:   []string{"display_name", "sys_name"},
 					Fallback:  "type_label",
@@ -96,12 +100,15 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 		Identity:          []string{"id"},
 		MergeIdentity:     []string{"mac_addresses", "ip_addresses"},
 		AggregationScopes: []string{"endpoint", "network"},
+		Search:            &topologyv1.ActorSearchPolicy{Columns: []string{"display_name"}},
 		Presentation: &topologyv1.ActorPresentation{
 			Label:     "Inferred endpoint",
 			Role:      "endpoint",
 			Icon:      "remote-endpoint",
 			ColorSlot: "derived",
 			Border:    &topologyv1.BorderPresentation{Enabled: topologyv1.Bool(true)},
+			Size:      &topologyv1.ActorSizePresentation{Mode: "fixed", Scale: "compact"},
+			Layout:    &topologyv1.ActorLayoutPresentation{Repulsion: "weaker"},
 			LabelPolicy: &topologyv1.LabelPolicy{
 				Columns:   []string{"display_name"},
 				Fallback:  "type_label",
@@ -117,11 +124,14 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 		MergeIdentity:     []string{"id"},
 		ParentIdentity:    []string{"parent_devices"},
 		AggregationScopes: []string{"segment", "network"},
+		Search:            &topologyv1.ActorSearchPolicy{Enabled: topologyv1.Bool(false)},
 		Presentation: &topologyv1.ActorPresentation{
 			Label:     "Network segment",
 			Role:      "group",
 			Icon:      "segment",
 			ColorSlot: "dim",
+			Size:      &topologyv1.ActorSizePresentation{Mode: "fixed", Scale: "compact"},
+			Layout:    &topologyv1.ActorLayoutPresentation{Repulsion: "weakest"},
 			LabelPolicy: &topologyv1.LabelPolicy{
 				Columns:   []string{"display_name"},
 				Fallback:  "type_label",
@@ -136,6 +146,7 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 		Identity:          []string{"id"},
 		MergeIdentity:     []string{"id"},
 		AggregationScopes: []string{"network"},
+		Search:            &topologyv1.ActorSearchPolicy{Columns: []string{"display_name"}},
 		Presentation: &topologyv1.ActorPresentation{
 			Label:     "Custom",
 			Role:      "actor",
@@ -333,24 +344,25 @@ func snmpTopologyV1PortTypes() map[string]topologyv1.PortType {
 }
 
 type snmpTopologyV1LinkTypeSpec struct {
-	id        string
-	label     string
-	colorSlot string
-	lineStyle string
-	width     string
+	id           string
+	label        string
+	colorSlot    string
+	lineStyle    string
+	width        string
+	semanticRole string
 }
 
 func snmpTopologyV1LinkTypeSpecs() []snmpTopologyV1LinkTypeSpec {
 	return []snmpTopologyV1LinkTypeSpec{
-		{id: snmpTopologyV1LinkLLDP, label: "LLDP", colorSlot: "accent", lineStyle: "solid", width: "thick"},
-		{id: snmpTopologyV1LinkCDP, label: "CDP", colorSlot: "accent", lineStyle: "solid", width: "thick"},
-		{id: snmpTopologyV1LinkBridge, label: "Bridge", colorSlot: "neutral", lineStyle: "solid", width: "normal"},
-		{id: snmpTopologyV1LinkFDB, label: "FDB", colorSlot: "neutral", lineStyle: "solid", width: "normal"},
-		{id: snmpTopologyV1LinkSTP, label: "STP", colorSlot: "muted", lineStyle: "solid", width: "normal"},
-		{id: snmpTopologyV1LinkARP, label: "ARP", colorSlot: "muted", lineStyle: "solid", width: "normal"},
-		{id: snmpTopologyV1LinkSNMP, label: "SNMP", colorSlot: "primary", lineStyle: "solid", width: "normal"},
-		{id: snmpTopologyV1LinkProbable, label: "Probable", colorSlot: "dim", lineStyle: "solid", width: "normal"},
-		{id: snmpTopologyV1LinkObservation, label: "L2 observation", colorSlot: "neutral", lineStyle: "solid", width: "normal"},
+		{id: snmpTopologyV1LinkLLDP, label: "LLDP", colorSlot: "accent", lineStyle: "solid", width: "thick", semanticRole: "discovery"},
+		{id: snmpTopologyV1LinkCDP, label: "CDP", colorSlot: "accent", lineStyle: "solid", width: "thick", semanticRole: "discovery"},
+		{id: snmpTopologyV1LinkBridge, label: "Bridge", colorSlot: "neutral", lineStyle: "solid", width: "normal", semanticRole: "normal"},
+		{id: snmpTopologyV1LinkFDB, label: "FDB", colorSlot: "neutral", lineStyle: "solid", width: "normal", semanticRole: "normal"},
+		{id: snmpTopologyV1LinkSTP, label: "STP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
+		{id: snmpTopologyV1LinkARP, label: "ARP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
+		{id: snmpTopologyV1LinkSNMP, label: "SNMP", colorSlot: "primary", lineStyle: "solid", width: "normal", semanticRole: "normal"},
+		{id: snmpTopologyV1LinkProbable, label: "Probable", colorSlot: "dim", lineStyle: "solid", width: "normal", semanticRole: "normal"},
+		{id: snmpTopologyV1LinkObservation, label: "L2 observation", colorSlot: "neutral", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 	}
 }
 
@@ -360,6 +372,7 @@ func snmpTopologyV1LinkTypes() map[string]topologyv1.LinkType {
 		types[spec.id] = topologyv1.LinkType{
 			Orientation:   "observed_bidirectional",
 			DirectionRole: "observation",
+			SemanticRole:  spec.semanticRole,
 			Aggregation: topologyv1.LinkAggregation{
 				Direction: "canonicalize_unordered",
 				Evidence:  "append",

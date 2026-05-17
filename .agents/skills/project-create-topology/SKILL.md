@@ -136,6 +136,23 @@ developer-facing and must stay in this project skill, not under
    - Use UI-owned color/icon/line/width/opacity/layout tokens only.
    - Define `label_policy.columns` with safe scalar display columns; never let
      canonical identity arrays become actor names.
+   - Define `search.columns[]` and/or `search.label_keys[]` for searchable
+     actors. Set `search.enabled: false` for helper actors that should not
+     appear in graph search. Do not rely on UI hardcoded `details`, `match`, or
+     `attributes` paths.
+   - Define `presentation.size.scale` when an actor type needs fixed visual
+     emphasis, and `presentation.layout.repulsion` when an actor type needs
+     relative force-graph separation. Do not emit raw force numbers.
+   - Define `link_types.<id>.semantic_role` when behavior depends on link
+     meaning, such as `discovery`, `ownership`, `traffic`, `correlation`, or
+     `control`. Do not make the UI infer this from link type names or protocol
+     strings.
+   - Keep `presentation.arrow` authoritative for arrows. Omitted or `auto`
+     derives no arrows for `undirected`, `observed_bidirectional`, `none`, or
+     `observation`; derives `forward` for directed `flow`/`dependency` and
+     hierarchical `ownership`. Use explicit `reverse` or `both` when needed.
+     `direction_role` is required; never rely on `orientation: directed` alone
+     to infer arrows.
    - Define `ports.sources[]` whenever an actor type sets
      `ports.show_bullets: true`.
    - Use scalar display columns for `ports.sources[].name_column`; do not use
@@ -152,6 +169,11 @@ developer-facing and must stay in this project skill, not under
      and varies only `presentation.layout.distance` where semantic separation is
      needed. Do not emit non-normal strength tokens for graph polish unless a
      later product decision explicitly re-enables force-strength tuning.
+   - Use only closed icon tokens. Do not emit raw SVG or depend on frontend
+     capability-string icon inference; add a schema/UI icon token first.
+   - Missing v1 `size.scale`, `layout.repulsion`, and `search` use neutral
+     defaults. Do not expect the UI to preserve legacy self/device/SNMP/
+     endpoint heuristics for v1.
 
 9. Define modal/table composition.
    - Put actor modal recipes in

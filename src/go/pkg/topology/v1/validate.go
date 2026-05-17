@@ -694,6 +694,9 @@ func validateActorTypePresentation(raw any, shape topologyShape) error {
 		if err := validateActorSizePresentation(path+".size", presentation["size"], shape.actorColumns); err != nil {
 			return err
 		}
+		if err := validateActorLayoutPresentation(path+".layout", presentation["layout"]); err != nil {
+			return err
+		}
 		if err := validateLabelPolicy(path+".label_policy", presentation["label_policy"], shape.actorColumns); err != nil {
 			return err
 		}
@@ -704,6 +707,9 @@ func validateActorTypePresentation(raw any, shape topologyShape) error {
 			return err
 		}
 		if err := validateModalPresentation(path+".modal", presentation["modal"], shape); err != nil {
+			return err
+		}
+		if err := validateActorSearchPolicy("data.types.actor_types."+typeID+".search", actorType["search"], shape.actorColumns); err != nil {
 			return err
 		}
 	}
@@ -719,6 +725,9 @@ func validateLinkTypePresentation(raw any, shape topologyShape) error {
 		linkType, ok := rawType.(map[string]any)
 		if !ok {
 			return fmt.Errorf("data.types.link_types.%s is not an object", typeID)
+		}
+		if err := optionalEnum("data.types.link_types."+typeID+".semantic_role", linkType["semantic_role"], linkSemanticRoleTokens...); err != nil {
+			return err
 		}
 		presentation, ok := linkType["presentation"].(map[string]any)
 		if !ok {
@@ -776,6 +785,17 @@ func validateLinkLayoutPresentation(path string, raw any) error {
 		return err
 	}
 	return optionalEnum(path+".distance", layout["distance"], layoutDistanceTokens...)
+}
+
+func validateActorLayoutPresentation(path string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	layout, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	return optionalEnum(path+".repulsion", layout["repulsion"], layoutStrengthTokens...)
 }
 
 func validatePortTypePresentation(raw any) error {
@@ -1440,6 +1460,53 @@ func validateActorSizePresentation(path string, raw any, actorColumns map[string
 		}
 		if !isNumericColumnType(columnType) {
 			return fmt.Errorf("%s.metric_column references non-numeric actor column %q (%s)", path, column, columnType)
+		}
+	}
+	return optionalEnum(path+".scale", size["scale"], actorSizeScaleTokens...)
+}
+
+func validateActorSearchPolicy(path string, raw any, actorColumns map[string]string) error {
+	if raw == nil {
+		return nil
+	}
+	search, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s is not an object", path)
+	}
+	if enabled, ok := search["enabled"]; ok {
+		if _, ok := enabled.(bool); !ok {
+			return fmt.Errorf("%s.enabled is not a boolean", path)
+		}
+	}
+	for _, field := range []string{"columns", "label_keys"} {
+		rawList, ok := search[field]
+		if !ok {
+			continue
+		}
+		values, ok := rawList.([]any)
+		if !ok {
+			return fmt.Errorf("%s.%s is not an array", path, field)
+		}
+		seen := make(map[string]struct{}, len(values))
+		for i, rawValue := range values {
+			value, ok := rawValue.(string)
+			if !ok || value == "" {
+				return fmt.Errorf("%s.%s[%d] is not a non-empty string", path, field, i)
+			}
+			if _, ok := seen[value]; ok {
+				return fmt.Errorf("%s.%s[%d] duplicates %q", path, field, i, value)
+			}
+			seen[value] = struct{}{}
+			if field != "columns" {
+				continue
+			}
+			columnType, ok := actorColumns[value]
+			if !ok {
+				return fmt.Errorf("%s.columns[%d] references unknown actor column %q", path, i, value)
+			}
+			if !isDisplayColumnType(columnType) {
+				return fmt.Errorf("%s.columns[%d] references non-display actor column %q (%s)", path, i, value, columnType)
+			}
 		}
 	}
 	return nil
@@ -2144,16 +2211,19 @@ var (
 		"info", "structural", "warning", "success", "danger", "blue", "green", "orange",
 		"purple", "cyan", "yellow", "teal", "gray",
 	}
-	opacityTokens        = []string{"normal", "muted", "faded"}
-	widthTokens          = []string{"thin", "normal", "thick", "emphasis"}
-	layoutStrengthTokens = []string{"weakest", "weaker", "normal", "stronger", "strongest"}
-	layoutDistanceTokens = []string{"closest", "closer", "normal", "farther", "farthest"}
-	iconTokens           = []string{
+	opacityTokens          = []string{"normal", "muted", "faded"}
+	widthTokens            = []string{"thin", "normal", "thick", "emphasis"}
+	layoutStrengthTokens   = []string{"weakest", "weaker", "normal", "stronger", "strongest"}
+	layoutDistanceTokens   = []string{"closest", "closer", "normal", "farther", "farthest"}
+	actorSizeScaleTokens   = []string{"compact", "normal", "emphasized"}
+	linkSemanticRoleTokens = []string{"normal", "discovery", "ownership", "traffic", "correlation", "control"}
+	iconTokens             = []string{
 		"router", "switch", "firewall", "access_point", "server", "storage", "load_balancer",
 		"printer", "phone", "ups", "camera", "process", "agent", "netdata-agent", "parent",
 		"remote-endpoint", "local-endpoint", "segment", "self", "ip", "cloud", "container",
 		"vm", "database", "service", "datacenter", "cluster", "host", "network", "datastore",
-		"datastore_cluster", "resource_pool",
+		"datastore_cluster", "resource_pool", "device", "endpoint", "correlation", "interface",
+		"group", "unknown",
 	}
 )
 

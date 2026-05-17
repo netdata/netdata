@@ -1731,6 +1731,8 @@ static void streaming_topology_v1_emit_actor_type(
     const char *icon,
     bool border,
     bool size_by_links,
+    const char *size_scale,
+    const char *layout_repulsion,
     bool show_port_bullets) {
     buffer_json_member_add_object(wb, id);
     {
@@ -1745,6 +1747,19 @@ static void streaming_topology_v1_emit_actor_type(
         buffer_json_member_add_array(wb, "aggregation_scopes");
         buffer_json_add_array_item_string(wb, "node");
         buffer_json_array_close(wb);
+        buffer_json_member_add_object(wb, "search");
+        {
+            if(strcmp(id, "stale") == 0)
+                buffer_json_member_add_boolean(wb, "enabled", true);
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "display_name");
+            buffer_json_add_array_item_string(wb, "hostname");
+            buffer_json_add_array_item_string(wb, "machine_guid");
+            buffer_json_add_array_item_string(wb, "node_id");
+            buffer_json_add_array_item_string(wb, "agent_version");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
         buffer_json_member_add_object(wb, "presentation");
         {
             buffer_json_member_add_string(wb, "label", label);
@@ -1760,8 +1775,17 @@ static void streaming_topology_v1_emit_actor_type(
             buffer_json_member_add_object(wb, "size");
             {
                 buffer_json_member_add_string(wb, "mode", size_by_links ? "link_count" : "fixed");
+                if(size_scale)
+                    buffer_json_member_add_string(wb, "scale", size_scale);
             }
             buffer_json_object_close(wb);
+            if(layout_repulsion) {
+                buffer_json_member_add_object(wb, "layout");
+                {
+                    buffer_json_member_add_string(wb, "repulsion", layout_repulsion);
+                }
+                buffer_json_object_close(wb);
+            }
             buffer_json_member_add_object(wb, "label_policy");
             {
                 buffer_json_member_add_array(wb, "columns");
@@ -1802,6 +1826,7 @@ static void streaming_topology_v1_emit_link_type(
     BUFFER *wb,
     const char *id,
     const char *direction_role,
+    const char *semantic_role,
     const char *evidence_type,
     const char *label,
     const char *color_slot,
@@ -1812,6 +1837,8 @@ static void streaming_topology_v1_emit_link_type(
     {
         buffer_json_member_add_string(wb, "orientation", "directed");
         buffer_json_member_add_string(wb, "direction_role", direction_role);
+        if(semantic_role)
+            buffer_json_member_add_string(wb, "semantic_role", semantic_role);
         buffer_json_member_add_object(wb, "aggregation");
         {
             buffer_json_member_add_string(wb, "direction", "preserve");
@@ -1889,23 +1916,27 @@ static void streaming_topology_v1_emit_type_registry(BUFFER *wb) {
     {
         buffer_json_member_add_object(wb, "actor_types");
         {
-            streaming_topology_v1_emit_actor_type(wb, "parent", "Netdata Parent", "primary", "parent", true, true, true);
-            streaming_topology_v1_emit_actor_type(wb, "child", "Netdata Child", "primary", "netdata-agent", false, false, false);
-            streaming_topology_v1_emit_actor_type(wb, "vnode", "Virtual Node", "warning", "netdata-agent", false, false, false);
-            streaming_topology_v1_emit_actor_type(wb, "stale", "Stale Node", "dim", "netdata-agent", false, false, false);
+            streaming_topology_v1_emit_actor_type(
+                wb, "parent", "Netdata Parent", "primary", "parent", true, true, "emphasized", "stronger", true);
+            streaming_topology_v1_emit_actor_type(
+                wb, "child", "Netdata Child", "primary", "netdata-agent", false, false, "normal", "normal", false);
+            streaming_topology_v1_emit_actor_type(
+                wb, "vnode", "Virtual Node", "warning", "netdata-agent", false, false, "normal", "normal", false);
+            streaming_topology_v1_emit_actor_type(
+                wb, "stale", "Stale Node", "dim", "netdata-agent", false, false, "compact", "weaker", false);
         }
         buffer_json_object_close(wb);
 
         buffer_json_member_add_object(wb, "link_types");
         {
             streaming_topology_v1_emit_link_type(
-                wb, "streaming", "dependency", "streaming_link",
+                wb, "streaming", "dependency", "traffic", "streaming_link",
                 "Streaming", "primary", "solid", "thick", "normal");
             streaming_topology_v1_emit_link_type(
-                wb, "virtual", "dependency", "virtual_link",
+                wb, "virtual", "dependency", "ownership", "virtual_link",
                 "Virtual origin", "warning", "dashed", "thin", "muted");
             streaming_topology_v1_emit_link_type(
-                wb, "stale", "observation", "stale_link",
+                wb, "stale", "observation", "normal", "stale_link",
                 "Stale data", "dim", "dashed", "thin", "faded");
         }
         buffer_json_object_close(wb);
