@@ -2713,6 +2713,8 @@ if(ENABLE_PLUGIN_APPS)
 
     if(OS_LINUX)
         list(APPEND APPS_PLUGIN_FILES
+                src/collectors/collectors-ipc/ebpfgo_shared_memory.h
+                src/collectors/collectors-ipc/ebpfgo_shared_memory.c
                 src/collectors/apps.plugin/apps_ebpf_shared_memory.c)
     endif()
 
