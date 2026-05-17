@@ -338,7 +338,7 @@ None.
 
 ## Regression Log
 
-### Regression - 2026-05-11 - Streaming Modal Relationship Semantics
+## Regression - 2026-05-11 - Streaming Modal Relationship Semantics
 
 What broke:
 
@@ -446,7 +446,7 @@ Validation still pending:
   binary is installed/restarted. Validating before install would exercise the
   old binary.
 
-### Regression - 2026-05-17 - Streaming Parent Graph Bullets And Size
+## Regression - 2026-05-17 - Streaming Parent Graph Bullets And Size
 
 What broke:
 
@@ -521,7 +521,7 @@ Validation still pending:
 
 - Live Function/UI validation after the rebuilt Agent is installed/restarted.
 
-### Regression - 2026-05-18 - Streaming Parent Size Must Use Retained Nodes
+## Regression - 2026-05-18 - Streaming Parent Size Must Use Retained Nodes
 
 What changed:
 
@@ -581,7 +581,7 @@ Validation still pending:
 
 - Live Function/UI validation after the rebuilt Agent is installed/restarted.
 
-### Regression - 2026-05-18 - Streaming Actor Header Labels
+## Regression - 2026-05-18 - Streaming Actor Header Labels
 
 What broke:
 

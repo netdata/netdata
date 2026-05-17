@@ -650,7 +650,7 @@ Artifact maintenance for review pass:
 
 ## Regression Log
 
-### Regression - 2026-05-08 - Missing Provider Integration Modules
+## Regression - 2026-05-08 - Missing Provider Integration Modules
 
 What broke:
 
