@@ -218,6 +218,8 @@ developer-facing and must stay in this project skill, not under
    - Add semantic validation fixtures.
    - Measure raw and gzip size on realistic data.
    - Fail explicitly on size/row limits; never silently truncate.
+   - For topology row limits, count rows as `max(actor rows, link rows)` so
+     valid actor-only payloads are not rejected.
 
 ## Direction Rules
 

@@ -408,7 +408,7 @@ See regression entries below.
 
 Append regression entries here only after this SOW was completed or closed and later testing or use found broken behavior. Use a dated `## Regression - YYYY-MM-DD` heading at the end of the file. Never prepend regression content above the original SOW narrative.
 
-## Regression - 2026-05-11
+### Regression - 2026-05-11
 
 ### What Broke
 
@@ -552,7 +552,7 @@ Completed. SNMP Ports no longer display SNMP `ifIndex` as a synthetic-looking
 port number, expanded port rows can expose a clickable neighbor actor when link
 facts allow it, and frontend v1 actor-link cells navigate again.
 
-## Regression - 2026-05-11 - SNMP Port Identity Alignment
+### Regression - 2026-05-11 - SNMP Port Identity Alignment
 
 ### What Broke
 

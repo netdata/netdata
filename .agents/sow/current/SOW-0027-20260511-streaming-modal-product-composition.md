@@ -275,7 +275,7 @@ Reviewer findings:
 Same-failure scan:
 
 - `rg -n "Inbound children|Outbound stream|\"Retention\"|No inbound children|No outbound stream" src/web/api/functions .agents/sow/specs .agents/skills/project-create-topology/SKILL.md` found no remaining stale streaming modal labels.
-- `rg -n "retention|observer_actor|retained_nodes|Received nodes|Outbound streams|child_count" ...` confirmed the new contract is present in the producer, specs, and project topology skill.
+- `rg -n "retention|observer_actor|retained_nodes|Received nodes|Outbound streams|child_count" src/web/api/functions .agents/sow/specs .agents/skills/project-create-topology/SKILL.md` confirmed the new contract is present in the producer, specs, and project topology skill.
 
 Sensitive data gate:
 
@@ -338,7 +338,7 @@ None.
 
 ## Regression Log
 
-## Regression - 2026-05-11 - Streaming Modal Relationship Semantics
+### Regression - 2026-05-11 - Streaming Modal Relationship Semantics
 
 What broke:
 
@@ -446,7 +446,7 @@ Validation still pending:
   binary is installed/restarted. Validating before install would exercise the
   old binary.
 
-## Regression - 2026-05-17 - Streaming Parent Graph Bullets And Size
+### Regression - 2026-05-17 - Streaming Parent Graph Bullets And Size
 
 What broke:
 
@@ -521,7 +521,7 @@ Validation still pending:
 
 - Live Function/UI validation after the rebuilt Agent is installed/restarted.
 
-## Regression - 2026-05-18 - Streaming Parent Size Must Use Retained Nodes
+### Regression - 2026-05-18 - Streaming Parent Size Must Use Retained Nodes
 
 What changed:
 
@@ -581,7 +581,7 @@ Validation still pending:
 
 - Live Function/UI validation after the rebuilt Agent is installed/restarted.
 
-## Regression - 2026-05-18 - Streaming Actor Header Labels
+### Regression - 2026-05-18 - Streaming Actor Header Labels
 
 What broke:
 

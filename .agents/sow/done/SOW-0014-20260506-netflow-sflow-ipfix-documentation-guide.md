@@ -607,7 +607,7 @@ Open follow-ups, ordered by priority:
 
 ## Regression Log
 
-## Regression - 2026-05-07
+### Regression - 2026-05-07
 
 ### What broke
 
@@ -2520,7 +2520,7 @@ Follow-up mapping:
   deployment guidance to ingress-only; double counting remains a visualization
   and interpretation guideline, not an ingestion-side avoidance requirement.
 
-## Regression - 2026-05-08
+### Regression - 2026-05-08
 
 ### Trigger
 
@@ -2894,7 +2894,7 @@ Repairs:
   the file is moved back to `.agents/sow/done/` in the same commit as the
   repair.
 
-## Regression - 2026-05-08 - Flow Integration Section Rendering
+### Regression - 2026-05-08 - Flow Integration Section Rendering
 
 ### What broke
 
@@ -3009,7 +3009,7 @@ No deferred follow-up remains for this regression. The website integration PR
 must be regenerated after this repair reaches `netdata/master`; that is the
 normal downstream propagation path rather than a separate source-code TODO.
 
-## Regression - 2026-05-08 - Metadata Learn Links
+### Regression - 2026-05-08 - Metadata Learn Links
 
 ### What broke
 
