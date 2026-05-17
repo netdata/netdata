@@ -163,7 +163,7 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: open for schema documentation, lab work, validator/helper rails, and first Go producer migration; remaining producer/UI/aggregator implementation remains gated by the schema contract and validation evidence.
+Status at implementation start: open for schema documentation, lab work, validator/helper rails, and first Go producer migration; final closure evidence is in the Execution Log and Validation sections.
 
 Problem / root-cause model:
 

@@ -31,7 +31,7 @@ func (dict *StringDictionary) Ref(value string) int {
 }
 
 func (dict *StringDictionary) Values() []any {
-	if dict == nil {
+	if dict == nil || len(dict.values) == 0 {
 		return []any{}
 	}
 	return append([]any(nil), dict.values...)

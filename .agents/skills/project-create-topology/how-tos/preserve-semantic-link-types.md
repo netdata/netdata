@@ -44,7 +44,7 @@ that share the same general relationship family?
 ## Validation
 
 - Validate the full response against `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
-- Run `topologyv1.ValidateDecodedData()` so type references are checked.
+- Run `topologyv1.ValidateDecodedResponse()` so type references are checked.
 - For Go producers, add a package test that verifies:
   - rows with verified protocols keep their protocol link type;
   - inferred/probable rows use the inferred/probable link type;

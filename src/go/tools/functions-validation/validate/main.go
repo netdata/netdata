@@ -109,7 +109,7 @@ func countRows(payload any) (int, error) {
 	}
 
 	if topologyv1.IsDecodedData(data) {
-		return topologyv1.LinkRowsFromDecodedData(data)
+		return topologyv1.GraphRowsFromDecodedData(data)
 	}
 
 	rows, ok := data.([]any)

@@ -127,6 +127,22 @@ func LinkRowsFromDecodedData(raw any) (int, error) {
 	return rows, nil
 }
 
+func GraphRowsFromDecodedData(raw any) (int, error) {
+	data, ok := raw.(map[string]any)
+	if !ok {
+		return 0, fmt.Errorf("data is not an object")
+	}
+	actorRows, err := decodedTableRows(data["actors"])
+	if err != nil {
+		return 0, fmt.Errorf("data.actors: %w", err)
+	}
+	linkRows, err := decodedTableRows(data["links"])
+	if err != nil {
+		return 0, fmt.Errorf("data.links: %w", err)
+	}
+	return max(actorRows, linkRows), nil
+}
+
 func collectEvidenceRows(raw any) (map[string]int, error) {
 	rowsByType := make(map[string]int)
 	if raw == nil {

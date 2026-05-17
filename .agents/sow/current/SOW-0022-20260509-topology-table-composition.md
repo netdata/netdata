@@ -945,7 +945,7 @@ Artifact maintenance gate:
   Function docs under `src/plugins.d/`.
 - End-user/operator skills: unaffected; this is developer topology work, not an
   operator skill change.
-- SOW lifecycle: moved to `current/` with `Status: in-progress`; do not close
+- SOW lifecycle: remains in `current/` with `Status: paused`; do not close
   until integrated QA and commit are complete.
 
 Specs update:

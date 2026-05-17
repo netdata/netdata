@@ -254,7 +254,7 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: ready-for-implementation
+Status at implementation start: ready-for-implementation (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
 Problem / root-cause model:
 

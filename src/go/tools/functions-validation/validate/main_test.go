@@ -67,6 +67,31 @@ func TestFunctionUISchemaValidationSkipsTopologySemanticsForTableResponses(t *te
 	}
 }
 
+func TestCountRowsUsesActorsWhenTopologyHasNoLinks(t *testing.T) {
+	payload := decodeTestJSON(t, `{
+		"status": 200,
+		"type": "topology",
+		"data": {
+			"schema_version": "netdata.topology.v1",
+			"dictionaries": {"strings": ["node"]},
+			"actors": {
+				"rows": 2,
+				"columns": [{"id": "type", "type": "string_ref", "dictionary": "strings"}],
+				"values": [{"codec": "const", "value": 0}]
+			},
+			"links": {"rows": 0, "columns": [], "values": []}
+		}
+	}`)
+
+	rows, err := countRows(payload)
+	if err != nil {
+		t.Fatalf("count rows: %v", err)
+	}
+	if rows != 2 {
+		t.Fatalf("expected actor rows when there are no links, got %d", rows)
+	}
+}
+
 func TestTopologySemanticChecksRejectColumnLengthMismatch(t *testing.T) {
 	payload := decodeTestJSON(t, `{
 		"status": 200,

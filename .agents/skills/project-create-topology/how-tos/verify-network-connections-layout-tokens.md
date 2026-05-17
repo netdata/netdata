@@ -24,10 +24,17 @@ topology skill, not to the public/operator query skills.
 
    ```bash
    AGENT_URL="${AGENT_URL:-http://127.0.0.1:19999}"
+   AGENT_URL="${AGENT_URL%/}"
    AGENT_HOST="${AGENT_URL#http://}"
    AGENT_HOST="${AGENT_HOST#https://}"
+   AGENT_HOST="${AGENT_HOST%%/*}"
+   AGENT_SCHEME="http"
+   case "$AGENT_URL" in
+     https://*) AGENT_SCHEME="https" ;;
+   esac
+   AGENT_ORIGIN="${AGENT_SCHEME}://${AGENT_HOST}"
 
-   INFO_JSON="$(curl -sS --max-time 10 "${AGENT_URL}/api/v3/info")"
+   INFO_JSON="$(curl --fail -sS --max-time 10 "${AGENT_ORIGIN}/api/v3/info")"
 
    jq '{
      agent_count: (.agents | length),

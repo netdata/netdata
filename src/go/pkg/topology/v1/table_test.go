@@ -170,3 +170,9 @@ func TestNilStringDictionaryReturnsEmptyValues(t *testing.T) {
 
 	assert.Equal(t, []any{}, dict.Values())
 }
+
+func TestEmptyStringDictionaryReturnsEmptyValues(t *testing.T) {
+	dict := NewStringDictionary()
+
+	assert.Equal(t, []any{}, dict.Values())
+}

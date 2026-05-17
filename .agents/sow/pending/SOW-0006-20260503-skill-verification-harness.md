@@ -80,9 +80,9 @@ SOW-0007 (`integrations-lifecycle`) as their own acceptance gates.
      it made, and the final answer.
   4. Records results under
      `<repo>/.local/audits/<skill>/verify/<timestamp>/`.
-  5. Grades each answer against `verify/grader.md`.
+  5. Grades each answer against `.agents/skill-verification/<skill>/grader.md`.
   6. Reports pass / fail / unanswered counts.
-- `verify/grader.md` per skill: rubric covering (a) correctness,
+- `.agents/skill-verification/<skill>/grader.md` per skill: rubric covering (a) correctness,
   (b) evidence shown (file:line refs, response keys), (c) no
   exposed tokens / bearers / claim ids in the transcript or
   output, (d) how-to authored when missing.
@@ -168,7 +168,7 @@ SOW-0010 closes and stage 2 begins.
 1. **Wait for SOW-0010 to close.**
 2. Stage 2a: read SOW-0010 final deliverables (SKILL.md
    structure, how-tos shape, wrappers).
-3. Stage 2b: implement `verify/run.sh` for the cloud skill;
+3. Stage 2b: implement `.agents/skill-verification/query-netdata-cloud/run.sh`;
    prove end-to-end on the seed questions.
 4. Stage 2c: parameterize `run.sh` so it can target any of the
    SOW-0010+ skills.

@@ -269,7 +269,7 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: ready (user decisions recorded 2026-05-06: Decision 1 = Option 1, Decision 2 = Option 1, Decision 3 = Option 1 with no new actor type, Decision 4 = Option 2, hardening deferred to separate SOW)
+Status at implementation start: ready (user decisions recorded 2026-05-06: Decision 1 = Option 1, Decision 2 = Option 1, Decision 3 = Option 1 with no new actor type, Decision 4 = Option 2, hardening deferred to separate SOW; final closure evidence is in the Validation and Outcome sections).
 
 Problem / root-cause model:
 
