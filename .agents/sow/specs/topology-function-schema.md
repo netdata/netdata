@@ -537,16 +537,39 @@ presentation metadata for highlight-path behavior, legend, link styles, and
 port bullets. Streaming hops remain signed so stale path values are not
 corrupted.
 
+Streaming parent actor size is data-driven by the actor row
+`retained_node_count` metric, not by graph degree or direct child count. This
+count represents nodes for which the parent has retained DB data, including
+self, virtual nodes, stale nodes, and transit descendants when they have
+retention state. The parent actor type must declare `presentation.size:
+{"mode":"metric","metric_column":"retained_node_count"}`. Parent port bullets
+represent child or vnode streams attached to the parent side of streaming graph
+links, so the parent `ports.sources[]` entry over `links` must use
+`actor_column: "dst_actor"` with a scalar child/node display column such as
+`port_name`.
+
 Streaming modal composition emits `actor_labels`, complete host labels where
 available, host/system metadata labels needed by old summaries, and typed
 OS/architecture/CPU columns. The actor modal header must select important
 identity/status labels from `actor_labels`, including hostname, node type,
-stream status, ingest status, health status, child count, machine GUID, and
-Agent version. Existing `stream_path`, `retention`, and `inbound` tables have
-the right actor-ref shape for recipe-based table rendering. The `outbound`
-table must use the parent-owned shape described below; a table that only records
-the selected actor's own upstream destination is insufficient for parent
-operator workflows.
+stream status, ingest status, health status, retained-node count where
+applicable, direct-child count where applicable, OS/platform labels, and Agent
+version. Existing `stream_path`, `retention`, and `inbound` tables have the
+right actor-ref shape for recipe-based table rendering. The `outbound` table
+must use the parent-owned shape described below; a table that only records the
+selected actor's own upstream destination is insufficient for parent operator
+workflows.
+
+Streaming actor modal identification is role-specific. Host-like actors
+(`parent`, `child`, and `stale`) should expose operational status plus
+OS/hardware/platform labels such as OS, OS version, kernel, architecture, CPU
+model, cores, RAM, virtualization, container, cloud provider/type/region, and
+Agent version. Parents additionally expose `retained_node_count` and
+`child_count` so the visual size and direct attachments are both explainable.
+Vnode actors should expose inventory/device labels such as vnode type, vendor,
+model, address, location, sys object id, LLDP system name, and status. Long
+stable identifiers such as `machine_guid` and `node_id` remain in the full
+Labels tab by default unless a future product decision explicitly promotes them.
 
 Streaming actor modals must keep those tables as the single source of truth and
 must not duplicate rows only for modal display. The default visible sections are:

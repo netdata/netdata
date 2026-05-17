@@ -2,10 +2,12 @@
 
 ## Status
 
-Status: in-progress
+Status: paused
 
 Sub-state: selected by the user on 2026-05-17; implementation starting after
-pausing unrelated streaming modal validation work.
+pausing unrelated streaming modal validation work. Paused on 2026-05-17 while
+the user requested a streaming graph presentation regression fix under
+SOW-0027.
 
 ## Requirements
 

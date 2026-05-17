@@ -293,13 +293,29 @@ For socket correlation:
 
 For `topology:streaming` actor modals:
 
+- Size parent actors from the actor row `retained_node_count` metric, not from
+  graph degree or direct child count. Emit `presentation.size.mode: "metric"`
+  and `presentation.size.metric_column: "retained_node_count"` for the parent
+  actor type. This count represents nodes for which the parent has retained
+  data, including self, virtual nodes, stale nodes, and transit descendants
+  when they have DB retention state.
+- Attach parent graph bullets to the parent side of incoming streaming links.
+  For graph-link sources this means `ports.sources[].actor_column:
+  "dst_actor"` and a scalar child/node display `name_column`, such as
+  `port_name`.
 - Keep `actor_labels`, `stream_path`, `retention`, `inbound`, and `outbound`
   as the single source of truth. Do not duplicate rows only to populate modal
   sections.
 - Put important node identity/status facts in
   `modal.labels.identification.fields[]`, backed by `actor_labels`. Typical
-  keys are hostname, node type, stream status, ingest status, health status,
-  child count, machine GUID, and Agent version.
+  host-like keys are hostname, node type, health, stream, ingest, OS, OS
+  version, kernel, architecture, CPU, cores, RAM, virtualization, container,
+  cloud placement, and Agent version. Parent actors also include retained-node
+  count and direct child count.
+  Vnode actors should use inventory/device labels such as vnode type, vendor,
+  model, address, location, sys object id, LLDP name, and status. Keep long
+  stable identifiers such as machine GUID and node id in the full Labels tab by
+  default.
 - Show `Stream path` from `stream_path` filtered by `actor`, ordered by
   `path_index`. This is only the selected actor's own path; child and virtual
   node paths belong to their own actors. Do not emit blank `since` or

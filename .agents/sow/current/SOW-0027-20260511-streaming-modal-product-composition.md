@@ -2,15 +2,16 @@
 
 ## Status
 
-Status: paused
+Status: in-progress
 
 Sub-state: reopened for regression on 2026-05-11. Live modal review showed
 that the completed work still left streaming relationship sections with
 incorrect product semantics, especially retention direction, missing timestamps,
 missing received-from actors, and outbound stream ownership. Source repair is
 implemented and build-validated; live UI validation is pending install/restart
-of the rebuilt Agent. Paused on 2026-05-17 while the user selected a separate
-network-connections dependency-semantics correction.
+of the rebuilt Agent. Reopened again on 2026-05-17 after live graph review
+showed streaming parents without child bullets and without child-count-based
+size emphasis.
 
 ## Requirements
 
@@ -253,7 +254,7 @@ Acceptance criteria evidence:
 - Actor role expectations recorded under `Target audience and questions`.
 - `Retained nodes` now filters the same `retention` table by `observer_actor`, without duplicating retention rows.
 - `Received nodes` now explains the existing `inbound` rows as children, virtual nodes, stale nodes, and descendants received through a parent.
-- Actor modal identification now includes hostname, node type, stream status, ingest status, health status, child count, machine GUID, and Agent version.
+- Actor modal identification now includes hostname, node type, stream status, ingest status, health status, retained-node count for parents, direct-child count for parents, OS/platform labels, and Agent version.
 - No missing producer rows were found for this SOW's modal fix. Aggregator preservation of multi-parent retention rows is already specified in `.agents/sow/specs/topology-modes-correlation-aggregation.md`.
 
 Tests or equivalent validation:
@@ -443,3 +444,211 @@ Validation still pending:
 - Live Function/UI validation against the running Agent after this rebuilt
   binary is installed/restarted. Validating before install would exercise the
   old binary.
+
+## Regression - 2026-05-17 - Streaming Parent Graph Bullets And Size
+
+What broke:
+
+- Parent actors in `topology:streaming` do not show child bullets.
+- Parent actors appear effectively the same size as ordinary nodes even when
+  they retain data for many children, virtual nodes, stale nodes, or transit
+  descendants.
+
+Evidence:
+
+- The parent actor type is configured with `show_port_bullets: true` and
+  data-driven sizing in `src/web/api/functions/function-topology-streaming.c`.
+- Streaming graph links are emitted as child/source actor to parent/destination
+  actor.
+- The parent bullet source incorrectly points to `src_actor`; therefore child
+  bullets are attached to children, not parents.
+- The parent size policy uses `link_count`; the intended producer-owned size
+  metric is the actor row `retained_node_count`.
+
+Decision:
+
+- Parent bullets must attach to the parent side of streaming links
+  (`dst_actor`).
+- Parent actor size must use `presentation.size.mode: "metric"` with
+  `metric_column: "retained_node_count"`.
+- `child_count` remains a direct-child count and can still explain immediate
+  attachments in the actor header.
+
+Repair plan:
+
+1. Update the streaming actor-type emitter so actor types can declare metric
+   sizing and the actor-ref side used by `ports.sources[]`.
+2. Configure the `parent` actor type with `metric(retained_node_count)` sizing.
+3. Configure parent port bullets to read streaming link rows where
+   `dst_actor` is the selected actor.
+4. Keep child, virtual, and stale actor types fixed-size with no bullets.
+
+Validation required:
+
+- Compile `function-topology-streaming.c`.
+- Validate the emitted topology schema path with existing Function validation
+  tests.
+- After install, verify a parent actor receives bullets and grows according to
+  `retained_node_count`.
+
+Implementation evidence:
+
+- `src/web/api/functions/function-topology-streaming.c` now lets streaming actor
+  types declare metric sizing and a port-bullet actor-ref side.
+- The `parent` actor type now declares `size.mode: "metric"`,
+  `metric_column: "retained_node_count"`, and
+  `ports.sources[].actor_column: "dst_actor"`.
+- The actor table now exposes `retained_node_count` as a metric column and
+  parent actor labels expose it as `Retained Nodes`.
+- Child, virtual-node, and stale actor types remain fixed-size and do not show
+  bullets.
+- `.agents/sow/specs/topology-function-schema.md`,
+  `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, and
+  `.agents/skills/project-create-topology/SKILL.md` now record that streaming
+  parent size is `retained_node_count` and parent bullets attach on
+  `dst_actor`.
+
+Validation completed:
+
+- `git diff --check` passed.
+- Compile command from `build/compile_commands.json` for
+  `src/web/api/functions/function-topology-streaming.c` passed.
+- `(cd src/go && go test -count=1 ./pkg/topology/v1 ./tools/functions-validation/validate)`
+  passed.
+
+Validation still pending:
+
+- Live Function/UI validation after the rebuilt Agent is installed/restarted.
+
+## Regression - 2026-05-18 - Streaming Parent Size Must Use Retained Nodes
+
+What changed:
+
+- Parent size must be relative to retained nodes, not direct children or graph
+  degree.
+- Retained nodes means every node for which the parent has DB retention state,
+  including self, virtual nodes, stale nodes, and transit descendants when the
+  Agent has retained data for them.
+
+Evidence:
+
+- The producer already emits a `retention` table with `actor` and
+  `observer_actor`, so retained-node ownership is already canonical in the v1
+  payload.
+- The previous visual metric used `child_count`, which is a direct-child count
+  and does not account for nodes received from another parent.
+- The existing schema already supports producer-defined actor metric columns and
+  `presentation.size.metric_column`, so no schema change is required.
+
+Decision:
+
+- Add actor metric column `retained_node_count`.
+- Count retained nodes from the same DB-retention state that controls whether a
+  retention row is emitted.
+- Size `parent` actors with
+  `presentation.size.metric_column: "retained_node_count"`.
+- Keep `child_count` as a direct-child explanatory metric in the parent modal
+  header.
+
+Implementation evidence:
+
+- `src/web/api/functions/function-topology-streaming.c` now emits
+  `retained_node_count` in the actor table and actor labels.
+- `retained_node_count` uses aggregation `max` because it is an absolute
+  retaining-parent property, not an additive duplicate-row metric.
+- The parent actor type now sizes by `retained_node_count`.
+- The Retained Nodes modal header value is backed by the same actor label.
+- `.agents/sow/specs/topology-function-schema.md`,
+  `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, and
+  `.agents/skills/project-create-topology/SKILL.md` now record retained-node
+  sizing.
+
+Validation completed:
+
+- `git diff --check` passed.
+- Syntax-only compile from `build/compile_commands.json` for
+  `src/web/api/functions/function-topology-streaming.c` passed. Direct object
+  compile was not used because the local build object's output path is not
+  writable in this worktree.
+- `(cd src/go && go test -count=1 ./pkg/topology/v1 ./tools/functions-validation/validate)`
+  passed.
+- `git fetch upstream master && git rebase --autostash upstream/master` passed.
+- Post-rebase `git rev-list --left-right --count upstream/master...HEAD`
+  reported `0 12`.
+
+Validation still pending:
+
+- Live Function/UI validation after the rebuilt Agent is installed/restarted.
+
+## Regression - 2026-05-18 - Streaming Actor Header Labels
+
+What broke:
+
+- The streaming actor modal header still exposes only generic status labels and
+  long identity fields. It does not promote important host/inventory labels such
+  as operating system, kernel, hardware model, CPU, RAM, virtualization, cloud
+  placement, or vnode inventory fields.
+
+Evidence:
+
+- A live `topology:streaming` payload showed rich `actor_labels` for host-like
+  actors, including OS, kernel, architecture, CPU, RAM, virtualization,
+  container, cloud provider/type/region, and hardware vendor/product labels.
+- The same payload showed vnode/inventory labels including vendor, model,
+  address, location, sys object id, vnode type, and LLDP identity fields.
+- The current modal identification recipe emits only hostname, node type,
+  stream, ingest, health, children, machine GUID, and Agent version.
+
+Decision:
+
+- Host-like streaming actors (`parent`, `child`, `stale`) should expose concise
+  operational identity plus OS/hardware/platform labels in the modal header.
+- Parent actors additionally expose `retained_node_count` and `child_count`.
+- Vnode actors should expose inventory/device identity labels instead of
+  host-only OS/hardware labels.
+- `machine_guid` and `node_id` remain in the full Labels tab, not in the modal
+  header, because they are long identifiers rather than human-scannable master
+  labels.
+
+Repair plan:
+
+1. Make the streaming modal identification recipe role-specific by actor type.
+2. Use host-like labels for parent, child, and stale actor types.
+3. Use vnode/inventory labels for vnode actor types.
+4. Keep all labels in `actor_labels`; do not duplicate row data for the modal
+   header.
+
+Validation required:
+
+- Compile `function-topology-streaming.c`.
+- Validate the topology schema tooling.
+- After install, verify the actor modal header shows the selected role-specific
+  label set and hides missing labels cleanly.
+
+Implementation evidence:
+
+- `src/web/api/functions/function-topology-streaming.c` now emits role-specific
+  modal identification recipes:
+  - `parent`, `child`, and `stale` use host-like operational, OS, hardware, and
+    platform labels;
+  - `parent` additionally includes `retained_node_count` and `child_count`;
+  - `vnode` uses inventory/device labels such as vnode type, vendor, model,
+    address, location, sys object id, and LLDP name.
+- The modal header no longer promotes `machine_guid` or `node_id`; those remain
+  available through the full Labels tab.
+- `.agents/sow/specs/topology-function-schema.md`,
+  `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, and
+  `.agents/skills/project-create-topology/SKILL.md` now describe the
+  role-specific streaming identification policy.
+
+Validation completed:
+
+- `git diff --check` passed.
+- Compile command from `build/compile_commands.json` for
+  `src/web/api/functions/function-topology-streaming.c` passed.
+- `(cd src/go && go test -count=1 ./pkg/topology/v1 ./tools/functions-validation/validate)`
+  passed.
+
+Validation still pending:
+
+- Live Function/UI validation after the rebuilt Agent is installed/restarted.

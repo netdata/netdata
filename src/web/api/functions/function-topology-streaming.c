@@ -283,6 +283,7 @@ typedef struct streaming_topology_v1_actor {
     char architecture[64];
     char cpu_count[32];
     uint64_t child_count;
+    uint64_t retained_node_count;
     uint64_t health_critical;
     uint64_t health_warning;
     uint64_t health_clear;
@@ -577,6 +578,8 @@ static void streaming_topology_v1_collect_actor_labels(
     streaming_topology_v1_add_actor_label(payload, actor_index, "architecture", actor->architecture, "system");
     streaming_topology_v1_add_actor_label(payload, actor_index, "cpu_count", actor->cpu_count, "system");
     streaming_topology_v1_add_actor_label_uint(payload, actor_index, "child_count", actor->child_count, "metric");
+    streaming_topology_v1_add_actor_label_uint(
+        payload, actor_index, "retained_node_count", actor->retained_node_count, "metric");
     streaming_topology_v1_add_actor_label_uint(payload, actor_index, "health_critical", actor->health_critical, "metric");
     streaming_topology_v1_add_actor_label_uint(payload, actor_index, "health_warning", actor->health_warning, "metric");
     streaming_topology_v1_add_actor_label_uint(payload, actor_index, "health_clear", actor->health_clear, "metric");
@@ -750,6 +753,26 @@ static bool streaming_topology_v1_status_has_db_counts(RRDHOST_STATUS *status) {
     return status && (status->db.metrics || status->db.instances || status->db.contexts);
 }
 
+static bool streaming_topology_v1_status_has_retention(RRDHOST_STATUS *status) {
+    return status &&
+        (status->db.first_time_s || status->db.last_time_s || streaming_topology_v1_status_has_db_counts(status));
+}
+
+static uint64_t streaming_topology_v1_count_local_retained_nodes(time_t now) {
+    uint64_t retained = 0;
+
+    RRDHOST *host;
+    dfe_start_read(rrdhost_root_index, host) {
+        RRDHOST_STATUS status;
+        rrdhost_status(host, now, &status, RRDHOST_STATUS_ALL);
+        if(streaming_topology_v1_status_has_retention(&status))
+            retained++;
+    }
+    dfe_done(host);
+
+    return retained;
+}
+
 static uint64_t streaming_topology_v1_retention_from_ut(RRDHOST_STATUS *status) {
     if(!status)
         return 0;
@@ -868,6 +891,7 @@ static bool streaming_topology_v1_collect_synth_actor(
 static void streaming_topology_v1_collect_actors(
     STREAMING_TOPOLOGY_V1_PAYLOAD *payload,
     DICTIONARY *parent_child_count,
+    uint64_t local_retained_node_count,
     time_t now) {
     RRDHOST *host;
     dfe_start_read(rrdhost_root_index, host) {
@@ -905,6 +929,7 @@ static void streaming_topology_v1_collect_actors(
 
         uint32_t *cc = streaming_topology_parent_child_count_get(parent_child_count, host);
         actor->child_count = cc ? *cc : 0;
+        actor->retained_node_count = host == localhost ? local_retained_node_count : 0;
         if(status.health.status == RRDHOST_HEALTH_STATUS_RUNNING) {
             actor->health_critical = status.health.alerts.critical;
             actor->health_warning = status.health.alerts.warning;
@@ -1220,19 +1245,21 @@ static void streaming_topology_v1_collect_actor_detail_rows(
             row->first_time_ut = streaming_topology_v1_best_first_time_ut(&status);
         }
 
-        STREAMING_TOPOLOGY_V1_RETENTION_ROW *retention = streaming_topology_v1_add_retention_row(payload);
-        retention->actor = i;
-        retention->observer_actor = localhost_actor;
-        streaming_topology_v1_strncpy(retention->db_status, sizeof(retention->db_status),
-            rrdhost_db_status_to_string(status.db.status));
-        retention->db_from_ut = streaming_topology_v1_retention_from_ut(&status);
-        retention->db_to_ut = streaming_topology_v1_retention_to_ut(&status);
-        retention->db_duration =
-            retention->db_from_ut && retention->db_to_ut && retention->db_to_ut > retention->db_from_ut ?
-                (retention->db_to_ut - retention->db_from_ut) / USEC_PER_SEC : 0;
-        retention->db_metrics = status.db.metrics;
-        retention->db_instances = status.db.instances;
-        retention->db_contexts = status.db.contexts;
+        if(streaming_topology_v1_status_has_retention(&status)) {
+            STREAMING_TOPOLOGY_V1_RETENTION_ROW *retention = streaming_topology_v1_add_retention_row(payload);
+            retention->actor = i;
+            retention->observer_actor = localhost_actor;
+            streaming_topology_v1_strncpy(retention->db_status, sizeof(retention->db_status),
+                rrdhost_db_status_to_string(status.db.status));
+            retention->db_from_ut = streaming_topology_v1_retention_from_ut(&status);
+            retention->db_to_ut = streaming_topology_v1_retention_to_ut(&status);
+            retention->db_duration =
+                retention->db_from_ut && retention->db_to_ut && retention->db_to_ut > retention->db_from_ut ?
+                    (retention->db_to_ut - retention->db_from_ut) / USEC_PER_SEC : 0;
+            retention->db_metrics = status.db.metrics;
+            retention->db_instances = status.db.instances;
+            retention->db_contexts = status.db.contexts;
+        }
     }
 
     for(size_t i = 0; i < payload->actors_used; i++) {
@@ -1362,6 +1389,7 @@ static void streaming_topology_v1_emit_actor_columns(BUFFER *wb) {
     streaming_topology_v1_emit_column(wb, "architecture", "string", "attribute", true, NULL);
     streaming_topology_v1_emit_column(wb, "cpu_count", "string", "attribute", true, NULL);
     streaming_topology_v1_emit_column(wb, "child_count", "uint", "metric", false, "sum");
+    streaming_topology_v1_emit_column(wb, "retained_node_count", "uint", "metric", false, "max");
     streaming_topology_v1_emit_column(wb, "health_critical", "uint", "metric", false, "sum");
     streaming_topology_v1_emit_column(wb, "health_warning", "uint", "metric", false, "sum");
     streaming_topology_v1_emit_column(wb, "health_clear", "uint", "metric", false, "sum");
@@ -1576,27 +1604,64 @@ static void streaming_topology_v1_emit_modal_identification_field(BUFFER *wb, co
     buffer_json_object_close(wb);
 }
 
-static void streaming_topology_v1_emit_modal_label_identification(BUFFER *wb) {
+static void streaming_topology_v1_emit_host_identification_fields(BUFFER *wb, const char *actor_type) {
+    streaming_topology_v1_emit_modal_identification_field(wb, "hostname", "Hostname");
+    streaming_topology_v1_emit_modal_identification_field(wb, "type", "Node Type");
+    streaming_topology_v1_emit_modal_identification_field(wb, "health_status", "Health");
+    streaming_topology_v1_emit_modal_identification_field(wb, "stream_status", "Stream");
+    streaming_topology_v1_emit_modal_identification_field(wb, "ingest_status", "Ingest");
+    if(actor_type && strcmp(actor_type, "parent") == 0) {
+        streaming_topology_v1_emit_modal_identification_field(wb, "retained_node_count", "Retained Nodes");
+        streaming_topology_v1_emit_modal_identification_field(wb, "child_count", "Direct Children");
+    }
+    streaming_topology_v1_emit_modal_identification_field(wb, "os_name", "OS");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_os_version", "OS Version");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_kernel_version", "Kernel");
+    streaming_topology_v1_emit_modal_identification_field(wb, "architecture", "Architecture");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_system_cpu_model", "CPU");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_system_cores", "Cores");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_system_ram_total", "RAM");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_virtualization", "Virtualization");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_container", "Container");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_cloud_provider_type", "Cloud");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_cloud_instance_type", "Instance");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_cloud_instance_region", "Region");
+    streaming_topology_v1_emit_modal_identification_field(wb, "agent_version", "Agent");
+}
+
+static void streaming_topology_v1_emit_vnode_identification_fields(BUFFER *wb) {
+    streaming_topology_v1_emit_modal_identification_field(wb, "hostname", "Hostname");
+    streaming_topology_v1_emit_modal_identification_field(wb, "type", "Node Type");
+    streaming_topology_v1_emit_modal_identification_field(wb, "_vnode_type", "Vnode Type");
+    streaming_topology_v1_emit_modal_identification_field(wb, "vendor", "Vendor");
+    streaming_topology_v1_emit_modal_identification_field(wb, "model", "Model");
+    streaming_topology_v1_emit_modal_identification_field(wb, "address", "Address");
+    streaming_topology_v1_emit_modal_identification_field(wb, "location", "Location");
+    streaming_topology_v1_emit_modal_identification_field(wb, "sys_object_id", "Sys Object ID");
+    streaming_topology_v1_emit_modal_identification_field(wb, "lldp_loc_sys_name", "LLDP Name");
+    streaming_topology_v1_emit_modal_identification_field(wb, "health_status", "Health");
+    streaming_topology_v1_emit_modal_identification_field(wb, "stream_status", "Stream");
+    streaming_topology_v1_emit_modal_identification_field(wb, "ingest_status", "Ingest");
+    streaming_topology_v1_emit_modal_identification_field(wb, "agent_version", "Agent");
+}
+
+static void streaming_topology_v1_emit_modal_label_identification(BUFFER *wb, const char *actor_type) {
     buffer_json_member_add_object(wb, "identification");
     {
         buffer_json_member_add_boolean(wb, "enabled", true);
         buffer_json_member_add_array(wb, "fields");
         {
-            streaming_topology_v1_emit_modal_identification_field(wb, "hostname", "Hostname");
-            streaming_topology_v1_emit_modal_identification_field(wb, "type", "Node Type");
-            streaming_topology_v1_emit_modal_identification_field(wb, "stream_status", "Stream");
-            streaming_topology_v1_emit_modal_identification_field(wb, "ingest_status", "Ingest");
-            streaming_topology_v1_emit_modal_identification_field(wb, "health_status", "Health");
-            streaming_topology_v1_emit_modal_identification_field(wb, "child_count", "Children");
-            streaming_topology_v1_emit_modal_identification_field(wb, "machine_guid", "Machine GUID");
-            streaming_topology_v1_emit_modal_identification_field(wb, "agent_version", "Agent");
+            if(actor_type && strcmp(actor_type, "vnode") == 0)
+                streaming_topology_v1_emit_vnode_identification_fields(wb);
+            else
+                streaming_topology_v1_emit_host_identification_fields(wb, actor_type);
         }
         buffer_json_array_close(wb);
     }
     buffer_json_object_close(wb);
 }
 
-static void streaming_topology_v1_emit_actor_modal(BUFFER *wb) {
+static void streaming_topology_v1_emit_actor_modal(BUFFER *wb, const char *actor_type) {
     buffer_json_member_add_object(wb, "modal");
     {
         buffer_json_member_add_boolean(wb, "enabled", true);
@@ -1604,7 +1669,7 @@ static void streaming_topology_v1_emit_actor_modal(BUFFER *wb) {
         {
             buffer_json_member_add_boolean(wb, "enabled", true);
             buffer_json_member_add_string(wb, "table", "actor_labels");
-            streaming_topology_v1_emit_modal_label_identification(wb);
+            streaming_topology_v1_emit_modal_label_identification(wb, actor_type);
         }
         buffer_json_object_close(wb);
         buffer_json_member_add_object(wb, "mini_topology");
@@ -1730,10 +1795,12 @@ static void streaming_topology_v1_emit_actor_type(
     const char *color_slot,
     const char *icon,
     bool border,
-    bool size_by_links,
+    const char *size_mode,
+    const char *size_metric_column,
     const char *size_scale,
     const char *layout_repulsion,
-    bool show_port_bullets) {
+    bool show_port_bullets,
+    const char *port_actor_column) {
     buffer_json_member_add_object(wb, id);
     {
         buffer_json_member_add_string(wb, "layer", "streaming");
@@ -1774,7 +1841,9 @@ static void streaming_topology_v1_emit_actor_type(
             buffer_json_object_close(wb);
             buffer_json_member_add_object(wb, "size");
             {
-                buffer_json_member_add_string(wb, "mode", size_by_links ? "link_count" : "fixed");
+                buffer_json_member_add_string(wb, "mode", size_mode ? size_mode : "fixed");
+                if(size_metric_column)
+                    buffer_json_member_add_string(wb, "metric_column", size_metric_column);
                 if(size_scale)
                     buffer_json_member_add_string(wb, "scale", size_scale);
             }
@@ -1805,7 +1874,8 @@ static void streaming_topology_v1_emit_actor_type(
                     {
                         buffer_json_add_array_item_object(wb);
                         buffer_json_member_add_string(wb, "source", "links");
-                        buffer_json_member_add_string(wb, "actor_column", "src_actor");
+                        buffer_json_member_add_string(
+                            wb, "actor_column", port_actor_column ? port_actor_column : "src_actor");
                         buffer_json_member_add_string(wb, "name_column", "port_name");
                         buffer_json_member_add_string(wb, "type_column", "type");
                         buffer_json_member_add_string(wb, "default_type", "streaming");
@@ -1815,7 +1885,7 @@ static void streaming_topology_v1_emit_actor_type(
                 }
             }
             buffer_json_object_close(wb);
-            streaming_topology_v1_emit_actor_modal(wb);
+            streaming_topology_v1_emit_actor_modal(wb, id);
         }
         buffer_json_object_close(wb);
     }
@@ -1917,13 +1987,17 @@ static void streaming_topology_v1_emit_type_registry(BUFFER *wb) {
         buffer_json_member_add_object(wb, "actor_types");
         {
             streaming_topology_v1_emit_actor_type(
-                wb, "parent", "Netdata Parent", "primary", "parent", true, true, "emphasized", "stronger", true);
+                wb, "parent", "Netdata Parent", "primary", "parent", true,
+                "metric", "retained_node_count", "emphasized", "stronger", true, "dst_actor");
             streaming_topology_v1_emit_actor_type(
-                wb, "child", "Netdata Child", "primary", "netdata-agent", false, false, "normal", "normal", false);
+                wb, "child", "Netdata Child", "primary", "netdata-agent", false,
+                "fixed", NULL, "normal", "normal", false, NULL);
             streaming_topology_v1_emit_actor_type(
-                wb, "vnode", "Virtual Node", "warning", "netdata-agent", false, false, "normal", "normal", false);
+                wb, "vnode", "Virtual Node", "warning", "netdata-agent", false,
+                "fixed", NULL, "normal", "normal", false, NULL);
             streaming_topology_v1_emit_actor_type(
-                wb, "stale", "Stale Node", "dim", "netdata-agent", false, false, "compact", "weaker", false);
+                wb, "stale", "Stale Node", "dim", "netdata-agent", false,
+                "fixed", NULL, "compact", "weaker", false, NULL);
         }
         buffer_json_object_close(wb);
 
@@ -2164,6 +2238,7 @@ static void streaming_topology_v1_emit_actor_table(BUFFER *wb, STREAMING_TOPOLOG
         } while(0)
 
         STREAMING_TOPOLOGY_ACTOR_UINT_VALUES(child_count);
+        STREAMING_TOPOLOGY_ACTOR_UINT_VALUES(retained_node_count);
         STREAMING_TOPOLOGY_ACTOR_UINT_VALUES(health_critical);
         STREAMING_TOPOLOGY_ACTOR_UINT_VALUES(health_warning);
         STREAMING_TOPOLOGY_ACTOR_UINT_VALUES(health_clear);
@@ -2858,7 +2933,8 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
         }
     }
 
-    streaming_topology_v1_collect_actors(&topology, parent_child_count, now);
+    uint64_t local_retained_node_count = streaming_topology_v1_count_local_retained_nodes(now);
+    streaming_topology_v1_collect_actors(&topology, parent_child_count, local_retained_node_count, now);
     streaming_topology_v1_collect_links(&topology, now, now_ut);
     streaming_topology_v1_collect_actor_detail_rows(&topology, parent_descendants, now);
 

@@ -1153,6 +1153,26 @@ For streaming:
 Streaming custom tables are allowed because they carry actor-owned state that
 cannot be derived from links.
 
+Streaming parent actor size should use the actor row `retained_node_count`
+metric: `presentation.size:
+{"mode":"metric","metric_column":"retained_node_count"}`. Do not use generic
+graph degree or direct child count for parent sizing; the operational question
+is how many nodes have data retained by the parent, including self, virtual
+nodes, stale nodes, and transit descendants when they have DB retention state.
+Parent graph bullets should be derived from incoming streaming links by using a
+`ports.sources[]` entry over `links` with `actor_column: "dst_actor"` and a
+scalar child/node display column such as `port_name`.
+
+Streaming modal identification should be role-specific. Host-like actors
+(`parent`, `child`, and `stale`) should use compact status plus OS/hardware/
+platform labels from `actor_labels`: hostname, node type, health, stream,
+ingest, OS, OS version, kernel, architecture, CPU, cores, RAM, virtualization,
+container, cloud placement, and Agent version. Parents also include retained
+nodes and direct children. Vnode actors should use inventory labels such as
+vnode type, vendor, model, address, location, sys object id, LLDP name, and
+status. Keep long identifiers such as machine GUID and node id available in the
+full Labels tab instead of promoting them into the header.
+
 Streaming detail tables can contain stable node or Cloud identifiers. These
 fields must not be used as graph labels and must not be copied into logs,
 diagnostics, docs, SOWs, or durable review artifacts without redaction.
