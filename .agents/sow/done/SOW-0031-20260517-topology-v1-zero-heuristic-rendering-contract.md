@@ -2,11 +2,11 @@
 
 ## Status
 
-Status: in-progress
+Status: completed
 
 `completed` is the successful terminal status. `done` is a directory name, not a status value. Do not use `Status: done` or `Status: complete`.
 
-Sub-state: implementation approved by the user after the Cloud frontend TODO review loop.
+Sub-state: implemented, validated, installed by the user, and committed across the Agent, Cloud frontend, and Cloud topology service repositories.
 
 ## Requirements
 
@@ -334,11 +334,11 @@ Open decisions:
 
 Acceptance criteria evidence:
 
-- SOW active at `.agents/sow/current/SOW-0031-20260517-topology-v1-zero-heuristic-rendering-contract.md`.
+- SOW completed at `.agents/sow/done/SOW-0031-20260517-topology-v1-zero-heuristic-rendering-contract.md`.
 - JSON schema updated at `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
 - Spec/docs/skill updates are present in `.agents/sow/specs/topology-function-schema.md`, `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md`, and `.agents/skills/project-create-topology/SKILL.md`.
 - Cloud frontend TODO created as `${CLOUD_FRONTEND_REPO}/TODO-topology-v1-zero-heuristic-rendering-contract.md`.
-- Cloud topology service SOW active as `${CLOUD_TOPOLOGY_SERVICE_REPO}/.agents/sow/current/SOW-0017-20260517-topology-v1-zero-heuristic-contract.md`.
+- Cloud topology service SOW completed as `${CLOUD_TOPOLOGY_SERVICE_REPO}/.agents/sow/done/SOW-0017-20260517-topology-v1-zero-heuristic-contract.md`.
 - Agent topology structs and validators implement actor search, actor size scale, actor layout repulsion, link semantic role, and closed icon tokens in `src/go/pkg/topology/v1/types.go` and `src/go/pkg/topology/v1/validate.go`.
 - Agent producers emit the contract fields in `src/collectors/network-viewer.plugin/network-viewer.c`, `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go`, and `src/web/api/functions/function-topology-streaming.c`.
 - Cloud frontend v1 rendering consumes schema-driven search, size, repulsion, semantic role, and port lookup fields in `${CLOUD_FRONTEND_REPO}`.
@@ -357,10 +357,11 @@ Tests or equivalent validation:
 - Cloud topology service tests passed: `go test ./internal/topology/schema ./internal/topology/validate ./internal/topology/aggregate`.
 - Full Cloud frontend test suite passed: 269 suites passed, 2,139 tests passed, 6 skipped, 7 snapshots passed.
 - Agent C build validation is blocked by local filesystem permissions: `build`, `build/.ninja_log`, and `build/.ninja_deps` are owned by `root:root`; `ninja -C build` cannot create `build/.ninja_lock` in this worktree.
+- User later installed the Agent and UI successfully from the updated worktrees.
 
 Real-use evidence:
 
-- Pending final local install/browser validation because the Agent C build is blocked by the root-owned local build directory.
+- User reported the Agent and UI were installed and running after implementation.
 
 Reviewer findings:
 
@@ -381,7 +382,7 @@ Artifact maintenance gate:
 - Specs: `.agents/sow/specs/topology-function-schema.md` updated.
 - End-user/operator docs: not affected; this is developer schema work.
 - End-user/operator skills: not affected; no operator workflow changed.
-- SOW lifecycle: SOW is `in-progress` in `current/`; do not move to `done/` until remaining validation and commit handling are complete.
+- SOW lifecycle: SOW is `completed` in `done/`; implementation and lifecycle closure are committed in follow-up commits because the first implementation commit accidentally left the SOWs in progress.
 
 Specs update:
 
@@ -405,13 +406,13 @@ Lessons:
 
 Follow-up mapping:
 
-- Cloud frontend implementation is in progress in `${CLOUD_FRONTEND_REPO}` and tracked by its TODO.
-- Cloud topology service implementation is in progress in `${CLOUD_TOPOLOGY_SERVICE_REPO}` and tracked by SOW-0017.
-- Remaining work is validation, lifecycle closure, and commit handling after all repositories are ready.
+- Cloud frontend implementation is committed in `${CLOUD_FRONTEND_REPO}`.
+- Cloud topology service implementation is committed in `${CLOUD_TOPOLOGY_SERVICE_REPO}`.
+- No remaining SOW follow-up is open for this contract.
 
 ## Outcome
 
-Implementation in progress. Core Agent, Cloud frontend, and Cloud topology service code paths are implemented; final validation and lifecycle closure remain.
+Completed. Core Agent, Cloud frontend, and Cloud topology service code paths are implemented, validated, installed by the user, and committed.
 
 ## Lessons Extracted
 
@@ -420,9 +421,7 @@ Implementation in progress. Core Agent, Cloud frontend, and Cloud topology servi
 
 ## Followup
 
-- Full Cloud frontend validation is complete.
-- Resolve or explicitly record the local Agent build-directory permission blocker.
-- Decide commit split across Agent, Cloud frontend, and Cloud topology service after validation.
+- None.
 
 ## Regression Log
 
