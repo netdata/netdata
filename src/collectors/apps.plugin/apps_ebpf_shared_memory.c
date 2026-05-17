@@ -55,8 +55,11 @@ static bool apps_ebpf_sem_wait(sem_t *sem)
         if (sem_timedwait(sem, &ts) == 0)
             return true;
 
-        if (errno == ETIMEDOUT || errno == EINTR)
+        if (errno == EINTR)
             continue;
+
+        if (errno == ETIMEDOUT)
+            return false;
 
         return false;
     }
