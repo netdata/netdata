@@ -288,8 +288,11 @@ bool apps_ebpf_sync_pid_stat(struct pid_stat *p)
         return false;
 
     const struct ebpf_pid_stat *item = apps_ebpf_lookup_snapshot(p->pid);
-    if (!item)
+    if (!item) {
+        p->has_ebpf = false;
+        memset(&p->ebpf, 0, sizeof(p->ebpf));
         return false;
+    }
 
     memcpy(&p->ebpf, item, sizeof(p->ebpf));
     p->has_ebpf = true;
