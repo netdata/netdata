@@ -165,8 +165,10 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
             return false;
     } else {
         int fd = shm_open(shm_name, O_RDONLY, 0);
-        if (fd < 0)
+        if (fd < 0) {
+            netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
             return false;
+        }
 
         struct stat st;
         if (fstat(fd, &st) != 0) {
