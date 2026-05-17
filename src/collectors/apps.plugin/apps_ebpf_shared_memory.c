@@ -171,21 +171,14 @@ static inline int64_t apps_ebpf_diff_counters(uint64_t current, uint64_t previou
 
 void apps_ebpf_accumulate_cachestat(void)
 {
-    bool have_rows = false;
-
     for (struct pid_stat *p = root_of_pids(); p; p = p->next) {
         if (unlikely(!p->has_ebpf || !p->updated))
             continue;
 
         if (unlikely(!p->target))
             continue;
-
-        have_rows = true;
         break;
     }
-
-    if (!have_rows)
-        return;
 
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
         w->cachestat_totals_prev = w->cachestat_totals;
