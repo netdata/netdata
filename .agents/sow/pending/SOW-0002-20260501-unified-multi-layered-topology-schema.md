@@ -146,10 +146,9 @@ Evidence reviewed:
 
 Affected contracts and surfaces:
 
-- `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` — schema may evolve.
-- `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` — SOW-0023 correlation plane
-  is the current v1 payload contract to reuse instead of inventing a parallel
-  matching surface.
+- `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` — schema may evolve; SOW-0023
+  correlation plane is the current v1 payload contract to reuse instead of
+  inventing a parallel matching surface.
 - All four source producers (SNMP topology Go path, netflow Rust+Go, network-viewer C, streaming C) — output schema may need conformance changes.
 - Topology functions exposed to the UI — possibly a new "merged" function or the existing per-source functions extended.
 - Cloud-side consumers — the merged output schema becomes a Cloud contract.

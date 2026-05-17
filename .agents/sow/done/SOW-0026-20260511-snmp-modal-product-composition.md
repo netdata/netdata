@@ -122,7 +122,7 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Execution Log and Validation sections).
 
 Problem / root-cause model:
 
@@ -400,11 +400,11 @@ names. Endpoint/segment/custom actor modals keep generic graph-link drilldowns.
 
 ## Followup
 
-None yet.
+See regression entries below.
 
 ## Regression Log
 
-None yet.
+See regression entries below.
 
 Append regression entries here only after this SOW was completed or closed and later testing or use found broken behavior. Use a dated `## Regression - YYYY-MM-DD` heading at the end of the file. Never prepend regression content above the original SOW narrative.
 

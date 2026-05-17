@@ -491,7 +491,7 @@ The mapping also shows producer-specific canonical field work:
 
 ## Pre-Implementation Gate
 
-Status: ready
+Status at implementation start: ready (historical snapshot; current SOW state is recorded in the top-level Status section).
 
 Problem / root-cause model:
 
@@ -993,19 +993,13 @@ pending before this SOW can close.
 
 ## Lessons Extracted
 
-- Table/modal composition can stay generic only if the producer emits missing
-  facts once as canonical typed fields or actor labels.
+- See the Validation section's Lessons entry for the current extracted lesson.
 
 ## Followup
 
-- Cloud frontend implementation is tracked by
-  `../../dashboard/cloud-frontend/TODO-topology-modal-composition-contract.md`.
-- Cloud aggregator implementation is tracked by
-  `../../netdata/cloud-topology-service/.agents/sow/pending/SOW-0009-20260510-modal-composition-and-actor-labels.md`.
-- Function-specific modal product composition is tracked by:
-  - `.agents/sow/pending/SOW-0025-20260511-network-connections-modal-product-composition.md`;
-  - `.agents/sow/pending/SOW-0026-20260511-snmp-modal-product-composition.md`;
-  - `.agents/sow/pending/SOW-0027-20260511-streaming-modal-product-composition.md`.
+- See the Validation section's Follow-up mapping entry for the active tracker
+  list. This SOW is paused until integrated Agent/UI/aggregator QA can close
+  those mapped items.
 
 ## Regression Log
 

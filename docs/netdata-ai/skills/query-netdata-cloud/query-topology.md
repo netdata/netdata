@@ -24,7 +24,7 @@ Known producer families:
 | `topology:network-connections` | Network Viewer plugin | process, endpoint, socket evidence |
 | `topology:streaming` | Netdata streaming subsystem | parent/child streaming graph |
 | `topology:snmp` | SNMP topology collector | L2 devices, interfaces, endpoints, adjacencies |
-| `topology:vsphere` | vSphere collector | inventory and virtualization relationships |
+| `topology:vsphere` | vSphere collector (planned) | inventory and virtualization relationships |
 
 Always start with an info request to discover the parameters supported by the
 Agent version you are querying.

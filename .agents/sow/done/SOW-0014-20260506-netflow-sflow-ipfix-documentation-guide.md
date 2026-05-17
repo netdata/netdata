@@ -204,7 +204,7 @@ CPU semantics note (will appear in docs):
 
 ## Pre-Implementation Gate
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
 Problem / root-cause model:
 
@@ -3040,7 +3040,7 @@ but the actual Learn page is
 
 ### Pre-Implementation Gate
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
 Problem / root-cause model:
 

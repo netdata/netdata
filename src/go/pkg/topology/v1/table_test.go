@@ -74,6 +74,84 @@ func TestNewTableRejectsNilEncoding(t *testing.T) {
 	assert.Contains(t, err.Error(), "is nil")
 }
 
+func TestNewTableRejectsDuplicateColumnIDs(t *testing.T) {
+	_, err := NewTable(1,
+		[]Column{
+			NewColumn("id", "string"),
+			NewColumn("id", "string"),
+		},
+		[]ColumnEncoding{
+			Const("actor-1"),
+			Const("actor-2"),
+		},
+	)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicates column")
+}
+
+func TestNewTableRejectsColumnValueContractMismatch(t *testing.T) {
+	cases := map[string]struct {
+		column Column
+		value  ColumnEncoding
+		want   string
+	}{
+		"non nullable null": {
+			column: NewColumn("name", "string"),
+			value:  Const(nil),
+			want:   "not nullable",
+		},
+		"string ref without dictionary": {
+			column: NewColumn("name", "string_ref"),
+			value:  Const(0),
+			want:   "requires dictionary",
+		},
+		"string ref value must be integer": {
+			column: NewColumn("name", "string_ref", WithDictionary("strings")),
+			value:  Const("node-a"),
+			want:   "dictionary reference",
+		},
+		"actor ref must be non negative integer": {
+			column: NewColumn("actor", "actor_ref"),
+			value:  Const(-1),
+			want:   "actor_ref reference",
+		},
+		"dictionary only belongs on reference columns": {
+			column: Column{ID: "name", Type: "string", Dictionary: "strings"},
+			value:  Const("node-a"),
+			want:   "dictionary with non-reference type",
+		},
+		"unsupported type rejected even when nullable": {
+			column: Column{ID: "name", Type: "unknown", Nullable: true},
+			value:  Const(nil),
+			want:   "unsupported type",
+		},
+		"uint must be non negative": {
+			column: NewColumn("socket_count", "uint"),
+			value:  Const(-1),
+			want:   "non-negative integer",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewTable(1, []Column{tc.column}, []ColumnEncoding{tc.value})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestNewTableAllowsNullableNull(t *testing.T) {
+	table, err := NewTable(1,
+		[]Column{NewColumn("name", "string", WithNullable())},
+		[]ColumnEncoding{Const(nil)},
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, table.Rows)
+}
+
 func TestStringDictionaryDeduplicatesValues(t *testing.T) {
 	dict := NewStringDictionary()
 
@@ -85,4 +163,10 @@ func TestStringDictionaryDeduplicatesValues(t *testing.T) {
 	assert.Equal(t, 1, second)
 	assert.Equal(t, first, again)
 	assert.Equal(t, []any{"alpha", "beta"}, dict.Values())
+}
+
+func TestNilStringDictionaryReturnsEmptyValues(t *testing.T) {
+	var dict *StringDictionary
+
+	assert.Equal(t, []any{}, dict.Values())
 }

@@ -317,7 +317,8 @@ Follow-up mapping:
 
 ## Outcome
 
-Implemented.
+Implementation complete for the current producer changes; live UI validation
+after Agent install is still pending.
 
 - `topology:streaming` actor modals now expose operator-relevant identity in the modal header.
 - Retention is shown in both directions:

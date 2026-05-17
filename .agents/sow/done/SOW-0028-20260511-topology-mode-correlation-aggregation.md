@@ -122,7 +122,7 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Execution Log and Validation sections).
 
 Problem / root-cause model:
 
@@ -483,13 +483,9 @@ End-user/operator skills update:
 
 - Not affected.
 
-Lessons:
+Lessons and follow-up mapping:
 
-- Pending.
-
-Follow-up mapping:
-
-- Pending.
+- Completed in the final Lessons Extracted and Followup sections below.
 
 ## Outcome
 

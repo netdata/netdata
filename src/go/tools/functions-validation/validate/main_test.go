@@ -51,6 +51,22 @@ func TestTopologyV1EnvelopeVersionValidates(t *testing.T) {
 	}
 }
 
+func TestFunctionUISchemaValidationSkipsTopologySemanticsForTableResponses(t *testing.T) {
+	schemaBytes := readTestFile(t, filepath.Join("..", "..", "..", "..", "plugins.d", "FUNCTION_UI_SCHEMA.json"))
+	input := []byte(`{
+		"status": 200,
+		"type": "table",
+		"columns": {
+			"name": {"index": 0, "name": "Name", "type": "string", "visualization": "value"}
+		},
+		"data": [["row-a"]]
+	}`)
+
+	if _, err := validateJSON(schemaBytes, input); err != nil {
+		t.Fatalf("validate table response: %v", err)
+	}
+}
+
 func TestTopologySemanticChecksRejectColumnLengthMismatch(t *testing.T) {
 	payload := decodeTestJSON(t, `{
 		"status": 200,

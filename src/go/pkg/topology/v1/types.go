@@ -526,7 +526,9 @@ type ConstEncoding struct {
 	Value any    `json:"value"`
 }
 
-func (ConstEncoding) isColumnEncoding() {}
+func (ConstEncoding) isColumnEncoding() {
+	// Marker method for the closed ColumnEncoding union.
+}
 
 func Const(value any) ConstEncoding {
 	return ConstEncoding{
@@ -540,7 +542,9 @@ type ValuesEncoding struct {
 	Values []any  `json:"values"`
 }
 
-func (ValuesEncoding) isColumnEncoding() {}
+func (ValuesEncoding) isColumnEncoding() {
+	// Marker method for the closed ColumnEncoding union.
+}
 
 func Values(values ...any) ValuesEncoding {
 	return ValuesEncoding{
@@ -555,7 +559,9 @@ type DictEncoding struct {
 	Indexes []int  `json:"indexes"`
 }
 
-func (DictEncoding) isColumnEncoding() {}
+func (DictEncoding) isColumnEncoding() {
+	// Marker method for the closed ColumnEncoding union.
+}
 
 func Dict(values []any, indexes ...int) DictEncoding {
 	return DictEncoding{

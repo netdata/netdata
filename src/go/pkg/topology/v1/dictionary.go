@@ -32,7 +32,7 @@ func (dict *StringDictionary) Ref(value string) int {
 
 func (dict *StringDictionary) Values() []any {
 	if dict == nil {
-		return nil
+		return []any{}
 	}
 	return append([]any(nil), dict.values...)
 }

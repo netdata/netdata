@@ -159,7 +159,7 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Execution Log and Validation sections).
 
 Problem / root-cause model:
 

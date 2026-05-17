@@ -137,7 +137,7 @@ Risk and blast radius:
 
 Sensitive data handling plan:
 
-- Do not copy raw IP addresses, MAC addresses, hostnames, machine GUIDs, node IDs, account IDs, customer identifiers, or private topology examples into this SOW, specs, docs, skills, code comments, commits, or PR text.
+- Do not copy raw IP addresses, MAC addresses, hostnames, machine GUIDs, node IDs, account IDs, customer identifiers, credentials, secrets, API tokens, bearer tokens, session cookies, SNMP communities, or private topology examples into this SOW, specs, docs, skills, code comments, commits, or PR text.
 - Use sanitized synthetic fixtures and placeholder identifiers.
 - Keep any raw captured payloads under `.local/` only.
 

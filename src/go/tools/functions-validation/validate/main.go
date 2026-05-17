@@ -79,8 +79,12 @@ func validateJSON(schemaBytes, inputBytes []byte) (any, error) {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
-	if err := topologyv1.ValidateDecodedResponse(payload); err != nil {
-		return nil, fmt.Errorf("topology validation failed: %w", err)
+	if obj, ok := payload.(map[string]any); ok {
+		if data, ok := obj["data"]; ok && topologyv1.IsDecodedData(data) {
+			if err := topologyv1.ValidateDecodedResponse(payload); err != nil {
+				return nil, fmt.Errorf("topology validation failed: %w", err)
+			}
+		}
 	}
 
 	return payload, nil

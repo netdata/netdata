@@ -12,7 +12,8 @@ topology skill, not to the public/operator query skills.
 
 ## Inputs
 
-- Local Agent URL, usually `http://127.0.0.1:19999`.
+- Local Agent URL, usually `http://127.0.0.1:19999`; set `AGENT_URL` when
+  using a non-default address.
 - `NETDATA_CLOUD_TOKEN` and `NETDATA_CLOUD_HOSTNAME` in `<repo>/.env`.
 - A local Agent that exposes `topology:network-connections`.
 
@@ -22,7 +23,11 @@ topology skill, not to the public/operator query skills.
    checks:
 
    ```bash
-   INFO_JSON="$(curl -sS --max-time 10 http://127.0.0.1:19999/api/v3/info)"
+   AGENT_URL="${AGENT_URL:-http://127.0.0.1:19999}"
+   AGENT_HOST="${AGENT_URL#http://}"
+   AGENT_HOST="${AGENT_HOST#https://}"
+
+   INFO_JSON="$(curl -sS --max-time 10 "${AGENT_URL}/api/v3/info")"
 
    jq '{
      agent_count: (.agents | length),
@@ -52,7 +57,7 @@ topology skill, not to the public/operator query skills.
 
    agents_query_agent \
      --node "$NODE_UUID" \
-     --host 127.0.0.1:19999 \
+     --host "$AGENT_HOST" \
      --machine-guid "$MACHINE_GUID" \
      GET "/api/v3/function?function=${FUNCTION_ENCODED}&timeout=120000&last=200" \
      > "$OUT"
