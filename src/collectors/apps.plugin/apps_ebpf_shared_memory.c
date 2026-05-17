@@ -174,15 +174,6 @@ static inline int64_t apps_ebpf_diff_counters(uint64_t current, uint64_t previou
 
 void apps_ebpf_accumulate_cachestat(void)
 {
-    for (struct pid_stat *p = root_of_pids(); p; p = p->next) {
-        if (unlikely(!p->has_ebpf || !p->updated))
-            continue;
-
-        if (unlikely(!p->target))
-            continue;
-        break;
-    }
-
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
         w->cachestat_totals_prev = w->cachestat_totals;
         memset(&w->cachestat_totals, 0, sizeof(w->cachestat_totals));
@@ -197,10 +188,10 @@ void apps_ebpf_accumulate_cachestat(void)
         if (unlikely(!p->has_ebpf || !p->updated))
             continue;
 
-        if (unlikely(!p->target))
+        struct target *w = p->target;
+        if (unlikely(!w))
             continue;
 
-        struct target *w = p->target;
         const struct ebpf_cachestat *current = &p->ebpf.cachestat.current;
 
         w->cachestat_totals.account_page_dirtied += current->account_page_dirtied;
