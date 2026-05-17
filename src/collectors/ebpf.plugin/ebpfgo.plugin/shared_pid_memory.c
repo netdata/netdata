@@ -44,9 +44,6 @@ static bool shared_pid_memory_sem_wait(sem_t *sem)
         if (errno == EINTR)
             continue;
 
-        if (errno == ETIMEDOUT)
-            return false;
-
         return false;
     }
 }
