@@ -161,7 +161,7 @@ Risks:
 - Raw topology payloads may contain process names, private IPs, hostnames, container identifiers, and other customer- or infrastructure-identifying data. They must stay in `.local/`.
 - Raising parser limits alone would move the failure boundary but would not fix the root problem: topology is shipping tens of thousands of near-duplicate graph links and 100+ MB JSON for fewer than 50 actors.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: open for schema documentation, lab work, validator/helper rails, and first Go producer migration; final closure evidence is in the Execution Log and Validation sections.
 

@@ -128,7 +128,7 @@ Risks:
 - Silent data loss if typed schema does not model scalar-only licensing rows and table licensing rows cleanly.
 - Sensitive data/provenance risk from committing local MIB files, workstation paths, or unsanitized SNMP fixtures.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 

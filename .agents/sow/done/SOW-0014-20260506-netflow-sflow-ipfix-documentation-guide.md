@@ -202,7 +202,7 @@ CPU semantics note (will appear in docs):
 - At saturation on a multi-core host it is well above 100% (e.g. ~600-800% on this workstation when ingest threads + tier-batch threads are all busy)
 - Documentation must call this out explicitly so capacity planners read the metric correctly
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
@@ -3038,7 +3038,7 @@ but the actual Learn page is
 - The broken link returns a routing/publishing problem only when clicked or
   link-checked against Learn, not during metadata schema validation.
 
-### Pre-Implementation Gate
+### Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 

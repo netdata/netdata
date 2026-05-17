@@ -91,7 +91,7 @@ Risks:
 - NAT, load balancers, address reuse, namespaces, and reused MAC/IP identities can make simple exact matching unsafe.
 - Matching strategies can leak sensitive infrastructure identities if durable artifacts include raw examples.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status: unblocked for netdata-side contract and network-connections producer
 implementation. Cloud and frontend implementation are delegated through the

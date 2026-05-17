@@ -131,7 +131,7 @@ Risks:
 - Installing and restarting the local plugin affects the user's running Netdata instance; use the provided script deliberately and record the command/result.
 - Documentation is generated from metadata for integration cards; generated files must not be hand-edited.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 

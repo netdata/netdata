@@ -252,7 +252,7 @@ Risks:
 - If presentation fields allow raw untrusted HTML/SVG, the UI could get a security-sensitive rendering surface.
 - If the schema is designed only around the three current in-tree producers, the vSphere topology in the companion worktree will either need a special UI path or will regress during migration.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready-for-implementation (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
@@ -696,16 +696,16 @@ C. Keep old raw numeric semantics.
 - Recorded the SOW-0021 identity guardrail so presentation labels do not misuse canonical identity and do not block the cross-payload matcher.
 - Implemented compact presentation in `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`, `src/go/pkg/topology/v1`, network-connections, streaming, and SNMP v1 producers.
 - Created worker handoff docs:
-  - `~/src/dashboard/cloud-frontend/TODO-topology-presentation-contract.md`
-  - `~/src/netdata/cloud-topology-service/REQUIREMENTS-topology-presentation.md`
+  - `<cloud-frontend-repo>/TODO-topology-presentation-contract.md`
+  - `<cloud-topology-service-repo>/REQUIREMENTS-topology-presentation.md`
 - Created the backend-worker SOW and expanded the frontend-worker TODO so the
   other workers can port the SOW-0021 changes into their codebases:
-  - `~/src/netdata/cloud-topology-service/.agents/sow/pending/SOW-0005-20260509-port-topology-presentation-contract.md`
-  - `~/src/netdata/cloud-topology-service/SOW-status.md`
-  - `~/src/dashboard/cloud-frontend/TODO-topology-presentation-contract.md`
+  - `<cloud-topology-service-repo>/.agents/sow/pending/SOW-0005-20260509-port-topology-presentation-contract.md`
+  - `<cloud-topology-service-repo>/SOW-status.md`
+  - `<cloud-frontend-repo>/TODO-topology-presentation-contract.md`
 - Answered the first Cloud frontend worker question batch by appending
   `## Answers - 2026-05-10` to
-  `~/src/dashboard/cloud-frontend/TODO-topology-presentation-contract.md`.
+  `<cloud-frontend-repo>/TODO-topology-presentation-contract.md`.
   The answers explicitly state that the frontend remains topology-schema
   agnostic and must use representative v1 feature fixtures, not
   producer-specific UI branches.
@@ -791,9 +791,9 @@ Acceptance criteria evidence:
   - `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go`
 - UI and Cloud aggregator worker handoff docs exist at the absolute paths recorded in the execution log.
 - Backend service handoff is now a real pending SOW in the service repository:
-  `~/src/netdata/cloud-topology-service/.agents/sow/pending/SOW-0005-20260509-port-topology-presentation-contract.md`.
+  `<cloud-topology-service-repo>/.agents/sow/pending/SOW-0005-20260509-port-topology-presentation-contract.md`.
 - Frontend handoff is now an expanded implementation TODO in the frontend
-  repository: `~/src/dashboard/cloud-frontend/TODO-topology-presentation-contract.md`.
+  repository: `<cloud-frontend-repo>/TODO-topology-presentation-contract.md`.
 
 Tests or equivalent validation:
 
@@ -809,7 +809,7 @@ Tests or equivalent validation:
   - `jq empty src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` passed.
   - `go test ./pkg/topology/v1 ./plugin/go.d/collector/snmp_topology ./tools/functions-validation/validate` passed from `src/go`.
   - C syntax validation passed for `src/web/api/functions/function-topology-streaming.c` using the exact compile command from `build/compile_commands.json` with `-fsyntax-only`.
-  - In `~/src/dashboard/cloud-frontend`, `yarn test src/domains/functions/topology/v1/normalizeTopologyV1.test.js src/domains/functions/topology/v1/buildRenderPresentation.test.js --runInBand` passed with 83 tests.
+  - In `<cloud-frontend-repo>`, `yarn test src/domains/functions/topology/v1/normalizeTopologyV1.test.js src/domains/functions/topology/v1/buildRenderPresentation.test.js --runInBand` passed with 83 tests.
 - The Go test suite includes a schema-token parity test so future token additions must update the schema and Go validator together.
 - The SNMP Go tests now decode `data.links.type` and verify LLDP rows remain
   `lldp`, probable/inferred rows become `probable`, presentation tokens differ,

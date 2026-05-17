@@ -120,7 +120,7 @@ Risks:
 - Actor labels may contain sensitive system metadata, users, command lines, or
   endpoint data. Durable artifacts must use synthetic examples only.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Execution Log and Validation sections).
 
@@ -339,9 +339,9 @@ Cloud topology service repository:
 - Created the cross-topology mode/correlation/aggregation spec.
 - Paused SOW-0025 because it depends on this broader contract.
 - Created Cloud frontend handoff TODO:
-  `/home/costa/src/dashboard/cloud-frontend/TODO-topology-mode-correlation-aggregation.md`.
+  `<cloud-frontend-repo>/TODO-topology-mode-correlation-aggregation.md`.
 - Created and completed Cloud topology service SOW:
-  `/home/costa/src/netdata/cloud-topology-service/.agents/sow/done/SOW-0011-20260511-topology-mode-correlation-aggregation.md`.
+  `<cloud-topology-service-repo>/.agents/sow/done/SOW-0011-20260511-topology-mode-correlation-aggregation.md`.
 - Updated Agent schema, developer guide, project topology skill, Go topology
   structs/validation, network-connections producer, SNMP topology tests, and
   streaming actor modal identification.

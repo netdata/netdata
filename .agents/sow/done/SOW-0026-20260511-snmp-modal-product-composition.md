@@ -120,7 +120,7 @@ Risks:
 - Showing raw nested neighbor JSON in normal table cells would regress polish and usefulness.
 - If numeric port IDs are unavailable, fabricating autoincrement IDs would be worse than showing no numeric ID.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Execution Log and Validation sections).
 

@@ -152,7 +152,7 @@ Risks:
   not uniform across the three surfaces. If so, document the
   divergences explicitly rather than papering over them.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status: filled-2026-05-05
 

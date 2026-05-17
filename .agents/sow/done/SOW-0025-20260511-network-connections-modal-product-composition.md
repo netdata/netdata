@@ -157,7 +157,7 @@ Risks:
 - If aggregated mode continues to use only graph links plus `socket_ports`, it cannot show accurate local/remote port pairing. `socket_ports` is actor inventory, not a relationship table.
 - If the frontend guesses important labels from names such as `process`, `username`, or `cmdline`, the UI becomes topology-specific and violates the v1 contract that producers define presentation.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Execution Log and Validation sections).
 

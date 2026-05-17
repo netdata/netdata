@@ -124,7 +124,7 @@ Risks:
 - Integration artifacts can drift unless metadata, generated docs, health alerts, config, and docs are closed together.
 - Raw local MIBs and fixture provenance must not leak into committed artifacts.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 

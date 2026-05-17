@@ -109,7 +109,7 @@ Risks:
 - Leaving heavy profile sections in the 1-second path causes gaps and misleading rate spikes after skipped samples.
 - Changing profile filtering can affect all SNMP devices that rely on shared topology or LLDP profile fragments.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 

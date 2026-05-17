@@ -23,7 +23,8 @@ The user asked to add a later SOW to transform vSphere to the new schema because
 
 Facts:
 
-- The vSphere topology producer lives in the separate worktree `~/src/PRs/vsphere-extensions`.
+- The vSphere topology producer lives in the separate vSphere feature worktree
+  `<vsphere-worktree>`.
 - The vSphere producer currently uses the legacy Go topology package and `WithPresentation()`.
 - Agent SOW-0021 explicitly did not migrate vSphere, but added color/icon tokens so the later vSphere migration should not need another graph-presentation schema redesign.
 - Agent SOW-0023 added generic correlation rules and link layout tokens that
@@ -67,8 +68,8 @@ Sources checked:
 - `.agents/sow/current/SOW-0021-20260509-topology-presentation-contract.md`
 - `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`
 - `.agents/sow/specs/topology-function-schema.md`
-- `~/src/PRs/vsphere-extensions/src/go/plugin/go.d/collector/vsphere/func_topology.go`
-- `~/src/PRs/vsphere-extensions/src/go/plugin/go.d/collector/vsphere/func_topology_presentation.go`
+- `<vsphere-worktree>/src/go/plugin/go.d/collector/vsphere/func_topology.go`
+- `<vsphere-worktree>/src/go/plugin/go.d/collector/vsphere/func_topology_presentation.go`
 
 Current state:
 
@@ -135,7 +136,7 @@ Sensitive data handling plan:
 
 Implementation plan:
 
-1. Reconfirm with the user before editing `~/src/PRs/vsphere-extensions`.
+1. Reconfirm with the user before editing `<vsphere-worktree>`.
 2. Read completed SOW-0021, SOW-0023, and SOW-0022 outcomes.
 3. Inventory current vSphere actors, links, attributes, labels, and presentation.
 4. Design the v1 actor/link/evidence/table types for vSphere.

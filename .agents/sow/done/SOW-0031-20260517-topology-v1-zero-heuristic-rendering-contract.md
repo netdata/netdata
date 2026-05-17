@@ -226,7 +226,7 @@ Rules:
 - Capability-to-icon inference moves to producers, where producer-specific capabilities are already known.
 - UI maps icon tokens to safe bundled icons only.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status: approved
 

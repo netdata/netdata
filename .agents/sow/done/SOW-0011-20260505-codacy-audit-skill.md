@@ -34,7 +34,7 @@ Facts:
 
 - Three sister legacy skills already exist with the triage shape we want to mirror: `.agents/skills/coverity-audit/`, `.agents/skills/sonarqube-audit/`, `.agents/skills/graphql-audit/`. A `codacy-audit/` is the natural fourth.
 - Codacy Cloud ships an official local CLI: `codacy-analysis-cli` (https://github.com/codacy/codacy-analysis-cli). Install paths: docker, install.sh, brew. **Docker is available on this workstation** (`/usr/bin/docker`, version 29.4.1).
-- The Codacy v3 REST API at `api.codacy.com` is reachable: PR-level issue lists work even anonymously; broader cross-PR / org queries require an Account API token. Verified live during the conversation that this skill is being created for: `gh user 30945 = Costa Tsaousis`, 31,425 issues currently open on `master`.
+- The Codacy v3 REST API at `api.codacy.com` is reachable: PR-level issue lists work even anonymously; broader cross-PR / org queries require an Account API token. Verified live during the conversation that this skill is being created for the configured account; 31,425 issues were open on `master`.
 - PR #22423 is a useful end-to-end fixture for validation: it had 864 markdownlint findings on the first CI run; fixed by `.codacy.yml` exclusion in commit `3a54c9afbc`. The local CLI must reproduce the original 864 findings for an objective accuracy check.
 - The repo's `.codacy.yml` is the source of truth for path exclusions; the local CLI must respect it (or we have to teach it to).
 - Path discipline spec at `<repo>/.agents/sow/specs/sensitive-data-discipline.md` already defines `CODACY_TOKEN`-class constraints by precedent (Coverity / Sonar tokens). Keys must live in `.env`, never in committed artifacts.
@@ -91,7 +91,7 @@ Risks:
 - **Token accidentally committed via a finding dump**: a JSON dump from the API could echo back the token in error messages. Mitigation: token-safe wrappers in `_lib.sh` plus the no-leak self-test.
 - **`.local/audits/codacy/` filling up with stale dumps**: ephemeral, gitignored, but disk pressure risk on long sessions. Mitigation: filename includes timestamp; user can `rm` whenever.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
@@ -132,7 +132,7 @@ Risk and blast radius:
 Sensitive data handling plan:
 
 - `CODACY_TOKEN` is a credential -- handled exactly like `NETDATA_CLOUD_TOKEN`, `COVERITY_COOKIE`, `SONAR_TOKEN`: lives in `.env` (gitignored), referenced via `${CODACY_TOKEN}` in scripts only, never in commit messages, never in fixtures.
-- Account ID 30945 (Costa's Codacy account) was returned by `/v3/user` during exploration but will not be written to any committed artifact. The SOW redacts to "the configured account".
+- The configured Codacy account was returned by `/v3/user` during exploration but will not be written to any committed artifact. The SOW redacts to "the configured account".
 - Audit JSON dumps land under `<repo>/.local/audits/codacy/<timestamp>.json` (gitignored).
 - No customer / community member / private-host data is touched -- this is a public-repo CI workflow.
 
@@ -268,7 +268,7 @@ Same-failure scan:
 
 Sensitive data gate:
 
-- No raw tokens, account UUIDs, customer-identifying IPs, or private endpoints were written to any committed artifact. The Codacy account ID 30945 (Costa) was returned by `/v3/user` during exploration and is intentionally not committed; this SOW redacts to "the configured account".
+- No raw tokens, account UUIDs, customer-identifying IPs, or private endpoints were written to any committed artifact. The configured Codacy account was returned by `/v3/user` during exploration and is intentionally not committed; this SOW redacts to "the configured account".
 - `CODACY_TOKEN` is referenced via `${CODACY_TOKEN}` only, never literally.
 - Dumps land under `<repo>/.local/audits/codacy/` (gitignored).
 
