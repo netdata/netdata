@@ -32,6 +32,25 @@ func TestTopologyV1FixturesValidate(t *testing.T) {
 	}
 }
 
+func TestTopologyV1EnvelopeVersionValidates(t *testing.T) {
+	schemaBytes := readTestFile(t, filepath.Join("..", "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json"))
+	fixture := readTestFile(t, filepath.Join("..", "fixtures", "topology-v1", "snmp-l2.json"))
+
+	var payload map[string]any
+	if err := json.Unmarshal(fixture, &payload); err != nil {
+		t.Fatalf("decode fixture: %v", err)
+	}
+	payload["v"] = float64(3)
+
+	inputBytes, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("encode fixture: %v", err)
+	}
+	if _, err := validateJSON(schemaBytes, inputBytes); err != nil {
+		t.Fatalf("validate fixture with envelope version: %v", err)
+	}
+}
+
 func TestTopologySemanticChecksRejectColumnLengthMismatch(t *testing.T) {
 	payload := decodeTestJSON(t, `{
 		"status": 200,

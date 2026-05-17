@@ -2,9 +2,15 @@
 
 ## Status
 
-Status: completed
+Status: paused
 
-Sub-state: producer modal composition implemented and validated. This SOW is intentionally separate from network-connections and SNMP modal work.
+Sub-state: reopened for regression on 2026-05-11. Live modal review showed
+that the completed work still left streaming relationship sections with
+incorrect product semantics, especially retention direction, missing timestamps,
+missing received-from actors, and outbound stream ownership. Source repair is
+implemented and build-validated; live UI validation is pending install/restart
+of the rebuilt Agent. Paused on 2026-05-17 while the user selected a separate
+network-connections dependency-semantics correction.
 
 ## Requirements
 
@@ -203,7 +209,9 @@ Open-source reference evidence:
 Open decisions:
 
 - Resolved for this SOW: use one recipe with multiple well-labeled sections and owner filters. This avoids repeating modal metadata across actor types while preserving role-specific behavior through table filters.
-- Resolved for this SOW: use concise operator-facing section names: `Stream path`, `Retention for node`, `Retained nodes`, `Received nodes`, and `Upstream stream`.
+- Resolved for the regression repair: default streaming modals use concise
+  operator-facing section names: `Stream path`, `Retained nodes`,
+  `Received nodes`, and `Outbound streams`.
 
 ## Implications And Decisions
 
@@ -213,10 +221,9 @@ Decision recorded after the user asked to proceed to SOW-0027:
 - Do not create modal-only duplicate rows.
 - Keep one shared streaming actor modal recipe unless implementation proves role-specific recipes are necessary.
 - Rename/recompose sections so the modal answers operator questions directly:
-  - `Retention for node`: who retains the selected node and for what range.
   - `Retained nodes`: which nodes' data the selected actor maintains.
   - `Received nodes`: which children/vnodes/stale descendants are received through the selected parent.
-  - `Upstream stream`: where the selected actor itself sends data.
+  - `Outbound streams`: which node payloads the selected parent sends upstream and where they go.
 
 ## Plan
 
@@ -234,8 +241,8 @@ Decision recorded after the user asked to proceed to SOW-0027:
 - Created SOW from user-reported streaming modal regressions and current code evidence.
 - Promoted SOW to current and recorded the implementation decision to keep one shared streaming actor modal recipe with role-aware sections over existing tables.
 - Updated `topology:streaming` modal identification fields to include health status and child count.
-- Split retention presentation into `Retention for node` and `Retained nodes` using the existing `retention` table and different owner filters.
-- Renamed/recomposed relationship sections as `Received nodes` and `Upstream stream` so they match the underlying `inbound` and `outbound` table semantics.
+- Split retention presentation using the existing `retention` table and different owner filters.
+- Renamed/recomposed relationship sections as `Received nodes` and `Outbound streams` so they match the underlying `inbound` and `outbound` table semantics.
 - Updated topology specs and the project topology skill with streaming modal rules.
 
 ## Validation
@@ -244,7 +251,6 @@ Acceptance criteria evidence:
 
 - Complete fact inventory recorded in `## Analysis` and `## Pre-Implementation Gate`.
 - Actor role expectations recorded under `Target audience and questions`.
-- `Retention for node` now filters `retention` rows by `actor` and displays `observer_actor`.
 - `Retained nodes` now filters the same `retention` table by `observer_actor`, without duplicating retention rows.
 - `Received nodes` now explains the existing `inbound` rows as children, virtual nodes, stale nodes, and descendants received through a parent.
 - Actor modal identification now includes hostname, node type, stream status, ingest status, health status, child count, machine GUID, and Agent version.
@@ -268,7 +274,7 @@ Reviewer findings:
 Same-failure scan:
 
 - `rg -n "Inbound children|Outbound stream|\"Retention\"|No inbound children|No outbound stream" src/web/api/functions .agents/sow/specs .agents/skills/project-create-topology/SKILL.md` found no remaining stale streaming modal labels.
-- `rg -n "retention|observer_actor|retained_nodes|Received nodes|Upstream stream|child_count" ...` confirmed the new contract is present in the producer, specs, and project topology skill.
+- `rg -n "retention|observer_actor|retained_nodes|Received nodes|Outbound streams|child_count" ...` confirmed the new contract is present in the producer, specs, and project topology skill.
 
 Sensitive data gate:
 
@@ -281,7 +287,7 @@ Artifact maintenance gate:
 - Specs: updated `.agents/sow/specs/topology-function-schema.md` and `.agents/sow/specs/topology-modes-correlation-aggregation.md`.
 - End-user/operator docs: unchanged. This is internal topology payload/modal composition, not a public user command or operator workflow.
 - End-user/operator skills: unchanged. No public/operator skill behavior changed.
-- SOW lifecycle: SOW promoted to current, completed, and will be moved to done with implementation in the same commit.
+- SOW lifecycle: reopened from done to current and left paused until live UI validation is performed on an installed/restarted Agent.
 
 Specs update:
 
@@ -317,7 +323,7 @@ Implemented.
   - who maintains the selected node;
   - which nodes the selected actor maintains.
 - Parent responsibility is clearer through `Received nodes`, backed by existing descendant rows.
-- `Upstream stream` now clearly means the selected actor's own outbound stream.
+- `Outbound streams` now lists node payloads sent by the selected parent, including the node and destination per row.
 
 ## Lessons Extracted
 
@@ -330,6 +336,110 @@ None.
 
 ## Regression Log
 
-None yet.
+## Regression - 2026-05-11 - Streaming Modal Relationship Semantics
 
-Append regression entries here only after this SOW was completed or closed and later testing or use found broken behavior. Use a dated `## Regression - YYYY-MM-DD` heading at the end of the file. Never prepend regression content above the original SOW narrative.
+What broke:
+
+- `Stream path` correctly scopes to the selected actor only, but timestamp
+  columns may render empty because synthetic path rows do not always carry
+  `since` and `first_time` values.
+- `Retention for node` is misleading in the direct parent modal. The useful
+  operational view is the parent-owned list of nodes retained by the selected
+  actor.
+- `Retained nodes` rows may render empty `from` and `to` values even though the
+  retention table is expected to carry database time ranges.
+- `Received nodes` may render empty `Received from` values for locally received
+  rows because the producer leaves `source_actor` empty when the source is
+  considered local.
+- `Upstream stream` currently describes the selected actor's own upstream
+  stream. For a parent actor, operators need every node payload this parent
+  sends upstream, with the node and destination shown per row.
+
+Evidence:
+
+- `stream_path` rows contain `since_ut` and `first_time_ut` fields in
+  `src/web/api/functions/function-topology-streaming.c`, but synthetic local
+  append rows only set actor/path identity and do not set those timestamps.
+- `retention` rows contain both retained `actor` and retaining
+  `observer_actor`, so the same table can answer parent-owned retained-node
+  views without duplicate rows.
+- `inbound` rows contain nullable `source_actor`; local-source rows currently
+  leave it empty.
+- `outbound` rows currently contain `actor` and nullable `destination_actor`
+  only, so they cannot express "selected parent sends node X to destination Y"
+  for all descendants.
+
+Why previous validation missed it:
+
+- Validation checked schema shape, compilation, and table presence, but did not
+  inspect a live clustered-parent setup where one parent owns virtual nodes,
+  retains children, receives descendants, and streams them to another parent.
+
+Repair plan:
+
+1. Update the durable topology specs and project topology skill first so future
+   workers do not repeat the same interpretation mistake.
+2. Change the streaming producer modal contract so default visible sections are
+   `Stream path`, `Retained nodes`, `Received nodes`, and `Outbound streams`.
+3. Keep the canonical `retention` table lossless, but remove the confusing
+   default `Retention for node` modal section unless a future explicitly named
+   `Retained by` view is designed for aggregated/cloud views.
+4. Add or repurpose outbound table columns so the table is owned by the sending
+   parent and has at least `sender_actor`, `node_actor`, `destination_actor`,
+   status, age, hops, TLS, compression, and useful counts where available.
+5. Populate `source_actor` for received rows whenever the immediate sending
+   actor is known. For direct local receipt, use the received child/vnode actor
+   rather than rendering an empty source.
+6. Ensure retention and stream-path timestamps are populated from the best
+   available canonical source and remain nullable only when the Agent genuinely
+   does not know the value.
+
+Validation required:
+
+- Local Function response for a clustered parent with self, virtual nodes,
+  children, and an upstream clustered parent.
+- Verify the selected parent modal shows all retained nodes, all received
+  nodes, and all outbound node transmissions.
+- Verify stale/archived hosts from the Agent root index are included in
+  retention and received-node rows when present.
+- Schema validation and focused build/test commands for the streaming Function.
+
+Implementation evidence:
+
+- `src/web/api/functions/function-topology-streaming.c` now backfills stream
+  path `since` and `first_time` timestamps from the best available host status
+  source when path rows are missing those values.
+- `retention` rows still remain single-source canonical rows, but `db_from`
+  and `db_to` now fall back to known DB/status timing when the raw retention
+  range is incomplete.
+- Local-source `inbound` rows now set `source_actor` to the known child/vnode
+  actor, so `Received from` does not render empty for direct local receipt.
+- The default modal no longer exposes the misleading `Retention for node`
+  section. It exposes `Retained nodes`, `Received nodes`, and `Outbound streams`
+  from canonical tables.
+- `outbound` rows now use `sender_actor`, `node_actor`, and
+  `destination_actor`, so a parent modal can list every node payload that the
+  selected parent currently sends upstream.
+
+Validation completed:
+
+- `git diff --check` passed.
+- `cmd=$(jq -r '.[] | select(.file|endswith("src/web/api/functions/function-topology-streaming.c")) | .command' build/compile_commands.json | sed 's# -o [^ ]*# -o /tmp/function-topology-streaming.c.o#'); eval "$cmd"` passed.
+- `sudo -n cmake --build build --target netdata -- -j2` passed. The build
+  emitted unrelated generated protobuf/stringop warnings during link; the
+  modified streaming topology translation unit compiled.
+- `(cd src/go && go test -count=1 ./pkg/topology/v1 ./tools/functions-validation/validate)`
+  passed.
+- `(cd src/go && go test -count=1 ./tools/functions-validation/validate)`
+  passed after adding the top-level Function envelope `v` schema acceptance
+  test.
+- `rg -n "Inbound children|Outbound stream|Upstream stream|Retention for node|No inbound children|No outbound stream|No upstream stream|No retained nodes" src/web/api/functions .agents/sow/specs .agents/skills/project-create-topology/SKILL.md`
+  found no stale producer modal labels; remaining `Retention for node`
+  mentions are explicit spec/skill notes saying that section is not part of the
+  current default modal.
+
+Validation still pending:
+
+- Live Function/UI validation against the running Agent after this rebuilt
+  binary is installed/restarted. Validating before install would exercise the
+  old binary.

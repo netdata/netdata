@@ -19,6 +19,11 @@
       "type": "string",
       "const": "topology"
     },
+    "v": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Optional Function transport protocol version. This is part of the Function response envelope, not topology data."
+    },
     "has_history": {
       "type": "boolean",
       "const": false
