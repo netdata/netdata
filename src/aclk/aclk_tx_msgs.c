@@ -225,8 +225,8 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
     tmp = json_object_new_int(http_code);
     json_object_object_add(msg, "http-code", tmp);
 
-    const char *json_str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
-    size_t json_len = strlen(json_str);
+    size_t json_len;
+    const char *json_str = json_object_to_json_string_length(msg, JSON_C_TO_STRING_PLAIN, &json_len);
 
     const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
     const int has_payload = (http_headers_len || body_len);
