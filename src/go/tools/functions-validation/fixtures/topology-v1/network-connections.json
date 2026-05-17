@@ -23,39 +23,38 @@
     },
     "dictionaries": {
       "strings": [
-        "node",
+        "self",
         "process",
         "endpoint",
         "node-a",
         "machine-a",
-        "nginx",
+        "curl",
         "198.51.100.10",
         "socket",
         "192.0.2.10",
         "tcp",
-        "outbound",
         "established",
         "public",
         "ownership",
         "endpoint_socket",
         "socket_exact",
         "network_socket",
-        "correlated_socket"
+        "correlated_socket",
+        "active"
       ]
     },
     "types": {
       "actor_types": {
-        "node": {
+        "self": {
           "layer": "node",
-          "identity": ["node_id"],
-          "merge_identity": ["node_id"],
+          "identity": ["id"],
+          "merge_identity": ["machine_guid", "hostname"],
           "aggregation_scopes": ["node"]
         },
         "process": {
           "layer": "process",
-          "identity": ["node_id", "process_name", "pid"],
-          "merge_identity": ["node_id", "process_name"],
-          "parent_identity": ["node_id"],
+          "identity": ["id"],
+          "merge_identity": ["machine_guid", "process"],
           "aggregation_scopes": ["node", "process_name", "pid"],
           "presentation": {
             "label": "Process",
@@ -78,8 +77,8 @@
         },
         "endpoint": {
           "layer": "network",
-          "identity": ["ip", "port"],
-          "merge_identity": ["ip", "port"],
+          "identity": ["id"],
+          "merge_identity": ["ip", "address_space"],
           "aggregation_scopes": ["node"]
         }
       },
@@ -87,10 +86,7 @@
         "ownership": {
           "orientation": "hierarchical",
           "direction_role": "ownership",
-          "aggregation": {
-            "direction": "preserve",
-            "evidence": "count"
-          },
+          "aggregation": {"direction": "preserve", "evidence": "count"},
           "presentation": {
             "label": "Process ownership",
             "color_slot": "dim",
@@ -98,21 +94,21 @@
             "line_style": "dotted",
             "width": "thin",
             "arrow": "none",
-            "layout": {
-              "strength": "normal",
-              "distance": "normal"
-            }
+            "layout": {"strength": "normal", "distance": "normal"}
           }
         },
         "socket": {
           "orientation": "directed",
-          "direction_role": "flow",
+          "direction_role": "dependency",
           "aggregation": {
             "direction": "preserve",
             "evidence": "append",
             "metrics": {
               "socket_count": "sum",
-              "evidence_count": "sum"
+              "evidence_count": "sum",
+              "retransmissions": "sum",
+              "rtt_ms_max": "max",
+              "recv_rtt_ms_max": "max"
             }
           },
           "evidence_types": ["socket"],
@@ -122,28 +118,21 @@
             "line_style": "solid",
             "width": "thin",
             "arrow": "forward",
-            "variable": {
-              "channel": "width",
-              "scale_key": "sockets",
-              "value_column": "socket_count",
-              "min": "thin",
-              "max": "emphasis"
-            },
-            "layout": {
-              "strength": "stronger",
-              "distance": "farther"
-            }
+            "layout": {"strength": "normal", "distance": "normal"}
           }
         },
         "endpoint_socket": {
           "orientation": "directed",
-          "direction_role": "flow",
+          "direction_role": "dependency",
           "aggregation": {
             "direction": "preserve",
             "evidence": "append",
             "metrics": {
               "socket_count": "sum",
-              "evidence_count": "sum"
+              "evidence_count": "sum",
+              "retransmissions": "sum",
+              "rtt_ms_max": "max",
+              "recv_rtt_ms_max": "max"
             }
           },
           "evidence_types": ["socket"],
@@ -153,21 +142,21 @@
             "line_style": "solid",
             "width": "thin",
             "arrow": "forward",
-            "layout": {
-              "strength": "weakest",
-              "distance": "normal"
-            }
+            "layout": {"strength": "normal", "distance": "normal"}
           }
         },
         "correlated_socket": {
           "orientation": "directed",
-          "direction_role": "flow",
+          "direction_role": "dependency",
           "aggregation": {
             "direction": "preserve",
             "evidence": "append",
             "metrics": {
               "socket_count": "sum",
-              "evidence_count": "sum"
+              "evidence_count": "sum",
+              "retransmissions": "sum",
+              "rtt_ms_max": "max",
+              "recv_rtt_ms_max": "max"
             }
           },
           "evidence_types": ["socket"],
@@ -177,17 +166,7 @@
             "line_style": "solid",
             "width": "thin",
             "arrow": "forward",
-            "variable": {
-              "channel": "width",
-              "scale_key": "sockets",
-              "value_column": "socket_count",
-              "min": "thin",
-              "max": "emphasis"
-            },
-            "layout": {
-              "strength": "weakest",
-              "distance": "farthest"
-            }
+            "layout": {"strength": "normal", "distance": "farthest"}
           }
         }
       },
@@ -204,23 +183,22 @@
           "link_type": "socket",
           "role": "relationship_evidence",
           "match_columns": [
-            "local_ip",
-            "local_port",
-            "remote_ip",
-            "remote_port",
-            "protocol",
-            "direction"
+            "client_ip",
+            "client_port",
+            "server_ip",
+            "server_port",
+            "protocol"
           ],
           "columns": [
             {"id": "link", "type": "link_ref", "role": "reference"},
-            {"id": "local_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
-            {"id": "local_port", "type": "uint", "role": "group_key"},
-            {"id": "remote_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
-            {"id": "remote_port", "type": "uint", "role": "group_key"},
+            {"id": "src_actor", "type": "actor_ref", "role": "reference"},
+            {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
+            {"id": "client_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "client_port", "type": "uint", "role": "group_key"},
+            {"id": "server_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "server_port", "type": "uint", "role": "group_key"},
             {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
-            {"id": "direction", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
-            {"id": "state", "type": "string_ref", "dictionary": "strings"},
-            {"id": "namespace", "type": "string_ref", "dictionary": "strings"}
+            {"id": "state", "type": "string_ref", "dictionary": "strings"}
           ]
         }
       },
@@ -233,27 +211,34 @@
             {"id": "actor", "type": "actor_ref", "role": "reference"},
             {"id": "port", "type": "uint", "role": "group_key"},
             {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
-            {"id": "direction", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+          ]
+        },
+        "connections": {
+          "role": "relationship_summary",
+          "owner": "link",
+          "aggregation": "merge_metrics",
+          "columns": [
+            {"id": "src_actor", "type": "actor_ref", "role": "reference"},
+            {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
+            {"id": "client_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "server_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "state", "type": "string_ref", "dictionary": "strings"},
             {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
           ]
         }
-      },
-      "aggregation_scopes": {
-        "node": {"columns": ["node_id"], "evidence_policy": "preserve"},
-        "process_name": {"columns": ["node_id", "process_name"], "evidence_policy": "preserve"},
-        "pid": {"columns": ["node_id", "pid"], "evidence_policy": "preserve"}
       }
     },
     "presentation": {
       "legend": {
         "actors": [
-          {"type": "node", "label": "Node"},
+          {"type": "self", "label": "Node"},
           {"type": "process", "label": "Process"},
           {"type": "endpoint", "label": "Correlation endpoint"}
         ],
         "links": [
           {"type": "ownership", "label": "Process ownership"},
-          {"type": "socket", "label": "Local socket"},
           {"type": "endpoint_socket", "label": "Endpoint connection"},
           {"type": "correlated_socket", "label": "Correlated socket"}
         ]
@@ -299,9 +284,9 @@
         ],
         "values": [
           {"codec": "const", "value": 2},
-          {"codec": "const", "value": 15},
+          {"codec": "const", "value": 14},
           {"codec": "const", "value": 9},
-          {"codec": "const", "value": 12},
+          {"codec": "const", "value": 11},
           {"codec": "const", "value": 6},
           {"codec": "const", "value": 443}
         ]
@@ -318,9 +303,9 @@
         ],
         "values": [
           {"codec": "const", "value": 1},
-          {"codec": "const", "value": 15},
+          {"codec": "const", "value": 14},
           {"codec": "const", "value": 9},
-          {"codec": "const", "value": 12},
+          {"codec": "const", "value": 11},
           {"codec": "const", "value": 8},
           {"codec": "const", "value": 43000}
         ]
@@ -330,22 +315,20 @@
       "rows": 3,
       "columns": [
         {"id": "type", "type": "string_ref", "dictionary": "strings"},
-        {"id": "node_id", "type": "string_ref", "dictionary": "strings", "nullable": true, "role": "identity"},
+        {"id": "id", "type": "string_ref", "dictionary": "strings", "role": "identity"},
         {"id": "machine_guid", "type": "string_ref", "dictionary": "strings", "nullable": true},
-        {"id": "process_name", "type": "string_ref", "dictionary": "strings", "nullable": true, "role": "identity"},
-        {"id": "pid", "type": "uint", "nullable": true, "role": "identity"},
-        {"id": "ip", "type": "ip_ref", "dictionary": "strings", "nullable": true, "role": "identity"},
-        {"id": "port", "type": "uint", "nullable": true, "role": "identity"},
+        {"id": "process", "type": "string_ref", "dictionary": "strings", "nullable": true},
+        {"id": "ip", "type": "ip_ref", "dictionary": "strings", "nullable": true},
+        {"id": "address_space", "type": "string_ref", "dictionary": "strings", "nullable": true},
         {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
       ],
       "values": [
         {"codec": "dict", "values": [0, 1, 2], "indexes": [0, 1, 2]},
-        {"codec": "values", "values": [3, 3, null]},
+        {"codec": "values", "values": [3, 5, 6]},
         {"codec": "values", "values": [4, 4, null]},
         {"codec": "values", "values": [null, 5, null]},
-        {"codec": "values", "values": [null, 1001, null]},
         {"codec": "values", "values": [null, null, 6]},
-        {"codec": "values", "values": [null, null, 443]},
+        {"codec": "values", "values": [null, null, 11]},
         {"codec": "values", "values": [2, 2, 2]}
       ]
     },
@@ -355,15 +338,25 @@
         {"id": "src_actor", "type": "actor_ref", "role": "reference"},
         {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
         {"id": "type", "type": "string_ref", "dictionary": "strings"},
+        {"id": "protocol", "type": "string_ref", "dictionary": "strings", "nullable": true},
+        {"id": "state", "type": "string_ref", "dictionary": "strings", "nullable": true},
+        {"id": "evidence_count", "type": "uint", "role": "metric", "aggregation": "sum"},
         {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"},
-        {"id": "evidence_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+        {"id": "retransmissions", "type": "uint", "role": "metric", "aggregation": "sum"},
+        {"id": "rtt_ms_max", "type": "float", "role": "metric", "aggregation": "max"},
+        {"id": "recv_rtt_ms_max", "type": "float", "role": "metric", "aggregation": "max"}
       ],
       "values": [
         {"codec": "values", "values": [0, 1]},
         {"codec": "values", "values": [1, 2]},
-        {"codec": "values", "values": [13, 14]},
+        {"codec": "values", "values": [12, 13]},
+        {"codec": "values", "values": [null, 9]},
+        {"codec": "values", "values": [17, 10]},
         {"codec": "values", "values": [0, 2]},
-        {"codec": "values", "values": [0, 2]}
+        {"codec": "values", "values": [2, 2]},
+        {"codec": "values", "values": [0, 0]},
+        {"codec": "values", "values": [0, 5.5]},
+        {"codec": "values", "values": [0, 4.2]}
       ]
     },
     "tables": {
@@ -376,12 +369,36 @@
               {"id": "actor", "type": "actor_ref", "role": "reference"},
               {"id": "port", "type": "uint", "role": "group_key"},
               {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
-              {"id": "direction", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
               {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
             ],
             "values": [
               {"codec": "const", "value": 1},
               {"codec": "const", "value": 43000},
+              {"codec": "const", "value": 9},
+              {"codec": "const", "value": 2}
+            ]
+          }
+        }
+      },
+      "relationship": {
+        "connections": {
+          "type": "connections",
+          "table": {
+            "rows": 1,
+            "columns": [
+              {"id": "src_actor", "type": "actor_ref", "role": "reference"},
+              {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
+              {"id": "client_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+              {"id": "server_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+              {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+              {"id": "state", "type": "string_ref", "dictionary": "strings"},
+              {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+            ],
+            "values": [
+              {"codec": "const", "value": 1},
+              {"codec": "const", "value": 2},
+              {"codec": "const", "value": 8},
+              {"codec": "const", "value": 6},
               {"codec": "const", "value": 9},
               {"codec": "const", "value": 10},
               {"codec": "const", "value": 2}
@@ -397,32 +414,34 @@
           "rows": 2,
           "columns": [
             {"id": "link", "type": "link_ref", "role": "reference"},
-            {"id": "local_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
-            {"id": "local_port", "type": "uint", "role": "group_key"},
-            {"id": "remote_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
-            {"id": "remote_port", "type": "uint", "role": "group_key"},
+            {"id": "src_actor", "type": "actor_ref", "role": "reference"},
+            {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
+            {"id": "client_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "client_port", "type": "uint", "role": "group_key"},
+            {"id": "server_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "server_port", "type": "uint", "role": "group_key"},
             {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
-            {"id": "direction", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
             {"id": "state", "type": "string_ref", "dictionary": "strings"},
-            {"id": "namespace", "type": "string_ref", "dictionary": "strings"}
+            {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
           ],
           "values": [
             {"codec": "const", "value": 1},
+            {"codec": "const", "value": 1},
+            {"codec": "const", "value": 2},
             {"codec": "const", "value": 8},
             {"codec": "values", "values": [43000, 43001]},
             {"codec": "const", "value": 6},
             {"codec": "const", "value": 443},
             {"codec": "const", "value": 9},
             {"codec": "const", "value": 10},
-            {"codec": "const", "value": 11},
-            {"codec": "const", "value": 12}
+            {"codec": "const", "value": 1}
           ]
         }
       }
     },
     "stats": {
       "actors": 3,
-      "links": 1,
+      "links": 2,
       "evidence_rows": 2
     }
   }

@@ -317,16 +317,17 @@ The UI renders the payload it receives.
 
 ### Domain Model
 
-A socket observation is associated with a local process actor and two endpoint
-tuples:
+A socket observation is associated with an observed process actor and two
+dependency endpoint tuples:
 
 ```text
-protocol, src_ip, src_port, dst_ip, dst_port, direction, state
+protocol, client_ip, client_port, server_ip, server_port, state
 ```
 
-For inbound sockets, the process owns `dst_ip:dst_port`.
-For outbound sockets, the process owns `src_ip:src_port`.
-For local sockets, both process actors may be known.
+For inbound sockets, the observed process owns the server tuple.
+For outbound sockets, the observed process owns the client tuple.
+For local/same-node sockets, both process actors may be known, but the emitted
+topology direction remains client-to-server.
 For listening sockets, there is no remote side.
 
 The exact remote tuple is required for cross-node correlation, but creating an
@@ -341,10 +342,13 @@ Agent aggregated mode is a readable local process dependency map.
 Rules:
 
 - Every graph link has two actor references.
-- The producer creates materialized endpoint actors for unknown peers using a
-  compact grouping policy, normally remote IP or remote IP plus address space.
-- Exact socket tuples remain in relationship-summary rows when needed for
-  modal drilldown, not as graph actors.
+- The producer creates materialized endpoint actors for unknown peers using the
+  peer IP plus address space.
+- Socket dependency link types use `direction_role: "dependency"` and graph
+  links point from client/dependant actor to server/dependency actor.
+- Relationship-summary rows are collapsed by actor pair, protocol, and state.
+  They keep dependency endpoint IPs (`client_ip`, `server_ip`) and merged
+  metrics, but not per-socket ephemeral ports.
 - Process actor size is driven by `socket_count`.
 - Port bullets are driven by compact actor-owned port summaries, using a
   numeric count column.
@@ -363,12 +367,12 @@ Synthetic example:
   ],
   "links": [
     { "src_actor": 1, "dst_actor": 2, "type": "ownership" },
-    { "src_actor": 2, "dst_actor": 3, "type": "endpoint_socket", "protocol": "tcp", "direction": "outbound", "socket_count": 12 }
+    { "src_actor": 2, "dst_actor": 3, "type": "endpoint_socket", "protocol": "tcp", "socket_count": 12 }
   ],
   "tables": {
     "relationship": {
       "connections": [
-        { "src_actor": 2, "dst_actor": 3, "protocol": "tcp", "local_ip": "192.0.2.10", "local_port": 50120, "remote_ip": "198.51.100.20", "remote_port": 443, "socket_count": 12 }
+        { "src_actor": 2, "dst_actor": 3, "protocol": "tcp", "client_ip": "192.0.2.10", "server_ip": "198.51.100.20", "socket_count": 12 }
       ]
     }
   }
@@ -383,13 +387,13 @@ Agent detailed mode preserves exact socket evidence.
 
 Rules:
 
-- Actors are only known entities: node, process, container, and any other
-  entity the producer knows exists.
-- A link or evidence row may have one actor side and one loose side.
-- The loose side carries typed endpoint facts: protocol, address space, IP,
-  port, and side role.
+- Graph links still have two actor references.
+- Unknown peers are still visible endpoint actors, grouped by peer IP plus
+  address space.
+- Socket evidence preserves the exact client/server tuple, including ports, so
+  Cloud correlation has no tuple loss.
 - Listening rows have no remote side and no fake remote actor.
-- Local sockets with both processes known have two actor refs.
+- Local sockets with both processes known have two process actor refs.
 
 Synthetic example:
 
@@ -398,20 +402,19 @@ Synthetic example:
   "view": { "mode": "detailed" },
   "actors": [
     { "id": 1, "type": "node", "display_name": "node-a" },
-    { "id": 2, "type": "process", "display_name": "api" }
+    { "id": 2, "type": "process", "display_name": "api" },
+    { "id": 3, "type": "endpoint", "display_name": "198.51.100.20", "ip": "198.51.100.20" }
   ],
   "evidence": {
     "socket": [
       {
         "src_actor": 2,
-        "dst_actor": null,
+        "dst_actor": 3,
         "protocol": "tcp",
-        "direction": "outbound",
-        "src_ip": "192.0.2.10",
-        "src_port": 50120,
-        "dst_ip": "198.51.100.20",
-        "dst_port": 443,
-        "loose_side": "dst"
+        "client_ip": "192.0.2.10",
+        "client_port": 50120,
+        "server_ip": "198.51.100.20",
+        "server_port": 443
       }
     ]
   }
@@ -425,8 +428,8 @@ The aggregator receives detailed rows.
 Exact match:
 
 ```text
-node-a api outbound 192.0.2.10:50120 -> 198.51.100.20:443
-node-b nginx inbound 192.0.2.10:50120 -> 198.51.100.20:443
+node-a api claims client tcp 192.0.2.10:50120, points at server tcp 198.51.100.20:443
+node-b nginx claims server tcp 198.51.100.20:443, points at client tcp 192.0.2.10:50120
 ```
 
 Result:
@@ -470,15 +473,17 @@ Direct Agent aggregated:
 
 - Show process and endpoint actors.
 - Show two-sided graph links.
-- Process modal primary table is `Connections` from relationship-summary rows.
-- Endpoint modal primary table is `Processes` from the same relationship rows.
+- Non-node actor modals show `Dependencies` from relationship-summary rows
+  where the selected actor is `src_actor`, and `Dependants` where it is
+  `dst_actor`.
 
 Direct Agent detailed:
 
 - Show known actors.
-- Materialize loose sides only according to producer policy, for example by
-  remote IP, so the graph remains readable.
-- Process modal primary table is exact socket evidence.
+- Show visible endpoint actors for unknown peers, grouped by peer IP and address
+  space.
+- Non-node actor modals show `Dependencies` and `Dependants` from exact socket
+  evidence using the same `src_actor` / `dst_actor` split.
 
 Aggregator aggregated:
 
@@ -603,9 +608,13 @@ Required merge behavior:
 - stream path rows: deduplicate identical path membership rows;
 - retention rows: preserve each retaining parent/source row, because multiple
   parents retaining the same child are meaningful;
-- inbound/outbound stream rows: merge by declared relationship identity, with
-  numeric metrics merged by table policy;
-- links: merge by source actor, destination actor, type, direction, and state,
+- inbound stream rows: merge by parent actor, child actor, immediate source
+  actor when known, and relationship type, with numeric metrics merged by table
+  policy;
+- outbound stream rows: merge by sending parent actor, streamed node actor,
+  destination actor when known, and stream state, with numeric metrics merged by
+  table policy;
+- links: merge by source actor, destination actor, type, protocol, and state,
   then merge metrics/evidence according to link type policy.
 
 Retention example:
@@ -639,15 +648,26 @@ complete.
 
 Tables:
 
-- stream path: deduplicated path rows;
-- retention for node: all retaining sources relevant to the selected actor,
-  including the retaining `observer_actor`;
+- stream path: deduplicated path rows for the selected actor only. Timestamps
+  must be populated for every path row when the producer or aggregator can
+  derive them; synthetic rows used for highlighting are not allowed to drop
+  known timing facts;
 - retained nodes: all nodes whose data is maintained by the selected actor,
-  using the same retention table filtered by `observer_actor`;
+  using the same retention table filtered by `observer_actor`. This is the
+  default retention view in the current modal contract;
 - received nodes: children, virtual nodes, stale nodes, and descendants
-  received or transiting through the selected parent;
-- upstream stream: the selected actor's own outgoing stream destination and
-  stream attributes.
+  received or transiting through the selected parent. The immediate source must
+  be populated when known; direct local receipt should use the child/vnode actor
+  as the source instead of rendering an empty value;
+- outbound streams: every node payload the selected parent sends upstream,
+  including self, virtual nodes, direct children, and transit descendants. Rows
+  are owned by the sending parent and must show the streamed node and the
+  destination.
+
+The current default modal contract does not show a separate `Retention for node`
+section. The underlying retention table still preserves `actor` and
+`observer_actor` so aggregated/cloud views can add an explicitly named
+`Retained by` section later without changing the facts.
 
 Highlight path must use the deduplicated stream-path table, not direct sibling
 selection only.

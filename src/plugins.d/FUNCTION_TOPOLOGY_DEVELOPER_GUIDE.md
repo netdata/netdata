@@ -70,6 +70,7 @@ Topology Functions return a normal Function envelope with `type: "topology"`:
 
 ```json
 {
+  "v": 3,
   "status": 200,
   "type": "topology",
   "has_history": false,
@@ -115,6 +116,10 @@ Topology Functions return a normal Function envelope with `type: "topology"`:
   }
 }
 ```
+
+`v` is the optional Function transport protocol version. It belongs to the
+response envelope, not to `data`, and is commonly `3` for Functions that accept
+POST JSON parameters.
 
 `schema_version` is the topology contract version. It is not the producer
 version. Producers may expose their own version in `producer.agent_version`,
@@ -244,17 +249,11 @@ Actor types define source-local identity and cross-source merge identity:
             "show_bullets": true,
             "sources": [
               {
-                "source": "evidence",
-                "evidence": "socket",
-                "actor_column": "src_actor",
-                "name_column": "local_port",
-                "default_type": "topology"
-              },
-              {
-                "source": "evidence",
-                "evidence": "socket",
-                "actor_column": "dst_actor",
-                "name_column": "remote_port",
+                "source": "actor_table",
+                "table": "socket_ports",
+                "actor_column": "actor",
+                "name_column": "port",
+                "value_column": "socket_count",
                 "default_type": "topology"
               }
             ]
@@ -441,10 +440,12 @@ Link layout is also tokenized. Producers may set
 link type. These are relative hints for the UI force layout, not raw physics
 values. The allowed strength tokens are `weakest`, `weaker`, `normal`,
 `stronger`, and `strongest`. The allowed distance tokens are `closest`,
-`closer`, `normal`, `farther`, and `farthest`. Use weaker/farther tokens for
-dense mesh, local-noise, inferred, and partial-correlation links; use
-stronger/closer tokens for ownership or containment links that should keep a
-cluster together.
+`closer`, `normal`, `farther`, and `farthest`.
+
+Current Netdata topology tuning keeps `strength` at `normal` and varies only
+`distance` where a topology needs semantic separation. Do not use non-normal
+`strength` tokens for graph polish unless a later product decision explicitly
+re-enables force-strength tuning.
 
 Actor size supports:
 
@@ -538,15 +539,16 @@ Example socket evidence type:
       "socket": {
         "link_type": "socket",
         "role": "relationship_evidence",
-        "match_columns": ["local_ip", "local_port", "remote_ip", "remote_port", "protocol", "direction"],
+        "match_columns": ["client_ip", "client_port", "server_ip", "server_port", "protocol"],
         "columns": [
           {"id": "link", "type": "link_ref", "role": "reference"},
-          {"id": "local_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
-          {"id": "local_port", "type": "uint", "role": "group_key"},
-          {"id": "remote_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
-          {"id": "remote_port", "type": "uint", "role": "group_key"},
+          {"id": "src_actor", "type": "actor_ref", "role": "reference"},
+          {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
+          {"id": "client_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+          {"id": "client_port", "type": "uint", "role": "group_key"},
+          {"id": "server_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+          {"id": "server_port", "type": "uint", "role": "group_key"},
           {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
-          {"id": "direction", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
           {"id": "namespace", "type": "string_ref", "dictionary": "strings"},
           {"id": "rtt_ms_max", "type": "float", "unit": "ms", "aggregation": "max"}
         ]
@@ -965,21 +967,23 @@ distinguish unresolved, partial, inferred, and resolved relationships.
 For network-connections, graph links must be split into semantic families:
 
 - node-to-process ownership links that keep the graph together;
-- local process-to-process links where both process endpoints are already known;
-- process-to-correlation-endpoint links for unresolved or cross-node remote
-  socket endpoints.
+- resolved process-to-process links where both process endpoints are already
+  known;
+- process-to-correlation-endpoint links for unresolved or cross-node socket
+  endpoints.
 
 Socket evidence preserves exact tuples.
 
 Canonical socket evidence columns:
 
 - graph link reference;
-- local bind IP;
-- local port;
-- remote IP;
-- remote port;
+- source actor reference;
+- destination actor reference;
+- client IP;
+- client port;
+- server IP;
+- server port;
 - protocol;
-- direction;
 - TCP state when available;
 - network namespace or address-space tags;
 - optional snapshot metrics such as RTT, receive RTT, retransmissions, and
@@ -989,7 +993,7 @@ Do not emit these per socket:
 
 - repeated display strings or labels;
 - `port_name` if it can be derived from port;
-- duplicated `src` and `dst` objects;
+- duplicated endpoint objects;
 - actor labels repeated as evidence labels;
 - actor modal socket rows.
 
@@ -997,12 +1001,18 @@ In the measured Cloud corpus, this production-only socket evidence shape was
 about 7.25 MB raw for 323,077 socket evidence rows, or about 11.25 MB raw when
 including current RTT/retransmission metrics.
 
-For outbound sockets, the process claims the local `protocol + local_ip +
-local_port` tuple and the correlation endpoint points at the remote `protocol +
-remote_ip + remote_port` tuple. For inbound sockets, the process claims the
-local destination tuple and the correlation endpoint points at the remote source
-tuple. Local sockets where both processes are identified should emit a resolved
-process-to-process link. Listening sockets have no remote correlation point.
+Network-connections graph direction is dependency direction: link types use
+`direction_role: "dependency"`, the client actor is always `src_actor`, and the
+server actor is always `dst_actor`. The topology payload must not expose a
+separate `local` direction. Local host or same-node sockets still resolve to
+either inbound or outbound dependency direction, and same-node process pairs
+should emit resolved process-to-process links when both actors are known.
+
+For outbound sockets, the process claims the client `protocol + client_ip +
+client_port` tuple and the correlation endpoint points at the server `protocol +
+server_ip + server_port` tuple. For inbound sockets, the process claims the
+server tuple and the correlation endpoint points at the client tuple. Listening
+sockets have no remote correlation point.
 The current `socket_exact` rule key is `protocol + address_space + ip + port`;
 `address_space` prevents private or otherwise scoped endpoint identities from
 matching across unrelated address domains.
@@ -1011,13 +1021,14 @@ Network-connections uses four link types with different graph semantics:
 
 - `endpoint_socket`: process-to-correlation-endpoint links. These are the
   primary unresolved network dependencies in a single-node view. They should be
-  solid, colored, thin, weak, and normal-distance so unresolved endpoints do not
-  force the graph to zoom out.
+  solid, colored, thin, normal-strength, and normal-distance so unresolved
+  endpoints do not force the graph to zoom out.
 - `correlated_socket`: aggregator output after exact endpoint absorption. These
-  are cross-payload process-to-process dependencies and should be weak and
-  farthest so independent topology clusters do not blend into one dense layout.
+  are cross-payload process-to-process dependencies and should be
+  normal-strength and farthest so independent topology clusters do not blend
+  into one dense layout.
 - `socket`: resolved local process-to-process socket links. These are gray,
-  thin, farther links whose width can vary by `socket_count`.
+  thin, normal-distance links whose width can vary by `socket_count`.
 - `ownership`: node-to-process containment links. These are graph-coherence
   links, not network traffic. They should be dotted, faded/dim, thin, normal
   strength, and normal distance.
@@ -1029,15 +1040,16 @@ process actor type's `presentation.ports.sources[]` at that actor table with
 `value_column: "socket_count"`. Size process actors with
 `presentation.size: {"mode": "metric", "metric_column": "socket_count"}`.
 
-Network-connections actor modals should expose one primary troubleshooting
-section per actor type, not every internal table as a peer tab:
+Network-connections actor modals should expose dependency semantics, not every
+internal table as a peer tab:
 
 - self/node actors: `Processes` over `links`, filtered to `type == ownership`;
-- process actors in aggregated mode: `Connections` over
+- non-node actors in aggregated mode: `Dependencies` and `Dependants` over
   `tables.relationship.connections`;
-- process actors in detailed mode: `Sockets` over `evidence.socket`;
-- endpoint actors: `Processes` over the same aggregated relationship table or
-  detailed evidence source for the active mode.
+- non-node actors in detailed mode: `Dependencies` and `Dependants` over
+  `evidence.socket`;
+- `Dependencies` filters rows where the selected actor is `src_actor`;
+- `Dependants` filters rows where the selected actor is `dst_actor`.
 
 Do not show `socket_ports` as a normal network-connections modal section. It is
 only the graph port-bullet inventory. Put less common per-connection fields such

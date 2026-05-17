@@ -148,6 +148,10 @@ developer-facing and must stay in this project skill, not under
      `stronger`, `strongest`, and `presentation.layout.distance` tokens
      `closest`, `closer`, `normal`, `farther`, `farthest`; do not emit numeric
      force values.
+   - Current producer tuning keeps `presentation.layout.strength` at `normal`
+     and varies only `presentation.layout.distance` where semantic separation is
+     needed. Do not emit non-normal strength tokens for graph polish unless a
+     later product decision explicitly re-enables force-strength tuning.
 
 9. Define modal/table composition.
    - Put actor modal recipes in
@@ -210,19 +214,26 @@ direction.
 Network-connections uses three graph-link families:
 
 - node-to-process ownership links;
-- local/resolved process-to-process socket links;
-- process-to-endpoint or loose-side socket relationships for unresolved or
-  cross-node remote socket endpoints.
+- resolved process-to-process socket links;
+- process-to-endpoint socket relationships for unresolved or cross-node
+  endpoint tuples.
+
+Network-connections dependency direction is client-to-server. Use
+`direction_role: "dependency"` for socket dependency link types. Emit
+`src_actor` as the client/dependant and `dst_actor` as the server/dependency
+target. Do not expose `local` as a topology socket direction; same-node sockets
+still become inbound or outbound dependency rows based on which side is the
+client.
 
 Use distinct presentation for each family:
 
-- `endpoint_socket`: solid, colored, thin, weakest, normal-distance unresolved
+- `endpoint_socket`: solid, colored, thin, normal-strength, normal-distance unresolved
   endpoint dependency links;
-- `correlated_socket`: solid, colored, thin, weakest, farthest aggregator
+- `correlated_socket`: solid, colored, thin, normal-strength, farthest aggregator
   output links after exact endpoint absorption;
-- `socket`: gray, thin, stronger, farther local process links, optionally
+- `socket`: gray, thin, normal-strength, normal-distance local process links, optionally
   variable by `socket_count`;
-- `ownership`: dotted, faded/dim, thin, normal, normal graph-coherence links.
+- `ownership`: dotted, faded/dim, thin, normal-strength, normal-distance graph-coherence links.
 
 In aggregated mode, do not enable process port bullets from detailed socket
 evidence. Emit a compact actor inventory table such as `socket_ports` with
@@ -234,10 +245,10 @@ For network-connections actor modals:
 
 - self/node actors show a `Processes` section from `links` filtered to
   `type == ownership`;
-- process actors show one primary section: aggregated mode uses
-  `tables.relationship.connections`, detailed mode uses `evidence.socket`;
-- endpoint actors show a `Processes` section over the same mode-specific
-  relationship/evidence source;
+- non-node actors show `Dependencies` where the selected actor is `src_actor`
+  and `Dependants` where the selected actor is `dst_actor`;
+- aggregated mode uses `tables.relationship.connections`;
+- detailed mode uses `evidence.socket`;
 - `socket_ports` stays an actor inventory for graph port bullets, not a normal
   modal tab;
 - secondary socket metrics belong in `visibility: "expanded"` columns instead
@@ -245,15 +256,14 @@ For network-connections actor modals:
 
 For socket correlation:
 
-- process actors emit claim rows for locally owned socket tuples;
+- process actors emit claim rows for the socket tuple they own: client tuple
+  for outbound observations, server tuple for inbound observations;
 - visible endpoint/correlation actors emit point rows when the producer
   materializes them;
-- detailed evidence may also preserve loose remote tuple facts that the
-  aggregator or UI can materialize according to schema-declared policy;
 - the `socket_exact` rule uses `class: resolve_loose_side` and
   `action: absorb`;
 - the key is declarative, typically protocol + address space + IP + port;
-- `endpoint_socket` links are weak/normal-distance visible links before
+- `endpoint_socket` links are normal-strength/normal-distance visible links before
   aggregation;
 - `correlated_socket` is the farthest output link type after exact absorption.
 
@@ -269,18 +279,29 @@ For `topology:streaming` actor modals:
   keys are hostname, node type, stream status, ingest status, health status,
   child count, machine GUID, and Agent version.
 - Show `Stream path` from `stream_path` filtered by `actor`, ordered by
-  `path_index`.
-- Show `Retention for node` from `retention` filtered by `actor`; include
-  `observer_actor` so multi-parent/cloud views show who maintains each
-  retention row.
-- Show `Retained nodes` from the same `retention` table filtered by
+  `path_index`. This is only the selected actor's own path; child and virtual
+  node paths belong to their own actors. Do not emit blank `since` or
+  `first_time` values for synthetic path rows when those timestamps can be
+  derived from adjacent path, ingest, or DB status.
+- Show `Retained nodes` from the `retention` table filtered by
   `observer_actor`; this answers which nodes' data the selected actor
-  maintains.
+  maintains. Include self, virtual nodes, direct children, transit descendants,
+  and stale/archived hosts when present in the Agent root index. Preserve
+  `db_from` and `db_to` whenever the DB status knows the range.
 - Show `Received nodes` from `inbound` filtered by `parent_actor`; this table
   represents children, virtual nodes, stale nodes, and descendants received or
-  transiting through the selected parent.
-- Show `Upstream stream` from `outbound` filtered by `actor`; this table is the
-  selected actor's own upstream stream, not a duplicate list of descendants.
+  transiting through the selected parent. Populate `source_actor` whenever the
+  immediate sending actor is known; for direct local receipt, use the child or
+  virtual-node actor instead of leaving the cell empty.
+- Show `Outbound streams` from `outbound` filtered by the sending parent actor.
+  This table must list every node payload the selected parent streams upstream,
+  including self, virtual nodes, direct children, and transit descendants. Rows
+  need at least streamed node actor, destination actor when known, status, age,
+  hops, TLS, compression, and useful counts/replication metrics when available.
+- Do not show the old `Retention for node` default section in the current modal
+  contract. Keep `actor` and `observer_actor` in the canonical retention table
+  so Cloud aggregation can preserve multiple retaining parents and a future
+  explicitly named `Retained by` section can be added without changing facts.
 
 ## SNMP/L2 Modal Rules
 

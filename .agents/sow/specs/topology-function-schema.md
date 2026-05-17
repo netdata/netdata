@@ -237,10 +237,11 @@ opacity variables use opacity tokens.
 
 Link types may also define tokenized force-layout hints using
 `presentation.layout.strength` and `presentation.layout.distance`. These are
-relative UI-owned tokens, not numeric physics. Use weak/far tokens for dense
-mesh, local-noise, inferred, partial-correlation, and cross-topology links. Use
-strong/close tokens for ownership and containment links that keep a cluster
-together.
+relative UI-owned tokens, not numeric physics. Current producer tuning keeps
+`strength` at `normal` and varies only `distance` where the topology needs
+semantic separation. Do not reintroduce non-normal `strength` tokens for graph
+polish unless a later product decision explicitly re-enables force-strength
+tuning.
 
 Actor port bullets require explicit `ports.sources[]` when
 `show_bullets: true`. The source may be `links`, `evidence`, or an
@@ -401,13 +402,17 @@ type after exact endpoint absorption by an aggregator and may use farthest
 distance to keep independent topology clusters from blending.
 
 Network-connections modal composition is producer-declared. Self/node actors use
-a `Processes` section over `ownership` graph links filtered by link type. Process
-actors use a single primary section: `Connections` from
-`tables.relationship.connections` in aggregated mode and `Sockets` from
-`evidence.socket` in detailed mode. Endpoint actors use a `Processes` section
-from the same mode-specific relationship/evidence source. `socket_ports` is an
-actor inventory for process port bullets only; it is not a standalone modal tab
-for network-connections.
+a `Processes` section over `ownership` graph links filtered by link type.
+Network-connections socket link types use `direction_role: "dependency"` and
+are client-to-server: `src_actor` is the client/dependant and `dst_actor` is the
+server/dependency target. Non-node actors therefore use two primary sections in
+both aggregated and detailed mode:
+`Dependencies`, filtered to rows where the selected actor is `src_actor`, and
+`Dependants`, filtered to rows where the selected actor is `dst_actor`.
+Aggregated mode reads these sections from `tables.relationship.connections`;
+detailed mode reads them from `evidence.socket`. `socket_ports` is an actor
+inventory for process port bullets only; it is not a standalone modal tab for
+network-connections.
 
 `topology:snmp` now emits `netdata.topology.v1` from the Function handler
 through an adapter over the existing SNMP topology engine output. The adapter
@@ -463,23 +468,50 @@ available, host/system metadata labels needed by old summaries, and typed
 OS/architecture/CPU columns. The actor modal header must select important
 identity/status labels from `actor_labels`, including hostname, node type,
 stream status, ingest status, health status, child count, machine GUID, and
-Agent version. Existing `stream_path`, `retention`, `inbound`, and `outbound`
-tables have the right actor-ref shape for recipe-based table rendering.
+Agent version. Existing `stream_path`, `retention`, and `inbound` tables have
+the right actor-ref shape for recipe-based table rendering. The `outbound`
+table must use the parent-owned shape described below; a table that only records
+the selected actor's own upstream destination is insufficient for parent
+operator workflows.
 
 Streaming actor modals must keep those tables as the single source of truth and
-must not duplicate rows only for modal display. Required sections are:
+must not duplicate rows only for modal display. The default visible sections are:
 
 - `Stream path`: rows from `stream_path` filtered by `actor`, ordered by
-  `path_index`.
-- `Retention for node`: rows from `retention` filtered by `actor`; this view
-  must show `observer_actor` as the actor maintaining the selected node's
-  retention, plus retention status, time range, duration, metrics, instances,
-  and contexts.
+  `path_index`. The table shows the selected actor's own path only; virtual
+  nodes and children have their own actors and therefore their own path rows.
+  `since` and `first_time` must be populated from the best canonical source
+  available for every path row. Synthetic path rows added only for rendering or
+  highlighting must still carry timestamps when the producer can derive them
+  from the adjacent path edge, the selected actor's ingest status, or database
+  first-time status. They may be null only when the Agent genuinely does not
+  know the value.
 - `Retained nodes`: rows from the same `retention` table filtered by
   `observer_actor`; this view answers which nodes' data the selected actor
-  maintains.
+  maintains. The table must include self, virtual nodes, direct children,
+  transit descendants, and stale/archived hosts when those hosts are present in
+  the Agent root index and have retention state. It must show retained node,
+  node type, retention status, from/to timestamps, duration, metrics, instances,
+  and contexts. `db_from` and `db_to` may be null only when the database status
+  genuinely has no time range.
 - `Received nodes`: rows from `inbound` filtered by `parent_actor`; this view
   represents children, virtual nodes, stale nodes, and descendants received or
-  transiting through the selected parent.
-- `Upstream stream`: rows from `outbound` filtered by `actor`; this view
-  describes where the selected actor itself streams upstream.
+  transiting through the selected parent. `source_actor` is the immediate actor
+  from which the selected parent receives the row. For direct local receipt,
+  `source_actor` should be the child/vnode actor itself; it should be null only
+  when the immediate source is genuinely unknown.
+- `Outbound streams`: rows from `outbound` filtered by the sending parent
+  actor, not by the streamed node actor. This view answers which node payloads
+  the selected parent currently streams, and where it streams each one. Each row
+  must include the streamed node actor, destination actor when known, status,
+  age, hops, TLS, compression, and useful stream/replication/count metrics when
+  available. In clustered-parent setups, the selected parent must list self,
+  virtual nodes, direct children, and transit descendants that are sent to each
+  upstream destination.
+
+The old `Retention for node` default section is not part of the current
+streaming modal contract. The canonical `retention` table still keeps both
+`actor` and `observer_actor` so Cloud aggregation can preserve multiple
+retaining parents for the same node. If a future modal needs a selected-node
+"who retains me" view, it must be explicitly named `Retained by` and must not
+replace the parent-owned `Retained nodes` view.

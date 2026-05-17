@@ -77,6 +77,12 @@ typedef struct {
     char process[TASK_COMM_LEN + 1];
 } NV_ENDPOINT_OWNER;
 
+typedef enum {
+    NV_TOPOLOGY_ENDPOINT_ROLE_NONE = 0,
+    NV_TOPOLOGY_ENDPOINT_ROLE_CLIENT,
+    NV_TOPOLOGY_ENDPOINT_ROLE_SERVER,
+} NV_TOPOLOGY_ENDPOINT_ROLE;
+
 typedef struct {
     uint64_t pid;
     uint64_t ppid;
@@ -86,24 +92,21 @@ typedef struct {
     uint64_t retransmissions;
     uint32_t max_rtt_usec;
     uint32_t max_rcv_rtt_usec;
-    uint16_t local_port;
-    uint16_t remote_port;
-    uint16_t peer_port;
+    uint16_t client_port;
+    uint16_t server_port;
+    uint16_t process_port;
     uint16_t protocol_id;
-    uint8_t direction_id;
+    bool process_is_client;
     char process[TASK_COMM_LEN + 1];
     char username[NV_TOPOLOGY_USERNAME_MAX];
     char namespace_type[16];
     char protocol[8];
     char protocol_family[8];
-    char direction[16];
     char state[32];
-    char local_ip[INET6_ADDRSTRLEN];
-    char remote_ip[INET6_ADDRSTRLEN];
-    char peer_ip[INET6_ADDRSTRLEN];
-    char local_address_space[16];
-    char remote_address_space[16];
-    char port_name[64];
+    char client_ip[INET6_ADDRSTRLEN];
+    char server_ip[INET6_ADDRSTRLEN];
+    char client_address_space[16];
+    char server_address_space[16];
     char cmdline[NV_TOPOLOGY_CMDLINE_MAX];
 } NV_TOPOLOGY_LINK;
 
@@ -112,7 +115,6 @@ typedef struct {
     bool detailed;
     bool processes_by_pid;
     bool sockets_listening;
-    bool sockets_local;
     bool sockets_inbound;
     bool sockets_outbound;
     bool protocols_ipv4_tcp;
@@ -169,8 +171,8 @@ static SERVICENAMES_CACHE *sc;
 
 ENUM_STR_MAP_DEFINE(SOCKET_DIRECTION) = {
     { .id = SOCKET_DIRECTION_LISTEN, .name = "listen" },
-    { .id = SOCKET_DIRECTION_LOCAL_INBOUND, .name = "local" },
-    { .id = SOCKET_DIRECTION_LOCAL_OUTBOUND, .name = "local" },
+    { .id = SOCKET_DIRECTION_LOCAL_INBOUND, .name = "inbound" },
+    { .id = SOCKET_DIRECTION_LOCAL_OUTBOUND, .name = "outbound" },
     { .id = SOCKET_DIRECTION_INBOUND, .name = "inbound" },
     { .id = SOCKET_DIRECTION_OUTBOUND, .name = "outbound" },
 
@@ -221,7 +223,6 @@ static inline void topology_options_defaults(NV_TOPOLOGY_OPTIONS *opts) {
     opts->detailed = false; // default: aggregated graph view
     opts->processes_by_pid = false; // default: by_name
     opts->sockets_listening = false;
-    opts->sockets_local = false;
     opts->sockets_inbound = true;
     opts->sockets_outbound = true;
     opts->protocols_ipv4_tcp = true;
@@ -235,7 +236,6 @@ static inline bool topology_sockets_any_enabled(const NV_TOPOLOGY_OPTIONS *opts)
         return false;
 
     return (opts->sockets_listening ||
-            opts->sockets_local ||
             opts->sockets_inbound ||
             opts->sockets_outbound);
 }
@@ -303,7 +303,6 @@ static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *op
         if(strncmp(param, "sockets:", 8) == 0) {
             if(!sockets_selected_explicitly) {
                 opts->sockets_listening = false;
-                opts->sockets_local = false;
                 opts->sockets_inbound = false;
                 opts->sockets_outbound = false;
                 sockets_selected_explicitly = true;
@@ -320,8 +319,6 @@ static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *op
 
                 if(strcmp(socket_kind, "listening") == 0)
                     opts->sockets_listening = true;
-                else if(strcmp(socket_kind, "local") == 0)
-                    opts->sockets_local = true;
                 else if(strcmp(socket_kind, "inbound") == 0)
                     opts->sockets_inbound = true;
                 else if(strcmp(socket_kind, "outbound") == 0)
@@ -365,7 +362,6 @@ static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *op
 
     if(!topology_sockets_any_enabled(opts)) {
         opts->sockets_listening = false;
-        opts->sockets_local = false;
         opts->sockets_inbound = true;
         opts->sockets_outbound = true;
     }
@@ -1099,17 +1095,35 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
     }
 }
 
+static bool topology_socket_direction_selected(const NV_TOPOLOGY_CONTEXT *ctx, SOCKET_DIRECTION direction) {
+    if(!ctx)
+        return false;
+
+    switch(direction) {
+        case SOCKET_DIRECTION_LISTEN:
+            return ctx->options.sockets_listening;
+        case SOCKET_DIRECTION_INBOUND:
+        case SOCKET_DIRECTION_LOCAL_INBOUND:
+            return ctx->options.sockets_inbound;
+        case SOCKET_DIRECTION_OUTBOUND:
+        case SOCKET_DIRECTION_LOCAL_OUTBOUND:
+            return ctx->options.sockets_outbound;
+        default:
+            return false;
+    }
+}
+
 static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, void *data) {
     if(n->direction == SOCKET_DIRECTION_NONE)
         return;
 
     NV_TOPOLOGY_CONTEXT *ctx = data;
-    bool hidden_listen_socket = (n->direction == SOCKET_DIRECTION_LISTEN && !ctx->options.sockets_listening);
     ctx->sockets_total++;
+    bool selected_socket = topology_socket_direction_selected(ctx, n->direction);
+    bool hidden_listen_socket = (n->direction == SOCKET_DIRECTION_LISTEN && !ctx->options.sockets_listening);
 
     char local_ip[INET6_ADDRSTRLEN] = "";
     char remote_ip[INET6_ADDRSTRLEN] = "";
-    char remote_peer_ip[INET6_ADDRSTRLEN] = "";
 
     if(is_local_socket_ipv46(n))
         strncpyz(local_ip, "*", sizeof(local_ip) - 1);
@@ -1118,7 +1132,6 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
 
     if(!local_sockets_is_zero_address(&n->remote)) {
         socket_endpoint_to_ip_text(&n->remote, remote_ip);
-        snprintf(remote_peer_ip, sizeof(remote_peer_ip), "%s", remote_ip);
     }
 
     const char *namespace_type;
@@ -1167,6 +1180,11 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         return;
     }
 
+    if(!selected_socket) {
+        ctx->skipped_sockets++;
+        return;
+    }
+
     char process_key[NV_TOPOLOGY_KEY_MAX];
     if(ctx->options.processes_by_pid) {
         snprintf(process_key, sizeof(process_key), "pid=%d|uid=%u|ns=%llu",
@@ -1211,91 +1229,70 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
                               n->direction == SOCKET_DIRECTION_LOCAL_INBOUND);
     topology_register_endpoint_owner(ctx, n->net_ns_inode, n->local.protocol, local_ip, n->local.port, pa, service_candidate);
 
-    if(!remote_ip[0]) {
-        if(n->direction == SOCKET_DIRECTION_LISTEN || n->direction == SOCKET_DIRECTION_LOCAL_INBOUND) {
-            if(strcmp(local_ip, "*") == 0 || local_sockets_is_zero_address(&n->local)) {
-                ctx->skipped_sockets++;
-                return;
-            }
-            snprintf(remote_ip, sizeof(remote_ip), "%s", local_ip);
-            remote_address_space = local_address_space;
-        }
-        else {
-            ctx->skipped_sockets++;
-            return;
-        }
-    }
-
-    if(topology_ip_is_unspecified(remote_ip)) {
+    if(n->direction == SOCKET_DIRECTION_LISTEN) {
         ctx->skipped_sockets++;
         return;
     }
 
-    bool remote_is_self = topology_ip_belongs_to_self(ctx, remote_ip, remote_address_space);
-    bool self_owned_listen_socket = (n->direction == SOCKET_DIRECTION_LISTEN && remote_is_self);
-    bool create_endpoint_actor = !remote_is_self;
-    if(create_endpoint_actor) {
+    if(!remote_ip[0] || topology_ip_is_unspecified(remote_ip)) {
+        ctx->skipped_sockets++;
+        return;
+    }
+
+    bool process_is_client = (n->direction == SOCKET_DIRECTION_OUTBOUND ||
+                              n->direction == SOCKET_DIRECTION_LOCAL_OUTBOUND);
+
+    char client_ip[INET6_ADDRSTRLEN] = "";
+    char server_ip[INET6_ADDRSTRLEN] = "";
+    const char *client_address_space = NULL;
+    const char *server_address_space = NULL;
+    uint16_t client_port = 0;
+    uint16_t server_port = 0;
+
+    if(process_is_client) {
+        snprintf(client_ip, sizeof(client_ip), "%s", local_ip);
+        snprintf(server_ip, sizeof(server_ip), "%s", remote_ip);
+        client_address_space = local_address_space;
+        server_address_space = remote_address_space;
+        client_port = n->local.port;
+        server_port = n->remote.port;
+    }
+    else {
+        snprintf(client_ip, sizeof(client_ip), "%s", remote_ip);
+        snprintf(server_ip, sizeof(server_ip), "%s", local_ip);
+        client_address_space = remote_address_space;
+        server_address_space = local_address_space;
+        client_port = n->remote.port;
+        server_port = n->local.port;
+    }
+
+    const char *endpoint_ip = process_is_client ? server_ip : client_ip;
+    const char *endpoint_address_space = process_is_client ? server_address_space : client_address_space;
+    bool endpoint_is_self = topology_ip_belongs_to_self(ctx, endpoint_ip, endpoint_address_space);
+    if(!endpoint_is_self) {
         char endpoint_actor_key[NV_TOPOLOGY_KEY_MAX];
-        topology_actor_id_for_remote_endpoint(ctx, remote_ip, remote_address_space, endpoint_actor_key, sizeof(endpoint_actor_key));
+        topology_actor_id_for_remote_endpoint(ctx, endpoint_ip, endpoint_address_space, endpoint_actor_key, sizeof(endpoint_actor_key));
         NV_REMOTE_ACTOR *ra = dictionary_get(ctx->remote_actors, endpoint_actor_key);
         if(!ra) {
             NV_REMOTE_ACTOR tmp = { 0 };
-            snprintf(tmp.ip, sizeof(tmp.ip), "%s", remote_ip);
-            snprintf(tmp.address_space, sizeof(tmp.address_space), "%s", remote_address_space);
+            snprintf(tmp.ip, sizeof(tmp.ip), "%s", endpoint_ip);
+            snprintf(tmp.address_space, sizeof(tmp.address_space), "%s", endpoint_address_space);
             ra = dictionary_set(ctx->remote_actors, endpoint_actor_key, &tmp, sizeof(tmp));
         }
         ra->sockets++;
     }
 
-    if(self_owned_listen_socket) {
-        ctx->skipped_sockets++;
-        return;
-    }
-
-    const struct socket_endpoint *server_endpoint = NULL;
-    uint16_t endpoint_port = n->remote.port;
-    switch(n->direction) {
-        case SOCKET_DIRECTION_LISTEN:
-            server_endpoint = &n->local;
-            endpoint_port = n->local.port;
-            break;
-
-        case SOCKET_DIRECTION_INBOUND:
-        case SOCKET_DIRECTION_LOCAL_INBOUND:
-            server_endpoint = &n->local;
-            endpoint_port = n->remote.port;
-            break;
-
-        case SOCKET_DIRECTION_OUTBOUND:
-        case SOCKET_DIRECTION_LOCAL_OUTBOUND:
-            server_endpoint = &n->remote;
-            endpoint_port = n->remote.port;
-            break;
-
-        default:
-            break;
-    }
-
-    char port_name[64] = "[unknown]";
-    if(server_endpoint) {
-        STRING *serv = system_servicenames_cache_lookup(sc, server_endpoint->port, server_endpoint->protocol);
-        const char *tmp_name = string2str(serv);
-        if(tmp_name && *tmp_name)
-            snprintf(port_name, sizeof(port_name), "%s", tmp_name);
-    }
-
     char link_key[NV_TOPOLOGY_KEY_MAX];
-    snprintf(link_key, sizeof(link_key), "pid=%d|uid=%u|ns=%llu|local=%s|remote=%s|proto=%u|dir=%u|state=%u|lport=%u|rport=%u",
+    snprintf(link_key, sizeof(link_key), "pid=%d|uid=%u|ns=%llu|client=%s:%u|server=%s:%u|proto=%u|state=%u",
              n->pid,
              (unsigned)n->uid,
              (unsigned long long)n->net_ns_inode,
-             local_ip,
-             remote_ip,
+             client_ip,
+             (unsigned)client_port,
+             server_ip,
+             (unsigned)server_port,
              (unsigned)n->local.protocol,
-             (unsigned)n->direction,
-             (unsigned)n->state,
-             n->local.port,
-             endpoint_port);
+             (unsigned)n->state);
 
     NV_TOPOLOGY_LINK *link = dictionary_get(ctx->links, link_key);
     if(!link) {
@@ -1304,25 +1301,22 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         tmp.ppid = n->ppid;
         tmp.uid = n->uid;
         tmp.net_ns_inode = n->net_ns_inode;
-        tmp.local_port = n->local.port;
-        tmp.remote_port = endpoint_port;
-        tmp.peer_port = n->remote.port;
+        tmp.client_port = client_port;
+        tmp.server_port = server_port;
+        tmp.process_port = n->local.port;
         tmp.protocol_id = n->local.protocol;
-        tmp.direction_id = (uint8_t)n->direction;
+        tmp.process_is_client = process_is_client;
         snprintf(tmp.process, sizeof(tmp.process), "%s", process_name);
         snprintf(tmp.username, sizeof(tmp.username), "%s", username);
         snprintf(tmp.namespace_type, sizeof(tmp.namespace_type), "%s", namespace_type);
         snprintf(tmp.protocol, sizeof(tmp.protocol), "%s", socket_protocol_name(n->local.protocol));
         snprintf(tmp.protocol_family, sizeof(tmp.protocol_family), "%s", socket_protocol_family_name(n));
-        snprintf(tmp.direction, sizeof(tmp.direction), "%s", SOCKET_DIRECTION_2str(n->direction));
         snprintf(tmp.state, sizeof(tmp.state), "%s",
                  n->local.protocol == IPPROTO_TCP ? TCP_STATE_2str(n->state) : "stateless");
-        snprintf(tmp.local_ip, sizeof(tmp.local_ip), "%s", local_ip);
-        snprintf(tmp.remote_ip, sizeof(tmp.remote_ip), "%s", remote_ip);
-        snprintf(tmp.peer_ip, sizeof(tmp.peer_ip), "%s", remote_peer_ip);
-        snprintf(tmp.local_address_space, sizeof(tmp.local_address_space), "%s", local_address_space);
-        snprintf(tmp.remote_address_space, sizeof(tmp.remote_address_space), "%s", remote_address_space);
-        snprintf(tmp.port_name, sizeof(tmp.port_name), "%s", port_name);
+        snprintf(tmp.client_ip, sizeof(tmp.client_ip), "%s", client_ip);
+        snprintf(tmp.server_ip, sizeof(tmp.server_ip), "%s", server_ip);
+        snprintf(tmp.client_address_space, sizeof(tmp.client_address_space), "%s", client_address_space);
+        snprintf(tmp.server_address_space, sizeof(tmp.server_address_space), "%s", server_address_space);
         if(cmdline && *cmdline)
             snprintf(tmp.cmdline, sizeof(tmp.cmdline), "%s", cmdline);
         link = dictionary_set(ctx->links, link_key, &tmp, sizeof(tmp));
@@ -1397,7 +1391,7 @@ static bool topology_prepare_context(NV_TOPOLOGY_CONTEXT *ctx, usec_t now_ut, co
             // Always collect listeners so inbound/outbound socket classification
             // remains stable across topology socket filters.
             .listening = true,
-            .local = ctx->options.sockets_local,
+            .local = ctx->options.sockets_inbound || ctx->options.sockets_outbound,
             .inbound = ctx->options.sockets_inbound,
             .outbound = ctx->options.sockets_outbound,
             .tcp4 = ctx->options.protocols_ipv4_tcp,
@@ -1543,12 +1537,6 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 buffer_json_object_close(wb);
                 buffer_json_add_array_item_object(wb);
                 {
-                    buffer_json_member_add_string(wb, "id", "local");
-                    buffer_json_member_add_string(wb, "name", "Local");
-                }
-                buffer_json_object_close(wb);
-                buffer_json_add_array_item_object(wb);
-                {
                     buffer_json_member_add_string(wb, "id", "inbound");
                     buffer_json_member_add_string(wb, "name", "Inbound");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
@@ -1663,7 +1651,6 @@ typedef struct {
     uint64_t dst_actor;
     char type[32];
     char protocol[16];
-    char direction[16];
     char state[32];
     uint64_t evidence_count;
     uint64_t socket_count;
@@ -1682,7 +1669,14 @@ typedef struct {
 typedef struct {
     uint64_t src_actor;
     uint64_t dst_actor;
-    const NV_TOPOLOGY_LINK *source;
+    uint64_t socket_count;
+    uint64_t retransmissions;
+    uint32_t max_rtt_usec;
+    uint32_t max_rcv_rtt_usec;
+    char client_ip[INET6_ADDRSTRLEN];
+    char server_ip[INET6_ADDRSTRLEN];
+    char protocol[16];
+    char state[32];
 } NV_TOPOLOGY_V1_CONNECTION_ROW;
 
 typedef struct {
@@ -1690,7 +1684,6 @@ typedef struct {
     uint64_t port;
     uint64_t socket_count;
     char protocol[16];
-    char direction[16];
 } NV_TOPOLOGY_V1_PORT_ROW;
 
 typedef struct {
@@ -1746,6 +1739,7 @@ typedef struct {
 
     DICTIONARY *actor_index;
     DICTIONARY *graph_link_index;
+    DICTIONARY *connection_index;
     DICTIONARY *port_index;
     DICTIONARY *correlation_point_index;
     DICTIONARY *correlation_claim_index;
@@ -1830,8 +1824,27 @@ static void topology_v1_add_connection_row(
     uint64_t src_actor,
     uint64_t dst_actor,
     const NV_TOPOLOGY_LINK *source) {
-    if(!payload || !source)
+    if(!payload || !payload->connection_index || !source)
         return;
+
+    char key[NV_TOPOLOGY_KEY_MAX];
+    snprintfz(key, sizeof(key), "%"PRIu64"|%"PRIu64"|%s|%s",
+              src_actor,
+              dst_actor,
+              source->protocol,
+              source->state);
+
+    uint64_t *stored = dictionary_get(payload->connection_index, key);
+    if(stored) {
+        NV_TOPOLOGY_V1_CONNECTION_ROW *row = &payload->connections[*stored];
+        row->socket_count += source->sockets;
+        row->retransmissions += source->retransmissions;
+        if(row->max_rtt_usec < source->max_rtt_usec)
+            row->max_rtt_usec = source->max_rtt_usec;
+        if(row->max_rcv_rtt_usec < source->max_rcv_rtt_usec)
+            row->max_rcv_rtt_usec = source->max_rcv_rtt_usec;
+        return;
+    }
 
     if(payload->connections_used == payload->connections_size) {
         size_t new_size = payload->connections_size ? payload->connections_size * 2 : 256;
@@ -1839,28 +1852,35 @@ static void topology_v1_add_connection_row(
         payload->connections_size = new_size;
     }
 
+    uint64_t index = payload->connections_used;
     NV_TOPOLOGY_V1_CONNECTION_ROW *row = &payload->connections[payload->connections_used++];
     *row = (NV_TOPOLOGY_V1_CONNECTION_ROW){ 0 };
     row->src_actor = src_actor;
     row->dst_actor = dst_actor;
-    row->source = source;
+    row->socket_count = source->sockets;
+    row->retransmissions = source->retransmissions;
+    row->max_rtt_usec = source->max_rtt_usec;
+    row->max_rcv_rtt_usec = source->max_rcv_rtt_usec;
+    topology_v1_strncpy(row->client_ip, sizeof(row->client_ip), source->client_ip);
+    topology_v1_strncpy(row->server_ip, sizeof(row->server_ip), source->server_ip);
+    topology_v1_strncpy(row->protocol, sizeof(row->protocol), source->protocol);
+    topology_v1_strncpy(row->state, sizeof(row->state), source->state);
+    dictionary_set(payload->connection_index, key, &index, sizeof(index));
 }
 
 static void topology_v1_add_port_row(
     NV_TOPOLOGY_V1_PAYLOAD *payload,
     uint64_t actor,
     const char *protocol,
-    const char *direction,
     uint64_t port,
     uint64_t socket_count) {
     if(!payload || !payload->port_index || !port || !socket_count)
         return;
 
     char key[NV_TOPOLOGY_KEY_MAX];
-    snprintfz(key, sizeof(key), "%"PRIu64"|%s|%s|%"PRIu64,
+    snprintfz(key, sizeof(key), "%"PRIu64"|%s|%"PRIu64,
               actor,
               protocol ? protocol : "",
-              direction ? direction : "",
               port);
 
     uint64_t *stored = dictionary_get(payload->port_index, key);
@@ -1882,7 +1902,6 @@ static void topology_v1_add_port_row(
     row->port = port;
     row->socket_count = socket_count;
     topology_v1_strncpy(row->protocol, sizeof(row->protocol), protocol);
-    topology_v1_strncpy(row->direction, sizeof(row->direction), direction);
 
     dictionary_set(payload->port_index, key, &index, sizeof(index));
 }
@@ -1978,11 +1997,14 @@ static void topology_v1_add_correlation_row(
     dictionary_set(index, key, &stored, sizeof(stored));
 }
 
-static void topology_v1_add_correlation_claim(
+static void topology_v1_add_correlation_claim_endpoint(
     NV_TOPOLOGY_V1_PAYLOAD *payload,
     uint64_t actor,
-    const NV_TOPOLOGY_LINK *source) {
-    if(!payload || !source)
+    const char *protocol,
+    const char *address_space,
+    const char *ip,
+    uint64_t port) {
+    if(!payload)
         return;
 
     topology_v1_add_correlation_row(
@@ -1991,17 +2013,20 @@ static void topology_v1_add_correlation_claim(
         &payload->correlation_claims_size,
         payload->correlation_claim_index,
         actor,
-        source->protocol,
-        source->local_address_space,
-        source->local_ip,
-        source->local_port);
+        protocol,
+        address_space,
+        ip,
+        port);
 }
 
-static void topology_v1_add_correlation_point(
+static void topology_v1_add_correlation_point_endpoint(
     NV_TOPOLOGY_V1_PAYLOAD *payload,
     uint64_t actor,
-    const NV_TOPOLOGY_LINK *source) {
-    if(!payload || !source)
+    const char *protocol,
+    const char *address_space,
+    const char *ip,
+    uint64_t port) {
+    if(!payload)
         return;
 
     topology_v1_add_correlation_row(
@@ -2010,10 +2035,10 @@ static void topology_v1_add_correlation_point(
         &payload->correlation_points_size,
         payload->correlation_point_index,
         actor,
-        source->protocol,
-        source->remote_address_space,
-        source->remote_ip,
-        source->remote_port);
+        protocol,
+        address_space,
+        ip,
+        port);
 }
 
 static void topology_v1_free(NV_TOPOLOGY_V1_PAYLOAD *payload) {
@@ -2032,6 +2057,8 @@ static void topology_v1_free(NV_TOPOLOGY_V1_PAYLOAD *payload) {
         dictionary_destroy(payload->actor_index);
     if(payload->graph_link_index)
         dictionary_destroy(payload->graph_link_index);
+    if(payload->connection_index)
+        dictionary_destroy(payload->connection_index);
     if(payload->port_index)
         dictionary_destroy(payload->port_index);
     if(payload->correlation_point_index)
@@ -2175,14 +2202,12 @@ static uint64_t topology_v1_graph_link_get_or_add(
     uint64_t dst_actor,
     const char *type,
     const char *protocol,
-    const char *direction,
     const char *state) {
     char key[NV_TOPOLOGY_KEY_MAX];
-    snprintfz(key, sizeof(key), "%"PRIu64"|%"PRIu64"|%s|%s|%s|%s",
+    snprintfz(key, sizeof(key), "%"PRIu64"|%"PRIu64"|%s|%s|%s",
               src_actor, dst_actor,
               type ? type : "",
               protocol ? protocol : "",
-              direction ? direction : "",
               state ? state : "");
 
     uint64_t *stored = dictionary_get(payload->graph_link_index, key);
@@ -2195,40 +2220,53 @@ static uint64_t topology_v1_graph_link_get_or_add(
     link->dst_actor = dst_actor;
     topology_v1_strncpy(link->type, sizeof(link->type), type);
     topology_v1_strncpy(link->protocol, sizeof(link->protocol), protocol);
-    topology_v1_strncpy(link->direction, sizeof(link->direction), direction);
     topology_v1_strncpy(link->state, sizeof(link->state), state);
     dictionary_set(payload->graph_link_index, key, &index, sizeof(index));
     return index;
 }
 
-static bool topology_v1_socket_dst_actor_index(
+static bool topology_v1_socket_peer_actor_index(
     const NV_TOPOLOGY_CONTEXT *ctx,
     NV_TOPOLOGY_V1_PAYLOAD *payload,
     const NV_TOPOLOGY_LINK *link,
-    uint64_t *dst_actor,
-    bool *dst_is_correlation_point) {
-    if(dst_is_correlation_point)
-        *dst_is_correlation_point = false;
+    NV_TOPOLOGY_ENDPOINT_ROLE role,
+    uint64_t *actor,
+    bool *is_correlation_point) {
+    if(is_correlation_point)
+        *is_correlation_point = false;
 
-    bool remote_is_self = topology_ip_belongs_to_self(ctx, link->remote_ip, link->remote_address_space);
-    if(remote_is_self && link->direction_id != SOCKET_DIRECTION_LISTEN) {
-        const char *peer_ip = link->peer_ip[0] ? link->peer_ip : link->remote_ip;
-        NV_ENDPOINT_OWNER *owner = topology_lookup_endpoint_owner(ctx, link->net_ns_inode, link->protocol_id, peer_ip, link->peer_port, true);
+    const char *ip = NULL;
+    const char *address_space = NULL;
+    uint16_t port = 0;
 
+    if(role == NV_TOPOLOGY_ENDPOINT_ROLE_CLIENT) {
+        ip = link->client_ip;
+        address_space = link->client_address_space;
+        port = link->client_port;
+    }
+    else if(role == NV_TOPOLOGY_ENDPOINT_ROLE_SERVER) {
+        ip = link->server_ip;
+        address_space = link->server_address_space;
+        port = link->server_port;
+    }
+    else
+        return false;
+
+    bool endpoint_is_self = topology_ip_belongs_to_self(ctx, ip, address_space);
+    if(endpoint_is_self) {
+        NV_ENDPOINT_OWNER *owner = topology_lookup_endpoint_owner(ctx, link->net_ns_inode, link->protocol_id, ip, port, true);
         if(owner) {
             return topology_v1_process_actor_index(ctx, payload,
                                                    owner->pid, owner->uid, owner->net_ns_inode,
-                                                   owner->process, dst_actor);
+                                                   owner->process, actor);
         }
 
-        return topology_v1_process_actor_index(ctx, payload,
-                                               link->pid, link->uid, link->net_ns_inode,
-                                               link->process, dst_actor);
+        return false;
     }
 
-    if(dst_is_correlation_point)
-        *dst_is_correlation_point = true;
-    return topology_v1_endpoint_actor_index(ctx, payload, link->remote_ip, link->remote_address_space, dst_actor);
+    if(is_correlation_point)
+        *is_correlation_point = true;
+    return topology_v1_endpoint_actor_index(ctx, payload, ip, address_space, actor);
 }
 
 static void topology_v1_collect_links(
@@ -2245,7 +2283,7 @@ static void topology_v1_collect_links(
             continue;
 
         uint64_t link_index = topology_v1_graph_link_get_or_add(
-            payload, host_actor, process_actor, "ownership", "ownership", "contains", "active");
+            payload, host_actor, process_actor, "ownership", "ownership", "active");
         NV_TOPOLOGY_V1_GRAPH_LINK *link = &payload->links[link_index];
         link->socket_count += pa->sockets;
         state->ownership_link_count++;
@@ -2260,25 +2298,55 @@ static void topology_v1_collect_links(
                                             source->process, &src_actor))
             continue;
 
-        uint64_t dst_actor;
-        bool dst_is_correlation_point = false;
-        if(!topology_v1_socket_dst_actor_index(ctx, payload, source, &dst_actor, &dst_is_correlation_point))
+        uint64_t client_actor = 0;
+        uint64_t server_actor = 0;
+        bool client_is_correlation_point = false;
+        bool server_is_correlation_point = false;
+
+        if(source->process_is_client) {
+            client_actor = src_actor;
+            if(!topology_v1_socket_peer_actor_index(
+                   ctx, payload, source, NV_TOPOLOGY_ENDPOINT_ROLE_SERVER, &server_actor, &server_is_correlation_point))
+                continue;
+        }
+        else {
+            server_actor = src_actor;
+            if(!topology_v1_socket_peer_actor_index(
+                   ctx, payload, source, NV_TOPOLOGY_ENDPOINT_ROLE_CLIENT, &client_actor, &client_is_correlation_point))
+                continue;
+        }
+
+        if(!client_actor || !server_actor)
             continue;
 
-        topology_v1_add_correlation_claim(payload, src_actor, source);
-        if(dst_is_correlation_point)
-            topology_v1_add_correlation_point(payload, dst_actor, source);
+        if(source->process_is_client) {
+            topology_v1_add_correlation_claim_endpoint(
+                payload, client_actor, source->protocol, source->client_address_space, source->client_ip, source->client_port);
+            if(server_is_correlation_point)
+                topology_v1_add_correlation_point_endpoint(
+                    payload, server_actor, source->protocol, source->server_address_space, source->server_ip, source->server_port);
+        }
+        else {
+            topology_v1_add_correlation_claim_endpoint(
+                payload, server_actor, source->protocol, source->server_address_space, source->server_ip, source->server_port);
+            if(client_is_correlation_point)
+                topology_v1_add_correlation_point_endpoint(
+                    payload, client_actor, source->protocol, source->client_address_space, source->client_ip, source->client_port);
+        }
 
         topology_v1_add_port_row(
-            payload, src_actor, source->protocol, source->direction, source->local_port, source->sockets);
-        if(!dst_is_correlation_point)
+            payload, src_actor, source->protocol, source->process_port, source->sockets);
+        if(!source->process_is_client && !client_is_correlation_point)
             topology_v1_add_port_row(
-                payload, dst_actor, source->protocol, source->direction, source->remote_port, source->sockets);
+                payload, client_actor, source->protocol, source->client_port, source->sockets);
+        else if(source->process_is_client && !server_is_correlation_point)
+            topology_v1_add_port_row(
+                payload, server_actor, source->protocol, source->server_port, source->sockets);
 
         uint64_t link_index = topology_v1_graph_link_get_or_add(
-            payload, src_actor, dst_actor,
-            dst_is_correlation_point ? "endpoint_socket" : "socket",
-            source->protocol, source->direction, source->state);
+            payload, client_actor, server_actor,
+            (client_is_correlation_point || server_is_correlation_point) ? "endpoint_socket" : "socket",
+            source->protocol, source->state);
         NV_TOPOLOGY_V1_GRAPH_LINK *link = &payload->links[link_index];
         link->evidence_count++;
         link->socket_count += source->sockets;
@@ -2291,12 +2359,12 @@ static void topology_v1_collect_links(
         if(ctx->options.detailed) {
             NV_TOPOLOGY_V1_SOCKET_EVIDENCE *row = topology_v1_add_socket_evidence(payload);
             row->link = link_index;
-            row->src_actor = src_actor;
-            row->dst_actor = dst_actor;
+            row->src_actor = client_actor;
+            row->dst_actor = server_actor;
             row->source = source;
         }
         else
-            topology_v1_add_connection_row(payload, src_actor, dst_actor, source);
+            topology_v1_add_connection_row(payload, client_actor, server_actor, source);
     }
     dfe_done(source);
 }
@@ -2489,7 +2557,6 @@ static void topology_v1_emit_link_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "dst_actor", "actor_ref", "reference", false, NULL);
     topology_v1_emit_column(wb, "type", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "protocol", "string", "group_key", true, NULL);
-    topology_v1_emit_column(wb, "direction", "string", "group_key", true, NULL);
     topology_v1_emit_column(wb, "state", "string", "group_key", true, NULL);
     topology_v1_emit_column(wb, "evidence_count", "uint", "metric", false, "sum");
     topology_v1_emit_column(wb, "socket_count", "uint", "metric", false, "sum");
@@ -2502,18 +2569,16 @@ static void topology_v1_emit_socket_evidence_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "link", "link_ref", "reference", false, NULL);
     topology_v1_emit_column(wb, "src_actor", "actor_ref", "reference", false, NULL);
     topology_v1_emit_column(wb, "dst_actor", "actor_ref", "reference", false, NULL);
-    topology_v1_emit_column(wb, "local_ip", "ip", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "local_port", "uint", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "remote_ip", "ip", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "remote_port", "uint", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "peer_port", "uint", "attribute", true, NULL);
+    topology_v1_emit_column(wb, "client_ip", "ip", "group_key", false, NULL);
+    topology_v1_emit_column(wb, "client_port", "uint", "group_key", false, NULL);
+    topology_v1_emit_column(wb, "server_ip", "ip", "group_key", false, NULL);
+    topology_v1_emit_column(wb, "server_port", "uint", "group_key", false, NULL);
     topology_v1_emit_column(wb, "protocol", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "protocol_family", "string", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "direction", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "state", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "namespace_type", "string", "group_key", true, NULL);
-    topology_v1_emit_column(wb, "local_address_space", "string", "group_key", true, NULL);
-    topology_v1_emit_column(wb, "remote_address_space", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "client_address_space", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "server_address_space", "string", "group_key", true, NULL);
     topology_v1_emit_column(wb, "pid", "uint", "attribute", true, NULL);
     topology_v1_emit_column(wb, "uid", "uint", "attribute", true, NULL);
     topology_v1_emit_column(wb, "net_ns_inode", "uint", "attribute", true, NULL);
@@ -2527,15 +2592,10 @@ static void topology_v1_emit_socket_evidence_columns(BUFFER *wb) {
 static void topology_v1_emit_connection_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "src_actor", "actor_ref", "reference", false, NULL);
     topology_v1_emit_column(wb, "dst_actor", "actor_ref", "reference", false, NULL);
-    topology_v1_emit_column(wb, "local_ip", "ip", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "local_port", "uint", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "remote_ip", "ip", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "remote_port", "uint", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "peer_port", "uint", "attribute", true, NULL);
+    topology_v1_emit_column(wb, "client_ip", "ip", "group_key", false, NULL);
+    topology_v1_emit_column(wb, "server_ip", "ip", "group_key", false, NULL);
     topology_v1_emit_column(wb, "protocol", "string", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "direction", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "state", "string", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "service", "string", "attribute", true, NULL);
     topology_v1_emit_column(wb, "socket_count", "uint", "metric", false, "sum");
     topology_v1_emit_column(wb, "retransmissions", "uint", "metric", false, "sum");
     topology_v1_emit_column(wb, "rtt_ms_max", "float", "metric", false, "max");
@@ -2546,7 +2606,6 @@ static void topology_v1_emit_socket_port_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "actor", "actor_ref", "reference", false, NULL);
     topology_v1_emit_column(wb, "port", "uint", "group_key", false, NULL);
     topology_v1_emit_column(wb, "protocol", "string", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "direction", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "socket_count", "uint", "metric", false, "sum");
 }
 
@@ -2617,24 +2676,77 @@ static void topology_v1_emit_modal_opposite_actor_column_labeled(BUFFER *wb, con
     buffer_json_object_close(wb);
 }
 
-static void topology_v1_emit_modal_selected_socket_endpoint_column(BUFFER *wb) {
+static void topology_v1_emit_modal_formatted_endpoint_column(
+    BUFFER *wb,
+    const char *id,
+    const char *label,
+    const char *ip_column,
+    const char *port_column) {
     buffer_json_add_array_item_object(wb);
     {
-        buffer_json_member_add_string(wb, "id", "endpoint");
-        buffer_json_member_add_string(wb, "label", "Endpoint");
+        buffer_json_member_add_string(wb, "id", id);
+        buffer_json_member_add_string(wb, "label", label);
         buffer_json_member_add_object(wb, "projection");
         {
-            buffer_json_member_add_string(wb, "kind", "selected_side_endpoint");
-            buffer_json_member_add_string(wb, "src_actor_column", "src_actor");
-            buffer_json_member_add_string(wb, "dst_actor_column", "dst_actor");
-            buffer_json_member_add_string(wb, "local_ip_column", "local_ip");
-            buffer_json_member_add_string(wb, "local_port_column", "local_port");
-            buffer_json_member_add_string(wb, "remote_ip_column", "remote_ip");
-            buffer_json_member_add_string(wb, "remote_port_column", "remote_port");
+            buffer_json_member_add_string(wb, "kind", "formatted_endpoint");
+            if(ip_column)
+                buffer_json_member_add_string(wb, "ip_column", ip_column);
+            if(port_column)
+                buffer_json_member_add_string(wb, "port_column", port_column);
             buffer_json_member_add_string(wb, "protocol_column", "protocol");
         }
         buffer_json_object_close(wb);
         buffer_json_member_add_string(wb, "cell", "endpoint");
+    }
+    buffer_json_object_close(wb);
+}
+
+static void topology_v1_emit_network_connection_modal_section(
+    BUFFER *wb,
+    const char *id,
+    const char *label,
+    const char *selected_actor_column,
+    const char *peer_label,
+    const char *endpoint_label,
+    const char *endpoint_ip_column,
+    const char *endpoint_port_column,
+    bool detailed,
+    uint64_t order) {
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_string(wb, "id", id);
+        buffer_json_member_add_string(wb, "label", label);
+        buffer_json_member_add_uint64(wb, "order", order);
+        buffer_json_member_add_object(wb, "source");
+        {
+            buffer_json_member_add_string(wb, "kind", detailed ? "evidence" : "relationship_table");
+            if(detailed)
+                buffer_json_member_add_string(wb, "evidence", "socket");
+            else
+                buffer_json_member_add_string(wb, "table", "connections");
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_object(wb, "owner_filter");
+        {
+            buffer_json_member_add_string(wb, "mode", "actor_column");
+            buffer_json_member_add_string(wb, "actor_column", selected_actor_column);
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_array(wb, "columns");
+        {
+            topology_v1_emit_modal_opposite_actor_column_labeled(wb, "actor", peer_label);
+            topology_v1_emit_modal_formatted_endpoint_column(
+                wb, "endpoint", endpoint_label, endpoint_ip_column, detailed ? endpoint_port_column : NULL);
+            topology_v1_emit_modal_direct_column(wb, "protocol", "Protocol", "protocol", "badge");
+            topology_v1_emit_modal_direct_column(wb, "state", "State", "state", "badge");
+            topology_v1_emit_modal_direct_column(wb, "sockets", "Sockets", "socket_count", "number");
+            topology_v1_emit_modal_direct_column_with_visibility(
+                wb, "retransmissions", "Retransmissions", "retransmissions", "number", "expanded");
+            topology_v1_emit_modal_direct_column(wb, "rtt", "RTT max", "rtt_ms_max", "number");
+            topology_v1_emit_modal_direct_column_with_visibility(
+                wb, "recv_rtt", "Receiver RTT max", "recv_rtt_ms_max", "number", "expanded");
+        }
+        buffer_json_array_close(wb);
     }
     buffer_json_object_close(wb);
 }
@@ -2698,7 +2810,6 @@ static void topology_v1_emit_actor_type(
     const char *label_column_a,
     const char *label_column_b) {
     bool is_self = strcmp(id, "self") == 0;
-    bool is_endpoint = strcmp(id, "endpoint") == 0;
 
     buffer_json_member_add_object(wb, id);
     {
@@ -2784,42 +2895,24 @@ static void topology_v1_emit_actor_type(
                 buffer_json_object_close(wb);
                 buffer_json_member_add_array(wb, "sections");
                 {
-                    buffer_json_add_array_item_object(wb);
-                    {
-                        if(is_self) {
-                            buffer_json_member_add_string(wb, "id", "processes");
-                            buffer_json_member_add_string(wb, "label", "Processes");
-                        }
-                        else if(is_endpoint) {
-                            buffer_json_member_add_string(wb, "id", "processes");
-                            buffer_json_member_add_string(wb, "label", "Processes");
-                        }
-                        else {
-                            buffer_json_member_add_string(wb, "id", detailed ? "sockets" : "connections");
-                            buffer_json_member_add_string(wb, "label", detailed ? "Sockets" : "Connections");
-                        }
-                        buffer_json_member_add_uint64(wb, "order", 1);
-                        buffer_json_member_add_object(wb, "source");
+                    if(is_self) {
+                        buffer_json_add_array_item_object(wb);
                         {
-                            if(is_self)
+                            buffer_json_member_add_string(wb, "id", "processes");
+                            buffer_json_member_add_string(wb, "label", "Processes");
+                            buffer_json_member_add_uint64(wb, "order", 1);
+                            buffer_json_member_add_object(wb, "source");
+                            {
                                 buffer_json_member_add_string(wb, "kind", "links");
-                            else
-                                buffer_json_member_add_string(wb, "kind", detailed ? "evidence" : "relationship_table");
-
-                            if(!is_self && detailed)
-                                buffer_json_member_add_string(wb, "evidence", "socket");
-                            else if(!is_self)
-                                buffer_json_member_add_string(wb, "table", "connections");
-                        }
-                        buffer_json_object_close(wb);
-                        buffer_json_member_add_object(wb, "owner_filter");
-                        {
-                            buffer_json_member_add_string(wb, "mode", (!is_self && detailed) ? "incident_evidence" : "incident_link");
-                            buffer_json_member_add_string(wb, "src_actor_column", "src_actor");
-                            buffer_json_member_add_string(wb, "dst_actor_column", "dst_actor");
-                        }
-                        buffer_json_object_close(wb);
-                        if(is_self) {
+                            }
+                            buffer_json_object_close(wb);
+                            buffer_json_member_add_object(wb, "owner_filter");
+                            {
+                                buffer_json_member_add_string(wb, "mode", "incident_link");
+                                buffer_json_member_add_string(wb, "src_actor_column", "src_actor");
+                                buffer_json_member_add_string(wb, "dst_actor_column", "dst_actor");
+                            }
+                            buffer_json_object_close(wb);
                             buffer_json_member_add_array(wb, "row_filters");
                             {
                                 buffer_json_add_array_item_object(wb);
@@ -2831,37 +2924,41 @@ static void topology_v1_emit_actor_type(
                                 buffer_json_object_close(wb);
                             }
                             buffer_json_array_close(wb);
-                        }
-                        buffer_json_member_add_array(wb, "columns");
-                        {
-                            if(is_self) {
+                            buffer_json_member_add_array(wb, "columns");
+                            {
                                 topology_v1_emit_modal_opposite_actor_column_labeled(wb, "process", "Process");
-                            }
-                            else {
-                                topology_v1_emit_modal_opposite_actor_column_labeled(
-                                    wb, is_endpoint ? "process" : "remote", is_endpoint ? "Process" : "Remote");
-                                topology_v1_emit_modal_selected_socket_endpoint_column(wb);
-                                if(!detailed)
-                                    topology_v1_emit_modal_direct_column(wb, "service", "Service", "service", "text");
-                                topology_v1_emit_modal_direct_column(wb, "protocol", "Protocol", "protocol", "badge");
-                                topology_v1_emit_modal_direct_column(wb, "direction", "Direction", "direction", "badge");
-                                topology_v1_emit_modal_direct_column(wb, "state", "State", "state", "badge");
-                            }
-                            topology_v1_emit_modal_direct_column(wb, "sockets", "Sockets", "socket_count", "number");
-                            if(is_self)
+                                topology_v1_emit_modal_direct_column(wb, "sockets", "Sockets", "socket_count", "number");
                                 topology_v1_emit_modal_direct_column_with_visibility(
                                     wb, "evidence", "Evidence", "evidence_count", "number", "expanded");
-                            else {
-                                topology_v1_emit_modal_direct_column_with_visibility(
-                                    wb, "retransmissions", "Retransmissions", "retransmissions", "number", "expanded");
-                                topology_v1_emit_modal_direct_column(wb, "rtt", "RTT max", "rtt_ms_max", "number");
-                                topology_v1_emit_modal_direct_column_with_visibility(
-                                    wb, "recv_rtt", "Receiver RTT max", "recv_rtt_ms_max", "number", "expanded");
                             }
+                            buffer_json_array_close(wb);
                         }
-                        buffer_json_array_close(wb);
+                        buffer_json_object_close(wb);
                     }
-                    buffer_json_object_close(wb);
+                    else {
+                        topology_v1_emit_network_connection_modal_section(
+                            wb,
+                            detailed ? "dependency_sockets" : "dependencies",
+                            "Dependencies",
+                            "src_actor",
+                            "Service",
+                            "Server",
+                            "server_ip",
+                            "server_port",
+                            detailed,
+                            1);
+                        topology_v1_emit_network_connection_modal_section(
+                            wb,
+                            detailed ? "dependant_sockets" : "dependants",
+                            "Dependants",
+                            "dst_actor",
+                            "Client",
+                            "Client",
+                            "client_ip",
+                            "client_port",
+                            detailed,
+                            2);
+                    }
                 }
                 buffer_json_array_close(wb);
             }
@@ -2980,17 +3077,17 @@ static void topology_v1_emit_type_registry(BUFFER *wb, bool detailed __maybe_unu
         buffer_json_member_add_object(wb, "link_types");
         {
             topology_v1_emit_link_type(
-                wb, "socket", "directed", "flow", "socket",
+                wb, "socket", "directed", "dependency", "socket",
                 "Local socket", "gray", "solid", "thin", "forward", NULL,
-                "sockets", "socket_count", "stronger", "farther");
+                "sockets", "socket_count", "normal", "normal");
             topology_v1_emit_link_type(
-                wb, "endpoint_socket", "directed", "flow", "socket",
+                wb, "endpoint_socket", "directed", "dependency", "socket",
                 "Endpoint connection", "primary", "solid", "thin", "forward", NULL,
-                NULL, NULL, "weakest", "normal");
+                NULL, NULL, "normal", "normal");
             topology_v1_emit_link_type(
-                wb, "correlated_socket", "directed", "flow", "socket",
+                wb, "correlated_socket", "directed", "dependency", "socket",
                 "Correlated socket", "primary", "solid", "thin", "forward", NULL,
-                "sockets", "socket_count", "weakest", "farthest");
+                "sockets", "socket_count", "normal", "farthest");
             topology_v1_emit_link_type(
                 wb, "ownership", "hierarchical", "ownership", NULL,
                 "Process ownership", "dim", "dotted", "thin", "none", "faded",
@@ -3024,12 +3121,11 @@ static void topology_v1_emit_type_registry(BUFFER *wb, bool detailed __maybe_unu
                 topology_v1_emit_socket_evidence_columns(wb);
                 buffer_json_array_close(wb);
                 buffer_json_member_add_array(wb, "match_columns");
-                buffer_json_add_array_item_string(wb, "local_ip");
-                buffer_json_add_array_item_string(wb, "local_port");
-                buffer_json_add_array_item_string(wb, "remote_ip");
-                buffer_json_add_array_item_string(wb, "remote_port");
+                buffer_json_add_array_item_string(wb, "client_ip");
+                buffer_json_add_array_item_string(wb, "client_port");
+                buffer_json_add_array_item_string(wb, "server_ip");
+                buffer_json_add_array_item_string(wb, "server_port");
                 buffer_json_add_array_item_string(wb, "protocol");
-                buffer_json_add_array_item_string(wb, "direction");
                 buffer_json_array_close(wb);
             }
             buffer_json_object_close(wb);
@@ -3054,7 +3150,6 @@ static void topology_v1_emit_type_registry(BUFFER *wb, bool detailed __maybe_unu
                     {
                         topology_v1_emit_modal_direct_column(wb, "port", "Port", "port", "number");
                         topology_v1_emit_modal_direct_column(wb, "protocol", "Protocol", "protocol", "badge");
-                        topology_v1_emit_modal_direct_column(wb, "direction", "Direction", "direction", "badge");
                         topology_v1_emit_modal_direct_column(wb, "sockets", "Sockets", "socket_count", "number");
                     }
                     buffer_json_array_close(wb);
@@ -3321,7 +3416,6 @@ static void topology_v1_emit_link_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *payl
         NV_TOPOLOGY_V1_LINK_UINT_VALUES(dst_actor);
         NV_TOPOLOGY_V1_LINK_STRING_VALUES(type);
         NV_TOPOLOGY_V1_LINK_STRING_VALUES(protocol);
-        NV_TOPOLOGY_V1_LINK_STRING_VALUES(direction);
         NV_TOPOLOGY_V1_LINK_STRING_VALUES(state);
         NV_TOPOLOGY_V1_LINK_UINT_VALUES(evidence_count);
         NV_TOPOLOGY_V1_LINK_UINT_VALUES(socket_count);
@@ -3379,7 +3473,6 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
                     NV_TOPOLOGY_V1_PORT_UINT_VALUES(actor);
                     NV_TOPOLOGY_V1_PORT_UINT_VALUES(port);
                     NV_TOPOLOGY_V1_PORT_STRING_VALUES(protocol);
-                    NV_TOPOLOGY_V1_PORT_STRING_VALUES(direction);
                     NV_TOPOLOGY_V1_PORT_UINT_VALUES(socket_count);
 
 #undef NV_TOPOLOGY_V1_PORT_UINT_VALUES
@@ -3459,48 +3552,36 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
                                 buffer_json_add_array_item_uint64(wb, payload->connections[i].member); \
                             topology_v1_values_end(wb); \
                         } while(0)
-#define NV_TOPOLOGY_V1_CONNECTION_SOURCE_UINT_VALUES(member) do { \
-                            topology_v1_values_start(wb); \
-                            for(size_t i = 0; i < payload->connections_used; i++) \
-                                buffer_json_add_array_item_uint64(wb, payload->connections[i].source->member); \
-                            topology_v1_values_end(wb); \
-                        } while(0)
-#define NV_TOPOLOGY_V1_CONNECTION_SOURCE_STRING_VALUES(member) do { \
+#define NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(member) do { \
                             NV_TOPOLOGY_V1_STRING_COLUMN column; \
                             topology_v1_string_column_init(&column, payload->connections_used); \
                             for(size_t i = 0; i < payload->connections_used; i++) \
-                                topology_v1_string_column_add(&column, payload->connections[i].source->member); \
+                                topology_v1_string_column_add(&column, payload->connections[i].member); \
                             topology_v1_emit_auto_string_column(wb, &column); \
                             topology_v1_string_column_free(&column); \
                         } while(0)
 
                         NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(src_actor);
                         NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(dst_actor);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_STRING_VALUES(local_ip);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_UINT_VALUES(local_port);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_STRING_VALUES(remote_ip);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_UINT_VALUES(remote_port);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_UINT_VALUES(peer_port);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_STRING_VALUES(protocol);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_STRING_VALUES(direction);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_STRING_VALUES(state);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_STRING_VALUES(port_name);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_UINT_VALUES(sockets);
-                        NV_TOPOLOGY_V1_CONNECTION_SOURCE_UINT_VALUES(retransmissions);
+                        NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(client_ip);
+                        NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(server_ip);
+                        NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(protocol);
+                        NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(state);
+                        NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(socket_count);
+                        NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(retransmissions);
 
                         topology_v1_values_start(wb);
                         for(size_t i = 0; i < payload->connections_used; i++)
-                            buffer_json_add_array_item_double(wb, (double)payload->connections[i].source->max_rtt_usec / (double)USEC_PER_MS);
+                            buffer_json_add_array_item_double(wb, (double)payload->connections[i].max_rtt_usec / (double)USEC_PER_MS);
                         topology_v1_values_end(wb);
 
                         topology_v1_values_start(wb);
                         for(size_t i = 0; i < payload->connections_used; i++)
-                            buffer_json_add_array_item_double(wb, (double)payload->connections[i].source->max_rcv_rtt_usec / (double)USEC_PER_MS);
+                            buffer_json_add_array_item_double(wb, (double)payload->connections[i].max_rcv_rtt_usec / (double)USEC_PER_MS);
                         topology_v1_values_end(wb);
 
 #undef NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES
-#undef NV_TOPOLOGY_V1_CONNECTION_SOURCE_UINT_VALUES
-#undef NV_TOPOLOGY_V1_CONNECTION_SOURCE_STRING_VALUES
+#undef NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES
 
                         buffer_json_array_close(wb);
                     }
@@ -3552,18 +3633,16 @@ static void topology_v1_emit_socket_evidence_table(BUFFER *wb, NV_TOPOLOGY_V1_PA
                 NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES(link);
                 NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES(src_actor);
                 NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES(dst_actor);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(local_ip);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(local_port);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(remote_ip);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(remote_port);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(peer_port);
+                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(client_ip);
+                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(client_port);
+                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(server_ip);
+                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(server_port);
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(protocol);
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(protocol_family);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(direction);
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(state);
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(namespace_type);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(local_address_space);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(remote_address_space);
+                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(client_address_space);
+                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(server_address_space);
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(pid);
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(uid);
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(net_ns_inode);
@@ -3717,6 +3796,9 @@ static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
         .graph_link_index = dictionary_create_advanced(
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(uint64_t)),
+        .connection_index = dictionary_create_advanced(
+            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(uint64_t)),
         .port_index = dictionary_create_advanced(
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(uint64_t)),
@@ -3728,7 +3810,7 @@ static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
             NULL, sizeof(bool)),
     };
 
-    if(!topology.actor_index || !topology.graph_link_index || !topology.port_index ||
+    if(!topology.actor_index || !topology.graph_link_index || !topology.connection_index || !topology.port_index ||
        !topology.correlation_point_index || !topology.correlation_claim_index) {
         topology_v1_free(&topology);
         return;
@@ -3790,7 +3872,6 @@ static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
             buffer_json_member_add_string(wb, "processes_mode", ctx->options.processes_by_pid ? "by_pid" : "by_name");
             buffer_json_member_add_string(wb, "mode", ctx->options.detailed ? "detailed" : "aggregated");
             buffer_json_member_add_boolean(wb, "sockets_listening", ctx->options.sockets_listening);
-            buffer_json_member_add_boolean(wb, "sockets_local", ctx->options.sockets_local);
             buffer_json_member_add_boolean(wb, "sockets_inbound", ctx->options.sockets_inbound);
             buffer_json_member_add_boolean(wb, "sockets_outbound", ctx->options.sockets_outbound);
             buffer_json_member_add_string(wb, "endpoints_mode_selected", "by_ip");
