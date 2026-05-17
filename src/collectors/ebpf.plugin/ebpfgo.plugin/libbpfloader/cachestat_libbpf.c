@@ -103,6 +103,7 @@ static const char *cachestat_account_program_name(const char *account_function, 
     if (!strcmp(account_function, "__set_page_dirty"))
         return "netdata_set_page_dirty_kprobe";
 #else
+    (void)account_function;
     (void)flavor;
 #endif
     return "netdata_account_page_dirtied_kprobe";
@@ -127,6 +128,7 @@ static const char *cachestat_data_program_name(const char *event_name, int flavo
             return "netdata_mark_buffer_dirty_kprobe";
     }
 #else
+    (void)event_name;
     (void)flavor;
 #endif
 
@@ -369,6 +371,8 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
             return NULL;
         }
     } else
+#else
+    (void)use_core;
 #endif
     {
         struct bpf_object *obj = bpf_object__open_file(path, NULL);
