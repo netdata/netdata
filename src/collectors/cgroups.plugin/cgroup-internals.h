@@ -28,6 +28,27 @@ struct pids {
     unsigned long long pids_current;
 };
 
+#if defined(OS_LINUX)
+typedef struct cgroup_ebpfgo_cachestat {
+    uint32_t add_to_page_cache_lru;
+    uint32_t mark_page_accessed;
+    uint32_t account_page_dirtied;
+    uint32_t mark_buffer_dirty;
+} cgroup_ebpfgo_cachestat_t;
+
+typedef struct cgroup_ebpfgo_publish_cachestat {
+    uint64_t ct;
+
+    long long ratio;
+    long long dirty;
+    long long hit;
+    long long miss;
+
+    cgroup_ebpfgo_cachestat_t current;
+    cgroup_ebpfgo_cachestat_t prev;
+} cgroup_ebpfgo_publish_cachestat_t;
+#endif
+
 // https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt
 struct memory {
     ARL_BASE *arl_base;
@@ -184,6 +205,11 @@ struct cgroup {
     struct blkio io_queued;                     // operations
 
     struct pids pids_current;
+
+#if defined(OS_LINUX)
+    // eBPF cachestat snapshot mirrored from the legacy ebpf.plugin cgroup path.
+    cgroup_ebpfgo_publish_cachestat_t cachestat;
+#endif
 
     struct cgroup_network_interface *interfaces;
 
@@ -443,5 +469,13 @@ void update_io_some_pressure_chart(struct cgroup *cg);
 void update_io_some_pressure_stall_time_chart(struct cgroup *cg);
 void update_io_full_pressure_chart(struct cgroup *cg);
 void update_io_full_pressure_stall_time_chart(struct cgroup *cg);
+
+#if defined(OS_LINUX)
+bool cgroup_ebpfgo_cachestat_refresh(void);
+void cgroup_ebpfgo_cachestat_update_locked(void);
+#else
+static inline bool cgroup_ebpfgo_cachestat_refresh(void) { return false; }
+static inline void cgroup_ebpfgo_cachestat_update_locked(void) {}
+#endif
 
 #endif // NETDATA_CGROUP_INTERNALS_H

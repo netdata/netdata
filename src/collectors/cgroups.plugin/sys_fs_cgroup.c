@@ -1457,6 +1457,8 @@ void cgroups_main(void *ptr) {
             cgroups_check = 0;
         }
 
+        bool ebpf_cachestat_ready = cgroup_ebpfgo_cachestat_refresh();
+
         worker_is_busy(WORKER_CGROUPS_LOCK);
         netdata_mutex_lock(&cgroup_root_mutex);
 
@@ -1466,6 +1468,10 @@ void cgroups_main(void *ptr) {
         if (unlikely(!service_running(SERVICE_COLLECTORS))) {
             netdata_mutex_unlock(&cgroup_root_mutex);
             break;
+        }
+
+        if (likely(ebpf_cachestat_ready)) {
+            cgroup_ebpfgo_cachestat_update_locked();
         }
 
         worker_is_busy(WORKER_CGROUPS_CHART);
