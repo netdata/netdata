@@ -30,6 +30,21 @@ static bool cgroup_ebpfgo_find_procs_path(char *path_buf, size_t path_buf_size, 
     return false;
 }
 
+static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path)
+{
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0)
+        return NULL;
+
+    char fd_path[64];
+    snprintfz(fd_path, sizeof(fd_path), "/proc/self/fd/%d", fd);
+
+    procfile *ff = procfile_open_no_log(fd_path, " \t:", PROCFILE_FLAG_DEFAULT);
+    close(fd);
+
+    return ff;
+}
+
 bool cgroup_ebpfgo_cachestat_refresh(void)
 {
     return cgroup_ebpfgo_shared_memory_refresh();
@@ -104,7 +119,7 @@ static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
     if (!cgroup_ebpfgo_find_procs_path(path_buf, sizeof(path_buf), cg->id))
         goto calculate;
 
-    ff = procfile_open_no_log(path_buf, " \t:", PROCFILE_FLAG_DEFAULT);
+    ff = cgroup_ebpfgo_open_procfile_fd(path_buf);
     if (!ff)
         goto calculate;
 
