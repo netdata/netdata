@@ -27,176 +27,141 @@ static size_t query_metric_first_working_tier(QUERY_METRIC *qm) {
     return 0;
 }
 
-long query_plan_points_coverage_weight(time_t db_first_time_s, time_t db_last_time_s, time_t db_update_every_s, time_t after_wanted, time_t before_wanted, size_t points_wanted, size_t tier __maybe_unused) {
-    if(db_first_time_s == 0 ||
-        db_last_time_s == 0 ||
-        db_update_every_s == 0 ||
-        db_first_time_s > before_wanted ||
-        db_last_time_s < after_wanted)
+#define QUERY_PLAN_POINTS_WEIGHT_SCALE 1000000ULL
+#define QUERY_PLAN_ACCEPTABLE_POINTS_NUMERATOR 1ULL
+#define QUERY_PLAN_ACCEPTABLE_POINTS_DENOMINATOR 2ULL
+
+static bool query_metric_tier_overlaps_timeframe(QUERY_METRIC *qm, size_t tier, time_t after_wanted, time_t before_wanted) {
+    if(!query_metric_is_valid_tier(qm, tier))
+        return false;
+
+    return qm->tiers[tier].db_first_time_s <= before_wanted &&
+           qm->tiers[tier].db_last_time_s >= after_wanted;
+}
+
+static long query_plan_points_density_weight(time_t db_update_every_s, time_t after_wanted, time_t before_wanted) {
+    if(db_update_every_s <= 0 || before_wanted <= after_wanted)
         return -LONG_MAX;
 
-    long long common_first_t = MAX(db_first_time_s, after_wanted);
-    long long common_last_t = MIN(db_last_time_s, before_wanted);
+    uint64_t duration_s = (uint64_t)(before_wanted - after_wanted);
 
-    long long time_coverage = (common_last_t - common_first_t) * 1000000LL / (before_wanted - after_wanted);
-    long long points_wanted_in_coverage = (long long)points_wanted * time_coverage / 1000000LL;
+    if(duration_s > (uint64_t)LONG_MAX / QUERY_PLAN_POINTS_WEIGHT_SCALE)
+        return LONG_MAX;
 
-    long long points_available = (common_last_t - common_first_t) / db_update_every_s;
-    long long points_delta = (long)(points_available - points_wanted_in_coverage);
-    long long points_coverage = (points_delta < 0) ? (long)(points_available * time_coverage / points_wanted_in_coverage) : time_coverage;
+    return (long)((duration_s * QUERY_PLAN_POINTS_WEIGHT_SCALE) / (uint64_t)db_update_every_s);
+}
 
-    // a way to benefit higher tiers
-    // points_coverage += (long)tier * 10000;
+static long query_plan_minimum_acceptable_points_weight(size_t points_wanted) {
+    if(!points_wanted)
+        return 0;
 
-    if(points_available <= 0)
-        return -LONG_MAX;
+    if((uint64_t)points_wanted > (uint64_t)LONG_MAX / QUERY_PLAN_POINTS_WEIGHT_SCALE)
+        return LONG_MAX;
 
-    return (long)(points_coverage + (25000LL * tier)); // 2.5% benefit for each higher tier
+    uint64_t wanted_scaled = (uint64_t)points_wanted * QUERY_PLAN_POINTS_WEIGHT_SCALE;
+
+    if(wanted_scaled > UINT64_MAX / QUERY_PLAN_ACCEPTABLE_POINTS_NUMERATOR)
+        return LONG_MAX;
+
+    uint64_t acceptable_scaled =
+        (wanted_scaled * QUERY_PLAN_ACCEPTABLE_POINTS_NUMERATOR + QUERY_PLAN_ACCEPTABLE_POINTS_DENOMINATOR - 1) /
+        QUERY_PLAN_ACCEPTABLE_POINTS_DENOMINATOR;
+
+    if(acceptable_scaled > (uint64_t)LONG_MAX)
+        return LONG_MAX;
+
+    return (long)acceptable_scaled;
+}
+
+static bool query_plan_points_density_is_better(
+    size_t tier, long weight, bool acceptable,
+    size_t best_tier, long best_weight, bool best_acceptable) {
+    if(acceptable) {
+        if(!best_acceptable)
+            return true;
+
+        if(weight < best_weight)
+            return true;
+
+        return weight == best_weight && tier > best_tier;
+    }
+
+    if(best_acceptable)
+        return false;
+
+    if(weight > best_weight)
+        return true;
+
+    return weight == best_weight && tier < best_tier;
 }
 
 static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
     if(unlikely(nd_profile.storage_tiers < 2))
         return 0;
 
-    if(unlikely(after_wanted == before_wanted || points_wanted <= 0))
+    if(unlikely(before_wanted <= after_wanted || points_wanted <= 0))
         return query_metric_first_working_tier(qm);
 
     if(points_wanted < QUERY_PLAN_MIN_POINTS)
         // when selecting tiers, aim for a resolution of at least QUERY_PLAN_MIN_POINTS points
         points_wanted = (before_wanted - after_wanted) > QUERY_PLAN_MIN_POINTS ? QUERY_PLAN_MIN_POINTS : before_wanted - after_wanted;
 
-    time_t min_first_time_s = 0;
-    time_t max_last_time_s = 0;
+    long minimum_acceptable_weight = query_plan_minimum_acceptable_points_weight(points_wanted);
 
-    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-        time_t first_time_s = qm->tiers[tier].db_first_time_s;
-        time_t last_time_s  = qm->tiers[tier].db_last_time_s;
-
-        if(!min_first_time_s || (first_time_s && first_time_s < min_first_time_s))
-            min_first_time_s = first_time_s;
-
-        if(!max_last_time_s || (last_time_s && last_time_s > max_last_time_s))
-            max_last_time_s = last_time_s;
-    }
+    size_t best_tier = 0;
+    long best_weight = -LONG_MAX;
+    bool best_acceptable = false;
+    bool found_candidate = false;
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 
-        // find the db time-range for this tier for all metrics
-        STORAGE_METRIC_HANDLE *smh = qm->tiers[tier].smh;
-        time_t first_time_s = qm->tiers[tier].db_first_time_s;
-        time_t last_time_s  = qm->tiers[tier].db_last_time_s;
         time_t update_every_s = qm->tiers[tier].db_update_every_s;
 
-        if( !smh ||
-            !first_time_s ||
-            !last_time_s ||
-            !update_every_s ||
-            first_time_s > before_wanted ||
-            last_time_s < after_wanted
-        ) {
+        if(!query_metric_tier_overlaps_timeframe(qm, tier, after_wanted, before_wanted)) {
             qm->tiers[tier].weight = -LONG_MAX;
             continue;
         }
 
-        internal_fatal(first_time_s > before_wanted || last_time_s < after_wanted, "QUERY: invalid db durations");
+        qm->tiers[tier].weight = query_plan_points_density_weight(update_every_s, after_wanted, before_wanted);
+        if(qm->tiers[tier].weight == -LONG_MAX)
+            continue;
 
-        qm->tiers[tier].weight = query_plan_points_coverage_weight(
-            min_first_time_s, max_last_time_s, update_every_s,
-            after_wanted, before_wanted, points_wanted, tier);
-    }
+        bool acceptable = qm->tiers[tier].weight >= minimum_acceptable_weight;
 
-    size_t best_tier = 0;
-    for(size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
-        if(qm->tiers[tier].weight >= qm->tiers[best_tier].weight)
+        if(!found_candidate ||
+           query_plan_points_density_is_better(
+               tier, qm->tiers[tier].weight, acceptable,
+               best_tier, best_weight, best_acceptable)) {
             best_tier = tier;
-    }
-
-    return best_tier;
-}
-
-static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
-    if(unlikely(nd_profile.storage_tiers < 2))
-        return 0;
-
-    if(unlikely(after_wanted == before_wanted || points_wanted <= 0)) {
-        internal_error(true, "QUERY: '%s' has invalid params to tier calculation", qt->id);
-        return 0;
-    }
-
-    long weight[RRD_STORAGE_TIERS];
-
-    // cap at the compile-time maximum to guard the fixed-size weight[] array
-    size_t tiers = MIN(nd_profile.storage_tiers, RRD_STORAGE_TIERS);
-
-    for(size_t tier = 0; tier < tiers; tier++) {
-
-        time_t common_first_time_s = 0;
-        time_t common_last_time_s = 0;
-        time_t common_update_every_s = 0;
-
-        // find the db time-range for this tier for all metrics
-        for(size_t i = 0, used = qt->query.used; i < used ; i++) {
-            QUERY_METRIC *qm = query_metric(qt, i);
-
-            time_t first_time_s = qm->tiers[tier].db_first_time_s;
-            time_t last_time_s  = qm->tiers[tier].db_last_time_s;
-            time_t update_every_s = qm->tiers[tier].db_update_every_s;
-
-            if(!first_time_s || !last_time_s || !update_every_s)
-                continue;
-
-            if(!common_first_time_s)
-                common_first_time_s = first_time_s;
-            else
-                common_first_time_s = MIN(first_time_s, common_first_time_s);
-
-            if(!common_last_time_s)
-                common_last_time_s = last_time_s;
-            else
-                common_last_time_s = MAX(last_time_s, common_last_time_s);
-
-            if(!common_update_every_s)
-                common_update_every_s = update_every_s;
-            else
-                common_update_every_s = MIN(update_every_s, common_update_every_s);
+            best_weight = qm->tiers[tier].weight;
+            best_acceptable = acceptable;
+            found_candidate = true;
         }
-
-        weight[tier] = query_plan_points_coverage_weight(common_first_time_s, common_last_time_s, common_update_every_s, after_wanted, before_wanted, points_wanted, tier);
     }
 
-    size_t best_tier = 0;
-    for(size_t tier = 1; tier < tiers; tier++) {
-        if(weight[tier] >= weight[best_tier])
-            best_tier = tier;
-    }
-
-    if(weight[best_tier] == -LONG_MAX)
-        best_tier = 0;
-
-    return best_tier;
+    return found_candidate ? best_tier : query_metric_first_working_tier(qm);
 }
 
-time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted, RRDR_OPTIONS options, size_t tier) {
-    size_t best_tier;
-    if((options & RRDR_OPTION_SELECTED_TIER) && tier < nd_profile.storage_tiers)
-        best_tier = tier;
-    else
-        best_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
+time_t query_target_min_update_every_for_tier(QUERY_TARGET *qt, size_t tier) {
+    if(tier >= nd_profile.storage_tiers)
+        return nd_profile.update_every;
 
     // find the db minimum update every for this tier for all metrics
-    time_t common_update_every_s = nd_profile.update_every;
+    time_t common_update_every_s = 0;
     for(size_t i = 0, used = qt->query.used; i < used ; i++) {
         QUERY_METRIC *qm = query_metric(qt, i);
 
-        time_t update_every_s = qm->tiers[best_tier].db_update_every_s;
+        time_t update_every_s = qm->tiers[tier].db_update_every_s;
+        if(!update_every_s)
+            continue;
 
-        if(!i)
+        if(!common_update_every_s)
             common_update_every_s = update_every_s;
         else
             common_update_every_s = MIN(update_every_s, common_update_every_s);
     }
 
-    return common_update_every_s;
+    return common_update_every_s ? common_update_every_s : nd_profile.update_every;
 }
 
 static size_t query_planer_expand_duration_in_points(time_t this_update_every, time_t next_update_every) {
@@ -339,7 +304,7 @@ static int compare_query_plan_entries_on_start_time(const void *a, const void *b
     return (p1->after < p2->after)?-1:1;
 }
 
-static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
+static bool query_plan_build_entries(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
     QUERY_METRIC *qm = ops->qm;
 
     // put our selected tier as the first plan
@@ -460,6 +425,13 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     }
 #endif
 
+    return true;
+}
+
+static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
+    if(!query_plan_build_entries(ops, after_wanted, before_wanted, points_wanted))
+        return false;
+
     query_planer_initialize_plans(ops);
     query_planer_activate_plan(ops, 0, 0);
 
@@ -518,4 +490,292 @@ QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id) {
     }
 
     return ops;
+}
+
+static void query_plan_unittest_set_tier(
+    QUERY_METRIC *qm, size_t tier, time_t first_time_s, time_t last_time_s, time_t update_every_s) {
+    static char smh_stub;
+
+    qm->tiers[tier].smh = (STORAGE_METRIC_HANDLE *)&smh_stub;
+    qm->tiers[tier].db_first_time_s = first_time_s;
+    qm->tiers[tier].db_last_time_s = last_time_s;
+    qm->tiers[tier].db_update_every_s = update_every_s;
+}
+
+static int query_plan_unittest_expect_best_tier(
+    const char *name, QUERY_METRIC *qm, time_t after, time_t before, size_t points, size_t expected) {
+    size_t got = query_metric_best_tier_for_timeframe(qm, after, before, points);
+    if(got == expected) {
+        fprintf(stderr, "OK query plan tier selection: %s\n", name);
+        return 0;
+    }
+
+    fprintf(stderr,
+            "FAILED query plan tier selection: %s, expected tier %zu, got tier %zu\n",
+            name, expected, got);
+
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+        fprintf(stderr,
+                " tier %zu: first %ld, last %ld, update_every %ld, weight %ld\n",
+                tier,
+                qm->tiers[tier].db_first_time_s,
+                qm->tiers[tier].db_last_time_s,
+                qm->tiers[tier].db_update_every_s,
+                qm->tiers[tier].weight);
+
+    return 1;
+}
+
+static bool query_plan_unittest_build_entries(
+    QUERY_METRIC *qm, RRDR_OPTIONS options, size_t selected_tier,
+    time_t after, time_t before, size_t points) {
+    RRDR r = {0};
+    QUERY_TARGET qt = {0};
+    QUERY_ENGINE_OPS ops = {
+        .r = &r,
+        .qm = qm,
+    };
+
+    r.internal.qt = &qt;
+    qt.window.options = options;
+    qt.window.tier = selected_tier;
+
+    return query_plan_build_entries(&ops, after, before, points);
+}
+
+static int query_plan_unittest_expect_plan(
+    const char *name, QUERY_METRIC *qm, RRDR_OPTIONS options, size_t selected_tier,
+    time_t after, time_t before, size_t points,
+    const QUERY_PLAN_ENTRY *expected, size_t expected_used) {
+    if(!query_plan_unittest_build_entries(qm, options, selected_tier, after, before, points)) {
+        fprintf(stderr, "FAILED query plan entries: %s, planner returned false\n", name);
+        return 1;
+    }
+
+    if(qm->plan.used != expected_used) {
+        fprintf(stderr,
+                "FAILED query plan entries: %s, expected %zu entries, got %zu\n",
+                name, expected_used, qm->plan.used);
+        return 1;
+    }
+
+    for(size_t i = 0; i < expected_used; i++) {
+        if(qm->plan.array[i].tier == expected[i].tier &&
+           qm->plan.array[i].after == expected[i].after &&
+           qm->plan.array[i].before == expected[i].before)
+            continue;
+
+        fprintf(stderr,
+                "FAILED query plan entries: %s, entry %zu expected tier %zu after %ld before %ld, got tier %zu after %ld before %ld\n",
+                name, i,
+                expected[i].tier, expected[i].after, expected[i].before,
+                qm->plan.array[i].tier, qm->plan.array[i].after, qm->plan.array[i].before);
+        return 1;
+    }
+
+    fprintf(stderr, "OK query plan entries: %s\n", name);
+    return 0;
+}
+
+static int query_plan_unittest_expect_no_plan(
+    const char *name, QUERY_METRIC *qm, RRDR_OPTIONS options, size_t selected_tier,
+    time_t after, time_t before, size_t points) {
+    if(!query_plan_unittest_build_entries(qm, options, selected_tier, after, before, points)) {
+        fprintf(stderr, "OK query plan entries: %s\n", name);
+        return 0;
+    }
+
+    fprintf(stderr, "FAILED query plan entries: %s, expected no plan, got %zu entries\n", name, qm->plan.used);
+    return 1;
+}
+
+static int query_plan_unittest_expect_update_every(QUERY_TARGET *qt, size_t tier, time_t expected) {
+    time_t got = query_target_min_update_every_for_tier(qt, tier);
+    if(got == expected) {
+        fprintf(stderr, "OK query plan selected-tier natural update_every\n");
+        return 0;
+    }
+
+    fprintf(stderr,
+            "FAILED query plan selected-tier natural update_every: expected %ld, got %ld\n",
+            expected, got);
+
+    return 1;
+}
+
+int query_plan_unittest(void) {
+    size_t old_storage_tiers = nd_profile.storage_tiers;
+    time_t old_update_every = nd_profile.update_every;
+    int errors = 0;
+
+    nd_profile.storage_tiers = 3;
+    nd_profile.update_every = 1;
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 200, 10);
+        query_plan_unittest_set_tier(&qm, 1, 1, 200, 600);
+        query_plan_unittest_set_tier(&qm, 2, 1, 100, 36000);
+
+        errors += query_plan_unittest_expect_best_tier(
+            "sub-resolution window ignores non-overlapping coarser tier", &qm, 103, 108, 5, 0);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 200, 10);
+        query_plan_unittest_set_tier(&qm, 1, 1, 200, 600);
+        query_plan_unittest_set_tier(&qm, 2, 1, 200, 36000);
+
+        errors += query_plan_unittest_expect_best_tier(
+            "sub-resolution window chooses densest overlapping tier", &qm, 103, 108, 5, 0);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 400000, 1);
+        query_plan_unittest_set_tier(&qm, 1, 1, 400000, 600);
+        query_plan_unittest_set_tier(&qm, 2, 1, 400000, 36000);
+
+        errors += query_plan_unittest_expect_best_tier(
+            "50 percent tolerance chooses sparsest acceptable tier", &qm, 1000, 301000, 500, 1);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 1000, 1);
+        query_plan_unittest_set_tier(&qm, 1, 1, 1000, 10);
+        query_plan_unittest_set_tier(&qm, 2, 1, 1000, 11);
+
+        errors += query_plan_unittest_expect_best_tier(
+            "50 percent tolerance includes exact threshold", &qm, 100, 400, 60, 1);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 1000, 10);
+        query_plan_unittest_set_tier(&qm, 1, 1, 1000, 600);
+        query_plan_unittest_set_tier(&qm, 2, 1, 1000, 36000);
+
+        errors += query_plan_unittest_expect_best_tier(
+            "under-resolution request chooses densest tier", &qm, 100, 700, 600, 0);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 50, 10);
+        query_plan_unittest_set_tier(&qm, 1, 100, 200, 600);
+        query_plan_unittest_set_tier(&qm, 2, 1, 50, 36000);
+
+        errors += query_plan_unittest_expect_best_tier(
+            "zero-overlap tiers are not candidates", &qm, 103, 108, 5, 1);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 1, 1, 200, 600);
+        query_plan_unittest_set_tier(&qm, 2, 1, 200, 36000);
+
+        errors += query_plan_unittest_expect_best_tier(
+            "invalid duration returns first working tier", &qm, 108, 108, 5, 1);
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 300, 10);
+        query_plan_unittest_set_tier(&qm, 1, 1, 300, 600);
+
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 100, .before = 200 },
+        };
+
+        errors += query_plan_unittest_expect_plan(
+            "selected tier covers full window", &qm, 0, 0, 100, 200, 10, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 100, 180, 10);
+        query_plan_unittest_set_tier(&qm, 1, 50, 150, 30);
+
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 50, .before = 100 },
+            { .tier = 0, .after = 100, .before = 180 },
+        };
+
+        errors += query_plan_unittest_expect_plan(
+            "coarser tier fills head gap", &qm, 0, 0, 50, 180, 10, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 180, 260, 10);
+        query_plan_unittest_set_tier(&qm, 1, 100, 200, 30);
+
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 100, .before = 200 },
+            { .tier = 0, .after = 200, .before = 250 },
+        };
+
+        errors += query_plan_unittest_expect_plan(
+            "finer tier fills tail gap", &qm, 0, 0, 100, 250, 10, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 180, 260, 10);
+        query_plan_unittest_set_tier(&qm, 1, 100, 200, 30);
+        query_plan_unittest_set_tier(&qm, 2, 50, 150, 60);
+
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 2, .after = 50, .before = 100 },
+            { .tier = 1, .after = 100, .before = 200 },
+            { .tier = 0, .after = 200, .before = 250 },
+        };
+
+        errors += query_plan_unittest_expect_plan(
+            "planner fills both head and tail gaps", &qm, 0, 0, 50, 250, 10, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 180, 260, 10);
+        query_plan_unittest_set_tier(&qm, 1, 100, 200, 30);
+        query_plan_unittest_set_tier(&qm, 2, 50, 150, 60);
+
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 100, .before = 200 },
+        };
+
+        errors += query_plan_unittest_expect_plan(
+            "explicit selected tier disables gap filling", &qm, RRDR_OPTION_SELECTED_TIER, 1,
+            50, 250, 10, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 50, 10);
+        query_plan_unittest_set_tier(&qm, 1, 60, 90, 30);
+        query_plan_unittest_set_tier(&qm, 2, 100, 150, 60);
+
+        errors += query_plan_unittest_expect_no_plan(
+            "no overlapping tier fails planning", &qm, 0, 0, 200, 250, 10);
+    }
+
+    {
+        QUERY_METRIC metrics[2] = {0};
+        QUERY_TARGET qt = {0};
+
+        metrics[0].tiers[1].db_update_every_s = 600;
+        metrics[1].tiers[1].db_update_every_s = 300;
+        qt.query.array = metrics;
+        qt.query.used = 2;
+
+        errors += query_plan_unittest_expect_update_every(&qt, 1, 300);
+    }
+
+    nd_profile.storage_tiers = old_storage_tiers;
+    nd_profile.update_every = old_update_every;
+
+    return errors;
 }
