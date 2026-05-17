@@ -18,6 +18,15 @@ static void freez_aclk_publish5b(void *ptr) {
     freez(ptr);
 }
 
+static bool aclk_size_add_overflow(size_t *total, size_t add)
+{
+    if (add > SIZE_MAX - *total)
+        return true;
+
+    *total += add;
+    return false;
+}
+
 #define ACLK_HEADER_VERSION (2)
 
 uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
@@ -209,7 +218,6 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
 {
     if (unlikely(!topic || topic[0] != '/')) {
         netdata_log_error("Full topic required!");
-        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_INTERNAL_SERVER_ERROR, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, NULL, 0);
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
@@ -231,7 +239,16 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
     const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
     const int has_payload = (http_headers_len || body_len);
 
-    size_t total = json_len + (has_payload ? sep_len : 0) + http_headers_len + body_len;
+    size_t total = json_len;
+    if (unlikely(
+            (has_payload && aclk_size_add_overflow(&total, sep_len)) ||
+            aclk_size_add_overflow(&total, http_headers_len) ||
+            aclk_size_add_overflow(&total, body_len))) {
+        json_object_put(msg);
+        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
+        return HTTP_RESP_CONTENT_TOO_LONG;
+    }
+
     char *raw = mallocz(total);
 
     size_t pos = 0;
@@ -258,6 +275,11 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
     if (rc == MQTT_WSS_ERR_MSG_TOO_BIG) {
         aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
         return HTTP_RESP_CONTENT_TOO_LONG;
+    }
+
+    if (rc != MQTT_WSS_OK) {
+        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_INTERNAL_SERVER_ERROR, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, NULL, 0);
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
     return http_code;
