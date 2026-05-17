@@ -17,6 +17,7 @@ Example:
 ```bash
 source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
+AGENT_PORT="${AGENT_PORT:-19999}"
 
 read -r -d '' BODY <<'JSON'
 {
@@ -29,7 +30,7 @@ JSON
 
 agents_query_agent \
     --node "$NODE_UUID" \
-    --host "$AGENT_HOST:19999" \
+    --host "${AGENT_HOST}:${AGENT_PORT}" \
     --machine-guid "$AGENT_MG" \
     POST '/api/v3/function?function=topology:network-connections' "$BODY" \
   | jq '.data | {
@@ -45,7 +46,7 @@ agents_query_agent \
 ```bash
 agents_query_agent \
     --node "$NODE_UUID" \
-    --host "$AGENT_HOST:19999" \
+    --host "${AGENT_HOST}:${AGENT_PORT}" \
     --machine-guid "$AGENT_MG" \
     POST '/api/v3/function?function=topology:network-connections' \
     '{"info":true,"timeout":30000}' \

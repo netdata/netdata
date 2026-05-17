@@ -176,3 +176,11 @@ func TestEmptyStringDictionaryReturnsEmptyValues(t *testing.T) {
 
 	assert.Equal(t, []any{}, dict.Values())
 }
+
+func TestNilStringDictionaryRefPanics(t *testing.T) {
+	var dict *StringDictionary
+
+	assert.Panics(t, func() {
+		dict.Ref("alpha")
+	})
+}

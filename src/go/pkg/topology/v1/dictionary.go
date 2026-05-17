@@ -18,6 +18,9 @@ func NewStringDictionary(values ...string) *StringDictionary {
 }
 
 func (dict *StringDictionary) Ref(value string) int {
+	if dict == nil {
+		panic("topologyv1.StringDictionary.Ref called on nil dictionary")
+	}
 	if dict.index == nil {
 		dict.index = make(map[string]int)
 	}
