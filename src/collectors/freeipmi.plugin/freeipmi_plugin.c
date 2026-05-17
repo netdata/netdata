@@ -2028,7 +2028,7 @@ int main (int argc, char **argv) {
 
         switch(state.sensors.status) {
             case ICS_RUNNING:
-                if(state.sensors.last_iteration_ut < now_monotonic_usec() - IPMI_RESTART_IF_SENSORS_DONT_ITERATE_EVERY_SECONDS * USEC_PER_SEC) {
+                if(now_monotonic_usec() > state.sensors.last_iteration_ut + IPMI_RESTART_IF_SENSORS_DONT_ITERATE_EVERY_SECONDS * USEC_PER_SEC) {
                     collector_error("%s(): sensors have not be collected for %zu seconds. Exiting to restart.",
                                     __FUNCTION__, (size_t)((now_monotonic_usec() - state.sensors.last_iteration_ut) / USEC_PER_SEC));
 
