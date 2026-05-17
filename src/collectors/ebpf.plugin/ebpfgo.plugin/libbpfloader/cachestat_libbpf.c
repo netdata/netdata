@@ -483,7 +483,7 @@ int netdata_cachestat_runtime_update_controller(
     if (fd < 0)
         return -1;
 
-    uint32_t values[NETDATA_CONTROLLER_END] = {
+    const uint32_t values[NETDATA_CONTROLLER_END] = {
         apps_enabled ? 1U : 0U,
         (uint32_t)apps_level,
         0,
@@ -491,9 +491,31 @@ int netdata_cachestat_runtime_update_controller(
         0,
         0,
     };
+    const enum bpf_map_type type = bpf_map__type(map);
+    const bool is_percpu = (type == BPF_MAP_TYPE_PERCPU_ARRAY || type == BPF_MAP_TYPE_PERCPU_HASH);
 
     for (uint32_t key = NETDATA_CONTROLLER_APPS_ENABLED; key < NETDATA_CONTROLLER_PID_TABLE_ADD; key++) {
-        if (bpf_map_update_elem(fd, &key, &values[key], BPF_ANY))
+        if (!is_percpu) {
+            if (bpf_map_update_elem(fd, &key, &values[key], BPF_ANY))
+                return -1;
+            continue;
+        }
+
+        const int cpus = libbpf_num_possible_cpus();
+        if (cpus <= 0)
+            return -1;
+
+        uint32_t *percpu = calloc((size_t)cpus, sizeof(*percpu));
+        if (!percpu)
+            return -1;
+
+        for (int cpu = 0; cpu < cpus; cpu++)
+            percpu[cpu] = values[key];
+
+        const int rc = bpf_map_update_elem(fd, &key, percpu, BPF_ANY);
+        free(percpu);
+
+        if (rc)
             return -1;
     }
 
