@@ -226,6 +226,7 @@ int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
+int query_plan_unittest(void);
 #ifdef ENABLE_ML
 int ml_unittest(void);
 #endif
@@ -441,6 +442,7 @@ int netdata_main(int argc, char **argv) {
                             if (rrdlabels_unittest()) return 1;
                             if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
+                            if (query_plan_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
@@ -549,6 +551,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "utf8sanitizertest") == 0) {
                             unittest_running = true;
                             return utf8_sanitizer_unittest();
+                        }
+                        else if(strcmp(optarg, "queryplantest") == 0) {
+                            unittest_running = true;
+                            return query_plan_unittest();
                         }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {

@@ -17,6 +17,13 @@
 struct aclk_request {
     bool has_type;
     bool is_http;
+    // Heap-allocated string fields below are owned by the local instance in
+    // aclk_handle_cloud_cmd_message. On the v2 success path, msg_id and
+    // callback_topic are transferred into the query and released by
+    // aclk_query_free; payload is not consumed by v2 (the HTTP body is
+    // re-derived from the raw frame) and must be freed by the caller on both
+    // success and error paths. Any new owned field added here must extend
+    // both cleanup paths to preserve this invariant.
     char *msg_id;
     char *callback_topic;
     char *payload;
@@ -205,8 +212,11 @@ int aclk_handle_cloud_cmd_message(char *payload)
     }
 
     if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload))) {
-        // aclk_handle_cloud_request takes ownership of the pointers
-        // (to avoid copying) in case of success
+        // aclk_handle_cloud_http_request_v2 takes ownership of msg_id and
+        // callback_topic on success. The JSON-parsed payload field is not
+        // consumed by v2 (the HTTP body comes from the raw frame), so free
+        // it here to avoid leaking when the cmd JSON included a "payload" key.
+        freez(cloud_to_agent.payload);
         return 0;
     }
 
