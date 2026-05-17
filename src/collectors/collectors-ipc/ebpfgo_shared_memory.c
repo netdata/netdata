@@ -55,6 +55,21 @@ static bool netdata_ebpfgo_shared_pid_memory_sem_wait(sem_t *sem)
     }
 }
 
+static bool netdata_ebpfgo_shared_pid_memory_open_sem(
+    netdata_ebpfgo_shared_pid_memory_t *ctx,
+    const char *sem_name)
+{
+    if (!ctx || !sem_name)
+        return false;
+
+    sem_t *sem = sem_open(sem_name, 0);
+    if (sem == SEM_FAILED)
+        return false;
+
+    ctx->sem = sem;
+    return true;
+}
+
 static void netdata_ebpfgo_shared_pid_memory_close_internal(netdata_ebpfgo_shared_pid_memory_t *ctx)
 {
     if (!ctx)
@@ -112,9 +127,8 @@ static bool netdata_ebpfgo_shared_pid_memory_open(
         goto fail;
     }
 
-    if (sem_name) {
-        ctx->sem = sem_open(sem_name, 0);
-    }
+    if (sem_name)
+        netdata_ebpfgo_shared_pid_memory_open_sem(ctx, sem_name);
 
     return true;
 
@@ -171,6 +185,11 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
             if (!netdata_ebpfgo_shared_pid_memory_open(ctx, shm_name, sem_name))
                 return false;
         }
+    }
+
+    if (ctx->sem == SEM_FAILED) {
+        if (!netdata_ebpfgo_shared_pid_memory_open_sem(ctx, sem_name))
+            return false;
     }
 
     bool locked = false;
