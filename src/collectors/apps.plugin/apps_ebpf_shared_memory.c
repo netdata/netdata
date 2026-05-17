@@ -35,9 +35,9 @@ void apps_ebpf_accumulate_cachestat(void)
         if (unlikely(!p->has_ebpf || !p->updated))
             continue;
 
-        struct target *w;
-        if (unlikely(!(w = p->target)))
+        if (unlikely(!p->target))
             continue;
+        struct target *w = p->target;
 
         const struct ebpf_cachestat *current = &p->ebpf.cachestat.current;
 
