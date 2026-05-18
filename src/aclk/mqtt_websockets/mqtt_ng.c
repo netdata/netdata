@@ -1300,6 +1300,8 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
 
     if (client->max_msg_size && PUBLISH_SP_SIZE + mqtt_ng_publish_size(topic, msg_len, topic_id) > client->max_msg_size) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Message too big for server: %zu", msg_len);
+        if (packet_id)
+            *packet_id = 0;
         if (msg_free)
             msg_free(msg);
         return MQTT_NG_MSGGEN_MSG_TOO_BIG;
