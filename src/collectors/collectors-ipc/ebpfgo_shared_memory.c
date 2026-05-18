@@ -193,8 +193,9 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
 
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
-        if (!netdata_ebpfgo_shared_pid_memory_sem_wait(ctx->sem))
-            return false;
+        if (!netdata_ebpfgo_shared_pid_memory_sem_wait(ctx->sem)) {
+            return ctx->snapshot && ctx->snapshot_total;
+        }
         locked = true;
     }
 
