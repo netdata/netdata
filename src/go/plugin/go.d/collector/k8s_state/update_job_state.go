@@ -48,10 +48,10 @@ func (c *Collector) updateJobState(r resource) {
 	}
 
 	if job.Status.StartTime != nil {
-		st.startTime = ptr(job.Status.StartTime.Time)
+		st.startTime = new(job.Status.StartTime.Time)
 	}
 	if job.Status.CompletionTime != nil {
-		st.completionTime = ptr(job.Status.CompletionTime.Time)
+		st.completionTime = new(job.Status.CompletionTime.Time)
 	}
 	st.active = job.Status.Active
 	st.conditions = job.Status.Conditions

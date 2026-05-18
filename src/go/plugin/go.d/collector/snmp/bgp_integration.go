@@ -5,6 +5,7 @@ package snmp
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -173,12 +174,7 @@ func collectorSpecificMethodConfigs() []funcapi.MethodConfig {
 }
 
 func profilesHaveBGP(profiles []*ddsnmp.Profile) bool {
-	for _, prof := range profiles {
-		if profileHasBGP(prof) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(profiles, profileHasBGP)
 }
 
 func profileHasBGP(prof *ddsnmp.Profile) bool {

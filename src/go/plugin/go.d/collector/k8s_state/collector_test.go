@@ -517,7 +517,7 @@ func TestCollector_Collect(t *testing.T) {
 			create: func(t *testing.T) testCase {
 				cj := prepareCronJob("cronjob01")
 				cjSuspended := prepareCronJob("cronjob02")
-				cjSuspended.Spec.Suspend = ptr(true)
+				cjSuspended.Spec.Suspend = new(true)
 				jobNotStarted := prepareCronJobNotStartedJob("job-not-started", cj)
 				jobComplete := prepareCronJobCompleteJob("job-complete", cj)
 				jobFailed := prepareCronJobFailedJob("job-failed", cj)
@@ -1158,7 +1158,7 @@ func prepareCronJobJob(name string, cj *batchv1.CronJob) *batchv1.Job {
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					Controller: ptr(true),
+					Controller: new(true),
 					Kind:       "CronJob",
 					UID:        cj.UID,
 					Name:       cj.Name,
