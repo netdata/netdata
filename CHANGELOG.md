@@ -184,6 +184,9 @@
 - Update bundled static curl to 8.20.0 ([#22473](https://github.com/netdata/netdata/issues/22473))
 - Feat(integrations): add collector taxonomy framework POC ([#22489](https://github.com/netdata/netdata/issues/22489))
 - Docs: task class: improve_docs — add a 'check status' section to the service [surgical_edit] ([#22485](https://github.com/netdata/netdata/issues/22485))
+- Fix query tier selection for sub-resolution windows ([#22495](https://github.com/netdata/netdata/issues/22495))
+- Freeipmi.plugin: fix watchdog underflow at low system uptime ([#22490](https://github.com/netdata/netdata/issues/22490))
+- Fix payload memory leak ([#22492](https://github.com/netdata/netdata/issues/22492))
 
 ## [2.10.0] - 2026-04-09
 
