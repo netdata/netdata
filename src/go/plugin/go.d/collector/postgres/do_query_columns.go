@@ -24,7 +24,7 @@ func (c *Collector) doDBQueryColumns(db *sql.DB) error {
 
 	for _, m := range c.mx.tables {
 		if m.nullColumns != nil {
-			m.nullColumns = newInt(0)
+			m.nullColumns = new(int64(0))
 		}
 	}
 
@@ -47,7 +47,7 @@ func (c *Collector) doDBQueryColumns(db *sql.DB) error {
 		if nullPerc == 100 && c.hasTableMetrics(table, dbname, schema) {
 			v := c.getTableMetrics(table, dbname, schema)
 			if v.nullColumns == nil {
-				v.nullColumns = newInt(0)
+				v.nullColumns = new(int64(0))
 			}
 			*v.nullColumns++
 		}

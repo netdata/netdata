@@ -441,28 +441,28 @@ func setFieldDefaults(field *ConfigField) {
 	switch field.Name {
 	case "UpdateEvery":
 		field.Default = 1
-		field.Minimum = intPtr(1)
+		field.Minimum = new(1)
 	case "ConnectTimeout":
 		field.Default = 5
-		field.Minimum = intPtr(1)
-		field.Maximum = intPtr(300)
+		field.Minimum = new(1)
+		field.Maximum = new(300)
 	case "CollectItems":
 		field.Default = true
 	case "MaxItems":
 		field.Default = 10
-		field.Minimum = intPtr(1)
-		field.Maximum = intPtr(1000)
+		field.Minimum = new(1)
+		field.Maximum = new(1000)
 	case "Endpoint":
 		field.Default = "dummy://localhost"
 		field.Examples = []string{"dummy://localhost", "tcp://server:1414"}
 	case "ObsoletionIterations":
 		field.Default = 60
-		field.Minimum = intPtr(1)
+		field.Minimum = new(1)
 
 	// Generic defaults for common field patterns
 	case "Port":
-		field.Minimum = intPtr(1)
-		field.Maximum = intPtr(65535)
+		field.Minimum = new(1)
+		field.Maximum = new(65535)
 	}
 
 	// Set format hints for specific field types

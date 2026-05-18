@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -149,15 +150,11 @@ func cloneMessageQueueSnapshot(src messageQueueSnapshot) messageQueueSnapshot {
 	}
 	if src.metrics != nil {
 		dst.metrics = make(map[string]messageQueueInstanceMetrics, len(src.metrics))
-		for k, v := range src.metrics {
-			dst.metrics[k] = v
-		}
+		maps.Copy(dst.metrics, src.metrics)
 	}
 	if src.meta != nil {
 		dst.meta = make(map[string]messageQueueMetrics, len(src.meta))
-		for k, v := range src.meta {
-			dst.meta[k] = v
-		}
+		maps.Copy(dst.meta, src.meta)
 	}
 	return dst
 }
@@ -169,15 +166,11 @@ func cloneJobQueueSnapshot(src jobQueueSnapshot) jobQueueSnapshot {
 	}
 	if src.metrics != nil {
 		dst.metrics = make(map[string]jobQueueInstanceMetrics, len(src.metrics))
-		for k, v := range src.metrics {
-			dst.metrics[k] = v
-		}
+		maps.Copy(dst.metrics, src.metrics)
 	}
 	if src.meta != nil {
 		dst.meta = make(map[string]jobQueueMetrics, len(src.meta))
-		for k, v := range src.meta {
-			dst.meta[k] = v
-		}
+		maps.Copy(dst.meta, src.meta)
 	}
 	return dst
 }
@@ -189,15 +182,11 @@ func cloneOutputQueueSnapshot(src outputQueueSnapshot) outputQueueSnapshot {
 	}
 	if src.metrics != nil {
 		dst.metrics = make(map[string]outputQueueInstanceMetrics, len(src.metrics))
-		for k, v := range src.metrics {
-			dst.metrics[k] = v
-		}
+		maps.Copy(dst.metrics, src.metrics)
 	}
 	if src.meta != nil {
 		dst.meta = make(map[string]outputQueueMetrics, len(src.meta))
-		for k, v := range src.meta {
-			dst.meta[k] = v
-		}
+		maps.Copy(dst.meta, src.meta)
 	}
 	return dst
 }
@@ -209,15 +198,11 @@ func cloneSubsystemSnapshot(src subsystemSnapshot) subsystemSnapshot {
 	}
 	if src.metrics != nil {
 		dst.metrics = make(map[string]subsystemInstanceMetrics, len(src.metrics))
-		for k, v := range src.metrics {
-			dst.metrics[k] = v
-		}
+		maps.Copy(dst.metrics, src.metrics)
 	}
 	if src.meta != nil {
 		dst.meta = make(map[string]subsystemMetrics, len(src.meta))
-		for k, v := range src.meta {
-			dst.meta[k] = v
-		}
+		maps.Copy(dst.meta, src.meta)
 	}
 	return dst
 }
@@ -229,15 +214,11 @@ func clonePlanCacheSnapshot(src planCacheSnapshot) planCacheSnapshot {
 	}
 	if src.values != nil {
 		dst.values = make(map[string]planCacheInstanceMetrics, len(src.values))
-		for k, v := range src.values {
-			dst.values[k] = v
-		}
+		maps.Copy(dst.values, src.values)
 	}
 	if src.meta != nil {
 		dst.meta = make(map[string]planCacheMetrics, len(src.meta))
-		for k, v := range src.meta {
-			dst.meta[k] = v
-		}
+		maps.Copy(dst.meta, src.meta)
 	}
 	return dst
 }

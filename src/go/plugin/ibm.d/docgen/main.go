@@ -251,7 +251,7 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 		}}, fields...)
 	}
 
-	ensureField("update_every", "Data collection frequency", "UpdateEvery", 10, "integer", "Connection", "", intPtr(1), nil)
+	ensureField("update_every", "Data collection frequency", "UpdateEvery", 10, "integer", "Connection", "", new(1), nil)
 
 	if g.hasHTTPConfig {
 		ensureField("url", "Target URL", "", "", "string", "Connection", "", nil, nil)
@@ -282,7 +282,7 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Required:    false,
 			Default:     10,
 			Description: "Data collection frequency",
-			Minimum:     intPtr(1),
+			Minimum:     new(1),
 		},
 		{
 			Name:        "reset_statistics",
@@ -311,8 +311,8 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Required:    false,
 			Default:     5,
 			Description: "Connection timeout in seconds",
-			Minimum:     intPtr(1),
-			Maximum:     intPtr(300),
+			Minimum:     new(1),
+			Maximum:     new(300),
 		},
 		{
 			Name:        "collect_items",
@@ -331,14 +331,15 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Required:    false,
 			Default:     10,
 			Description: "Maximum number of items to collect",
-			Minimum:     intPtr(1),
-			Maximum:     intPtr(1000),
+			Minimum:     new(1),
+			Maximum:     new(1000),
 		},
 	}
 }
 
+//go:fix inline
 func intPtr(i int) *int {
-	return &i
+	return new(i)
 }
 
 func indent(spaces int, text string) string {

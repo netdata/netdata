@@ -180,7 +180,7 @@ func (d *downloader) resolveCAIDAPrefix2ASURL(logURL string) (string, error) {
 	}
 
 	candidates := make([]caidaCandidate, 0)
-	for _, line := range strings.Split(string(page), "\n") {
+	for line := range strings.SplitSeq(string(page), "\n") {
 		fields := strings.Fields(strings.TrimSpace(line))
 		if len(fields) == 0 {
 			continue

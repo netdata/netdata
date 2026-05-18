@@ -25,7 +25,7 @@ func cleanName(name string) string {
 	return strings.ToLower(r.Replace(name))
 }
 
-func (c *Collector) logOnce(key string, format string, args ...interface{}) {
+func (c *Collector) logOnce(key string, format string, args ...any) {
 	if c.disabled[key] {
 		return
 	}
@@ -33,7 +33,7 @@ func (c *Collector) logOnce(key string, format string, args ...interface{}) {
 	c.disabled[key] = true
 }
 
-func (c *Collector) logErrorOnce(key string, format string, args ...interface{}) {
+func (c *Collector) logErrorOnce(key string, format string, args ...any) {
 	c.muErrorLog.Lock()
 	defer c.muErrorLog.Unlock()
 
