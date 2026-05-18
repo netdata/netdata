@@ -216,6 +216,12 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
+    // normalize NULL-with-len so the allocation size and the memcpys stay in sync
+    if (!http_headers)
+        http_headers_len = 0;
+    if (!body)
+        body_len = 0;
+
     json_object *msg = create_hdr("http", msg_id);
     json_object *tmp;
 
