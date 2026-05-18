@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD043 -->
+
 # Netdata Topology Function Schema
 
 This document defines the production topology payload contract for Netdata
@@ -623,16 +625,37 @@ Example socket evidence type:
       "socket": {
         "link_type": "socket",
         "role": "relationship_evidence",
-        "match_columns": ["client_ip", "client_port", "server_ip", "server_port", "protocol"],
+        "match_columns": [
+          "client_ip",
+          "client_port",
+          "server_ip",
+          "server_port",
+          "protocol"
+        ],
         "columns": [
           {"id": "link", "type": "link_ref", "role": "reference"},
           {"id": "src_actor", "type": "actor_ref", "role": "reference"},
           {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
-          {"id": "client_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+          {
+            "id": "client_ip",
+            "type": "ip_ref",
+            "dictionary": "strings",
+            "role": "group_key"
+          },
           {"id": "client_port", "type": "uint", "role": "group_key"},
-          {"id": "server_ip", "type": "ip_ref", "dictionary": "strings", "role": "group_key"},
+          {
+            "id": "server_ip",
+            "type": "ip_ref",
+            "dictionary": "strings",
+            "role": "group_key"
+          },
           {"id": "server_port", "type": "uint", "role": "group_key"},
-          {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+          {
+            "id": "protocol",
+            "type": "string_ref",
+            "dictionary": "strings",
+            "role": "group_key"
+          },
           {"id": "namespace", "type": "string_ref", "dictionary": "strings"},
           {"id": "rtt_ms_max", "type": "float", "unit": "ms", "aggregation": "max"}
         ]
@@ -723,8 +746,18 @@ Use a compact actor-owned label table for display labels and metadata:
           {"id": "actor", "type": "actor_ref", "role": "reference"},
           {"id": "key", "type": "string_ref", "dictionary": "strings"},
           {"id": "value", "type": "string_ref", "dictionary": "strings"},
-          {"id": "source", "type": "string_ref", "dictionary": "strings", "nullable": true},
-          {"id": "kind", "type": "string_ref", "dictionary": "strings", "nullable": true},
+          {
+            "id": "source",
+            "type": "string_ref",
+            "dictionary": "strings",
+            "nullable": true
+          },
+          {
+            "id": "kind",
+            "type": "string_ref",
+            "dictionary": "strings",
+            "nullable": true
+          },
           {"id": "value_index", "type": "uint", "nullable": true}
         ]
       }

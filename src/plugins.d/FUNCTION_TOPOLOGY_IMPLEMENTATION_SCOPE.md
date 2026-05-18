@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD043 -->
+
 # Topology Schema Implementation Scope
 
 This document scopes the work needed to move Netdata topology producers,
@@ -11,7 +13,8 @@ backend, frontend, producer, and aggregator changes.
 ## Ground Rules
 
 - New topology producers emit only the new schema.
-- Superseded topology schema support is removed from Agent/backend contracts and docs.
+- Superseded topology schema support is removed from Agent/backend contracts
+  and docs.
 - Temporary compatibility support may exist only as an isolated Cloud frontend
   adapter during Agent rollout.
 - Production payloads carry canonical topology facts, not reconstruction
@@ -196,8 +199,8 @@ Required behavior:
 - default to aggregated graph projection while preserving detailed evidence;
 - support aggregation scopes prepared for node, process name, PID, container,
   and Kubernetes workload labels as enrichment becomes available;
-- omit compatibility per-row display strings, duplicated labels, and actor modal socket
-  tables from production payload;
+- omit compatibility per-row display strings, duplicated labels, and actor
+  modal socket tables from production payload;
 - keep current metrics optional and separate from topology identity.
 
 Validation:

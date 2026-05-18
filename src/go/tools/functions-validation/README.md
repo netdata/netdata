@@ -22,12 +22,14 @@ src/go/go.d.plugin \
 ```
 
 ## Validate output
+
 ```
 echo '{"status":200,"type":"table","columns":{},"data":[]}' | \
   (cd src/go && go run ./tools/functions-validation/validate)
 ```
 
 ## Validate topology v1 fixtures
+
 ```
 (cd src/go && \
   go run ./tools/functions-validation/validate \
