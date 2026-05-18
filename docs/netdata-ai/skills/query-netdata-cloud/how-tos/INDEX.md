@@ -46,9 +46,9 @@ Bearer $TOKEN"` -- that defeats the no-token-leak guarantee.
 
 ## Index
 
-(Populate as how-tos are authored. Stubs below are common
-operator questions; replace each `(stub -- not yet authored)` with
-a real link as soon as a how-to is written.)
+(Populate as how-tos are authored. Stubs below mirror the canonical
+skill-verification harness questions for `verify/questions.md`; replace each
+`(stub -- not yet authored)` with a real link as soon as a how-to is written.)
 
 ### Identity / hardware / OS
 

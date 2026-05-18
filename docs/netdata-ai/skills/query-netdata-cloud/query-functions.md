@@ -59,7 +59,7 @@ that build on the same envelope but emit non-tabular `data`:
 
 | `type` | Response shape | Examples | Guide |
 |---|---|---|---|
-| `topology` | compact topology schema with actor, link, evidence, detail-table, and overlay sections | `topology:network-connections`, `topology:streaming`, `topology:snmp` | [query-topology.md](./query-topology.md) |
+| `topology` | `data.actors`/`data.links` graph plus compact-schema sections (`data.evidence`, `data.tables`, `data.overlays`) | `topology:network-connections`, `topology:streaming`, `topology:snmp` | [query-topology.md](./query-topology.md) |
 | `flows` | `data.flows[]` plus `data.facets` / `data.columns` / `data.stats` over a time window | `flows:netflow` (covers NetFlow / sFlow / IPFIX) | [query-flows.md](./query-flows.md) |
 
 For full protocol semantics (facet pills, histograms, charts

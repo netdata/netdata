@@ -3,7 +3,7 @@
 package topologyv1
 
 type StringDictionary struct {
-	values []any
+	values []string
 	index  map[string]int
 }
 
@@ -37,5 +37,9 @@ func (dict *StringDictionary) Values() []any {
 	if dict == nil || len(dict.values) == 0 {
 		return []any{}
 	}
-	return append([]any(nil), dict.values...)
+	values := make([]any, len(dict.values))
+	for index, value := range dict.values {
+		values[index] = value
+	}
+	return values
 }

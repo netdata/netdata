@@ -79,7 +79,7 @@ func validateJSON(schemaBytes, inputBytes []byte) (any, error) {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
-	if obj, ok := payload.(map[string]any); ok {
+	if obj, ok := payload.(map[string]any); ok && isTopologyResponse(obj) {
 		if data, ok := obj["data"]; ok && topologyv1.IsDecodedData(data) {
 			if err := topologyv1.ValidateDecodedResponse(payload); err != nil {
 				return nil, fmt.Errorf("topology validation failed: %w", err)
@@ -108,7 +108,7 @@ func countRows(payload any) (int, error) {
 		return 0, fmt.Errorf("missing data field")
 	}
 
-	if topologyv1.IsDecodedData(data) {
+	if isTopologyResponse(obj) && topologyv1.IsDecodedData(data) {
 		return topologyv1.GraphRowsFromDecodedData(data)
 	}
 
@@ -118,6 +118,11 @@ func countRows(payload any) (int, error) {
 	}
 
 	return len(rows), nil
+}
+
+func isTopologyResponse(obj map[string]any) bool {
+	responseType, ok := obj["type"].(string)
+	return ok && responseType == "topology"
 }
 
 func loadSchema(path string) ([]byte, error) {

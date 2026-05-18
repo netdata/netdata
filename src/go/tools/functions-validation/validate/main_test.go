@@ -67,6 +67,21 @@ func TestFunctionUISchemaValidationSkipsTopologySemanticsForTableResponses(t *te
 	}
 }
 
+func TestValidationSkipsTopologySemanticsForNonTopologyObjectData(t *testing.T) {
+	schemaBytes := []byte(`{"type": "object"}`)
+	input := []byte(`{
+		"status": 200,
+		"type": "custom",
+		"data": {
+			"schema_version": "netdata.topology.v1"
+		}
+	}`)
+
+	if _, err := validateJSON(schemaBytes, input); err != nil {
+		t.Fatalf("validate custom response: %v", err)
+	}
+}
+
 func TestCountRowsUsesActorsWhenTopologyHasNoLinks(t *testing.T) {
 	payload := decodeTestJSON(t, `{
 		"status": 200,
@@ -89,6 +104,26 @@ func TestCountRowsUsesActorsWhenTopologyHasNoLinks(t *testing.T) {
 	}
 	if rows != 2 {
 		t.Fatalf("expected actor rows when there are no links, got %d", rows)
+	}
+}
+
+func TestCountRowsDoesNotTreatNonTopologyObjectDataAsGraph(t *testing.T) {
+	payload := decodeTestJSON(t, `{
+		"status": 200,
+		"type": "custom",
+		"data": {
+			"schema_version": "netdata.topology.v1",
+			"actors": {"rows": 4, "columns": [], "values": []},
+			"links": {"rows": 1, "columns": [], "values": []}
+		}
+	}`)
+
+	_, err := countRows(payload)
+	if err == nil {
+		t.Fatal("expected non-array data error")
+	}
+	if !strings.Contains(err.Error(), "data is not an array") {
+		t.Fatalf("expected non-array data error, got %v", err)
 	}
 }
 
