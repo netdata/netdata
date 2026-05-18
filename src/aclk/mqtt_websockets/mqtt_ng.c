@@ -1308,10 +1308,15 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
     int rc = TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
     if (rc == MQTT_NG_MSGGEN_OK) {
         add_packet_to_timeout_monitor_list(client, *packet_id);
-    } else if (msg_free) {
-        // generator rolled back without attaching msg to a fragment; free here so the
-        // publish-layer contract (msg freed on every non-OK return) holds for all callers
-        msg_free(msg);
+    } else {
+        // generator may have written *packet_id before rolling back; clear it so callers
+        // don't observe a stale id on failure
+        *packet_id = 0;
+        if (msg_free) {
+            // generator rolled back without attaching msg to a fragment; free here so the
+            // publish-layer contract (msg freed on every non-OK return) holds for all callers
+            msg_free(msg);
+        }
     }
     return rc;
 }
