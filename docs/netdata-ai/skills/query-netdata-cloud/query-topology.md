@@ -135,7 +135,7 @@ jq '.data | {
   schema: .schema_version,
   actors: .actors.rows,
   links: .links.rows,
-  evidence_rows: (.evidence | to_entries | map(.value.table.rows) | add // 0),
+  evidence_rows: ([.evidence[]?.table.rows] | add // 0),
   stats
 }'
 ```
