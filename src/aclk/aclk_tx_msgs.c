@@ -11,10 +11,7 @@
 #pragma region aclk_tx_msgs helper functions
 #endif
 
-static void freez_aclk_publish5a(void *ptr) {
-    freez(ptr);
-}
-static void freez_aclk_publish5b(void *ptr) {
+static void freez_aclk_publish_msg(void *ptr) {
     freez(ptr);
 }
 
@@ -41,6 +38,8 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
         netdata_log_error("Couldn't get topic. Aborting message send.");
         return 0;
     }
+
+    mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish_msg, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (aclklog_enabled) {
         char *json = protomsg_to_json(msg, msg_len, msgname);
@@ -86,7 +85,7 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
         memcpy(&full_msg[len], payload, payload_len);
     }
 
-    int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish_msg, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (rc == MQTT_WSS_ERR_MSG_TOO_BIG)
         return HTTP_RESP_CONTENT_TOO_LONG;
@@ -207,10 +206,6 @@ short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *ms
     return rc;
 }
 
-static void freez_aclk_publish5c(void *ptr) {
-    freez(ptr);
-}
-
 short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const char *msg_id,
                                usec_t t_exec, usec_t created, short http_code,
                                const char *http_headers, size_t http_headers_len,
@@ -237,7 +232,7 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
     const char *json_str = json_object_to_json_string_length(msg, JSON_C_TO_STRING_PLAIN, &json_len);
 
     const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
-    const int has_payload = (http_headers_len || body_len);
+    const bool has_payload = (http_headers_len != 0 || body_len != 0);
 
     size_t total = json_len;
     if (unlikely(
@@ -270,7 +265,7 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
         memcpy(raw + pos, body, body_len);
 
     uint16_t packet_id;
-    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, raw, &freez_aclk_publish5c, total, MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, raw, &freez_aclk_publish_msg, total, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (rc == MQTT_WSS_ERR_MSG_TOO_BIG) {
         aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
