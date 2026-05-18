@@ -181,9 +181,11 @@ static void cgroup_ebpfgo_cachestat_update_single_chart(
     const char *dimension,
     const char *units,
     int priority,
+    collected_number divisor,
     collected_number value)
 {
     RRDSET *chart = *chart_ptr;
+    collected_number scale = divisor ? divisor : 1;
 
     if (unlikely(!chart)) {
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -202,7 +204,7 @@ static void cgroup_ebpfgo_cachestat_update_single_chart(
             RRDSET_TYPE_LINE);
 
         rrdset_update_rrdlabels(chart, cg->chart_labels);
-        rrddim_add(chart, dimension, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rrddim_add(chart, dimension, NULL, 1, scale, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set(chart, dimension, value);
@@ -243,6 +245,7 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
         "ratio",
         "%",
         prio,
+        1,
         (collected_number)cg->cachestat.ratio);
 
     cgroup_ebpfgo_cachestat_update_single_chart(
@@ -254,6 +257,7 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
         "dirty",
         "page/s",
         prio + 1,
+        cgroup_update_every,
         (collected_number)cg->cachestat.dirty);
 
     cgroup_ebpfgo_cachestat_update_single_chart(
@@ -265,6 +269,7 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
         "hit",
         "hits/s",
         prio + 2,
+        cgroup_update_every,
         (collected_number)cg->cachestat.hit);
 
     cgroup_ebpfgo_cachestat_update_single_chart(
@@ -276,6 +281,7 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
         "miss",
         "misses/s",
         prio + 3,
+        cgroup_update_every,
         (collected_number)cg->cachestat.miss);
 }
 
