@@ -97,7 +97,7 @@ func parseVoltage(s *VoltageSensor, values map[string]rawValue) error {
 		case "label":
 			s.Label = v
 		case "alarm":
-			s.Alarm = ptr(v != "0")
+			s.Alarm = new(v != "0")
 		case "min":
 			s.Min, err = parseFloat(v, div)
 		case "lcrit":
@@ -142,7 +142,7 @@ func parseFan(s *FanSensor, values map[string]rawValue) error {
 		case "target":
 			s.Target, err = parseFloat(v, div)
 		case "alarm":
-			s.Alarm = ptr(v != "0")
+			s.Alarm = new(v != "0")
 		case "label":
 			s.Label = v
 		}
@@ -181,7 +181,7 @@ func parseTemperature(s *TemperatureSensor, values map[string]rawValue) error {
 		case "highest":
 			s.Highest, err = parseFloat(v, div)
 		case "alarm":
-			s.Alarm = ptr(v != "0")
+			s.Alarm = new(v != "0")
 		case "type":
 			t, err := strconv.Atoi(v)
 			if err != nil {
@@ -226,7 +226,7 @@ func parseCurrent(s *CurrentSensor, values map[string]rawValue) error {
 		case "highest":
 			s.Highest, err = parseFloat(v, div)
 		case "alarm":
-			s.Alarm = ptr(v != "0")
+			s.Alarm = new(v != "0")
 		case "label":
 			s.Label = v
 		}
@@ -251,7 +251,7 @@ func parsePower(s *PowerSensor, values map[string]rawValue) error {
 		case "label":
 			s.Label = v
 		case "alarm":
-			s.Alarm = ptr(v != "0")
+			s.Alarm = new(v != "0")
 		case "average":
 			s.Average, err = parseFloat(v, div)
 		case "average_highest":
@@ -345,7 +345,7 @@ func parseIntrusion(s *IntrusionSensor, values map[string]rawValue) error {
 		case "label":
 			s.Label = v
 		case "alarm":
-			s.Alarm = ptr(v != "0")
+			s.Alarm = new(v != "0")
 		}
 	}
 
@@ -358,7 +358,8 @@ func parseFloat(s string, div float64) (*float64, error) {
 		return nil, err
 	}
 
-	return ptr(f / div), nil
+	return new(f / div), nil
 }
 
-func ptr[T any](v T) *T { return &v }
+//go:fix inline
+func ptr[T any](v T) *T { return new(v) }

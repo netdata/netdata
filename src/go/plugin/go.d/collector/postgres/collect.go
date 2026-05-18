@@ -309,8 +309,9 @@ func parseFloat(s string) int64 {
 	return int64(v)
 }
 
+//go:fix inline
 func newInt(v int64) *int64 {
-	return &v
+	return new(v)
 }
 
 func calcPercentage(value, total int64) (v int64) {

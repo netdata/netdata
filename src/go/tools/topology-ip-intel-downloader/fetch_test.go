@@ -205,5 +205,5 @@ func clearTarMagicAndRecomputeChecksum(t *testing.T, header []byte) {
 	for _, b := range header {
 		sum += int(b)
 	}
-	copy(header[148:156], []byte(fmt.Sprintf("%06o\x00 ", sum)))
+	copy(header[148:156], fmt.Appendf(nil, "%06o\x00 ", sum))
 }
