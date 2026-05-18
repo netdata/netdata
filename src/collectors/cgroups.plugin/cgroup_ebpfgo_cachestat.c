@@ -16,6 +16,10 @@ static bool cgroup_ebpfgo_find_procs_path(char *path_buf, size_t path_buf_size, 
         return stat(path_buf, &buf) == 0;
     }
 
+    snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_cpuacct_base, cg_id);
+    if (stat(path_buf, &buf) == 0)
+        return true;
+
     snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_cpuset_base, cg_id);
     if (stat(path_buf, &buf) == 0)
         return true;
@@ -47,6 +51,11 @@ static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path)
     snprintfz(fd_path, sizeof(fd_path), "/proc/self/fd/%d", fd);
 
     procfile *ff = procfile_open_no_log(fd_path, " \t:", PROCFILE_FLAG_DEFAULT);
+    if (!ff) {
+        close(fd);
+        return NULL;
+    }
+
     close(fd);
 
     return ff;
