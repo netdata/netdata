@@ -5,6 +5,8 @@
 
 #if defined(OS_LINUX)
 
+static bool cgroup_ebpfgo_cachestat_snapshot_ready = false;
+
 static bool cgroup_ebpfgo_find_procs_path(char *path_buf, size_t path_buf_size, const char *cg_id)
 {
     struct stat buf;
@@ -47,7 +49,8 @@ static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path)
 
 bool cgroup_ebpfgo_cachestat_refresh(void)
 {
-    return cgroup_ebpfgo_shared_memory_refresh();
+    cgroup_ebpfgo_cachestat_snapshot_ready = cgroup_ebpfgo_shared_memory_refresh();
+    return cgroup_ebpfgo_cachestat_snapshot_ready;
 }
 
 static inline void cgroup_ebpfgo_cachestat_initialize(struct cgroup *cg)
@@ -219,6 +222,9 @@ void cgroup_ebpfgo_cachestat_update_locked(void)
 void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
 {
     if (unlikely(!cg || !cg->enabled || cg->pending_renames))
+        return;
+
+    if (unlikely(!cgroup_ebpfgo_cachestat_snapshot_ready))
         return;
 
     const bool is_service = is_cgroup_systemd_service(cg);
