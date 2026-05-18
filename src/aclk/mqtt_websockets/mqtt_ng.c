@@ -1313,8 +1313,11 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
         // don't observe a stale id on failure
         *packet_id = 0;
         if (msg_free) {
-            // generator rolled back without attaching msg to a fragment; free here so the
-            // publish-layer contract (msg freed on every non-OK return) holds for all callers
+            // mqtt_ng_generate_publish has no fail_rollback path after frag_set_external_data
+            // succeeds, so on non-OK return msg was never linked to a fragment and the rollback
+            // cannot have freed it. Free here to keep the publish-layer contract (msg freed on
+            // every non-OK return) holding for all callers. If a future change adds a fallible
+            // step after frag_set_external_data, this branch will double-free and must be revisited.
             msg_free(msg);
         }
     }
