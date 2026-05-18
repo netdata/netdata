@@ -12,19 +12,19 @@ static bool cgroup_ebpfgo_find_procs_path(char *path_buf, size_t path_buf_size, 
     struct stat buf;
 
     if (cgroup_use_unified_cgroups) {
-        snprintfz(path_buf, path_buf_size - 1, "%s%s/cgroup.procs", cgroup_unified_base, cg_id);
+        snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_unified_base, cg_id);
         return stat(path_buf, &buf) == 0;
     }
 
-    snprintfz(path_buf, path_buf_size - 1, "%s%s/cgroup.procs", cgroup_cpuset_base, cg_id);
+    snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_cpuset_base, cg_id);
     if (stat(path_buf, &buf) == 0)
         return true;
 
-    snprintfz(path_buf, path_buf_size - 1, "%s%s/cgroup.procs", cgroup_blkio_base, cg_id);
+    snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_blkio_base, cg_id);
     if (stat(path_buf, &buf) == 0)
         return true;
 
-    snprintfz(path_buf, path_buf_size - 1, "%s%s/cgroup.procs", cgroup_memory_base, cg_id);
+    snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_memory_base, cg_id);
     if (stat(path_buf, &buf) == 0)
         return true;
 
@@ -34,7 +34,12 @@ static bool cgroup_ebpfgo_find_procs_path(char *path_buf, size_t path_buf_size, 
 
 static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path)
 {
-    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    int dirfd = open(path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
+    if (dirfd < 0)
+        return NULL;
+
+    int fd = openat(dirfd, "cgroup.procs", O_RDONLY | O_CLOEXEC);
+    close(dirfd);
     if (fd < 0)
         return NULL;
 
