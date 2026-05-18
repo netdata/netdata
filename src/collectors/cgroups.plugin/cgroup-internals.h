@@ -209,6 +209,11 @@ struct cgroup {
 #if defined(OS_LINUX)
     // eBPF cachestat snapshot mirrored from the legacy ebpf.plugin cgroup path.
     cgroup_ebpfgo_publish_cachestat_t cachestat;
+
+    RRDSET *st_cachestat_ratio;
+    RRDSET *st_cachestat_dirties;
+    RRDSET *st_cachestat_hits;
+    RRDSET *st_cachestat_misses;
 #endif
 
     struct cgroup_network_interface *interfaces;
@@ -473,9 +478,11 @@ void update_io_full_pressure_stall_time_chart(struct cgroup *cg);
 #if defined(OS_LINUX)
 bool cgroup_ebpfgo_cachestat_refresh(void);
 void cgroup_ebpfgo_cachestat_update_locked(void);
+void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg);
 #else
 static inline bool cgroup_ebpfgo_cachestat_refresh(void) { return false; }
 static inline void cgroup_ebpfgo_cachestat_update_locked(void) {}
+static inline void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg) { (void)cg; }
 #endif
 
 #endif // NETDATA_CGROUP_INTERNALS_H

@@ -32,7 +32,7 @@ modules:
         - linux containers
     overview: &overview
       data_collection: &data_collection
-        metrics_description: "Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+        metrics_description: "Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, network, and page cache activity — via Linux cgroups."
         method_description: ""
       supported_platforms:
         include:
@@ -329,6 +329,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: pids
+            - name: cgroup.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: cgroup.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: dirty
+            - name: cgroup.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hit
+            - name: cgroup.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: miss
         - name: cgroup network device
           description: ""
           labels:
@@ -979,6 +1003,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: pids
+            - name: services.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
   - <<: *module
     meta:
       <<: *meta

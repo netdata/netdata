@@ -1122,6 +1122,8 @@ void update_cgroup_systemd_services_charts() {
             update_pids_current_chart(cg);
         }
 
+        cgroup_ebpfgo_cachestat_update_charts(cg);
+
         cg->function_ready = true;
     }
 }
@@ -1270,6 +1272,8 @@ void update_cgroup_charts() {
         if (likely(cg->pids_current.updated)) {
                 update_pids_current_chart(cg);
         }
+
+        cgroup_ebpfgo_cachestat_update_charts(cg);
 
         if (cg->options & CGROUP_OPTIONS_IS_UNIFIED) {
             if (likely(cg->cpu_pressure.updated)) {

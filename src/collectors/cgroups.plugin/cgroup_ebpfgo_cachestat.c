@@ -169,6 +169,43 @@ calculate:
     cgroup_ebpfgo_cachestat_calculate(cg);
 }
 
+static void cgroup_ebpfgo_cachestat_update_single_chart(
+    struct cgroup *cg,
+    RRDSET **chart_ptr,
+    const char *chart_id,
+    const char *title,
+    const char *context,
+    const char *dimension,
+    const char *units,
+    int priority,
+    collected_number value)
+{
+    RRDSET *chart = *chart_ptr;
+
+    if (unlikely(!chart)) {
+        char buff[RRD_ID_LENGTH_MAX + 1];
+        chart = *chart_ptr = rrdset_create_localhost(
+            cgroup_chart_type(buff, cg),
+            chart_id,
+            NULL,
+            "page_cache",
+            context,
+            title,
+            units,
+            PLUGIN_CGROUPS_NAME,
+            is_cgroup_systemd_service(cg) ? PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME : PLUGIN_CGROUPS_MODULE_CGROUPS_NAME,
+            priority,
+            cgroup_update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdset_update_rrdlabels(chart, cg->chart_labels);
+        rrddim_add(chart, dimension, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set(chart, dimension, value);
+    rrdset_done(chart);
+}
+
 void cgroup_ebpfgo_cachestat_update_locked(void)
 {
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
@@ -177,6 +214,63 @@ void cgroup_ebpfgo_cachestat_update_locked(void)
 
         cgroup_ebpfgo_cachestat_sum_pids(cg);
     }
+}
+
+void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
+{
+    if (unlikely(!cg || !cg->enabled || cg->pending_renames))
+        return;
+
+    const bool is_service = is_cgroup_systemd_service(cg);
+    const char *ratio_context = is_service ? "services.cachestat_ratio" : "cgroup.cachestat_ratio";
+    const char *dirty_context = is_service ? "services.cachestat_dirties" : "cgroup.cachestat_dirties";
+    const char *hit_context = is_service ? "services.cachestat_hits" : "cgroup.cachestat_hits";
+    const char *miss_context = is_service ? "services.cachestat_misses" : "cgroup.cachestat_misses";
+    const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5200;
+
+    cgroup_ebpfgo_cachestat_update_single_chart(
+        cg,
+        &cg->st_cachestat_ratio,
+        "cachestat_ratio",
+        "Hit ratio",
+        ratio_context,
+        "ratio",
+        "%",
+        prio,
+        (collected_number)cg->cachestat.ratio);
+
+    cgroup_ebpfgo_cachestat_update_single_chart(
+        cg,
+        &cg->st_cachestat_dirties,
+        "cachestat_dirties",
+        "Number of dirty pages",
+        dirty_context,
+        "dirty",
+        "page/s",
+        prio + 1,
+        (collected_number)cg->cachestat.dirty);
+
+    cgroup_ebpfgo_cachestat_update_single_chart(
+        cg,
+        &cg->st_cachestat_hits,
+        "cachestat_hits",
+        "Number of accessed files",
+        hit_context,
+        "hit",
+        "hits/s",
+        prio + 2,
+        (collected_number)cg->cachestat.hit);
+
+    cgroup_ebpfgo_cachestat_update_single_chart(
+        cg,
+        &cg->st_cachestat_misses,
+        "cachestat_misses",
+        "Files out of page cache",
+        miss_context,
+        "miss",
+        "misses/s",
+        prio + 3,
+        (collected_number)cg->cachestat.miss);
 }
 
 #endif

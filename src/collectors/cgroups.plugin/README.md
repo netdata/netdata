@@ -12,6 +12,9 @@ To visualize cgroup metrics Netdata provides configuration for cherry-picking th
 Netdata should pick **systemd services**, all kinds of **containers** (lxc, docker, etc.) and **virtual machines** spawn
 by managers that register them with cgroups (qemu, libvirt, etc.).
 
+The collector also exposes cachestat charts for both regular cgroups and systemd services, mirroring the legacy
+`ebpf.plugin` contexts.
+
 ## Supported Technologies
 
 cgroups.plugin monitors **any process** that creates Linux cgroups. For the following technologies, Netdata also
