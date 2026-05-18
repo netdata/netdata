@@ -47,19 +47,25 @@ Netdata provides three API versions that you can access with API tokens:
 
 With appropriate API tokens, you can access endpoints including:
 
-| Endpoint | Purpose | Available On |
-|:---------|:--------|:-------------|
-| `/api/v3/spaces/{spaceID}/rooms/{roomID}/data` | Time-series metric data queries (POST with JSON body) | Netdata Cloud |
-| `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes` | List nodes in a room (POST with JSON body) | Netdata Cloud |
-| `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts` | List available metric contexts (POST with JSON body) | Netdata Cloud |
-| `/api/v2/nodes` | Node information | Netdata Cloud, Local Agent |
-| `/api/v2/data` | Multi-dimensional data queries | Netdata Cloud, Local Agent |
-| `/api/v2/contexts` | Context metadata | Netdata Cloud, Local Agent |
-| `/api/v2/weights` | Metric scoring/correlation | Netdata Cloud, Local Agent |
-| `/api/v2/q` | Full-text search | Netdata Cloud, Local Agent |
-| `/api/v1/info` | Agent information | Local Agent |
-| `/api/v1/charts` | Chart information | Local Agent |
-| `/api/v1/data` | Single node data queries | Local Agent |
+| Endpoint                                            | Purpose                                                  | Available On               |
+|:----------------------------------------------------|:---------------------------------------------------------|:---------------------------|
+| `/api/v3/spaces/{spaceID}/rooms/{roomID}/data`      | Time-series metric data queries (POST with JSON body)    | Netdata Cloud              |
+| `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes`     | List nodes in a room (POST with JSON body)               | Netdata Cloud              |
+| `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts`  | List available metric contexts (POST with JSON body)     | Netdata Cloud              |
+| `/api/v2/nodes`                                     | Node information                                         | Netdata Cloud, Local Agent |
+| `/api/v2/data`                                      | Multi-dimensional data queries                           | Netdata Cloud, Local Agent |
+| `/api/v2/contexts`                                  | Context metadata                                         | Netdata Cloud, Local Agent |
+| `/api/v2/weights`                                   | Metric scoring/correlation                               | Netdata Cloud, Local Agent |
+| `/api/v2/q`                                         | Full-text search                                         | Netdata Cloud, Local Agent |
+| `/api/v1/info`                                      | Agent information                                        | Local Agent                |
+| `/api/v1/charts`                                    | Chart information                                        | Local Agent                |
+| `/api/v1/data`                                      | Single node data queries                                 | Local Agent                |
+
+:::caution
+
+The `/api/v1/charts` endpoint is deprecated and no longer supported. For new integrations, use `/api/v3/contexts` instead to retrieve chart metadata and dimension information.
+
+:::
 
 :::note
 
@@ -122,22 +128,22 @@ curl -s -X POST \
 
 The `time_group` parameter in `aggregations.time` controls how data points within each time interval are combined:
 
-| Option | Description | Use Case |
-|--------|-------------|----------|
-| `average` | Mean value (default) | Average resource consumption over time |
-| `min` | Minimum value | Find lowest values in each interval |
-| `max` | Maximum value | Find spikes or peaks |
-| `sum` | Sum of values | Total volume transferred (counters) |
-| `median` | Median value | Robust central tendency |
-| `stddev` | Standard deviation | Measure of variability |
-| `ses` | Single exponential smoothing | Trend-aware smoothing |
-| `des` | Double exponential smoothing | Trend + seasonality smoothing |
-| `incremental-sum` | Difference between last and first value | Change over interval |
-| `percentile` | Generic percentile (set value in `time_group_options`) | e.g., 95th percentile latency |
-| `countif` | Count values matching condition (set condition in `time_group_options`) | e.g., count samples above threshold |
-| `trimmed-mean` | Mean after trimming outliers (set trim % in `time_group_options`) | Robust average excluding extremes |
-| `trimmed-median` | Median after trimming outliers (set trim % in `time_group_options`) | Robust median excluding extremes |
-| `extremes` | Min and max values | Show value range per interval |
+| Option             | Description                                                                        | Use Case                                 |
+|:-------------------|:-----------------------------------------------------------------------------------|:-----------------------------------------|
+| `average`          | Mean value (default)                                                               | Average resource consumption over time    |
+| `min`              | Minimum value                                                                      | Find lowest values in each interval       |
+| `max`              | Maximum value                                                                      | Find spikes or peaks                      |
+| `sum`              | Sum of values                                                                      | Total volume transferred (counters)       |
+| `median`           | Median value                                                                       | Robust central tendency                   |
+| `stddev`           | Standard deviation                                                                 | Measure of variability                    |
+| `ses`              | Single exponential smoothing                                                       | Trend-aware smoothing                     |
+| `des`              | Double exponential smoothing                                                       | Trend + seasonality smoothing             |
+| `incremental-sum`  | Difference between last and first value                                            | Change over interval                      |
+| `percentile`       | Generic percentile (set value in `time_group_options`)                             | e.g., 95th percentile latency             |
+| `countif`          | Count values matching condition (set condition in `time_group_options`)            | e.g., count samples above threshold       |
+| `trimmed-mean`     | Mean after trimming outliers (set trim % in `time_group_options`)                  | Robust average excluding extremes         |
+| `trimmed-median`   | Median after trimming outliers (set trim % in `time_group_options`)                | Robust median excluding extremes          |
+| `extremes`         | Min and max values                                                                 | Show value range per interval             |
 
 :::important
 
