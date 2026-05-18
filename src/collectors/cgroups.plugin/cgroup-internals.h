@@ -30,10 +30,10 @@ struct pids {
 
 #if defined(OS_LINUX)
 typedef struct cgroup_ebpfgo_cachestat {
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
+    uint64_t add_to_page_cache_lru;
+    uint64_t mark_page_accessed;
+    uint64_t account_page_dirtied;
+    uint64_t mark_buffer_dirty;
 } cgroup_ebpfgo_cachestat_t;
 
 typedef struct cgroup_ebpfgo_publish_cachestat {

@@ -74,41 +74,33 @@ static inline void cgroup_ebpfgo_cachestat_initialize(struct cgroup *cg)
 
 static inline void cgroup_ebpfgo_cachestat_calculate(struct cgroup *cg)
 {
-    int64_t mpa = (int64_t)cg->cachestat.current.mark_page_accessed - (int64_t)cg->cachestat.prev.mark_page_accessed;
-    if (mpa < 0)
-        mpa = 0;
+    uint64_t mpa = 0;
+    if (cg->cachestat.current.mark_page_accessed >= cg->cachestat.prev.mark_page_accessed)
+        mpa = cg->cachestat.current.mark_page_accessed - cg->cachestat.prev.mark_page_accessed;
 
-    int64_t mbd = (int64_t)cg->cachestat.current.mark_buffer_dirty - (int64_t)cg->cachestat.prev.mark_buffer_dirty;
-    if (mbd < 0)
-        mbd = 0;
+    uint64_t mbd = 0;
+    if (cg->cachestat.current.mark_buffer_dirty >= cg->cachestat.prev.mark_buffer_dirty)
+        mbd = cg->cachestat.current.mark_buffer_dirty - cg->cachestat.prev.mark_buffer_dirty;
 
-    int64_t apcl =
-        (int64_t)cg->cachestat.current.add_to_page_cache_lru - (int64_t)cg->cachestat.prev.add_to_page_cache_lru;
-    if (apcl < 0)
-        apcl = 0;
+    uint64_t apcl = 0;
+    if (cg->cachestat.current.add_to_page_cache_lru >= cg->cachestat.prev.add_to_page_cache_lru)
+        apcl = cg->cachestat.current.add_to_page_cache_lru - cg->cachestat.prev.add_to_page_cache_lru;
 
-    int64_t apd =
-        (int64_t)cg->cachestat.current.account_page_dirtied - (int64_t)cg->cachestat.prev.account_page_dirtied;
-    if (apd < 0)
-        apd = 0;
+    uint64_t apd = 0;
+    if (cg->cachestat.current.account_page_dirtied >= cg->cachestat.prev.account_page_dirtied)
+        apd = cg->cachestat.current.account_page_dirtied - cg->cachestat.prev.account_page_dirtied;
 
     cg->cachestat.dirty = (long long)mbd;
 
-    NETDATA_DOUBLE total = (NETDATA_DOUBLE)mpa - (NETDATA_DOUBLE)mbd;
-    if (total < 0)
-        total = 0;
+    uint64_t total = (mpa > mbd) ? (mpa - mbd) : 0;
 
-    NETDATA_DOUBLE misses = (NETDATA_DOUBLE)apcl - (NETDATA_DOUBLE)apd;
-    if (misses < 0)
-        misses = 0;
+    uint64_t misses = (apcl > apd) ? (apcl - apd) : 0;
 
-    NETDATA_DOUBLE hits = total - misses;
-    if (hits < 0) {
+    uint64_t hits = (total > misses) ? (total - misses) : 0;
+    if (hits == 0 && misses > total)
         misses = total;
-        hits = 0;
-    }
 
-    NETDATA_DOUBLE ratio = (total > 0) ? hits / total : 1;
+    NETDATA_DOUBLE ratio = (total > 0) ? ((NETDATA_DOUBLE)hits / (NETDATA_DOUBLE)total) : 1;
 
     cg->cachestat.ratio = (long long)(ratio * 100);
     cg->cachestat.hit = (long long)hits;
@@ -171,10 +163,10 @@ calculate:
     if (ff)
         procfile_close(ff);
 
-    cg->cachestat.current.mark_page_accessed = (mpa > UINT32_MAX) ? UINT32_MAX : (uint32_t)mpa;
-    cg->cachestat.current.mark_buffer_dirty = (mbd > UINT32_MAX) ? UINT32_MAX : (uint32_t)mbd;
-    cg->cachestat.current.add_to_page_cache_lru = (apcl > UINT32_MAX) ? UINT32_MAX : (uint32_t)apcl;
-    cg->cachestat.current.account_page_dirtied = (apd > UINT32_MAX) ? UINT32_MAX : (uint32_t)apd;
+    cg->cachestat.current.mark_page_accessed = mpa;
+    cg->cachestat.current.mark_buffer_dirty = mbd;
+    cg->cachestat.current.add_to_page_cache_lru = apcl;
+    cg->cachestat.current.account_page_dirtied = apd;
     cg->cachestat.ct = ct;
 
     if (!cg->cachestat.prev.mark_page_accessed && !cg->cachestat.prev.add_to_page_cache_lru &&
