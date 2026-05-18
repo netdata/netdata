@@ -47,29 +47,32 @@ Netdata provides three API versions that you can access with API tokens:
 
 With appropriate API tokens, you can access endpoints including:
 
-| Endpoint                                            | Purpose                                                  | Available On               |
-|:----------------------------------------------------|:---------------------------------------------------------|:---------------------------|
-| `/api/v3/spaces/{spaceID}/rooms/{roomID}/data`      | Time-series metric data queries (POST with JSON body)    | Netdata Cloud              |
-| `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes`     | List nodes in a room (POST with JSON body)               | Netdata Cloud              |
-| `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts`  | List available metric contexts (POST with JSON body)     | Netdata Cloud              |
-| `/api/v2/nodes`                                     | Node information                                         | Netdata Cloud, Local Agent |
-| `/api/v2/data`                                      | Multi-dimensional data queries                           | Netdata Cloud, Local Agent |
-| `/api/v2/contexts`                                  | Context metadata                                         | Netdata Cloud, Local Agent |
-| `/api/v2/weights`                                   | Metric scoring/correlation                               | Netdata Cloud, Local Agent |
-| `/api/v2/q`                                         | Full-text search                                         | Netdata Cloud, Local Agent |
-| `/api/v1/info`                                      | Agent information                                        | Local Agent                |
-| `/api/v1/charts`                                    | Chart information                                        | Local Agent                |
-| `/api/v1/data`                                      | Single node data queries                                 | Local Agent                |
+| Surface                     | Method | Endpoint                                           | Purpose                                              |
+|:----------------------------|:-------|:---------------------------------------------------|:-----------------------------------------------------|
+| Netdata Cloud               | `POST` | `/api/v3/spaces/{spaceID}/rooms/{roomID}/data`     | Time-series metric data queries                      |
+| Netdata Cloud               | `POST` | `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes`    | List nodes in a room                                 |
+| Netdata Cloud               | `POST` | `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts` | List available metric contexts                       |
+| Local Agent                 | `POST` | `/api/v3/data`                                     | Single-node v3 data queries                          |
+| Local Agent                 | `GET`  | `/api/v3/nodes`                                    | Multi-host node listing on a parent Agent            |
+| Local Agent                 | `GET`  | `/api/v3/contexts`                                 | List available metric contexts on an Agent           |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/nodes`                                    | Node information                                     |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/data`                                     | Multi-dimensional data queries                       |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/contexts`                                 | Context metadata                                     |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/weights`                                  | Metric scoring/correlation                           |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/q`                                        | Full-text search                                     |
+| Local Agent                 | `GET`  | `/api/v1/info`                                     | Agent information                                    |
+| Local Agent                 | `GET`  | `/api/v1/charts`                                   | Legacy chart information                             |
+| Local Agent                 | `GET`  | `/api/v1/data`                                     | Legacy single-node data queries                      |
 
 :::caution
 
-The `/api/v1/charts` endpoint is deprecated and no longer supported. For new integrations, use `/api/v3/contexts` instead to retrieve chart metadata and dimension information.
+The local Agent `/api/v1/charts` endpoint is still available for backward compatibility, but it is deprecated for new integrations. Use `/api/v3/contexts` on local Agents, or `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts` in Netdata Cloud, to discover current metric contexts and dimensions.
 
 :::
 
 :::note
 
-For Netdata Cloud metric queries, use **v3 endpoints** (POST with a JSON body). v1 endpoints such as `/api/v1/data` and `/api/v1/charts` are local Agent endpoints and will return **404** when called against `app.netdata.cloud`. v2 endpoints work on both Cloud and local Agents for backward compatibility, but v3 is recommended for Cloud.
+For Netdata Cloud metric queries, use the room-scoped **v3 POST endpoints** with a JSON body. Local Agents expose their own unscoped v3 endpoints such as `/api/v3/data`, `/api/v3/nodes`, and `/api/v3/contexts`. v1 endpoints such as `/api/v1/data` and `/api/v1/charts` remain local-Agent only and return **404** when called against `app.netdata.cloud`. v2 endpoints work on both Cloud and local Agents for backward compatibility, but v3 is recommended for Cloud.
 
 :::
 
