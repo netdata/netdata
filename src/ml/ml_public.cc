@@ -591,6 +591,10 @@ void ml_init()
     int rc = sqlite3_open(path, &ml_db);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", path, sqlite3_errstr(rc));
+        // Drop the sentinel now so the next start quarantines the file;
+        // otherwise a corrupt header here leaves ml.db on disk and we'd
+        // hit the same open() failure forever.
+        ml_db_mark_if_corrupt(rc);
         sqlite3_close(ml_db);
         ml_db = NULL;
     }
@@ -599,7 +603,12 @@ void ml_init()
     if (ml_db) {
         int target_version = perform_ml_database_migration(ml_db, ML_METADATA_VERSION);
         if (configure_sqlite_database(ml_db, target_version, "ml_config")) {
-            error_report("Failed to setup ML database");
+            // configure_sqlite_database() returns 0/1 and loses the SQLite rc;
+            // recover the last error from the connection before close() so
+            // corruption surfaced by PRAGMA/migration drops the sentinel too.
+            int errc = sqlite3_extended_errcode(ml_db);
+            error_report("Failed to setup ML database (errcode=%d)", errc);
+            ml_db_mark_if_corrupt(errc);
             sqlite3_close(ml_db);
             ml_db = NULL;
         }
@@ -608,6 +617,7 @@ void ml_init()
             int rc = sqlite3_exec(ml_db, db_models_create_table, NULL, NULL, &err);
             if (rc != SQLITE_OK) {
                 error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
+                ml_db_mark_if_corrupt(rc);
                 sqlite3_close(ml_db);
                 sqlite3_free(err);
                 ml_db = NULL;

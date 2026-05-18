@@ -29,9 +29,18 @@ extern const char *db_models_create_table;
 // subsequent ml.db access short-circuits for the rest of the session. The
 // sentinel is consumed at next startup, which renames
 // ml.db -> ml.db.bad.<usec-timestamp> and creates a fresh DB.
-// `rc` is the SQLite error code that triggered the call (SQLITE_CORRUPT or
-// SQLITE_NOTADB); logged for diagnostics.
+// `rc` is the SQLite error code that triggered the call; logged raw for
+// diagnostics. It may be a primary code (SQLITE_CORRUPT, SQLITE_NOTADB) or
+// an extended variant (SQLITE_CORRUPT_VTAB, SQLITE_CORRUPT_INDEX, ...).
+// Callers should normally route through ml_db_mark_if_corrupt() rather than
+// invoking this directly.
 void ml_db_mark_corrupt(int rc);
+
+// Flag ml.db as corrupt if `rc` is a corruption signal (SQLITE_CORRUPT or
+// SQLITE_NOTADB, including extended variants which encode the primary code
+// in the low 8 bits). Returns true when `rc` indicated corruption,
+// regardless of whether the sentinel was successfully written.
+bool ml_db_mark_if_corrupt(int rc);
 
 // True if ml.db has been flagged unusable in this session by an earlier
 // CORRUPT/NOTADB detection. The flag is read/written via __atomic_* on the

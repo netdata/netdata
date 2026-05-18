@@ -69,16 +69,12 @@ void ml_db_mark_corrupt(int rc)
     }
 }
 
-// Flag ml.db as corrupt if `rc` is a corruption signal (SQLITE_CORRUPT or
-// SQLITE_NOTADB). Returns true when the rc indicated corruption (regardless
-// of whether the sentinel was successfully written).
-//
 // Mask with 0xFF to also catch SQLite extended result codes (e.g.
 // SQLITE_CORRUPT_VTAB, SQLITE_CORRUPT_INDEX, ...) which encode the primary
 // code in the low 8 bits. Extended codes are off by default but can be
 // enabled per-connection via sqlite3_extended_result_codes(); masking is
 // the canonical way to compare regardless of that setting.
-static inline bool ml_db_mark_if_corrupt(int rc)
+bool ml_db_mark_if_corrupt(int rc)
 {
     int primary = rc & 0xFF;
     if (primary != SQLITE_CORRUPT && primary != SQLITE_NOTADB)
