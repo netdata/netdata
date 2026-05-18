@@ -406,6 +406,9 @@ See regression entries below.
 
 See regression entries below.
 
+Note: dated regression entries intentionally use `## Regression - YYYY-MM-DD`
+headings to match the repository SOW lifecycle contract.
+
 Append regression entries here only after this SOW was completed or closed and later testing or use found broken behavior. Use a dated `## Regression - YYYY-MM-DD` heading at the end of the file. Never prepend regression content above the original SOW narrative.
 
 ## Regression - 2026-05-11

@@ -607,6 +607,9 @@ Open follow-ups, ordered by priority:
 
 ## Regression Log
 
+Note: dated regression entries intentionally use `## Regression - YYYY-MM-DD`
+headings to match the repository SOW lifecycle contract.
+
 ## Regression - 2026-05-07
 
 ### What broke

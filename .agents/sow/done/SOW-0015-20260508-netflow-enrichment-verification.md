@@ -650,6 +650,9 @@ Artifact maintenance for review pass:
 
 ## Regression Log
 
+Note: dated regression entries intentionally use `## Regression - YYYY-MM-DD`
+headings to match the repository SOW lifecycle contract.
+
 ## Regression - 2026-05-08 - Missing Provider Integration Modules
 
 What broke:
