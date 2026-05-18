@@ -852,6 +852,18 @@ int mqtt_wss_publish5(mqtt_wss_client client,
     //    transaction buffer will call msg_free after the message is ack'd.
     //  - On any non-OK return, msg is never attached, so ownership stays with
     //    us and we must call msg_free here.
+    //
+    //    Single-free invariant: msg is attached to a fragment only at the
+    //    final frag_set_external_data() inside mqtt_ng_generate_publish(),
+    //    after which the function commits unconditionally -- there is no
+    //    `goto fail_rollback` between attachment and commit. Every reachable
+    //    fail_rollback site therefore runs with msg unattached, so the
+    //    rollback walks no msg-bearing fragment and msg_free() is only ever
+    //    called by us. If a future change inserts a failure exit after
+    //    attaching msg but before commit, the rollback would also invoke
+    //    msg_free and this branch would double-free; preserve the invariant
+    //    or move responsibility entirely into mqtt_ng_publish().
+    //
     //  - topic_free is intentionally NOT handled here. mqtt_ng_publish may
     //    attach topic to a fragment via optimized_add() before failing, in
     //    which case the rollback already invokes topic_free; if it fails
