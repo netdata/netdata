@@ -10,7 +10,7 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
-#ifdef LIBBPF_MAJOR_VERSION
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1) && defined(__has_include) && __has_include(<linux/btf.h>)
 /*
  * The repo-local CO-RE bundle currently ships the skeleton wrapper but not the
  * arena BPF-side state type header. Keep the shim size aligned with the
@@ -25,6 +25,7 @@ struct netdata_cachestat_arena_state_t {
 #include "cachestat.skel.h"
 #include "cachestat_buffer.skel.h"
 #include "cachestat_arena.skel.h"
+#define NETDATA_LIBBPF_CORE_SUPPORTED 1
 #endif
 
 enum netdata_ebpf_cachestat_runtime_kind {
@@ -43,7 +44,7 @@ struct netdata_ebpf_cachestat_runtime {
     int flavor;
     struct bpf_object *obj;
     struct bpf_link **links;
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     union {
         struct cachestat_bpf *base;
         struct cachestat_buffer_bpf *buffer;
@@ -89,7 +90,7 @@ enum netdata_controller {
 
 static const char *cachestat_account_program_name(const char *account_function, int flavor)
 {
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
         if (!strcmp(account_function, "__folio_mark_dirty"))
             return "netdata_folio_mark_dirty_buffer";
@@ -111,7 +112,7 @@ static const char *cachestat_account_program_name(const char *account_function, 
 
 static const char *cachestat_data_program_name(const char *event_name, int flavor)
 {
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
         if (!strcmp(event_name, "add_to_page_cache_lru"))
             return "netdata_add_to_page_cache_lru_buffer";
@@ -159,7 +160,7 @@ static void cachestat_prepare_autoload(struct bpf_object *obj, const char *accou
     cachestat_disable_program_if_present(obj, "netdata_folio_mark_dirty_kprobe");
     cachestat_disable_program_if_present(obj, "netdata_set_page_dirty_kprobe");
     cachestat_disable_program_if_present(obj, "netdata_account_page_dirtied_kprobe");
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     cachestat_disable_program_if_present(obj, "netdata_folio_mark_dirty_buffer");
     cachestat_disable_program_if_present(obj, "netdata_set_page_dirty_buffer");
     cachestat_disable_program_if_present(obj, "netdata_account_page_dirtied_buffer");
@@ -258,7 +259,7 @@ static void cachestat_destroy_links(struct netdata_ebpf_cachestat_runtime *rt)
     rt->links = NULL;
 }
 
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
 static int cachestat_runtime_flavor_from_path(const char *path)
 {
     if (!path)
@@ -279,7 +280,7 @@ static struct bpf_object *cachestat_runtime_object(struct netdata_ebpf_cachestat
     if (!rt)
         return NULL;
 
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
         switch (rt->flavor) {
         case NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER:
@@ -295,7 +296,7 @@ static struct bpf_object *cachestat_runtime_object(struct netdata_ebpf_cachestat
     return rt->obj;
 }
 
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
 static int cachestat_runtime_load_core(struct netdata_ebpf_cachestat_runtime *rt)
 {
     switch (rt->flavor) {
@@ -332,7 +333,7 @@ static void cachestat_runtime_destroy_core(struct netdata_ebpf_cachestat_runtime
 
 int netdata_cachestat_runtime_supports_core(void)
 {
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     return 1;
 #else
     return 0;
@@ -346,7 +347,7 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
         return NULL;
     }
 
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (use_core) {
         rt->kind = NETDATA_CACHESTAT_RUNTIME_CORE;
         rt->flavor = cachestat_runtime_flavor_from_path(path);
@@ -410,7 +411,7 @@ int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
     if (!rt || !rt->obj)
         return -1;
 
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE)
         return cachestat_runtime_load_core(rt);
 #endif
@@ -435,7 +436,7 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
         return -1;
 
     const char *account_prog = cachestat_account_program_name(account_function, rt->flavor);
-#ifdef LIBBPF_MAJOR_VERSION
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     const char *add_prog = (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE && rt->flavor != NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE) ?
                                "netdata_add_to_page_cache_lru_buffer" :
                                "netdata_add_to_page_cache_lru_kprobe";

@@ -2,11 +2,16 @@
 // +build netdata_ebpf_libbpf
 
 #include <stdbool.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <bpf/btf.h>
 #include <bpf/libbpf.h>
+
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1) && defined(__has_include) && __has_include(<linux/btf.h>)
+#include <bpf/btf.h>
+#define NETDATA_LIBBPF_CORE_SUPPORTED 1
+#endif
 
 struct bpf_object *netdata_ebpf_open_file(const char *path)
 {
@@ -25,6 +30,7 @@ void netdata_ebpf_close_object(struct bpf_object *obj)
     }
 }
 
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
 struct btf *netdata_ebpf_parse_btf_file(const char *filename)
 {
     struct btf *bf = btf__parse(filename, NULL);
@@ -71,3 +77,24 @@ int netdata_ebpf_is_function_inside_btf(struct btf *file, const char *function)
 
     return (id > 0) ? 1 : 0;
 }
+#else
+struct btf *netdata_ebpf_parse_btf_file(const char *filename)
+{
+    (void)filename;
+    errno = ENOTSUP;
+    return NULL;
+}
+
+void netdata_ebpf_free_btf(struct btf *file)
+{
+    (void)file;
+}
+
+int netdata_ebpf_is_function_inside_btf(struct btf *file, const char *function)
+{
+    (void)file;
+    (void)function;
+    errno = ENOTSUP;
+    return -1;
+}
+#endif
