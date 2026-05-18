@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testCollectedAt = time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC)
+
 func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 	payload := NewResponse(Data{
 		Producer: Producer{
@@ -384,268 +386,86 @@ func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 }
 
 func TestValidateDecodedResponseRejectsInvalidPresentationReferences(t *testing.T) {
-	payload := NewResponse(Data{
-		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
-		CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
-		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
-		Types: TypeRegistry{
-			ActorTypes: map[string]ActorType{
-				"node": {
-					Layer:    "node",
-					Identity: []string{"id"},
-					Presentation: &ActorPresentation{
-						LabelPolicy: &LabelPolicy{Columns: []string{"missing"}},
-					},
-				},
-			},
-			LinkTypes: map[string]LinkType{
-				"dependency": {
-					Orientation:   "directed",
-					DirectionRole: "dependency",
-					Aggregation:   LinkAggregation{Direction: "preserve"},
-				},
-			},
-		},
-		Actors: MustTable(1,
-			[]Column{
-				NewColumn("id", "string", WithRole("identity")),
-				NewColumn("type", "string"),
-			},
-			[]ColumnEncoding{
-				Values("node-a"),
-				Const("node"),
-			},
-		),
-		Links: MustTable(1,
-			[]Column{
-				NewColumn("src", "actor_ref"),
-				NewColumn("dst", "actor_ref"),
-				NewColumn("type", "string"),
-			},
-			[]ColumnEncoding{
-				Values(0),
-				Values(0),
-				Const("dependency"),
-			},
-		),
-	})
+	err := validateResponseData(t, minimalValidationData(&ActorPresentation{
+		LabelPolicy: &LabelPolicy{Columns: []string{"missing"}},
+	}))
 
-	payloadBytes, err := json.Marshal(payload)
-	require.NoError(t, err)
-	var decoded any
-	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
-
-	err = ValidateDecodedResponse(decoded)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "label_policy.columns[0] references unknown actor column")
 }
 
 func TestValidateDecodedResponseRejectsNonDisplayLabelColumn(t *testing.T) {
-	payload := NewResponse(Data{
-		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
-		CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
-		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
-		Types: TypeRegistry{
-			ActorTypes: map[string]ActorType{
-				"node": {
-					Layer:    "node",
-					Identity: []string{"id"},
-					Presentation: &ActorPresentation{
-						LabelPolicy: &LabelPolicy{Columns: []string{"metadata"}},
-					},
-				},
-			},
-			LinkTypes: map[string]LinkType{
-				"dependency": {
-					Orientation:   "directed",
-					DirectionRole: "dependency",
-					Aggregation:   LinkAggregation{Direction: "preserve"},
-				},
-			},
-		},
-		Actors: MustTable(1,
-			[]Column{
-				NewColumn("id", "string", WithRole("identity")),
-				NewColumn("type", "string"),
-				NewColumn("metadata", "json", WithNullable()),
-			},
-			[]ColumnEncoding{
-				Values("node-a"),
-				Const("node"),
-				Values(map[string]any{"labels": []any{"not-a-label"}}),
-			},
-		),
-		Links: MustTable(1,
-			[]Column{
-				NewColumn("src", "actor_ref"),
-				NewColumn("dst", "actor_ref"),
-				NewColumn("type", "string"),
-			},
-			[]ColumnEncoding{
-				Values(0),
-				Values(0),
-				Const("dependency"),
-			},
-		),
-	})
+	actors := minimalActorTable(
+		[]Column{NewColumn("metadata", "json", WithNullable())},
+		[]ColumnEncoding{Values(map[string]any{"labels": []any{"not-a-label"}})},
+	)
+	err := validateResponseData(t, minimalValidationData(
+		&ActorPresentation{LabelPolicy: &LabelPolicy{Columns: []string{"metadata"}}},
+		withActors(actors),
+	))
 
-	payloadBytes, err := json.Marshal(payload)
-	require.NoError(t, err)
-	var decoded any
-	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
-
-	err = ValidateDecodedResponse(decoded)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "references non-display actor column")
 }
 
 func TestValidateDecodedResponseRejectsMissingPortSourceTable(t *testing.T) {
-	payload := NewResponse(Data{
-		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
-		CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
-		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
-		Types: TypeRegistry{
-			ActorTypes: map[string]ActorType{
-				"node": {
-					Layer:    "node",
-					Identity: []string{"id"},
-					Presentation: &ActorPresentation{
-						Ports: &ActorPortsPresentation{
-							ShowBullets: true,
-							Sources: []PortSourcePresentation{
-								{
-									Source:      "actor_table",
-									Table:       "missing_ports",
-									ActorColumn: "actor",
-									NameColumn:  "name",
-									DefaultType: "topology",
-								},
-							},
-						},
+	err := validateResponseData(t, minimalValidationData(
+		&ActorPresentation{
+			Ports: &ActorPortsPresentation{
+				ShowBullets: true,
+				Sources: []PortSourcePresentation{
+					{
+						Source:      "actor_table",
+						Table:       "missing_ports",
+						ActorColumn: "actor",
+						NameColumn:  "name",
+						DefaultType: "topology",
 					},
 				},
 			},
-			LinkTypes: map[string]LinkType{
-				"dependency": {
-					Orientation:   "directed",
-					DirectionRole: "dependency",
-					Aggregation:   LinkAggregation{Direction: "preserve"},
-				},
-			},
-			PortTypes: map[string]PortType{
-				"topology": {Presentation: &PortPresentation{Label: "Topology"}},
-			},
 		},
-		Actors: MustTable(1,
-			[]Column{
-				NewColumn("id", "string", WithRole("identity")),
-				NewColumn("type", "string"),
-			},
-			[]ColumnEncoding{
-				Values("node-a"),
-				Const("node"),
-			},
-		),
-		Links: MustTable(1,
-			[]Column{
-				NewColumn("src", "actor_ref"),
-				NewColumn("dst", "actor_ref"),
-				NewColumn("type", "string"),
-			},
-			[]ColumnEncoding{
-				Values(0),
-				Values(0),
-				Const("dependency"),
-			},
-		),
-	})
+		withPortTypes(map[string]PortType{
+			"topology": {Presentation: &PortPresentation{Label: "Topology"}},
+		}),
+	))
 
-	payloadBytes, err := json.Marshal(payload)
-	require.NoError(t, err)
-	var decoded any
-	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
-
-	err = ValidateDecodedResponse(decoded)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "references unknown actor table")
 }
 
 func TestValidateDecodedResponseRejectsMissingModalActorTable(t *testing.T) {
-	payload := NewResponse(Data{
-		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
-		CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
-		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
-		Types: TypeRegistry{
-			ActorTypes: map[string]ActorType{
-				"node": {
-					Layer:    "node",
-					Identity: []string{"id"},
-					Presentation: &ActorPresentation{
-						Modal: &ModalPresentation{
-							Sections: []ModalSection{
-								{
-									ID:    "missing",
-									Label: "Missing",
-									Source: ModalSource{
-										Kind:  "actor_table",
-										Table: "missing_table",
-									},
-									Columns: []ModalColumn{
-										{
-											ID:    "name",
-											Label: "Name",
-											Projection: ModalProjection{
-												Kind:   "direct",
-												Column: "name",
-											},
-										},
-									},
+	err := validateResponseData(t, minimalValidationData(
+		&ActorPresentation{
+			Modal: &ModalPresentation{
+				Sections: []ModalSection{
+					{
+						ID:    "missing",
+						Label: "Missing",
+						Source: ModalSource{
+							Kind:  "actor_table",
+							Table: "missing_table",
+						},
+						Columns: []ModalColumn{
+							{
+								ID:    "name",
+								Label: "Name",
+								Projection: ModalProjection{
+									Kind:   "direct",
+									Column: "name",
 								},
 							},
 						},
 					},
 				},
 			},
-			LinkTypes: map[string]LinkType{
-				"dependency": {
-					Orientation:   "directed",
-					DirectionRole: "dependency",
-					Aggregation:   LinkAggregation{Direction: "preserve"},
-				},
-			},
 		},
-		Actors: MustTable(1,
-			[]Column{
-				NewColumn("id", "string", WithRole("identity")),
-				NewColumn("type", "string"),
-				NewColumn("name", "string_ref", WithDictionary("strings")),
-			},
-			[]ColumnEncoding{
-				Values("node-a"),
-				Const("node"),
-				Values(0),
-			},
-		),
-		Links: MustTable(0,
-			[]Column{
-				NewColumn("src", "actor_ref"),
-				NewColumn("dst", "actor_ref"),
-				NewColumn("type", "string"),
-			},
-			[]ColumnEncoding{
-				Const(0),
-				Const(0),
-				Const("dependency"),
-			},
-		),
-	})
+		withActors(minimalActorTable(
+			[]Column{NewColumn("name", "string_ref", WithDictionary("strings"))},
+			[]ColumnEncoding{Values(0)},
+		)),
+		withLinks(dependencyLinkTable(0)),
+	))
 
-	payloadBytes, err := json.Marshal(payload)
-	require.NoError(t, err)
-	var decoded any
-	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
-
-	err = ValidateDecodedResponse(decoded)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "modal.sections[0].source.table references unknown actor table")
 }
@@ -711,74 +531,40 @@ func TestValidateDecodedResponseRejectsInvalidModalProjectionShapes(t *testing.T
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			payload := NewResponse(Data{
-				Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
-				CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
-				Dictionaries: Dictionaries{"strings": StringValues("node-a")},
-				Types: TypeRegistry{
-					ActorTypes: map[string]ActorType{
-						"node": {
-							Layer:    "node",
-							Identity: []string{"id"},
-							Presentation: &ActorPresentation{
-								Modal: &ModalPresentation{
-									Sections: []ModalSection{
-										{
-											ID:     "links",
-											Label:  "Links",
-											Source: ModalSource{Kind: "links"},
-											Columns: []ModalColumn{
-												{
-													ID:         "endpoint",
-													Label:      "Endpoint",
-													Projection: tc.projection,
-												},
-											},
-										},
+			data := minimalValidationData(
+				&ActorPresentation{
+					Modal: &ModalPresentation{
+						Sections: []ModalSection{
+							{
+								ID:     "links",
+								Label:  "Links",
+								Source: ModalSource{Kind: "links"},
+								Columns: []ModalColumn{
+									{
+										ID:         "endpoint",
+										Label:      "Endpoint",
+										Projection: tc.projection,
 									},
 								},
 							},
 						},
 					},
-					LinkTypes: map[string]LinkType{
-						"dependency": {
-							Orientation:   "directed",
-							DirectionRole: "dependency",
-							Aggregation:   LinkAggregation{Direction: "preserve"},
-						},
-					},
 				},
-				Actors: MustTable(1,
+				withLinks(dependencyLinkTableWith(1,
 					[]Column{
-						NewColumn("id", "string", WithRole("identity")),
-						NewColumn("type", "string"),
-					},
-					[]ColumnEncoding{
-						Values("node-a"),
-						Const("node"),
-					},
-				),
-				Links: MustTable(1,
-					[]Column{
-						NewColumn("src", "actor_ref"),
-						NewColumn("dst", "actor_ref"),
-						NewColumn("type", "string"),
 						NewColumn("local_ip", "string", WithNullable()),
 						NewColumn("remote_ip", "string", WithNullable()),
 						NewColumn("metadata", "json", WithNullable()),
 					},
 					[]ColumnEncoding{
-						Const(0),
-						Const(0),
-						Const("dependency"),
 						Values("10.0.0.1"),
 						Values("10.0.0.2"),
 						Values(map[string]any{"state": "open"}),
 					},
-				),
-			})
+				)),
+			)
 
-			payloadBytes, err := json.Marshal(payload)
+			payloadBytes, err := json.Marshal(NewResponse(data))
 			require.NoError(t, err)
 			require.Error(t, topologySchemaValidationError(t, payloadBytes))
 
@@ -1553,159 +1339,78 @@ func TestValidateDecodedResponseRejectsInvalidModalRowFilters(t *testing.T) {
 }
 
 func TestValidateDecodedResponseRejectsCorrelationMissingKeyColumn(t *testing.T) {
-	payload := NewResponse(Data{
-		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
-		CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
-		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
-		Types: TypeRegistry{
-			ActorTypes: map[string]ActorType{
-				"node": {Layer: "node", Identity: []string{"id"}},
+	correlation := &Correlation{
+		Rules: map[string]CorrelationRule{
+			"node_name": {
+				Action:          "link",
+				Priority:        10,
+				KeySpace:        "node_name",
+				Key:             []CorrelationKeyPart{{Column: "name"}},
+				PointActorTypes: []string{"node"},
+				OutputLinkType:  "dependency",
 			},
-			LinkTypes: map[string]LinkType{
-				"dependency": {
-					Orientation:   "directed",
-					DirectionRole: "dependency",
-					Aggregation:   LinkAggregation{Direction: "preserve"},
-				},
-			},
-		},
-		Correlation: &Correlation{
-			Rules: map[string]CorrelationRule{
-				"node_name": {
-					Action:          "link",
-					Priority:        10,
-					KeySpace:        "node_name",
-					Key:             []CorrelationKeyPart{{Column: "name"}},
-					PointActorTypes: []string{"node"},
-					OutputLinkType:  "dependency",
-				},
-			},
-			Points: &Table{
-				Rows: 1,
-				Columns: []Column{
-					NewColumn("actor", "actor_ref"),
-					NewColumn("rule", "string"),
-				},
-				Values: []ColumnEncoding{
-					Values(0),
-					Const("node_name"),
-				},
+			"node_owner": {
+				Action:          "link",
+				Priority:        20,
+				KeySpace:        "node_owner",
+				Key:             []CorrelationKeyPart{{Column: "owner"}},
+				PointActorTypes: []string{"node"},
+				OutputLinkType:  "dependency",
 			},
 		},
-		Actors: MustTable(1,
-			[]Column{
-				NewColumn("id", "string", WithRole("identity")),
-				NewColumn("type", "string"),
+		Points: &Table{
+			Rows: 1,
+			Columns: []Column{
+				NewColumn("actor", "actor_ref"),
+				NewColumn("rule", "string"),
 			},
-			[]ColumnEncoding{
-				Values("node-a"),
-				Const("node"),
+			Values: []ColumnEncoding{
+				Values(0),
+				Const("node_name"),
 			},
-		),
-		Links: MustTable(0,
-			[]Column{
-				NewColumn("src", "actor_ref"),
-				NewColumn("dst", "actor_ref"),
-				NewColumn("type", "string"),
-			},
-			[]ColumnEncoding{
-				Const(0),
-				Const(0),
-				Const("dependency"),
-			},
-		),
-	})
+		},
+	}
+	err := validateResponseData(t, minimalValidationData(nil,
+		withCorrelation(correlation),
+		withLinks(dependencyLinkTable(0)),
+	))
 
-	payloadBytes, err := json.Marshal(payload)
-	require.NoError(t, err)
-	var decoded any
-	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
-
-	err = ValidateDecodedResponse(decoded)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing correlation key column")
 }
 
 func TestValidateDecodedResponseAllowsUnusedCorrelationRuleColumns(t *testing.T) {
-	payload := NewResponse(Data{
-		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
-		CollectedAt:  time.Date(2026, 5, 9, 10, 0, 0, 0, time.UTC),
-		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
-		Types: TypeRegistry{
-			ActorTypes: map[string]ActorType{
-				"node": {Layer: "node", Identity: []string{"id"}},
-			},
-			LinkTypes: map[string]LinkType{
-				"dependency": {
-					Orientation:   "directed",
-					DirectionRole: "dependency",
-					Aggregation:   LinkAggregation{Direction: "preserve"},
-				},
+	correlation := &Correlation{
+		Rules: map[string]CorrelationRule{
+			"node_name": {
+				Action:          "link",
+				Priority:        10,
+				KeySpace:        "node_name",
+				Key:             []CorrelationKeyPart{{Column: "name"}},
+				PointActorTypes: []string{"node"},
+				OutputLinkType:  "dependency",
 			},
 		},
-		Correlation: &Correlation{
-			Rules: map[string]CorrelationRule{
-				"node_name": {
-					Action:          "link",
-					Priority:        10,
-					KeySpace:        "node_name",
-					Key:             []CorrelationKeyPart{{Column: "name"}},
-					PointActorTypes: []string{"node"},
-					OutputLinkType:  "dependency",
-				},
-				"node_owner": {
-					Action:          "link",
-					Priority:        20,
-					KeySpace:        "node_owner",
-					Key:             []CorrelationKeyPart{{Column: "owner"}},
-					PointActorTypes: []string{"node"},
-					OutputLinkType:  "dependency",
-				},
+		Points: &Table{
+			Rows: 1,
+			Columns: []Column{
+				NewColumn("actor", "actor_ref"),
+				NewColumn("rule", "string"),
+				NewColumn("name", "string_ref", WithDictionary("strings")),
 			},
-			Points: &Table{
-				Rows: 1,
-				Columns: []Column{
-					NewColumn("actor", "actor_ref"),
-					NewColumn("rule", "string"),
-					NewColumn("name", "string_ref", WithDictionary("strings")),
-				},
-				Values: []ColumnEncoding{
-					Values(0),
-					Const("node_name"),
-					Values(0),
-				},
+			Values: []ColumnEncoding{
+				Values(0),
+				Const("node_name"),
+				Values(0),
 			},
 		},
-		Actors: MustTable(1,
-			[]Column{
-				NewColumn("id", "string", WithRole("identity")),
-				NewColumn("type", "string"),
-			},
-			[]ColumnEncoding{
-				Values("node-a"),
-				Const("node"),
-			},
-		),
-		Links: MustTable(0,
-			[]Column{
-				NewColumn("src", "actor_ref"),
-				NewColumn("dst", "actor_ref"),
-				NewColumn("type", "string"),
-			},
-			[]ColumnEncoding{
-				Const(0),
-				Const(0),
-				Const("dependency"),
-			},
-		),
-	})
+	}
+	err := validateResponseData(t, minimalValidationData(nil,
+		withCorrelation(correlation),
+		withLinks(dependencyLinkTable(0)),
+	))
 
-	payloadBytes, err := json.Marshal(payload)
 	require.NoError(t, err)
-	var decoded any
-	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
-
-	require.NoError(t, ValidateDecodedResponse(decoded))
 }
 
 func TestPresentationTokenEnumsMatchSchema(t *testing.T) {
@@ -1782,6 +1487,106 @@ func TestValidateDecodedResponseRejectsInvalidEvidenceSectionShape(t *testing.T)
 	err := ValidateDecodedResponse(payload)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "data.evidence.socket is not an object")
+}
+
+func validateResponseData(t *testing.T, data Data) error {
+	t.Helper()
+
+	payloadBytes, err := json.Marshal(NewResponse(data))
+	require.NoError(t, err)
+
+	var decoded any
+	require.NoError(t, json.Unmarshal(payloadBytes, &decoded))
+	return ValidateDecodedResponse(decoded)
+}
+
+func minimalValidationData(actorPresentation *ActorPresentation, opts ...func(*Data)) Data {
+	data := Data{
+		Producer:     Producer{Source: "test-topology", Instance: "test-instance"},
+		CollectedAt:  testCollectedAt,
+		Dictionaries: Dictionaries{"strings": StringValues("node-a")},
+		Types: TypeRegistry{
+			ActorTypes: map[string]ActorType{
+				"node": {
+					Layer:        "node",
+					Identity:     []string{"id"},
+					Presentation: actorPresentation,
+				},
+			},
+			LinkTypes: map[string]LinkType{
+				"dependency": {
+					Orientation:   "directed",
+					DirectionRole: "dependency",
+					Aggregation:   LinkAggregation{Direction: "preserve"},
+				},
+			},
+		},
+		Actors: minimalActorTable(nil, nil),
+		Links:  dependencyLinkTable(1),
+	}
+
+	for _, opt := range opts {
+		opt(&data)
+	}
+	return data
+}
+
+func minimalActorTable(extraColumns []Column, extraValues []ColumnEncoding) Table {
+	columns := []Column{
+		NewColumn("id", "string", WithRole("identity")),
+		NewColumn("type", "string"),
+	}
+	values := []ColumnEncoding{
+		Values("node-a"),
+		Const("node"),
+	}
+	columns = append(columns, extraColumns...)
+	values = append(values, extraValues...)
+	return MustTable(1, columns, values)
+}
+
+func dependencyLinkTable(rows int) Table {
+	return dependencyLinkTableWith(rows, nil, nil)
+}
+
+func dependencyLinkTableWith(rows int, extraColumns []Column, extraValues []ColumnEncoding) Table {
+	columns := []Column{
+		NewColumn("src", "actor_ref"),
+		NewColumn("dst", "actor_ref"),
+		NewColumn("type", "string"),
+	}
+	values := []ColumnEncoding{
+		Const(0),
+		Const(0),
+		Const("dependency"),
+	}
+	columns = append(columns, extraColumns...)
+	values = append(values, extraValues...)
+	return MustTable(rows, columns, values)
+}
+
+func withActors(actors Table) func(*Data) {
+	return func(data *Data) {
+		data.Actors = actors
+	}
+}
+
+func withLinks(links Table) func(*Data) {
+	return func(data *Data) {
+		data.Links = links
+	}
+}
+
+func withPortTypes(portTypes map[string]PortType) func(*Data) {
+	return func(data *Data) {
+		data.Types.PortTypes = portTypes
+	}
+}
+
+func withCorrelation(correlation *Correlation) func(*Data) {
+	return func(data *Data) {
+		data.Correlation = correlation
+	}
 }
 
 func validateAgainstTopologySchema(t *testing.T, payload []byte) {
