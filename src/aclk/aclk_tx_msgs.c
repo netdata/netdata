@@ -264,7 +264,7 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
     if (body_len)
         memcpy(raw + pos, body, body_len);
 
-    uint16_t packet_id;
+    uint16_t packet_id = 0;
     int rc = mqtt_wss_publish5(client, (char *)topic, NULL, raw, &freez_aclk_publish_msg, total, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (rc == MQTT_WSS_ERR_MSG_TOO_BIG) {
