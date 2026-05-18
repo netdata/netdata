@@ -91,7 +91,7 @@ Sources checked:
 - `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`
 - `.agents/sow/specs/topology-function-schema.md`
 - `.agents/skills/project-create-topology/SKILL.md`
-- `.agents/sow/current/SOW-0025-20260511-network-connections-modal-product-composition.md`
+- `.agents/sow/done/SOW-0025-20260511-network-connections-modal-product-composition.md`
 - Cloud frontend `TODO-topology-modal-composition-contract.md`
 - Cloud topology service `AGENTS.md`
 - Cloud topology service `.agents/sow/specs/cloud-topology-service-contract.md`
@@ -141,7 +141,7 @@ Evidence reviewed:
   `data.correlation`.
 - `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json:1097` defines current
   `modal_labels_presentation` without selected identification fields.
-- `.agents/sow/current/SOW-0025-20260511-network-connections-modal-product-composition.md`
+- `.agents/sow/done/SOW-0025-20260511-network-connections-modal-product-composition.md`
   records the missing modal header label contract and the need for
   relationship-summary rows in aggregated network-connections.
 

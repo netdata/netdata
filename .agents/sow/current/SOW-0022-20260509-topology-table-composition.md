@@ -554,7 +554,6 @@ Validation plan:
 Artifact impact plan:
 
 - AGENTS.md: no expected update unless workflow rules change.
-- Runtime project skills: likely no update except collector/topology workflow references if needed.
 - Specs: likely update `.agents/sow/specs/topology-function-schema.md`.
 - End-user/operator docs: likely update `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`.
 - Runtime project skills: likely update `.agents/skills/project-create-topology/SKILL.md`.
@@ -702,7 +701,7 @@ Acceptance criteria evidence:
 - Cloud frontend handoff created at
   `../../dashboard/cloud-frontend/TODO-topology-modal-composition-contract.md`.
 - Cloud aggregator handoff SOW created at
-  `../../netdata/cloud-topology-service/.agents/sow/pending/SOW-0009-20260510-modal-composition-and-actor-labels.md`.
+  `../../netdata/cloud-topology-service/.agents/sow/done/SOW-0009-20260510-modal-composition-and-actor-labels.md`.
 
 Tests or equivalent validation:
 
@@ -715,7 +714,7 @@ Tests or equivalent validation:
   - `src/collectors/network-viewer.plugin/network-viewer.c`
   - `src/web/api/functions/function-topology-streaming.c`
 - `git -C ../../dashboard/cloud-frontend diff --check TODO-topology-modal-composition-contract.md`
-- `git -C ../../netdata/cloud-topology-service diff --check .agents/sow/pending/SOW-0009-20260510-modal-composition-and-actor-labels.md`
+- `git -C ../../netdata/cloud-topology-service diff --check .agents/sow/done/SOW-0009-20260510-modal-composition-and-actor-labels.md`
 
 Real-use evidence:
 
@@ -976,12 +975,12 @@ Follow-up mapping:
 - Cloud frontend implementation is tracked by
   `../../dashboard/cloud-frontend/TODO-topology-modal-composition-contract.md`.
 - Cloud aggregator implementation is tracked by
-  `../../netdata/cloud-topology-service/.agents/sow/pending/SOW-0009-20260510-modal-composition-and-actor-labels.md`.
+  `../../netdata/cloud-topology-service/.agents/sow/done/SOW-0009-20260510-modal-composition-and-actor-labels.md`.
 - Function-specific modal product composition is intentionally split out and
   tracked separately:
-  - `.agents/sow/pending/SOW-0025-20260511-network-connections-modal-product-composition.md`;
-  - `.agents/sow/pending/SOW-0026-20260511-snmp-modal-product-composition.md`;
-  - `.agents/sow/pending/SOW-0027-20260511-streaming-modal-product-composition.md`.
+  - `.agents/sow/done/SOW-0025-20260511-network-connections-modal-product-composition.md`;
+  - `.agents/sow/done/SOW-0026-20260511-snmp-modal-product-composition.md`;
+  - `.agents/sow/current/SOW-0027-20260511-streaming-modal-product-composition.md`.
 - Integrated Agent/UI/aggregator QA remains in this SOW after the other workers
   finish their implementation slices.
 

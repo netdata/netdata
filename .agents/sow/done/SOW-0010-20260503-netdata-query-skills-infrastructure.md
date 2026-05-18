@@ -743,7 +743,7 @@ Pending decisions 1-3. After they are answered:
   + how-tos + verify pointers. The "if you analyze, you author
   a how-to" rule baked into SKILL.md, AGENTS.md, and both
   how-tos/INDEX.md files. Seed verify/questions.md written for
-  both skills (the user's supplied 23 + 19 questions covering
+  both skills (the user-supplied 23 + 19 questions covering
   identity / hardware / OS / streaming / vnodes / collectors /
   alerts / logs / topology / flows / dyncfg / members / rooms /
   feed / token-safety self-test). Stage 2l (close) pending.

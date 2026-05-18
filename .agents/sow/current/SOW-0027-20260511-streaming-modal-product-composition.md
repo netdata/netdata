@@ -125,7 +125,8 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: ready for implementation
+Status at implementation start: ready for implementation (historical snapshot;
+current SOW state is recorded in the top-level Status section).
 
 Problem / root-cause model:
 
