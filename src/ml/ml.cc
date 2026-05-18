@@ -43,23 +43,28 @@ void ml_db_mark_corrupt(int rc)
     // the sentinel path cannot redirect a O_TRUNC write to an attacker-
     // chosen target. EEXIST is treated as success-equivalent: the desired
     // post-condition is "next agent start will see something at this path
-    // and trigger quarantine", and that is satisfied whether the path
-    // holds our sentinel or any other file/symlink (startup unlink()s it
-    // unconditionally before quarantine).
+    // and try to quarantine", and that is satisfied whether the path holds
+    // our sentinel or any other file/symlink. Startup attempts unlink()
+    // before quarantine; if unlink fails with anything other than ENOENT
+    // (e.g. EISDIR on a directory, EACCES on a permission-denied path,
+    // EROFS on a read-only mount), quarantine is deferred and the operator
+    // is logged at NDLP_ERR -- we cannot promise quarantine, only "will be
+    // attempted".
     int fd = open(sentinel, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
     int oerr = errno;
     if (fd >= 0) {
         close(fd);
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "ML: ml.db reported corruption (rc=%d); sentinel %s created. "
-               "ml.db will be renamed to a timestamped ml.db.bad.* and recreated at next agent start. "
+               "Quarantine to a timestamped ml.db.bad.* will be attempted at next agent start. "
                "Stored anomaly-detection models will be lost; ML will retrain.",
                rc, sentinel);
     }
     else if (oerr == EEXIST) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "ML: ml.db reported corruption (rc=%d); sentinel %s already present. "
-               "Quarantine to ml.db.bad.* will run at next agent start.",
+               "Quarantine to ml.db.bad.* will be attempted at next agent start "
+               "(deferred if the sentinel path cannot be unlinked then).",
                rc, sentinel);
     }
     else {
@@ -1328,7 +1333,12 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     static time_t next_vacuum_run = 0;
     int op_no = 1;
 
-    if (unlikely(ml_db_is_unusable())) {
+    // Bail when ml.db is missing OR poisoned. The NULL check covers
+    // non-corruption init failures (sqlite3_open ENOSPC/EACCES, ...) that
+    // leave ml_db == NULL without setting the unusable flag -- without it
+    // we'd drive db_execute(NULL, ...) / vacuum_database(NULL, ...) every
+    // flush and spam the log.
+    if (unlikely(!ml_db || ml_db_is_unusable())) {
         worker->pending_model_info.clear();
         return;
     }
