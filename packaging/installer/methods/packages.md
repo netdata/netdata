@@ -182,6 +182,50 @@ Enabled: Yes
    sudo apt install netdata
    ```
 
+### Manual Repository Configuration (Without Config Package)
+
+<details>
+<summary>If the repoconfig package is not yet available for your distribution</summary>
+<br/>
+
+If the repository configuration package for your distribution is not available at the [repoconfig index](https://repository.netdata.cloud/repos/repoconfig/index.html) (for example, when a new Debian or Ubuntu release is not yet covered), you can configure the APT repository manually.
+
+:::tip
+
+Using [kickstart.sh](/packaging/installer/methods/kickstart.md) is the recommended way to install Netdata. It handles repository setup automatically with fallback logic when a config package is not available.
+
+:::
+
+1. Download and dearmor the GPG key:
+
+   ```bash
+   sudo curl -fL https://repository.netdata.cloud/netdatabot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/netdata-archive-keyring.gpg
+   ```
+
+2. Create the repository configuration using Deb822 format:
+
+   ```bash
+   sudo tee /etc/apt/sources.list.d/netdata.sources <<EOF
+   Types: deb
+   URIs: http://repository.netdata.cloud/repos/stable/debian/
+   Suites: YOUR_CODENAME/
+   Signed-By: /usr/share/keyrings/netdata-archive-keyring.gpg
+   By-Hash: Yes
+   Enabled: Yes
+   EOF
+   ```
+
+   Replace `YOUR_CODENAME` with your distribution codename (for example, `trixie`). Keep the trailing slash after the codename. For Ubuntu-based systems, change `debian/` to `ubuntu/` in the `URIs` line.
+
+3. Update package lists and install Netdata:
+
+   ```bash
+   sudo apt update
+   sudo apt install netdata
+   ```
+
+</details>
+
 ## Example: Complete Installation on Ubuntu 22.04 (Jammy)
 
 <details>
