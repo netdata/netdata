@@ -1311,7 +1311,8 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
     } else {
         // generator may have written *packet_id before rolling back; clear it so callers
         // don't observe a stale id on failure
-        *packet_id = 0;
+        if (packet_id)
+            *packet_id = 0;
         if (msg_free) {
             // mqtt_ng_generate_publish has no fail_rollback path after frag_set_external_data
             // succeeds, so on non-OK return msg was never linked to a fragment and the rollback
