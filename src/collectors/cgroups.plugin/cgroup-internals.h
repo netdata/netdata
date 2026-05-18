@@ -398,7 +398,7 @@ static inline int matches_entrypoint_parent_process_comm(const char *comm) {
 }
 
 static inline int is_cgroup_systemd_service(struct cgroup *cg) {
-    return (int)(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE);
+    return (int)(cg && (cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE));
 }
 
 static inline int k8s_is_kubepod(struct cgroup *cg) {
