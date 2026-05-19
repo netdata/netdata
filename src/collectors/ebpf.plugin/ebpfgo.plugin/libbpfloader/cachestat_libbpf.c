@@ -233,6 +233,15 @@ static uint64_t cachestat_sum_percpu_values(const uint64_t *values, int count)
     return total;
 }
 
+static int cachestat_pid_snapshot_cmp(const void *a, const void *b)
+{
+    const struct netdata_ebpf_cachestat_pid_snapshot *pa = a;
+    const struct netdata_ebpf_cachestat_pid_snapshot *pb = b;
+    if (pa->pid < pb->pid) return -1;
+    if (pa->pid > pb->pid) return 1;
+    return 0;
+}
+
 struct netdata_ebpf_cachestat_pid_entry {
     uint64_t ct;
     uint32_t tgid;
@@ -621,9 +630,30 @@ int netdata_cachestat_runtime_snapshot_apps(
             continue;
         }
 
+        if (out_count >= max_entries)
+            goto next_key_iter;
+
+        /*
+         * With NETDATA_APPS_LEVEL_ALL the BPF key is the thread ID (TID).
+         * The process TGID is stored in values[i].tgid by the BPF program.
+         * We must index shared memory by TGID so that cgroup.procs lookups
+         * (which use TGIDs) succeed.  Fall back to key only when every
+         * per-CPU entry has tgid==0 (race at entry creation; counters are
+         * also zero in that case so the entry is harmless).
+         */
+        uint32_t tgid = 0;
+        for (int i = 0; i < count; i++) {
+            if (values[i].tgid != 0) {
+                tgid = values[i].tgid;
+                break;
+            }
+        }
+        if (tgid == 0)
+            tgid = key;
+
         struct netdata_ebpf_cachestat_pid_snapshot *dst = &items[out_count];
-        dst->pid = key;
-        dst->ppid = 0;
+        memset(dst, 0, sizeof(*dst));
+        dst->pid = tgid;
 
         for (int i = 0; i < count; i++) {
             if (values[i].ct > dst->ct)
@@ -638,16 +668,43 @@ int netdata_cachestat_runtime_snapshot_apps(
                 dst->comm[comm_len] = '\0';
             }
         }
-
         out_count++;
-        if (out_count >= max_entries)
-            break;
 
+next_key_iter:
         key = next_key;
         memset(values, 0, (size_t)count * sizeof(*values));
     }
 
     free(values);
+
+    /*
+     * Multiple threads of the same process produce separate BPF entries with
+     * the same TGID.  Sort by pid (TGID) and merge consecutive same-pid
+     * entries so each shared-memory slot represents one process.
+     */
+    if (out_count > 1) {
+        qsort(items, out_count, sizeof(*items), cachestat_pid_snapshot_cmp);
+
+        size_t merged_count = 0;
+        for (size_t i = 0; i < out_count; i++) {
+            if (merged_count == 0 || items[merged_count - 1].pid != items[i].pid) {
+                if (merged_count != i)
+                    items[merged_count] = items[i];
+                merged_count++;
+            } else {
+                struct netdata_ebpf_cachestat_pid_snapshot *m = &items[merged_count - 1];
+                if (items[i].ct > m->ct)
+                    m->ct = items[i].ct;
+                m->add_to_page_cache_lru += items[i].add_to_page_cache_lru;
+                m->mark_page_accessed += items[i].mark_page_accessed;
+                m->account_page_dirtied += items[i].account_page_dirtied;
+                m->mark_buffer_dirty += items[i].mark_buffer_dirty;
+                if (!m->comm[0] && items[i].comm[0])
+                    memcpy(m->comm, items[i].comm, sizeof(m->comm));
+            }
+        }
+        out_count = merged_count;
+    }
 
     out->items = items;
     out->count = out_count;

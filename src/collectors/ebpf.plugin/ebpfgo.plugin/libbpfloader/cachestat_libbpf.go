@@ -70,7 +70,10 @@ type CachestatRuntimeConfig struct {
 	AccountFunction string
 }
 
-const cachestatAppsLevelRealParent = 0
+// NETDATA_APPS_LEVEL_ALL (2): BPF key = TID; values[i].tgid = process TGID.
+// cgroup.procs contains TGIDs, so we must index shared memory by TGID, not by
+// the parent's TGID that REAL_PARENT (0) would produce.
+const cachestatAppsLevelAll = 2
 
 func SupportsCore() bool {
 	return C.netdata_cachestat_runtime_supports_core() != 0
@@ -150,7 +153,7 @@ func (r *CachestatRuntime) UpdateController(appsEnabled bool) error {
 		cAppsEnabled = 1
 	}
 
-	if ret := C.netdata_cachestat_runtime_update_controller(r.ptr, cAppsEnabled, C.int(cachestatAppsLevelRealParent)); ret != 0 {
+	if ret := C.netdata_cachestat_runtime_update_controller(r.ptr, cAppsEnabled, C.int(cachestatAppsLevelAll)); ret != 0 {
 		return fmt.Errorf("update cachestat controller failed: %d", int(ret))
 	}
 
