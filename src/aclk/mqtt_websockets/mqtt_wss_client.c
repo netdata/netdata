@@ -838,6 +838,8 @@ int mqtt_wss_publish5(mqtt_wss_client client,
 
     if (fail_reason) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "%s", fail_reason);
+        if (packet_id)
+            *packet_id = 0;
         if (msg_free)
             msg_free(msg);
         return 1;
