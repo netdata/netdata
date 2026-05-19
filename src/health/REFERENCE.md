@@ -1278,7 +1278,7 @@ template: ml_5min_cpu_chart
 | ------------- | ------------------------------------------ | ----------------------------------- |
 | `lookup`      | Average anomaly rate across CPU dimensions | 5-minute rolling window             |
 | Hysteresis    | Prevent alert flapping                     | Warning: 20%→5%, Critical: 100%→20% |
-| `anomaly-bit` | ML-generated anomaly indicators            | 0 (normal) or 1 (anomalous)         |
+| `anomaly-bit` | ML-generated anomaly indicators            | 0 (normal) or 100 (anomalous)       |
 
 <br/>
 </details>
