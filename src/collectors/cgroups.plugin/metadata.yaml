@@ -1003,30 +1003,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: pids
-            - name: services.cachestat_ratio
+            - name: systemd.service.cachestat_ratio
               description: Hit ratio
               unit: "%"
               chart_type: line
               dimensions:
-                - name: a dimension per systemd service
-            - name: services.cachestat_dirties
+                - name: ratio
+            - name: systemd.service.cachestat_dirties
               description: Number of dirty pages
               unit: "page/s"
               chart_type: line
               dimensions:
-                - name: a dimension per systemd service
-            - name: services.cachestat_hits
+                - name: dirty
+            - name: systemd.service.cachestat_hits
               description: Number of accessed files
               unit: "hits/s"
               chart_type: line
               dimensions:
-                - name: a dimension per systemd service
-            - name: services.cachestat_misses
+                - name: hit
+            - name: systemd.service.cachestat_misses
               description: Files out of page cache
               unit: "misses/s"
               chart_type: line
               dimensions:
-                - name: a dimension per systemd service
+                - name: miss
   - <<: *module
     meta:
       <<: *meta

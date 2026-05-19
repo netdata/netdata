@@ -301,10 +301,10 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
         return;
 
     const bool is_service = is_cgroup_systemd_service(cg);
-    const char *ratio_context = is_service ? "services.cachestat_ratio" : "cgroup.cachestat_ratio";
-    const char *dirty_context = is_service ? "services.cachestat_dirties" : "cgroup.cachestat_dirties";
-    const char *hit_context = is_service ? "services.cachestat_hits" : "cgroup.cachestat_hits";
-    const char *miss_context = is_service ? "services.cachestat_misses" : "cgroup.cachestat_misses";
+    const char *ratio_context = is_service ? "systemd.service.cachestat_ratio" : "cgroup.cachestat_ratio";
+    const char *dirty_context = is_service ? "systemd.service.cachestat_dirties" : "cgroup.cachestat_dirties";
+    const char *hit_context = is_service ? "systemd.service.cachestat_hits" : "cgroup.cachestat_hits";
+    const char *miss_context = is_service ? "systemd.service.cachestat_misses" : "cgroup.cachestat_misses";
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5200;
 
     cgroup_ebpfgo_cachestat_update_single_chart(
