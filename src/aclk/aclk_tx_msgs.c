@@ -39,15 +39,13 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
         return 0;
     }
 
-    mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish_msg, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
-
     if (aclklog_enabled) {
         char *json = protomsg_to_json(msg, msg_len, msgname);
         log_aclk_message_bin(json, strlen(json), 1, topic, msgname);
         freez(json);
     }
 
-    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish5a, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish_msg, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
     if (rc != MQTT_WSS_OK)
         packet_id = 0;
 
