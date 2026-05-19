@@ -5,7 +5,7 @@ package main
 import (
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/netipc/protocol"
 )
 
 const testSharedSnapshotResponseSize = 65536

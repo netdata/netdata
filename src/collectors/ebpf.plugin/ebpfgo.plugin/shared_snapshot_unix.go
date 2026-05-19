@@ -8,8 +8,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
-	"github.com/netdata/netdata/go/plugins/pkg/netipc/service/cgroups"
+	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/netipc/protocol"
+	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/netipc/service/cgroups"
 )
 
 const defaultSharedSnapshotServiceName = "ebpf-cgroups-snapshot"
