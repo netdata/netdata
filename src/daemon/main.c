@@ -615,6 +615,7 @@ int netdata_main(int argc, char **argv) {
                             if(!rc)
                                 rc = dyncfg_unittest();
 
+                            sqlite_close_databases();
                             sqlite_library_shutdown();
                             rrdlabels_aral_destroy(false);
                             return rc;
