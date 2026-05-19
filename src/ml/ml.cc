@@ -87,6 +87,47 @@ bool ml_db_mark_if_corrupt(int rc)
     return true;
 }
 
+// Execute a prepared model-table statement (INSERT/DELETE/UPDATE) and reset
+// it. Latches ml.db corruption on either step so the sentinel is dropped
+// regardless of which call surfaces the bad page. `action_name` is the
+// infinitive used in "Failed to <action_name>" ("store model",
+// "delete models", "prune old models"); `gerund_name` is the form used in
+// "Failed to reset statement when <gerund_name>" ("storing model",
+// "deleting models", "pruning old models"). The exact wording is preserved
+// so operator log searches keep matching.
+static int execute_and_reset_model_stmt(sqlite3_stmt *res,
+                                        const char *action_name,
+                                        const char *gerund_name)
+{
+    int rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to %s, rc = %d", action_name, rc);
+        ml_db_mark_if_corrupt(rc);
+        return rc;
+    }
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to reset statement when %s, rc = %d", gerund_name, rc);
+        ml_db_mark_if_corrupt(rc);
+        return rc;
+    }
+
+    return 0;
+}
+
+// Common bind-failure handler for model-table statements. Reports which
+// parameter failed, attempts a reset (logging separately if reset also
+// fails), and returns the original bind rc.
+static int handle_model_bind_fail(sqlite3_stmt *res, int param, int rc, const char *action_name)
+{
+    error_report("Failed to bind parameter %d to %s, rc = %d", param, action_name, rc);
+    int reset_rc = sqlite3_reset(res);
+    if (unlikely(reset_rc != SQLITE_OK))
+        error_report("Failed to reset statement to %s, rc = %d", action_name, reset_rc);
+    return rc;
+}
+
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&db_mutex);
 }
@@ -347,28 +388,10 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
         }
     }
 
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to store model, rc = %d", rc);
-        ml_db_mark_if_corrupt(rc);
-        return rc;
-    }
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when storing model, rc = %d", rc);
-        ml_db_mark_if_corrupt(rc);
-        return rc;
-    }
-
-    return 0;
+    return execute_and_reset_model_stmt(res, "store model", "storing model");
 
 bind_fail:
-    error_report("Failed to bind parameter %d to store model, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to store model, rc = %d", rc);
-    return rc;
+    return handle_model_bind_fail(res, param, rc, "store model");
 }
 
 static int
@@ -404,28 +427,10 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to delete models, rc = %d", rc);
-        ml_db_mark_if_corrupt(rc);
-        return rc;
-    }
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when deleting models, rc = %d", rc);
-        ml_db_mark_if_corrupt(rc);
-        return rc;
-    }
-
-    return 0;
+    return execute_and_reset_model_stmt(res, "delete models", "deleting models");
 
 bind_fail:
-    error_report("Failed to bind parameter %d to delete models, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to delete models, rc = %d", rc);
-    return rc;
+    return handle_model_bind_fail(res, param, rc, "delete models");
 }
 
 static int
@@ -463,28 +468,10 @@ ml_prune_old_models(size_t num_models_to_prune)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to prune old models, rc = %d", rc);
-        ml_db_mark_if_corrupt(rc);
-        return rc;
-    }
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when pruning old models, rc = %d", rc);
-        ml_db_mark_if_corrupt(rc);
-        return rc;
-    }
-
-    return 0;
+    return execute_and_reset_model_stmt(res, "prune old models", "pruning old models");
 
 bind_fail:
-    error_report("Failed to bind parameter %d to prune old models, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to prune old models, rc = %d", rc);
-    return rc;
+    return handle_model_bind_fail(res, param, rc, "prune old models");
 }
 
 int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
