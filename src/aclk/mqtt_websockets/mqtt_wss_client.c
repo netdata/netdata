@@ -873,6 +873,8 @@ int mqtt_wss_publish5(mqtt_wss_client client,
     //    pass topic_free=NULL, so this asymmetry is harmless today.
     int rc = mqtt_ng_publish(client->mqtt, topic, topic_free, msg, msg_free, msg_len, mqtt_flags, packet_id);
     if (rc != MQTT_NG_MSGGEN_OK) {
+        if (packet_id)
+            *packet_id = 0;
         if (msg_free)
             msg_free(msg);
         if (rc == MQTT_NG_MSGGEN_MSG_TOO_BIG)
