@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/netdataapi"
 )
 
 const (
