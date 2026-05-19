@@ -51,8 +51,10 @@ int mqtt_ng_connect(struct mqtt_ng_client *client,
  *    via msg_free after the packet is ack'd; *packet_id is set to the queued
  *    packet id. The caller must not free msg.
  *  - Any non-OK return (MQTT_NG_MSGGEN_MSG_TOO_BIG, MQTT_NG_MSGGEN_BUFFER_OOM,
- *    ...): msg is NOT consumed and *packet_id is NOT written. The caller owns
- *    msg and must invoke msg_free and reset packet_id as appropriate.
+ *    ...): msg is NOT consumed -- ownership stays with the caller, who must
+ *    invoke msg_free. *packet_id must be treated as undefined: the generator
+ *    may have written a transient value before rolling back, so callers that
+ *    care should reset it to a sentinel (e.g. 0) on the failure path.
  *
  * topic_free: ownership of topic is handled internally by the transaction
  *  buffer on the success path. On failure the topic may or may not have been

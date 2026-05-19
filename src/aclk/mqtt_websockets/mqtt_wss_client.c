@@ -830,6 +830,12 @@ int mqtt_wss_publish5(mqtt_wss_client client,
                       uint8_t publish_flags,
                       uint16_t *packet_id)
 {
+    // topic_free is not yet supported: the rollback path inside mqtt_ng_publish
+    // can free topic asymmetrically across failure modes (see contract notes in
+    // mqtt_ng.h and the long comment below). Enforce NULL until that is fixed
+    // so callers don't silently leak a borrowed/allocated topic on failure.
+    internal_fatal(topic_free != NULL, "mqtt_wss_publish5: topic_free must be NULL until rollback ownership is made symmetric");
+
     const char *fail_reason = NULL;
     if (client->mqtt_disconnecting)
         fail_reason = "mqtt_wss is disconnecting can't publish";
