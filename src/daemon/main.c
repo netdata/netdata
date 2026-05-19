@@ -607,9 +607,17 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
-                            if(unittest_prepare_rrd(&user))
+                            if (sqlite_library_init())
                                 return 1;
-                            return dyncfg_unittest();
+                            rrdlabels_aral_init(false);
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if(!rc)
+                                rc = dyncfg_unittest();
+
+                            sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
+                            return rc;
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
