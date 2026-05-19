@@ -518,8 +518,7 @@ void ml_init()
     //                      ml.db, looping indefinitely. Log loudly and skip;
     //                      operator must remove the sentinel manually.
     int unlink_rc = unlink(sentinel);
-    int unlink_err = errno;
-    if (unlink_rc == -1 && unlink_err != ENOENT) {
+    if (int unlink_err = errno; unlink_rc == -1 && unlink_err != ENOENT) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "ML: sentinel %s exists but unlink() failed (errno=%d). "
                "Skipping quarantine to avoid re-quarantining a healthy ml.db on every restart. "

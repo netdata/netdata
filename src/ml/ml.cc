@@ -81,8 +81,7 @@ void ml_db_mark_corrupt(int rc)
 // the canonical way to compare regardless of that setting.
 bool ml_db_mark_if_corrupt(int rc)
 {
-    int primary = rc & 0xFF;
-    if (primary != SQLITE_CORRUPT && primary != SQLITE_NOTADB)
+    if (int primary = rc & 0xFF; primary != SQLITE_CORRUPT && primary != SQLITE_NOTADB)
         return false;
     ml_db_mark_corrupt(rc);
     return true;
