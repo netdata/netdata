@@ -607,7 +607,7 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
-                            if (sqlite_library_init())
+                            if(sqlite_library_init())
                                 return 1;
                             rrdlabels_aral_init(false);
 
