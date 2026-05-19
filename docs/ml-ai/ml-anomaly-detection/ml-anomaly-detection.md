@@ -301,6 +301,28 @@ Use `foreach` instead of `of` to get a separate alert per dimension (e.g., per C
 
 :::
 
+### Adding context to alert notifications
+
+The `info` and `summary` fields support template variables that add contextual detail to notifications:
+
+| Variable | Replaced With |
+|----------|---------------|
+| `${family}` | Family instance (for example, `eth0`) |
+| `${label:LABEL_NAME}` | Chart label value |
+
+:::important
+
+`$this` is available only in `calc`, `warn`, and `crit` expressions — not in the `info` or `summary` fields.
+
+:::
+
+### Investigating anomaly alerts
+
+When an anomaly alert fires, use Netdata's built-in tools to investigate the root cause:
+
+- **[Alert Troubleshooting](/docs/netdata-ai/troubleshooting/index.md)** — generate a one-click report from any fired alert, assessing its validity, uncovering correlated signals, and proposing a root-cause hypothesis
+- **[Investigations](/docs/netdata-ai/investigations/index.md)** — ask open-ended questions about your infrastructure for deeper analysis beyond a single alert
+
 ## Getting Started
 
 ML is enabled by default in recent Netdata versions. To use anomaly detection:
