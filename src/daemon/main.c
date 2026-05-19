@@ -612,7 +612,7 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_init(false);
 
                             int rc = unittest_prepare_rrd(&user);
-                            if(!rc)
+                            if (!rc)
                                 rc = dyncfg_unittest();
 
                             sqlite_close_databases();
