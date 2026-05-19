@@ -7,33 +7,98 @@
 
 static bool cgroup_ebpfgo_cachestat_snapshot_ready = false;
 
-static bool cgroup_ebpfgo_find_procs_path(char *path_buf, size_t path_buf_size, const char *cg_id)
+static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path);
+
+static procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf_size, const char *cg_id)
 {
     struct stat buf;
+    const char *bases[] = {
+        cgroup_unified_base,
+        cgroup_cpuset_base,
+        cgroup_blkio_base,
+        cgroup_memory_base,
+        cgroup_cpuacct_base,
+    };
+    char best_path[FILENAME_MAX + 1] = "";
+    procfile *best = NULL;
+    size_t best_lines = 0;
 
     if (cgroup_use_unified_cgroups) {
         snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_unified_base, cg_id);
-        return stat(path_buf, &buf) == 0;
+        if (stat(path_buf, &buf) == 0) {
+            procfile *ff = cgroup_ebpfgo_open_procfile_fd(path_buf);
+            if (ff) {
+                procfile *read = procfile_readall(ff);
+                if (read) {
+                    size_t lines = procfile_lines(read);
+                    if (lines > 0) {
+                        if (path_buf && path_buf_size)
+                            snprintfz(best_path, sizeof(best_path) - 1, "%s", path_buf);
+                        best = read;
+                        best_lines = lines;
+                    } else {
+                        procfile_close(read);
+                    }
+                } else {
+                    procfile_close(ff);
+                }
+            }
+        }
+
+        if (best) {
+            if (path_buf && path_buf_size)
+                snprintfz(path_buf, path_buf_size - 1, "%s", best_path);
+            return best;
+        }
+
+        path_buf[0] = '\0';
+        return NULL;
     }
 
-    snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_cpuacct_base, cg_id);
-    if (stat(path_buf, &buf) == 0)
-        return true;
+    for (size_t i = 0; i < sizeof(bases) / sizeof(bases[0]); i++) {
+        const char *base = bases[i];
 
-    snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_cpuset_base, cg_id);
-    if (stat(path_buf, &buf) == 0)
-        return true;
+        if (!base)
+            continue;
 
-    snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_blkio_base, cg_id);
-    if (stat(path_buf, &buf) == 0)
-        return true;
+        snprintfz(path_buf, path_buf_size - 1, "%s%s", base, cg_id);
+        if (stat(path_buf, &buf) != 0)
+            continue;
 
-    snprintfz(path_buf, path_buf_size - 1, "%s%s", cgroup_memory_base, cg_id);
-    if (stat(path_buf, &buf) == 0)
-        return true;
+        procfile *ff = cgroup_ebpfgo_open_procfile_fd(path_buf);
+        if (!ff)
+            continue;
+
+        procfile *read = procfile_readall(ff);
+        if (!read) {
+            procfile_close(ff);
+            continue;
+        }
+
+        size_t lines = procfile_lines(read);
+        if (lines == 0) {
+            procfile_close(read);
+            continue;
+        }
+
+        if (!best || lines > best_lines) {
+            if (best)
+                procfile_close(best);
+            best = read;
+            best_lines = lines;
+            snprintfz(best_path, sizeof(best_path) - 1, "%s", path_buf);
+        } else {
+            procfile_close(read);
+        }
+    }
+
+    if (best) {
+        snprintfz(path_buf, path_buf_size - 1, "%s", best_path);
+        return best;
+    }
 
     path_buf[0] = '\0';
-    return false;
+    return NULL;
 }
 
 static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path)
@@ -125,10 +190,7 @@ static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
     cg->cachestat.miss = 0;
     cg->cachestat.ct = 0;
 
-    if (!cgroup_ebpfgo_find_procs_path(path_buf, sizeof(path_buf), cg->id))
-        goto calculate;
-
-    ff = cgroup_ebpfgo_open_procfile_fd(path_buf);
+    ff = cgroup_ebpfgo_open_nonempty_procs_file(path_buf, sizeof(path_buf), cg->id);
     if (!ff)
         goto calculate;
 
