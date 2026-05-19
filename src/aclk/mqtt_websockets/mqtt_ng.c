@@ -1309,7 +1309,7 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
     // the transaction-buffer GC after ack; *packet_id has been written by the
     // generator. See the long comment in mqtt_wss_publish5 for the invariant.
     int rc = TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
-    if (rc == MQTT_NG_MSGGEN_OK)
+    if (rc == MQTT_NG_MSGGEN_OK && packet_id)
         add_packet_to_timeout_monitor_list(client, *packet_id);
     return rc;
 }
