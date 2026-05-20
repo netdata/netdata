@@ -118,10 +118,24 @@ Dynamic Configuration requires a paid plan:
 
 ### Increase Node Limits
 
-The 5-node limit on multi-node dashboards applies to Community plans:
+The 5-node limit on multi-node views applies to both **Anonymous** and **Community** access levels. To work around this limit:
 
-1. **Upgrade to a paid plan** for unlimited nodes
-2. **Or select preferred nodes** in Space settings to choose which 5 nodes appear in multi-node views
+1. **Upgrade to a paid plan** for unlimited nodes in multi-node views
+2. **Select preferred nodes** in Space settings to choose which 5 nodes appear in multi-node views
+
+:::note
+
+Preferred nodes are a Netdata Cloud feature that requires signing in. They are **not available** in the local Agent dashboard.
+
+:::
+
+#### Workarounds for Anonymous Users
+
+If you access the dashboard without signing in, you can:
+
+- **Sign in to Netdata Cloud** (free Community plan) and use preferred nodes in Space settings to control which 5 nodes appear
+- **Access individual Agent dashboards directly** by navigating to each Agent's URL (e.g. `http://<agent-ip>:19999`) — single-node dashboards have no node limit
+- **Upgrade to Business** for unlimited nodes across all dashboards
 
 ## Summary
 
