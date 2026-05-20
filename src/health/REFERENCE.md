@@ -996,7 +996,7 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 - `$disk.sda.reads` - Read operations from sda disk chart
 - `$prometheus.kubelet-pvc-volumes.kubelet_volume_stats_used_bytes` - PVC volume used bytes from a Prometheus kubelet-pvc-volumes chart
 
-For Prometheus collector metrics, the chart name follows the pattern `prometheus.<job_name>` and the dimension name is the Prometheus metric name.
+For Prometheus collector metrics, the chart name follows the pattern `prometheus.<job_name>` and the dimension name is the Prometheus metric name. Here, `prometheus.<job_name>` is the chart ID as shown by `/api/v1/alarm_variables?chart=...`. If the chart ID contains special characters, URL-encode it only in the API query parameter; do not percent-encode it in the `$prometheus...` variable syntax.
 
 #### Special Variables
 
