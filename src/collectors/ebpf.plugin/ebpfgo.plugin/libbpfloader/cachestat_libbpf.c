@@ -728,9 +728,12 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
         return;
 
     cachestat_destroy_links(rt);
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE)
         cachestat_runtime_destroy_core(rt);
-    else if (rt->obj)
+    else
+#endif
+    if (rt->obj)
         bpf_object__close(rt->obj);
     free(rt);
 }
