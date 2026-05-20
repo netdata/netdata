@@ -994,9 +994,50 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 
 - `$system.cpu.user` - User CPU from system.cpu chart
 - `$disk.sda.reads` - Read operations from sda disk chart
-- `$prometheus.kubelet-pvc-volumes.kubelet_volume_stats_used_bytes` - PVC volume used bytes from a Prometheus kubelet-pvc-volumes chart
 
-For Prometheus collector metrics, the chart name follows the pattern `prometheus.<job_name>` and the dimension name is the Prometheus metric name. Here, `prometheus.<job_name>` is the chart ID as shown by `/api/v1/alarm_variables?chart=...`. If the chart ID contains special characters, URL-encode it only in the API query parameter; do not percent-encode it in the `$prometheus...` variable syntax.
+##### Cross-Chart Variable Examples from Stock Alerts
+
+Several stock health configurations use host variables to reference dimensions from **other charts** in their `calc`, `warn`, and `crit` expressions.
+
+| Alert | File | Expression | Cross-chart reference |
+|-------|------|------------|-----------------------|
+| `30min_ram_swapped_out` | `health.d/swap.conf` | `calc: $this / 1024 * 100 / ( $system.ram.used + $system.ram.cached + $system.ram.free )` | `$system.ram.*` from within a `mem.swapio` alarm |
+| `ram_available` | `health.d/ram.conf` | `calc: $avail * 100 / ($system.ram.used + $system.ram.cached + $system.ram.free + $system.ram.buffers)` | `$system.ram.*` from within a `mem.available` alarm |
+| `system_clock_sync_state` | `health.d/timex.conf` | `warn: $system.uptime.uptime > 17 * 60 AND $this == 0` | `$system.uptime.uptime` from within a `system.clock_sync_state` alarm |
+| `audit_backlog_utilization` | `health.d/audit.conf` | `warn: $this > 50 AND $audit.failure.panic == 1` | `$audit.failure.panic` from within an `audit.backlog_utilization` alarm |
+| `10s_ip_tcp_resets_sent` | `health.d/tcp_resets.conf` | `warn: $netdata.uptime.uptime > (1 * 60) AND ...` | `$netdata.uptime.uptime` from within an `ip.tcphandshake` alarm |
+| `streaming_never_connected` | `health.d/streaming.conf` | `warn: $netdata.uptime.uptime > 30 * 60 AND $this > 0` | `$netdata.uptime.uptime` from within a `netdata.streaming_inbound` alarm |
+
+##### Prometheus Collector Variables
+
+For Prometheus collector metrics, the chart ID follows the pattern `prometheus.<metric_family>` and dimension names correspond to the Prometheus metric labels. Use the `$prometheus.<chart_id>.<dimension>` syntax (without braces) in `calc`/`warn`/`crit` expressions.
+
+**Example — PVC volume usage alert using kubelet metrics:**
+
+```text
+   alarm: kubelet_pvc_volume_usage
+      on: prometheus.kubelet-pvc-volumes
+   lookup: max -1m unaligned of kubelet_volume_stats_used_bytes
+     calc: $kubelet_volume_stats_used_bytes * 100 / $kubelet_volume_stats_capacity_bytes
+     warn: $this > 80
+     crit: $this > 95
+   units: %
+    every: 1m
+     info: PVC volume usage percentage
+       to: sysadmin
+```
+
+:::note
+
+The exact chart ID and dimension names depend on how the Prometheus collector registers them for your endpoint. Use the alarm variables API to discover the correct names:
+
+```text
+http://NODE:19999/api/v1/alarm_variables?chart=prometheus.kubelet-pvc-volumes
+```
+
+If the chart ID contains special characters (e.g. hyphens), URL-encode it only in the API query parameter. Do not percent-encode it in the `$prometheus...` variable syntax.
+
+:::
 
 #### Special Variables
 
