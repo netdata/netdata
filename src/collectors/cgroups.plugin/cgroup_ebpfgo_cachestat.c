@@ -290,10 +290,10 @@ void cgroup_ebpfgo_cachestat_update_locked(void)
 
 void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
 {
-    if (unlikely(!cg))
+    if (!cg)
         return;
 
-    if (unlikely(!cg->enabled || cg->pending_renames))
+    if (!cg->enabled || cg->pending_renames)
         return;
 
     if (unlikely(!cgroup_ebpfgo_cachestat_snapshot_ready))
