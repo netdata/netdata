@@ -12,6 +12,7 @@ use crate::{
     Seconds,
 };
 use journal_core::collections::{HashMap, HashSet};
+use journal_core::field_map::REMAPPING_MARKER;
 use journal_core::file::{JournalFile, Mmap, offset_array::InlinedCursor};
 use journal_registry::File;
 use std::num::NonZeroU64;
@@ -101,6 +102,14 @@ pub struct FileIndexer {
     // Maps entry offsets to an index of an implicitly defined time-ordered
     // array of entries
     entry_offset_index: HashMap<NonZeroU64, u64>,
+
+    // Entry offsets that belong to ND_REMAPPING=1 bookkeeping records written
+    // by the otel-plugin. These describe the OTel-to-systemd field name
+    // mapping; they are not real log records and must be excluded from the
+    // file's time histogram, the time-ordered entry list, and the per-field
+    // bitmaps so that downstream consumers (queries, histograms) see only
+    // genuine log entries.
+    remapping_entry_offsets: HashSet<NonZeroU64>,
 }
 
 impl Default for FileIndexer {
@@ -120,6 +129,7 @@ impl FileIndexer {
             realtime_entry_offset_pairs: Vec::new(),
             entry_indices: Vec::new(),
             entry_offset_index: HashMap::default(),
+            remapping_entry_offsets: HashSet::default(),
         }
     }
 }
@@ -145,6 +155,7 @@ impl FileIndexer {
         self.entry_indices = Vec::new();
         self.entry_offsets = Vec::new();
         self.entry_offset_index = HashMap::default();
+        self.remapping_entry_offsets.clear();
 
         let window_size = 32 * 1024 * 1024;
         let journal_file = JournalFile::<Mmap>::open(file, window_size)?;
@@ -185,6 +196,13 @@ impl FileIndexer {
         let was_online = journal_file.journal_header_ref().state == 1 || file.is_active();
 
         let field_map = journal_file.load_fields()?;
+
+        // Discover ND_REMAPPING bookkeeping entries so they can be excluded
+        // from the time histogram, the time-ordered entry list, and the
+        // per-field bitmaps. Typically there is at most one such entry per
+        // file (written by the otel-plugin); journals without remappings
+        // produce an empty set.
+        self.collect_remapping_entry_offsets(&journal_file, tail_object_offset)?;
 
         // Build the file histogram
         let histogram = self.build_histogram(
@@ -300,11 +318,6 @@ impl FileIndexer {
                         continue;
                     }
 
-                    // Skip the remapping value
-                    if data_object.raw_payload().ends_with(field_name.as_bytes()) {
-                        continue;
-                    };
-
                     let data_payload =
                         String::from_utf8_lossy(data_object.raw_payload()).into_owned();
                     let Some(inlined_cursor) = data_object.inlined_cursor() else {
@@ -330,7 +343,9 @@ impl FileIndexer {
                 }
 
                 // Map entry offsets where this data object appears to entry indices.
-                // Filter out any offsets that are beyond our initial snapshot's maximum
+                // Filter out any offsets that are beyond our initial snapshot's maximum,
+                // and any offsets that belong to ND_REMAPPING bookkeeping records (those
+                // entries are not in entry_offset_index and must not appear in bitmaps).
                 self.entry_indices.clear();
                 for entry_offset in self
                     .entry_offsets
@@ -338,8 +353,12 @@ impl FileIndexer {
                     .copied()
                     .filter(|offset| *offset <= tail_object_offset)
                 {
+                    if self.remapping_entry_offsets.contains(&entry_offset) {
+                        continue;
+                    }
                     let Some(entry_index) = self.entry_offset_index.get(&entry_offset) else {
-                        // This should never happen given that we filter by the tail object offset.
+                        // This should never happen given that we filter by the tail object
+                        // offset and exclude remapping entries.
                         panic!(
                             "missing entry offset {} from index (total offsets: {})",
                             entry_offset,
@@ -347,6 +366,14 @@ impl FileIndexer {
                         );
                     };
                     self.entry_indices.push(*entry_index as u32);
+                }
+
+                // If every entry that contains this data object is a remapping
+                // record, the data object only describes the OTel field mapping
+                // (e.g. NDABE_LOG_SEVERITY_NUMBER=log.severity_number) and must
+                // not surface as a value in the index.
+                if self.entry_indices.is_empty() {
+                    continue;
                 }
                 self.entry_indices.sort_unstable();
 
@@ -406,6 +433,74 @@ impl FileIndexer {
         }
 
         Ok(entries_index)
+    }
+
+    /// Collect entry offsets that belong to ND_REMAPPING=1 bookkeeping
+    /// records.
+    ///
+    /// The otel-plugin writes one such entry per journal file containing the
+    /// mapping from OTel field names to their systemd-compatible counterparts
+    /// (e.g. `NDABE_LOG_SEVERITY_NUMBER=log.severity_number`). These records
+    /// are not log messages and must be excluded from time histograms,
+    /// time-ordered entry lists, and per-field bitmaps. Journals that contain
+    /// no remappings (e.g. regular systemd journals) leave the set empty.
+    ///
+    /// Only entries whose offset is at or before `tail_object_offset` are
+    /// considered, matching the snapshot semantics used elsewhere in
+    /// indexing.
+    fn collect_remapping_entry_offsets(
+        &mut self,
+        journal_file: &JournalFile<Mmap>,
+        tail_object_offset: NonZeroU64,
+    ) -> Result<()> {
+        // The ND_REMAPPING field key is the bytes before '=' in the marker.
+        // Resolved from REMAPPING_MARKER to keep both call sites in sync.
+        let Some(eq_pos) = REMAPPING_MARKER.iter().position(|b| *b == b'=') else {
+            // REMAPPING_MARKER is a compile-time constant containing '='; this
+            // branch is unreachable but is preferred over an unwrap so changes
+            // to the marker can't crash indexing.
+            return Ok(());
+        };
+        let marker_field = &REMAPPING_MARKER[..eq_pos];
+
+        let Ok(field_data_iterator) = journal_file.field_data_objects(marker_field) else {
+            // No ND_REMAPPING field is present in this journal file.
+            return Ok(());
+        };
+
+        for data_object in field_data_iterator {
+            let Ok(data_object) = data_object else {
+                continue;
+            };
+
+            // Only the exact `ND_REMAPPING=1` payload marks a remapping entry.
+            if data_object.raw_payload() != REMAPPING_MARKER {
+                continue;
+            }
+
+            let Some(inlined_cursor) = data_object.inlined_cursor() else {
+                continue;
+            };
+
+            self.entry_offsets.clear();
+            if inlined_cursor
+                .collect_offsets(journal_file, &mut self.entry_offsets)
+                .is_err()
+            {
+                continue;
+            }
+
+            for entry_offset in self
+                .entry_offsets
+                .iter()
+                .copied()
+                .filter(|offset| *offset <= tail_object_offset)
+            {
+                self.remapping_entry_offsets.insert(entry_offset);
+            }
+        }
+
+        Ok(())
     }
 
     /// Collect timestamp information from a source timestamp field.
@@ -474,6 +569,9 @@ impl FileIndexer {
             }
 
             for entry_offset in &self.entry_offsets {
+                if self.remapping_entry_offsets.contains(entry_offset) {
+                    continue;
+                }
                 self.source_timestamp_entry_offset_pairs
                     .push((*ts, *entry_offset));
             }
@@ -536,6 +634,7 @@ impl FileIndexer {
             .iter()
             .copied()
             .filter(|offset| *offset <= tail_object_offset)
+            .filter(|offset| !self.remapping_entry_offsets.contains(offset))
         {
             if self.entry_offset_index.contains_key(&entry_offset) {
                 // We have the timestamp of this entry offset
