@@ -140,9 +140,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Target** | url | Target endpoint URL. | https://vcenter.local | yes |
 |  | timeout | HTTP request timeout (seconds). | 20 | no |
 | **Discovery** | discovery_interval | Hosts, VMs, datastores, clusters, and resource pools discovery interval (seconds). | 300 | no |
-| **Labels** | [collect_inventory_path_label](#option-labels-collect-inventory-path-label) | Add an inventory_path label to vSphere resource charts. | no | no |
-|  | [vm_guest_labels](#option-labels-vm-guest-labels) | VM guest label allowlist. |  | no |
-|  | [vsphere_tag_categories](#option-labels-vsphere-tag-categories) | vSphere tag category allowlist. |  | no |
+| **Labels** | [tag_categories](#option-labels-tag-categories) | vSphere tag category allowlist. |  | no |
 |  | [custom_attributes](#option-labels-custom-attributes) | vSphere custom attribute allowlist. |  | no |
 | **High Cardinality** | [collect_vm_disks](#option-high-cardinality-collect-vm-disks) | Collect VM virtual disk capacity. | no | no |
 |  | [collect_vm_disk_performance](#option-high-cardinality-collect-vm-disk-performance) | Collect VM virtual disk performance. | no | no |
@@ -188,32 +186,8 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
-<a id="option-labels-collect-inventory-path-label"></a>
-##### collect_inventory_path_label
-
-Disabled by default because inventory paths can expose internal naming
-schemes. When enabled, the collector adds `inventory_path` to VM, host,
-datastore, cluster, and resource-pool charts when the path can be
-derived from discovered inventory.
-
-
-<a id="option-labels-vm-guest-labels"></a>
-##### vm_guest_labels
-
-Disabled by default because guest hostnames, IP addresses, and OS names
-can be sensitive and high cardinality. Valid values are
-`guest_hostname`, `guest_ip`, and `guest_os`.
-
-```yaml
-vm_guest_labels:
-  - guest_hostname
-  - guest_ip
-  - guest_os
-```
-
-
-<a id="option-labels-vsphere-tag-categories"></a>
-##### vsphere_tag_categories
+<a id="option-labels-tag-categories"></a>
+##### tag_categories
 
 Disabled by default because vSphere tags are user-defined metadata
 and can expose internal names, ownership, business unit, or
@@ -227,7 +201,7 @@ tags in the same category, values are sorted and joined with the
 pipe character.
 
 ```yaml
-vsphere_tag_categories:
+tag_categories:
   - "Environment"
   - "Business Unit"
 ```
@@ -728,12 +702,8 @@ Labels:
 | cluster | Cluster name |
 | host | Host name |
 | vm | Virtual Machine name |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
-| guest_hostname | VM guest hostname; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_ip | VM guest primary IP address; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_os | VM guest OS name; present only when included in `vm_guest_labels` and reported by VMware Tools |
 
 Metrics:
 
@@ -780,12 +750,8 @@ Labels:
 | disk | vSphere virtual disk label for capacity metrics and vSphere disk performance instance for performance metrics |
 | disk_key | vSphere virtual disk device key; present only for `collect_vm_disks` capacity metrics |
 | disk_instance | vSphere virtual disk performance instance; present only for `collect_vm_disk_performance` metrics |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
-| guest_hostname | VM guest hostname; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_ip | VM guest primary IP address; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_os | VM guest OS name; present only when included in `vm_guest_labels` and reported by VMware Tools |
 
 Metrics:
 
@@ -812,12 +778,8 @@ Labels:
 | vm | Virtual Machine name |
 | interface | vSphere network interface performance instance |
 | interface_instance | vSphere network interface performance instance |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
-| guest_hostname | VM guest hostname; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_ip | VM guest primary IP address; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_os | VM guest OS name; present only when included in `vm_guest_labels` and reported by VMware Tools |
 
 Metrics:
 
@@ -842,12 +804,8 @@ Labels:
 | cluster | Cluster name |
 | host | Host name |
 | vm | Virtual Machine name |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
-| guest_hostname | VM guest hostname; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_ip | VM guest primary IP address; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_os | VM guest OS name; present only when included in `vm_guest_labels` and reported by VMware Tools |
 
 Metrics:
 
@@ -870,12 +828,8 @@ Labels:
 | host | Host name |
 | vm | Virtual Machine name |
 | vm_instance_uuid | VM instance UUID used by vSAN performance entity references |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
-| guest_hostname | VM guest hostname; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_ip | VM guest primary IP address; present only when included in `vm_guest_labels` and reported by VMware Tools |
-| guest_os | VM guest OS name; present only when included in `vm_guest_labels` and reported by VMware Tools |
 
 Metrics:
 
@@ -899,8 +853,7 @@ Labels:
 | host | Host name |
 | interface | vSphere network interface performance instance |
 | interface_instance | vSphere network interface performance instance |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -930,8 +883,7 @@ Labels:
 | host | Host name |
 | disk | vSphere disk performance instance |
 | disk_instance | vSphere disk performance instance |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -965,8 +917,7 @@ Labels:
 | host | Host name |
 | adapter | vSphere storage adapter performance instance |
 | adapter_instance | vSphere storage adapter performance instance |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -993,8 +944,7 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | host | Host name |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1017,8 +967,7 @@ Labels:
 | host | Host name |
 | path | vSphere storage path performance instance |
 | path_instance | vSphere storage path performance instance |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1044,8 +993,7 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | host | Host name |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1068,8 +1016,7 @@ Labels:
 | host | Host name |
 | cpu | vSphere CPU performance instance |
 | cpu_instance | vSphere CPU performance instance |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1091,8 +1038,7 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | host | Host name |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1117,8 +1063,7 @@ Labels:
 | cluster | Cluster name |
 | host | Host name |
 | vsan_node_uuid | vSAN host node UUID used by vSAN performance entity references |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1143,8 +1088,7 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | host | Host name |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1179,8 +1123,7 @@ Labels:
 | datacenter | Datacenter name |
 | datastore | Datastore name |
 | type | Datastore type (VMFS, NFS, NFS41, vsan, VVOL, PMEM) |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1208,7 +1151,7 @@ Labels:
 | id | vSphere managed object reference ID |
 | datacenter | Datacenter name |
 | datastore_cluster | Datastore cluster name |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1232,8 +1175,7 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | vsan_uuid | vSAN cluster UUID used by vSAN performance entity references |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1259,8 +1201,7 @@ Labels:
 | id | vSphere managed object reference ID |
 | datacenter | Datacenter name |
 | cluster | Cluster name |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
@@ -1311,8 +1252,7 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | resource_pool | Resource Pool name |
-| inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `vsphere_tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
 | vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:

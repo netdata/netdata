@@ -11,18 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-const (
-	vmGuestLabelHostName = "guest_hostname"
-	vmGuestLabelIP       = "guest_ip"
-	vmGuestLabelOS       = "guest_os"
-)
-
-var validVMGuestLabels = []string{
-	vmGuestLabelHostName,
-	vmGuestLabelIP,
-	vmGuestLabelOS,
-}
-
 type userMetadataPatternTerm struct {
 	matcher  matcher.Matcher
 	positive bool
@@ -82,32 +70,9 @@ func (c *Collector) resourceEnrichmentLabels(resourceID string) []metrix.Label {
 	}
 
 	labels := make(map[string]string)
-	if c.InventoryPathLabel {
-		if path := c.inventoryPath(resourceID); path != "" {
-			labels["inventory_path"] = path
-		}
-	}
 	for key, value := range c.userMetadataLabels(resourceID) {
 		if key != "" && value != "" {
 			labels[key] = value
-		}
-	}
-	if vm := c.resources.VMs.Get(resourceID); vm != nil {
-		for _, label := range c.VMGuestLabels {
-			switch label {
-			case vmGuestLabelHostName:
-				if vm.GuestHostName != "" {
-					labels[vmGuestLabelHostName] = vm.GuestHostName
-				}
-			case vmGuestLabelIP:
-				if vm.GuestIPAddress != "" {
-					labels[vmGuestLabelIP] = vm.GuestIPAddress
-				}
-			case vmGuestLabelOS:
-				if vm.GuestFullName != "" {
-					labels[vmGuestLabelOS] = vm.GuestFullName
-				}
-			}
 		}
 	}
 
@@ -148,62 +113,6 @@ func (c *Collector) userMetadataLabels(resourceID string) map[string]string {
 	}
 	if sp := c.resources.StoragePods.Get(resourceID); sp != nil {
 		return sp.Labels
-	}
-	return nil
-}
-
-func (c *Collector) inventoryPath(resourceID string) string {
-	if c.resources == nil {
-		return ""
-	}
-	if vm := c.resources.VMs.Get(resourceID); vm != nil {
-		return inventoryPathFromParts(vm.Hier.DC.Name, vm.Hier.Cluster.Name, vm.Hier.Host.Name, vm.Name)
-	}
-	if host := c.resources.Hosts.Get(resourceID); host != nil {
-		return inventoryPathFromParts(host.Hier.DC.Name, host.Hier.Cluster.Name, host.Name)
-	}
-	if ds := c.resources.Datastores.Get(resourceID); ds != nil {
-		return inventoryPathFromParts(ds.Hier.DC.Name, ds.Name)
-	}
-	if cluster := c.resources.Clusters.Get(resourceID); cluster != nil {
-		return inventoryPathFromParts(cluster.Hier.DC.Name, cluster.Name)
-	}
-	if rp := c.resources.ResourcePools.Get(resourceID); rp != nil {
-		return inventoryPathFromParts(rp.Hier.DC.Name, rp.Hier.Cluster.Name, rp.Name)
-	}
-	return ""
-}
-
-func inventoryPathFromParts(parts ...string) string {
-	var clean []string
-	for _, part := range parts {
-		part = strings.Trim(part, "/ ")
-		if part == "" {
-			continue
-		}
-		clean = append(clean, part)
-	}
-	if len(clean) == 0 {
-		return ""
-	}
-	return "/" + strings.Join(clean, "/")
-}
-
-func validateStringAllowlist(name string, values, allowed []string) error {
-	allowedSet := make(map[string]bool, len(allowed))
-	for _, value := range allowed {
-		allowedSet[value] = true
-	}
-
-	seen := make(map[string]bool, len(values))
-	for _, value := range values {
-		if !allowedSet[value] {
-			return fmt.Errorf("%s has invalid value %q (valid: %s)", name, value, strings.Join(allowed, ", "))
-		}
-		if seen[value] {
-			return fmt.Errorf("%s has duplicate value %q", name, value)
-		}
-		seen[value] = true
 	}
 	return nil
 }

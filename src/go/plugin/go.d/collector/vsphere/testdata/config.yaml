@@ -20,12 +20,7 @@ tls_key: "ok"
 tls_skip_verify: yes
 force_http2: yes
 discovery_interval: 123.123
-collect_inventory_path_label: yes
-vm_guest_labels:
-  - "guest_hostname"
-  - "guest_ip"
-  - "guest_os"
-vsphere_tag_categories:
+tag_categories:
   - "Environment"
   - "Business*"
 custom_attributes:

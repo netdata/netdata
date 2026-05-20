@@ -23,11 +23,8 @@ func (c *Collector) validateConfig() error {
 	if c.UpdateEvery < minRecommendedUpdateEvery {
 		c.Warningf("config option update_every=%d is lower than recommended minimum %d", c.UpdateEvery, minRecommendedUpdateEvery)
 	}
-	if err := validateStringAllowlist("vm_guest_labels", c.VMGuestLabels, validVMGuestLabels); err != nil {
-		return err
-	}
-	if len(c.VSphereTagCategories) > 0 {
-		m, err := newUserMetadataPatternMatcher("vsphere_tag_categories", c.VSphereTagCategories)
+	if len(c.TagCategories) > 0 {
+		m, err := newUserMetadataPatternMatcher("tag_categories", c.TagCategories)
 		if err != nil {
 			return err
 		}

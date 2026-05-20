@@ -22,13 +22,7 @@
   "tls_skip_verify": true,
   "force_http2": true,
   "discovery_interval": 123.123,
-  "collect_inventory_path_label": true,
-  "vm_guest_labels": [
-    "guest_hostname",
-    "guest_ip",
-    "guest_os"
-  ],
-  "vsphere_tag_categories": [
+  "tag_categories": [
     "Environment",
     "Business*"
   ],

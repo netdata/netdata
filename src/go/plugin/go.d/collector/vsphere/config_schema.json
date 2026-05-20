@@ -38,32 +38,7 @@
         "minimum": 60,
         "default": 300
       },
-      "collect_inventory_path_label": {
-        "title": "Collect inventory path label",
-        "description": "If enabled, adds an inventory_path chart label to discovered vSphere resources. Disabled by default because inventory paths can expose internal naming schemes.",
-        "type": "boolean",
-        "default": false
-      },
-      "vm_guest_labels": {
-        "title": "VM guest labels",
-        "description": "Optional allowlist of VM guest labels to add to VM charts. Disabled by default because guest hostnames, IP addresses, and OS names can be sensitive and high cardinality.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "items": {
-          "title": "VM guest label",
-          "type": "string",
-          "enum": [
-            "guest_hostname",
-            "guest_ip",
-            "guest_os"
-          ]
-        },
-        "default": []
-      },
-      "vsphere_tag_categories": {
+      "tag_categories": {
         "title": "vSphere tag categories",
         "description": "Optional glob-pattern allowlist of vSphere tag category names to expose as chart labels. Each list item is one pattern, so names with spaces are supported. Disabled by default because tags are user-defined metadata and can expose internal names. Use \"*\" only when all tag categories are intentional. Label keys are vsphere_tag_<sanitized_category>; multiple tags in the same category are sorted and joined with \"|\".",
         "type": [
@@ -568,9 +543,7 @@
         {
           "title": "Labels",
           "fields": [
-            "collect_inventory_path_label",
-            "vm_guest_labels",
-            "vsphere_tag_categories",
+            "tag_categories",
             "custom_attributes"
           ]
         },
@@ -708,10 +681,7 @@
     "vm_include": {
       "ui:listFlavour": "list"
     },
-    "vm_guest_labels": {
-      "ui:listFlavour": "list"
-    },
-    "vsphere_tag_categories": {
+    "tag_categories": {
       "ui:listFlavour": "list"
     },
     "custom_attributes": {

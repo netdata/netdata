@@ -105,10 +105,8 @@ type Config struct {
 	ClustersInclude   match.ClusterIncludes   `yaml:"cluster_include,omitempty" json:"cluster_include"`
 
 	// Opt-in label enrichment.
-	InventoryPathLabel   bool     `yaml:"collect_inventory_path_label,omitempty" json:"collect_inventory_path_label"`
-	VMGuestLabels        []string `yaml:"vm_guest_labels,omitempty" json:"vm_guest_labels"`
-	VSphereTagCategories []string `yaml:"vsphere_tag_categories,omitempty" json:"vsphere_tag_categories"`
-	CustomAttributes     []string `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
+	TagCategories    []string `yaml:"tag_categories,omitempty" json:"tag_categories"`
+	CustomAttributes []string `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
 
 	// Optional datastore cluster metrics.
 	CollectDatastoreClusters bool     `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`

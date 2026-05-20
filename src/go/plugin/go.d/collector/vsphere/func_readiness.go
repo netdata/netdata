@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -246,9 +245,7 @@ func (c *Collector) readinessRows() []readinessRow {
 	}
 
 	rows = append(rows,
-		c.booleanReadinessRow("inventory_path_label", "labels", c.InventoryPathLabel, "inventory_path label collection is enabled", "inventory_path label collection is disabled"),
 		c.userMetadataReadinessRow(),
-		c.vmGuestLabelsReadinessRow(),
 		c.optionalMetricReadinessRow("datastore_clusters", "metrics", c.CollectDatastoreClusters, c.DatastoreClustersInclude),
 		c.optionalMetricReadinessRow("vm_disks", "metrics", c.CollectVMDisks || c.CollectVMDiskPerformance, c.VMDisksInclude),
 		c.optionalMetricReadinessRow("vm_nics", "metrics", c.CollectVMNICPerformance, c.VMNICsInclude),
@@ -297,7 +294,7 @@ func (c *Collector) optionalMetricReadinessRow(check, scope string, enabled bool
 }
 
 func (c *Collector) userMetadataReadinessRow() readinessRow {
-	tags := len(c.VSphereTagCategories)
+	tags := len(c.TagCategories)
 	attrs := len(c.CustomAttributes)
 	if tags == 0 && attrs == 0 {
 		return readinessRow{
@@ -312,23 +309,6 @@ func (c *Collector) userMetadataReadinessRow() readinessRow {
 		scope:   "labels",
 		status:  readinessStatusOK,
 		details: fmt.Sprintf("enabled for %d tag category pattern(s), %d custom attribute pattern(s)", tags, attrs),
-	}
-}
-
-func (c *Collector) vmGuestLabelsReadinessRow() readinessRow {
-	if len(c.VMGuestLabels) == 0 {
-		return readinessRow{
-			check:   "vm_guest_labels",
-			scope:   "labels",
-			status:  readinessStatusDisabled,
-			details: "VM guest labels are disabled",
-		}
-	}
-	return readinessRow{
-		check:   "vm_guest_labels",
-		scope:   "labels",
-		status:  readinessStatusOK,
-		details: fmt.Sprintf("enabled labels: %s", strings.Join(c.VMGuestLabels, ", ")),
 	}
 }
 
