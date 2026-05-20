@@ -36,7 +36,7 @@ void apps_ebpf_accumulate_cachestat(void)
             continue;
 
         struct target *w = p->target;
-        if (unlikely(!w))
+        if (!w)
             continue;
 
         const struct ebpf_cachestat *current = &p->ebpf.cachestat.current;
