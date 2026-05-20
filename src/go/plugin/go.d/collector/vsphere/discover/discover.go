@@ -42,8 +42,6 @@ type Client interface {
 func New(client Client) *Discoverer {
 	return &Discoverer{
 		Client:                     client,
-		HostPowerStates:            []string{poweredOn},
-		VMPowerStates:              []string{poweredOn},
 		missingPerfCounterWarnings: make(map[string]bool),
 	}
 }
@@ -55,8 +53,6 @@ type Discoverer struct {
 	match.VMMatcher
 	match.DatastoreMatcher
 	match.ClusterMatcher
-	HostPowerStates                      []string
-	VMPowerStates                        []string
 	CollectDatastoreClusters             bool
 	CollectVMDisks                       bool
 	CollectVMDiskPerformance             bool

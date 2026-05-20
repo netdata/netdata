@@ -38,51 +38,6 @@
         "minimum": 60,
         "default": 300
       },
-      "host_power_states": {
-        "title": "Host power states",
-        "description": "ESXi host power states to discover. The default preserves existing behavior by discovering only powered-on hosts. Non-powered-on hosts are collected as property/status-only resources; real-time performance counters are skipped.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "minItems": 1,
-        "items": {
-          "title": "Host power state",
-          "type": "string",
-          "enum": [
-            "poweredOn",
-            "poweredOff",
-            "standBy",
-            "unknown"
-          ]
-        },
-        "default": [
-          "poweredOn"
-        ]
-      },
-      "vm_power_states": {
-        "title": "VM power states",
-        "description": "Virtual machine power states to discover. The default preserves existing behavior by discovering only powered-on VMs. Powered-off and suspended VMs are collected as property/status/snapshot-only resources; real-time performance counters are skipped.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "minItems": 1,
-        "items": {
-          "title": "VM power state",
-          "type": "string",
-          "enum": [
-            "poweredOn",
-            "poweredOff",
-            "suspended"
-          ]
-        },
-        "default": [
-          "poweredOn"
-        ]
-      },
       "collect_inventory_path_label": {
         "title": "Collect inventory path label",
         "description": "If enabled, adds an inventory_path chart label to discovered vSphere resources. Disabled by default because inventory paths can expose internal naming schemes.",
@@ -607,9 +562,7 @@
             "host_include",
             "vm_include",
             "datastore_include",
-            "cluster_include",
-            "host_power_states",
-            "vm_power_states"
+            "cluster_include"
           ]
         },
         {
@@ -752,13 +705,7 @@
     "host_include": {
       "ui:listFlavour": "list"
     },
-    "host_power_states": {
-      "ui:listFlavour": "list"
-    },
     "vm_include": {
-      "ui:listFlavour": "list"
-    },
-    "vm_power_states": {
       "ui:listFlavour": "list"
     },
     "vm_guest_labels": {

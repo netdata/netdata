@@ -60,8 +60,6 @@ func New() *Collector {
 			VMsInclude:                 []string{"/*"},
 			DatastoresInclude:          []string{"/*"},
 			ClustersInclude:            []string{"/*"},
-			HostPowerStates:            cloneStrings(defaultHostPowerStates),
-			VMPowerStates:              cloneStrings(defaultVMPowerStates),
 			DatastoreClustersInclude:   []string{"/*"},
 			VMDisksInclude:             []string{"*"},
 			VMNICsInclude:              []string{"*"},
@@ -93,44 +91,59 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode                                string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery                          int    `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry                   int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig                       `yaml:",inline" json:""`
-	DiscoveryInterval                    confopt.Duration        `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
-	HostsInclude                         match.HostIncludes      `yaml:"host_include,omitempty" json:"host_include"`
-	VMsInclude                           match.VMIncludes        `yaml:"vm_include,omitempty" json:"vm_include"`
-	DatastoresInclude                    match.DatastoreIncludes `yaml:"datastore_include,omitempty" json:"datastore_include"`
-	ClustersInclude                      match.ClusterIncludes   `yaml:"cluster_include,omitempty" json:"cluster_include"`
-	HostPowerStates                      []string                `yaml:"host_power_states,omitempty" json:"host_power_states"`
-	VMPowerStates                        []string                `yaml:"vm_power_states,omitempty" json:"vm_power_states"`
-	CollectDatastoreClusters             bool                    `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
-	DatastoreClustersInclude             []string                `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
-	InventoryPathLabel                   bool                    `yaml:"collect_inventory_path_label,omitempty" json:"collect_inventory_path_label"`
-	VMGuestLabels                        []string                `yaml:"vm_guest_labels,omitempty" json:"vm_guest_labels"`
-	VSphereTagCategories                 []string                `yaml:"vsphere_tag_categories,omitempty" json:"vsphere_tag_categories"`
-	CustomAttributes                     []string                `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
-	CollectVMDisks                       bool                    `yaml:"collect_vm_disks,omitempty" json:"collect_vm_disks"`
-	CollectVMDiskPerformance             bool                    `yaml:"collect_vm_disk_performance,omitempty" json:"collect_vm_disk_performance"`
-	VMDisksInclude                       []string                `yaml:"vm_disk_include,omitempty" json:"vm_disk_include"`
-	CollectVMNICPerformance              bool                    `yaml:"collect_vm_nic_performance,omitempty" json:"collect_vm_nic_performance"`
-	VMNICsInclude                        []string                `yaml:"vm_nic_include,omitempty" json:"vm_nic_include"`
-	CollectHostNICPerformance            bool                    `yaml:"collect_host_nic_performance,omitempty" json:"collect_host_nic_performance"`
-	HostNICsInclude                      []string                `yaml:"host_nic_include,omitempty" json:"host_nic_include"`
-	CollectHostDiskPerformance           bool                    `yaml:"collect_host_disk_performance,omitempty" json:"collect_host_disk_performance"`
-	HostDisksInclude                     []string                `yaml:"host_disk_include,omitempty" json:"host_disk_include"`
-	CollectHostStorageAdapterPerformance bool                    `yaml:"collect_host_storage_adapter_performance,omitempty" json:"collect_host_storage_adapter_performance"`
-	HostStorageAdaptersInclude           []string                `yaml:"host_storage_adapter_include,omitempty" json:"host_storage_adapter_include"`
-	CollectHostStoragePathPerformance    bool                    `yaml:"collect_host_storage_path_performance,omitempty" json:"collect_host_storage_path_performance"`
-	HostStoragePathsInclude              []string                `yaml:"host_storage_path_include,omitempty" json:"host_storage_path_include"`
-	CollectHostCPUInstancePerformance    bool                    `yaml:"collect_host_cpu_instance_performance,omitempty" json:"collect_host_cpu_instance_performance"`
-	HostCPUInstancesInclude              []string                `yaml:"host_cpu_instance_include,omitempty" json:"host_cpu_instance_include"`
-	CollectPowerMetrics                  bool                    `yaml:"collect_power_metrics,omitempty" json:"collect_power_metrics"`
-	CollectVSAN                          bool                    `yaml:"collect_vsan,omitempty" json:"collect_vsan"`
-	VSANClustersInclude                  []string                `yaml:"vsan_cluster_include,omitempty" json:"vsan_cluster_include"`
-	VSANHostsInclude                     []string                `yaml:"vsan_host_include,omitempty" json:"vsan_host_include"`
-	VSANVMsInclude                       []string                `yaml:"vsan_vm_include,omitempty" json:"vsan_vm_include"`
-	CollectNetworkTopology               bool                    `yaml:"collect_network_topology,omitempty" json:"collect_network_topology"`
+	// Job identity and scheduling.
+	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	web.HTTPConfig     `yaml:",inline" json:""`
+	DiscoveryInterval  confopt.Duration `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
+
+	// Inventory filters.
+	HostsInclude      match.HostIncludes      `yaml:"host_include,omitempty" json:"host_include"`
+	VMsInclude        match.VMIncludes        `yaml:"vm_include,omitempty" json:"vm_include"`
+	DatastoresInclude match.DatastoreIncludes `yaml:"datastore_include,omitempty" json:"datastore_include"`
+	ClustersInclude   match.ClusterIncludes   `yaml:"cluster_include,omitempty" json:"cluster_include"`
+
+	// Opt-in label enrichment.
+	InventoryPathLabel   bool     `yaml:"collect_inventory_path_label,omitempty" json:"collect_inventory_path_label"`
+	VMGuestLabels        []string `yaml:"vm_guest_labels,omitempty" json:"vm_guest_labels"`
+	VSphereTagCategories []string `yaml:"vsphere_tag_categories,omitempty" json:"vsphere_tag_categories"`
+	CustomAttributes     []string `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
+
+	// Optional datastore cluster metrics.
+	CollectDatastoreClusters bool     `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
+	DatastoreClustersInclude []string `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
+
+	// Optional VM child-instance metrics.
+	CollectVMDisks           bool     `yaml:"collect_vm_disks,omitempty" json:"collect_vm_disks"`
+	CollectVMDiskPerformance bool     `yaml:"collect_vm_disk_performance,omitempty" json:"collect_vm_disk_performance"`
+	VMDisksInclude           []string `yaml:"vm_disk_include,omitempty" json:"vm_disk_include"`
+	CollectVMNICPerformance  bool     `yaml:"collect_vm_nic_performance,omitempty" json:"collect_vm_nic_performance"`
+	VMNICsInclude            []string `yaml:"vm_nic_include,omitempty" json:"vm_nic_include"`
+
+	// Optional host child-instance metrics.
+	CollectHostNICPerformance            bool     `yaml:"collect_host_nic_performance,omitempty" json:"collect_host_nic_performance"`
+	HostNICsInclude                      []string `yaml:"host_nic_include,omitempty" json:"host_nic_include"`
+	CollectHostDiskPerformance           bool     `yaml:"collect_host_disk_performance,omitempty" json:"collect_host_disk_performance"`
+	HostDisksInclude                     []string `yaml:"host_disk_include,omitempty" json:"host_disk_include"`
+	CollectHostStorageAdapterPerformance bool     `yaml:"collect_host_storage_adapter_performance,omitempty" json:"collect_host_storage_adapter_performance"`
+	HostStorageAdaptersInclude           []string `yaml:"host_storage_adapter_include,omitempty" json:"host_storage_adapter_include"`
+	CollectHostStoragePathPerformance    bool     `yaml:"collect_host_storage_path_performance,omitempty" json:"collect_host_storage_path_performance"`
+	HostStoragePathsInclude              []string `yaml:"host_storage_path_include,omitempty" json:"host_storage_path_include"`
+	CollectHostCPUInstancePerformance    bool     `yaml:"collect_host_cpu_instance_performance,omitempty" json:"collect_host_cpu_instance_performance"`
+	HostCPUInstancesInclude              []string `yaml:"host_cpu_instance_include,omitempty" json:"host_cpu_instance_include"`
+
+	// Optional aggregate power metrics.
+	CollectPowerMetrics bool `yaml:"collect_power_metrics,omitempty" json:"collect_power_metrics"`
+
+	// Optional vSAN metrics.
+	CollectVSAN         bool     `yaml:"collect_vsan,omitempty" json:"collect_vsan"`
+	VSANClustersInclude []string `yaml:"vsan_cluster_include,omitempty" json:"vsan_cluster_include"`
+	VSANHostsInclude    []string `yaml:"vsan_host_include,omitempty" json:"vsan_host_include"`
+	VSANVMsInclude      []string `yaml:"vsan_vm_include,omitempty" json:"vsan_vm_include"`
+
+	// Optional cached topology Function data.
+	CollectNetworkTopology bool `yaml:"collect_network_topology,omitempty" json:"collect_network_topology"`
 }
 
 type (

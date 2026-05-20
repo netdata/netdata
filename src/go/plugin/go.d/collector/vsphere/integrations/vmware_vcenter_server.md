@@ -140,8 +140,6 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Target** | url | Target endpoint URL. | https://vcenter.local | yes |
 |  | timeout | HTTP request timeout (seconds). | 20 | no |
 | **Discovery** | discovery_interval | Hosts, VMs, datastores, clusters, and resource pools discovery interval (seconds). | 300 | no |
-|  | [host_power_states](#option-discovery-host-power-states) | ESXi host power states to discover. | poweredOn | no |
-|  | [vm_power_states](#option-discovery-vm-power-states) | Virtual machine power states to discover. | poweredOn | no |
 | **Labels** | [collect_inventory_path_label](#option-labels-collect-inventory-path-label) | Add an inventory_path label to vSphere resource charts. | no | no |
 |  | [vm_guest_labels](#option-labels-vm-guest-labels) | VM guest label allowlist. |  | no |
 |  | [vsphere_tag_categories](#option-labels-vsphere-tag-categories) | vSphere tag category allowlist. |  | no |
@@ -189,43 +187,6 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
 |  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
-
-<a id="option-discovery-host-power-states"></a>
-##### host_power_states
-
-By default, only powered-on hosts are discovered, preserving historical behavior.
-Add `poweredOff`, `standBy`, or `unknown` only when you want non-running hosts
-collected as property/status-only resources. Real-time performance counters are
-skipped for non-powered-on hosts.
-
-Valid values: `poweredOn`, `poweredOff`, `standBy`, `unknown`.
-
-```yaml
-host_power_states:
-  - poweredOn
-  - poweredOff
-  - standBy
-  - unknown
-```
-
-
-<a id="option-discovery-vm-power-states"></a>
-##### vm_power_states
-
-By default, only powered-on VMs are discovered, preserving historical behavior.
-Add `poweredOff` or `suspended` only when you want non-running VMs collected as
-property/status/snapshot-only resources. Real-time performance counters are
-skipped for powered-off and suspended VMs.
-
-Valid values: `poweredOn`, `poweredOff`, `suspended`.
-
-```yaml
-vm_power_states:
-  - poweredOn
-  - poweredOff
-  - suspended
-```
-
 
 <a id="option-labels-collect-inventory-path-label"></a>
 ##### collect_inventory_path_label

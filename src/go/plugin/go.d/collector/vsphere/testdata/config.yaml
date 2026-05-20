@@ -20,15 +20,6 @@ tls_key: "ok"
 tls_skip_verify: yes
 force_http2: yes
 discovery_interval: 123.123
-host_power_states:
-  - "poweredOn"
-  - "poweredOff"
-  - "standBy"
-  - "unknown"
-vm_power_states:
-  - "poweredOn"
-  - "poweredOff"
-  - "suspended"
 collect_inventory_path_label: yes
 vm_guest_labels:
   - "guest_hostname"

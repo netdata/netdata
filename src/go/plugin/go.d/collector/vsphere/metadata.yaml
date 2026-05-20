@@ -134,45 +134,6 @@ modules:
               default_value: 300
               required: false
               group: Discovery
-            - name: host_power_states
-              description: ESXi host power states to discover.
-              default_value: poweredOn
-              required: false
-              group: Discovery
-              detailed_description: |
-                By default, only powered-on hosts are discovered, preserving historical behavior.
-                Add `poweredOff`, `standBy`, or `unknown` only when you want non-running hosts
-                collected as property/status-only resources. Real-time performance counters are
-                skipped for non-powered-on hosts.
-
-                Valid values: `poweredOn`, `poweredOff`, `standBy`, `unknown`.
-
-                ```yaml
-                host_power_states:
-                  - poweredOn
-                  - poweredOff
-                  - standBy
-                  - unknown
-                ```
-            - name: vm_power_states
-              description: Virtual machine power states to discover.
-              default_value: poweredOn
-              required: false
-              group: Discovery
-              detailed_description: |
-                By default, only powered-on VMs are discovered, preserving historical behavior.
-                Add `poweredOff` or `suspended` only when you want non-running VMs collected as
-                property/status/snapshot-only resources. Real-time performance counters are
-                skipped for powered-off and suspended VMs.
-
-                Valid values: `poweredOn`, `poweredOff`, `suspended`.
-
-                ```yaml
-                vm_power_states:
-                  - poweredOn
-                  - poweredOff
-                  - suspended
-                ```
             - name: collect_inventory_path_label
               description: Add an inventory_path label to vSphere resource charts.
               default_value: no

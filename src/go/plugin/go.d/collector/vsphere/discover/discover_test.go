@@ -152,7 +152,7 @@ func TestResourceBuildersSkipMissingParent(t *testing.T) {
 	assert.Nil(t, newStoragePod(mo.StoragePod{}))
 }
 
-func TestDiscoverer_buildHostsPowerStateFilter(t *testing.T) {
+func TestDiscoverer_buildHostsKeepsNonPoweredHosts(t *testing.T) {
 	raw := []mo.HostSystem{
 		{
 			ManagedEntity: mo.ManagedEntity{
@@ -182,10 +182,6 @@ func TestDiscoverer_buildHostsPowerStateFilter(t *testing.T) {
 
 	hosts := Discoverer{}.buildHosts(raw)
 	assert.NotNil(t, hosts.Get("host-1"))
-	assert.Nil(t, hosts.Get("host-2"))
-
-	hosts = Discoverer{HostPowerStates: []string{"poweredOn", "poweredOff"}}.buildHosts(raw)
-	assert.NotNil(t, hosts.Get("host-1"))
 	assert.NotNil(t, hosts.Get("host-2"))
 	host := hosts.Get("host-2")
 	require.NotNil(t, host)
@@ -194,7 +190,7 @@ func TestDiscoverer_buildHostsPowerStateFilter(t *testing.T) {
 	assert.True(t, host.InMaintenanceMode)
 }
 
-func TestDiscoverer_buildVMsPowerStateFilterAndNilHost(t *testing.T) {
+func TestDiscoverer_buildVMsKeepsNonPoweredVMsAndNilHost(t *testing.T) {
 	raw := []mo.VirtualMachine{
 		{
 			ManagedEntity: mo.ManagedEntity{
@@ -248,10 +244,6 @@ func TestDiscoverer_buildVMsPowerStateFilterAndNilHost(t *testing.T) {
 	raw[0].Runtime.Host = &hostRef
 
 	vms := Discoverer{}.buildVMs(raw)
-	assert.NotNil(t, vms.Get("vm-1"))
-	assert.Nil(t, vms.Get("vm-2"))
-
-	vms = Discoverer{VMPowerStates: []string{"poweredOn", "poweredOff"}}.buildVMs(raw)
 	assert.NotNil(t, vms.Get("vm-1"))
 	vm := vms.Get("vm-2")
 	require.NotNil(t, vm)

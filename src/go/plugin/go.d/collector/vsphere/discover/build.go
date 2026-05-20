@@ -135,19 +135,9 @@ func newCluster(raw mo.ComputeResource) *rs.Cluster {
 	return cluster
 }
 
-const (
-	poweredOn = "poweredOn"
-)
-
 func (d Discoverer) buildHosts(raw []mo.HostSystem) rs.Hosts {
-	var num int
 	hosts := make(rs.Hosts)
 	for _, h := range raw {
-		//	poweredOn | poweredOff | standBy | unknown
-		if !powerStateIncluded(d.HostPowerStates, string(h.Runtime.PowerState)) {
-			num++
-			continue
-		}
 		// connected | notResponding | disconnected
 		//if v.Runtime.ConnectionState == "" {
 		//
@@ -155,9 +145,6 @@ func (d Discoverer) buildHosts(raw []mo.HostSystem) rs.Hosts {
 		if host := newHost(h); host != nil {
 			hosts.Put(host)
 		}
-	}
-	if num > 0 {
-		d.Infof("discovering : building : removed %d hosts (power state not included)", num)
 	}
 	return hosts
 }
@@ -188,22 +175,13 @@ func newHost(raw mo.HostSystem) *rs.Host {
 }
 
 func (d Discoverer) buildVMs(raw []mo.VirtualMachine) rs.VMs {
-	var num int
 	vms := make(rs.VMs)
 	for _, v := range raw {
-		//  poweredOff | poweredOn | suspended
-		if !powerStateIncluded(d.VMPowerStates, string(v.Runtime.PowerState)) {
-			num++
-			continue
-		}
 		// connected | disconnected | orphaned | inaccessible | invalid
 		//if v.Runtime.ConnectionState == "" {
 		//
 		//}
 		vms.Put(newVM(v))
-	}
-	if num > 0 {
-		d.Infof("discovering : building : removed %d vms (power state not included)", num)
 	}
 	return vms
 }
@@ -293,18 +271,6 @@ func newVMDisks(config *types.VirtualMachineConfigInfo) []rs.VMDisk {
 		})
 	}
 	return disks
-}
-
-func powerStateIncluded(states []string, state string) bool {
-	if len(states) == 0 {
-		return state == poweredOn
-	}
-	for _, allowed := range states {
-		if allowed == state {
-			return true
-		}
-	}
-	return false
 }
 
 func (d Discoverer) buildDatastores(raw []mo.Datastore) rs.Datastores {

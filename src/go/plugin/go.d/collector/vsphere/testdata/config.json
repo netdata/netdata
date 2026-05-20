@@ -22,17 +22,6 @@
   "tls_skip_verify": true,
   "force_http2": true,
   "discovery_interval": 123.123,
-  "host_power_states": [
-    "poweredOn",
-    "poweredOff",
-    "standBy",
-    "unknown"
-  ],
-  "vm_power_states": [
-    "poweredOn",
-    "poweredOff",
-    "suspended"
-  ],
   "collect_inventory_path_label": true,
   "vm_guest_labels": [
     "guest_hostname",

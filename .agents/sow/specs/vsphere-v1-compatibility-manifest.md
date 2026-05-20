@@ -55,8 +55,6 @@ Executable golden scope:
 | Default VM include | `/*` |
 | Default datastore include | `/*` |
 | Default cluster include | `/*` |
-| Default host power states | `poweredOn` |
-| Default VM power states | `poweredOn` |
 | Default inventory path label | `false` |
 | Default VM guest labels | empty allowlist |
 | Default vSphere tag category labels | empty allowlist |
@@ -100,8 +98,6 @@ Struct fields and YAML/JSON keys that must remain accepted:
 | `vm_include` | `vm_include` | no | Selector list, default `/*`. |
 | `datastore_include` | `datastore_include` | no | Selector list, default `/*`. |
 | `cluster_include` | `cluster_include` | no | Selector list, default `/*`. |
-| `host_power_states` | `host_power_states` | no | Optional allow-list. Default `poweredOn`; valid values `poweredOn`, `poweredOff`, `standBy`, `unknown`. Non-powered-on hosts are property/status-only and are skipped by real-time perf scraping. |
-| `vm_power_states` | `vm_power_states` | no | Optional allow-list. Default `poweredOn`; valid values `poweredOn`, `poweredOff`, `suspended`. Non-powered-on VMs are property/status/snapshot-only and are skipped by real-time perf scraping. |
 | `collect_inventory_path_label` | `collect_inventory_path_label` | no | Optional label enrichment. Default `false`; adds derived `inventory_path` labels when the path can be derived. |
 | `vm_guest_labels` | `vm_guest_labels` | no | Optional VM guest label allowlist. Default empty; valid values `guest_hostname`, `guest_ip`, `guest_os`. |
 | `vsphere_tag_categories` | `vsphere_tag_categories` | no | Optional vSphere tag category label allowlist. Default empty; each YAML list item is one glob pattern matching a tag category name. Matching categories become labels named `vsphere_tag_<sanitized_category>`; multiple tags in one category are sorted and joined with the pipe character. |
@@ -514,10 +510,9 @@ Cluster performance counters:
 - Datastore performance charts are created only after performance data arrives.
 - Cluster property charts are created when the cluster is present.
 - Cluster performance charts are created only after performance data arrives.
-- Non-powered-on hosts and VMs can be discovered only through explicit
-  `host_power_states` / `vm_power_states` opt-in. Their property/status metrics
-  keep the resource alive; real-time host/VM performance query specs are not
-  generated for them.
+- Non-powered-on hosts and VMs are discovered when vSphere returns them and the
+  include selectors keep them. Their property/status metrics keep the resource
+  alive; real-time host/VM performance query specs are not generated for them.
 - Optional VM virtual disk metrics are not part of the legacy V1 surface. They
   are emitted only when `collect_vm_disks` is enabled, only for disks matching
   `vm_disk_include`.

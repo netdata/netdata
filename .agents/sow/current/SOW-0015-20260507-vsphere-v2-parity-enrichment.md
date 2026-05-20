@@ -4,7 +4,7 @@
 
 Status: in-progress
 
-Sub-state: Reopened on 2026-05-09 for PR CI regression triage and pre-merge hardening. Framework V2 migration, VM snapshot aggregate metrics/alerts, datastore aggregate enrichment, VM/host power-state controls, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory object counts, opt-in inventory/VM guest labels, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in vSAN cluster space/health plus cluster/host/VM performance metrics, read-only readiness Function, cached vSphere inventory topology Function, and opt-in Network/DVPG topology discovery are implemented. Local fixes are in progress for yamllint, SonarCloud, DynCfg tab layout, metadata linting, supportable vSphere error messages, and hard removal of optional ESXi/VM vnode support before closing again. Remaining parity feasibility is complete; vCenter/ESXi events and collector-generated vSphere vnodes are explicitly out of this PR by user decision.
+Sub-state: Reopened on 2026-05-09 for PR CI regression triage and pre-merge hardening. Framework V2 migration, VM snapshot aggregate metrics/alerts, datastore aggregate enrichment, VM/host power-state metrics, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory object counts, opt-in inventory/VM guest labels, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in vSAN cluster space/health plus cluster/host/VM performance metrics, read-only readiness Function, cached vSphere inventory topology Function, and opt-in Network/DVPG topology discovery are implemented. Local fixes are in progress for yamllint, SonarCloud, DynCfg tab layout, metadata linting, supportable vSphere error messages, and hard removal of optional ESXi/VM vnode support plus host/VM power-state config controls before closing again. Remaining parity feasibility is complete; vCenter/ESXi events, collector-generated vSphere vnodes, and host/VM power-state config controls are explicitly out of this PR by user decision.
 
 ### 2026-05-20 Vnode Removal Decision
 
@@ -48,6 +48,42 @@ Validation after removal:
   and vSphere health file returned no matches.
 - `go test -count=1 ./collector/vsphere/...` passed from
   `src/go/plugin/go.d`.
+
+### 2026-05-20 Power-State Config Removal Decision
+
+The user directed removal of `host_power_states` and `vm_power_states` before
+merge. This supersedes the earlier 2026-05-08 decision that added explicit
+power-state discovery controls.
+
+Removal scope:
+
+- remove the `HostPowerStates` and `VMPowerStates` config and discoverer
+  fields;
+- remove default/valid power-state lists, config validation, and the
+  `powerStateIncluded` discovery filter;
+- remove `host_power_states` and `vm_power_states` from `config_schema.json`,
+  `metadata.yaml`, stock `go.d/vsphere.conf`, generated integration docs, and
+  test fixtures;
+- keep `vsphere.host_power_state` and `vsphere.vm_power_state` metrics/charts;
+- keep powered-on-only real-time performance scraping for hosts and VMs.
+
+Evidence and reason:
+
+- The review confirmed the removed options filtered discovery, while
+  performance scraping already had independent `IsPoweredOn()` guards.
+- Public config options are backward-compatibility commitments after release.
+  Since no real operator need for power-state discovery filtering was proven,
+  the smaller contract is preferable.
+
+Validation after removal:
+
+- `go test -count=1 ./collector/vsphere/...` passed from
+  `src/go/plugin/go.d`.
+- `config_schema.json`, `testdata/config.json`, `metadata.yaml`,
+  `testdata/config.yaml`, and stock `go.d/vsphere.conf` parsed with
+  repo-root `.venv`.
+- Grep for removed power-state option symbols and config keys under the vSphere
+  collector, stock config, and health file returned no matches.
 
 ## Requirements
 
@@ -974,6 +1010,12 @@ Implementation started after the decisions, compatibility manifest, and normaliz
 
 9. VM and host power-state discovery controls
 
+   Superseded by user decision 2026-05-20: remove `vm_power_states` and
+   `host_power_states` before merge. If vSphere returns a VM or host and the
+   existing include selectors keep it, the collector discovers it and emits
+   available property/status data. Real-time performance scraping remains
+   powered-on only.
+
    A. Add `vm_power_states` and `host_power_states` as optional config arrays. Defaults preserve current behavior by including only `poweredOn`. The stock config and dyncfg schema show every valid state so users can opt in explicitly.
    - Pros: backwards compatible, self-explanatory, lets users collect property/status/snapshot data for non-running objects when they want it.
    - Cons: more config surface.
@@ -986,7 +1028,7 @@ Implementation started after the decisions, compatibility manifest, and normaliz
    - Implications: status/snapshot/property data for powered-off and suspended VMs remains unavailable.
    - Risks: parity gap remains.
 
-	   Recommendation: A.
+	   Original recommendation: A. Superseded by the 2026-05-20 decision above.
 
 	   User decision 2026-05-08: A. Add explicit power-state configuration for VMs and hosts. Defaults must remain `poweredOn` only for backwards compatibility. The stock config must list all valid states so the option is self-explanatory. Non-powered-on VMs/hosts may collect only safe property/status data; performance scraping for non-powered-on VMs/hosts must be skipped unless the implementation proves a valid VMware performance path.
 
@@ -1197,17 +1239,19 @@ Implementation decisions derived from feasibility:
 - Updated `metadata.yaml`, generated `README.md`, generated `charts.yaml`, and the executable compatibility manifest for datastore enrichment.
 - Updated `.agents/sow/specs/vsphere-parity-matrix.md` row P08 from proposed datastore contexts to implemented contexts and semantics.
 - Expanded `src/go/plugin/go.d/config/go.d/vsphere.conf` comments so the stock config explains one-job-per-vCenter behavior, selector formats/defaults, resource-pool selector behavior, secret resolver usage, optional `vnode`, discovery interval load considerations, and common HTTP/TLS settings.
-- Recorded user decision to add explicit VM/host power-state configuration while preserving default `poweredOn` discovery.
-- Added optional config keys:
-  - `host_power_states`, default `poweredOn`, valid values `poweredOn`, `poweredOff`, `standBy`, `unknown`;
-  - `vm_power_states`, default `poweredOn`, valid values `poweredOn`, `poweredOff`, `suspended`.
+- Recorded user decision to remove explicit VM/host power-state configuration
+  before merge. VM/host discovery now keeps resources returned by vSphere after
+  existing include selectors, while real-time performance query specs remain
+  powered-on only.
 - Added default object-level power-state metrics:
   - `vsphere.host_power_state` with dimensions `powered_on`, `powered_off`, `standby`, `unknown`;
   - `vsphere.vm_power_state` with dimensions `powered_on`, `powered_off`, `suspended`.
-- Changed discovery filtering from hardcoded `poweredOn` to the configured power-state allow-lists. Defaults preserve previous behavior.
+- Removed hardcoded/configured power-state discovery filtering. Non-powered-on
+  hosts and VMs are discoverable when vSphere returns them; performance scraping
+  still skips them.
 - Added a safe hierarchy fallback for opted-in non-running VMs whose `runtime.host` is absent: use the VM inventory folder parent to recover the datacenter label where possible; host and cluster labels remain empty when vCenter does not provide placement.
 - Skipped real-time performance query specs for non-powered-on hosts and VMs. Such objects collect property/status data only.
-- Updated `config_schema.json`, stock `go.d/vsphere.conf`, `metadata.yaml`, generated README/integration docs, generated `charts.yaml`, the compatibility manifest fixture, and the parity/compatibility specs for the power-state controls and metrics.
+- Updated `config_schema.json`, stock `go.d/vsphere.conf`, `metadata.yaml`, generated README/integration docs, generated `charts.yaml`, the compatibility manifest fixture, and the parity/compatibility specs for removed power-state controls and retained power-state metrics.
 - Added default object-level VM property/status metrics:
   - `vsphere.vm_connection_state` for connected/disconnected/orphaned/inaccessible/invalid;
   - `vsphere.vm_tools_running_status` for running/not-running/executing-scripts/unknown;
@@ -1415,7 +1459,7 @@ Acceptance criteria evidence:
 - The compatibility-manifest prep gate is drafted in `.agents/sow/specs/vsphere-v1-compatibility-manifest.md`.
 - The executable V1 golden baseline is added at `src/go/plugin/go.d/collector/vsphere/testdata/v1_compat_manifest.json` and checked by `TestCollector_V1CompatibilityManifest`.
 - The parity-matrix prep gate is drafted in `.agents/sow/specs/vsphere-parity-matrix.md`.
-- Framework V2 migration acceptance is satisfied by `TestCollector_ChartTemplateYAML`, `TestCollector_V2CompatibilitySurface`, and the full vSphere package test. Snapshot, datastore aggregate enrichment, VM/host power-state controls, VM/host property-status, cluster property-status, inventory-count, opt-in label enrichment, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore-cluster metrics, opt-in vSAN metrics, read-only readiness Function, cached topology Function, and opt-in Network/DVPG topology discovery criteria are satisfied for the currently implemented metrics, controls, and non-metric surfaces.
+- Framework V2 migration acceptance is satisfied by `TestCollector_ChartTemplateYAML`, `TestCollector_V2CompatibilitySurface`, and the full vSphere package test. Snapshot, datastore aggregate enrichment, VM/host power-state metrics, VM/host property-status, cluster property-status, inventory-count, opt-in label enrichment, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore-cluster metrics, opt-in vSAN metrics, read-only readiness Function, cached topology Function, and opt-in Network/DVPG topology discovery criteria are satisfied for the currently implemented metrics, controls, and non-metric surfaces.
 
 Tests or equivalent validation:
 
@@ -1622,10 +1666,10 @@ Artifact maintenance gate:
 - Legacy runtime skills: reworded one GitHub SSH example in `.agents/skills/mirror-netdata-repos/SKILL.md` to avoid a SOW audit false positive.
 - Integration generator: updated `integrations/gen_docs_integrations.py` to normalize both current `blob/master` and older `edit/master` metadata links; this was required for scoped regeneration of the vSphere integration README.
 - Follow-up SOWs: the four pending vSphere follow-up SOW files created during the earlier split attempt were deleted after the user decided to keep all remaining non-event vSphere parity work in this SOW/PR. Events remain out of this PR by user decision, not by a pending SOW.
-- Collector tests/fixtures: added the V1 compatibility golden test and fixture, generated V2 `charts.yaml`, chart-template validation, V2 compatibility-surface validation, chart coverage validation, snapshot tree traversal tests, power-state config validation tests, power-state discovery tests, non-powered-on property-only collection tests, VM/host property-status tests, perf query skip tests, opt-in inventory/guest label enrichment tests, opt-in vSphere tag/custom-attribute label tests, user-metadata pattern tests for names with spaces, opt-in VM disk capacity/performance tests, wildcard `virtualDisk.*` metric-list tests, opt-in VM network-interface performance tests, wildcard VM `net.*` metric-list tests, aggregate VM network compatibility coverage, opt-in host physical network-interface performance tests, wildcard host `net.*` metric-list tests, aggregate host network compatibility coverage, opt-in host disk/LUN/device performance tests, wildcard host `disk.*` metric-list tests, aggregate host disk compatibility coverage, opt-in host storage-adapter performance tests, wildcard host `storageAdapter.*` metric-list tests, aggregate storage-adapter maximum-latency coverage, opt-in host storage-path performance tests, wildcard `storagePath.*` metric-list tests, aggregate storage-path maximum-latency coverage, opt-in host CPU-instance performance tests, wildcard host `cpu.*` metric-list tests, opt-in host/VM power metric tests, optional `power.*` metric-list tests, opt-in datastore cluster tests, read-only readiness Function tests, cached topology Function tests, opt-in Network/DVPG topology discovery tests, re-entrant `Init()` reset tests, optional network/topology fail-soft tests, enrichment API fail-soft tests, partial-init Function tests, and context-aware high-cardinality chart lookup tests.
+- Collector tests/fixtures: added the V1 compatibility golden test and fixture, generated V2 `charts.yaml`, chart-template validation, V2 compatibility-surface validation, chart coverage validation, snapshot tree traversal tests, non-powered-on discovery tests, non-powered-on property-only collection tests, VM/host property-status tests, perf query skip tests, opt-in inventory/guest label enrichment tests, opt-in vSphere tag/custom-attribute label tests, user-metadata pattern tests for names with spaces, opt-in VM disk capacity/performance tests, wildcard `virtualDisk.*` metric-list tests, opt-in VM network-interface performance tests, wildcard VM `net.*` metric-list tests, aggregate VM network compatibility coverage, opt-in host physical network-interface performance tests, wildcard host `net.*` metric-list tests, aggregate host network compatibility coverage, opt-in host disk/LUN/device performance tests, wildcard host `disk.*` metric-list tests, aggregate host disk compatibility coverage, opt-in host storage-adapter performance tests, wildcard host `storageAdapter.*` metric-list tests, aggregate storage-adapter maximum-latency coverage, opt-in host storage-path performance tests, wildcard `storagePath.*` metric-list tests, aggregate storage-path maximum-latency coverage, opt-in host CPU-instance performance tests, wildcard host `cpu.*` metric-list tests, opt-in host/VM power metric tests, optional `power.*` metric-list tests, opt-in datastore cluster tests, read-only readiness Function tests, cached topology Function tests, opt-in Network/DVPG topology discovery tests, re-entrant `Init()` reset tests, optional network/topology fail-soft tests, enrichment API fail-soft tests, partial-init Function tests, and context-aware high-cardinality chart lookup tests.
 - Optional vnode tests/fixtures: removed after the 2026-05-20 hard-removal decision. Config serialization fixtures no longer include `esxi_vnodes` or `vm_vnodes`.
-- Specs: added `.agents/sow/specs/vsphere-v1-compatibility-manifest.md` and `.agents/sow/specs/vsphere-parity-matrix.md`; updated the compatibility manifest to record the accepted chart-ID break, additive V2 `id` instance label, power-state config keys, property-only non-powered-on semantics, fail-soft empty host/VM performance cycles, selector keys being optional in DynCfg schema, additive cluster DRS/HA property-status charts, static inventory-count chart, opt-in inventory/VM guest label keys, opt-in vSphere tag/custom-attribute label keys/config, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster contexts/config, `collect_network_topology`, and the cached Function contract; updated parity rows P01/P02/P06/P07/P08/P09/P10/P11/P12/P13/P14/P15/P16/P17/P18/P19/P20/P21/P22/P28/P29/P30/P31/P32 to implemented or implemented-subset status.
-- End-user/operator docs: updated `README.md` and `metadata.yaml` for new snapshot metrics, snapshot alerts, datastore aggregate metrics, VM/host power-state metrics, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory-count metrics, opt-in VM disk capacity/performance metrics, opt-in VM network-interface performance metrics, opt-in host physical network-interface performance metrics, opt-in host disk/LUN/device performance metrics, opt-in host storage-adapter performance metrics, opt-in host storage-path performance metrics, opt-in host CPU-instance performance metrics, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in inventory/VM guest labels, opt-in vSphere tag/custom-attribute labels, readiness/topology Functions, `collect_network_topology`, power-state discovery controls, zero no-snapshot semantics, inaccessible datastore capacity semantics, and the `id` label; expanded the stock `go.d/vsphere.conf` comments so file-based configuration is self-explanatory. Chart-ID continuity loss remains accepted and not emphasized in end-user docs.
+- Specs: added `.agents/sow/specs/vsphere-v1-compatibility-manifest.md` and `.agents/sow/specs/vsphere-parity-matrix.md`; updated the compatibility manifest to record the accepted chart-ID break, additive V2 `id` instance label, non-powered-on discovery/property-only semantics, fail-soft empty host/VM performance cycles, selector keys being optional in DynCfg schema, additive cluster DRS/HA property-status charts, static inventory-count chart, opt-in inventory/VM guest label keys, opt-in vSphere tag/custom-attribute label keys/config, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster contexts/config, `collect_network_topology`, and the cached Function contract; updated parity rows P01/P02/P06/P07/P08/P09/P10/P11/P12/P13/P14/P15/P16/P17/P18/P19/P20/P21/P22/P28/P29/P30/P31/P32 to implemented or implemented-subset status.
+- End-user/operator docs: updated `README.md` and `metadata.yaml` for new snapshot metrics, snapshot alerts, datastore aggregate metrics, VM/host power-state metrics, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory-count metrics, opt-in VM disk capacity/performance metrics, opt-in VM network-interface performance metrics, opt-in host physical network-interface performance metrics, opt-in host disk/LUN/device performance metrics, opt-in host storage-adapter performance metrics, opt-in host storage-path performance metrics, opt-in host CPU-instance performance metrics, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in inventory/VM guest labels, opt-in vSphere tag/custom-attribute labels, readiness/topology Functions, `collect_network_topology`, power-state discovery/performance behavior, zero no-snapshot semantics, inaccessible datastore capacity semantics, and the `id` label; expanded the stock `go.d/vsphere.conf` comments so file-based configuration is self-explanatory. Chart-ID continuity loss remains accepted and not emphasized in end-user docs.
 - End-user/operator skills: no update needed for this internal collector-framework migration slice.
 - SOW lifecycle: moved to `.agents/sow/current/` after user approved proceeding; the previous follow-up split was consolidated back into this SOW by user decision; no pending vSphere follow-up SOW files remain. At close, this SOW is marked completed and moved to `.agents/sow/done/` with the implementation commit.
 
@@ -1640,7 +1684,7 @@ Project skills update:
 
 End-user/operator docs update:
 
-- Snapshot, datastore aggregate, power-state, VM/host property-status, cluster DRS/HA property-status, inventory-count, optional VM disk capacity/performance, optional VM network-interface performance, optional host physical network-interface performance, optional host disk/LUN/device performance, optional host storage-adapter performance, optional host storage-path performance, optional host CPU-instance performance, optional host/VM power metrics, optional datastore cluster, optional inventory path label, optional VM guest label, optional vSphere tag/custom-attribute label, readiness/topology Function, and optional Network/DVPG topology docs are now updated in `README.md` and `metadata.yaml`; stock `go.d/vsphere.conf` now documents selectors, secrets, vnode behavior, all valid host/VM power states, opt-in labels, opt-in high-cardinality groups, opt-in power metrics, optional network topology discovery, and safe discovery defaults inline.
+- Snapshot, datastore aggregate, power-state, VM/host property-status, cluster DRS/HA property-status, inventory-count, optional VM disk capacity/performance, optional VM network-interface performance, optional host physical network-interface performance, optional host disk/LUN/device performance, optional host storage-adapter performance, optional host storage-path performance, optional host CPU-instance performance, optional host/VM power metrics, optional datastore cluster, optional inventory path label, optional VM guest label, optional vSphere tag/custom-attribute label, readiness/topology Function, and optional Network/DVPG topology docs are now updated in `README.md` and `metadata.yaml`; stock `go.d/vsphere.conf` now documents selectors, secrets, vnode behavior, power-state discovery/performance behavior, opt-in labels, opt-in high-cardinality groups, opt-in power metrics, optional network topology discovery, and safe discovery defaults inline.
 
 End-user/operator skills update:
 

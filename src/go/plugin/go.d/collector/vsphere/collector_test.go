@@ -47,13 +47,6 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestCollector_DefaultPowerStates(t *testing.T) {
-	collr := New()
-
-	assert.Equal(t, []string{string(types.HostSystemPowerStatePoweredOn)}, collr.HostPowerStates)
-	assert.Equal(t, []string{string(types.VirtualMachinePowerStatePoweredOn)}, collr.VMPowerStates)
-}
-
 func TestCollector_Init(t *testing.T) {
 	collr, _, teardown := prepareVSphereSim(t)
 	defer teardown()
@@ -173,20 +166,6 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostVMIncludeFormat(t *testing.T) {
 	collr.DatastoresInclude = collr.DatastoresInclude[:0]
 
 	collr.ClustersInclude = match.ClusterIncludes{"invalid"}
-	assert.Error(t, collr.Init(context.Background()))
-}
-
-func TestCollector_Init_ReturnsFalseIfInvalidPowerState(t *testing.T) {
-	collr := New()
-	collr.URL = "https://vcenter.local"
-	collr.Username = "user"
-	collr.Password = "pass"
-
-	collr.HostPowerStates = []string{"poweredOn", "invalid"}
-	assert.Error(t, collr.Init(context.Background()))
-
-	collr.HostPowerStates = cloneStrings(defaultHostPowerStates)
-	collr.VMPowerStates = []string{"poweredOn", "invalid"}
 	assert.Error(t, collr.Init(context.Background()))
 }
 

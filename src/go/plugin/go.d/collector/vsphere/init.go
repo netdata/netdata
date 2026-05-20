@@ -23,18 +23,6 @@ func (c *Collector) validateConfig() error {
 	if c.UpdateEvery < minRecommendedUpdateEvery {
 		c.Warningf("config option update_every=%d is lower than recommended minimum %d", c.UpdateEvery, minRecommendedUpdateEvery)
 	}
-	if len(c.HostPowerStates) == 0 {
-		c.HostPowerStates = cloneStrings(defaultHostPowerStates)
-	}
-	if len(c.VMPowerStates) == 0 {
-		c.VMPowerStates = cloneStrings(defaultVMPowerStates)
-	}
-	if err := validatePowerStates("host_power_states", c.HostPowerStates, validHostPowerStates); err != nil {
-		return err
-	}
-	if err := validatePowerStates("vm_power_states", c.VMPowerStates, validVMPowerStates); err != nil {
-		return err
-	}
 	if err := validateStringAllowlist("vm_guest_labels", c.VMGuestLabels, validVMGuestLabels); err != nil {
 		return err
 	}
@@ -157,8 +145,6 @@ func (c *Collector) initClient() (*client.Client, error) {
 func (c *Collector) initDiscoverer(cli *client.Client) error {
 	d := discover.New(cli)
 	d.Logger = c.Logger
-	d.HostPowerStates = cloneStrings(c.HostPowerStates)
-	d.VMPowerStates = cloneStrings(c.VMPowerStates)
 	d.CollectDatastoreClusters = c.CollectDatastoreClusters
 	d.CollectVMDisks = c.CollectVMDisks
 	d.CollectVMDiskPerformance = c.CollectVMDiskPerformance
