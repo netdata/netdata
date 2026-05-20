@@ -303,6 +303,43 @@ bool dyncfg_job_has_registered_template(const char *id) {
     return ret;
 }
 
+DYNCFG_CMDS dyncfg_sanitize_cmds(DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, DYNCFG_CMDS cmds) {
+    // all configurations support schema
+    cmds |= DYNCFG_CMD_SCHEMA;
+
+    // if there is either enable or disable, both are supported
+    if(cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
+        cmds |= DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE;
+
+    // add
+    if(type == DYNCFG_TYPE_TEMPLATE) {
+        // templates must always support "add"
+        cmds |= DYNCFG_CMD_ADD;
+    }
+    else {
+        // only templates can have "add"
+        cmds &= ~DYNCFG_CMD_ADD;
+    }
+
+    // remove
+    if(source_type == DYNCFG_SOURCE_TYPE_DYNCFG && type == DYNCFG_TYPE_JOB) {
+        // dyncfg jobs must always be removable
+        cmds |= DYNCFG_CMD_REMOVE;
+    }
+    else {
+        // remove is only available for dyncfg jobs
+        cmds &= ~DYNCFG_CMD_REMOVE;
+    }
+
+    // data
+    if(type == DYNCFG_TYPE_TEMPLATE) {
+        // templates do not have data
+        cmds &= ~(DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE);
+    }
+
+    return cmds;
+}
+
 bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
                           DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source,
                           DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync,
@@ -326,35 +363,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
     }
 
     DYNCFG_CMDS old_cmds = cmds;
-
-    // all configurations support schema
-    cmds |= DYNCFG_CMD_SCHEMA;
-
-    // if there is either enable or disable, both are supported
-    if(cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
-        cmds |= DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE;
-
-    // add
-    if(type == DYNCFG_TYPE_TEMPLATE) {
-        // templates must always support "add"
-        cmds |= DYNCFG_CMD_ADD;
-    }
-    else {
-        // only templates can have "add"
-        cmds &= ~DYNCFG_CMD_ADD;
-    }
-
-    // remove
-    if(source_type != DYNCFG_SOURCE_TYPE_DYNCFG || type != DYNCFG_TYPE_JOB) {
-        // remove is only available for dyncfg jobs
-        cmds &= ~DYNCFG_CMD_REMOVE;
-    }
-
-    // data
-    if(type == DYNCFG_TYPE_TEMPLATE) {
-        // templates do not have data
-        cmds &= ~(DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE);
-    }
+    cmds = dyncfg_sanitize_cmds(type, source_type, cmds);
 
     if(cmds != old_cmds) {
         CLEAN_BUFFER *t = buffer_create(1024, NULL);

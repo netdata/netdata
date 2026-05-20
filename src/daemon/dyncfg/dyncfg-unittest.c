@@ -446,8 +446,11 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
         t->expected.enabled = false;
     if(c == DYNCFG_CMD_ENABLE)
         t->expected.enabled = true;
-    if(c == DYNCFG_CMD_UPDATE)
+    if(c == DYNCFG_CMD_UPDATE) {
         memset(&t->current.value, 0, sizeof(t->current.value));
+        if(t->type == DYNCFG_TYPE_JOB)
+            t->cmds = dyncfg_sanitize_cmds(t->type, DYNCFG_SOURCE_TYPE_DYNCFG, t->cmds);
+    }
 
     if(c & (DYNCFG_CMD_UPDATE) || (c & (DYNCFG_CMD_DISABLE|DYNCFG_CMD_ENABLE) && t->type != DYNCFG_TYPE_TEMPLATE)) {
         freez((void *)t->source);
@@ -676,6 +679,13 @@ int dyncfg_unittest(void) {
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 add dyn2", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 add dyn3", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 add dyn4", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
+
+    // ------------------------------------------------------------------------
+    // updating an existing user/stock-style job makes it dyncfg-owned and removable
+
+    user1->expected.value.dbl = 3.14;
+    user1->expected.value.bln = true;
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:user1 update", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
 
     // ------------------------------------------------------------------------
     // saving of user_disabled

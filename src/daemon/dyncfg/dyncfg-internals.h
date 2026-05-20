@@ -58,6 +58,7 @@ void dyncfg_file_load(const char *filename);
 void dyncfg_file_save(const char *id, DYNCFG *df);
 void dyncfg_file_delete(const char *id);
 
+DYNCFG_CMDS dyncfg_sanitize_cmds(DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, DYNCFG_CMDS cmds);
 bool dyncfg_get_schema(const char *id, BUFFER *dst);
 
 void dyncfg_echo_cb(BUFFER *wb, int code, void *result_cb_data);
