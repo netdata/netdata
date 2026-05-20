@@ -889,7 +889,7 @@ int mqtt_wss_publish5(mqtt_wss_client client,
     }
 
     mqtt_wss_wakeup(client);
-    return MQTT_NG_MSGGEN_OK;
+    return MQTT_WSS_OK;
 }
 
 int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level)
