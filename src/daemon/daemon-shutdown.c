@@ -326,8 +326,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
 
     // unlink the pipe
+    // libuv's uv__pipe_close() already unlinks it when commands_exit() runs
+    // (signal-handler path); for other exit paths the command thread keeps
+    // running and we must clean it up here. ENOENT just means libuv beat us.
     const char *pipe = daemon_pipename();
-    if(pipe && *pipe && unlink(pipe) != 0)
+    if(pipe && *pipe && unlink(pipe) != 0 && errno != ENOENT)
         netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
 
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
