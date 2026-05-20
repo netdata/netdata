@@ -463,15 +463,18 @@ impl FileIndexer {
         };
         let marker_field = &REMAPPING_MARKER[..eq_pos];
 
-        let Ok(field_data_iterator) = journal_file.field_data_objects(marker_field) else {
-            // No ND_REMAPPING field is present in this journal file.
-            return Ok(());
-        };
+        // `field_data_objects` returns an empty iterator when the field is
+        // absent (the regular-systemd-journal case), so any Err here is a
+        // genuine journal read failure. Swallowing it would leave the
+        // indexer unaware of bookkeeping records and re-introduce the leak
+        // this helper exists to prevent; propagate instead. The same
+        // reasoning applies to the per-data-object and per-cursor errors
+        // below — a missed ND_REMAPPING data object means its entries
+        // silently flow into the index.
+        let field_data_iterator = journal_file.field_data_objects(marker_field)?;
 
         for data_object in field_data_iterator {
-            let Ok(data_object) = data_object else {
-                continue;
-            };
+            let data_object = data_object?;
 
             // Only the exact `ND_REMAPPING=1` payload marks a remapping entry.
             if data_object.raw_payload() != REMAPPING_MARKER {
@@ -483,12 +486,7 @@ impl FileIndexer {
             };
 
             self.entry_offsets.clear();
-            if inlined_cursor
-                .collect_offsets(journal_file, &mut self.entry_offsets)
-                .is_err()
-            {
-                continue;
-            }
+            inlined_cursor.collect_offsets(journal_file, &mut self.entry_offsets)?;
 
             for entry_offset in self
                 .entry_offsets
