@@ -624,7 +624,7 @@ int netdata_cachestat_runtime_snapshot_apps(
     uint32_t key = 0, next_key = 0;
 
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        if (bpf_map_lookup_elem(fd, &key, values)) {
+        if (bpf_map_lookup_elem(fd, &next_key, values)) {
             key = next_key;
             memset(values, 0, (size_t)count * sizeof(*values));
             continue;

@@ -390,13 +390,18 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_
     if(NOT GO_FOUND)
         if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW)
             find_package(Go "${MIN_GO_VERSION}" REQUIRED)
-        else()
-            message(STATUS "Go ${MIN_GO_VERSION} is unavailable or too old; ebpf-go.plugin will not be built")
         endif()
     endif()
 
+    # ebpf-go.plugin is a separate Go module with its own (lower) minimum Go version.
+    # Re-check against that module so the eBPF plugin builds with older toolchains
+    # even when go.d.plugin requires a newer one.
+    find_min_go_version("${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin")
+    find_package(Go "${MIN_GO_VERSION}" QUIET)
     if(GO_FOUND AND GO_VERSION_STRING VERSION_GREATER_EQUAL MIN_GO_VERSION)
         set(ENABLE_PLUGIN_EBPF_GO ON)
+    else()
+        message(STATUS "Go ${MIN_GO_VERSION} is unavailable or too old; ebpf-go.plugin will not be built")
     endif()
 endif()
 
