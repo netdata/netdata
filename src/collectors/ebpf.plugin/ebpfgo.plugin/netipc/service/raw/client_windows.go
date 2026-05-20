@@ -888,7 +888,7 @@ func (s *Server) Run() error {
 		s.wg.Add(1)
 		go func(sess *windows.Session, shmCtx *windows.WinShmContext) {
 			defer func() {
-				if r := recover(); r != nil {
+				if recover() != nil {
 					// Session handler panicked; log but don't crash the server
 				}
 				<-sem
