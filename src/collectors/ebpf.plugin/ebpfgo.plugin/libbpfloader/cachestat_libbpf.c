@@ -493,9 +493,10 @@ int netdata_cachestat_runtime_update_controller(
     if (fd < 0)
         return -1;
 
-    const uint32_t values[NETDATA_CONTROLLER_END] = {
-        apps_enabled ? 1U : 0U,
-        (uint32_t)apps_level,
+    /* cstat_ctrl BPF map stores __u64 values; use uint64_t to match exactly */
+    const uint64_t values[NETDATA_CONTROLLER_END] = {
+        apps_enabled ? 1ULL : 0ULL,
+        (uint64_t)apps_level,
         0,
         0,
         0,
@@ -515,7 +516,7 @@ int netdata_cachestat_runtime_update_controller(
         if (cpus <= 0)
             return -1;
 
-        uint32_t *percpu = calloc((size_t)cpus, sizeof(*percpu));
+        uint64_t *percpu = calloc((size_t)cpus, sizeof(*percpu));
         if (!percpu)
             return -1;
 
@@ -637,7 +638,7 @@ int netdata_cachestat_runtime_snapshot_apps(
          * With NETDATA_APPS_LEVEL_ALL the BPF key is the thread ID (TID).
          * The process TGID is stored in values[i].tgid by the BPF program.
          * We must index shared memory by TGID so that cgroup.procs lookups
-         * (which use TGIDs) succeed.  Fall back to key only when every
+         * (which use TGIDs) succeed.  Fall back to next_key only when every
          * per-CPU entry has tgid==0 (race at entry creation; counters are
          * also zero in that case so the entry is harmless).
          */
@@ -649,7 +650,7 @@ int netdata_cachestat_runtime_snapshot_apps(
             }
         }
         if (tgid == 0)
-            tgid = key;
+            tgid = next_key;
 
         struct netdata_ebpf_cachestat_pid_snapshot *dst = &items[out_count];
         memset(dst, 0, sizeof(*dst));
