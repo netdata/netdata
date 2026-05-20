@@ -96,7 +96,7 @@ func (c *Collector) collectVMDiskPerformanceMetrics(vm *rs.VM, metrics []perform
 }
 
 func (c *Collector) writeVMDiskPerformanceMetrics(meter metrix.SnapshotMeter) {
-	if !c.CollectVMDiskPerformance || len(c.vmDiskPerfSamples) == 0 || c.MaxVMDisks < 1 {
+	if !c.CollectVMDiskPerformance || len(c.vmDiskPerfSamples) == 0 {
 		return
 	}
 
@@ -105,15 +105,10 @@ func (c *Collector) writeVMDiskPerformanceMetrics(meter metrix.SnapshotMeter) {
 		m = matcher.TRUE()
 	}
 
-	count := 0
 	for _, sample := range sortedVMDiskPerfSamples(c.vmDiskPerfSamples) {
 		if !vmDiskInstanceMatches(m, sample.instance) {
 			continue
 		}
-		if count >= c.MaxVMDisks {
-			return
-		}
-		count++
 
 		labels := meter.LabelSet(c.vmDiskPerformanceLabels(sample.vm, sample.instance)...)
 		for metricName, value := range sample.values {

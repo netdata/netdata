@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	defaultMaxHostDisks   = 1024
 	hostDiskLabel         = "disk"
 	hostDiskInstanceLabel = "disk_instance"
 
@@ -174,7 +173,7 @@ func (c *Collector) collectHostDiskPerformanceMetrics(host *rs.Host, metrics []p
 }
 
 func (c *Collector) writeHostDiskPerformanceMetrics(meter metrix.SnapshotMeter) {
-	if !c.CollectHostDiskPerformance || len(c.hostDiskPerfSamples) == 0 || c.MaxHostDisks < 1 {
+	if !c.CollectHostDiskPerformance || len(c.hostDiskPerfSamples) == 0 {
 		return
 	}
 
@@ -183,15 +182,10 @@ func (c *Collector) writeHostDiskPerformanceMetrics(meter metrix.SnapshotMeter) 
 		m = matcher.TRUE()
 	}
 
-	count := 0
 	for _, sample := range sortedHostDiskPerfSamples(c.hostDiskPerfSamples) {
 		if !hostDiskInstanceMatches(m, sample.instance) {
 			continue
 		}
-		if count >= c.MaxHostDisks {
-			return
-		}
-		count++
 
 		labels := meter.LabelSet(c.hostDiskPerformanceLabels(sample.host, sample.instance)...)
 		for metricName, value := range sample.values {

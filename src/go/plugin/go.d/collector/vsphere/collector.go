@@ -63,29 +63,17 @@ func New() *Collector {
 			HostPowerStates:            cloneStrings(defaultHostPowerStates),
 			VMPowerStates:              cloneStrings(defaultVMPowerStates),
 			DatastoreClustersInclude:   []string{"/*"},
-			MaxDatastoreClusters:       defaultMaxDatastoreClusters,
 			VMDisksInclude:             []string{"*"},
-			MaxVMDisks:                 defaultMaxVMDisks,
 			VMNICsInclude:              []string{"*"},
-			MaxVMNICs:                  defaultMaxVMNICs,
 			HostNICsInclude:            []string{"*"},
-			MaxHostNICs:                defaultMaxHostNICs,
 			HostDisksInclude:           []string{"*"},
-			MaxHostDisks:               defaultMaxHostDisks,
 			HostStorageAdaptersInclude: []string{"*"},
-			MaxHostStorageAdapters:     defaultMaxHostStorageAdapters,
 			HostStoragePathsInclude:    []string{"*"},
-			MaxHostStoragePaths:        defaultMaxHostStoragePaths,
 			HostCPUInstancesInclude:    []string{"*"},
-			MaxHostCPUInstances:        defaultMaxHostCPUInstances,
 			CollectVSAN:                false,
 			VSANClustersInclude:        []string{"/*"},
-			MaxVSANClusters:            defaultMaxVSANClusters,
 			VSANHostsInclude:           []string{"/*"},
-			MaxVSANHosts:               defaultMaxVSANHosts,
 			VSANVMsInclude:             []string{"/*"},
-			MaxVSANVMs:                 defaultMaxVSANVMs,
-			MaxUserMetadataLabels:      defaultMaxUserMetadataLabels,
 		},
 		store:                   store,
 		mx:                      mx,
@@ -118,42 +106,30 @@ type Config struct {
 	VMPowerStates                        []string                `yaml:"vm_power_states,omitempty" json:"vm_power_states"`
 	CollectDatastoreClusters             bool                    `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
 	DatastoreClustersInclude             []string                `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
-	MaxDatastoreClusters                 int                     `yaml:"max_datastore_clusters,omitempty" json:"max_datastore_clusters"`
 	InventoryPathLabel                   bool                    `yaml:"collect_inventory_path_label,omitempty" json:"collect_inventory_path_label"`
 	VMGuestLabels                        []string                `yaml:"vm_guest_labels,omitempty" json:"vm_guest_labels"`
 	VSphereTagCategories                 []string                `yaml:"vsphere_tag_categories,omitempty" json:"vsphere_tag_categories"`
 	CustomAttributes                     []string                `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
-	MaxUserMetadataLabels                int                     `yaml:"max_user_metadata_labels,omitempty" json:"max_user_metadata_labels"`
 	CollectVMDisks                       bool                    `yaml:"collect_vm_disks,omitempty" json:"collect_vm_disks"`
 	CollectVMDiskPerformance             bool                    `yaml:"collect_vm_disk_performance,omitempty" json:"collect_vm_disk_performance"`
 	VMDisksInclude                       []string                `yaml:"vm_disk_include,omitempty" json:"vm_disk_include"`
-	MaxVMDisks                           int                     `yaml:"max_vm_disks,omitempty" json:"max_vm_disks"`
 	CollectVMNICPerformance              bool                    `yaml:"collect_vm_nic_performance,omitempty" json:"collect_vm_nic_performance"`
 	VMNICsInclude                        []string                `yaml:"vm_nic_include,omitempty" json:"vm_nic_include"`
-	MaxVMNICs                            int                     `yaml:"max_vm_nics,omitempty" json:"max_vm_nics"`
 	CollectHostNICPerformance            bool                    `yaml:"collect_host_nic_performance,omitempty" json:"collect_host_nic_performance"`
 	HostNICsInclude                      []string                `yaml:"host_nic_include,omitempty" json:"host_nic_include"`
-	MaxHostNICs                          int                     `yaml:"max_host_nics,omitempty" json:"max_host_nics"`
 	CollectHostDiskPerformance           bool                    `yaml:"collect_host_disk_performance,omitempty" json:"collect_host_disk_performance"`
 	HostDisksInclude                     []string                `yaml:"host_disk_include,omitempty" json:"host_disk_include"`
-	MaxHostDisks                         int                     `yaml:"max_host_disks,omitempty" json:"max_host_disks"`
 	CollectHostStorageAdapterPerformance bool                    `yaml:"collect_host_storage_adapter_performance,omitempty" json:"collect_host_storage_adapter_performance"`
 	HostStorageAdaptersInclude           []string                `yaml:"host_storage_adapter_include,omitempty" json:"host_storage_adapter_include"`
-	MaxHostStorageAdapters               int                     `yaml:"max_host_storage_adapters,omitempty" json:"max_host_storage_adapters"`
 	CollectHostStoragePathPerformance    bool                    `yaml:"collect_host_storage_path_performance,omitempty" json:"collect_host_storage_path_performance"`
 	HostStoragePathsInclude              []string                `yaml:"host_storage_path_include,omitempty" json:"host_storage_path_include"`
-	MaxHostStoragePaths                  int                     `yaml:"max_host_storage_paths,omitempty" json:"max_host_storage_paths"`
 	CollectHostCPUInstancePerformance    bool                    `yaml:"collect_host_cpu_instance_performance,omitempty" json:"collect_host_cpu_instance_performance"`
 	HostCPUInstancesInclude              []string                `yaml:"host_cpu_instance_include,omitempty" json:"host_cpu_instance_include"`
-	MaxHostCPUInstances                  int                     `yaml:"max_host_cpu_instances,omitempty" json:"max_host_cpu_instances"`
 	CollectPowerMetrics                  bool                    `yaml:"collect_power_metrics,omitempty" json:"collect_power_metrics"`
 	CollectVSAN                          bool                    `yaml:"collect_vsan,omitempty" json:"collect_vsan"`
 	VSANClustersInclude                  []string                `yaml:"vsan_cluster_include,omitempty" json:"vsan_cluster_include"`
-	MaxVSANClusters                      int                     `yaml:"max_vsan_clusters,omitempty" json:"max_vsan_clusters"`
 	VSANHostsInclude                     []string                `yaml:"vsan_host_include,omitempty" json:"vsan_host_include"`
-	MaxVSANHosts                         int                     `yaml:"max_vsan_hosts,omitempty" json:"max_vsan_hosts"`
 	VSANVMsInclude                       []string                `yaml:"vsan_vm_include,omitempty" json:"vsan_vm_include"`
-	MaxVSANVMs                           int                     `yaml:"max_vsan_vms,omitempty" json:"max_vsan_vms"`
 	CollectNetworkTopology               bool                    `yaml:"collect_network_topology,omitempty" json:"collect_network_topology"`
 }
 

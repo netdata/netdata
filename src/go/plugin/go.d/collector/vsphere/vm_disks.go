@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	defaultMaxVMDisks      = 1024
 	vmDiskCapacityContext  = "vsphere.vm_disk_capacity"
 	vmDiskCapacityDim      = "capacity"
 	vmDiskCapacityMetric   = "vm_disk_capacity_capacity"
@@ -107,7 +106,7 @@ func (c *Collector) writeOptionalMetrics(meter metrix.SnapshotMeter) {
 }
 
 func (c *Collector) writeVMDiskMetrics(meter metrix.SnapshotMeter) {
-	if !c.CollectVMDisks || c.resources == nil || c.MaxVMDisks < 1 {
+	if !c.CollectVMDisks || c.resources == nil {
 		return
 	}
 
@@ -117,16 +116,11 @@ func (c *Collector) writeVMDiskMetrics(meter metrix.SnapshotMeter) {
 	}
 
 	gaugeName := v2MetricName(vmDiskCapacityContext, vmDiskCapacityDim)
-	count := 0
 	for _, vm := range sortedVMs(c.resources.VMs) {
 		for _, disk := range sortedVMDiskCopy(vm.Disks) {
 			if !vmDiskMatches(m, disk) {
 				continue
 			}
-			if count >= c.MaxVMDisks {
-				return
-			}
-			count++
 
 			if gauge := c.mx.gauge(gaugeName); gauge != nil {
 				gauge.Observe(metrix.SampleValue(disk.CapacityBytes), meter.LabelSet(c.vmDiskLabels(vm, disk)...))

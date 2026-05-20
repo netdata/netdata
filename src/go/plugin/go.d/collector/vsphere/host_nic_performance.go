@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	defaultMaxHostNICs   = 1024
 	hostNICLabel         = "interface"
 	hostNICInstanceLabel = "interface_instance"
 
@@ -128,7 +127,7 @@ func (c *Collector) collectHostNICPerformanceMetrics(host *rs.Host, metrics []pe
 }
 
 func (c *Collector) writeHostNICPerformanceMetrics(meter metrix.SnapshotMeter) {
-	if !c.CollectHostNICPerformance || len(c.hostNICPerfSamples) == 0 || c.MaxHostNICs < 1 {
+	if !c.CollectHostNICPerformance || len(c.hostNICPerfSamples) == 0 {
 		return
 	}
 
@@ -137,15 +136,10 @@ func (c *Collector) writeHostNICPerformanceMetrics(meter metrix.SnapshotMeter) {
 		m = matcher.TRUE()
 	}
 
-	count := 0
 	for _, sample := range sortedHostNICPerfSamples(c.hostNICPerfSamples) {
 		if !hostNICInstanceMatches(m, sample.instance) {
 			continue
 		}
-		if count >= c.MaxHostNICs {
-			return
-		}
-		count++
 
 		labels := meter.LabelSet(c.hostNICPerformanceLabels(sample.host, sample.instance)...)
 		for metricName, value := range sample.values {

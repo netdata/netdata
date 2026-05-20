@@ -146,40 +146,28 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | [vm_guest_labels](#option-labels-vm-guest-labels) | VM guest label allowlist. |  | no |
 |  | [vsphere_tag_categories](#option-labels-vsphere-tag-categories) | vSphere tag category allowlist. |  | no |
 |  | [custom_attributes](#option-labels-custom-attributes) | vSphere custom attribute allowlist. |  | no |
-|  | [max_user_metadata_labels](#option-labels-max-user-metadata-labels) | Maximum vSphere tag and custom-attribute labels per resource. | 64 | no |
 | **High Cardinality** | [collect_vm_disks](#option-high-cardinality-collect-vm-disks) | Collect VM virtual disk capacity. | no | no |
 |  | [collect_vm_disk_performance](#option-high-cardinality-collect-vm-disk-performance) | Collect VM virtual disk performance. | no | no |
 |  | [collect_datastore_clusters](#option-high-cardinality-collect-datastore-clusters) | Collect datastore cluster capacity and Storage DRS status. | no | no |
 |  | [datastore_cluster_include](#option-high-cardinality-datastore-cluster-include) | Datastore cluster selector. | /* | no |
-|  | [max_datastore_clusters](#option-high-cardinality-max-datastore-clusters) | Maximum datastore clusters to emit. | 256 | no |
 |  | [vm_disk_include](#option-high-cardinality-vm-disk-include) | VM virtual disk selector. | * | no |
-|  | [max_vm_disks](#option-high-cardinality-max-vm-disks) | Maximum VM virtual disks to emit. | 1024 | no |
 |  | [collect_vm_nic_performance](#option-high-cardinality-collect-vm-nic-performance) | Collect VM network interface performance. | no | no |
 |  | [vm_nic_include](#option-high-cardinality-vm-nic-include) | VM network interface selector. | * | no |
-|  | [max_vm_nics](#option-high-cardinality-max-vm-nics) | Maximum VM network interfaces to emit. | 1024 | no |
 |  | [collect_host_nic_performance](#option-high-cardinality-collect-host-nic-performance) | Collect host physical network interface performance. | no | no |
 |  | [host_nic_include](#option-high-cardinality-host-nic-include) | Host physical network interface selector. | * | no |
-|  | [max_host_nics](#option-high-cardinality-max-host-nics) | Maximum host physical network interfaces to emit. | 1024 | no |
 |  | [collect_host_disk_performance](#option-high-cardinality-collect-host-disk-performance) | Collect host disk device performance. | no | no |
 |  | [host_disk_include](#option-high-cardinality-host-disk-include) | Host disk device selector. | * | no |
-|  | [max_host_disks](#option-high-cardinality-max-host-disks) | Maximum host disk devices to emit. | 1024 | no |
 |  | [collect_host_storage_adapter_performance](#option-high-cardinality-collect-host-storage-adapter-performance) | Collect host storage adapter performance. | no | no |
 |  | [host_storage_adapter_include](#option-high-cardinality-host-storage-adapter-include) | Host storage adapter selector. | * | no |
-|  | [max_host_storage_adapters](#option-high-cardinality-max-host-storage-adapters) | Maximum host storage adapters to emit. | 1024 | no |
 |  | [collect_host_storage_path_performance](#option-high-cardinality-collect-host-storage-path-performance) | Collect host storage path performance. | no | no |
 |  | [host_storage_path_include](#option-high-cardinality-host-storage-path-include) | Host storage path selector. | * | no |
-|  | [max_host_storage_paths](#option-high-cardinality-max-host-storage-paths) | Maximum host storage paths to emit. | 1024 | no |
 |  | [collect_host_cpu_instance_performance](#option-high-cardinality-collect-host-cpu-instance-performance) | Collect host CPU instance performance. | no | no |
 |  | [host_cpu_instance_include](#option-high-cardinality-host-cpu-instance-include) | Host CPU instance selector. | * | no |
-|  | [max_host_cpu_instances](#option-high-cardinality-max-host-cpu-instances) | Maximum host CPU instances to emit. | 1024 | no |
 | **Collection** | [collect_power_metrics](#option-collection-collect-power-metrics) | Collect host and VM power metrics. | no | no |
 | **High Cardinality** | [collect_vsan](#option-high-cardinality-collect-vsan) | Collect vSAN metrics. | no | no |
 |  | [vsan_cluster_include](#option-high-cardinality-vsan-cluster-include) | vSAN cluster selector. | /* | no |
-|  | [max_vsan_clusters](#option-high-cardinality-max-vsan-clusters) | Maximum vSAN clusters to query and emit. | 256 | no |
 |  | [vsan_host_include](#option-high-cardinality-vsan-host-include) | vSAN host selector. | /* | no |
-|  | [max_vsan_hosts](#option-high-cardinality-max-vsan-hosts) | Maximum vSAN hosts to query and emit. | 1024 | no |
 |  | [vsan_vm_include](#option-high-cardinality-vsan-vm-include) | vSAN VM selector. | /* | no |
-|  | [max_vsan_vms](#option-high-cardinality-max-vsan-vms) | Maximum vSAN VMs to query and emit. | 1024 | no |
 | **Collection** | [collect_network_topology](#option-collection-collect-network-topology) | Discover networks for the vSphere Topology function. | no | no |
 | **Filters** | [host_include](#option-filters-host-include) | Hosts selector (filter). | /* | no |
 |  | [vm_include](#option-filters-vm-include) | VM selector (filter). | /* | no |
@@ -305,14 +293,6 @@ custom_attributes:
 ```
 
 
-<a id="option-labels-max-user-metadata-labels"></a>
-##### max_user_metadata_labels
-
-Applies only when `vsphere_tag_categories` or `custom_attributes`
-is configured. This safety cap bounds the number of user-defined
-metadata labels added to each discovered resource.
-
-
 <a id="option-high-cardinality-collect-vm-disks"></a>
 ##### collect_vm_disks
 
@@ -355,14 +335,6 @@ datastore_cluster_include:
 ```
 
 
-<a id="option-high-cardinality-max-datastore-clusters"></a>
-##### max_datastore_clusters
-
-Applies only when `collect_datastore_clusters` is enabled. This
-safety cap bounds the number of emitted datastore-cluster series
-for a job.
-
-
 <a id="option-high-cardinality-vm-disk-include"></a>
 ##### vm_disk_include
 
@@ -379,15 +351,6 @@ vm_disk_include:
   - "key:2000"
   - "instance:scsi0:0"
 ```
-
-
-<a id="option-high-cardinality-max-vm-disks"></a>
-##### max_vm_disks
-
-Applies only when `collect_vm_disks` or
-`collect_vm_disk_performance` is enabled. This safety cap bounds
-the number of emitted VM disk capacity or performance instances
-for a job.
 
 
 <a id="option-high-cardinality-collect-vm-nic-performance"></a>
@@ -414,14 +377,6 @@ vm_nic_include:
 ```
 
 
-<a id="option-high-cardinality-max-vm-nics"></a>
-##### max_vm_nics
-
-Applies only when `collect_vm_nic_performance` is enabled. This
-safety cap bounds the number of emitted VM network-interface
-performance instances for a job.
-
-
 <a id="option-high-cardinality-collect-host-nic-performance"></a>
 ##### collect_host_nic_performance
 
@@ -445,14 +400,6 @@ host_nic_include:
 ```
 
 
-<a id="option-high-cardinality-max-host-nics"></a>
-##### max_host_nics
-
-Applies only when `collect_host_nic_performance` is enabled.
-This safety cap bounds the number of emitted host
-network-interface performance instances for a job.
-
-
 <a id="option-high-cardinality-collect-host-disk-performance"></a>
 ##### collect_host_disk_performance
 
@@ -474,14 +421,6 @@ host_disk_include:
   - "naa.*"
   - "instance:naa.123"
 ```
-
-
-<a id="option-high-cardinality-max-host-disks"></a>
-##### max_host_disks
-
-Applies only when `collect_host_disk_performance` is enabled.
-This safety cap bounds the number of emitted host disk/LUN/device
-performance instances for a job.
 
 
 <a id="option-high-cardinality-collect-host-storage-adapter-performance"></a>
@@ -508,14 +447,6 @@ host_storage_adapter_include:
 ```
 
 
-<a id="option-high-cardinality-max-host-storage-adapters"></a>
-##### max_host_storage_adapters
-
-Applies only when `collect_host_storage_adapter_performance` is
-enabled. This safety cap bounds the number of emitted host
-storage-adapter performance instances for a job.
-
-
 <a id="option-high-cardinality-collect-host-storage-path-performance"></a>
 ##### collect_host_storage_path_performance
 
@@ -538,14 +469,6 @@ host_storage_path_include:
   - "vmhba*:C0:T0:L0"
   - "path:vmhba0:C0:T0:L0"
 ```
-
-
-<a id="option-high-cardinality-max-host-storage-paths"></a>
-##### max_host_storage_paths
-
-Applies only when `collect_host_storage_path_performance` is
-enabled. This safety cap bounds the number of emitted host
-storage-path performance instances for a job.
 
 
 <a id="option-high-cardinality-collect-host-cpu-instance-performance"></a>
@@ -571,14 +494,6 @@ host_cpu_instance_include:
 ```
 
 
-<a id="option-high-cardinality-max-host-cpu-instances"></a>
-##### max_host_cpu_instances
-
-Applies only when `collect_host_cpu_instance_performance` is
-enabled. This safety cap bounds the number of emitted host CPU
-instance performance series for a job.
-
-
 <a id="option-collection-collect-power-metrics"></a>
 ##### collect_power_metrics
 
@@ -595,10 +510,9 @@ Disabled by default because it uses the vSAN Management API and
 vSAN Performance Service, and adds extra vCenter queries. When
 enabled, it emits vSAN cluster capacity, vSAN cluster health, and
 vSAN cluster, host, and VM performance metrics for discovered
-vSAN-enabled clusters. Use the vSAN selectors and max caps below
-to bound both emitted series and the concrete vSAN performance
-entity refs queried. vSAN events are not collected by this
-option.
+vSAN-enabled clusters. Use the vSAN selectors below to choose the
+concrete vSAN performance entity refs queried. vSAN events are
+not collected by this option.
 
 
 <a id="option-high-cardinality-vsan-cluster-include"></a>
@@ -613,14 +527,6 @@ vsan_cluster_include:
   - "/*"
   - "vsan_uuid:52b..."
 ```
-
-
-<a id="option-high-cardinality-max-vsan-clusters"></a>
-##### max_vsan_clusters
-
-Applies only when `collect_vsan` is enabled. This safety cap
-bounds vSAN cluster capacity, health, and performance series for
-a job.
 
 
 <a id="option-high-cardinality-vsan-host-include"></a>
@@ -638,13 +544,6 @@ vsan_host_include:
 ```
 
 
-<a id="option-high-cardinality-max-vsan-hosts"></a>
-##### max_vsan_hosts
-
-Applies only when `collect_vsan` is enabled. This safety cap
-bounds high-cardinality vSAN host performance series for a job.
-
-
 <a id="option-high-cardinality-vsan-vm-include"></a>
 ##### vsan_vm_include
 
@@ -658,13 +557,6 @@ vsan_vm_include:
   - "/*"
   - "instance_uuid:52b..."
 ```
-
-
-<a id="option-high-cardinality-max-vsan-vms"></a>
-##### max_vsan_vms
-
-Applies only when `collect_vsan` is enabled. This safety cap
-bounds high-cardinality vSAN VM performance series for a job.
 
 
 <a id="option-collection-collect-network-topology"></a>

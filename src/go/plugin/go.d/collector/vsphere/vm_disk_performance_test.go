@@ -66,8 +66,8 @@ func TestCollector_VMDiskPerformanceOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[chartID], vmDiskDeviceIOWriteDim)
 }
 
-func TestCollector_VMDiskPerformanceSelectorAndCap(t *testing.T) {
-	tests := instanceSelectorCapCases("disk", "scsi0:1", "NoSuchDisk")
+func TestCollector_VMDiskPerformanceSelector(t *testing.T) {
+	tests := instanceSelectorCases("disk", "scsi0:1", "NoSuchDisk")
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -75,7 +75,6 @@ func TestCollector_VMDiskPerformanceSelectorAndCap(t *testing.T) {
 			defer teardown()
 			collr.CollectVMDiskPerformance = true
 			collr.VMDisksInclude = tc.include
-			collr.MaxVMDisks = tc.max
 
 			require.NoError(t, collr.Init(context.Background()))
 			vm := firstSortedVM(t, collr)

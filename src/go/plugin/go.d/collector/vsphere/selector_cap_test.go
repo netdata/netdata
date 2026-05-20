@@ -2,34 +2,31 @@
 
 package vsphere
 
-type includeCapTestCase struct {
+type includeSelectorTestCase struct {
 	include []string
-	max     int
 	want    int
 }
 
-func prefixedSelectorCapCases(kind, prefix, match, missing string) map[string]includeCapTestCase {
-	return map[string]includeCapTestCase{
-		"selector keeps matching " + kind + " instance": {include: []string{match}, max: 10, want: 1},
-		"selector keeps matching " + kind + " prefix":   {include: []string{prefix + ":" + match}, max: 10, want: 1},
-		"selector keeps matching instance prefix":       {include: []string{"instance:" + match}, max: 10, want: 1},
-		"cap limits emitted " + kind + " instances":     {include: []string{"*"}, max: 1, want: 1},
+func prefixedSelectorCases(kind, prefix, match, missing string) map[string]includeSelectorTestCase {
+	return map[string]includeSelectorTestCase{
+		"selector keeps matching " + kind + " instance": {include: []string{match}, want: 1},
+		"selector keeps matching " + kind + " prefix":   {include: []string{prefix + ":" + match}, want: 1},
+		"selector keeps matching instance prefix":       {include: []string{"instance:" + match}, want: 1},
+		"selector keeps all " + kind + " instances":     {include: []string{"*"}, want: 2},
 		"selector can exclude all " + kind + " instances": {
 			include: []string{missing},
-			max:     10,
 			want:    0,
 		},
 	}
 }
 
-func instanceSelectorCapCases(kind, match, missing string) map[string]includeCapTestCase {
-	return map[string]includeCapTestCase{
-		"selector keeps matching " + kind + " instance": {include: []string{match}, max: 10, want: 1},
-		"selector keeps matching instance prefix":       {include: []string{"instance:" + match}, max: 10, want: 1},
-		"cap limits emitted " + kind + " instances":     {include: []string{"*"}, max: 1, want: 1},
+func instanceSelectorCases(kind, match, missing string) map[string]includeSelectorTestCase {
+	return map[string]includeSelectorTestCase{
+		"selector keeps matching " + kind + " instance": {include: []string{match}, want: 1},
+		"selector keeps matching instance prefix":       {include: []string{"instance:" + match}, want: 1},
+		"selector keeps all " + kind + " instances":     {include: []string{"*"}, want: 2},
 		"selector can exclude all " + kind + " instances": {
 			include: []string{missing},
-			max:     10,
 			want:    0,
 		},
 	}

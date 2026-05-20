@@ -11,8 +11,6 @@ import (
 )
 
 const (
-	defaultMaxDatastoreClusters = 256
-
 	datastoreClusterSpaceUsageContext       = "vsphere.datastore_cluster_space_usage"
 	datastoreClusterSpaceUtilizationContext = "vsphere.datastore_cluster_space_utilization"
 	datastoreClusterStorageDRSContext       = "vsphere.datastore_cluster_storage_drs_status"
@@ -47,7 +45,7 @@ func datastoreClusterOptionalMetricNames() []string {
 }
 
 func (c *Collector) writeDatastoreClusterMetrics(meter metrix.SnapshotMeter) {
-	if !c.CollectDatastoreClusters || c.resources == nil || c.MaxDatastoreClusters < 1 {
+	if !c.CollectDatastoreClusters || c.resources == nil {
 		return
 	}
 
@@ -56,15 +54,10 @@ func (c *Collector) writeDatastoreClusterMetrics(meter metrix.SnapshotMeter) {
 		m = matcher.TRUE()
 	}
 
-	count := 0
 	for _, pod := range sortedStoragePods(c.resources.StoragePods) {
 		if !datastoreClusterMatches(m, pod) {
 			continue
 		}
-		if count >= c.MaxDatastoreClusters {
-			return
-		}
-		count++
 
 		labels := meter.LabelSet(c.datastoreClusterLabels(pod)...)
 		c.observeGauge(datastoreClusterSpaceUsageCapacityMetric, pod.Capacity, labels)

@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	defaultMaxHostStoragePaths   = 1024
 	hostStoragePathLabel         = "path"
 	hostStoragePathInstanceLabel = "path_instance"
 
@@ -161,7 +160,7 @@ func (c *Collector) writeHostStoragePathPerformanceMetrics(meter metrix.Snapshot
 }
 
 func (c *Collector) writeHostStoragePathInstancePerformanceMetrics(meter metrix.SnapshotMeter) {
-	if len(c.hostStoragePathPerfSamples) == 0 || c.MaxHostStoragePaths < 1 {
+	if len(c.hostStoragePathPerfSamples) == 0 {
 		return
 	}
 
@@ -170,15 +169,10 @@ func (c *Collector) writeHostStoragePathInstancePerformanceMetrics(meter metrix.
 		m = matcher.TRUE()
 	}
 
-	count := 0
 	for _, sample := range sortedHostStoragePathPerfSamples(c.hostStoragePathPerfSamples) {
 		if !hostStoragePathInstanceMatches(m, sample.instance) {
 			continue
 		}
-		if count >= c.MaxHostStoragePaths {
-			return
-		}
-		count++
 
 		labels := meter.LabelSet(c.hostStoragePathPerformanceLabels(sample.host, sample.instance)...)
 		for metricName, value := range sample.values {

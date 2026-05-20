@@ -77,14 +77,6 @@ func TestCollector_Init_ReturnsFalseIfInvalidUserMetadataLabelConfig(t *testing.
 	collr.URL = "https://vcenter.local"
 	collr.Username = "user"
 	collr.Password = "pass"
-	collr.CustomAttributes = []string{"Owner"}
-	collr.MaxUserMetadataLabels = -1
-	require.ErrorContains(t, collr.Init(context.Background()), "max_user_metadata_labels must be greater than zero")
-
-	collr = New()
-	collr.URL = "https://vcenter.local"
-	collr.Username = "user"
-	collr.Password = "pass"
 	collr.VSphereTagCategories = []string{"!"}
 	require.ErrorContains(t, collr.Init(context.Background()), "vsphere_tag_categories has invalid empty negative pattern")
 

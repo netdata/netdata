@@ -78,8 +78,8 @@ func TestCollector_HostStoragePathPerformanceOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[aggregateChartID], hostStoragePathMaxLatencyDim)
 }
 
-func TestCollector_HostStoragePathPerformanceSelectorAndCap(t *testing.T) {
-	tests := prefixedSelectorCapCases("path", "path", "vmhba1:C0:T0:L0", "NoSuchPath")
+func TestCollector_HostStoragePathPerformanceSelector(t *testing.T) {
+	tests := prefixedSelectorCases("path", "path", "vmhba1:C0:T0:L0", "NoSuchPath")
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -87,7 +87,6 @@ func TestCollector_HostStoragePathPerformanceSelectorAndCap(t *testing.T) {
 			defer teardown()
 			collr.CollectHostStoragePathPerformance = true
 			collr.HostStoragePathsInclude = tc.include
-			collr.MaxHostStoragePaths = tc.max
 
 			require.NoError(t, collr.Init(context.Background()))
 			host := firstSortedHost(t, collr)
@@ -113,11 +112,7 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostStoragePathConfig(t *testing.T)
 	collr.Username = "user"
 	collr.Password = "pass"
 	collr.CollectHostStoragePathPerformance = true
-	collr.MaxHostStoragePaths = -1
 
-	require.ErrorContains(t, collr.Init(context.Background()), "max_host_storage_paths must be greater than zero")
-
-	collr.MaxHostStoragePaths = 1
 	collr.HostStoragePathsInclude = []string{"["}
 	require.ErrorContains(t, collr.Init(context.Background()), "host_storage_path_include has invalid pattern")
 }

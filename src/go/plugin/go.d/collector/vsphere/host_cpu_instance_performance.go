@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	defaultMaxHostCPUInstances   = 1024
 	hostCPUInstanceLabel         = "cpu"
 	hostCPUInstanceInstanceLabel = "cpu_instance"
 
@@ -86,7 +85,7 @@ func (c *Collector) writeHostCPUInstancePerformanceMetrics(meter metrix.Snapshot
 	if !c.CollectHostCPUInstancePerformance {
 		return
 	}
-	if len(c.hostCPUInstancePerfSamples) == 0 || c.MaxHostCPUInstances < 1 {
+	if len(c.hostCPUInstancePerfSamples) == 0 {
 		return
 	}
 
@@ -95,15 +94,10 @@ func (c *Collector) writeHostCPUInstancePerformanceMetrics(meter metrix.Snapshot
 		m = matcher.TRUE()
 	}
 
-	count := 0
 	for _, sample := range sortedHostCPUInstancePerfSamples(c.hostCPUInstancePerfSamples) {
 		if !hostCPUInstanceMatches(m, sample.instance) {
 			continue
 		}
-		if count >= c.MaxHostCPUInstances {
-			return
-		}
-		count++
 
 		labels := meter.LabelSet(c.hostCPUInstancePerformanceLabels(sample.host, sample.instance)...)
 		for metricName, value := range sample.values {

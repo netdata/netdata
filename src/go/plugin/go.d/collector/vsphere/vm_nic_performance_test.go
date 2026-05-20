@@ -68,8 +68,8 @@ func TestCollector_VMNICPerformanceOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[chartID], vmNetInterfaceTrafficTxDim)
 }
 
-func TestCollector_VMNICPerformanceSelectorAndCap(t *testing.T) {
-	tests := prefixedSelectorCapCases("interface", "interface", "4001", "NoSuchInterface")
+func TestCollector_VMNICPerformanceSelector(t *testing.T) {
+	tests := prefixedSelectorCases("interface", "interface", "4001", "NoSuchInterface")
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -77,7 +77,6 @@ func TestCollector_VMNICPerformanceSelectorAndCap(t *testing.T) {
 			defer teardown()
 			collr.CollectVMNICPerformance = true
 			collr.VMNICsInclude = tc.include
-			collr.MaxVMNICs = tc.max
 
 			require.NoError(t, collr.Init(context.Background()))
 			vm := firstSortedVM(t, collr)
@@ -103,11 +102,7 @@ func TestCollector_Init_ReturnsFalseIfInvalidVMNICConfig(t *testing.T) {
 	collr.Username = "user"
 	collr.Password = "pass"
 	collr.CollectVMNICPerformance = true
-	collr.MaxVMNICs = -1
 
-	require.ErrorContains(t, collr.Init(context.Background()), "max_vm_nics must be greater than zero")
-
-	collr.MaxVMNICs = 1
 	collr.VMNICsInclude = []string{"["}
 	require.ErrorContains(t, collr.Init(context.Background()), "vm_nic_include has invalid pattern")
 }

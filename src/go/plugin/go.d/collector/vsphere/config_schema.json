@@ -138,13 +138,6 @@
         },
         "default": []
       },
-      "max_user_metadata_labels": {
-        "title": "Maximum vSphere metadata labels",
-        "description": "Maximum number of vSphere tag and custom-attribute labels to add per discovered resource. Applies only when vsphere_tag_categories or custom_attributes is configured.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 64
-      },
       "collect_vm_disks": {
         "title": "Collect VM virtual disks",
         "description": "If enabled, collects one capacity series per VM virtual disk. Disabled by default because it can create many time series in large vCenters.",
@@ -181,13 +174,6 @@
           "/*"
         ]
       },
-      "max_datastore_clusters": {
-        "title": "Maximum datastore clusters",
-        "description": "Maximum number of datastore clusters to emit when collect_datastore_clusters is enabled.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 256
-      },
       "vm_disk_include": {
         "title": "VM virtual disk selector",
         "description": "Simple-pattern allowlist for VM virtual disks when collect_vm_disks or collect_vm_disk_performance is enabled. Capacity collection patterns match the vSphere disk label, the numeric disk key, or key:<disk_key>. Performance collection patterns match the vSphere performance instance or instance:<disk_instance>.",
@@ -205,13 +191,6 @@
         "default": [
           "*"
         ]
-      },
-      "max_vm_disks": {
-        "title": "Maximum VM virtual disks",
-        "description": "Maximum number of VM virtual disks to emit when collect_vm_disks or collect_vm_disk_performance is enabled. This bounds high-cardinality disk series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1024
       },
       "collect_vm_nic_performance": {
         "title": "Collect VM network interface performance",
@@ -237,13 +216,6 @@
           "*"
         ]
       },
-      "max_vm_nics": {
-        "title": "Maximum VM network interfaces",
-        "description": "Maximum number of VM network interfaces to emit when collect_vm_nic_performance is enabled. This bounds high-cardinality vNIC series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1024
-      },
       "collect_host_nic_performance": {
         "title": "Collect host physical network interface performance",
         "description": "If enabled, collects per-physical-NIC traffic, packets, drops, errors, broadcast packets, multicast packets, unknown protocol frames, and usage from vSphere net performance instances. Disabled by default because it adds high-cardinality per-interface performance series and can increase vCenter query load.",
@@ -267,13 +239,6 @@
         "default": [
           "*"
         ]
-      },
-      "max_host_nics": {
-        "title": "Maximum host physical network interfaces",
-        "description": "Maximum number of host physical network interfaces to emit when collect_host_nic_performance is enabled. This bounds high-cardinality pNIC series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1024
       },
       "collect_host_disk_performance": {
         "title": "Collect host disk device performance",
@@ -299,13 +264,6 @@
           "*"
         ]
       },
-      "max_host_disks": {
-        "title": "Maximum host disk devices",
-        "description": "Maximum number of host disk/LUN/device instances to emit when collect_host_disk_performance is enabled. This bounds high-cardinality disk series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1024
-      },
       "collect_host_storage_adapter_performance": {
         "title": "Collect host storage adapter performance",
         "description": "If enabled, collects per-host-storage-adapter I/O, command, latency, queue, outstanding I/O percentage, throughput usage, throughput contention, and aggregate maximum latency metrics from vSphere storageAdapter performance counters. Disabled by default because it adds high-cardinality per-adapter performance series and can increase vCenter query load.",
@@ -329,13 +287,6 @@
         "default": [
           "*"
         ]
-      },
-      "max_host_storage_adapters": {
-        "title": "Maximum host storage adapters",
-        "description": "Maximum number of host storage adapter instances to emit when collect_host_storage_adapter_performance is enabled. This bounds high-cardinality adapter series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1024
       },
       "collect_host_storage_path_performance": {
         "title": "Collect host storage path performance",
@@ -361,13 +312,6 @@
           "*"
         ]
       },
-      "max_host_storage_paths": {
-        "title": "Maximum host storage paths",
-        "description": "Maximum number of host storage path instances to emit when collect_host_storage_path_performance is enabled. This bounds high-cardinality path series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1024
-      },
       "collect_host_cpu_instance_performance": {
         "title": "Collect host CPU instance performance",
         "description": "If enabled, collects per-host CPU instance usage, utilization, core utilization, used time, and idle time from vSphere cpu performance counters. Disabled by default because it adds high-cardinality per-core/logical-CPU performance series and can increase vCenter query load.",
@@ -392,13 +336,6 @@
           "*"
         ]
       },
-      "max_host_cpu_instances": {
-        "title": "Maximum host CPU instances",
-        "description": "Maximum number of host CPU instances to emit when collect_host_cpu_instance_performance is enabled. This bounds high-cardinality CPU instance series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1024
-      },
       "collect_power_metrics": {
         "title": "Collect power and energy metrics",
         "description": "If enabled, collects aggregate host and VM power usage, energy usage, and host power-capacity metrics from vSphere power performance counters. Disabled by default to preserve existing collection scope and avoid extra vCenter performance queries.",
@@ -407,7 +344,7 @@
       },
       "collect_vsan": {
         "title": "Collect vSAN metrics",
-        "description": "If enabled, collects vSAN cluster capacity, vSAN cluster health, and vSAN cluster, host, and VM performance metrics through the vSAN Management API. Disabled by default because it requires vSAN APIs and the vSAN Performance Service, and adds additional vCenter queries. Use the vSAN selectors and max caps to bound the concrete vSAN performance entity refs queried.",
+        "description": "If enabled, collects vSAN cluster capacity, vSAN cluster health, and vSAN cluster, host, and VM performance metrics through the vSAN Management API. Disabled by default because it requires vSAN APIs and the vSAN Performance Service, and adds additional vCenter queries. Use the vSAN selectors to choose the concrete vSAN performance entity refs queried.",
         "type": "boolean",
         "default": false
       },
@@ -429,13 +366,6 @@
           "/*"
         ]
       },
-      "max_vsan_clusters": {
-        "title": "Maximum vSAN clusters",
-        "description": "Maximum number of vSAN-enabled clusters to query and emit when collect_vsan is enabled. This bounds vSAN cluster capacity, health, and performance series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 256
-      },
       "vsan_host_include": {
         "title": "vSAN host selector",
         "description": "Simple-pattern allowlist for vSAN host performance entities when collect_vsan is enabled. Patterns match /Datacenter/Cluster/Host, the host name, the vSphere managed object ID, or vsan_node_uuid:<uuid>.",
@@ -454,13 +384,6 @@
           "/*"
         ]
       },
-      "max_vsan_hosts": {
-        "title": "Maximum vSAN hosts",
-        "description": "Maximum number of vSAN host performance entities to query and emit when collect_vsan is enabled. This bounds high-cardinality vSAN host performance series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1024
-      },
       "vsan_vm_include": {
         "title": "vSAN VM selector",
         "description": "Simple-pattern allowlist for vSAN VM performance entities when collect_vsan is enabled. Patterns match /Datacenter/Cluster/Host/VM, the VM name, the vSphere managed object ID, or instance_uuid:<uuid>.",
@@ -478,13 +401,6 @@
         "default": [
           "/*"
         ]
-      },
-      "max_vsan_vms": {
-        "title": "Maximum vSAN VMs",
-        "description": "Maximum number of vSAN VM performance entities to query and emit when collect_vsan is enabled. This bounds high-cardinality vSAN VM performance series.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1024
       },
       "collect_network_topology": {
         "title": "Collect network topology",
@@ -702,8 +618,7 @@
             "collect_inventory_path_label",
             "vm_guest_labels",
             "vsphere_tag_categories",
-            "custom_attributes",
-            "max_user_metadata_labels"
+            "custom_attributes"
           ]
         },
         {
@@ -712,26 +627,22 @@
             "collect_vm_disks",
             "collect_vm_disk_performance",
             "vm_disk_include",
-            "max_vm_disks",
             "collect_vm_nic_performance",
-            "vm_nic_include",
-            "max_vm_nics"
+            "vm_nic_include"
           ]
         },
         {
           "title": "H-Net",
           "fields": [
             "collect_host_nic_performance",
-            "host_nic_include",
-            "max_host_nics"
+            "host_nic_include"
           ]
         },
         {
           "title": "H-Disk",
           "fields": [
             "collect_host_disk_performance",
-            "host_disk_include",
-            "max_host_disks"
+            "host_disk_include"
           ]
         },
         {
@@ -739,18 +650,15 @@
           "fields": [
             "collect_host_storage_adapter_performance",
             "host_storage_adapter_include",
-            "max_host_storage_adapters",
             "collect_host_storage_path_performance",
-            "host_storage_path_include",
-            "max_host_storage_paths"
+            "host_storage_path_include"
           ]
         },
         {
           "title": "H-CPU",
           "fields": [
             "collect_host_cpu_instance_performance",
-            "host_cpu_instance_include",
-            "max_host_cpu_instances"
+            "host_cpu_instance_include"
           ]
         },
         {
@@ -763,8 +671,7 @@
           "title": "Stores",
           "fields": [
             "collect_datastore_clusters",
-            "datastore_cluster_include",
-            "max_datastore_clusters"
+            "datastore_cluster_include"
           ]
         },
         {
@@ -772,11 +679,8 @@
           "fields": [
             "collect_vsan",
             "vsan_cluster_include",
-            "max_vsan_clusters",
             "vsan_host_include",
-            "max_vsan_hosts",
-            "vsan_vm_include",
-            "max_vsan_vms"
+            "vsan_vm_include"
           ]
         },
         {

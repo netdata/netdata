@@ -19,11 +19,7 @@ func TestCollector_Init_ReturnsFalseIfInvalidDatastoreClusterConfig(t *testing.T
 	collr.Username = "user"
 	collr.Password = "pass"
 	collr.CollectDatastoreClusters = true
-	collr.MaxDatastoreClusters = -1
 
-	require.ErrorContains(t, collr.Init(context.Background()), "max_datastore_clusters must be greater than zero")
-
-	collr.MaxDatastoreClusters = 1
 	collr.DatastoreClustersInclude = []string{"["}
 	require.ErrorContains(t, collr.Init(context.Background()), "datastore_cluster_include has invalid pattern")
 }
@@ -76,30 +72,25 @@ func TestCollector_DatastoreClustersOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[statusChartID], "green")
 }
 
-func TestCollector_DatastoreClustersSelectorAndCap(t *testing.T) {
+func TestCollector_DatastoreClustersSelector(t *testing.T) {
 	tests := map[string]struct {
 		include []string
-		max     int
 		want    int
 	}{
 		"selector keeps matching path": {
 			include: []string{"/DC0/DC0_POD1"},
-			max:     10,
 			want:    1,
 		},
 		"selector keeps matching name": {
 			include: []string{"DC0_POD1"},
-			max:     10,
 			want:    1,
 		},
-		"cap limits emitted datastore clusters": {
+		"selector keeps all datastore clusters": {
 			include: []string{"/*"},
-			max:     1,
-			want:    1,
+			want:    2,
 		},
 		"selector can exclude all datastore clusters": {
 			include: []string{"NoSuchPod"},
-			max:     10,
 			want:    0,
 		},
 	}
@@ -110,7 +101,6 @@ func TestCollector_DatastoreClustersSelectorAndCap(t *testing.T) {
 			defer teardown()
 			collr.CollectDatastoreClusters = true
 			collr.DatastoreClustersInclude = tc.include
-			collr.MaxDatastoreClusters = tc.max
 
 			require.NoError(t, collr.Init(context.Background()))
 			collr.scraper = mockScraper{collr.scraper}

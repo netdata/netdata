@@ -24,7 +24,7 @@ func TestAddCustomAttributeLabels(t *testing.T) {
 		2: "Env.Name",
 	}
 
-	addCustomAttributeLabels(&labels, values, namesByKey, 2)
+	addCustomAttributeLabels(&labels, values, namesByKey)
 
 	require.Equal(t, map[string]string{
 		"vsphere_custom_attribute_env_name":   "prod",
@@ -42,7 +42,7 @@ func TestAddTagLabels(t *testing.T) {
 		"Secret":        {"hidden"},
 	}
 
-	addTagLabels(&labels, tagsByCategory, m, 2)
+	addTagLabels(&labels, tagsByCategory, m)
 
 	require.Equal(t, map[string]string{
 		"vsphere_tag_business_unit": "Core|Payments",
@@ -60,7 +60,7 @@ func TestResourceLabelsByRefFindsClusterByValue(t *testing.T) {
 	labels := resourceLabelsByRef(res, types.ManagedObjectReference{Type: "ClusterComputeResource", Value: "domain-c1"})
 	require.NotNil(t, labels)
 
-	addUserMetadataLabel(labels, "vsphere_tag_env", "prod", 1)
+	addUserMetadataLabel(labels, "vsphere_tag_env", "prod")
 	require.Equal(t, "prod", res.Clusters.Get("domain-c1").Labels["vsphere_tag_env"])
 }
 

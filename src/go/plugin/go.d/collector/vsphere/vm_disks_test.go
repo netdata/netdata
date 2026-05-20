@@ -18,11 +18,7 @@ func TestCollector_Init_ReturnsFalseIfInvalidVMDiskConfig(t *testing.T) {
 	collr.Username = "user"
 	collr.Password = "pass"
 	collr.CollectVMDisks = true
-	collr.MaxVMDisks = -1
 
-	require.ErrorContains(t, collr.Init(context.Background()), "max_vm_disks must be greater than zero")
-
-	collr.MaxVMDisks = 1
 	collr.VMDisksInclude = []string{"["}
 	require.ErrorContains(t, collr.Init(context.Background()), "vm_disk_include has invalid pattern")
 
@@ -71,35 +67,29 @@ func TestCollector_VMDisksOptInEmitsCapacityChart(t *testing.T) {
 	require.Contains(t, createdDims[chartID], vmDiskCapacityDim)
 }
 
-func TestCollector_VMDisksSelectorAndCap(t *testing.T) {
+func TestCollector_VMDisksSelector(t *testing.T) {
 	tests := map[string]struct {
 		include []string
-		max     int
 		want    int
 	}{
 		"selector keeps matching disk labels": {
 			include: []string{"Hard*2"},
-			max:     10,
 			want:    1,
 		},
 		"selector keeps exact disk labels with spaces": {
 			include: []string{"Hard disk 1"},
-			max:     10,
 			want:    1,
 		},
 		"selector keeps matching disk keys": {
 			include: []string{"key:2001"},
-			max:     10,
 			want:    1,
 		},
-		"cap limits emitted disk series": {
+		"selector keeps all disk series": {
 			include: []string{"*"},
-			max:     1,
-			want:    1,
+			want:    2,
 		},
 		"selector can exclude all disks": {
 			include: []string{"NoSuchDisk"},
-			max:     10,
 			want:    0,
 		},
 	}
@@ -110,7 +100,6 @@ func TestCollector_VMDisksSelectorAndCap(t *testing.T) {
 			defer teardown()
 			collr.CollectVMDisks = true
 			collr.VMDisksInclude = tc.include
-			collr.MaxVMDisks = tc.max
 
 			require.NoError(t, collr.Init(context.Background()))
 			collr.scraper = mockScraper{collr.scraper}

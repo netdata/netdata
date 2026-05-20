@@ -64,8 +64,8 @@ func TestCollector_HostCPUInstancePerformanceOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[chartID], hostCPUInstanceUtilizationCoreDim)
 }
 
-func TestCollector_HostCPUInstancePerformanceSelectorAndCap(t *testing.T) {
-	tests := prefixedSelectorCapCases("cpu", "cpu", "1", "NoSuchCPU")
+func TestCollector_HostCPUInstancePerformanceSelector(t *testing.T) {
+	tests := prefixedSelectorCases("cpu", "cpu", "1", "NoSuchCPU")
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -73,7 +73,6 @@ func TestCollector_HostCPUInstancePerformanceSelectorAndCap(t *testing.T) {
 			defer teardown()
 			collr.CollectHostCPUInstancePerformance = true
 			collr.HostCPUInstancesInclude = tc.include
-			collr.MaxHostCPUInstances = tc.max
 
 			require.NoError(t, collr.Init(context.Background()))
 			host := firstSortedHost(t, collr)
@@ -99,11 +98,7 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostCPUInstanceConfig(t *testing.T)
 	collr.Username = "user"
 	collr.Password = "pass"
 	collr.CollectHostCPUInstancePerformance = true
-	collr.MaxHostCPUInstances = -1
 
-	require.ErrorContains(t, collr.Init(context.Background()), "max_host_cpu_instances must be greater than zero")
-
-	collr.MaxHostCPUInstances = 1
 	collr.HostCPUInstancesInclude = []string{"["}
 	require.ErrorContains(t, collr.Init(context.Background()), "host_cpu_instance_include has invalid pattern")
 }

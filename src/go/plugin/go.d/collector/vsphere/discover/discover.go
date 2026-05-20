@@ -71,7 +71,6 @@ type Discoverer struct {
 	CollectNetworkTopology               bool
 	TagCategoryMatcher                   matcher.Matcher
 	CustomAttributeMatcher               matcher.Matcher
-	MaxUserMetadataLabels                int
 	missingPerfCounterWarnings           map[string]bool
 }
 

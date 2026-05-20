@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	defaultMaxVMNICs   = 1024
 	vmNICLabel         = "interface"
 	vmNICInstanceLabel = "interface_instance"
 
@@ -111,7 +110,7 @@ func (c *Collector) collectVMNICPerformanceMetrics(vm *rs.VM, metrics []performa
 }
 
 func (c *Collector) writeVMNICPerformanceMetrics(meter metrix.SnapshotMeter) {
-	if !c.CollectVMNICPerformance || len(c.vmNICPerfSamples) == 0 || c.MaxVMNICs < 1 {
+	if !c.CollectVMNICPerformance || len(c.vmNICPerfSamples) == 0 {
 		return
 	}
 
@@ -120,15 +119,10 @@ func (c *Collector) writeVMNICPerformanceMetrics(meter metrix.SnapshotMeter) {
 		m = matcher.TRUE()
 	}
 
-	count := 0
 	for _, sample := range sortedVMNICPerfSamples(c.vmNICPerfSamples) {
 		if !vmNICInstanceMatches(m, sample.instance) {
 			continue
 		}
-		if count >= c.MaxVMNICs {
-			return
-		}
-		count++
 
 		labels := meter.LabelSet(c.vmNICPerformanceLabels(sample.vm, sample.instance)...)
 		for metricName, value := range sample.values {

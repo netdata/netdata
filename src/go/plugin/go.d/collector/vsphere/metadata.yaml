@@ -243,15 +243,6 @@ modules:
                   - "Owner"
                   - "Cost Center"
                 ```
-            - name: max_user_metadata_labels
-              description: Maximum vSphere tag and custom-attribute labels per resource.
-              default_value: 64
-              required: false
-              group: Labels
-              detailed_description: |
-                Applies only when `vsphere_tag_categories` or `custom_attributes`
-                is configured. This safety cap bounds the number of user-defined
-                metadata labels added to each discovered resource.
             - name: collect_vm_disks
               description: Collect VM virtual disk capacity.
               default_value: no
@@ -298,15 +289,6 @@ modules:
                 datastore_cluster_include:
                   - "/*"
                 ```
-            - name: max_datastore_clusters
-              description: Maximum datastore clusters to emit.
-              default_value: 256
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_datastore_clusters` is enabled. This
-                safety cap bounds the number of emitted datastore-cluster series
-                for a job.
             - name: vm_disk_include
               description: VM virtual disk selector.
               default_value: "*"
@@ -326,16 +308,6 @@ modules:
                   - "key:2000"
                   - "instance:scsi0:0"
                 ```
-            - name: max_vm_disks
-              description: Maximum VM virtual disks to emit.
-              default_value: 1024
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_vm_disks` or
-                `collect_vm_disk_performance` is enabled. This safety cap bounds
-                the number of emitted VM disk capacity or performance instances
-                for a job.
             - name: collect_vm_nic_performance
               description: Collect VM network interface performance.
               default_value: no
@@ -362,15 +334,6 @@ modules:
                   - "*"
                   - "interface:4000"
                 ```
-            - name: max_vm_nics
-              description: Maximum VM network interfaces to emit.
-              default_value: 1024
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_vm_nic_performance` is enabled. This
-                safety cap bounds the number of emitted VM network-interface
-                performance instances for a job.
             - name: collect_host_nic_performance
               description: Collect host physical network interface performance.
               default_value: no
@@ -396,15 +359,6 @@ modules:
                   - "vmnic*"
                   - "interface:vmnic0"
                 ```
-            - name: max_host_nics
-              description: Maximum host physical network interfaces to emit.
-              default_value: 1024
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_host_nic_performance` is enabled.
-                This safety cap bounds the number of emitted host
-                network-interface performance instances for a job.
             - name: collect_host_disk_performance
               description: Collect host disk device performance.
               default_value: no
@@ -430,15 +384,6 @@ modules:
                   - "naa.*"
                   - "instance:naa.123"
                 ```
-            - name: max_host_disks
-              description: Maximum host disk devices to emit.
-              default_value: 1024
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_host_disk_performance` is enabled.
-                This safety cap bounds the number of emitted host disk/LUN/device
-                performance instances for a job.
             - name: collect_host_storage_adapter_performance
               description: Collect host storage adapter performance.
               default_value: no
@@ -465,15 +410,6 @@ modules:
                   - "vmhba*"
                   - "adapter:vmhba0"
                 ```
-            - name: max_host_storage_adapters
-              description: Maximum host storage adapters to emit.
-              default_value: 1024
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_host_storage_adapter_performance` is
-                enabled. This safety cap bounds the number of emitted host
-                storage-adapter performance instances for a job.
             - name: collect_host_storage_path_performance
               description: Collect host storage path performance.
               default_value: no
@@ -500,15 +436,6 @@ modules:
                   - "vmhba*:C0:T0:L0"
                   - "path:vmhba0:C0:T0:L0"
                 ```
-            - name: max_host_storage_paths
-              description: Maximum host storage paths to emit.
-              default_value: 1024
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_host_storage_path_performance` is
-                enabled. This safety cap bounds the number of emitted host
-                storage-path performance instances for a job.
             - name: collect_host_cpu_instance_performance
               description: Collect host CPU instance performance.
               default_value: no
@@ -534,15 +461,6 @@ modules:
                   - "*"
                   - "cpu:0"
                 ```
-            - name: max_host_cpu_instances
-              description: Maximum host CPU instances to emit.
-              default_value: 1024
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_host_cpu_instance_performance` is
-                enabled. This safety cap bounds the number of emitted host CPU
-                instance performance series for a job.
             - name: collect_power_metrics
               description: Collect host and VM power metrics.
               default_value: no
@@ -563,10 +481,9 @@ modules:
                 vSAN Performance Service, and adds extra vCenter queries. When
                 enabled, it emits vSAN cluster capacity, vSAN cluster health, and
                 vSAN cluster, host, and VM performance metrics for discovered
-                vSAN-enabled clusters. Use the vSAN selectors and max caps below
-                to bound both emitted series and the concrete vSAN performance
-                entity refs queried. vSAN events are not collected by this
-                option.
+                vSAN-enabled clusters. Use the vSAN selectors below to choose the
+                concrete vSAN performance entity refs queried. vSAN events are
+                not collected by this option.
             - name: vsan_cluster_include
               description: vSAN cluster selector.
               default_value: "/*"
@@ -582,15 +499,6 @@ modules:
                   - "/*"
                   - "vsan_uuid:52b..."
                 ```
-            - name: max_vsan_clusters
-              description: Maximum vSAN clusters to query and emit.
-              default_value: 256
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_vsan` is enabled. This safety cap
-                bounds vSAN cluster capacity, health, and performance series for
-                a job.
             - name: vsan_host_include
               description: vSAN host selector.
               default_value: "/*"
@@ -607,14 +515,6 @@ modules:
                   - "/*"
                   - "vsan_node_uuid:52b..."
                 ```
-            - name: max_vsan_hosts
-              description: Maximum vSAN hosts to query and emit.
-              default_value: 1024
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_vsan` is enabled. This safety cap
-                bounds high-cardinality vSAN host performance series for a job.
             - name: vsan_vm_include
               description: vSAN VM selector.
               default_value: "/*"
@@ -631,14 +531,6 @@ modules:
                   - "/*"
                   - "instance_uuid:52b..."
                 ```
-            - name: max_vsan_vms
-              description: Maximum vSAN VMs to query and emit.
-              default_value: 1024
-              required: false
-              group: High Cardinality
-              detailed_description: |
-                Applies only when `collect_vsan` is enabled. This safety cap
-                bounds high-cardinality vSAN VM performance series for a job.
             - name: collect_network_topology
               description: Discover networks for the vSphere Topology function.
               default_value: no

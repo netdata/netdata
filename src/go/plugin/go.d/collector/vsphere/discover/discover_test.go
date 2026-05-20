@@ -87,7 +87,6 @@ func TestDiscoverer_DiscoverCustomAttributeErrorFailSoft(t *testing.T) {
 	defer teardown()
 	d.Client = customFieldsErrorClient{Client: d.Client}
 	d.CustomAttributeMatcher = matcher.TRUE()
-	d.MaxUserMetadataLabels = 64
 
 	res, err := d.Discover()
 
@@ -102,7 +101,6 @@ func TestDiscoverer_DiscoverTagErrorFailSoft(t *testing.T) {
 	defer teardown()
 	d.Client = tagsByRefErrorClient{Client: d.Client}
 	d.TagCategoryMatcher = matcher.TRUE()
-	d.MaxUserMetadataLabels = 64
 
 	res, err := d.Discover()
 

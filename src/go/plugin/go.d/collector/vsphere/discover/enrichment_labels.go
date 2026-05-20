@@ -19,7 +19,7 @@ const (
 )
 
 func (d Discoverer) collectEnrichmentLabels(res *rs.Resources) {
-	if res == nil || d.MaxUserMetadataLabels < 1 {
+	if res == nil {
 		return
 	}
 
@@ -53,28 +53,28 @@ func (d Discoverer) collectCustomAttributeLabels(res *rs.Resources) error {
 	}
 
 	for _, vm := range res.VMs {
-		addCustomAttributeLabels(&vm.Labels, vm.CustomValues, namesByKey, d.MaxUserMetadataLabels)
+		addCustomAttributeLabels(&vm.Labels, vm.CustomValues, namesByKey)
 	}
 	for _, host := range res.Hosts {
-		addCustomAttributeLabels(&host.Labels, host.CustomValues, namesByKey, d.MaxUserMetadataLabels)
+		addCustomAttributeLabels(&host.Labels, host.CustomValues, namesByKey)
 	}
 	for _, ds := range res.Datastores {
-		addCustomAttributeLabels(&ds.Labels, ds.CustomValues, namesByKey, d.MaxUserMetadataLabels)
+		addCustomAttributeLabels(&ds.Labels, ds.CustomValues, namesByKey)
 	}
 	for _, cluster := range res.Clusters {
-		addCustomAttributeLabels(&cluster.Labels, cluster.CustomValues, namesByKey, d.MaxUserMetadataLabels)
+		addCustomAttributeLabels(&cluster.Labels, cluster.CustomValues, namesByKey)
 	}
 	for _, rp := range res.ResourcePools {
-		addCustomAttributeLabels(&rp.Labels, rp.CustomValues, namesByKey, d.MaxUserMetadataLabels)
+		addCustomAttributeLabels(&rp.Labels, rp.CustomValues, namesByKey)
 	}
 	for _, sp := range res.StoragePods {
-		addCustomAttributeLabels(&sp.Labels, sp.CustomValues, namesByKey, d.MaxUserMetadataLabels)
+		addCustomAttributeLabels(&sp.Labels, sp.CustomValues, namesByKey)
 	}
 
 	return nil
 }
 
-func addCustomAttributeLabels(labels *map[string]string, values map[int32]string, namesByKey map[int32]string, maxLabels int) {
+func addCustomAttributeLabels(labels *map[string]string, values map[int32]string, namesByKey map[int32]string) {
 	if len(values) == 0 || len(namesByKey) == 0 {
 		return
 	}
@@ -95,7 +95,7 @@ func addCustomAttributeLabels(labels *map[string]string, values map[int32]string
 
 	for _, item := range items {
 		key := metadataLabelKey(customAttributeLabelPrefix, item.name)
-		addUserMetadataLabel(labels, key, item.value, maxLabels)
+		addUserMetadataLabel(labels, key, item.value)
 	}
 }
 
@@ -110,7 +110,7 @@ func (d Discoverer) collectTagLabels(res *rs.Resources) error {
 		return fmt.Errorf("collect vSphere tag attachments for %d inventory refs: %w", len(refs), err)
 	}
 	for ref, tagsByCategory := range tagsByRef {
-		addTagLabels(resourceLabelsByRef(res, ref), tagsByCategory, d.TagCategoryMatcher, d.MaxUserMetadataLabels)
+		addTagLabels(resourceLabelsByRef(res, ref), tagsByCategory, d.TagCategoryMatcher)
 	}
 
 	return nil
@@ -172,7 +172,7 @@ func resourceLabelsByRef(res *rs.Resources, ref types.ManagedObjectReference) *m
 	return nil
 }
 
-func addTagLabels(labels *map[string]string, tagsByCategory map[string][]string, categoryMatcher interface{ Match([]byte) bool }, maxLabels int) {
+func addTagLabels(labels *map[string]string, tagsByCategory map[string][]string, categoryMatcher interface{ Match([]byte) bool }) {
 	if labels == nil || len(tagsByCategory) == 0 || categoryMatcher == nil {
 		return
 	}
@@ -194,7 +194,7 @@ func addTagLabels(labels *map[string]string, tagsByCategory map[string][]string,
 		}
 		value := strings.Join(tags, "|")
 		key := metadataLabelKey(tagLabelPrefix, category)
-		addUserMetadataLabel(labels, key, value, maxLabels)
+		addUserMetadataLabel(labels, key, value)
 	}
 }
 
@@ -206,15 +206,12 @@ func metadataLabelKey(prefix, name string) string {
 	return prefix + suffix
 }
 
-func addUserMetadataLabel(labels *map[string]string, key, value string, maxLabels int) {
-	if key == "" || value == "" || maxLabels < 1 {
+func addUserMetadataLabel(labels *map[string]string, key, value string) {
+	if key == "" || value == "" {
 		return
 	}
 	if *labels == nil {
 		*labels = make(map[string]string)
-	}
-	if _, exists := (*labels)[key]; !exists && len(*labels) >= maxLabels {
-		return
 	}
 	(*labels)[key] = value
 }

@@ -87,8 +87,8 @@ func TestCollector_HostDiskPerformanceOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[chartID], hostDiskDeviceIOWriteDim)
 }
 
-func TestCollector_HostDiskPerformanceSelectorAndCap(t *testing.T) {
-	tests := instanceSelectorCapCases("disk", "naa.124", "NoSuchDisk")
+func TestCollector_HostDiskPerformanceSelector(t *testing.T) {
+	tests := instanceSelectorCases("disk", "naa.124", "NoSuchDisk")
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -96,7 +96,6 @@ func TestCollector_HostDiskPerformanceSelectorAndCap(t *testing.T) {
 			defer teardown()
 			collr.CollectHostDiskPerformance = true
 			collr.HostDisksInclude = tc.include
-			collr.MaxHostDisks = tc.max
 
 			require.NoError(t, collr.Init(context.Background()))
 			host := firstSortedHost(t, collr)
@@ -122,11 +121,7 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostDiskConfig(t *testing.T) {
 	collr.Username = "user"
 	collr.Password = "pass"
 	collr.CollectHostDiskPerformance = true
-	collr.MaxHostDisks = -1
 
-	require.ErrorContains(t, collr.Init(context.Background()), "max_host_disks must be greater than zero")
-
-	collr.MaxHostDisks = 1
 	collr.HostDisksInclude = []string{"["}
 	require.ErrorContains(t, collr.Init(context.Background()), "host_disk_include has invalid pattern")
 }

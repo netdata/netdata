@@ -109,7 +109,7 @@ func TestCollector_VSANSpaceUsageEdgeCases(t *testing.T) {
 	}
 }
 
-func TestCollector_CollectVSANUsesSelectorsAndCaps(t *testing.T) {
+func TestCollector_CollectVSANUsesSelectors(t *testing.T) {
 	collr := New()
 	collr.URL = "https://127.0.0.1"
 	collr.Username = "user"
@@ -118,9 +118,6 @@ func TestCollector_CollectVSANUsesSelectorsAndCaps(t *testing.T) {
 	collr.VSANClustersInclude = []string{"vsan_uuid:cluster-uuid-2"}
 	collr.VSANHostsInclude = []string{"vsan_node_uuid:host-uuid-2"}
 	collr.VSANVMsInclude = []string{"instance_uuid:vm-uuid-2"}
-	collr.MaxVSANClusters = 1
-	collr.MaxVSANHosts = 1
-	collr.MaxVSANVMs = 1
 	collr.resources = newVSANFilterTestResources()
 	scraper := &capturingVSANScraper{}
 	collr.scraper = scraper

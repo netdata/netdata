@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	defaultMaxHostStorageAdapters   = 1024
 	hostStorageAdapterLabel         = "adapter"
 	hostStorageAdapterInstanceLabel = "adapter_instance"
 
@@ -175,7 +174,7 @@ func (c *Collector) writeHostStorageAdapterPerformanceMetrics(meter metrix.Snaps
 }
 
 func (c *Collector) writeHostStorageAdapterInstancePerformanceMetrics(meter metrix.SnapshotMeter) {
-	if len(c.hostStorageAdapterPerfSamples) == 0 || c.MaxHostStorageAdapters < 1 {
+	if len(c.hostStorageAdapterPerfSamples) == 0 {
 		return
 	}
 
@@ -184,15 +183,10 @@ func (c *Collector) writeHostStorageAdapterInstancePerformanceMetrics(meter metr
 		m = matcher.TRUE()
 	}
 
-	count := 0
 	for _, sample := range sortedHostStorageAdapterPerfSamples(c.hostStorageAdapterPerfSamples) {
 		if !hostStorageAdapterInstanceMatches(m, sample.instance) {
 			continue
 		}
-		if count >= c.MaxHostStorageAdapters {
-			return
-		}
-		count++
 
 		labels := meter.LabelSet(c.hostStorageAdapterPerformanceLabels(sample.host, sample.instance)...)
 		for metricName, value := range sample.values {

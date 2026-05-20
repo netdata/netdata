@@ -12,10 +12,6 @@ import (
 )
 
 const (
-	defaultMaxVSANClusters = 256
-	defaultMaxVSANHosts    = 1024
-	defaultMaxVSANVMs      = 1024
-
 	vsanClusterSpaceUsageContext       = "vsphere.vsan_cluster_space_usage"
 	vsanClusterSpaceUtilizationContext = "vsphere.vsan_cluster_space_utilization"
 	vsanClusterHealthStatusContext     = "vsphere.vsan_cluster_health_status"
@@ -146,9 +142,6 @@ func (c *Collector) vsanResources() (rs.Clusters, rs.Hosts, rs.VMs) {
 
 	selectedClusters := make(map[string]bool)
 	for _, cluster := range sortedClusters(c.resources.Clusters) {
-		if len(clusters) >= c.MaxVSANClusters {
-			break
-		}
 		if !cluster.VSANEnabled || !vsanClusterMatches(clusterMatcher, cluster) {
 			continue
 		}
@@ -157,9 +150,6 @@ func (c *Collector) vsanResources() (rs.Clusters, rs.Hosts, rs.VMs) {
 	}
 
 	for _, host := range sortedHosts(c.resources.Hosts) {
-		if len(hosts) >= c.MaxVSANHosts {
-			break
-		}
 		if !selectedClusters[host.Hier.Cluster.ID] || host.VSANNodeUUID == "" || !vsanHostMatches(hostMatcher, host) {
 			continue
 		}
@@ -167,9 +157,6 @@ func (c *Collector) vsanResources() (rs.Clusters, rs.Hosts, rs.VMs) {
 	}
 
 	for _, vm := range sortedVMs(c.resources.VMs) {
-		if len(vms) >= c.MaxVSANVMs {
-			break
-		}
 		if !selectedClusters[vm.Hier.Cluster.ID] || vm.InstanceUUID == "" || !vsanVMMatches(vmMatcher, vm) {
 			continue
 		}

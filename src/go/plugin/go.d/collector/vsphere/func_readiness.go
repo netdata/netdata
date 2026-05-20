@@ -249,14 +249,14 @@ func (c *Collector) readinessRows() []readinessRow {
 		c.booleanReadinessRow("inventory_path_label", "labels", c.InventoryPathLabel, "inventory_path label collection is enabled", "inventory_path label collection is disabled"),
 		c.userMetadataReadinessRow(),
 		c.vmGuestLabelsReadinessRow(),
-		c.optionalMetricReadinessRow("datastore_clusters", "metrics", c.CollectDatastoreClusters, c.MaxDatastoreClusters, c.DatastoreClustersInclude),
-		c.optionalMetricReadinessRow("vm_disks", "metrics", c.CollectVMDisks || c.CollectVMDiskPerformance, c.MaxVMDisks, c.VMDisksInclude),
-		c.optionalMetricReadinessRow("vm_nics", "metrics", c.CollectVMNICPerformance, c.MaxVMNICs, c.VMNICsInclude),
-		c.optionalMetricReadinessRow("host_nics", "metrics", c.CollectHostNICPerformance, c.MaxHostNICs, c.HostNICsInclude),
-		c.optionalMetricReadinessRow("host_disks", "metrics", c.CollectHostDiskPerformance, c.MaxHostDisks, c.HostDisksInclude),
-		c.optionalMetricReadinessRow("host_storage_adapters", "metrics", c.CollectHostStorageAdapterPerformance, c.MaxHostStorageAdapters, c.HostStorageAdaptersInclude),
-		c.optionalMetricReadinessRow("host_storage_paths", "metrics", c.CollectHostStoragePathPerformance, c.MaxHostStoragePaths, c.HostStoragePathsInclude),
-		c.optionalMetricReadinessRow("host_cpu_instances", "metrics", c.CollectHostCPUInstancePerformance, c.MaxHostCPUInstances, c.HostCPUInstancesInclude),
+		c.optionalMetricReadinessRow("datastore_clusters", "metrics", c.CollectDatastoreClusters, c.DatastoreClustersInclude),
+		c.optionalMetricReadinessRow("vm_disks", "metrics", c.CollectVMDisks || c.CollectVMDiskPerformance, c.VMDisksInclude),
+		c.optionalMetricReadinessRow("vm_nics", "metrics", c.CollectVMNICPerformance, c.VMNICsInclude),
+		c.optionalMetricReadinessRow("host_nics", "metrics", c.CollectHostNICPerformance, c.HostNICsInclude),
+		c.optionalMetricReadinessRow("host_disks", "metrics", c.CollectHostDiskPerformance, c.HostDisksInclude),
+		c.optionalMetricReadinessRow("host_storage_adapters", "metrics", c.CollectHostStorageAdapterPerformance, c.HostStorageAdaptersInclude),
+		c.optionalMetricReadinessRow("host_storage_paths", "metrics", c.CollectHostStoragePathPerformance, c.HostStoragePathsInclude),
+		c.optionalMetricReadinessRow("host_cpu_instances", "metrics", c.CollectHostCPUInstancePerformance, c.HostCPUInstancesInclude),
 		c.booleanReadinessRow("power_metrics", "metrics", c.CollectPowerMetrics, "host and VM power metrics are enabled", "host and VM power metrics are disabled"),
 		c.booleanReadinessRow("network_topology", "topology", c.CollectNetworkTopology, "vSphere Network topology discovery is enabled", "vSphere Network topology discovery is disabled"),
 		c.vsanReadinessRow(),
@@ -279,7 +279,7 @@ func (c *Collector) booleanReadinessRow(check, scope string, enabled bool, enabl
 	return readinessRow{check: check, scope: scope, status: readinessStatusDisabled, details: disabledDetails}
 }
 
-func (c *Collector) optionalMetricReadinessRow(check, scope string, enabled bool, max int, includes []string) readinessRow {
+func (c *Collector) optionalMetricReadinessRow(check, scope string, enabled bool, includes []string) readinessRow {
 	if !enabled {
 		return readinessRow{
 			check:   check,
@@ -292,7 +292,7 @@ func (c *Collector) optionalMetricReadinessRow(check, scope string, enabled bool
 		check:   check,
 		scope:   scope,
 		status:  readinessStatusOK,
-		details: fmt.Sprintf("enabled with max=%d and include_patterns=%d", max, len(includes)),
+		details: fmt.Sprintf("enabled with include_patterns=%d", len(includes)),
 	}
 }
 
@@ -311,7 +311,7 @@ func (c *Collector) userMetadataReadinessRow() readinessRow {
 		check:   "user_metadata_labels",
 		scope:   "labels",
 		status:  readinessStatusOK,
-		details: fmt.Sprintf("enabled for %d tag category pattern(s), %d custom attribute pattern(s), cap=%d labels per resource", tags, attrs, c.MaxUserMetadataLabels),
+		details: fmt.Sprintf("enabled for %d tag category pattern(s), %d custom attribute pattern(s)", tags, attrs),
 	}
 }
 
@@ -364,7 +364,7 @@ func (c *Collector) vsanReadinessRow() readinessRow {
 			check:   "vsan",
 			scope:   "metrics",
 			status:  readinessStatusNotReady,
-			details: fmt.Sprintf("vSAN collection is enabled for %d cluster(s), %d host(s), and %d VM(s) after selectors/caps, but no vSAN scrape data is cached yet", len(clusters), len(hosts), len(vms)),
+			details: fmt.Sprintf("vSAN collection is enabled for %d cluster(s), %d host(s), and %d VM(s) after selectors, but no vSAN scrape data is cached yet", len(clusters), len(hosts), len(vms)),
 		}
 	}
 

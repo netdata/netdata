@@ -81,8 +81,8 @@ func TestCollector_HostStorageAdapterPerformanceOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[aggregateChartID], hostStorageAdapterMaxLatencyDim)
 }
 
-func TestCollector_HostStorageAdapterPerformanceSelectorAndCap(t *testing.T) {
-	tests := prefixedSelectorCapCases("adapter", "adapter", "vmhba1", "NoSuchAdapter")
+func TestCollector_HostStorageAdapterPerformanceSelector(t *testing.T) {
+	tests := prefixedSelectorCases("adapter", "adapter", "vmhba1", "NoSuchAdapter")
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -90,7 +90,6 @@ func TestCollector_HostStorageAdapterPerformanceSelectorAndCap(t *testing.T) {
 			defer teardown()
 			collr.CollectHostStorageAdapterPerformance = true
 			collr.HostStorageAdaptersInclude = tc.include
-			collr.MaxHostStorageAdapters = tc.max
 
 			require.NoError(t, collr.Init(context.Background()))
 			host := firstSortedHost(t, collr)
@@ -116,11 +115,7 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostStorageAdapterConfig(t *testing
 	collr.Username = "user"
 	collr.Password = "pass"
 	collr.CollectHostStorageAdapterPerformance = true
-	collr.MaxHostStorageAdapters = -1
 
-	require.ErrorContains(t, collr.Init(context.Background()), "max_host_storage_adapters must be greater than zero")
-
-	collr.MaxHostStorageAdapters = 1
 	collr.HostStorageAdaptersInclude = []string{"["}
 	require.ErrorContains(t, collr.Init(context.Background()), "host_storage_adapter_include has invalid pattern")
 }

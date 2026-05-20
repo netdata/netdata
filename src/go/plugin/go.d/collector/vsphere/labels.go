@@ -15,8 +15,6 @@ const (
 	vmGuestLabelHostName = "guest_hostname"
 	vmGuestLabelIP       = "guest_ip"
 	vmGuestLabelOS       = "guest_os"
-
-	defaultMaxUserMetadataLabels = 64
 )
 
 var validVMGuestLabels = []string{

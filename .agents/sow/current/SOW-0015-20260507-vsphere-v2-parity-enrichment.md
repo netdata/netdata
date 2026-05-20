@@ -1006,13 +1006,24 @@ Implementation started after the decisions, compatibility manifest, and normaliz
 
    User decision 2026-05-08: Do feasibility now before deciding whether every remaining opt-in metric group can be implemented in this PR. Feasibility must cover official documentation, SDK support, local mirrored/open-source implementations, fixtures or simulator paths, testability, and operational risk.
 
-14. Cap and selector policy
+14. Selector policy
 
    User decision 2026-05-08: Every opt-in high-cardinality group needs both a selector or allowlist and a maximum cap.
 
+   Superseding user decision 2026-05-20: remove resource-count `max_*`
+   caps from optional vSphere resource surfaces. Keep explicit boolean
+   enable/disable keys and include selectors. This supersedes optional
+   resource-count limits for VM disks, host NICs, vSAN VMs, and similar
+   resource-instance surfaces.
+
+   Follow-up superseding user decision 2026-05-20: remove the
+   user-metadata-label maximum option too. Current vSphere collector config
+   policy is explicit boolean enable/disable plus selectors/allowlists only,
+   with no `max_*` options.
+
 15. Sensitive enrichment labels
 
-   User concern 2026-05-08: Netdata is a monitoring system; users need labels to filter and group by vSphere metadata. The implementation adds opt-in inventory path, VM guest, vSphere tag, and custom-attribute labels with selectors/caps. More sensitive device identity labels such as MACs, IQNs, WWNs, and datastore paths remain excluded from this PR pending a separate allowlist/cap product decision.
+   User concern 2026-05-08: Netdata is a monitoring system; users need labels to filter and group by vSphere metadata. The implementation adds opt-in inventory path, VM guest, vSphere tag, and custom-attribute labels with explicit allowlists. More sensitive device identity labels such as MACs, IQNs, WWNs, and datastore paths remain excluded from this PR pending a separate allowlist product decision.
 
 16. vCenter/ESXi events
 
@@ -1060,13 +1071,13 @@ Feasibility table:
 
 | Rows | Surface | Feasibility | Evidence | Implementation rule |
 |---|---|---|---|---|
-| P13 | Datastore clusters / storage pods | Feasible | Broadcom `StoragePod` docs; `elastic/beats @ 7bbe8ee...` datastorecluster module | Opt-in `collect_datastore_clusters`, selector, max cap. |
-| P14-P16 | VM disks and vNICs | Feasible | Broadcom `VirtualDisk` and `VirtualEthernetCard`; Datadog/Telegraf/OTel/Zabbix/New Relic implementations | Opt-in groups, per-child selector, max cap, no raw datastore path/MAC by default. |
-| P17-P21 | Host pNICs, disks/LUNs, HBAs, storage paths, CPU cores | Feasible | Broadcom counter pages plus `HostScsiDisk`, `HostHostBusAdapter`, `HostMultipathInfo`; Datadog/Telegraf/OTel/New Relic implementations | Opt-in groups, selector, max cap. Storage paths are the highest-cardinality host detail. |
+| P13 | Datastore clusters / storage pods | Feasible | Broadcom `StoragePod` docs; `elastic/beats @ 7bbe8ee...` datastorecluster module | Opt-in `collect_datastore_clusters` plus selector. |
+| P14-P16 | VM disks and vNICs | Feasible | Broadcom `VirtualDisk` and `VirtualEthernetCard`; Datadog/Telegraf/OTel/Zabbix/New Relic implementations | Opt-in groups plus per-child selectors, no raw datastore path/MAC by default. |
+| P17-P21 | Host pNICs, disks/LUNs, HBAs, storage paths, CPU cores | Feasible | Broadcom counter pages plus `HostScsiDisk`, `HostHostBusAdapter`, `HostMultipathInfo`; Datadog/Telegraf/OTel/New Relic implementations | Opt-in groups plus selectors. Storage paths are the highest-cardinality host detail. |
 | P22 | Host/VM power and energy counters | Feasible | Broadcom power counters; Datadog/Telegraf/New Relic collect power counters | Opt-in until version/API availability is proven in tests. |
 | P26 | vSAN cluster/host capacity/performance/health | Feasible, high risk | Broadcom vSAN Management API; Datadog, Telegraf, OTel vSAN metrics and OTel recorded fixtures | Opt-in, cluster selector, vSAN API capability check, performance-service check, isolated commit. vSAN events excluded. |
-| P28 | Tags and custom attributes as labels | Feasible | Broadcom Tag Association API and `CustomFieldsManager`; Datadog, Telegraf, Elastic, New Relic | Opt-in only. Category/attribute allowlist, key prefix/sanitization, per-object label cap. |
-| P29 | Inventory paths, guest hostname/IP, MAC/IQN/WWN identity | Feasible in subsets | Datadog filters, Telegraf IP option, OTel inventory-path attributes, Broadcom guest/device/storage objects | Opt-in label groups. Sensitive values default off; multi-value values capped. |
+| P28 | Tags and custom attributes as labels | Feasible | Broadcom Tag Association API and `CustomFieldsManager`; Datadog, Telegraf, Elastic, New Relic | Opt-in only. Category/attribute allowlist and key prefix/sanitization. |
+| P29 | Inventory paths, guest hostname/IP, MAC/IQN/WWN identity | Feasible in subsets | Datadog filters, Telegraf IP option, OTel inventory-path attributes, Broadcom guest/device/storage objects | Opt-in label groups. Sensitive values default off; multi-value device identity values remain excluded from this PR. |
 | P30 | Topology edges | Implemented, non-metric | LogicMonitor topology sources, Elastic network module, New Relic object fixtures, OTel resource model, Netdata Function topology schema, SNMP topology Function pattern | Cached public `topology:vsphere` Function alias emits inventory actors/links, not metric labels, and requires selecting a vSphere job. |
 | P31 | Network/DVPG status | Implemented opt-in, non-metric | Broadcom `NetworkSummary.accessible`, Broadcom `DistributedVirtualPortgroup`, New Relic network collector, Elastic network module | `collect_network_topology` defaults off and discovers Network/DVPG objects only for cached topology actors/status/links. |
 | P32 | Troubleshooter/readiness checks | Implemented, non-metric | LogicMonitor troubleshooter, Datadog connection service checks, Netdata Function table schema | Cached `vsphere:readiness` Function reports local readiness/config/discovery/optional-surface/vSAN state without exposing URL/credentials or issuing extra vCenter API calls, and requires selecting a vSphere job. |
@@ -1082,7 +1093,7 @@ Testability:
 
 Implementation decisions derived from feasibility:
 
-- Use explicit boolean `collect_*` groups for each non-default surface, plus include selectors and max caps for every child-instance group.
+- Use explicit boolean `collect_*` groups for each non-default surface, plus include selectors for every child-instance group.
 - Preserve default-safe behavior: new child-instance metrics, sensitive labels, vSAN, and network topology discovery default off.
 - Implement labels because users need filtering/grouping, but only through opt-in allowlists for user-defined or sensitive metadata.
 - Events are excluded from this PR; no metric or Function substitute should be added for events.
@@ -1096,7 +1107,7 @@ Implementation decisions derived from feasibility:
    - Scope: one SOW/one PR, no deleted follow-up SOW references, rows P13-P34 classified against current decisions.
    - Risk: low.
 3. Implement opt-in labels and high-cardinality metric groups.
-   - Scope: P13-P22, P26, P28-P29 with granular config, selectors, caps, docs, tests.
+   - Scope: P13-P22, P26, P28-P29 with granular config, selectors/allowlists, docs, and tests.
    - Risk: high; vCenter load, cardinality, sensitive metadata, and vSAN capability handling.
 4. Remove collector-generated ESXi/VM vnodes from this PR.
    - Scope: P33-P34 with config, schema, docs, tests, and HostScope plumbing removed.
@@ -1221,7 +1232,7 @@ Implementation decisions derived from feasibility:
   - `vsphere.inventory_objects` with dimensions `datacenters`, `folders`, `clusters`, `hosts`, `vms`, `datastores`, and `resource_pools`.
 - Inventory counts reflect the resources discovered after include filters are applied. They do not create a mandatory vCenter vnode; V2 uses only the static `id=inventory` instance label.
 - Updated `metadata.yaml`, generated README/integration docs, generated `charts.yaml`, the compatibility manifest fixture, and the parity/compatibility specs for the inventory-count slice.
-- Recorded user decisions to keep all remaining non-event parity work in this SOW/PR, use granular opt-in groups, require selectors and caps for high-cardinality groups, implement labels through opt-in allowlists, exclude events from this PR, implement topology/troubleshooting through topology output and/or Functions, and hard-remove optional ESXi/VM vnodes before merge.
+- Recorded user decisions to keep all remaining non-event parity work in this SOW/PR, use granular opt-in groups, use selectors for high-cardinality groups, implement labels through opt-in allowlists, exclude events from this PR, implement topology/troubleshooting through topology output and/or Functions, and hard-remove optional ESXi/VM vnodes before merge. The initial 2026-05-08 resource-cap policy was superseded on 2026-05-20 by the selector-only resource policy.
 - Deleted the four pending vSphere follow-up SOW files that were superseded by the one-SOW/one-PR decision.
 - Completed feasibility for remaining parity rows P13-P34. All non-event rows are technically feasible with opt-in controls and tests/fixtures; P27 events are feasible separately but out of this PR by user decision; P26 vSAN is feasible but highest risk.
 - Updated `.agents/sow/specs/vsphere-parity-matrix.md` to remove stale follow-up-SOW language, update mirrored repository commit evidence, classify topology/function rows as non-metric surfaces, classify events as out-of-scope for this PR, and classify VM/ESXi vnodes as out of scope for this PR.
@@ -1237,11 +1248,10 @@ Implementation decisions derived from feasibility:
 - Added optional VM virtual disk capacity collection:
   - `collect_vm_disks` defaults to `false`;
   - `vm_disk_include` defaults to `*` and matches disk display label, numeric disk key, or `key:<disk_key>`;
-  - `max_vm_disks` defaults to `1024`;
   - context `vsphere.vm_disk_capacity` emits one `capacity` dimension in bytes with labels `id`, `datacenter`, `cluster`, `host`, `vm`, `disk`, and `disk_key`;
 - Added optional VM virtual disk performance collection:
   - `collect_vm_disk_performance` defaults to `false`;
-  - the group reuses `vm_disk_include` and `max_vm_disks`;
+  - the group reuses `vm_disk_include`;
   - vSphere `virtualDisk.*` counters are requested with wildcard instance `*` only when the option is enabled;
   - returned performance instances such as `scsi0:0` are selected by raw instance or `instance:<disk_instance>`;
   - contexts `vsphere.vm_disk_device_io`, `vsphere.vm_disk_device_iops`, `vsphere.vm_disk_device_latency`, and `vsphere.vm_disk_device_outstanding_io` emit read/write throughput, IOPS, latency, and outstanding I/O;
@@ -1249,7 +1259,6 @@ Implementation decisions derived from feasibility:
 - Added optional VM network-interface performance collection:
   - `collect_vm_nic_performance` defaults to `false`;
   - `vm_nic_include` defaults to `*` and matches the raw vSphere performance instance or `interface:<interface_instance>`;
-  - `max_vm_nics` defaults to `1024`;
   - selected VM `net.*` counters are requested with wildcard instance `*` only when the option is enabled;
   - existing aggregate VM network metrics remain default-on and are not suppressed by the opt-in per-interface surface;
   - contexts `vsphere.vm_net_interface_traffic`, `vsphere.vm_net_interface_packets`, `vsphere.vm_net_interface_drops`, `vsphere.vm_net_interface_broadcast_packets`, and `vsphere.vm_net_interface_multicast_packets` emit per-interface throughput, packets, drops, broadcast packets, and multicast packets;
@@ -1258,7 +1267,6 @@ Implementation decisions derived from feasibility:
 - Added optional host physical network-interface performance collection:
   - `collect_host_nic_performance` defaults to `false`;
   - `host_nic_include` defaults to `*` and matches the raw vSphere performance instance or `interface:<interface_instance>`;
-  - `max_host_nics` defaults to `1024`;
   - selected host `net.*` counters are requested with wildcard instance `*` only when the option is enabled;
   - existing aggregate host network metrics remain default-on and are not suppressed by the opt-in per-interface surface;
   - contexts `vsphere.host_net_interface_traffic`, `vsphere.host_net_interface_packets`, `vsphere.host_net_interface_drops`, `vsphere.host_net_interface_errors`, `vsphere.host_net_interface_broadcast_packets`, `vsphere.host_net_interface_multicast_packets`, `vsphere.host_net_interface_unknown_protocol_frames`, and `vsphere.host_net_interface_usage` emit per-interface throughput, packets, drops, errors, broadcast packets, multicast packets, unknown protocol frames, and combined usage;
@@ -1266,12 +1274,10 @@ Implementation decisions derived from feasibility:
 - Added optional datastore cluster / StoragePod collection:
   - `collect_datastore_clusters` defaults to `false`;
   - `datastore_cluster_include` defaults to `/*` and matches `/Datacenter/DatastoreCluster`, datastore-cluster name, or managed object ID;
-  - `max_datastore_clusters` defaults to `256`;
   - contexts `vsphere.datastore_cluster_space_utilization`, `vsphere.datastore_cluster_space_usage`, and `vsphere.datastore_cluster_storage_drs_status` emit capacity/free/used/utilization and Storage DRS enabled/disabled state.
 - Added optional host disk/LUN/device performance collection:
   - `collect_host_disk_performance` defaults to `false`;
   - `host_disk_include` defaults to `*` and matches the raw vSphere performance instance or `instance:<disk_instance>`;
-  - `max_host_disks` defaults to `1024`;
   - selected host `disk.*` counters are requested with wildcard instance `*` only when the option is enabled;
   - existing aggregate host disk metrics remain default-on and are not suppressed by the opt-in per-device surface;
   - contexts `vsphere.host_disk_device_io`, `vsphere.host_disk_device_iops`, `vsphere.host_disk_device_requests`, `vsphere.host_disk_device_latency`, `vsphere.host_disk_device_latency_breakdown`, `vsphere.host_disk_device_read_latency_breakdown`, `vsphere.host_disk_device_write_latency_breakdown`, `vsphere.host_disk_device_commands`, `vsphere.host_disk_device_command_events`, `vsphere.host_disk_device_queue_depth`, `vsphere.host_disk_device_scsi_reservation_conflicts`, and `vsphere.host_disk_device_scsi_reservation_conflicts_percentage` emit per-device throughput, IOPS, requests, latency, latency breakdowns, commands, command events, queue depth, and SCSI reservation conflicts;
@@ -1279,7 +1285,6 @@ Implementation decisions derived from feasibility:
 - Added optional host storage-adapter performance collection:
   - `collect_host_storage_adapter_performance` defaults to `false`;
   - `host_storage_adapter_include` defaults to `*` and matches the raw vSphere performance instance, `adapter:<adapter_instance>`, or `instance:<adapter_instance>`;
-  - `max_host_storage_adapters` defaults to `1024`;
   - selected host `storageAdapter.*` counters are requested with wildcard instance `*` only when the option is enabled;
   - aggregate-only `storageAdapter.maxTotalLatency.latest` is requested with an empty instance and emitted as a host-level storage-adapter aggregate metric;
   - contexts `vsphere.host_storage_adapter_io`, `vsphere.host_storage_adapter_commands`, `vsphere.host_storage_adapter_latency`, `vsphere.host_storage_adapter_queue`, `vsphere.host_storage_adapter_outstanding_io_percentage`, `vsphere.host_storage_adapter_throughput`, `vsphere.host_storage_adapter_throughput_contention`, and `vsphere.host_storage_adapter_max_latency` emit per-adapter throughput, commands, latency, queue, outstanding percentage, throughput usage/contention, and aggregate maximum latency;
@@ -1288,7 +1293,6 @@ Implementation decisions derived from feasibility:
 - Added optional host storage-path performance collection:
   - `collect_host_storage_path_performance` defaults to `false`;
   - `host_storage_path_include` defaults to `*` and matches the raw vSphere performance instance, `path:<path_instance>`, or `instance:<path_instance>`;
-  - `max_host_storage_paths` defaults to `1024`;
   - selected host `storagePath.*` counters are requested with wildcard instance `*` only when the option is enabled;
   - aggregate-only `storagePath.maxTotalLatency.latest` is requested with an empty instance and emitted as a host-level storage-path aggregate metric;
   - contexts `vsphere.host_storage_path_io`, `vsphere.host_storage_path_commands`, `vsphere.host_storage_path_latency`, `vsphere.host_storage_path_command_events`, `vsphere.host_storage_path_throughput`, `vsphere.host_storage_path_throughput_contention`, and `vsphere.host_storage_path_max_latency` emit per-path throughput, commands, latency, command events, throughput usage/contention, and aggregate maximum latency;
@@ -1298,14 +1302,13 @@ Implementation decisions derived from feasibility:
 - Added optional host CPU-instance performance collection:
   - `collect_host_cpu_instance_performance` defaults to `false`;
   - `host_cpu_instance_include` defaults to `*` and matches the raw vSphere performance instance, `cpu:<cpu_instance>`, or `instance:<cpu_instance>`;
-  - `max_host_cpu_instances` defaults to `1024`;
   - selected host `cpu.*` counters are requested with wildcard instance `*` only when the option is enabled;
   - contexts `vsphere.host_cpu_instance_utilization` and `vsphere.host_cpu_instance_time` emit per-instance usage, utilization, core utilization, used time, and idle time;
   - labels are `id`, `datacenter`, `cluster`, `host`, `cpu`, and `cpu_instance`, plus opt-in enrichment labels;
 - Added optional aggregate host/VM power metric collection:
   - `collect_power_metrics` defaults to `false`;
   - host and VM power counters are requested only when the option is enabled;
-  - this is not a per-child high-cardinality group, so it has no selector or max cap beyond the existing host/VM include selectors;
+  - this is not a per-child high-cardinality group, so it uses the existing host/VM include selectors instead of a child selector;
   - host contexts `vsphere.host_power_usage`, `vsphere.host_power_capacity_usage`, `vsphere.host_power_capacity_utilization`, and `vsphere.host_energy_usage` emit current power, power cap, capacity used/usable/idle/system/VM breakdown, capacity utilization, and energy;
   - VM contexts `vsphere.vm_power_usage` and `vsphere.vm_energy_usage` emit current power and energy;
   - host labels are `id`, `datacenter`, `cluster`, and `host`, plus opt-in enrichment labels;
@@ -1314,7 +1317,6 @@ Implementation decisions derived from feasibility:
 - Added opt-in vSphere user metadata labels:
   - `vsphere_tag_categories` defaults to an empty allowlist and matches vSphere tag category names with one glob pattern per YAML list item;
   - `custom_attributes` defaults to an empty allowlist and matches vSphere custom attribute names with one glob pattern per YAML list item;
-  - `max_user_metadata_labels` defaults to `64` and caps vSphere tag/custom-attribute labels per discovered resource;
   - tag labels use `vsphere_tag_<sanitized_category>` keys and sort/join multiple tags in one category with the pipe character;
   - custom attribute labels use `vsphere_custom_attribute_<sanitized_name>` keys;
   - discovery reads SOAP `customValue` only when custom attributes are configured, and reads REST/vAPI tag associations only when tag categories are configured;
@@ -1342,7 +1344,7 @@ Implementation decisions derived from feasibility:
   - vSAN API calls run only for clusters whose vSAN config is enabled;
   - vSAN space usage and health use vSAN Management API managed objects;
   - vSAN performance uses the OTel/Datadog common entity families, but queries concrete discovered refs (`cluster-domclient:<uuid>`, `host-domclient:<uuid>`, and `virtual-machine:<uuid>`) instead of wildcard refs;
-  - dedicated `vsan_cluster_include`, `vsan_host_include`, and `vsan_vm_include` selectors plus `max_vsan_clusters`, `max_vsan_hosts`, and `max_vsan_vms` caps bound both emitted series and vSAN API query scope;
+  - dedicated `vsan_cluster_include`, `vsan_host_include`, and `vsan_vm_include` selectors bound both emitted series and vSAN API query scope;
   - contexts `vsphere.vsan_cluster_space_usage`, `vsphere.vsan_cluster_space_utilization`, `vsphere.vsan_cluster_health_status`, `vsphere.vsan_cluster_operations`, `vsphere.vsan_cluster_throughput`, `vsphere.vsan_cluster_latency`, `vsphere.vsan_cluster_congestions`, `vsphere.vsan_host_operations`, `vsphere.vsan_host_throughput`, `vsphere.vsan_host_latency`, `vsphere.vsan_host_congestions`, `vsphere.vsan_host_cache_hit_rate`, `vsphere.vsan_vm_operations`, `vsphere.vsan_vm_throughput`, and `vsphere.vsan_vm_latency` are emitted only when vSAN returns matching data;
   - cluster, host, and VM vSAN metrics remain default/job scoped;
   - vSAN API/performance failures log one warning per failure class and otherwise emit no vSAN series for that query.
@@ -1350,7 +1352,7 @@ Implementation decisions derived from feasibility:
   - `open-telemetry/opentelemetry-collector-contrib @ 34ed18e037dc63e41c4b4a8356d2a13d55c768f4`, `receiver/vcenterreceiver/client.go:377`, `receiver/vcenterreceiver/client.go:472`, `receiver/vcenterreceiver/metrics.go:575`, `receiver/vcenterreceiver/internal/mockserver/responses/cluster-vsan.xml:6`.
   - `influxdata/telegraf @ 5a1147f1bb725ff8fd483ea55045506aa70db191`, `plugins/inputs/vsphere/vsan.go:116`, `plugins/inputs/vsphere/vsan.go:221`, `plugins/inputs/vsphere/vsan.go:224`, `plugins/inputs/vsphere/vsan.go:248`.
   - `DataDog/integrations-core @ 1befb9012c44152b0aedfb17142041bcc9c1dc61`, `vsphere/datadog_checks/vsphere/config.py:100`, `vsphere/datadog_checks/vsphere/vsphere.py:600`, `vsphere/datadog_checks/vsphere/api.py:442`, `vsphere/datadog_checks/vsphere/metrics.py:491`.
-- Updated `config_schema.json`, stock `go.d/vsphere.conf`, `metadata.yaml`, generated integration docs, config serialization fixtures, generated `charts.yaml`, and the parity/compatibility specs for opt-in vSAN metrics and dedicated vSAN selectors/caps.
+- Updated `config_schema.json`, stock `go.d/vsphere.conf`, `metadata.yaml`, generated integration docs, config serialization fixtures, generated `charts.yaml`, and the parity/compatibility specs for opt-in vSAN metrics and dedicated vSAN selectors.
 - Residual P26 gap recorded: vSAN events are out of this PR by user decision, and deeper vSAN disk-group, disk, component, CMMDS, and all Telegraf entity-type metrics are not emitted by `collect_vsan` in this slice because they need an explicit Netdata NIDL/context mapping and bounded config policy before implementation.
 - Added read-only vSphere Functions:
   - `vsphere:readiness` reports cached target/credential presence, initialized client/discovery/performance-counter state, inventory counts, optional metric/label gates, network topology gate, and cached vSAN counts for the selected vSphere job;
@@ -1372,7 +1374,7 @@ Implementation decisions derived from feasibility:
   - optional datastore-cluster discovery now fails soft with an operator warning instead of aborting the whole collection when StoragePod permissions/API calls fail;
   - optional-surface selectors and vSphere tag/custom-attribute label allowlists now reject empty negative patterns and pure-negative lists during `Init()`;
   - `metadata.yaml` now declares the public topology Function ID as `topology:vsphere`, matching the registered Function alias;
-  - stock config, DYNCFG schema, metadata, and generated docs now explain that `collect_vsan` queries concrete discovered vSAN entity refs bounded by dedicated vSAN selectors and caps;
+  - stock config, DYNCFG schema, metadata, and generated docs now explain that `collect_vsan` queries concrete discovered vSAN entity refs bounded by dedicated vSAN selectors;
   - vSAN performance scraping now queries concrete discovered cluster/host/VM entity refs instead of wildcard refs.
 - Round 3 reviewer hardening fixed the remaining actionable production-readiness risks:
   - `Init()` is now re-entrant for DynCfg/reload-style paths: it stops the previous discovery task, clears cached resources, chart runtime maps, matchers, samples, and Function-visible runtime state, then rebuilds the client/discoverer/scraper from the current config;
@@ -1389,10 +1391,10 @@ Implementation decisions derived from feasibility:
   - dead datastore-cluster discovery state was removed, topology link preallocation now accounts for network host/VM links, and malformed vSAN performance entity refs are skipped instead of dropping the whole batch.
 - Round 5 reviewer hardening fixed additional verified production-readiness risks:
   - vSphere client cleanup now logs out the REST/vAPI tag session, clears cached REST/tag/vSAN clients, and logs out the SOAP session if container-view creation fails after login;
-  - `collect_vsan` now has dedicated vSAN selectors and max caps for clusters, hosts, and VMs, and tests verify those controls bound the resources passed to the vSAN scraper;
+  - `collect_vsan` now has dedicated vSAN selectors for clusters, hosts, and VMs, and tests verify those controls bound the resources passed to the vSAN scraper;
   - `metadata.yaml` now uses the actual health template name `vsphere_vm_mem_utilization`;
   - missing vCenter performance counters now produce one operator warning per counter name instead of silently reducing the metric list;
-  - stock config, DYNCFG schema, metadata, generated integration docs, and config serialization fixtures were updated for the vSAN selector/cap options.
+  - stock config, DYNCFG schema, metadata, generated integration docs, and config serialization fixtures were updated for the vSAN selector options.
 - Round 6 reviewer hardening fixed additional verified production-readiness risks:
   - vCenter 7.0/8.0/9.0 performance query batching now uses the intended 256-query cap instead of the legacy 64-query cap reserved for pre-6.5 endpoints;
   - host and VM performance scrape empty-result cycles now warn and continue with property/status, datastore, cluster, resource-pool, and vSAN collection instead of aborting the full cycle after property metrics were already collected;
@@ -1595,10 +1597,10 @@ Real-use evidence:
 
 Reviewer findings:
 
-- External review rounds were requested and run read-only against this SOW and the branch diff. Earlier rounds returned mixed `NEEDS CHANGES` / `PRODUCTION READY` votes. The material findings handled in this SOW are datastore-cluster fail-soft behavior, pure-negative selector validation, topology Function metadata ID drift, stale `AGENTS.md` artifact notes, vSAN API-scope controls, re-entrant `Init()` runtime reset, optional network topology fail-soft behavior, enrichment API fail-soft test coverage, partial-init Function test coverage, vSphere client cleanup, vnode GUID URL fallback removal, datastore-cluster enrichment label emission, malformed parent/depth/cycle guards, NIC `instance:` selector aliases, `autodetection_retry` docs/default alignment, REST/vAPI session cleanup, partial-login cleanup, dedicated vSAN selectors/caps, metadata health-alert name alignment, missing-performance-counter warnings, vCenter 7+/8+ performance query batching, fail-soft empty host/VM performance cycles, DynCfg selector required-list cleanup, and lazy vAPI/vSAN client hardening. Round 6 returned six clean approvals plus one `NEEDS CHANGES`; the remaining actionable Round 6 findings were fixed, and the storage-adapter counter spelling finding was rejected with VMware API evidence. Round 7 returned production-ready votes from Codex, Claude, Qwen, MiMo, Kimi, and MiniMax. GLM's single `NEEDS CHANGES` finding was rejected with govmomi type evidence because `mo.ResourcePool.Runtime` is a value struct, not a pointer; Round 7 cleanup added a proof test/comment and handled low-risk cleanup notes. Round 8 returned production-ready votes from Codex, Claude, GLM, Kimi, MiMo, and MiniMax; the first Qwen Round 8 process timed out with no output, and the same-scope Qwen rerun returned `PRODUCTION READY`. The SOW and implementation are considered production-ready together, with residual non-blocking risks limited to no live production vCenter/vSAN validation, accepted chart-ID continuity loss, vCenter/ESXi events excluded by user decision, deeper vSAN internals excluded pending product/NIDL mapping, sensitive device identity labels excluded pending allowlist/cap policy, and readiness remaining cached/local rather than live permission probing.
+- External review rounds were requested and run read-only against this SOW and the branch diff. Earlier rounds returned mixed `NEEDS CHANGES` / `PRODUCTION READY` votes. The material findings handled in this SOW are datastore-cluster fail-soft behavior, pure-negative selector validation, topology Function metadata ID drift, stale `AGENTS.md` artifact notes, vSAN API-scope controls, re-entrant `Init()` runtime reset, optional network topology fail-soft behavior, enrichment API fail-soft test coverage, partial-init Function test coverage, vSphere client cleanup, vnode GUID URL fallback removal, datastore-cluster enrichment label emission, malformed parent/depth/cycle guards, NIC `instance:` selector aliases, `autodetection_retry` docs/default alignment, REST/vAPI session cleanup, partial-login cleanup, dedicated vSAN selectors, metadata health-alert name alignment, missing-performance-counter warnings, vCenter 7+/8+ performance query batching, fail-soft empty host/VM performance cycles, DynCfg selector required-list cleanup, and lazy vAPI/vSAN client hardening. Round 6 returned six clean approvals plus one `NEEDS CHANGES`; the remaining actionable Round 6 findings were fixed, and the storage-adapter counter spelling finding was rejected with VMware API evidence. Round 7 returned production-ready votes from Codex, Claude, Qwen, MiMo, Kimi, and MiniMax. GLM's single `NEEDS CHANGES` finding was rejected with govmomi type evidence because `mo.ResourcePool.Runtime` is a value struct, not a pointer; Round 7 cleanup added a proof test/comment and handled low-risk cleanup notes. Round 8 returned production-ready votes from Codex, Claude, GLM, Kimi, MiMo, and MiniMax; the first Qwen Round 8 process timed out with no output, and the same-scope Qwen rerun returned `PRODUCTION READY`. The SOW and implementation are considered production-ready together, with residual non-blocking risks limited to no live production vCenter/vSAN validation, accepted chart-ID continuity loss, vCenter/ESXi events excluded by user decision, deeper vSAN internals excluded pending product/NIDL mapping, sensitive device identity labels excluded pending allowlist/cap policy, and readiness remaining cached/local rather than live permission probing.
 - A 2026-05-09 reference-implementation review round compared this branch and SOW against mirrored `open-telemetry/opentelemetry-collector-contrib`, `DataDog/integrations-core`, `zabbix/zabbix`, `grafana/vmware_exporter`, `Checkmk/checkmk`, `newrelic/nri-vsphere`, `Appdynamics/vmware-vsphere-monitoring-extension`, `sensu-plugins/sensu-plugins-vsphere`, `logicmonitor/dashboards`, and `influxdata/telegraf`. GLM and MiMo returned `PRODUCTION READY`; Qwen, Claude, and Kimi returned `NEEDS CHANGES`; MiniMax returned an invalid review output that made false claims about hardcoded performance counter IDs even though `discover/metric_lists.go` uses `PerformanceManager.CounterInfoByName()` through the govmomi counter registry.
 - Actionable reference-review fixes implemented: add missing `divisor: 100` chart scaling for Datadog-confirmed percentage counters `disk.scsiReservationCnflctsPct.avg` and `storageAdapter.OIOsPct.avg`; tighten DynCfg include-selector schema patterns so empty strings are not accepted where collector validation rejects them; warn that opt-in custom-attribute label values are sent verbatim and may contain secrets; clarify VM disk `disk` label meaning across capacity/performance contexts; reword snapshot age as `oldest snapshot age`; add vSAN parser tests for OTel-supported host/VM label sets and rate handling; add a short resource-pool compressed-memory unit comment; and rate-limit optional discovery/enrichment warnings with stable low-cardinality limiter keys.
-- Reference-review findings rejected or accepted as residual risk: vSAN throughput/congestion division by interval is kept because OTel `receiver/vcenterreceiver/metrics.go` divides these values and OTel `client.go` defaults missing vSAN intervals to 300 seconds; vSAN explicit per-entity query specs are kept because the collector enforces selectors/caps before query and avoids fetching all entities; vSAN latest CSV-token timestamp validation remains a live-vSAN residual risk; govmomi URL credential embedding and keepalive re-login logging are pre-existing patterns outside this PR's scope; VM virtual disk capacity fallback remains because govmomi documents `VirtualDisk.CapacityInBytes` as always populated by the server and the fallback is harmless compatibility handling.
+- Reference-review findings rejected or accepted as residual risk: vSAN throughput/congestion division by interval is kept because OTel `receiver/vcenterreceiver/metrics.go` divides these values and OTel `client.go` defaults missing vSAN intervals to 300 seconds; vSAN explicit per-entity query specs are kept because the collector enforces selectors before query and avoids fetching all entities; vSAN latest CSV-token timestamp validation remains a live-vSAN residual risk; govmomi URL credential embedding and keepalive re-login logging are pre-existing patterns outside this PR's scope; VM virtual disk capacity fallback remains because govmomi documents `VirtualDisk.CapacityInBytes` as always populated by the server and the fallback is harmless compatibility handling.
 - Round 2 of the same reference-review scope was run after those fixes. Qwen, GLM, and MiniMax returned `PRODUCTION READY`; Claude returned `NEEDS CHANGES`; MiMo and Kimi outputs were invalid because they timed out before producing a verdict. Actionable Round 2 fixes implemented: add datastore-cluster `overallStatus` collection and a `vsphere.datastore_cluster_overall_status` chart; fix the resource-pool compressed-memory comment to document KiB input and MB chart display scale; add collector-level vSAN assertions for throughput, latency, and congestion; add vSAN space-utilization edge-case tests; align vSAN CSV metric values to the latest `SampleInfo` bucket when `SampleInfo` is present; and reset vSAN matchers in re-entrant `Init()`.
 - Round 2 findings rejected with evidence: V1+V2 double chart emission is not a runtime risk because `collectorapi.CollectorV2` does not include `Charts()` and `jobruntime/job_v2.go` loads only `ChartTemplateYAML()`; vSAN throughput/congestion interval division is confirmed by OTel `receiver/vcenterreceiver/metrics.go`; vSAN host `clientCacheHitRate` under `host-domclient` is confirmed by OTel `receiver/vcenterreceiver/client.go`; stale datastore values during property-refresh failures are existing fail-soft behavior and should not be changed in this PR without a broader stale-data policy decision; snapshot alert `calc` semantics preserve the explicit user thresholds for age and chain depth.
 - Round 3 of the same reference-review scope was run after the Round 2 fixes. Qwen and GLM returned `PRODUCTION READY`; Claude returned `NEEDS CHANGES` primarily because that reviewer could not access mirrored references and also listed low-severity observations; Kimi returned `NEEDS CHANGES`; MiniMax and MiMo timed out with invalid/incomplete outputs. Actionable Round 3 fixes implemented: correct the resource-pool compressed-memory comments to say vSphere reports KiB and the chart keeps V1's MB display scale, change the resource struct comment to `KiB`, and preserve empty vSAN health responses in the `Health` map so the existing writer emits `unknown=1` instead of no health series.
@@ -1767,7 +1769,7 @@ Implemented regression fixes as of 2026-05-09:
 - `.agents/skills/codacy-audit/` was updated with a no-token Codacy `action_required` triage how-to after the public v3 endpoint exposed the two blocking `markdownlint_MD013` generated-doc findings.
 - The vSphere metadata overview was split into shorter generated paragraphs, and `integrations/gen_integrations.py` plus `integrations/gen_docs_integrations.py -c go.d.plugin/vsphere` regenerated the vSphere integration page.
 - After that push, Codacy reported one remaining generated-doc `markdownlint_MD013` finding on the `autodetection_retry` config table row; the metadata table description was shortened while the fuller disable semantics remain documented in the stock config/schema surfaces.
-- After pushing the first regression repair, SonarCloud reported no bugs, no vulnerabilities, and no code smells, but failed the quality gate on `new_duplicated_lines_density=4.8` against the `3` threshold. The largest duplicate contributors were repeated selector/cap test tables and the topology presentation literal.
+- After pushing the first regression repair, SonarCloud reported no bugs, no vulnerabilities, and no code smells, but failed the quality gate on `new_duplicated_lines_density=4.8` against the `3` threshold. The largest duplicate contributors were repeated selector test tables and the topology presentation literal.
 - Selector/cap test cases were consolidated into shared test helpers, and topology presentation actor summary-field construction was factored through small local helpers. This preserves test intent while reducing copy-pasted blocks.
 - Reference-implementation review found two host percentage counters missing chart divisors. `host_disk_device_scsi_reservation_conflicts_percentage` and `host_storage_adapter_outstanding_io_percentage` now use `divisor: 100` in the V2 chart template, regenerated `charts.yaml`, and regenerated the compatibility fixture.
 - Reference-implementation review found DynCfg accepted empty include selectors that collector validation rejects. The four top-level include selector schema patterns now require `/`-prefixed inventory paths, matching `Init()` behavior.

@@ -77,8 +77,8 @@ func TestCollector_HostNICPerformanceOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[chartID], hostNetInterfaceTrafficTxDim)
 }
 
-func TestCollector_HostNICPerformanceSelectorAndCap(t *testing.T) {
-	tests := prefixedSelectorCapCases("interface", "interface", "vmnic1", "NoSuchInterface")
+func TestCollector_HostNICPerformanceSelector(t *testing.T) {
+	tests := prefixedSelectorCases("interface", "interface", "vmnic1", "NoSuchInterface")
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -86,7 +86,6 @@ func TestCollector_HostNICPerformanceSelectorAndCap(t *testing.T) {
 			defer teardown()
 			collr.CollectHostNICPerformance = true
 			collr.HostNICsInclude = tc.include
-			collr.MaxHostNICs = tc.max
 
 			require.NoError(t, collr.Init(context.Background()))
 			host := firstSortedHost(t, collr)
@@ -112,11 +111,7 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostNICConfig(t *testing.T) {
 	collr.Username = "user"
 	collr.Password = "pass"
 	collr.CollectHostNICPerformance = true
-	collr.MaxHostNICs = -1
 
-	require.ErrorContains(t, collr.Init(context.Background()), "max_host_nics must be greater than zero")
-
-	collr.MaxHostNICs = 1
 	collr.HostNICsInclude = []string{"["}
 	require.ErrorContains(t, collr.Init(context.Background()), "host_nic_include has invalid pattern")
 }
