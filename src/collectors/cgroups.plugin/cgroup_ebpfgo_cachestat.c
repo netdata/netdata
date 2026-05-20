@@ -35,7 +35,6 @@ static procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t p
                         if (path_buf && path_buf_size)
                             snprintfz(best_path, sizeof(best_path) - 1, "%s", path_buf);
                         best = read;
-                        best_lines = lines;
                     } else {
                         procfile_close(read);
                     }
