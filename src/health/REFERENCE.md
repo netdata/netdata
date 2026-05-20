@@ -996,7 +996,7 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 - `$disk.sda.reads` - Read operations from sda disk chart
 - `$system.ram.free` - Free RAM from system.ram chart (cross-chart reference)
 
-For metrics collected via the Prometheus/OpenMetrics collector, chart names follow the pattern `prometheus.<job_name>.<metric_name>`. Use the same `$CHART.VARIABLE` syntax to reference dimensions from those charts in your alert rules:
+For metrics collected via the Prometheus/OpenMetrics collector, the chart ID is `prometheus.<job_name>` and dimensions follow the pattern `prometheus.<job_name>.<metric_name>`. Use the `$CHART.DIMENSION` syntax to reference dimensions from those charts in your alert rules:
 
 ```text
 template: kubelet_pvc_volume_usage
@@ -1005,6 +1005,12 @@ lookup: average -1m unaligned
 units: bytes
 warn: $this > $prometheus.kubelet-pvc-volumes.kubelet_volume_stats_capacity_bytes * 0.8
 ```
+
+:::note
+
+Chart IDs for Prometheus endpoints often contain dots and other characters. When passing chart IDs to API endpoints, URL-encode them if they include special characters.
+
+:::
 
 :::tip
 
