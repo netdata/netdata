@@ -3705,7 +3705,25 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: "Enable the PerflibServices collector"
+            description: |
+              The PerflibServices collector is **disabled by default**. To enable it:
+
+              1. Open `netdata.conf` using `edit-config` from the MSYS2 shell (`C:\Program Files\Netdata\msys2.exe`):
+
+                 ```bash
+                 /etc/netdata/edit-config netdata.conf
+                 ```
+
+                 See [edit-config](/docs/netdata-agent/configuration/README.md#edit-configuration-files) for details.
+              2. In the `[plugin:windows]` section, uncomment the `PerflibServices` line and set it to `yes`:
+
+                 ```text
+                 [plugin:windows]
+                     PerflibServices = yes
+                 ```
+              3. [Restart Netdata](/docs/netdata-agent/start-stop-restart.md) to apply the change.
       configuration:
         file:
           name: "netdata.conf"
