@@ -28,6 +28,11 @@ bool ml_db_is_unusable(void)
     return __atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED);
 }
 
+void ml_db_force_unusable(void)
+{
+    __atomic_store_n(&ml_db_unusable, true, __ATOMIC_RELAXED);
+}
+
 void ml_db_mark_corrupt(int rc)
 {
     // Latch the flag first so concurrent callers stop hitting the bad DB
@@ -99,18 +104,28 @@ static int execute_and_reset_model_stmt(sqlite3_stmt *res,
                                         const char *action_name,
                                         const char *gerund_name)
 {
-    int rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to %s, rc = %d", action_name, rc);
-        ml_db_mark_if_corrupt(rc);
-        return rc;
+    int step_rc = execute_insert(res);
+    if (unlikely(step_rc != SQLITE_DONE)) {
+        error_report("Failed to %s, rc = %d", action_name, step_rc);
+        ml_db_mark_if_corrupt(step_rc);
+
+        // SQLite requires the statement to be reset before it can be reused
+        // after a failed sqlite3_step(). Without this, the next call that
+        // reuses the cached prepared statement (e.g. next flush iteration
+        // on a transient BUSY/IOERR) would re-bind onto a statement in an
+        // undefined state. Best-effort reset; latch separately if it
+        // surfaces corruption the step didn't.
+        int reset_rc = sqlite3_reset(res);
+        if (unlikely(reset_rc != SQLITE_OK && reset_rc != step_rc))
+            ml_db_mark_if_corrupt(reset_rc);
+        return step_rc;
     }
 
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when %s, rc = %d", gerund_name, rc);
-        ml_db_mark_if_corrupt(rc);
-        return rc;
+    int reset_rc = sqlite3_reset(res);
+    if (unlikely(reset_rc != SQLITE_OK)) {
+        error_report("Failed to reset statement when %s, rc = %d", gerund_name, reset_rc);
+        ml_db_mark_if_corrupt(reset_rc);
+        return reset_rc;
     }
 
     return 0;
@@ -123,8 +138,10 @@ static int handle_model_bind_fail(sqlite3_stmt *res, int param, int rc, const ch
 {
     error_report("Failed to bind parameter %d to %s, rc = %d", param, action_name, rc);
     int reset_rc = sqlite3_reset(res);
-    if (unlikely(reset_rc != SQLITE_OK))
+    if (unlikely(reset_rc != SQLITE_OK)) {
         error_report("Failed to reset statement to %s, rc = %d", action_name, reset_rc);
+        ml_db_mark_if_corrupt(reset_rc);
+    }
     return rc;
 }
 
@@ -1333,7 +1350,11 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     // flag if BEGIN/COMMIT/ROLLBACK themselves trip CORRUPT or NOTADB --
     // db_execute() returns only 0/1, the actual rc is exposed via the
     // out-param.
-    int sqlite_rc = 0;
+    // Reset sqlite_rc before every db_execute() call: db_execute() returns
+    // early without writing the out-param if its `db` argument is NULL, so
+    // a stale value from a prior call could otherwise survive and be fed
+    // to ml_db_mark_if_corrupt().
+    int sqlite_rc = SQLITE_OK;
     int rc = db_execute(ml_db, "BEGIN TRANSACTION;", &sqlite_rc);
     ml_db_mark_if_corrupt(sqlite_rc);
 
@@ -1362,6 +1383,7 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     // commit transaction
     if (!rc) {
         op_no++;
+        sqlite_rc = SQLITE_OK;
         rc = db_execute(ml_db, "COMMIT TRANSACTION;", &sqlite_rc);
         ml_db_mark_if_corrupt(sqlite_rc);
     }
@@ -1375,6 +1397,7 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     if (rc && !became_unusable) {
         netdata_log_error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
         op_no++;
+        sqlite_rc = SQLITE_OK;
         rc = db_execute(ml_db, "ROLLBACK;", &sqlite_rc);
         ml_db_mark_if_corrupt(sqlite_rc);
         if (rc)

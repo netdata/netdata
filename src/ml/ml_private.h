@@ -48,5 +48,11 @@ bool ml_db_mark_if_corrupt(int rc);
 // atomic contract self-enforcing.
 bool ml_db_is_unusable(void);
 
+// Force the "ml.db unusable" flag on without dropping a sentinel or
+// writing to disk. Used at startup when we know ml.db is poisoned
+// (e.g., a sentinel from a prior session exists but couldn't be
+// consumed) and want to skip opening the bad DB for this session.
+void ml_db_force_unusable(void);
+
 
 #endif /* NETDATA_ML_PRIVATE_H */

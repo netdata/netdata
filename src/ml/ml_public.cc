@@ -519,11 +519,19 @@ void ml_init()
     //                      operator must remove the sentinel manually.
     int unlink_rc = unlink(sentinel);
     if (int unlink_err = errno; unlink_rc == -1 && unlink_err != ENOENT) {
+        // The sentinel from a prior session is on disk but we can't remove
+        // it (EACCES, EROFS, EISDIR, ...). The DB was previously flagged
+        // corrupt; falling through to open it would just retrigger CORRUPT
+        // errors all session long. Mark the DB unusable in-memory and skip
+        // the open entirely -- ML runs without persistence until the
+        // operator removes the sentinel manually.
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "ML: sentinel %s exists but unlink() failed (errno=%d). "
-               "Skipping quarantine to avoid re-quarantining a healthy ml.db on every restart. "
-               "Operator must remove %s manually.",
+               "Marking ml.db unusable for this session and skipping the open. "
+               "ML will run without persistence; operator must remove %s manually.",
                sentinel, unlink_err, sentinel);
+        ml_db_force_unusable();
+        return;
     }
     if (unlink_rc == 0) {
         char bad_path[FILENAME_MAX + 1];
