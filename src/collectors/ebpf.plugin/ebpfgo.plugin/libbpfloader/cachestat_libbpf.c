@@ -10,6 +10,45 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+/*
+ * libbpf 0.0.9 (CentOS 7) does not define LIBBPF_MAJOR_VERSION and lacks
+ * several APIs added in later releases.  Provide inline shims so the rest
+ * of this file compiles unchanged on both old and new libbpf.
+ */
+#ifndef LIBBPF_MAJOR_VERSION
+static inline int bpf_program__set_autoload(struct bpf_program *prog, bool autoload)
+{
+    /* No autoload API in old libbpf; all programs load unconditionally.
+     * Legacy .bpf.o files for old kernels do not contain fentry/CO-RE
+     * programs, so missing this call is harmless. */
+    (void)prog;
+    (void)autoload;
+    return 0;
+}
+
+static inline enum bpf_map_type bpf_map__type(const struct bpf_map *map)
+{
+    return bpf_map__def(map)->type;
+}
+
+static inline int bpf_map__set_type(struct bpf_map *map, enum bpf_map_type type)
+{
+    /* bpf_map__def() is const-qualified but the map is mutable before load */
+    ((struct bpf_map_def *)bpf_map__def(map))->type = type;
+    return 0;
+}
+
+static inline int bpf_map__set_max_entries(struct bpf_map *map, __u32 max_entries)
+{
+    return bpf_map__resize(map, max_entries);
+}
+
+static inline __u32 bpf_map__max_entries(const struct bpf_map *map)
+{
+    return bpf_map__def(map)->max_entries;
+}
+#endif /* !LIBBPF_MAJOR_VERSION */
+
 #if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1) && defined(__has_include) && __has_include(<linux/btf.h>)
 /*
  * The repo-local CO-RE bundle currently ships the skeleton wrapper but not the
@@ -731,9 +770,11 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE)
         cachestat_runtime_destroy_core(rt);
-    else
-#endif
+    else if (rt->obj)
+        bpf_object__close(rt->obj);
+#else
     if (rt->obj)
         bpf_object__close(rt->obj);
+#endif
     free(rt);
 }
