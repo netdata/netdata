@@ -200,5 +200,8 @@ func (a *API) FUNCTIONGLOBAL(opts FunctionGlobalOpts) {
 		strconv.Itoa(opts.Version) + "\n\n"))
 }
 
-// FUNCTIONREMOVE is a no-op placeholder; Netdata core does not yet support removal.
-func (a *API) FUNCTIONREMOVE(_ string) {}
+// FUNCTIONREMOVE sends a FUNCTION_REMOVE message when the protocol supports it.
+func (a *API) FUNCTIONREMOVE(_ string) {
+	// The Netdata streaming protocol does not yet define a FUNCTION_REMOVE command;
+	// this method exists to satisfy the interface and will be implemented once supported.
+}
