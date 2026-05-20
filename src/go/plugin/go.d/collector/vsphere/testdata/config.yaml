@@ -29,8 +29,6 @@ vm_power_states:
   - "poweredOn"
   - "poweredOff"
   - "suspended"
-esxi_vnodes: yes
-vm_vnodes: yes
 collect_inventory_path_label: yes
 vm_guest_labels:
   - "guest_hostname"

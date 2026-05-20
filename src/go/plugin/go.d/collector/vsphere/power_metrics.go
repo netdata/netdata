@@ -152,15 +152,9 @@ func (c *Collector) writeHostPowerMetrics(meter metrix.SnapshotMeter) {
 	}
 
 	for _, sample := range sortedHostPowerPerfSamples(c.hostPowerPerfSamples) {
-		scope := c.resourceHostScope(sample.host.ID)
-		writeMeter := meter
-		scoped := !scope.IsDefault()
-		if scoped {
-			writeMeter = meter.WithHostScope(scope)
-		}
-		labels := writeMeter.LabelSet(c.hostPowerLabels(sample.host)...)
+		labels := meter.LabelSet(c.hostPowerLabels(sample.host)...)
 		for metricName, value := range sample.values {
-			if gauge := c.mx.gauge(writeMeter, metricName, scoped); gauge != nil {
+			if gauge := c.mx.gauge(metricName); gauge != nil {
 				gauge.Observe(metrix.SampleValue(value), labels)
 			}
 		}
@@ -173,15 +167,9 @@ func (c *Collector) writeVMPowerMetrics(meter metrix.SnapshotMeter) {
 	}
 
 	for _, sample := range sortedVMPowerPerfSamples(c.vmPowerPerfSamples) {
-		scope := c.resourceHostScope(sample.vm.ID)
-		writeMeter := meter
-		scoped := !scope.IsDefault()
-		if scoped {
-			writeMeter = meter.WithHostScope(scope)
-		}
-		labels := writeMeter.LabelSet(c.vmPowerLabels(sample.vm)...)
+		labels := meter.LabelSet(c.vmPowerLabels(sample.vm)...)
 		for metricName, value := range sample.values {
-			if gauge := c.mx.gauge(writeMeter, metricName, scoped); gauge != nil {
+			if gauge := c.mx.gauge(metricName); gauge != nil {
 				gauge.Observe(metrix.SampleValue(value), labels)
 			}
 		}

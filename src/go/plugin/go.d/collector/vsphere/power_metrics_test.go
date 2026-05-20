@@ -82,44 +82,6 @@ func TestCollector_PowerMetricsOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[vmPowerChartID], vmPowerUsagePowerDim)
 }
 
-func TestCollector_PowerMetricsUseVNodeScopes(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.CollectPowerMetrics = true
-	collr.ESXIVnodes = true
-	collr.VMVnodes = true
-
-	require.NoError(t, collr.Init(context.Background()))
-	host := firstSortedHost(t, collr)
-	vm := firstSortedVM(t, collr)
-	collr.scraper = mockPowerMetricsScraper{
-		mockScraper: mockScraper{collr.scraper},
-		hostID:      host.ID,
-		vmID:        vm.ID,
-		hostSeries:  testHostPowerSeries(),
-		vmSeries:    testVMPowerSeries(),
-	}
-
-	require.NotEmpty(t, collectMapForTest(t, collr))
-
-	reader := collr.MetricStore().Read(metrix.ReadRaw())
-	hostLabels := hostPowerLabelsMap(collr, host)
-	_, ok := reader.Value(hostPowerUsagePowerMetric, hostLabels)
-	require.False(t, ok, "host power metric should move out of the default scope when esxi_vnodes is enabled")
-
-	hostScope := collr.esxiHostScope(host)
-	_, ok = collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadHostScope(hostScope.ScopeKey)).Value(hostPowerUsagePowerMetric, hostLabels)
-	require.True(t, ok, "host power metric should be present in the ESXi host scope")
-
-	vmLabels := vmPowerLabelsMap(collr, vm)
-	_, ok = reader.Value(vmPowerUsagePowerMetric, vmLabels)
-	require.False(t, ok, "VM power metric should move out of the default scope when vm_vnodes is enabled")
-
-	vmScope := collr.vmHostScope(vm)
-	_, ok = collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadHostScope(vmScope.ScopeKey)).Value(vmPowerUsagePowerMetric, vmLabels)
-	require.True(t, ok, "VM power metric should be present in the VM host scope")
-}
-
 type mockPowerMetricsScraper struct {
 	mockScraper
 	hostID     string

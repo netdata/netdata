@@ -126,27 +126,6 @@ func TestCollector_VMDisksSelectorAndCap(t *testing.T) {
 	}
 }
 
-func TestCollector_VMDisksUseVMVnodeScope(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.CollectVMDisks = true
-	collr.VMVnodes = true
-
-	require.NoError(t, collr.Init(context.Background()))
-	collr.scraper = mockScraper{collr.scraper}
-	vm := setOnlyTestDisks(t, collr, []rs.VMDisk{{Key: 2000, Label: "Hard disk 1", CapacityBytes: 1024}})
-
-	require.NotEmpty(t, collectMapForTest(t, collr))
-
-	labels := vmDiskLabelsMap(collr, vm, vm.Disks[0])
-	_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value(vmDiskCapacityMetric, labels)
-	require.False(t, ok, "VM disk metric should move out of the default scope when vm_vnodes is enabled")
-
-	scope := collr.vmHostScope(vm)
-	_, ok = collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadHostScope(scope.ScopeKey)).Value(vmDiskCapacityMetric, labels)
-	require.True(t, ok, "VM disk metric should be present in the VM host scope")
-}
-
 func setOnlyTestDisks(t *testing.T, collr *Collector, disks []rs.VMDisk) *rs.VM {
 	t.Helper()
 

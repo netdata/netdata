@@ -93,31 +93,6 @@ func TestCollector_HostCPUInstancePerformanceSelectorAndCap(t *testing.T) {
 	}
 }
 
-func TestCollector_HostCPUInstancePerformanceUsesESXIVnodeScope(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.CollectHostCPUInstancePerformance = true
-	collr.ESXIVnodes = true
-
-	require.NoError(t, collr.Init(context.Background()))
-	host := firstSortedHost(t, collr)
-	collr.scraper = mockHostCPUInstancePerformanceScraper{
-		mockScraper: mockScraper{collr.scraper},
-		hostID:      host.ID,
-		series:      testHostCPUInstancePerformanceSeries("0"),
-	}
-
-	require.NotEmpty(t, collectMapForTest(t, collr))
-
-	labels := hostCPUInstancePerformanceLabelsMap(collr, host, "0")
-	_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value(hostCPUInstanceUtilizationUsageMetric, labels)
-	require.False(t, ok, "host CPU instance performance metric should move out of the default scope when esxi_vnodes is enabled")
-
-	scope := collr.esxiHostScope(host)
-	_, ok = collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadHostScope(scope.ScopeKey)).Value(hostCPUInstanceUtilizationUsageMetric, labels)
-	require.True(t, ok, "host CPU instance performance metric should be present in the ESXi host scope")
-}
-
 func TestCollector_Init_ReturnsFalseIfInvalidHostCPUInstanceConfig(t *testing.T) {
 	collr := New()
 	collr.URL = "https://vcenter.local"

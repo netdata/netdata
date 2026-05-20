@@ -95,31 +95,6 @@ func TestCollector_VMDiskPerformanceSelectorAndCap(t *testing.T) {
 	}
 }
 
-func TestCollector_VMDiskPerformanceUsesVMVnodeScope(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.CollectVMDiskPerformance = true
-	collr.VMVnodes = true
-
-	require.NoError(t, collr.Init(context.Background()))
-	vm := firstSortedVM(t, collr)
-	collr.scraper = mockVMDiskPerformanceScraper{
-		mockScraper: mockScraper{collr.scraper},
-		vmID:        vm.ID,
-		series:      testVMDiskPerformanceSeries("scsi0:0"),
-	}
-
-	require.NotEmpty(t, collectMapForTest(t, collr))
-
-	labels := vmDiskPerformanceLabelsMap(collr, vm, "scsi0:0")
-	_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value(vmDiskDeviceIOReadMetric, labels)
-	require.False(t, ok, "VM disk performance metric should move out of the default scope when vm_vnodes is enabled")
-
-	scope := collr.vmHostScope(vm)
-	_, ok = collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadHostScope(scope.ScopeKey)).Value(vmDiskDeviceIOReadMetric, labels)
-	require.True(t, ok, "VM disk performance metric should be present in the VM host scope")
-}
-
 type mockVMDiskPerformanceScraper struct {
 	mockScraper
 	vmID   string

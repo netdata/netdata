@@ -128,14 +128,8 @@ func (c *Collector) writeVMDiskMetrics(meter metrix.SnapshotMeter) {
 			}
 			count++
 
-			scope := c.resourceHostScope(vm.ID)
-			writeMeter := meter
-			scoped := !scope.IsDefault()
-			if scoped {
-				writeMeter = meter.WithHostScope(scope)
-			}
-			if gauge := c.mx.gauge(writeMeter, gaugeName, scoped); gauge != nil {
-				gauge.Observe(metrix.SampleValue(disk.CapacityBytes), writeMeter.LabelSet(c.vmDiskLabels(vm, disk)...))
+			if gauge := c.mx.gauge(gaugeName); gauge != nil {
+				gauge.Observe(metrix.SampleValue(disk.CapacityBytes), meter.LabelSet(c.vmDiskLabels(vm, disk)...))
 			}
 		}
 	}

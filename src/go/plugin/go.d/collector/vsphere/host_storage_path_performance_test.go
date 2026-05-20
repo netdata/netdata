@@ -107,31 +107,6 @@ func TestCollector_HostStoragePathPerformanceSelectorAndCap(t *testing.T) {
 	}
 }
 
-func TestCollector_HostStoragePathPerformanceUsesESXIVnodeScope(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.CollectHostStoragePathPerformance = true
-	collr.ESXIVnodes = true
-
-	require.NoError(t, collr.Init(context.Background()))
-	host := firstSortedHost(t, collr)
-	collr.scraper = mockHostStoragePathPerformanceScraper{
-		mockScraper: mockScraper{collr.scraper},
-		hostID:      host.ID,
-		series:      testHostStoragePathPerformanceSeries("vmhba0:C0:T0:L0"),
-	}
-
-	require.NotEmpty(t, collectMapForTest(t, collr))
-
-	labels := hostStoragePathPerformanceLabelsMap(collr, host, "vmhba0:C0:T0:L0")
-	_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value(hostStoragePathIOReadMetric, labels)
-	require.False(t, ok, "host storage path performance metric should move out of the default scope when esxi_vnodes is enabled")
-
-	scope := collr.esxiHostScope(host)
-	_, ok = collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadHostScope(scope.ScopeKey)).Value(hostStoragePathIOReadMetric, labels)
-	require.True(t, ok, "host storage path performance metric should be present in the ESXi host scope")
-}
-
 func TestCollector_Init_ReturnsFalseIfInvalidHostStoragePathConfig(t *testing.T) {
 	collr := New()
 	collr.URL = "https://vcenter.local"

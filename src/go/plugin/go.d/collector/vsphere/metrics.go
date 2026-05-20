@@ -54,13 +54,7 @@ func (c *Collector) writeMetrics(mx map[string]int64) {
 				continue
 			}
 			labels := c.v2ChartLabels(chart, resourceID)
-			scope := c.resourceHostScope(resourceID)
-			writeMeter := meter
-			scoped := !scope.IsDefault()
-			if scoped {
-				writeMeter = meter.WithHostScope(scope)
-			}
-			labelSet := writeMeter.LabelSet(labels...)
+			labelSet := meter.LabelSet(labels...)
 
 			for _, dim := range chart.Dims {
 				value, ok := mx[dim.ID]
@@ -68,7 +62,7 @@ func (c *Collector) writeMetrics(mx map[string]int64) {
 					continue
 				}
 				name := v2MetricName(chart.Ctx, dim.Name)
-				if gauge := c.mx.gauge(writeMeter, name, scoped); gauge != nil {
+				if gauge := c.mx.gauge(name); gauge != nil {
 					gauge.Observe(metrix.SampleValue(value), labelSet)
 				}
 			}
@@ -77,16 +71,8 @@ func (c *Collector) writeMetrics(mx map[string]int64) {
 	c.writeOptionalMetrics(meter)
 }
 
-func (mx *collectorMetrics) gauge(meter metrix.SnapshotMeter, name string, scoped bool) metrix.SnapshotGauge {
-	if !scoped {
-		if gauge := mx.gauges[name]; gauge != nil {
-			return gauge
-		}
-	}
-	if gauge := meter.Gauge(name); gauge != nil {
-		return gauge
-	}
-	return nil
+func (mx *collectorMetrics) gauge(name string) metrix.SnapshotGauge {
+	return mx.gauges[name]
 }
 
 func (c *Collector) v2ChartLabels(chart *collectorapi.Chart, id string) []metrix.Label {

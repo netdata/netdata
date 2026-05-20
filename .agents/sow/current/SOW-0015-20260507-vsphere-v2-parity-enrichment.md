@@ -4,7 +4,50 @@
 
 Status: in-progress
 
-Sub-state: Reopened on 2026-05-09 for PR CI regression triage and pre-merge hardening. Framework V2 migration, VM snapshot aggregate metrics/alerts, datastore aggregate enrichment, VM/host power-state controls, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory object counts, optional ESXi/VM vnodes, opt-in inventory/VM guest labels, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in vSAN cluster space/health plus cluster/host/VM performance metrics, read-only readiness Function, cached vSphere inventory topology Function, and opt-in Network/DVPG topology discovery are implemented. Local fixes are in progress for yamllint, SonarCloud, DynCfg tab layout, metadata linting, and supportable vSphere error messages before closing again. Remaining parity feasibility is complete; vCenter/ESXi events are explicitly out of this PR by user decision.
+Sub-state: Reopened on 2026-05-09 for PR CI regression triage and pre-merge hardening. Framework V2 migration, VM snapshot aggregate metrics/alerts, datastore aggregate enrichment, VM/host power-state controls, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory object counts, opt-in inventory/VM guest labels, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in vSAN cluster space/health plus cluster/host/VM performance metrics, read-only readiness Function, cached vSphere inventory topology Function, and opt-in Network/DVPG topology discovery are implemented. Local fixes are in progress for yamllint, SonarCloud, DynCfg tab layout, metadata linting, supportable vSphere error messages, and hard removal of optional ESXi/VM vnode support before closing again. Remaining parity feasibility is complete; vCenter/ESXi events and collector-generated vSphere vnodes are explicitly out of this PR by user decision.
+
+### 2026-05-20 Vnode Removal Decision
+
+The user directed hard removal of vnode-related vSphere changes before merge.
+This supersedes the earlier 2026-05-07/2026-05-08 decisions that allowed
+default-off ESXi and VM vnode options.
+
+Removal scope:
+
+- delete the vnode implementation and tests;
+- remove `esxi_vnodes` and `vm_vnodes` config, schema, metadata, stock-config,
+  test-fixture, and readiness surfaces;
+- remove `vcenterInstanceUUID` runtime plumbing used only by generated vnodes;
+- remove all metric writer `metrix.HostScope` routing call sites instead of
+  leaving stubs or disabled dead code;
+- keep the existing job-level `vnode` configuration because it predates this PR
+  and is not part of the generated ESXi/VM vnode feature.
+
+Evidence and reason:
+
+- The review found generated ESXi/VM vnode GUIDs were derived from vCenter
+  managed-object references, which are vCenter-database-local and can change
+  after vCenter rebuilds or object re-addition.
+- The hard removal path has lower long-term maintenance risk than leaving
+  default-off dead plumbing, and reintroducing vnodes later should happen in a
+  focused design/identity PR.
+
+Validation after removal:
+
+- `src/go/plugin/go.d/collector/vsphere/config_schema.json` and
+  `src/go/plugin/go.d/collector/vsphere/testdata/config.json` parsed with
+  repo-root `.venv`.
+- `src/go/plugin/go.d/collector/vsphere/metadata.yaml`,
+  `src/go/plugin/go.d/collector/vsphere/testdata/config.yaml`, and
+  `src/go/plugin/go.d/config/go.d/vsphere.conf` parsed with `ruamel.yaml` from
+  repo-root `.venv`.
+- Grep for `ESXIVnodes`, `VMVnodes`, `esxi_vnodes`, `vm_vnodes`,
+  `vcenterInstanceUUID`, `resourceHostScope`, `HostScope`, `WithHostScope`,
+  `esxiHostScope`, `vmHostScope`, `newResourceHostScope`, `_vnode_type`, and
+  old scoped-gauge call signatures under the vSphere collector, stock config,
+  and vSphere health file returned no matches.
+- `go test -count=1 ./collector/vsphere/...` passed from
+  `src/go/plugin/go.d`.
 
 ## Requirements
 
@@ -176,9 +219,8 @@ Compatibility harness design:
 - Scope/vnode compatibility tests:
   - with no `vnode`, all existing metrics remain in the default/global scope;
   - with existing `vnode`, existing metrics remain under the configured job-level vnode behavior;
-  - with `esxi_vnodes: false`, behavior matches no host scopes;
-  - with `esxi_vnodes: true`, only explicitly selected ESXi host metrics route to host scopes, and VM/datastore/cluster/resource-pool charts remain under the vCenter/job/default scope;
-  - with `vm_vnodes: false`, behavior is unchanged.
+  - collector-generated ESXi/VM host scopes are excluded from this PR by the
+    2026-05-20 hard-removal decision.
 - Acceptance gate:
   - The V2 migration PR cannot proceed unless compatibility tests pass before enrichment metrics are added.
   - Enrichment tests must prove new metrics are additive and do not alter the V1 manifest subset.
@@ -645,7 +687,7 @@ Code-size estimate from current tree:
   - VM disks, VM NICs, host NICs, LUNs/devices, storage adapters, storage paths, hardware sensors, vSAN, tags/custom attributes, and event/log follow-up each have different cardinality, labels, docs, tests, and operational risks.
 - Practical implication:
   - one PR for V2 migration plus safe default enrichment is manageable because the compatibility harness landed first;
-  - the user explicitly pulled the remaining non-event parity rows into this SOW/PR on 2026-05-08, so opt-in high-cardinality, label-enrichment, topology/function, and optional vnode work must be implemented as reviewable commits rather than separate SOWs;
+  - the user explicitly pulled the remaining non-event parity rows into this SOW/PR on 2026-05-08, so opt-in high-cardinality, label-enrichment, and topology/function work must be implemented as reviewable commits rather than separate SOWs; collector-generated ESXi/VM vnode work was later removed from this PR by user decision on 2026-05-20;
   - events remain out of this PR by user decision.
 
 Sensitive data handling plan:
@@ -801,7 +843,7 @@ Implementation started after the decisions, compatibility manifest, and normaliz
 
    Recommendation: A for this SOW.
 
-   User decision 2026-05-07: default to A, with opt-in host-scope modes. Do not automatically create a vSphere/vCenter vnode because that would move existing charts for users who did not configure `vnode` and would break backwards compatibility. Preserve the existing optional `vnode` config for the vCenter/job scope. Add `esxi_vnodes: false` so ESXi hosts may become v2 host-scoped vnodes only when explicitly enabled. Add `vm_vnodes: false` only as an explicitly warned advanced option because users are expected to install Netdata Agents inside VMs, and VM vnodes would duplicate those nodes in dashboards. Datastores are not recommended as vnodes in this SOW; keep them as datastore-labeled resource charts under the vCenter job/default scope unless a future topology-specific design creates non-host resource entities.
+   User decision 2026-05-07: default to A, with opt-in host-scope modes. Do not automatically create a vSphere/vCenter vnode because that would move existing charts for users who did not configure `vnode` and would break backwards compatibility. Preserve the existing optional `vnode` config for the vCenter/job scope. Add `esxi_vnodes: false` so ESXi hosts may become v2 host-scoped vnodes only when explicitly enabled. Add `vm_vnodes: false` only as an explicitly warned advanced option because users are expected to install Netdata Agents inside VMs, and VM vnodes would duplicate those nodes in dashboards. Datastores are not recommended as vnodes in this SOW; keep them as datastore-labeled resource charts under the vCenter job/default scope unless a future topology-specific design creates non-host resource entities. This ESXi/VM vnode portion was superseded by the 2026-05-20 hard-removal decision; only the pre-existing job-level `vnode` remains in scope.
 
    Datastore vnode rationale:
    - Datastores are shared storage resources, not hosts that can run an Agent.
@@ -982,9 +1024,14 @@ Implementation started after the decisions, compatibility manifest, and normaliz
 
    Follow-up user decision 2026-05-08: Publish vSphere topology using the existing topology Function naming convention: public `topology:vsphere` with a required job selector. Do not keep the job-method shape `vsphere:<job>:topology`. Keep readiness as a module Function with a required job selector too because the framework does not allow mixing module methods and job methods in one collector.
 
-18. Optional vnodes
+18. Collector-generated vnodes
 
    User decision 2026-05-08: Implement optional ESXi and optional VM vnodes, both default off. VM vnodes must carry a clear duplication warning because users are expected to run Netdata Agents inside VMs too. Datastore vnodes remain excluded unless a later explicit product decision changes that.
+
+   Superseding user decision 2026-05-20: hard-remove optional ESXi and VM
+   vnode support from this PR. Keep only the existing job-level `vnode`
+   configuration. Reintroduce collector-generated ESXi/VM vnodes only in a
+   separate PR with stable identity and lifecycle design.
 
 19. Evidence threshold for difficult surfaces
 
@@ -1023,7 +1070,7 @@ Feasibility table:
 | P30 | Topology edges | Implemented, non-metric | LogicMonitor topology sources, Elastic network module, New Relic object fixtures, OTel resource model, Netdata Function topology schema, SNMP topology Function pattern | Cached public `topology:vsphere` Function alias emits inventory actors/links, not metric labels, and requires selecting a vSphere job. |
 | P31 | Network/DVPG status | Implemented opt-in, non-metric | Broadcom `NetworkSummary.accessible`, Broadcom `DistributedVirtualPortgroup`, New Relic network collector, Elastic network module | `collect_network_topology` defaults off and discovers Network/DVPG objects only for cached topology actors/status/links. |
 | P32 | Troubleshooter/readiness checks | Implemented, non-metric | LogicMonitor troubleshooter, Datadog connection service checks, Netdata Function table schema | Cached `vsphere:readiness` Function reports local readiness/config/discovery/optional-surface/vSAN state without exposing URL/credentials or issuing extra vCenter API calls, and requires selecting a vSphere job. |
-| P33-P34 | Optional VM and ESXi vnodes | Feasible | V2 host-scope spec and local `azure_monitor` scoped collector pattern | Default off. Deterministic GUID/scope. VM vnode warning about duplicate nodes. |
+| P33-P34 | Optional VM and ESXi vnodes | Feasible but removed from this PR | V2 host-scope spec, local `azure_monitor` scoped collector pattern, and 2026-05-20 review decision | Out of scope for this PR. Requires a future focused identity/lifecycle design. |
 | P27 | vCenter/ESXi events | Feasible separately, excluded here | Datadog/New Relic event implementations and Broadcom EventManager | Do not implement in this PR by user decision. |
 
 Testability:
@@ -1036,7 +1083,7 @@ Testability:
 Implementation decisions derived from feasibility:
 
 - Use explicit boolean `collect_*` groups for each non-default surface, plus include selectors and max caps for every child-instance group.
-- Preserve default-safe behavior: new child-instance metrics, sensitive labels, vSAN, network topology discovery, and optional vnodes default off.
+- Preserve default-safe behavior: new child-instance metrics, sensitive labels, vSAN, and network topology discovery default off.
 - Implement labels because users need filtering/grouping, but only through opt-in allowlists for user-defined or sensitive metadata.
 - Events are excluded from this PR; no metric or Function substitute should be added for events.
 
@@ -1051,9 +1098,9 @@ Implementation decisions derived from feasibility:
 3. Implement opt-in labels and high-cardinality metric groups.
    - Scope: P13-P22, P26, P28-P29 with granular config, selectors, caps, docs, tests.
    - Risk: high; vCenter load, cardinality, sensitive metadata, and vSAN capability handling.
-4. Implement optional ESXi/VM vnodes.
-   - Scope: P33-P34 with default-off V2 host scopes and VM duplication warning.
-   - Risk: medium; scope identity and dashboard node duplication.
+4. Remove collector-generated ESXi/VM vnodes from this PR.
+   - Scope: P33-P34 with config, schema, docs, tests, and HostScope plumbing removed.
+   - Risk: low after removal; reintroduction requires a separate identity/lifecycle design.
 5. Implement topology/function surfaces where existing Netdata patterns allow it.
    - Scope: P30-P32. Implemented as cached read-only Functions; topology is not faked as metric labels.
    - Risk: medium; product surface must not be faked as metrics.
@@ -1077,13 +1124,13 @@ Implementation decisions derived from feasibility:
 - Clarified the vCenter-backed collection topology: one Netdata job can fan out across all included resources behind one vCenter endpoint.
 - Added proposed default-vs-opt-in policy: safe aggregate object-level metrics default on; high-cardinality, sensitive, or expensive surfaces opt-in.
 - Recorded user decision for safe default metrics and opt-in high-cardinality groups.
-- Recorded corrected user vnode decision: no automatic vCenter vnode; preserve optional `vnode`; optional ESXi host vnodes; optional but warned VM vnodes; no datastore vnodes in this SOW.
+- Recorded corrected user vnode decision: no automatic vCenter vnode; preserve optional job-level `vnode`; no datastore vnodes in this SOW. Optional ESXi/VM vnodes were later removed by user decision on 2026-05-20.
 - Added evidence for snapshot no-data behavior in Zabbix, Elastic Beats, New Relic, Datadog, Telegraf, and Grafana exporter.
 - Recorded user decision for aggregate per-VM snapshot metrics and zero no-snapshot semantics.
 - Recorded user decision to exclude vCenter events from this metrics SOW while tracking event ingestion as a later OTEL/logs-path problem.
 - Clarified that deferred vCenter events are separate API calls/surface, not the same VMware metric query, using Datadog as evidence.
 - Clarified that framework v2 is not inherently user-facing incompatible with v1; compatibility depends on preserving config/schema/chart/metric/label/scope contracts during migration.
-- Added concrete compatibility harness design: V1 golden manifest, config/schema tests, V2 chart-template tests, V2 metric-store tests, lifecycle tests, and vnode/scope tests.
+- Added concrete compatibility harness design: V1 golden manifest, config/schema tests, V2 chart-template tests, V2 metric-store tests, and lifecycle tests.
 - Added code-size estimate: V2 plus safe default enrichment is medium-sized; full opt-in parity is large.
 - Recorded implementation decomposition decision: one core SOW/PR split into focused reviewable commits; this was later expanded to include opt-in high-cardinality parity, while events remain excluded by user decision.
 - Added the initial parity target checklist defining the required coverage groups and classifying them as existing-default, new-default, opt-in, covered-elsewhere, follow-up, or excluded.
@@ -1174,16 +1221,15 @@ Implementation decisions derived from feasibility:
   - `vsphere.inventory_objects` with dimensions `datacenters`, `folders`, `clusters`, `hosts`, `vms`, `datastores`, and `resource_pools`.
 - Inventory counts reflect the resources discovered after include filters are applied. They do not create a mandatory vCenter vnode; V2 uses only the static `id=inventory` instance label.
 - Updated `metadata.yaml`, generated README/integration docs, generated `charts.yaml`, the compatibility manifest fixture, and the parity/compatibility specs for the inventory-count slice.
-- Recorded user decisions to keep all remaining non-event parity work in this SOW/PR, use granular opt-in groups, require selectors and caps for high-cardinality groups, implement labels through opt-in allowlists, exclude events from this PR, implement topology/troubleshooting through topology output and/or Functions, and add optional ESXi/VM vnodes default off.
+- Recorded user decisions to keep all remaining non-event parity work in this SOW/PR, use granular opt-in groups, require selectors and caps for high-cardinality groups, implement labels through opt-in allowlists, exclude events from this PR, implement topology/troubleshooting through topology output and/or Functions, and hard-remove optional ESXi/VM vnodes before merge.
 - Deleted the four pending vSphere follow-up SOW files that were superseded by the one-SOW/one-PR decision.
 - Completed feasibility for remaining parity rows P13-P34. All non-event rows are technically feasible with opt-in controls and tests/fixtures; P27 events are feasible separately but out of this PR by user decision; P26 vSAN is feasible but highest risk.
-- Updated `.agents/sow/specs/vsphere-parity-matrix.md` to remove stale follow-up-SOW language, update mirrored repository commit evidence, classify topology/function rows as non-metric surfaces, classify events as out-of-scope for this PR, and classify VM vnodes as opt-in default-off.
-- Added optional V2 host scopes for ESXi hosts and VMs:
-  - `esxi_vnodes` defaults to `false`; when enabled, only host-owned ESXi metrics move to one deterministic V2 host scope per ESXi host.
-  - `vm_vnodes` defaults to `false`; when enabled, only VM-owned metrics move to one deterministic V2 host scope per VM.
-  - Deterministic scope GUIDs use the vCenter instance UUID plus resource kind and managed object ID. If vCenter instance UUID is unavailable, the configured URL is used as a fallback input.
-  - Datastore, cluster, resource-pool, inventory, and job-level metrics remain unscoped/default-scope unless a separate explicit option changes them later.
-- Updated `config_schema.json`, stock `go.d/vsphere.conf`, `metadata.yaml`, generated integration docs, and config serialization fixtures for the new vnode options.
+- Updated `.agents/sow/specs/vsphere-parity-matrix.md` to remove stale follow-up-SOW language, update mirrored repository commit evidence, classify topology/function rows as non-metric surfaces, classify events as out-of-scope for this PR, and classify VM/ESXi vnodes as out of scope for this PR.
+- Removed optional V2 host scopes for ESXi hosts and VMs:
+  - deleted `esxi_vnodes` and `vm_vnodes` config/schema/metadata/stock-config/test-fixture surfaces;
+  - removed HostScope routing from VM-owned and host-owned metric writers;
+  - deleted vnode implementation and tests.
+- Updated `config_schema.json`, stock `go.d/vsphere.conf`, `metadata.yaml`, generated integration docs, and config serialization fixtures after removing the vnode options.
 - Added opt-in label enrichment:
   - `collect_inventory_path_label` defaults to `false` and adds `inventory_path` only when the collector can derive a bounded inventory path for VM, host, datastore, cluster, or resource-pool resources.
   - `vm_guest_labels` defaults to an empty allowlist and only accepts `guest_hostname`, `guest_ip`, and `guest_os`.
@@ -1193,7 +1239,6 @@ Implementation decisions derived from feasibility:
   - `vm_disk_include` defaults to `*` and matches disk display label, numeric disk key, or `key:<disk_key>`;
   - `max_vm_disks` defaults to `1024`;
   - context `vsphere.vm_disk_capacity` emits one `capacity` dimension in bytes with labels `id`, `datacenter`, `cluster`, `host`, `vm`, `disk`, and `disk_key`;
-  - VM disk capacity honors `vm_vnodes` because it is VM-owned.
 - Added optional VM virtual disk performance collection:
   - `collect_vm_disk_performance` defaults to `false`;
   - the group reuses `vm_disk_include` and `max_vm_disks`;
@@ -1201,7 +1246,6 @@ Implementation decisions derived from feasibility:
   - returned performance instances such as `scsi0:0` are selected by raw instance or `instance:<disk_instance>`;
   - contexts `vsphere.vm_disk_device_io`, `vsphere.vm_disk_device_iops`, `vsphere.vm_disk_device_latency`, and `vsphere.vm_disk_device_outstanding_io` emit read/write throughput, IOPS, latency, and outstanding I/O;
   - labels are `id`, `datacenter`, `cluster`, `host`, `vm`, `disk`, and `disk_instance`, plus opt-in enrichment labels;
-  - VM disk performance honors `vm_vnodes` because it is VM-owned.
 - Added optional VM network-interface performance collection:
   - `collect_vm_nic_performance` defaults to `false`;
   - `vm_nic_include` defaults to `*` and matches the raw vSphere performance instance or `interface:<interface_instance>`;
@@ -1210,7 +1254,6 @@ Implementation decisions derived from feasibility:
   - existing aggregate VM network metrics remain default-on and are not suppressed by the opt-in per-interface surface;
   - contexts `vsphere.vm_net_interface_traffic`, `vsphere.vm_net_interface_packets`, `vsphere.vm_net_interface_drops`, `vsphere.vm_net_interface_broadcast_packets`, and `vsphere.vm_net_interface_multicast_packets` emit per-interface throughput, packets, drops, broadcast packets, and multicast packets;
   - labels are `id`, `datacenter`, `cluster`, `host`, `vm`, `interface`, and `interface_instance`, plus opt-in enrichment labels;
-  - VM NIC performance honors `vm_vnodes` because it is VM-owned;
   - VM packet error counters are not emitted because the current Broadcom network counter table documents `errorsRx` and `errorsTx` for `HostSystem`, not VM.
 - Added optional host physical network-interface performance collection:
   - `collect_host_nic_performance` defaults to `false`;
@@ -1220,7 +1263,6 @@ Implementation decisions derived from feasibility:
   - existing aggregate host network metrics remain default-on and are not suppressed by the opt-in per-interface surface;
   - contexts `vsphere.host_net_interface_traffic`, `vsphere.host_net_interface_packets`, `vsphere.host_net_interface_drops`, `vsphere.host_net_interface_errors`, `vsphere.host_net_interface_broadcast_packets`, `vsphere.host_net_interface_multicast_packets`, `vsphere.host_net_interface_unknown_protocol_frames`, and `vsphere.host_net_interface_usage` emit per-interface throughput, packets, drops, errors, broadcast packets, multicast packets, unknown protocol frames, and combined usage;
   - labels are `id`, `datacenter`, `cluster`, `host`, `interface`, and `interface_instance`, plus opt-in enrichment labels;
-  - host pNIC performance honors `esxi_vnodes` because it is host-owned.
 - Added optional datastore cluster / StoragePod collection:
   - `collect_datastore_clusters` defaults to `false`;
   - `datastore_cluster_include` defaults to `/*` and matches `/Datacenter/DatastoreCluster`, datastore-cluster name, or managed object ID;
@@ -1234,7 +1276,6 @@ Implementation decisions derived from feasibility:
   - existing aggregate host disk metrics remain default-on and are not suppressed by the opt-in per-device surface;
   - contexts `vsphere.host_disk_device_io`, `vsphere.host_disk_device_iops`, `vsphere.host_disk_device_requests`, `vsphere.host_disk_device_latency`, `vsphere.host_disk_device_latency_breakdown`, `vsphere.host_disk_device_read_latency_breakdown`, `vsphere.host_disk_device_write_latency_breakdown`, `vsphere.host_disk_device_commands`, `vsphere.host_disk_device_command_events`, `vsphere.host_disk_device_queue_depth`, `vsphere.host_disk_device_scsi_reservation_conflicts`, and `vsphere.host_disk_device_scsi_reservation_conflicts_percentage` emit per-device throughput, IOPS, requests, latency, latency breakdowns, commands, command events, queue depth, and SCSI reservation conflicts;
   - labels are `id`, `datacenter`, `cluster`, `host`, `disk`, and `disk_instance`, plus opt-in enrichment labels;
-  - host disk/LUN/device performance honors `esxi_vnodes` because it is host-owned.
 - Added optional host storage-adapter performance collection:
   - `collect_host_storage_adapter_performance` defaults to `false`;
   - `host_storage_adapter_include` defaults to `*` and matches the raw vSphere performance instance, `adapter:<adapter_instance>`, or `instance:<adapter_instance>`;
@@ -1244,7 +1285,6 @@ Implementation decisions derived from feasibility:
   - contexts `vsphere.host_storage_adapter_io`, `vsphere.host_storage_adapter_commands`, `vsphere.host_storage_adapter_latency`, `vsphere.host_storage_adapter_queue`, `vsphere.host_storage_adapter_outstanding_io_percentage`, `vsphere.host_storage_adapter_throughput`, `vsphere.host_storage_adapter_throughput_contention`, and `vsphere.host_storage_adapter_max_latency` emit per-adapter throughput, commands, latency, queue, outstanding percentage, throughput usage/contention, and aggregate maximum latency;
   - per-adapter labels are `id`, `datacenter`, `cluster`, `host`, `adapter`, and `adapter_instance`, plus opt-in enrichment labels;
   - aggregate maximum-latency labels are `id`, `datacenter`, `cluster`, and `host`, plus opt-in enrichment labels;
-  - host storage-adapter performance honors `esxi_vnodes` because it is host-owned.
 - Added optional host storage-path performance collection:
   - `collect_host_storage_path_performance` defaults to `false`;
   - `host_storage_path_include` defaults to `*` and matches the raw vSphere performance instance, `path:<path_instance>`, or `instance:<path_instance>`;
@@ -1254,7 +1294,6 @@ Implementation decisions derived from feasibility:
   - contexts `vsphere.host_storage_path_io`, `vsphere.host_storage_path_commands`, `vsphere.host_storage_path_latency`, `vsphere.host_storage_path_command_events`, `vsphere.host_storage_path_throughput`, `vsphere.host_storage_path_throughput_contention`, and `vsphere.host_storage_path_max_latency` emit per-path throughput, commands, latency, command events, throughput usage/contention, and aggregate maximum latency;
   - per-path labels are `id`, `datacenter`, `cluster`, `host`, `path`, and `path_instance`, plus opt-in enrichment labels;
   - aggregate maximum-latency labels are `id`, `datacenter`, `cluster`, and `host`, plus opt-in enrichment labels;
-  - host storage-path performance honors `esxi_vnodes` because it is host-owned;
   - IQN/WWN labels are not emitted by default.
 - Added optional host CPU-instance performance collection:
   - `collect_host_cpu_instance_performance` defaults to `false`;
@@ -1263,7 +1302,6 @@ Implementation decisions derived from feasibility:
   - selected host `cpu.*` counters are requested with wildcard instance `*` only when the option is enabled;
   - contexts `vsphere.host_cpu_instance_utilization` and `vsphere.host_cpu_instance_time` emit per-instance usage, utilization, core utilization, used time, and idle time;
   - labels are `id`, `datacenter`, `cluster`, `host`, `cpu`, and `cpu_instance`, plus opt-in enrichment labels;
-  - host CPU-instance performance honors `esxi_vnodes` because it is host-owned.
 - Added optional aggregate host/VM power metric collection:
   - `collect_power_metrics` defaults to `false`;
   - host and VM power counters are requested only when the option is enabled;
@@ -1272,7 +1310,6 @@ Implementation decisions derived from feasibility:
   - VM contexts `vsphere.vm_power_usage` and `vsphere.vm_energy_usage` emit current power and energy;
   - host labels are `id`, `datacenter`, `cluster`, and `host`, plus opt-in enrichment labels;
   - VM labels are `id`, `datacenter`, `cluster`, `host`, and `vm`, plus opt-in enrichment labels;
-  - host power metrics honor `esxi_vnodes`; VM power metrics honor `vm_vnodes`;
   - non-powered-on hosts/VMs remain property/status-only because real-time performance query specs are skipped for them.
 - Added opt-in vSphere user metadata labels:
   - `vsphere_tag_categories` defaults to an empty allowlist and matches vSphere tag category names with one glob pattern per YAML list item;
@@ -1307,7 +1344,7 @@ Implementation decisions derived from feasibility:
   - vSAN performance uses the OTel/Datadog common entity families, but queries concrete discovered refs (`cluster-domclient:<uuid>`, `host-domclient:<uuid>`, and `virtual-machine:<uuid>`) instead of wildcard refs;
   - dedicated `vsan_cluster_include`, `vsan_host_include`, and `vsan_vm_include` selectors plus `max_vsan_clusters`, `max_vsan_hosts`, and `max_vsan_vms` caps bound both emitted series and vSAN API query scope;
   - contexts `vsphere.vsan_cluster_space_usage`, `vsphere.vsan_cluster_space_utilization`, `vsphere.vsan_cluster_health_status`, `vsphere.vsan_cluster_operations`, `vsphere.vsan_cluster_throughput`, `vsphere.vsan_cluster_latency`, `vsphere.vsan_cluster_congestions`, `vsphere.vsan_host_operations`, `vsphere.vsan_host_throughput`, `vsphere.vsan_host_latency`, `vsphere.vsan_host_congestions`, `vsphere.vsan_host_cache_hit_rate`, `vsphere.vsan_vm_operations`, `vsphere.vsan_vm_throughput`, and `vsphere.vsan_vm_latency` are emitted only when vSAN returns matching data;
-  - host vSAN metrics honor `esxi_vnodes`; VM vSAN metrics honor `vm_vnodes`; cluster vSAN metrics remain default/job scoped;
+  - cluster, host, and VM vSAN metrics remain default/job scoped;
   - vSAN API/performance failures log one warning per failure class and otherwise emit no vSAN series for that query.
 - Evidence for P26 used govmomi vSAN client/types and mirrored repository snapshots:
   - `open-telemetry/opentelemetry-collector-contrib @ 34ed18e037dc63e41c4b4a8356d2a13d55c768f4`, `receiver/vcenterreceiver/client.go:377`, `receiver/vcenterreceiver/client.go:472`, `receiver/vcenterreceiver/metrics.go:575`, `receiver/vcenterreceiver/internal/mockserver/responses/cluster-vsan.xml:6`.
@@ -1316,7 +1353,7 @@ Implementation decisions derived from feasibility:
 - Updated `config_schema.json`, stock `go.d/vsphere.conf`, `metadata.yaml`, generated integration docs, config serialization fixtures, generated `charts.yaml`, and the parity/compatibility specs for opt-in vSAN metrics and dedicated vSAN selectors/caps.
 - Residual P26 gap recorded: vSAN events are out of this PR by user decision, and deeper vSAN disk-group, disk, component, CMMDS, and all Telegraf entity-type metrics are not emitted by `collect_vsan` in this slice because they need an explicit Netdata NIDL/context mapping and bounded config policy before implementation.
 - Added read-only vSphere Functions:
-  - `vsphere:readiness` reports cached target/credential presence, initialized client/discovery/performance-counter state, inventory counts, optional metric/label/vnode gates, network topology gate, and cached vSAN counts for the selected vSphere job;
+  - `vsphere:readiness` reports cached target/credential presence, initialized client/discovery/performance-counter state, inventory counts, optional metric/label gates, network topology gate, and cached vSAN counts for the selected vSphere job;
   - public `topology:vsphere` reports cached inventory topology actors/links for datacenters, clusters, hosts, VMs, datastores, datastore clusters, and resource pools for the selected vSphere job;
   - both Functions are job-scoped, require Cloud, expose no configured vCenter URL or credentials, and do not issue extra vCenter API calls when invoked.
 - Added opt-in Network/DVPG topology discovery:
@@ -1343,7 +1380,7 @@ Implementation decisions derived from feasibility:
   - tests now cover re-entrant `Init()` after a selector change, optional network discovery fail-soft behavior, tag/custom-attribute enrichment API failure fail-soft behavior, and partial-init readiness/topology Function calls.
 - Round 4 reviewer hardening fixed verified production-readiness issues and cheap low-risk review notes:
   - collector cleanup and re-init now close the vSphere client/container view and wait for the discovery task to stop;
-  - optional vnode GUID generation now requires the vCenter instance UUID and no longer falls back to hashing the configured URL;
+  - collector-generated vnode GUID generation was removed from this PR by the 2026-05-20 hard-removal decision;
   - datastore-cluster V2 metric labels now include opt-in vSphere tag/custom-attribute enrichment labels;
   - resource builders skip malformed parentless folders/clusters/hosts/datastores/datastore clusters instead of panicking;
   - folder and snapshot traversal now have defensive cycle/depth guards;
@@ -1376,7 +1413,7 @@ Acceptance criteria evidence:
 - The compatibility-manifest prep gate is drafted in `.agents/sow/specs/vsphere-v1-compatibility-manifest.md`.
 - The executable V1 golden baseline is added at `src/go/plugin/go.d/collector/vsphere/testdata/v1_compat_manifest.json` and checked by `TestCollector_V1CompatibilityManifest`.
 - The parity-matrix prep gate is drafted in `.agents/sow/specs/vsphere-parity-matrix.md`.
-- Framework V2 migration acceptance is satisfied by `TestCollector_ChartTemplateYAML`, `TestCollector_V2CompatibilitySurface`, and the full vSphere package test. Snapshot, datastore aggregate enrichment, VM/host power-state controls, VM/host property-status, cluster property-status, inventory-count, optional ESXi/VM vnode, opt-in label enrichment, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore-cluster metrics, opt-in vSAN metrics, read-only readiness Function, cached topology Function, and opt-in Network/DVPG topology discovery criteria are satisfied for the currently implemented metrics, controls, and non-metric surfaces.
+- Framework V2 migration acceptance is satisfied by `TestCollector_ChartTemplateYAML`, `TestCollector_V2CompatibilitySurface`, and the full vSphere package test. Snapshot, datastore aggregate enrichment, VM/host power-state controls, VM/host property-status, cluster property-status, inventory-count, opt-in label enrichment, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore-cluster metrics, opt-in vSAN metrics, read-only readiness Function, cached topology Function, and opt-in Network/DVPG topology discovery criteria are satisfied for the currently implemented metrics, controls, and non-metric surfaces.
 
 Tests or equivalent validation:
 
@@ -1406,10 +1443,10 @@ Tests or equivalent validation:
 - `UPDATE_VSPHERE_COMPAT=1 go test ./plugin/go.d/collector/vsphere -run TestCollector_V1CompatibilityManifest -count=1` passed from `src/go/` after adding inventory-count metrics and regenerated the compatibility fixture.
 - `UPDATE_VSPHERE_CHARTS=1 go test ./plugin/go.d/collector/vsphere -run TestCollector_ChartTemplateYAML -count=1` passed from `src/go/` after adding inventory-count metrics and regenerated `charts.yaml`.
 - `go test ./plugin/go.d/collector/vsphere ./plugin/go.d/collector/vsphere/discover ./plugin/go.d/collector/vsphere/scrape ./plugin/framework/charttpl ./plugin/framework/chartengine ./plugin/go.d/pkg/collecttest -count=1` passed from `src/go/` after adding inventory-count metrics.
-- `go test ./plugin/go.d/collector/vsphere -run 'TestCollector_(OptionalVnodesDefaultOff|ESXIVnodesScopeOnlyHostMetrics|VMVnodesScopeOnlyVMMetrics)'` passed from `src/go/` after adding optional ESXi/VM vnodes.
-- `go test ./plugin/go.d/collector/vsphere/...` passed from `src/go/` after adding optional ESXi/VM vnodes and config/docs updates.
+- `go test ./plugin/go.d/collector/vsphere -run 'TestCollector_(OptionalVnodesDefaultOff|ESXIVnodesScopeOnlyHostMetrics|VMVnodesScopeOnlyVMMetrics)'` passed from `src/go/` after adding optional ESXi/VM vnodes. These tests were deleted with the feature by the 2026-05-20 hard-removal decision.
+- `go test ./plugin/go.d/collector/vsphere/...` passed from `src/go/` after adding optional ESXi/VM vnodes and config/docs updates. The feature and its tests were deleted by the 2026-05-20 hard-removal decision.
 - `go test ./plugin/go.d/collector/vsphere -run 'TestCollector_(AddsInventoryPathLabel|AddsVMGuestLabels|Init_ReturnsFalseIfInvalidVMGuestLabel|V2CompatibilitySurface)$' -count=1` passed from `src/go/` after adding opt-in inventory-path and VM guest labels.
-- `go test ./plugin/go.d/collector/vsphere -run 'TestCollector_(Init_ReturnsFalseIfInvalidVMDisksConfig|CollectsVMDiskCapacity|VMDiskCapacityHonorsSelectorAndCap|VMDiskCapacityHonorsVMVnodes|ChartTemplateYAML)$' -count=1` passed from `src/go/` after adding opt-in VM disk capacity metrics.
+- `go test ./plugin/go.d/collector/vsphere -run 'TestCollector_(Init_ReturnsFalseIfInvalidVMDisksConfig|CollectsVMDiskCapacity|VMDiskCapacityHonorsSelectorAndCap|VMDiskCapacityHonorsVMVnodes|ChartTemplateYAML)$' -count=1` passed from `src/go/` after adding opt-in VM disk capacity metrics. The vnode-specific test named here was deleted with the feature by the 2026-05-20 hard-removal decision.
 - `go test ./plugin/go.d/collector/vsphere -run 'TestCollector_(Init_ReturnsFalseIfInvalidDatastoreClusterConfig|CollectsDatastoreClusterMetrics|DatastoreClusterMetricsHonorSelectorAndCap|ChartTemplateYAML)$' -count=1` passed from `src/go/` after adding opt-in datastore cluster metrics.
 - `go test ./plugin/go.d/collector/vsphere/... -count=1` passed from `src/go/` after adding opt-in label enrichment, VM disk capacity, and datastore cluster metrics.
 - `UPDATE_VSPHERE_CHARTS=1 go test ./plugin/go.d/collector/vsphere -run TestCollector_ChartTemplateYAML -count=1` passed from `src/go/` and regenerated `charts.yaml` after adding opt-in VM disk performance metrics.
@@ -1584,15 +1621,15 @@ Artifact maintenance gate:
 - Integration generator: updated `integrations/gen_docs_integrations.py` to normalize both current `blob/master` and older `edit/master` metadata links; this was required for scoped regeneration of the vSphere integration README.
 - Follow-up SOWs: the four pending vSphere follow-up SOW files created during the earlier split attempt were deleted after the user decided to keep all remaining non-event vSphere parity work in this SOW/PR. Events remain out of this PR by user decision, not by a pending SOW.
 - Collector tests/fixtures: added the V1 compatibility golden test and fixture, generated V2 `charts.yaml`, chart-template validation, V2 compatibility-surface validation, chart coverage validation, snapshot tree traversal tests, power-state config validation tests, power-state discovery tests, non-powered-on property-only collection tests, VM/host property-status tests, perf query skip tests, opt-in inventory/guest label enrichment tests, opt-in vSphere tag/custom-attribute label tests, user-metadata pattern tests for names with spaces, opt-in VM disk capacity/performance tests, wildcard `virtualDisk.*` metric-list tests, opt-in VM network-interface performance tests, wildcard VM `net.*` metric-list tests, aggregate VM network compatibility coverage, opt-in host physical network-interface performance tests, wildcard host `net.*` metric-list tests, aggregate host network compatibility coverage, opt-in host disk/LUN/device performance tests, wildcard host `disk.*` metric-list tests, aggregate host disk compatibility coverage, opt-in host storage-adapter performance tests, wildcard host `storageAdapter.*` metric-list tests, aggregate storage-adapter maximum-latency coverage, opt-in host storage-path performance tests, wildcard `storagePath.*` metric-list tests, aggregate storage-path maximum-latency coverage, opt-in host CPU-instance performance tests, wildcard host `cpu.*` metric-list tests, opt-in host/VM power metric tests, optional `power.*` metric-list tests, opt-in datastore cluster tests, read-only readiness Function tests, cached topology Function tests, opt-in Network/DVPG topology discovery tests, re-entrant `Init()` reset tests, optional network/topology fail-soft tests, enrichment API fail-soft tests, partial-init Function tests, and context-aware high-cardinality chart lookup tests.
-- Optional vnode tests/fixtures: added tests proving default-off behavior creates no non-default host scopes, `esxi_vnodes` scopes host-owned metrics only, and `vm_vnodes` scopes VM-owned metrics only. Updated config serialization fixtures with the new boolean keys.
+- Optional vnode tests/fixtures: removed after the 2026-05-20 hard-removal decision. Config serialization fixtures no longer include `esxi_vnodes` or `vm_vnodes`.
 - Specs: added `.agents/sow/specs/vsphere-v1-compatibility-manifest.md` and `.agents/sow/specs/vsphere-parity-matrix.md`; updated the compatibility manifest to record the accepted chart-ID break, additive V2 `id` instance label, power-state config keys, property-only non-powered-on semantics, fail-soft empty host/VM performance cycles, selector keys being optional in DynCfg schema, additive cluster DRS/HA property-status charts, static inventory-count chart, opt-in inventory/VM guest label keys, opt-in vSphere tag/custom-attribute label keys/config, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster contexts/config, `collect_network_topology`, and the cached Function contract; updated parity rows P01/P02/P06/P07/P08/P09/P10/P11/P12/P13/P14/P15/P16/P17/P18/P19/P20/P21/P22/P28/P29/P30/P31/P32 to implemented or implemented-subset status.
-- End-user/operator docs: updated `README.md` and `metadata.yaml` for new snapshot metrics, snapshot alerts, datastore aggregate metrics, VM/host power-state metrics, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory-count metrics, opt-in VM disk capacity/performance metrics, opt-in VM network-interface performance metrics, opt-in host physical network-interface performance metrics, opt-in host disk/LUN/device performance metrics, opt-in host storage-adapter performance metrics, opt-in host storage-path performance metrics, opt-in host CPU-instance performance metrics, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in inventory/VM guest labels, opt-in vSphere tag/custom-attribute labels, readiness/topology Functions, `collect_network_topology`, power-state discovery controls, optional ESXi/VM vnode controls, zero no-snapshot semantics, inaccessible datastore capacity semantics, and the `id` label; expanded the stock `go.d/vsphere.conf` comments so file-based configuration is self-explanatory. Chart-ID continuity loss remains accepted and not emphasized in end-user docs.
+- End-user/operator docs: updated `README.md` and `metadata.yaml` for new snapshot metrics, snapshot alerts, datastore aggregate metrics, VM/host power-state metrics, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory-count metrics, opt-in VM disk capacity/performance metrics, opt-in VM network-interface performance metrics, opt-in host physical network-interface performance metrics, opt-in host disk/LUN/device performance metrics, opt-in host storage-adapter performance metrics, opt-in host storage-path performance metrics, opt-in host CPU-instance performance metrics, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in inventory/VM guest labels, opt-in vSphere tag/custom-attribute labels, readiness/topology Functions, `collect_network_topology`, power-state discovery controls, zero no-snapshot semantics, inaccessible datastore capacity semantics, and the `id` label; expanded the stock `go.d/vsphere.conf` comments so file-based configuration is self-explanatory. Chart-ID continuity loss remains accepted and not emphasized in end-user docs.
 - End-user/operator skills: no update needed for this internal collector-framework migration slice.
 - SOW lifecycle: moved to `.agents/sow/current/` after user approved proceeding; the previous follow-up split was consolidated back into this SOW by user decision; no pending vSphere follow-up SOW files remain. At close, this SOW is marked completed and moved to `.agents/sow/done/` with the implementation commit.
 
 Specs update:
 
-- Added `.agents/sow/specs/vsphere-v1-compatibility-manifest.md` as the current v1 compatibility contract for the migration, including the accepted chart-ID break, V2 `id` label, additive default-safe metrics, optional vnodes, optional inventory/guest label enrichment, optional vSphere tag/custom-attribute label enrichment, optional VM disk capacity/performance, optional VM network-interface performance, optional host physical network-interface performance, optional host disk/LUN/device performance, optional host storage-adapter performance, optional host storage-path performance, opt-in host CPU-instance performance, optional datastore cluster metric contracts, `collect_network_topology`, and cached Function contracts.
+- Added `.agents/sow/specs/vsphere-v1-compatibility-manifest.md` as the current v1 compatibility contract for the migration, including the accepted chart-ID break, V2 `id` label, additive default-safe metrics, optional inventory/guest label enrichment, optional vSphere tag/custom-attribute label enrichment, optional VM disk capacity/performance, optional VM network-interface performance, optional host physical network-interface performance, optional host disk/LUN/device performance, optional host storage-adapter performance, optional host storage-path performance, opt-in host CPU-instance performance, optional datastore cluster metric contracts, `collect_network_topology`, and cached Function contracts.
 - Added `.agents/sow/specs/vsphere-parity-matrix.md` as the current parity/default-policy contract for implementation planning, including implemented rows P06-P22/P30-P32, implemented-subset row P29, and explicitly excluded event row P27.
 
 Project skills update:
@@ -1616,13 +1653,13 @@ Follow-up mapping:
 - Product decisions are tracked in `## Implications And Decisions`.
 - Opt-in parity rows P13-P22, P26, P28, and P29 are now tracked inside this SOW.
 - Topology, network/distributed-port-group state, and troubleshooting rows P30-P32 were implemented inside this SOW as non-metric surfaces.
-- Optional ESXi/VM vnode work and the datastore-vnode exclusion rows P33-P35 are now tracked inside this SOW.
+- Collector-generated ESXi/VM vnode work is excluded from this PR by the 2026-05-20 user decision; datastore-vnode exclusion row P35 remains tracked inside this SOW.
 - vCenter/ESXi event parity row P27 is explicitly out of this PR by user decision on 2026-05-08.
 - Covered-elsewhere rows P23-P25 and P36 are documented or already represented by existing Netdata collectors; no new implementation SOW is needed for them.
 
 ## Outcome
 
-Implementation is completed and production-ready for this SOW/PR scope. Framework V2 migration, compatibility manifest, default-safe metrics, opt-in high-cardinality metrics, optional ESXi/VM vnodes, opt-in labels, opt-in datastore/vSAN additions, read-only readiness Function, cached topology Function, and opt-in Network/DVPG topology discovery are implemented, locally validated, and reviewed.
+Implementation is completed and production-ready for this SOW/PR scope. Framework V2 migration, compatibility manifest, default-safe metrics, opt-in high-cardinality metrics, opt-in labels, opt-in datastore/vSAN additions, read-only readiness Function, cached topology Function, and opt-in Network/DVPG topology discovery are implemented, locally validated, and reviewed. Collector-generated ESXi/VM vnodes were hard-removed before merge by user decision.
 
 Known unresolved parity gaps are not blocked by code mechanics:
 
@@ -1758,7 +1795,7 @@ Change-size analysis as of 2026-05-09:
 
 - Diff against `upstream/master...HEAD` before the local regression commit: 77 files, 33,983 insertions, 502 deletions.
 - Non-runtime bulk explains most of the size: 10,916 inserted lines are the V1 compatibility fixture, 3,176 are generated `charts.yaml`, 1,109 are generated integration docs, 2,585 are SOW/spec/skill artifacts, and 6,410 are tests.
-- Runtime collector Go changes are about 6,929 inserted lines across 35 files. This is large but maps to the approved broad scope: V2 migration, default-safe enrichment, opt-in high-cardinality metrics, optional vnodes, labels, vSAN, Functions, topology, and fail-soft supportability.
+- Runtime collector Go changes are about 6,929 inserted lines across 35 files before the 2026-05-20 vnode removal. This is large but maps to the approved broad scope: V2 migration, default-safe enrichment, opt-in high-cardinality metrics, labels, vSAN, Functions, topology, and fail-soft supportability.
 - Potential reductions exist but have tradeoffs: shrinking the compatibility fixture weakens compatibility proof, dropping generated docs conflicts with the integration artifact workflow, and removing SOW/spec/skill artifacts conflicts with the project SOW process.
 
 Real-vSphere risk and validation assessment as of 2026-05-09:

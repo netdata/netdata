@@ -173,27 +173,6 @@ modules:
                   - poweredOff
                   - suspended
                 ```
-            - name: esxi_vnodes
-              description: Create one Netdata Virtual Node per ESXi host.
-              default_value: no
-              required: false
-              group: Virtual Node
-              detailed_description: |
-                Disabled by default to preserve existing dashboards and metric scope.
-                When enabled, host-owned ESXi metrics are emitted under deterministic
-                v2 host scopes, one per discovered ESXi host. VM, datastore, cluster,
-                resource-pool, and inventory metrics remain under the vCenter job/default
-                scope unless their own explicit option changes that behavior.
-            - name: vm_vnodes
-              description: Create one Netdata Virtual Node per VM.
-              default_value: no
-              required: false
-              group: Virtual Node
-              detailed_description: |
-                Disabled by default because users are expected to run Netdata Agents
-                inside their VMs. Enabling this option can duplicate VM nodes in
-                dashboards: one node from the Agent inside the VM and one node from
-                vCenter collection.
             - name: collect_inventory_path_label
               description: Add an inventory_path label to vSphere resource charts.
               default_value: no
@@ -900,7 +879,7 @@ modules:
             - whether the target URL and credentials are configured
             - whether the vSphere client, discovery cache, and performance-counter lists are initialized
             - discovered inventory counts
-            - enabled or disabled optional metric, label, vnode, and vSAN groups
+            - enabled or disabled optional metric, label, and vSAN groups
             - cached vSAN result counts when `collect_vsan` is enabled
 
             The function does not expose the configured vCenter URL or credentials, and it does not issue extra vCenter API calls.

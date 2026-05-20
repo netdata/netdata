@@ -83,18 +83,6 @@
           "poweredOn"
         ]
       },
-      "esxi_vnodes": {
-        "title": "Create ESXi virtual nodes",
-        "description": "If enabled, host-owned ESXi metrics are emitted under one Netdata Virtual Node per ESXi host. Disabled by default to preserve existing dashboards and time-series scope.",
-        "type": "boolean",
-        "default": false
-      },
-      "vm_vnodes": {
-        "title": "Create VM virtual nodes",
-        "description": "If enabled, VM-owned metrics are emitted under one Netdata Virtual Node per VM. Disabled by default because VMs normally run their own Netdata Agents, and enabling this can duplicate VM nodes in dashboards.",
-        "type": "boolean",
-        "default": false
-      },
       "collect_inventory_path_label": {
         "title": "Collect inventory path label",
         "description": "If enabled, adds an inventory_path chart label to discovered vSphere resources. Disabled by default because inventory paths can expose internal naming schemes.",
@@ -706,13 +694,6 @@
             "cluster_include",
             "host_power_states",
             "vm_power_states"
-          ]
-        },
-        {
-          "title": "Vnodes",
-          "fields": [
-            "esxi_vnodes",
-            "vm_vnodes"
           ]
         },
         {

@@ -119,8 +119,6 @@ type Config struct {
 	CollectDatastoreClusters             bool                    `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
 	DatastoreClustersInclude             []string                `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
 	MaxDatastoreClusters                 int                     `yaml:"max_datastore_clusters,omitempty" json:"max_datastore_clusters"`
-	ESXIVnodes                           bool                    `yaml:"esxi_vnodes,omitempty" json:"esxi_vnodes"`
-	VMVnodes                             bool                    `yaml:"vm_vnodes,omitempty" json:"vm_vnodes"`
 	InventoryPathLabel                   bool                    `yaml:"collect_inventory_path_label,omitempty" json:"collect_inventory_path_label"`
 	VMGuestLabels                        []string                `yaml:"vm_guest_labels,omitempty" json:"vm_guest_labels"`
 	VSphereTagCategories                 []string                `yaml:"vsphere_tag_categories,omitempty" json:"vsphere_tag_categories"`
@@ -190,7 +188,6 @@ type (
 		datastorePerfCharted                   map[string]bool
 		clusterPerfReceived                    map[string]bool
 		clusterPerfCharted                     map[string]bool
-		vcenterInstanceUUID                    string
 		datastoreClusterMatcher                matcher.Matcher
 		vmDiskMatcher                          matcher.Matcher
 		vmNICMatcher                           matcher.Matcher
@@ -262,8 +259,6 @@ func (c *Collector) Init(context.Context) error {
 		c.closeClient()
 		return fmt.Errorf("create vSphere discoverer from configuration: %w", err)
 	}
-
-	c.vcenterInstanceUUID = vsClient.InstanceUUID()
 
 	c.initScraper(vsClient)
 
@@ -343,7 +338,6 @@ func (c *Collector) resetRuntimeStateForInit() {
 	c.datastorePerfCharted = make(map[string]bool)
 	c.clusterPerfReceived = make(map[string]bool)
 	c.clusterPerfCharted = make(map[string]bool)
-	c.vcenterInstanceUUID = ""
 	c.datastoreClusterMatcher = nil
 	c.vmDiskMatcher = nil
 	c.vmNICMatcher = nil

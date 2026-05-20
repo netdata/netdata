@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
 func TestCollector_OptInInventoryPathAndVMGuestLabels(t *testing.T) {
@@ -92,6 +94,28 @@ func TestCollector_Init_ReturnsFalseIfInvalidUserMetadataLabelConfig(t *testing.
 	collr.Password = "pass"
 	collr.CustomAttributes = []string{"!Secret"}
 	require.ErrorContains(t, collr.Init(context.Background()), "custom_attributes must include at least one positive pattern")
+}
+
+func firstHostWithMetric(t *testing.T, hosts rs.Hosts, mx map[string]int64, metric string) *rs.Host {
+	t.Helper()
+	for _, host := range hosts {
+		if _, ok := mx[host.ID+"_"+metric]; ok {
+			return host
+		}
+	}
+	t.Fatalf("expected at least one host with metric %q", metric)
+	return nil
+}
+
+func firstVMWithMetric(t *testing.T, vms rs.VMs, mx map[string]int64, metric string) *rs.VM {
+	t.Helper()
+	for _, vm := range vms {
+		if _, ok := mx[vm.ID+"_"+metric]; ok {
+			return vm
+		}
+	}
+	t.Fatalf("expected at least one VM with metric %q", metric)
+	return nil
 }
 
 func TestUserMetadataPatternMatcherPreservesListItems(t *testing.T) {

@@ -130,15 +130,9 @@ func (c *Collector) writeVMNICPerformanceMetrics(meter metrix.SnapshotMeter) {
 		}
 		count++
 
-		scope := c.resourceHostScope(sample.vm.ID)
-		writeMeter := meter
-		scoped := !scope.IsDefault()
-		if scoped {
-			writeMeter = meter.WithHostScope(scope)
-		}
-		labels := writeMeter.LabelSet(c.vmNICPerformanceLabels(sample.vm, sample.instance)...)
+		labels := meter.LabelSet(c.vmNICPerformanceLabels(sample.vm, sample.instance)...)
 		for metricName, value := range sample.values {
-			if gauge := c.mx.gauge(writeMeter, metricName, scoped); gauge != nil {
+			if gauge := c.mx.gauge(metricName); gauge != nil {
 				gauge.Observe(metrix.SampleValue(value), labels)
 			}
 		}

@@ -106,31 +106,6 @@ func TestCollector_HostNICPerformanceSelectorAndCap(t *testing.T) {
 	}
 }
 
-func TestCollector_HostNICPerformanceUsesESXIVnodeScope(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.CollectHostNICPerformance = true
-	collr.ESXIVnodes = true
-
-	require.NoError(t, collr.Init(context.Background()))
-	host := firstSortedHost(t, collr)
-	collr.scraper = mockHostNICPerformanceScraper{
-		mockScraper: mockScraper{collr.scraper},
-		hostID:      host.ID,
-		series:      testHostNICPerformanceSeries("vmnic0"),
-	}
-
-	require.NotEmpty(t, collectMapForTest(t, collr))
-
-	labels := hostNICPerformanceLabelsMap(collr, host, "vmnic0")
-	_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value(hostNetInterfaceTrafficRxMetric, labels)
-	require.False(t, ok, "host NIC performance metric should move out of the default scope when esxi_vnodes is enabled")
-
-	scope := collr.esxiHostScope(host)
-	_, ok = collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadHostScope(scope.ScopeKey)).Value(hostNetInterfaceTrafficRxMetric, labels)
-	require.True(t, ok, "host NIC performance metric should be present in the ESXi host scope")
-}
-
 func TestCollector_Init_ReturnsFalseIfInvalidHostNICConfig(t *testing.T) {
 	collr := New()
 	collr.URL = "https://vcenter.local"

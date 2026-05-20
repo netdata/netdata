@@ -147,15 +147,9 @@ func (c *Collector) writeHostNICPerformanceMetrics(meter metrix.SnapshotMeter) {
 		}
 		count++
 
-		scope := c.resourceHostScope(sample.host.ID)
-		writeMeter := meter
-		scoped := !scope.IsDefault()
-		if scoped {
-			writeMeter = meter.WithHostScope(scope)
-		}
-		labels := writeMeter.LabelSet(c.hostNICPerformanceLabels(sample.host, sample.instance)...)
+		labels := meter.LabelSet(c.hostNICPerformanceLabels(sample.host, sample.instance)...)
 		for metricName, value := range sample.values {
-			if gauge := c.mx.gauge(writeMeter, metricName, scoped); gauge != nil {
+			if gauge := c.mx.gauge(metricName); gauge != nil {
 				gauge.Observe(metrix.SampleValue(value), labels)
 			}
 		}

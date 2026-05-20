@@ -56,7 +56,6 @@ func TestFuncReadiness_HandlePartialInitState(t *testing.T) {
 	collr.URL = "https://vcenter.local"
 	collr.Username = "user"
 	collr.Password = "[REDACTED_SECRET]"
-	collr.vcenterInstanceUUID = "vcenter-instance-uuid"
 
 	handler := &funcReadiness{collector: collr}
 	resp := handler.Handle(context.Background(), "readiness", nil)

@@ -33,8 +33,6 @@
     "poweredOff",
     "suspended"
   ],
-  "esxi_vnodes": true,
-  "vm_vnodes": true,
   "collect_inventory_path_label": true,
   "vm_guest_labels": [
     "guest_hostname",

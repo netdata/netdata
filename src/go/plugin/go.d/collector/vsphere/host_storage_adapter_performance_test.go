@@ -110,31 +110,6 @@ func TestCollector_HostStorageAdapterPerformanceSelectorAndCap(t *testing.T) {
 	}
 }
 
-func TestCollector_HostStorageAdapterPerformanceUsesESXIVnodeScope(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.CollectHostStorageAdapterPerformance = true
-	collr.ESXIVnodes = true
-
-	require.NoError(t, collr.Init(context.Background()))
-	host := firstSortedHost(t, collr)
-	collr.scraper = mockHostStorageAdapterPerformanceScraper{
-		mockScraper: mockScraper{collr.scraper},
-		hostID:      host.ID,
-		series:      testHostStorageAdapterPerformanceSeries("vmhba0"),
-	}
-
-	require.NotEmpty(t, collectMapForTest(t, collr))
-
-	labels := hostStorageAdapterPerformanceLabelsMap(collr, host, "vmhba0")
-	_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value(hostStorageAdapterIOReadMetric, labels)
-	require.False(t, ok, "host storage adapter performance metric should move out of the default scope when esxi_vnodes is enabled")
-
-	scope := collr.esxiHostScope(host)
-	_, ok = collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadHostScope(scope.ScopeKey)).Value(hostStorageAdapterIOReadMetric, labels)
-	require.True(t, ok, "host storage adapter performance metric should be present in the ESXi host scope")
-}
-
 func TestCollector_Init_ReturnsFalseIfInvalidHostStorageAdapterConfig(t *testing.T) {
 	collr := New()
 	collr.URL = "https://vcenter.local"

@@ -67,30 +67,30 @@ func (c *Collector) writeDatastoreClusterMetrics(meter metrix.SnapshotMeter) {
 		count++
 
 		labels := meter.LabelSet(c.datastoreClusterLabels(pod)...)
-		c.observeGauge(meter, datastoreClusterSpaceUsageCapacityMetric, pod.Capacity, labels)
-		c.observeGauge(meter, datastoreClusterSpaceUsageFreeMetric, pod.FreeSpace, labels)
+		c.observeGauge(datastoreClusterSpaceUsageCapacityMetric, pod.Capacity, labels)
+		c.observeGauge(datastoreClusterSpaceUsageFreeMetric, pod.FreeSpace, labels)
 		used := max(pod.Capacity-pod.FreeSpace, 0)
-		c.observeGauge(meter, datastoreClusterSpaceUsageUsedMetric, used, labels)
+		c.observeGauge(datastoreClusterSpaceUsageUsedMetric, used, labels)
 		if pod.Capacity > 0 {
-			c.observeGauge(meter, datastoreClusterSpaceUtilizationUsedMetric, int64(float64(used)/float64(pod.Capacity)*10000), labels)
+			c.observeGauge(datastoreClusterSpaceUtilizationUsedMetric, int64(float64(used)/float64(pod.Capacity)*10000), labels)
 		} else {
-			c.observeGauge(meter, datastoreClusterSpaceUtilizationUsedMetric, 0, labels)
+			c.observeGauge(datastoreClusterSpaceUtilizationUsedMetric, 0, labels)
 		}
-		c.observeGauge(meter, datastoreClusterStorageDRSEnabledMetric, boolInt(pod.StorageDRSEnabled), labels)
-		c.observeGauge(meter, datastoreClusterStorageDRSDisabledMetric, boolInt(!pod.StorageDRSEnabled), labels)
+		c.observeGauge(datastoreClusterStorageDRSEnabledMetric, boolInt(pod.StorageDRSEnabled), labels)
+		c.observeGauge(datastoreClusterStorageDRSDisabledMetric, boolInt(!pod.StorageDRSEnabled), labels)
 		status := pod.OverallStatus
 		if status == "" {
 			status = "gray"
 		}
-		c.observeGauge(meter, datastoreClusterOverallStatusGreenMetric, boolInt(status == "green"), labels)
-		c.observeGauge(meter, datastoreClusterOverallStatusRedMetric, boolInt(status == "red"), labels)
-		c.observeGauge(meter, datastoreClusterOverallStatusYellowMetric, boolInt(status == "yellow"), labels)
-		c.observeGauge(meter, datastoreClusterOverallStatusGrayMetric, boolInt(status == "gray"), labels)
+		c.observeGauge(datastoreClusterOverallStatusGreenMetric, boolInt(status == "green"), labels)
+		c.observeGauge(datastoreClusterOverallStatusRedMetric, boolInt(status == "red"), labels)
+		c.observeGauge(datastoreClusterOverallStatusYellowMetric, boolInt(status == "yellow"), labels)
+		c.observeGauge(datastoreClusterOverallStatusGrayMetric, boolInt(status == "gray"), labels)
 	}
 }
 
-func (c *Collector) observeGauge(meter metrix.SnapshotMeter, name string, value int64, labels metrix.LabelSet) {
-	if gauge := c.mx.gauge(meter, name, false); gauge != nil {
+func (c *Collector) observeGauge(name string, value int64, labels metrix.LabelSet) {
+	if gauge := c.mx.gauge(name); gauge != nil {
 		gauge.Observe(metrix.SampleValue(value), labels)
 	}
 }

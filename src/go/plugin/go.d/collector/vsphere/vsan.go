@@ -224,13 +224,13 @@ func (c *Collector) writeVSANClusterSpaceMetrics(meter metrix.SnapshotMeter) {
 		space := c.vsanMetrics.Space[id]
 		used := max(space.Total-space.Free, 0)
 		labels := meter.LabelSet(c.vsanClusterLabels(cluster)...)
-		c.observeGaugeFloat(meter, vsanClusterSpaceUsageTotalMetric, float64(space.Total), labels, false)
-		c.observeGaugeFloat(meter, vsanClusterSpaceUsageFreeMetric, float64(space.Free), labels, false)
-		c.observeGaugeFloat(meter, vsanClusterSpaceUsageUsedMetric, float64(used), labels, false)
+		c.observeGaugeFloat(vsanClusterSpaceUsageTotalMetric, float64(space.Total), labels)
+		c.observeGaugeFloat(vsanClusterSpaceUsageFreeMetric, float64(space.Free), labels)
+		c.observeGaugeFloat(vsanClusterSpaceUsageUsedMetric, float64(used), labels)
 		if space.Total > 0 {
-			c.observeGaugeFloat(meter, vsanClusterSpaceUtilizationUsedMetric, float64(used)/float64(space.Total)*10000, labels, false)
+			c.observeGaugeFloat(vsanClusterSpaceUtilizationUsedMetric, float64(used)/float64(space.Total)*10000, labels)
 		} else {
-			c.observeGaugeFloat(meter, vsanClusterSpaceUtilizationUsedMetric, 0, labels, false)
+			c.observeGaugeFloat(vsanClusterSpaceUtilizationUsedMetric, 0, labels)
 		}
 	}
 }
@@ -243,10 +243,10 @@ func (c *Collector) writeVSANClusterHealthMetrics(meter metrix.SnapshotMeter) {
 		}
 		health := c.vsanMetrics.Health[id]
 		labels := meter.LabelSet(c.vsanClusterLabels(cluster)...)
-		c.observeGaugeFloat(meter, vsanClusterHealthStatusGreenMetric, boolFloat(health == "green"), labels, false)
-		c.observeGaugeFloat(meter, vsanClusterHealthStatusYellowMetric, boolFloat(health == "yellow"), labels, false)
-		c.observeGaugeFloat(meter, vsanClusterHealthStatusRedMetric, boolFloat(health == "red"), labels, false)
-		c.observeGaugeFloat(meter, vsanClusterHealthStatusUnknownMetric, boolFloat(health != "green" && health != "yellow" && health != "red"), labels, false)
+		c.observeGaugeFloat(vsanClusterHealthStatusGreenMetric, boolFloat(health == "green"), labels)
+		c.observeGaugeFloat(vsanClusterHealthStatusYellowMetric, boolFloat(health == "yellow"), labels)
+		c.observeGaugeFloat(vsanClusterHealthStatusRedMetric, boolFloat(health == "red"), labels)
+		c.observeGaugeFloat(vsanClusterHealthStatusUnknownMetric, boolFloat(health != "green" && health != "yellow" && health != "red"), labels)
 	}
 }
 
@@ -257,7 +257,7 @@ func (c *Collector) writeVSANClusterPerformanceMetrics(meter metrix.SnapshotMete
 			continue
 		}
 		labels := meter.LabelSet(c.vsanClusterLabels(cluster)...)
-		writeVSANPerformanceValues(c, meter, labels, c.vsanMetrics.Clusters[id], vsanClusterPerfMetricByName, false)
+		writeVSANPerformanceValues(c, labels, c.vsanMetrics.Clusters[id], vsanClusterPerfMetricByName)
 	}
 }
 
@@ -267,14 +267,8 @@ func (c *Collector) writeVSANHostPerformanceMetrics(meter metrix.SnapshotMeter) 
 		if host == nil {
 			continue
 		}
-		scope := c.resourceHostScope(host.ID)
-		writeMeter := meter
-		scoped := !scope.IsDefault()
-		if scoped {
-			writeMeter = meter.WithHostScope(scope)
-		}
-		labels := writeMeter.LabelSet(c.vsanHostLabels(host)...)
-		writeVSANPerformanceValues(c, writeMeter, labels, c.vsanMetrics.Hosts[id], vsanHostPerfMetricByName, scoped)
+		labels := meter.LabelSet(c.vsanHostLabels(host)...)
+		writeVSANPerformanceValues(c, labels, c.vsanMetrics.Hosts[id], vsanHostPerfMetricByName)
 	}
 }
 
@@ -284,29 +278,23 @@ func (c *Collector) writeVSANVMPerformanceMetrics(meter metrix.SnapshotMeter) {
 		if vm == nil {
 			continue
 		}
-		scope := c.resourceHostScope(vm.ID)
-		writeMeter := meter
-		scoped := !scope.IsDefault()
-		if scoped {
-			writeMeter = meter.WithHostScope(scope)
-		}
-		labels := writeMeter.LabelSet(c.vsanVMLabels(vm)...)
-		writeVSANPerformanceValues(c, writeMeter, labels, c.vsanMetrics.VMs[id], vsanVMPerfMetricByName, scoped)
+		labels := meter.LabelSet(c.vsanVMLabels(vm)...)
+		writeVSANPerformanceValues(c, labels, c.vsanMetrics.VMs[id], vsanVMPerfMetricByName)
 	}
 }
 
-func writeVSANPerformanceValues(c *Collector, meter metrix.SnapshotMeter, labels metrix.LabelSet, values scrapepkg.VSANEntityMetrics, metricByName map[string]string, scoped bool) {
+func writeVSANPerformanceValues(c *Collector, labels metrix.LabelSet, values scrapepkg.VSANEntityMetrics, metricByName map[string]string) {
 	for _, name := range sortedMapKeys(values) {
 		metricName := metricByName[name]
 		if metricName == "" {
 			continue
 		}
-		c.observeGaugeFloat(meter, metricName, values[name], labels, scoped)
+		c.observeGaugeFloat(metricName, values[name], labels)
 	}
 }
 
-func (c *Collector) observeGaugeFloat(meter metrix.SnapshotMeter, name string, value float64, labels metrix.LabelSet, scoped bool) {
-	if gauge := c.mx.gauge(meter, name, scoped); gauge != nil {
+func (c *Collector) observeGaugeFloat(name string, value float64, labels metrix.LabelSet) {
+	if gauge := c.mx.gauge(name); gauge != nil {
 		gauge.Observe(metrix.SampleValue(value), labels)
 	}
 }

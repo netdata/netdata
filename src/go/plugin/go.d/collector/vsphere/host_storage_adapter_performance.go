@@ -194,15 +194,9 @@ func (c *Collector) writeHostStorageAdapterInstancePerformanceMetrics(meter metr
 		}
 		count++
 
-		scope := c.resourceHostScope(sample.host.ID)
-		writeMeter := meter
-		scoped := !scope.IsDefault()
-		if scoped {
-			writeMeter = meter.WithHostScope(scope)
-		}
-		labels := writeMeter.LabelSet(c.hostStorageAdapterPerformanceLabels(sample.host, sample.instance)...)
+		labels := meter.LabelSet(c.hostStorageAdapterPerformanceLabels(sample.host, sample.instance)...)
 		for metricName, value := range sample.values {
-			if gauge := c.mx.gauge(writeMeter, metricName, scoped); gauge != nil {
+			if gauge := c.mx.gauge(metricName); gauge != nil {
 				gauge.Observe(metrix.SampleValue(value), labels)
 			}
 		}
@@ -215,15 +209,9 @@ func (c *Collector) writeHostStorageAdapterAggregatePerformanceMetrics(meter met
 	}
 
 	for _, sample := range sortedHostStorageAdapterAggregatePerfSamples(c.hostStorageAdapterAggregatePerfSamples) {
-		scope := c.resourceHostScope(sample.host.ID)
-		writeMeter := meter
-		scoped := !scope.IsDefault()
-		if scoped {
-			writeMeter = meter.WithHostScope(scope)
-		}
-		labels := writeMeter.LabelSet(c.hostStorageAdapterAggregatePerformanceLabels(sample.host)...)
+		labels := meter.LabelSet(c.hostStorageAdapterAggregatePerformanceLabels(sample.host)...)
 		for metricName, value := range sample.values {
-			if gauge := c.mx.gauge(writeMeter, metricName, scoped); gauge != nil {
+			if gauge := c.mx.gauge(metricName); gauge != nil {
 				gauge.Observe(metrix.SampleValue(value), labels)
 			}
 		}

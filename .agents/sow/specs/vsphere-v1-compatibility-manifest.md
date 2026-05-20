@@ -57,8 +57,6 @@ Executable golden scope:
 | Default cluster include | `/*` |
 | Default host power states | `poweredOn` |
 | Default VM power states | `poweredOn` |
-| Default ESXi vnodes | `false` |
-| Default VM vnodes | `false` |
 | Default inventory path label | `false` |
 | Default VM guest labels | empty allowlist |
 | Default vSphere tag category labels | empty allowlist |
@@ -121,8 +119,6 @@ Struct fields and YAML/JSON keys that must remain accepted:
 | `collect_datastore_clusters` | `collect_datastore_clusters` | no | Optional datastore cluster / StoragePod metrics. Default `false`. |
 | `datastore_cluster_include` | `datastore_cluster_include` | no | Optional simple-pattern allowlist for datastore clusters. Default `/*`; matches `/Datacenter/DatastoreCluster`, datastore-cluster name, or managed object ID. |
 | `max_datastore_clusters` | `max_datastore_clusters` | no | Optional safety cap for datastore cluster metric instances. Default `256`; must be greater than zero when datastore cluster collection is enabled. |
-| `esxi_vnodes` | `esxi_vnodes` | no | Optional V2 host-scope routing for host-owned ESXi metrics. Default `false`; when enabled, only host-owned metrics move to ESXi host scopes. |
-| `vm_vnodes` | `vm_vnodes` | no | Optional V2 host-scope routing for VM-owned metrics. Default `false`; enabling may duplicate VM nodes when Netdata Agents also run inside those VMs. |
 | `collect_vm_disks` | `collect_vm_disks` | no | Optional VM virtual disk capacity metrics. Default `false`. |
 | `collect_vm_disk_performance` | `collect_vm_disk_performance` | no | Optional VM virtual disk performance metrics. Default `false`; requests `virtualDisk.*` counters with wildcard instance `*` and emits only returned per-disk performance instances. |
 | `vm_disk_include` | `vm_disk_include` | no | Optional simple-pattern allowlist for VM virtual disks. Default `*`; capacity collection matches disk display label, numeric disk key, or `key:<disk_key>`; performance collection matches the vSphere performance instance or `instance:<disk_instance>`. |
@@ -210,10 +206,9 @@ Compatibility details:
   equals the host name.
 - By default, no per-resource V2 host scopes are created; all metrics follow
   the current job/global host behavior, with optional job-level `vnode`.
-- Optional `esxi_vnodes` and `vm_vnodes` are default-off compatibility
-  extensions. When enabled, they route only their owned host/VM resource metrics
-  to deterministic V2 host scopes; all other resource types remain in the
-  default/job scope.
+- Collector-generated ESXi/VM vnodes are excluded from this PR by user decision
+  on 2026-05-20. Reintroducing them requires a separate design for stable
+  resource identity and host-scope lifecycle.
 - Optional `collect_inventory_path_label` adds `inventory_path` to VM, host,
   datastore, cluster, and resource-pool chart labels when the collector can
   derive a path. It is default-off because inventory paths can expose internal
@@ -239,7 +234,7 @@ Compatibility details:
 - `vsphere:readiness` is a read-only module Function with the framework job
   selector parameter. It reports cached collector readiness rows for
   target/credential presence, client/discovery/performance-counter state,
-  inventory counts, optional metric/label/vnode gates, network-topology gate,
+  inventory counts, optional metric/label gates, network-topology gate,
   and cached vSAN counts. It does not expose the configured vCenter URL,
   username, password, or object inventory names, and it does not issue extra
   vCenter API calls.

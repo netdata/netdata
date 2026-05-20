@@ -246,8 +246,6 @@ func (c *Collector) readinessRows() []readinessRow {
 	}
 
 	rows = append(rows,
-		c.booleanReadinessRow("esxi_vnodes", "scope", c.ESXIVnodes, "host-owned metrics use ESXi host scopes", "host-owned metrics stay under the vCenter job/default scope"),
-		c.booleanReadinessRow("vm_vnodes", "scope", c.VMVnodes, "VM-owned metrics use VM scopes; this can duplicate Netdata Agents running in guests", "VM-owned metrics stay under the vCenter job/default scope"),
 		c.booleanReadinessRow("inventory_path_label", "labels", c.InventoryPathLabel, "inventory_path label collection is enabled", "inventory_path label collection is disabled"),
 		c.userMetadataReadinessRow(),
 		c.vmGuestLabelsReadinessRow(),

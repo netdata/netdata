@@ -142,8 +142,6 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Discovery** | discovery_interval | Hosts, VMs, datastores, clusters, and resource pools discovery interval (seconds). | 300 | no |
 |  | [host_power_states](#option-discovery-host-power-states) | ESXi host power states to discover. | poweredOn | no |
 |  | [vm_power_states](#option-discovery-vm-power-states) | Virtual machine power states to discover. | poweredOn | no |
-| **Virtual Node** | [esxi_vnodes](#option-virtual-node-esxi-vnodes) | Create one Netdata Virtual Node per ESXi host. | no | no |
-|  | [vm_vnodes](#option-virtual-node-vm-vnodes) | Create one Netdata Virtual Node per VM. | no | no |
 | **Labels** | [collect_inventory_path_label](#option-labels-collect-inventory-path-label) | Add an inventory_path label to vSphere resource charts. | no | no |
 |  | [vm_guest_labels](#option-labels-vm-guest-labels) | VM guest label allowlist. |  | no |
 |  | [vsphere_tag_categories](#option-labels-vsphere-tag-categories) | vSphere tag category allowlist. |  | no |
@@ -241,25 +239,6 @@ vm_power_states:
 ```
 
 
-<a id="option-virtual-node-esxi-vnodes"></a>
-##### esxi_vnodes
-
-Disabled by default to preserve existing dashboards and metric scope.
-When enabled, host-owned ESXi metrics are emitted under deterministic
-v2 host scopes, one per discovered ESXi host. VM, datastore, cluster,
-resource-pool, and inventory metrics remain under the vCenter job/default
-scope unless their own explicit option changes that behavior.
-
-
-<a id="option-virtual-node-vm-vnodes"></a>
-##### vm_vnodes
-
-Disabled by default because users are expected to run Netdata Agents
-inside their VMs. Enabling this option can duplicate VM nodes in
-dashboards: one node from the Agent inside the VM and one node from
-vCenter collection.
-
-
 <a id="option-labels-collect-inventory-path-label"></a>
 ##### collect_inventory_path_label
 
@@ -310,9 +289,11 @@ vsphere_tag_categories:
 
 Disabled by default because vSphere custom attributes are
 user-defined metadata and can expose internal names, ownership,
-business unit, or operational data. Each list item is one glob
-pattern matching custom attribute names, so names with spaces are
-supported. Use `*` only when every custom attribute is intentional.
+business unit, operational data, or secrets stored by administrators.
+Custom attribute values are sent verbatim as labels. Each list
+item is one glob pattern matching custom attribute names, so names
+with spaces are supported. Use `*` only when every custom attribute
+is intentional and none of the matched values contain secrets.
 
 Matching attributes are exposed as labels named
 `vsphere_custom_attribute_<sanitized_name>`.
@@ -852,7 +833,7 @@ The following alerts are available:
 | [ vsphere_vm_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_cpu_utilization | Virtual Machine CPU utilization |
 | [ vsphere_vm_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_mem_utilization | Virtual Machine memory utilization |
 | [ vsphere_vm_snapshot_chain_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_chain_depth | Virtual Machine snapshot maximum chain depth |
-| [ vsphere_vm_snapshot_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_age | Virtual Machine snapshot maximum age |
+| [ vsphere_vm_snapshot_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_age | Virtual Machine oldest snapshot age |
 | [ vsphere_host_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_cpu_utilization | ESXi Host CPU utilization |
 | [ vsphere_host_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_mem_utilization | ESXi Host memory utilization |
 
@@ -943,7 +924,7 @@ Labels:
 | cluster | Cluster name |
 | host | Host name |
 | vm | Virtual Machine name |
-| disk | vSphere virtual disk label |
+| disk | vSphere virtual disk label for capacity metrics and vSphere disk performance instance for performance metrics |
 | disk_key | vSphere virtual disk device key; present only for `collect_vm_disks` capacity metrics |
 | disk_instance | vSphere virtual disk performance instance; present only for `collect_vm_disk_performance` metrics |
 | inventory_path | vSphere inventory path; present only when `collect_inventory_path_label` is enabled and the path can be derived |
@@ -1384,6 +1365,7 @@ Metrics:
 | vsphere.datastore_cluster_space_utilization | used | percentage |
 | vsphere.datastore_cluster_space_usage | capacity, free, used | bytes |
 | vsphere.datastore_cluster_storage_drs_status | enabled, disabled | status |
+| vsphere.datastore_cluster_overall_status | green, red, yellow, gray | status |
 
 ### Per vSAN cluster
 
@@ -1510,7 +1492,7 @@ Reports the collector's current readiness from cached local state:
 - whether the target URL and credentials are configured
 - whether the vSphere client, discovery cache, and performance-counter lists are initialized
 - discovered inventory counts
-- enabled or disabled optional metric, label, vnode, and vSAN groups
+- enabled or disabled optional metric, label, and vSAN groups
 - cached vSAN result counts when `collect_vsan` is enabled
 
 The function does not expose the configured vCenter URL or credentials, and it does not issue extra vCenter API calls.

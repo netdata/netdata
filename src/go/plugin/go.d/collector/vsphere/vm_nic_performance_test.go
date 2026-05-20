@@ -97,31 +97,6 @@ func TestCollector_VMNICPerformanceSelectorAndCap(t *testing.T) {
 	}
 }
 
-func TestCollector_VMNICPerformanceUsesVMVnodeScope(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.CollectVMNICPerformance = true
-	collr.VMVnodes = true
-
-	require.NoError(t, collr.Init(context.Background()))
-	vm := firstSortedVM(t, collr)
-	collr.scraper = mockVMNICPerformanceScraper{
-		mockScraper: mockScraper{collr.scraper},
-		vmID:        vm.ID,
-		series:      testVMNICPerformanceSeries("4000"),
-	}
-
-	require.NotEmpty(t, collectMapForTest(t, collr))
-
-	labels := vmNICPerformanceLabelsMap(collr, vm, "4000")
-	_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value(vmNetInterfaceTrafficRxMetric, labels)
-	require.False(t, ok, "VM NIC performance metric should move out of the default scope when vm_vnodes is enabled")
-
-	scope := collr.vmHostScope(vm)
-	_, ok = collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadHostScope(scope.ScopeKey)).Value(vmNetInterfaceTrafficRxMetric, labels)
-	require.True(t, ok, "VM NIC performance metric should be present in the VM host scope")
-}
-
 func TestCollector_Init_ReturnsFalseIfInvalidVMNICConfig(t *testing.T) {
 	collr := New()
 	collr.URL = "https://vcenter.local"
