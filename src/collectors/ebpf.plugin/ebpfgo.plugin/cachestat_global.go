@@ -283,7 +283,7 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 	handle.UpdateEvery = updateEvery
 	api := netdataapi.New(os.Stdout)
 
-	collectApps := handle.AppsEnabled || handle.CgroupsEnabled
+	collectApps := true
 	store := NewCachestatSharedMemoryStore()
 	service := NewSharedSnapshotService(
 		"/var/run/netdata",
