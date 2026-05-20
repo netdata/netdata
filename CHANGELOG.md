@@ -187,6 +187,15 @@
 - Fix query tier selection for sub-resolution windows ([#22495](https://github.com/netdata/netdata/issues/22495))
 - Freeipmi.plugin: fix watchdog underflow at low system uptime ([#22490](https://github.com/netdata/netdata/issues/22490))
 - Fix payload memory leak ([#22492](https://github.com/netdata/netdata/issues/22492))
+- Docs: task class: improve_docs. remove the misleading 'nolock' cli option ([#22482](https://github.com/netdata/netdata/issues/22482))
+- Build(deps): bump github.com/vmware/govmomi from 0.53.1 to 0.54.0 in /src/go ([#22501](https://github.com/netdata/netdata/issues/22501))
+- Go.d/postgres: allow pg_ls_dir execute privilege for repl slot files ([#22488](https://github.com/netdata/netdata/issues/22488))
+- Build(deps): bump golang.org/x/net from 0.53.0 to 0.54.0 in /src/go ([#22503](https://github.com/netdata/netdata/issues/22503))
+- Docs: task class: improve_docs — add a troubleshooting note to packages.md ([#22480](https://github.com/netdata/netdata/issues/22480))
+- Build(deps): bump k8s.io modules to v0.36.1 ([#22505](https://github.com/netdata/netdata/issues/22505))
+- Build(deps): bump azure/artifact-signing-action from 1.2.0 to 2.0.0 ([#22498](https://github.com/netdata/netdata/issues/22498))
+- Avoid returning uninitialized packet_id on ACLK publish failure ([#22504](https://github.com/netdata/netdata/issues/22504))
+- Fix dynamic configuration unittest  ([#22506](https://github.com/netdata/netdata/issues/22506))
 
 ## [2.10.0] - 2026-04-09
 

@@ -103,7 +103,7 @@ int json_callback_print(JSON_ENTRY *e)
 
         case JSON_ARRAY:
             e->callback_function = json_callback_print;
-            sprintf(txt,"ARRAY[%lu]", (long unsigned int) e->data.items);
+            snprintfz(txt, sizeof(txt), "ARRAY[%lu]", (long unsigned int) e->data.items);
             buffer_strcat(wb, txt);
             break;
 
@@ -112,9 +112,7 @@ int json_callback_print(JSON_ENTRY *e)
             break;
 
         case JSON_NUMBER:
-            sprintf(txt, NETDATA_DOUBLE_FORMAT_AUTO, e->data.number);
-            buffer_strcat(wb,txt);
-
+            buffer_print_netdata_double(wb, e->data.number);
             break;
 
         case JSON_BOOLEAN:
