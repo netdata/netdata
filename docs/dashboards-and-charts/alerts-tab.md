@@ -75,9 +75,9 @@ From the Alerts tab, you can create new alerts or tune existing ones:
 - **[Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md)** — Visual UI wizard for manual alert creation and fine-tuning
 - **[Manual configuration](/src/health/REFERENCE.md)** — Edit `health.d/*.conf` files directly for full control
 
-:::important
+:::note
 
-**Alerts Automation** and **Alerts Configuration Manager** require a Netdata Cloud Business plan (or other paid subscription). Community and Homelab plan users can create and tune alerts using the [manual configuration](/src/health/REFERENCE.md) method. See the [feature availability table](/docs/netdata-oss-limitations.md) for the full breakdown.
+**Alerts Automation** and the **Alerts Configuration Manager** require a paid plan (Business or Enterprise On-Premise). Community and Homelab users can still create and tune alerts using [manual configuration](/src/health/REFERENCE.md).
 
 :::
 
