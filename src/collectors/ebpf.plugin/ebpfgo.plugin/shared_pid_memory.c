@@ -20,6 +20,11 @@ struct shared_pid_memory {
     sem_t *sem;
 };
 
+static inline size_t shared_pid_memory_nbytes(const struct shared_pid_memory *ctx)
+{
+    return ctx->total * sizeof(struct ebpf_pid_stat);
+}
+
 static bool shared_pid_memory_sem_wait(sem_t *sem)
 {
     if (!sem || sem == SEM_FAILED) {
@@ -65,7 +70,7 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
         goto fail;
 
     ctx->total = total;
-    size_t length = total * sizeof(struct ebpf_pid_stat);
+    size_t length = shared_pid_memory_nbytes(ctx);
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         goto fail;
 
@@ -76,8 +81,6 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
     }
 
     ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
-    if (ctx->sem == SEM_FAILED)
-        ctx->sem = SEM_FAILED;
 
     memset(ctx->entries, 0, length);
     return ctx;
@@ -102,7 +105,7 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
         locked = true;
     }
 
-    size_t length = ctx->total * sizeof(struct ebpf_pid_stat);
+    size_t length = shared_pid_memory_nbytes(ctx);
     memset(ctx->entries, 0, length);
     if (entries && count)
         memcpy(ctx->entries, entries, count * sizeof(struct ebpf_pid_stat));
@@ -122,7 +125,7 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
         sem_close(ctx->sem);
 
     if (ctx->entries)
-        munmap(ctx->entries, ctx->total * sizeof(struct ebpf_pid_stat));
+        munmap(ctx->entries, shared_pid_memory_nbytes(ctx));
 
     if (ctx->shm_fd >= 0)
         close(ctx->shm_fd);
