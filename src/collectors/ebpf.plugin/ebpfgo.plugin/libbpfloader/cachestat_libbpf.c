@@ -89,6 +89,13 @@ struct netdata_ebpf_cachestat_runtime {
         struct cachestat_buffer_bpf *buffer;
         struct cachestat_arena_bpf *arena;
     } core;
+    /* Ring buffer consumer and per-TGID accumulator (buffer flavor only).
+     * The buffer BPF flavor emits events via ring buffer instead of writing
+     * directly to cstat_pid, so per-app counters must be accumulated here. */
+    struct ring_buffer *rb;
+    struct netdata_ebpf_cachestat_pid_entry *acc;
+    size_t acc_cap;
+    size_t acc_count;
 #endif
 };
 
@@ -454,14 +461,163 @@ int netdata_cachestat_runtime_prepare(
     return 0;
 }
 
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+
+/*
+ * Ring buffer event layout — must match struct netdata_cachestat_event_t
+ * in ebpf-co-re/kernel-collector/includes/netdata_cache_buffer.h.
+ */
+struct cachestat_rb_event {
+    uint64_t ct;
+    uint32_t pid;
+    uint32_t tgid;
+    uint32_t uid;
+    uint32_t gid;
+    char     name[16]; /* TASK_COMM_LEN */
+    uint8_t  action;
+    uint8_t  pad[3];
+};
+
+enum {
+    CACHESTAT_RB_EVENT_PAGE_CACHE_LRU = 0,
+    CACHESTAT_RB_EVENT_PAGE_ACCESSED  = 1,
+    CACHESTAT_RB_EVENT_PAGE_DIRTIED   = 2,
+    CACHESTAT_RB_EVENT_BUFFER_DIRTY   = 3,
+};
+
+static struct netdata_ebpf_cachestat_pid_entry *cachestat_acc_find_or_add(
+    struct netdata_ebpf_cachestat_runtime *rt, uint32_t tgid)
+{
+    for (size_t i = 0; i < rt->acc_count; i++) {
+        if (rt->acc[i].tgid == tgid)
+            return &rt->acc[i];
+    }
+
+    if (rt->acc_count >= rt->acc_cap) {
+        size_t new_cap = rt->acc_cap ? rt->acc_cap * 2 : 64;
+        struct netdata_ebpf_cachestat_pid_entry *p = realloc(rt->acc, new_cap * sizeof(*p));
+        if (!p)
+            return NULL;
+        rt->acc = p;
+        rt->acc_cap = new_cap;
+    }
+
+    struct netdata_ebpf_cachestat_pid_entry *entry = &rt->acc[rt->acc_count++];
+    memset(entry, 0, sizeof(*entry));
+    entry->tgid = tgid;
+    return entry;
+}
+
+static int cachestat_rb_callback(void *ctx, void *data, size_t data_sz)
+{
+    if (data_sz < sizeof(struct cachestat_rb_event))
+        return 0;
+
+    struct netdata_ebpf_cachestat_runtime *rt = ctx;
+    const struct cachestat_rb_event *ev = data;
+
+    uint32_t tgid = ev->tgid ? ev->tgid : ev->pid;
+    struct netdata_ebpf_cachestat_pid_entry *entry = cachestat_acc_find_or_add(rt, tgid);
+    if (!entry)
+        return 0;
+
+    if (ev->ct > entry->ct)
+        entry->ct = ev->ct;
+    if (!entry->name[0] && ev->name[0]) {
+        size_t nlen = strnlen(ev->name, sizeof(ev->name));
+        memcpy(entry->name, ev->name, nlen < sizeof(entry->name) - 1 ? nlen : sizeof(entry->name) - 1);
+    }
+
+    switch (ev->action) {
+    case CACHESTAT_RB_EVENT_PAGE_CACHE_LRU: entry->add_to_page_cache_lru++; break;
+    case CACHESTAT_RB_EVENT_PAGE_ACCESSED:  entry->mark_page_accessed++;    break;
+    case CACHESTAT_RB_EVENT_PAGE_DIRTIED:   entry->account_page_dirtied++;  break;
+    case CACHESTAT_RB_EVENT_BUFFER_DIRTY:   entry->mark_buffer_dirty++;     break;
+    default:                                                                  break;
+    }
+
+    return 0;
+}
+
+static void cachestat_setup_ring_buffer(struct netdata_ebpf_cachestat_runtime *rt)
+{
+    struct bpf_object *obj = cachestat_runtime_object(rt);
+    if (!obj)
+        return;
+
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, "cachestat_events");
+    if (!map)
+        return;
+
+    int fd = bpf_map__fd(map);
+    if (fd < 0)
+        return;
+
+    rt->rb = ring_buffer__new(fd, cachestat_rb_callback, rt, NULL);
+}
+
+static void cachestat_destroy_ring_buffer(struct netdata_ebpf_cachestat_runtime *rt)
+{
+    if (rt->rb) {
+        ring_buffer__free(rt->rb);
+        rt->rb = NULL;
+    }
+    free(rt->acc);
+    rt->acc     = NULL;
+    rt->acc_cap   = 0;
+    rt->acc_count = 0;
+}
+
+static int cachestat_snapshot_from_acc(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    struct netdata_ebpf_cachestat_pid_snapshot_list *out)
+{
+    out->items = NULL;
+    out->count = 0;
+
+    if (!rt->acc || rt->acc_count == 0)
+        return 0;
+
+    struct netdata_ebpf_cachestat_pid_snapshot *items = calloc(rt->acc_count, sizeof(*items));
+    if (!items)
+        return -1;
+
+    for (size_t i = 0; i < rt->acc_count; i++) {
+        const struct netdata_ebpf_cachestat_pid_entry *src = &rt->acc[i];
+        struct netdata_ebpf_cachestat_pid_snapshot *dst = &items[i];
+        dst->pid = src->tgid;
+        dst->ct  = src->ct;
+        size_t nlen = strnlen(src->name, sizeof(src->name));
+        memcpy(dst->comm, src->name, nlen < sizeof(dst->comm) - 1 ? nlen : sizeof(dst->comm) - 1);
+        dst->add_to_page_cache_lru = src->add_to_page_cache_lru;
+        dst->mark_page_accessed    = src->mark_page_accessed;
+        dst->account_page_dirtied  = src->account_page_dirtied;
+        dst->mark_buffer_dirty     = src->mark_buffer_dirty;
+    }
+
+    qsort(items, rt->acc_count, sizeof(*items), cachestat_pid_snapshot_cmp);
+
+    out->items = items;
+    out->count = rt->acc_count;
+    return 0;
+}
+
+#endif /* NETDATA_LIBBPF_CORE_SUPPORTED */
+
 int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
 {
     if (!rt || !rt->obj)
         return -1;
 
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
-    if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE)
-        return cachestat_runtime_load_core(rt);
+    if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
+        int rc = cachestat_runtime_load_core(rt);
+        if (rc != 0)
+            return rc;
+        if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER)
+            cachestat_setup_ring_buffer(rt);
+        return 0;
+    }
 #endif
 
     return bpf_object__load(rt->obj);
@@ -635,6 +791,16 @@ int netdata_cachestat_runtime_snapshot_apps(
         return -1;
 
     struct bpf_map *map = bpf_object__find_map_by_name(obj, "cstat_pid");
+
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+    if (!map && rt->rb) {
+        /* Buffer flavor: no cstat_pid map; drain the ring buffer into the
+         * userspace accumulator and convert it to snapshot format. */
+        ring_buffer__consume(rt->rb);
+        return cachestat_snapshot_from_acc(rt, out);
+    }
+#endif
+
     if (!map)
         return -1;
 
@@ -768,9 +934,10 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
 
     cachestat_destroy_links(rt);
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
-    if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE)
+    if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
+        cachestat_destroy_ring_buffer(rt);
         cachestat_runtime_destroy_core(rt);
-    else if (rt->obj)
+    } else if (rt->obj)
         bpf_object__close(rt->obj);
 #else
     if (rt->obj)
