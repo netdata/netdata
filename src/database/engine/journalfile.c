@@ -1110,8 +1110,17 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
 
     journalfile_v2_data_release(journalfile);
 
-    if (unlikely(failed))
+    if (unlikely(failed)) {
+        // The journalfile is marked not-available but its fd/mmap are still
+        // bound and it is still registered in njfv2idx. If we leave it in this
+        // state, journalfile_close()/journalfile_destroy_unsafe() will skip
+        // journalfile_v2_data_unmap_permanently() (they gate on IS_AVAILABLE)
+        // and the rebuild path's journalfile_v2_data_set() will overwrite the
+        // fd/mmap and add a second njfv2idx entry. Tear it down now so a
+        // subsequent rebuild starts from a clean slate.
+        journalfile_v2_data_unmap_permanently(journalfile);
         return;
+    }
 
     __atomic_add_fetch(&ctx->atomic.samples, journal_samples, __ATOMIC_RELAXED);
 
