@@ -199,7 +199,7 @@ static void continue_as_child(void) {
     exit(EXIT_FAILURE);
 }
 
-int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
+int proc_pid_fd(const char *prefix, const char *ns, pid_t pid, ND_LOG_FIELD_PRIORITY priority) {
     if(!prefix) prefix = "";
 
     char filename[FILENAME_MAX + 1];
@@ -207,7 +207,7 @@ int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
     int fd = open(filename, O_RDONLY | O_CLOEXEC);
 
     if(fd == -1)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open proc_pid_fd() file '%s'", filename);
+        nd_log(NDLS_COLLECTORS, priority, "Cannot open proc_pid_fd() file '%s'", filename);
 
     return fd;
 }
@@ -234,11 +234,27 @@ static struct ns {
 static int switch_namespace(const char *prefix, pid_t pid) {
 #ifdef HAVE_SETNS
     int i;
-    for(i = 0; all_ns[i].name ; i++)
-        all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid);
+    int root_fd = -1;
 
-    int root_fd = proc_pid_fd(prefix, "root", pid);
-    int cwd_fd  = proc_pid_fd(prefix, "cwd", pid);
+    for(i = 0; all_ns[i].name ; i++) {
+        // Only network namespace is mandatory; optional namespaces log warnings
+        ND_LOG_FIELD_PRIORITY prio = (all_ns[i].nstype == CLONE_NEWNET) ? NDLP_ERR : NDLP_WARNING;
+        all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid, prio);
+    }
+
+    root_fd = proc_pid_fd(prefix, "root", pid, NDLP_ERR);
+
+    // Verify we can access the network namespace fd
+    // This is the only namespace critical for correct interface detection
+    for(i = 0; all_ns[i].name ; i++) {
+        if(all_ns[i].nstype == CLONE_NEWNET) {
+            if(all_ns[i].fd == -1) {
+                // proc_pid_fd() already logs the open failure
+                goto cleanup_and_fail;
+            }
+            break;
+        }
+    }
 
     setgroups(0, NULL);
 
@@ -255,9 +271,13 @@ static int switch_namespace(const char *prefix, pid_t pid) {
                 if(setns(all_ns[i].fd, all_ns[i].nstype) == -1) {
                     if(pass == 1) {
                         all_ns[i].status = 0;
-                        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                               "Cannot switch to %s namespace of pid %d",
-                               all_ns[i].name, (int) pid);
+                        // Only log critical namespace failures here;
+                        // non-critical failures are logged in the verification loop below
+                        if(all_ns[i].nstype == CLONE_NEWNET) {
+                            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                                   "Cannot switch to %s namespace of pid %d",
+                                   all_ns[i].name, (int) pid);
+                        }
                     }
                 }
                 else
@@ -266,24 +286,43 @@ static int switch_namespace(const char *prefix, pid_t pid) {
         }
     }
 
+    // Verify critical namespaces were successfully switched
+    for(i = 0; all_ns[i].name ; i++) {
+        if(all_ns[i].fd != -1 && !all_ns[i].status) {
+            if(all_ns[i].nstype == CLONE_NEWNET) {
+                // Network namespace is mandatory for correct interface detection
+                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                       "Failed to switch to %s namespace of pid %d",
+                       all_ns[i].name, (int) pid);
+                goto cleanup_and_fail;
+            }
+            // Mount/PID namespace failure is non-critical for network detection
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "Failed to switch to %s namespace of pid %d (continuing)",
+                   all_ns[i].name, (int) pid);
+        }
+    }
+
     gettid_uncached();
     setgroups(0, NULL);
 
     if(root_fd != -1) {
-        if(fchdir(root_fd) < 0)
+        if(fchdir(root_fd) < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d root directory", (int)pid);
+            goto cleanup_and_fail;
+        }
 
-        if(chroot(".") < 0)
+        if(chroot(".") < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot chroot() to pid %d root directory", (int)pid);
+            goto cleanup_and_fail;
+        }
+
+        if(chdir("/") < 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot chdir() to / after chroot for pid %d", (int)pid);
+            goto cleanup_and_fail;
+        }
 
         close(root_fd);
-    }
-
-    if(cwd_fd != -1) {
-        if(fchdir(cwd_fd) < 0)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d current working directory", (int)pid);
-
-        close(cwd_fd);
     }
 
     int do_fork = 0;
@@ -295,12 +334,24 @@ static int switch_namespace(const char *prefix, pid_t pid) {
                 do_fork = 1;
 
             close(all_ns[i].fd);
+            all_ns[i].fd = -1;
         }
 
     if(do_fork)
         continue_as_child();
 
     return 0;
+
+cleanup_and_fail:
+    if(root_fd != -1) close(root_fd);
+    for(i = 0; all_ns[i].name ; i++) {
+        if(all_ns[i].fd != -1) {
+            close(all_ns[i].fd);
+            all_ns[i].fd = -1;
+        }
+        all_ns[i].status = -1;
+    }
+    return 1;
 
 #else
 
