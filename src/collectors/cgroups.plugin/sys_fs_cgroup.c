@@ -209,12 +209,31 @@ static enum cgroups_type cgroups_try_detect_version()
     return CGROUPS_V2;
 }
 
-void set_cgroup_base_path(char *filename, char *path) {
+void set_cgroup_base_path(char *filename, const char *path) {
     if (strncmp(netdata_configured_host_prefix, path, strlen(netdata_configured_host_prefix)) == 0) {
         snprintfz(filename, FILENAME_MAX, "%s", path);
     } else {
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, path);
     }
+}
+
+static void cgroup_find_v1_mount(struct mountinfo *root, char *filename,
+                                  const char *subsystem, const char *default_path,
+                                  char **base)
+{
+    struct mountinfo *mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", subsystem);
+    if (!mi)
+        mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", subsystem);
+
+    const char *s;
+    if (!mi) {
+        collector_error("CGROUP: cannot find %s mountinfo. Assuming default: %s", subsystem, default_path);
+        s = default_path;
+    } else
+        s = mi->mount_point;
+
+    set_cgroup_base_path(filename, s);
+    *base = strdupz(filename);
 }
 
 void read_cgroup_plugin_configuration() {
@@ -251,63 +270,11 @@ void read_cgroup_plugin_configuration() {
     char filename[FILENAME_MAX + 1], *s;
     struct mountinfo *mi, *root = mountinfo_read(0);
     if (!cgroup_use_unified_cgroups) {
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
-        if (!mi) {
-            collector_error("CGROUP: cannot find cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
-            s = "/sys/fs/cgroup/cpuacct";
-        } else
-            s = mi->mount_point;
-        set_cgroup_base_path(filename, s);
-        cgroup_cpuacct_base = strdupz(filename);
-
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuset");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuset");
-        if (!mi) {
-            collector_error("CGROUP: cannot find cpuset mountinfo. Assuming default: /sys/fs/cgroup/cpuset");
-            s = "/sys/fs/cgroup/cpuset";
-        } else
-            s = mi->mount_point;
-        set_cgroup_base_path(filename, s);
-        cgroup_cpuset_base = strdupz(filename);
-
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
-        if (!mi) {
-            collector_error("CGROUP: cannot find blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
-            s = "/sys/fs/cgroup/blkio";
-        } else
-            s = mi->mount_point;
-        set_cgroup_base_path(filename, s);
-        cgroup_blkio_base = strdupz(filename);
-
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
-        if (!mi) {
-            collector_error("CGROUP: cannot find memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
-            s = "/sys/fs/cgroup/memory";
-        } else {
-            s = mi->mount_point;
-        }
-        set_cgroup_base_path(filename, s);
-        cgroup_memory_base = strdupz(filename);
-
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "pids");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "pids");
-        if (!mi) {
-            collector_error("CGROUP: cannot find pids mountinfo. Assuming default: /sys/fs/cgroup/pids");
-            s = "/sys/fs/cgroup/pids";
-        } else {
-            s = mi->mount_point;
-        }
-
-        set_cgroup_base_path(filename, s);
-        cgroup_pids_base = strdupz(filename);
+        cgroup_find_v1_mount(root, filename, "cpuacct", "/sys/fs/cgroup/cpuacct", &cgroup_cpuacct_base);
+        cgroup_find_v1_mount(root, filename, "cpuset",  "/sys/fs/cgroup/cpuset",  &cgroup_cpuset_base);
+        cgroup_find_v1_mount(root, filename, "blkio",   "/sys/fs/cgroup/blkio",   &cgroup_blkio_base);
+        cgroup_find_v1_mount(root, filename, "memory",  "/sys/fs/cgroup/memory",  &cgroup_memory_base);
+        cgroup_find_v1_mount(root, filename, "pids",    "/sys/fs/cgroup/pids",    &cgroup_pids_base);
     } else {
         //TODO: can there be more than 1 cgroup2 mount point?
         //there is no cgroup2 specific super option - for now use 'rw' option
@@ -1077,6 +1044,24 @@ static inline int update_memory_limits(struct cgroup *cg) {
 // ----------------------------------------------------------------------------
 // generate charts
 
+static void cgroup_update_io_pids_charts(struct cgroup *cg) {
+    if (likely(cg->io_service_bytes.updated))
+        update_io_serviced_bytes_chart(cg);
+    if (likely(cg->io_serviced.updated))
+        update_io_serviced_ops_chart(cg);
+    if (likely(cg->throttle_io_service_bytes.updated))
+        update_throttle_io_serviced_bytes_chart(cg);
+    if (likely(cg->throttle_io_serviced.updated))
+        update_throttle_io_serviced_ops_chart(cg);
+    if (likely(cg->io_queued.updated))
+        update_io_queued_ops_chart(cg);
+    if (likely(cg->io_merged.updated))
+        update_io_merged_ops_chart(cg);
+    if (likely(cg->pids_current.updated))
+        update_pids_current_chart(cg);
+    cgroup_ebpfgo_cachestat_update_charts(cg);
+}
+
 void update_cgroup_systemd_services_charts() {
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
         if (unlikely(!cg->enabled || cg->pending_renames || !is_cgroup_systemd_service(cg)))
@@ -1099,30 +1084,7 @@ void update_cgroup_systemd_services_charts() {
                 update_mem_activity_chart(cg);
             }
         }
-        if (likely(cg->io_service_bytes.updated)) {
-            update_io_serviced_bytes_chart(cg);
-        }
-        if (likely(cg->io_serviced.updated)) {
-            update_io_serviced_ops_chart(cg);
-        }
-        if (likely(cg->throttle_io_service_bytes.updated)) {
-            update_throttle_io_serviced_bytes_chart(cg);
-        }
-        if (likely(cg->throttle_io_serviced.updated)) {
-            update_throttle_io_serviced_ops_chart(cg);
-        }
-        if (likely(cg->io_queued.updated)) {
-            update_io_queued_ops_chart(cg);
-        }
-        if (likely(cg->io_merged.updated)) {
-            update_io_merged_ops_chart(cg);
-        }
-
-        if (likely(cg->pids_current.updated)) {
-            update_pids_current_chart(cg);
-        }
-
-        cgroup_ebpfgo_cachestat_update_charts(cg);
+        cgroup_update_io_pids_charts(cg);
 
         cg->function_ready = true;
     }
@@ -1245,35 +1207,7 @@ void update_cgroup_charts() {
             update_mem_failcnt_chart(cg);
         }
 
-        if (likely(cg->io_service_bytes.updated)) {
-            update_io_serviced_bytes_chart(cg);
-        }
-
-        if (likely(cg->io_serviced.updated)) {
-            update_io_serviced_ops_chart(cg);
-        }
-
-        if (likely(cg->throttle_io_service_bytes.updated)) {
-            update_throttle_io_serviced_bytes_chart(cg);
-        }
-
-        if (likely(cg->throttle_io_serviced.updated)) {
-            update_throttle_io_serviced_ops_chart(cg);
-        }
-
-        if (likely(cg->io_queued.updated)) {
-            update_io_queued_ops_chart(cg);
-        }
-
-        if (likely(cg->io_merged.updated)) {
-            update_io_merged_ops_chart(cg);
-        }
-
-        if (likely(cg->pids_current.updated)) {
-                update_pids_current_chart(cg);
-        }
-
-        cgroup_ebpfgo_cachestat_update_charts(cg);
+        cgroup_update_io_pids_charts(cg);
 
         if (cg->options & CGROUP_OPTIONS_IS_UNIFIED) {
             if (likely(cg->cpu_pressure.updated)) {
