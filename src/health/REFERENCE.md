@@ -1010,17 +1010,17 @@ Several stock health configurations use host variables to reference dimensions f
 
 ##### Prometheus Collector Variables
 
-For metrics collected by the go.d `prometheus` collector, each unique Prometheus label set produces a separate chart. The chart ID is built from the metric name followed by `-label=value` pairs for every label (e.g. `kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc`). In the Netdata chart registry, these are prefixed with `prometheus.`, so the full chart ID becomes `prometheus.<metric_name>-<label_set>`.
+For metrics collected by the go.d `prometheus` collector, each unique Prometheus label set produces a separate chart. The chart ID is built from the metric name followed by `-label=value` pairs for every label (e.g. `kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc`). In the Netdata chart registry, the prefix is the collector chart type: `prometheus.<metric_name>-<label_set>` when the Prometheus job name matches the module name, or `prometheus_<job_name>.<metric_name>-<label_set>` when the job has an explicit name.
 
-Because Prometheus chart IDs typically contain hyphens and `=` characters, use the `${...}` brace form to reference them in `calc`/`warn`/`crit` expressions — the unbraced `$var` form stops parsing at `-`.
+Because Prometheus chart IDs typically contain hyphens and `=` characters, use the `${...}` brace form to reference them in `calc`/`warn`/`crit` expressions — the unbraced `$var` form stops parsing at `-`. Apply the same rule whether the chart ID prefix is `prometheus` or `prometheus_<job_name>`.
 
-**Example — PVC volume usage alert using kubelet metrics:**
+**Example — PVC volume usage alert using kubelet metrics from a named Prometheus job (`name: kubelet`):**
 
 ```text
    alarm: kubelet_pvc_volume_usage
-      on: prometheus.kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc
+      on: prometheus_kubelet.kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc
    lookup: max -1m unaligned of kubelet_volume_stats_used_bytes
-     calc: $this * 100 / ${prometheus.kubelet_volume_stats_capacity_bytes-persistentvolumeclaim=my-pvc.kubelet_volume_stats_capacity_bytes}
+     calc: $this * 100 / ${prometheus_kubelet.kubelet_volume_stats_capacity_bytes-persistentvolumeclaim=my-pvc.kubelet_volume_stats_capacity_bytes}
      warn: $this > 80
      crit: $this > 95
    units: %
