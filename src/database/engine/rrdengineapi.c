@@ -1298,62 +1298,78 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
     if(unlikely(!j2_header))
         return;
 
-    stats->extents += j2_header->extent_count;
+    char file_path[RRDENG_PATH_MAX];
+    journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
 
-    unsigned entries;
-    struct journal_extent_list *extent_list = (void *) (data_start + j2_header->extent_offset);
-    for (entries = 0; entries < j2_header->extent_count; entries++) {
-        stats->extents_compressed_bytes += extent_list->datafile_size;
-        stats->extents_pages += extent_list->pages;
-        extent_list++;
-    }
+    // Protect the mmap walk: every j2_header->*, extent_list, metric, and
+    // descr access reads the mmap'd v2 journal. If the underlying file has
+    // any unreadable page (truncated, sparse hole, transient I/O error), the
+    // walk SIGBUSes and the process aborts. Same pattern as the sister sites
+    // (populate_retention_to_mrg, find_uuid_first_time, update_metrics_first_time_s).
+    // Partial accumulator increments on signal recovery are acceptable:
+    // size statistics are best-effort across datafiles, the caller continues
+    // to the next datafile in rrdeng_size_statistics().
+    PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "size-stats");
+    if(no_signal_received) {
+        stats->extents += j2_header->extent_count;
 
-    struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
-    time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-
-    stats->metrics += j2_header->metric_count;
-    for (entries = 0; entries < j2_header->metric_count; entries++) {
-
-        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
-        stats->metrics_pages += metric_list_header->entries;
-        struct journal_page_list *descr =  (void *) (data_start + metric->page_offset + sizeof(struct journal_page_header));
-        for (uint32_t idx=0; idx < metric_list_header->entries; idx++) {
-
-            time_t update_every_s;
-
-            size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile_ctx(datafile));
-
-            time_t start_time_s = journal_start_time_s + descr->delta_start_s;
-            time_t end_time_s = journal_start_time_s + descr->delta_end_s;
-
-            if(likely(points > 1))
-                update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
-            else {
-                update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile_ctx(datafile)->config.tier));
-                stats->single_point_pages++;
-            }
-
-            time_t duration_s = (time_t)((end_time_s - start_time_s + update_every_s));
-
-            stats->pages_uncompressed_bytes += descr->page_length;
-            stats->pages_duration_secs += duration_s;
-            stats->points += points;
-
-            stats->page_types[descr->type].pages++;
-            stats->page_types[descr->type].pages_uncompressed_bytes += descr->page_length;
-            stats->page_types[descr->type].pages_duration_secs += duration_s;
-            stats->page_types[descr->type].points += points;
-
-            if(!stats->first_time_s || (start_time_s - update_every_s) < stats->first_time_s)
-                stats->first_time_s = (start_time_s - update_every_s);
-
-            if(!stats->last_time_s || end_time_s > stats->last_time_s)
-                stats->last_time_s = end_time_s;
-
-            descr++;
+        unsigned entries;
+        struct journal_extent_list *extent_list = (void *) (data_start + j2_header->extent_offset);
+        for (entries = 0; entries < j2_header->extent_count; entries++) {
+            stats->extents_compressed_bytes += extent_list->datafile_size;
+            stats->extents_pages += extent_list->pages;
+            extent_list++;
         }
-        metric++;
+
+        struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
+        time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+
+        stats->metrics += j2_header->metric_count;
+        for (entries = 0; entries < j2_header->metric_count; entries++) {
+
+            struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+            stats->metrics_pages += metric_list_header->entries;
+            struct journal_page_list *descr =  (void *) (data_start + metric->page_offset + sizeof(struct journal_page_header));
+            for (uint32_t idx=0; idx < metric_list_header->entries; idx++) {
+
+                time_t update_every_s;
+
+                size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile_ctx(datafile));
+
+                time_t start_time_s = journal_start_time_s + descr->delta_start_s;
+                time_t end_time_s = journal_start_time_s + descr->delta_end_s;
+
+                if(likely(points > 1))
+                    update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
+                else {
+                    update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile_ctx(datafile)->config.tier));
+                    stats->single_point_pages++;
+                }
+
+                time_t duration_s = (time_t)((end_time_s - start_time_s + update_every_s));
+
+                stats->pages_uncompressed_bytes += descr->page_length;
+                stats->pages_duration_secs += duration_s;
+                stats->points += points;
+
+                stats->page_types[descr->type].pages++;
+                stats->page_types[descr->type].pages_uncompressed_bytes += descr->page_length;
+                stats->page_types[descr->type].pages_duration_secs += duration_s;
+                stats->page_types[descr->type].points += points;
+
+                if(!stats->first_time_s || (start_time_s - update_every_s) < stats->first_time_s)
+                    stats->first_time_s = (start_time_s - update_every_s);
+
+                if(!stats->last_time_s || end_time_s > stats->last_time_s)
+                    stats->last_time_s = end_time_s;
+
+                descr++;
+            }
+            metric++;
+        }
     }
+    // On SIGBUS/SIGSEGV the PROTECTED_ACCESS_SETUP macro already
+    // rate-limits the error log; fall through to release the journal.
 
     journalfile_v2_data_release(datafile->journalfile);
 }
