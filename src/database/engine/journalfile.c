@@ -1089,7 +1089,8 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         // the CRC compare against bytes inside the metric list itself.
         if ((size_t)j2_header->metric_offset > mmap_size ||
             (size_t)j2_header->metric_count > (mmap_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list) ||
-            (size_t)j2_header->metric_trailer_offset > mmap_size - sizeof(struct journal_v2_block_trailer) ||
+            (size_t)j2_header->metric_trailer_offset > mmap_size ||
+            mmap_size - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
             (size_t)j2_header->metric_trailer_offset != (size_t)j2_header->metric_offset + (size_t)j2_header->metric_count * sizeof(struct journal_metric_list)) {
             // header offsets out of range -- needs rebuild
             failed = true;

@@ -1311,23 +1311,55 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
     // to the next datafile in rrdeng_size_statistics().
     PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "size-stats");
     if(no_signal_received) {
-        stats->extents += j2_header->extent_count;
+        size_t mmap_size = datafile->journalfile->mmap.size;
 
-        unsigned entries;
-        struct journal_extent_list *extent_list = (void *) (data_start + j2_header->extent_offset);
-        for (entries = 0; entries < j2_header->extent_count; entries++) {
-            stats->extents_compressed_bytes += extent_list->datafile_size;
-            stats->extents_pages += extent_list->pages;
-            extent_list++;
+        // Bounds-check the extent list array against the mapping size before
+        // walking through header-controlled offsets. PROTECTED_ACCESS_SETUP
+        // only catches faults in [data_start, data_start+mmap_size); a
+        // corrupted offset that points past mmap_size would over-read into
+        // unrelated memory and abort. Same idiom as the bounds check in
+        // journalfile_v2_populate_retention_to_mrg.
+        bool extents_in_bounds = (size_t)j2_header->extent_offset <= mmap_size &&
+                                 (size_t)j2_header->extent_count <= (mmap_size - (size_t)j2_header->extent_offset) / sizeof(struct journal_extent_list);
+        if (extents_in_bounds) {
+            stats->extents += j2_header->extent_count;
+
+            struct journal_extent_list *extent_list = (void *) (data_start + j2_header->extent_offset);
+            for (unsigned entries = 0; entries < j2_header->extent_count; entries++) {
+                stats->extents_compressed_bytes += extent_list->datafile_size;
+                stats->extents_pages += extent_list->pages;
+                extent_list++;
+            }
         }
+
+        bool metrics_in_bounds = (size_t)j2_header->metric_offset <= mmap_size &&
+                                 (size_t)j2_header->metric_count <= (mmap_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list);
+        if (!metrics_in_bounds)
+            goto release;
 
         struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
         time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
 
         stats->metrics += j2_header->metric_count;
-        for (entries = 0; entries < j2_header->metric_count; entries++) {
+        for (unsigned entries = 0; entries < j2_header->metric_count; entries++) {
+
+            // Per-metric: page_offset is header-controlled. Validate it points
+            // into the mapping and that there is room for the page_header AND
+            // its trailing page_list[] before dereferencing through it.
+            if ((size_t)metric->page_offset > mmap_size ||
+                mmap_size - (size_t)metric->page_offset < sizeof(struct journal_page_header)) {
+                metric++;
+                continue;
+            }
 
             struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+
+            size_t page_list_room = mmap_size - (size_t)metric->page_offset - sizeof(struct journal_page_header);
+            if ((size_t)metric_list_header->entries > page_list_room / sizeof(struct journal_page_list)) {
+                metric++;
+                continue;
+            }
+
             stats->metrics_pages += metric_list_header->entries;
             struct journal_page_list *descr =  (void *) (data_start + metric->page_offset + sizeof(struct journal_page_header));
             for (uint32_t idx=0; idx < metric_list_header->entries; idx++) {
@@ -1371,6 +1403,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
     // On SIGBUS/SIGSEGV the PROTECTED_ACCESS_SETUP macro already
     // rate-limits the error log; fall through to release the journal.
 
+release:
     journalfile_v2_data_release(datafile->journalfile);
 }
 
