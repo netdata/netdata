@@ -4,7 +4,7 @@
 
 :::important
 
-Netdata Cloud paid subscription is required.
+Netdata Cloud Business plan (paid subscription) is required.
 
 :::
 

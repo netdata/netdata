@@ -10,7 +10,7 @@ The **Netdata Alerts Configuration Manager** lets you create and fine-tune alert
 
 :::info
 
-To use this feature, you'll need an active Netdata subscription. [View subscription plans](https://www.netdata.cloud/pricing/)
+To use this feature, you'll need a Netdata Cloud Business plan (or other paid subscription). [View subscription plans](https://www.netdata.cloud/pricing/)
 
 :::
 

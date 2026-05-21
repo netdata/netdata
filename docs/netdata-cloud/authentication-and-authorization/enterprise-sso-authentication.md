@@ -14,7 +14,7 @@ Enterprise SSO handles authentication only. You must configure user and role man
 |--------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **SSO Provider**   | Must be [supported by Netdata](https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/cloud-authentication-&-authorization-integrations) |
 | **Account Status** | Active Netdata Cloud account                                                                                                                                    |
-| **Subscription**   | Paid plan                                                                                                                             |
+| **Subscription**   | Business plan                                                                                                                        |
 | **Access Level**   | Space Administrator permissions                                                                                                                                 |
 
 ## Setup
