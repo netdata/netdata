@@ -85,7 +85,7 @@ You can collect custom metrics from PowerShell scripts using the [Nagios Plugins
 
 ### Quick setup
 
-1. **Create your script** — write a `.ps1` file that outputs status text with optional performance data and exits with code `0` (OK), `1` (WARNING), `2` (CRITICAL), or `3` (UNKNOWN). Save it to a known location, for example `C:\Netdata\checks\`:
+1. **Create your script** — write a `.ps1` file that outputs status text with optional performance data and exits with code `0` (OK), `1` (WARNING), `2` (CRITICAL), or `3` (UNKNOWN). Save it to the Netdata plugin directory (`C:\Program Files\Netdata\usr\libexec\netdata\plugins.d\`):
 
    ```powershell
    $value = 85
@@ -96,7 +96,7 @@ You can collect custom metrics from PowerShell scripts using the [Nagios Plugins
 2. **Test it manually** from PowerShell:
 
    ```powershell
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Netdata\checks\check_example.ps1"
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\plugins.d\check_example.ps1"
    echo "Exit code: $LASTEXITCODE"
    ```
 
@@ -112,7 +112,7 @@ You can collect custom metrics from PowerShell scripts using the [Nagios Plugins
    ```yaml
    jobs:
      - name: my_check
-       plugin: C:\Netdata\checks\check_example.ps1
+       plugin: C:\Program Files\Netdata\usr\libexec\netdata\plugins.d\check_example.ps1
        timeout: 10s
        check_interval: 1m
    ```
