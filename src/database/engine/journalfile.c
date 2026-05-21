@@ -1052,47 +1052,61 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
 
     uint8_t *data_start = (uint8_t *)j2_header;
 
-    if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
-        journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
-        if (journalfile_check_v2_metric_list(data_start, j2_header->journal_v2_file_size)) {
-            journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
-            // needs rebuild
-            return;
-        }
-    }
-
     char path_v2[RRDENG_PATH_MAX];
     journalfile_v2_generate_path(journalfile->datafile, path_v2, sizeof(path_v2));
-    time_t global_first_time_s;
+    time_t global_first_time_s = 0;
     bool failed = false;
-    uint32_t entries;
+    uint32_t entries = 0;
     // Calculate number of samples here and update once the file is loaded
     uint64_t journal_samples = 0;
+
+    // Protect the whole walk -- both the optional CRC check and the mrg update
+    // read into the mmap'd v2 journal. If a backing page cannot be paged in
+    // (file truncated, sparse hole, transient I/O error) the kernel raises
+    // SIGBUS; without a protected region active the process aborts. Same
+    // pattern as journalfile_v2_validate() in journalfile_v2_load().
     PROTECTED_ACCESS_SETUP(data_start, journalfile->mmap.size, path_v2, "mrg-load");
     if(no_signal_received) {
-        entries = j2_header->metric_count;
-        struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
-        time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-        global_first_time_s = header_start_time_s;
-        time_t now_s = max_acceptable_collected_time();
-        for (size_t i=0; i < entries; i++) {
-            time_t start_time_s = header_start_time_s + metric->delta_start_s;
-            time_t end_time_s = header_start_time_s + metric->delta_end_s;
-
-            mrg_update_metric_retention_and_granularity_by_uuid(
-                main_mrg,
-                (Word_t)ctx,
-                &metric->uuid,
-                start_time_s,
-                end_time_s,
-                metric->update_every_s,
-                now_s,
-                &journal_samples);
-
-            metric++;
+        if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
+            journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
+            if (journalfile_check_v2_metric_list(data_start, j2_header->journal_v2_file_size)) {
+                journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
+                // needs rebuild
+                failed = true;
+            }
         }
-    } else
+
+        if (!failed) {
+            entries = j2_header->metric_count;
+            struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
+            time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+            global_first_time_s = header_start_time_s;
+            time_t now_s = max_acceptable_collected_time();
+            for (size_t i=0; i < entries; i++) {
+                time_t start_time_s = header_start_time_s + metric->delta_start_s;
+                time_t end_time_s = header_start_time_s + metric->delta_end_s;
+
+                mrg_update_metric_retention_and_granularity_by_uuid(
+                    main_mrg,
+                    (Word_t)ctx,
+                    &metric->uuid,
+                    start_time_s,
+                    end_time_s,
+                    metric->update_every_s,
+                    now_s,
+                    &journal_samples);
+
+                metric++;
+            }
+        }
+    }
+    else {
+        // SIGBUS/SIGSEGV inside the mmap walk -- mark the file as not-available
+        // so the next pass rebuilds it. The PROTECTED_ACCESS_SETUP macro
+        // already rate-limits the error log.
+        journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
         failed = true;
+    }
 
     journalfile_v2_data_release(journalfile);
 
