@@ -8,6 +8,50 @@
 
 #define ML_METADATA_VERSION 2
 
+static void ml_host_clear_context_anomaly_rate(ml_host_t *host)
+{
+    spinlock_lock(&host->context_anomaly_rate_spinlock);
+
+    for (auto &entry : host->context_anomaly_rate)
+        string_freez(entry.first);
+
+    host->context_anomaly_rate.clear();
+
+    spinlock_unlock(&host->context_anomaly_rate_spinlock);
+}
+
+static void ml_dimension_enqueue_create_model(RRDHOST *rh, RRDDIM *rd)
+{
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (!host)
+        return;
+
+    ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
+    if (!dim)
+        return;
+
+    spinlock_lock(&dim->slock);
+    bool should_enqueue = !dim->create_new_model_queued &&
+                          dim->ts == TRAINING_STATUS_UNTRAINED &&
+                          (!dim->has_received_downstream_model || dim->km_contexts.empty());
+    if (should_enqueue)
+        dim->create_new_model_queued = true;
+    spinlock_unlock(&dim->slock);
+
+    if (!should_enqueue)
+        return;
+
+    ml_queue_item_t item;
+    item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
+    item.create_new_model.DLI = DimensionLookupInfo(
+        &rh->machine_guid[0],
+        rd->rrdset->id,
+        rd->id
+    );
+
+    ml_queue_push(host->queue, item);
+}
+
 bool ml_capable()
 {
     return true;
@@ -60,6 +104,7 @@ void ml_host_delete(RRDHOST *rh)
     if (!host)
         return;
 
+    ml_host_clear_context_anomaly_rate(host);
     netdata_mutex_destroy(&host->mutex);
 
     delete host;
@@ -71,7 +116,33 @@ void ml_host_start(RRDHOST *rh) {
     if (!host)
         return;
 
+    // Set ml_running and run the sweep under host->mutex so concurrent
+    // ml_host_start() calls are serialized and the visibility window of the
+    // flag flip is bounded by the same critical section that performs the
+    // sweep.
+    netdata_mutex_lock(&host->mutex);
+
+    if (host->ml_running) {
+        netdata_mutex_unlock(&host->mutex);
+        return;
+    }
+
     host->ml_running = true;
+
+    void *rsp = NULL;
+    rrdset_foreach_read(rsp, host->rh) {
+        RRDSET *rs = static_cast<RRDSET *>(rsp);
+
+        void *rdp = NULL;
+        rrddim_foreach_read(rdp, rs) {
+            RRDDIM *rd = static_cast<RRDDIM *>(rdp);
+            ml_dimension_enqueue_create_model(rh, rd);
+        }
+        rrddim_foreach_done(rdp);
+    }
+    rrdset_foreach_done(rsp);
+
+    netdata_mutex_unlock(&host->mutex);
 }
 
 void ml_host_stop(RRDHOST *rh) {
@@ -84,8 +155,14 @@ void ml_host_stop(RRDHOST *rh) {
 
     netdata_mutex_lock(&host->mutex);
 
+    // Re-assert under the mutex so stop deterministically wins over a racing
+    // ml_host_start() that may have flipped the flag back to true after our
+    // early write but before we acquired the mutex.
+    host->ml_running = false;
+
     // reset host stats
     host->mls = ml_machine_learning_stats_t();
+    ml_host_clear_context_anomaly_rate(host);
 
     // reset charts/dims
     void *rsp = NULL;
@@ -117,6 +194,10 @@ void ml_host_stop(RRDHOST *rh) {
             dim->cns.clear();
             dim->cns_head = 0;
             dim->km_contexts.clear();
+            dim->has_received_downstream_model = false;
+            // create_new_model_queued not reset here: stop does not drain the
+            // worker queue, so pending CREATE_NEW_MODEL items remain valid.
+            dim->reset_generation++;
 
             spinlock_unlock(&dim->slock);
         }
@@ -204,7 +285,7 @@ bool ml_host_running(RRDHOST *rh) {
     if(!host)
         return false;
 
-    return true;
+    return host->ml_running;
 }
 
 void ml_host_get_models(RRDHOST *rh, BUFFER *wb)
@@ -274,6 +355,9 @@ void ml_dimension_new(RRDDIM *rd)
     dim->suppression_anomaly_counter = 0;
     dim->suppression_window_counter = 0;
     dim->training_in_progress = false;
+    dim->has_received_downstream_model = false;
+    dim->create_new_model_queued = false;
+    dim->reset_generation = 0;
     dim->cns_head = 0;
 
     ml_kmeans_init(&dim->kmeans);
@@ -291,24 +375,13 @@ void ml_dimension_new(RRDDIM *rd)
 
     metaqueue_ml_load_models(rd);
 
-    // add to worker queue
-    {
-        RRDHOST *rh = rd->rrdset->rrdhost;
-        ml_host_t *host = (ml_host_t *) rh->ml_host;
-
-        ml_queue_item_t item;
-        item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
-
-        ml_request_create_new_model_t req;
-        req.DLI = DimensionLookupInfo(
-            &rh->machine_guid[0],
-            rd->rrdset->id,
-            rd->id
-        );
-        item.create_new_model = req;
-
-        ml_queue_push(host->queue, item);
-    }
+    // Only enqueue once ml is running for this host. Otherwise, ml_host_start()
+    // will sweep all untrained dimensions and enqueue them when it runs.
+    // This avoids double-enqueueing the same dim from both paths.
+    RRDHOST *rh = rd->rrdset->rrdhost;
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (host && host->ml_running)
+        ml_dimension_enqueue_create_model(rh, rd);
 }
 
 void ml_dimension_delete(RRDDIM *rd)

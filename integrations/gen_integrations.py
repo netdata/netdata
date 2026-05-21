@@ -1,40 +1,31 @@
 #!/usr/bin/env python3
 
 import json
-import os
 import re
 import sys
 from copy import deepcopy
-from pathlib import Path
 
-from jsonschema import Draft7Validator, ValidationError
-from referencing import Registry, Resource
-from referencing.jsonschema import DRAFT7
-from ruamel.yaml import YAML, YAMLError
+from jsonschema import ValidationError
 
-AGENT_REPO = 'netdata/netdata'
+from _common import (
+    AGENT_REPO,
+    INTEGRATIONS_PATH,
+    METADATA_PATTERN,
+    REPO_PATH,
+    debug,
+    fail_on_warnings,
+    load_collectors,
+    load_yaml,
+    make_id,
+    make_validator,
+    warn,
+)
 
-INTEGRATIONS_PATH = Path(__file__).parent
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
 JSON_PATH = INTEGRATIONS_PATH / 'integrations.json'
 CATEGORIES_FILE = INTEGRATIONS_PATH / 'categories.yaml'
-REPO_PATH = INTEGRATIONS_PATH.parent
-SCHEMA_PATH = INTEGRATIONS_PATH / 'schemas'
 DISTROS_FILE = REPO_PATH / '.github' / 'data' / 'distros.yml'
-METADATA_PATTERN = '*/metadata.yaml'
-
-COLLECTOR_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'scripts.d' / 'collector', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules' / 'websphere', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netdata-otel', True),
-]
 
 FLOWS_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'metadata.yaml', False),
@@ -138,104 +129,16 @@ SERVICE_DISCOVERY_RENDER_KEYS = [
 CUSTOM_TAG_PATTERN = re.compile('\\{% if .*?%\\}.*?\\{% /if %\\}|\\{%.*?%\\}', flags=re.DOTALL)
 FIXUP_BLANK_PATTERN = re.compile('\\\\\\n *\\n')
 
-GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
-DEBUG = os.environ.get('DEBUG', False)
-WARNINGS = []
-
-
-def debug(msg):
-    if GITHUB_ACTIONS:
-        print(f':debug:{msg}')
-    elif DEBUG:
-        print(f'>>> {msg}')
-    else:
-        pass
-
-
-def warn(msg, path):
-    WARNINGS.append((str(path), msg))
-
-    if GITHUB_ACTIONS:
-        print(f':warning file={path}:{msg}')
-    else:
-        print(f'!!! WARNING:{path}:{msg}')
-
-
-def fail_on_warnings():
-    if not WARNINGS:
-        return 0
-
-    warned_files = sorted({path for path, _ in WARNINGS})
-    print(f':error:Integrations generation failed with {len(WARNINGS)} warning(s) across {len(warned_files)} file(s).')
-
-    for path in warned_files:
-        print(f':error file={path}:Metadata warnings in this file are now fatal for integrations generation.')
-
-    return 1
-
-
-def retrieve_from_filesystem(uri):
-    path = SCHEMA_PATH / Path(uri)
-    contents = json.loads(path.read_text())
-    return Resource.from_contents(contents, DRAFT7)
-
-
-registry = Registry(retrieve=retrieve_from_filesystem)
-
-CATEGORY_VALIDATOR = Draft7Validator(
-    {'$ref': './categories.json#'},
-    registry=registry,
-)
-
-DEPLOY_VALIDATOR = Draft7Validator(
-    {'$ref': './deploy.json#'},
-    registry=registry,
-)
-
-EXPORTER_VALIDATOR = Draft7Validator(
-    {'$ref': './exporter.json#'},
-    registry=registry,
-)
-
-AGENT_NOTIFICATION_VALIDATOR = Draft7Validator(
-    {'$ref': './agent_notification.json#'},
-    registry=registry,
-)
-
-CLOUD_NOTIFICATION_VALIDATOR = Draft7Validator(
-    {'$ref': './cloud_notification.json#'},
-    registry=registry,
-)
-
-LOGS_VALIDATOR = Draft7Validator(
-    {'$ref': './logs.json#'},
-    registry=registry,
-)
-
-AUTHENTICATION_VALIDATOR = Draft7Validator(
-    {'$ref': './authentication.json#'},
-    registry=registry,
-)
-
-COLLECTOR_VALIDATOR = Draft7Validator(
-    {'$ref': './collector.json#'},
-    registry=registry,
-)
-
-FLOWS_VALIDATOR = Draft7Validator(
-    {'$ref': './flows.json#'},
-    registry=registry,
-)
-
-SECRETSTORE_VALIDATOR = Draft7Validator(
-    {'$ref': './secretstore.json#'},
-    registry=registry,
-)
-
-SERVICE_DISCOVERY_VALIDATOR = Draft7Validator(
-    {'$ref': './service_discovery.json#'},
-    registry=registry,
-)
+CATEGORY_VALIDATOR = make_validator('./categories.json#')
+DEPLOY_VALIDATOR = make_validator('./deploy.json#')
+EXPORTER_VALIDATOR = make_validator('./exporter.json#')
+AGENT_NOTIFICATION_VALIDATOR = make_validator('./agent_notification.json#')
+CLOUD_NOTIFICATION_VALIDATOR = make_validator('./cloud_notification.json#')
+LOGS_VALIDATOR = make_validator('./logs.json#')
+AUTHENTICATION_VALIDATOR = make_validator('./authentication.json#')
+FLOWS_VALIDATOR = make_validator('./flows.json#')
+SECRETSTORE_VALIDATOR = make_validator('./secretstore.json#')
+SERVICE_DISCOVERY_VALIDATOR = make_validator('./service_discovery.json#')
 
 _jinja_env = False
 
@@ -323,42 +226,6 @@ def get_category_sets(categories):
     return (default, valid)
 
 
-def get_collector_metadata_entries():
-    ret = []
-
-    for r, d, m in COLLECTOR_SOURCES:
-        if d.exists() and d.is_dir() and m:
-            for item in d.glob(METADATA_PATTERN):
-                ret.append((r, item))
-        elif d.exists() and d.is_file() and not m:
-            if d.match(METADATA_PATTERN):
-                ret.append((r, d))
-
-    return ret
-
-
-def load_yaml(src):
-    yaml = YAML(typ='safe')
-
-    if not src.is_file():
-        warn(f'{src} is not a file.', src)
-        return False
-
-    try:
-        contents = src.read_text()
-    except (IOError, OSError):
-        warn(f'Failed to read {src}.', src)
-        return False
-
-    try:
-        data = yaml.load(contents)
-    except YAMLError:
-        warn(f'Failed to parse {src} as YAML.', src)
-        return False
-
-    return data
-
-
 def load_categories():
     categories = load_yaml(CATEGORIES_FILE)
 
@@ -374,37 +241,6 @@ def load_categories():
         sys.exit(1)
 
     return categories
-
-
-def load_collectors():
-    ret = []
-
-    entries = get_collector_metadata_entries()
-
-    for repo, path in entries:
-        debug(f'Loading {path}.')
-        data = load_yaml(path)
-
-        if not data:
-            continue
-
-        try:
-            COLLECTOR_VALIDATOR.validate(data)
-        except ValidationError as e:
-            warn(
-                f'Failed to validate {path} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
-                path)
-            continue
-
-        for idx, item in enumerate(data['modules']):
-            item['meta']['plugin_name'] = data['plugin_name']
-            item['integration_type'] = 'collector'
-            item['_src_path'] = path
-            item['_repo'] = repo
-            item['_index'] = idx
-            ret.append(item)
-
-    return ret
 
 
 def load_flows():
@@ -817,17 +653,6 @@ def load_service_discoveries():
             ret.extend(_load_service_discovery_file(path, repo))
 
     return ret
-
-
-def make_id(meta):
-    if 'monitored_instance' in meta:
-        instance_name = meta['monitored_instance']['name'].replace(' ', '_')
-    elif 'instance_name' in meta:
-        instance_name = meta['instance_name']
-    else:
-        instance_name = '000_unknown'
-
-    return f'{meta["plugin_name"]}-{meta["module_name"]}-{instance_name}'
 
 
 def make_edit_link(item):

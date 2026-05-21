@@ -17,7 +17,7 @@ func (c *Collector) doQueryReplicationMetrics() error {
 		}
 	}
 
-	if c.pgVersion >= pgVersion10 && c.isSuperUser() {
+	if c.pgVersion >= pgVersion10 && c.canQueryReplicationSlotFiles() {
 		if err := c.doQueryReplSlotFiles(); err != nil {
 			return fmt.Errorf("querying replication slot files error: %v", err)
 		}

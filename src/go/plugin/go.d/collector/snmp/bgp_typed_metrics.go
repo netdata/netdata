@@ -280,9 +280,7 @@ func (b *bgpTypedMetricBuilder) metricsWithDeviceSummaries() []ddsnmp.Metric {
 		if peerCounts == nil && len(b.explicitDevicePeerCounts) > 0 {
 			peerCounts = make(map[string]int64, len(b.explicitDevicePeerCounts))
 		}
-		for dim, value := range b.explicitDevicePeerCounts {
-			peerCounts[dim] = value
-		}
+		maps.Copy(peerCounts, b.explicitDevicePeerCounts)
 		b.addMetric(b.deviceSample, "bgp.devices.peer_counts", peerCounts, nil)
 		b.addMetric(b.deviceSample, "bgp.devices.peer_states", b.devicePeerStates, nil)
 	}

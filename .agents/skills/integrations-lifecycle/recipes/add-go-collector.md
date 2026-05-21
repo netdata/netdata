@@ -151,10 +151,28 @@ validator will warn (fatal). Either pick an existing category
 or add a new one under the appropriate parent (typically
 `data-collection`).
 
-## 4. Stock `.conf`, `config_schema.json`, alerts, README
+## 4. Taxonomy, stock `.conf`, `config_schema.json`, alerts, README
 
-These three are the rest of the five-file consistency rule:
+These files are the rest of the collector consistency rule:
 
+- `src/go/plugin/go.d/collector/<name>/taxonomy.yaml` --
+  dashboard TOC placement for chart contexts. Static collectors
+  use ordered `items:` trees; plain strings in structural `items:`
+  own chart contexts. Dynamic collectors use `type: selector` with
+  `context_prefix:` or `collect_plugin:` and matching
+	  `metadata.yaml.metrics.dynamic_*` declarations. Display widgets
+	  use `type: context` with `contexts:` and `chart_library`; those
+	  referenced contexts must also be owned by structural items.
+	  Pick `--section-id` from
+	  `integrations/taxonomy/sections.yaml`; `section_id` is a stable
+	  registry ID, not a path to invent in the collector file.
+	  Seed the initial explicit context list with:
+	  ```bash
+	  python3 integrations/gen_taxonomy_seed.py src/go/plugin/go.d/collector/<name>/metadata.yaml --module-name <name> --section-id <section.id> --placement-id <name> --icon <icon>
+	  ```
+	  For a rich example with summary grids, table widgets, nested
+	  groups, and ownership leaves, read
+	  `src/go/plugin/go.d/collector/mysql/taxonomy.yaml`.
 - `src/go/plugin/go.d/config/go.d/<name>.conf` -- the stock
   config users will see at
   `/etc/netdata/go.d/<name>.conf`. Keep it minimal but
@@ -178,6 +196,7 @@ From the repo root:
 ```bash
 ./integrations/pip.sh   # once
 python3 integrations/gen_integrations.py
+python3 integrations/gen_taxonomy.py --check-only
 python3 integrations/gen_docs_integrations.py -c go.d/<name>
 python3 integrations/gen_doc_collector_page.py
 python3 integrations/gen_doc_secrets_page.py
@@ -187,6 +206,9 @@ Expected outputs:
 
 - `integrations/integrations.js` and `integrations/integrations.json`
   regenerated (gitignored, do NOT commit them).
+- Collector taxonomy validated. If `gen_taxonomy.py` fails, fix
+  `taxonomy.yaml` or the matching `metadata.yaml.metrics.dynamic_*`
+  declaration before continuing.
 - `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md`
   CREATED. Inspect: it should contain the `<!--startmeta`
   banner with your `sidebar_label` and `learn_rel_path`, then
@@ -208,6 +230,9 @@ re-run.
   every section reads correctly.
 - Open `src/collectors/COLLECTORS.md` and find your collector
   in the table.
+- Run `python3 integrations/check_collector_taxonomy.py` before
+  opening the PR. In CI this also runs with `--pr-diff` to enforce
+  touched-collector taxonomy coverage.
 - Run `git diff` and confirm the only changes are in:
   - `src/go/plugin/go.d/collector/<name>/...` (your new module
     files).
@@ -221,18 +246,19 @@ re-run.
     category.
   - NOT `integrations/integrations.js` or
     `integrations.json` (gitignored).
+  - NOT `integrations/taxonomy.json` (gitignored).
 
 ## 7. Commit and push
 
 Single PR, single commit (or a few logical commits) covering
-the five-file rule plus the generated integration page and
-umbrella update. Reviewers will check that all five files
-were updated together.
+the collector consistency rule plus the generated integration
+page and umbrella update. Reviewers will check that affected
+artifacts were updated together.
 
 ## 8. CI
 
 - `check-markdown.yml` will run on the PR. It runs the same
-  pipeline scripts and validates Learn ingest. If your
+  pipeline scripts, validates taxonomy, and validates Learn ingest. If your
   committed integration page diverges from CI's regen, the
   workflow fails -- fix locally and re-push.
 - After merge, `generate-integrations.yml` triggers on master.
@@ -256,10 +282,9 @@ were updated together.
 
 ## Common mistakes
 
-- **Forgetting one of the five files.** The most common
+- **Forgetting one collector-consistency artifact.** The most common
   cause of review feedback. Use `git status` after step 5 to
-  confirm all five (or six counting the umbrella) are
-  staged.
+  confirm every affected source/generated artifact is staged.
 - **Hand-editing `integrations/<slug>.md` after generation.**
   Never. It is regenerated each time. Edit `metadata.yaml`
   and re-run.

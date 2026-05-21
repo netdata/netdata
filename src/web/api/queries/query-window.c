@@ -131,9 +131,9 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     rrdr_relative_window_to_absolute_query(&after_wanted, &before_wanted, NULL, unittest_running);
     query_debug_log(":relative2absolute after %ld, before %ld", after_wanted, before_wanted);
 
-    if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && nd_profile.storage_tiers > 1) {
-        update_every = rrdset_find_natural_update_every_for_timeframe(
-                qt, after_wanted, before_wanted, points_wanted, options, tier);
+    if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) &&
+        tier > 0 && tier < nd_profile.storage_tiers && nd_profile.storage_tiers > 1) {
+        update_every = query_target_min_update_every_for_tier(qt, tier);
 
         if (update_every <= 0) update_every = qt->db.minimum_latest_update_every_s;
         query_debug_log(":natural update every %ld", update_every);

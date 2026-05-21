@@ -3,6 +3,7 @@
 #include "ml_config.h"
 #include "ml_features.h"
 #include "ml_kmeans.h"
+#include "ml_private.h"
 
 #include <algorithm>
 #include <cmath>
@@ -862,6 +863,84 @@ static void test_kmeans_timestamp_rejection()
     }
 }
 
+static void test_downstream_model_short_circuit_and_requeue()
+{
+    fprintf(stderr, "  test_downstream_model_short_circuit_and_requeue...\n");
+
+    enum ml_worker_result worker_res = ML_WORKER_RESULT_OK;
+    bool should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                                  true,
+                                                                  false,
+                                                                  &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
+                   "downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(!ml_should_requeue_create_new_model(worker_res),
+                   "downstream-supplied result should stop CREATE_NEW_MODEL requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_CONSTANT,
+                                                             true,
+                                                             false,
+                                                             &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "constant downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
+                   "constant downstream-supplied dimensions should drain CREATE_NEW_MODEL items");
+    ML_TEST_ASSERT(!ml_should_requeue_create_new_model(worker_res),
+                   "constant downstream-supplied result should stop CREATE_NEW_MODEL requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                             false,
+                                                             false,
+                                                             &worker_res);
+    ML_TEST_ASSERT(!should_short_circuit,
+                   "dimensions without downstream models should continue to training");
+    ML_TEST_ASSERT(ml_should_requeue_create_new_model(ML_WORKER_RESULT_OK),
+                   "ordinary training results should keep CREATE_NEW_MODEL items requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                             false,
+                                                             true,
+                                                             &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "training-in-progress dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_TRAINING_IN_PROGRESS,
+                   "training-in-progress dimensions should report the distinct result");
+    ML_TEST_ASSERT(ml_should_requeue_create_new_model(worker_res),
+                   "training-in-progress result should keep CREATE_NEW_MODEL items requeueing "
+                   "so the dim stays in the periodic retrain cycle");
+}
+
+static void test_reset_generation_cancels_model_publish()
+{
+    fprintf(stderr, "  test_reset_generation_cancels_model_publish...\n");
+
+    bool training_in_progress = true;
+    bool should_publish = ml_should_publish_model_update(true, 8, 7, &training_in_progress);
+    ML_TEST_ASSERT(!should_publish,
+                   "generation mismatch should cancel model publication");
+    ML_TEST_ASSERT(!training_in_progress,
+                   "generation mismatch should clear training_in_progress");
+
+    training_in_progress = true;
+    should_publish = ml_should_publish_model_update(false, 7, 7, &training_in_progress);
+    ML_TEST_ASSERT(!should_publish,
+                   "stopped hosts should cancel model publication");
+    ML_TEST_ASSERT(!training_in_progress,
+                   "stopped-host cancellation should clear training_in_progress");
+
+    training_in_progress = true;
+    should_publish = ml_should_publish_model_update(true, 7, 7, &training_in_progress);
+    ML_TEST_ASSERT(should_publish,
+                   "matching generation on a running host should allow model publication");
+    ML_TEST_ASSERT(training_in_progress,
+                   "successful publication path should leave training_in_progress unchanged");
+}
+
 extern "C" int ml_unittest()
 {
     fprintf(stderr, "\nML unit tests:\n");
@@ -888,6 +967,8 @@ extern "C" int ml_unittest()
     test_parameter_combinations();
     test_kmeans_timestamp_roundtrip();
     test_kmeans_timestamp_rejection();
+    test_downstream_model_short_circuit_and_requeue();
+    test_reset_generation_cancels_model_publish();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);
 

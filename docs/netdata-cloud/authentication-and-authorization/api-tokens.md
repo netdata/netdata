@@ -37,22 +37,45 @@ Netdata provides three API versions that you can access with API tokens:
 - **v2**: Multi-node API with advanced grouping and aggregation capabilities
 - **v3**: The latest API version that combines v1 and v2 endpoints and may include additional features
 
+:::tip
+
+**v3 is the recommended version for Netdata Cloud queries.** Netdata Cloud v3 endpoints use POST with a JSON body and provide the most control over scoping, filtering, and aggregation. Local Agent v3 endpoints are available via GET; for example, `/api/v3/data` is query-parameter driven and does not use the Cloud v3 JSON body shape. See the [Common Endpoints section](#common-endpoints) for v3 endpoint details.
+
+:::
+
 ## Common Endpoints
 
-With appropriate API tokens, you can access endpoints including:
+With the appropriate token type, you can access endpoints including:
+Cloud API tokens authenticate Netdata Cloud endpoints, while direct Local Agent endpoints use per-agent bearer tokens only when Agent bearer protection is enabled (and may not require a token when unprotected).
 
-- `/api/v2/nodes` - Node information
-- `/api/v2/data` - Multi-dimensional data queries
-- `/api/v2/contexts` - Context metadata
-- `/api/v2/weights` - Metric scoring/correlation
-- `/api/v2/q` - Full-text search
-- `/api/v1/info` - Agent information
-- `/api/v1/charts` - Chart information
-- `/api/v1/data` - Single node data queries
+| Surface                     | Method | Endpoint                                           | Purpose                                                          |
+|:----------------------------|:-------|:---------------------------------------------------|:-----------------------------------------------------------------|
+| Netdata Cloud               | `POST` | `/api/v3/spaces/{spaceID}/rooms/{roomID}/data`     | Time-series metric data queries                                  |
+| Netdata Cloud               | `POST` | `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes`    | List nodes in a room                                             |
+| Netdata Cloud               | `POST` | `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts` | List available metric contexts                                   |
+| Local Agent                 | `GET`  | `/api/v3/data`                                     | v3 data queries (single-node on an Agent, multi-node on a Parent) |
+| Local Agent                 | `GET`  | `/api/v3/nodes`                                    | Multi-host node listing on a parent Agent                        |
+| Local Agent                 | `GET`  | `/api/v3/contexts`                                 | List available metric contexts on an Agent                       |
+| Local Agent                 | `GET`  | `/api/v3/weights`                                  | Metric scoring/correlation                                       |
+| Local Agent                 | `GET`  | `/api/v3/q`                                        | Full-text search                                                 |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/nodes`                                    | Node information                                                 |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/data`                                     | Multi-dimensional data queries                                   |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/contexts`                                 | Context metadata                                                 |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/weights`                                  | Metric scoring/correlation                                       |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v2/q`                                        | Full-text search                                                 |
+| Local Agent                 | `GET`  | `/api/v1/info`                                     | Agent information                                                |
+| Local Agent                 | `GET`  | `/api/v1/charts`                                   | Legacy chart information                                         |
+| Local Agent                 | `GET`  | `/api/v1/data`                                     | Legacy single-node data queries                                  |
 
-:::info
+:::caution
 
-Currently, Netdata Cloud is not exposing the stable API.
+The local Agent `/api/v1/charts` endpoint is still available for backward compatibility, but it is deprecated for new integrations. Use `/api/v3/contexts` on local Agents, or `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts` in Netdata Cloud, to discover current metric contexts and dimensions.
+
+:::
+
+:::note
+
+For Netdata Cloud metric queries, use the room-scoped **v3 POST endpoints** with a JSON body. Local Agents expose their own unscoped v3 endpoints such as `/api/v3/data`, `/api/v3/nodes`, `/api/v3/contexts`, `/api/v3/weights`, and `/api/v3/q`. Legacy metrics v1 endpoints such as `/api/v1/data` and `/api/v1/charts` remain local-Agent only and return **404** when called against `app.netdata.cloud`. v2 endpoints work on both Cloud and local Agents for backward compatibility, but v3 is recommended for Cloud.
 
 :::
 
@@ -75,6 +98,12 @@ curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://ap
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/data?contexts=system.cpu&after=-600
 ```
+
+:::tip
+
+The examples above use v2 endpoints. For metric data queries, the v3 equivalent (`/api/v3/data`) is also available on local Agents and is used with query parameters. On Netdata Cloud, use the room-scoped v3 POST endpoint and JSON body — see the Advanced Metric Queries example below.
+
+:::
 
 **Advanced Metric Queries with Aggregation**
 
@@ -111,22 +140,22 @@ curl -s -X POST \
 
 The `time_group` parameter in `aggregations.time` controls how data points within each time interval are combined:
 
-| Option | Description | Use Case |
-|--------|-------------|----------|
-| `average` | Mean value (default) | Average resource consumption over time |
-| `min` | Minimum value | Find lowest values in each interval |
-| `max` | Maximum value | Find spikes or peaks |
-| `sum` | Sum of values | Total volume transferred (counters) |
-| `median` | Median value | Robust central tendency |
-| `stddev` | Standard deviation | Measure of variability |
-| `ses` | Single exponential smoothing | Trend-aware smoothing |
-| `des` | Double exponential smoothing | Trend + seasonality smoothing |
-| `incremental-sum` | Difference between last and first value | Change over interval |
-| `percentile` | Generic percentile (set value in `time_group_options`) | e.g., 95th percentile latency |
-| `countif` | Count values matching condition (set condition in `time_group_options`) | e.g., count samples above threshold |
-| `trimmed-mean` | Mean after trimming outliers (set trim % in `time_group_options`) | Robust average excluding extremes |
-| `trimmed-median` | Median after trimming outliers (set trim % in `time_group_options`) | Robust median excluding extremes |
-| `extremes` | Min and max values | Show value range per interval |
+| Option             | Description                                                                        | Use Case                                 |
+|:-------------------|:-----------------------------------------------------------------------------------|:-----------------------------------------|
+| `average`          | Mean value (default)                                                               | Average resource consumption over time    |
+| `min`              | Minimum value                                                                      | Find lowest values in each interval       |
+| `max`              | Maximum value                                                                      | Find spikes or peaks                      |
+| `sum`              | Sum of values                                                                      | Total volume transferred (counters)       |
+| `median`           | Median value                                                                       | Robust central tendency                   |
+| `stddev`           | Standard deviation                                                                 | Measure of variability                    |
+| `ses`              | Single exponential smoothing                                                       | Trend-aware smoothing                     |
+| `des`              | Double exponential smoothing                                                       | Trend + seasonality smoothing             |
+| `incremental-sum`  | Difference between last and first value                                            | Change over interval                      |
+| `percentile`       | Generic percentile (set value in `time_group_options`)                             | e.g., 95th percentile latency             |
+| `countif`          | Count values matching condition (set condition in `time_group_options`)            | e.g., count samples above threshold       |
+| `trimmed-mean`     | Mean after trimming outliers (set trim % in `time_group_options`)                  | Robust average excluding extremes         |
+| `trimmed-median`   | Median after trimming outliers (set trim % in `time_group_options`)                | Robust median excluding extremes          |
+| `extremes`         | Min and max values                                                                 | Show value range per interval             |
 
 :::important
 

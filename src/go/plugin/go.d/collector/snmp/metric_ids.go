@@ -33,19 +33,21 @@ func metricIDFromKey(key string, subkeys ...string) string {
 }
 
 func rawMetricID(prefix, base string, subkeys ...string) string {
-	id := prefix + base
+	var id strings.Builder
+	id.WriteString(prefix + base)
 	for _, subkey := range subkeys {
-		id += "_" + subkey
+		id.WriteString("_" + subkey)
 	}
-	return id
+	return id.String()
 }
 
 func cleanedMetricID(prefix, base string, subkeys ...string) string {
-	id := prefix + cleanMetricName.Replace(base)
+	var id strings.Builder
+	id.WriteString(prefix + cleanMetricName.Replace(base))
 	for _, subkey := range subkeys {
-		id += "_" + cleanMetricName.Replace(subkey)
+		id.WriteString("_" + cleanMetricName.Replace(subkey))
 	}
-	return id
+	return id.String()
 }
 
 func chartContextID(name string) string {

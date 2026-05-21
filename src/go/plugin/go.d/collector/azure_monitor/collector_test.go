@@ -612,7 +612,7 @@ func TestCollector_UsesConfiguredTimeout(t *testing.T) {
 				}
 				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 					{
-						ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+						ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
 						Values: []azmetrics.Metric{
 							metricWithAvg("cpu_percent", now, 21.5),
 						},
@@ -725,7 +725,7 @@ func TestCollector_RefreshDiscoveryDisabledWhenRefreshEveryZero(t *testing.T) {
 	mx := &mockMetricsClient{
 		queryResponse: azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 			{
-				ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+				ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
 				Values: []azmetrics.Metric{
 					metricWithAvg("cpu_percent", now, 21.5),
 				},
@@ -766,7 +766,7 @@ func TestCollector_RefreshDiscoveryFailureFallsBackToLastKnownSnapshot(t *testin
 	mx := &mockMetricsClient{
 		queryResponse: azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 			{
-				ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+				ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
 				Values: []azmetrics.Metric{
 					metricWithAvg("cpu_percent", now, 21.5),
 				},
@@ -825,14 +825,14 @@ func TestCollector_CollectScenarios(t *testing.T) {
 				}
 				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 					{
-						ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+						ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
 						Values: []azmetrics.Metric{
 							metricWithAvg("cpu_percent", now, 21.5),
 							metricWithAvg("storage_percent", now, 61.2),
 						},
 					},
 					{
-						ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-b/providers/microsoft.dbforpostgresql/flexibleservers/pg-b"),
+						ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-b/providers/microsoft.dbforpostgresql/flexibleservers/pg-b"),
 						Values: []azmetrics.Metric{
 							metricWithAvg("cpu_percent", now, 33.1),
 							metricWithAvg("storage_percent", now, 72.8),
@@ -870,13 +870,13 @@ func TestCollector_CollectScenarios(t *testing.T) {
 				}
 				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 					{
-						ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+						ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
 						Values: []azmetrics.Metric{
 							metricWithAvg("cpu_percent", now, 21.5),
 						},
 					},
 					{
-						ResourceID: ptrString("/subscriptions/sub-2/resourcegroups/rg-b/providers/microsoft.dbforpostgresql/flexibleservers/pg-b"),
+						ResourceID: new("/subscriptions/sub-2/resourcegroups/rg-b/providers/microsoft.dbforpostgresql/flexibleservers/pg-b"),
 						Values: []azmetrics.Metric{
 							metricWithAvg("cpu_percent", now, 33.1),
 						},
@@ -932,7 +932,7 @@ func TestCollector_CollectScenarios(t *testing.T) {
 				mx.queryResponses = map[string]azmetrics.QueryResourcesResponse{
 					"sub-1": {MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 						{
-							ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+							ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
 							Values: []azmetrics.Metric{
 								metricWithAvg("cpu_percent", now, 21.5),
 							},
@@ -1024,13 +1024,13 @@ func TestCollector_WorkloadMode_MixedTaggedAndUntaggedResources_RouteToCorrectSc
 	mx := &mockMetricsClient{
 		queryResponse: azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 			{
-				ResourceID: ptrString(strings.ToLower(taggedID)),
+				ResourceID: new(strings.ToLower(taggedID)),
 				Values: []azmetrics.Metric{
 					metricWithAvg("cpu_percent", now, 21.5),
 				},
 			},
 			{
-				ResourceID: ptrString(strings.ToLower(untaggedID)),
+				ResourceID: new(strings.ToLower(untaggedID)),
 				Values: []azmetrics.Metric{
 					metricWithAvg("cpu_percent", now, 33.1),
 				},
@@ -1167,7 +1167,7 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 	mx := &mockMetricsClient{
 		queryResponse: azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 			{
-				ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.storage/storageaccounts/st-a"),
+				ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.storage/storageaccounts/st-a"),
 				Values: []azmetrics.Metric{
 					metricWithAvg("UsedCapacity", now, 100),
 				},
@@ -1356,7 +1356,7 @@ func TestSamplesFromQueryResponse_UsesResourceHostScope(t *testing.T) {
 			resourceID := "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a"
 			samples := samplesFromQueryResponse(
 				[]azmetrics.MetricData{{
-					ResourceID: ptrString(strings.ToLower(resourceID)),
+					ResourceID: new(strings.ToLower(resourceID)),
 					Values: []azmetrics.Metric{
 						metricWithAvg("cpu_percent", now, 10),
 					},
@@ -2872,14 +2872,15 @@ func (m *mockMetricsClient) queryCalls() []metricsQueryCall {
 
 func metricWithAvg(name string, ts time.Time, value float64) azmetrics.Metric {
 	return azmetrics.Metric{
-		Name: &azmetrics.LocalizableString{Value: ptrString(name)},
+		Name: &azmetrics.LocalizableString{Value: new(name)},
 		TimeSeries: []azmetrics.TimeSeriesElement{
 			{Data: []azmetrics.MetricValue{{TimeStamp: &ts, Average: &value}}},
 		},
 	}
 }
 
-func ptrString(v string) *string { return &v }
+//go:fix inline
+func ptrString(v string) *string { return new(v) }
 
 func derefString(v *string) string {
 	if v == nil {

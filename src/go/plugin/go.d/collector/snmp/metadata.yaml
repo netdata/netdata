@@ -1145,6 +1145,9 @@ modules:
         - `route_totals` contains cumulative counters where the vendor MIB only exposes totals.
         - When the source model is peer-family scoped, alerts and chart labels include AFI/SAFI so operators can distinguish otherwise similar peers.
       availability: []
+      dynamic_context_prefixes:
+        - prefix: snmp.
+          reason: SNMP profiles emit vendor- and device-specific chart contexts at runtime under the snmp namespace.
       scopes:
         - name: device licensing
           description: Shared device-level licensing health metrics emitted when the matched SNMP profile provides licensing telemetry. Supported profile coverage includes Check Point licensing state and per-blade expiry, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state and per-license expiry telemetry, Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry, and basic MikroTik RouterOS upgrade-entitlement telemetry. MikroTik support is intentionally limited to the RouterOS upgrade-entitlement fields exposed by SNMP, and epoch-like placeholder `mtxrLicUpgrUntil` values are ignored.

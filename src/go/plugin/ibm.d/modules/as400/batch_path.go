@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -327,15 +328,11 @@ func cloneQueueTotalsSnapshot(src queueTotalsSnapshot) queueTotalsSnapshot {
 	}
 	if src.queues != nil {
 		dst.queues = make(map[string]int64, len(src.queues))
-		for k, v := range src.queues {
-			dst.queues[k] = v
-		}
+		maps.Copy(dst.queues, src.queues)
 	}
 	if src.items != nil {
 		dst.items = make(map[string]int64, len(src.items))
-		for k, v := range src.items {
-			dst.items[k] = v
-		}
+		maps.Copy(dst.items, src.items)
 	}
 	return dst
 }

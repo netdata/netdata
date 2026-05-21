@@ -309,7 +309,7 @@ Runtime input skills:
   Purpose: mirror maintainer-preferred framework V2 patterns from accepted collectors so new or migrated modules blend with repository style.
 
 - `.agents/skills/integrations-lifecycle/`
-  Trigger: editing any `metadata.yaml`; modifying `integrations/` generators, schemas, or templates; working with `integrations.js` / `integrations.json` / per-integration `.md` files / `COLLECTORS.md` / `SECRETS.md` / `SERVICE-DISCOVERY.md`; ibm.d module generation (`contexts.yaml` -> `metadata.yaml`); CI workflows `generate-integrations.yml` and `check-markdown.yml`; the five-file collector-consistency rule.
+  Trigger: editing any `metadata.yaml` or collector `taxonomy.yaml`; modifying `integrations/` generators, schemas, taxonomy registries, or templates; working with `integrations.js` / `integrations.json` / `integrations/taxonomy.json` / per-integration `.md` files / `COLLECTORS.md` / `SECRETS.md` / `SERVICE-DISCOVERY.md`; ibm.d module generation (`contexts.yaml` -> `metadata.yaml`); CI workflows `generate-integrations.yml` and `check-markdown.yml`; the collector-consistency rule.
   Status: live. SKILL.md plus per-domain guides (`pipeline.md`, `schema-reference.md`, `per-type-matrix.md`, `artifacts-and-banners.md`, `ibm-d.md`, `consistency.md`, `in-app-contract.md`, `gotchas.md`) and `recipes/`, `how-tos/` directories.
 
 - `.agents/skills/learn-site-structure/`
@@ -328,19 +328,19 @@ Runtime input skills:
 
 - `.agents/skills/coverity-audit/`
   Trigger: Coverity Scan defect triage for this repository.
-  Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+  Status: live.
 
 - `.agents/skills/sonarqube-audit/`
   Trigger: SonarCloud findings triage for this repository.
-  Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+  Status: live.
 
 - `.agents/skills/graphql-audit/`
   Trigger: GitHub Code Scanning/CodeQL triage for this repository.
-  Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+  Status: live.
 
 - `.agents/skills/pr-reviews/`
   Trigger: PR comment and review iteration work for this repository.
-  Status: preserved under legacy name; project-skill alignment is deferred and tracked by `.agents/sow/pending/SOW-0003-20260501-legacy-runtime-skill-alignment.md`.
+  Status: live.
 
 - `.agents/skills/codacy-audit/`
   Trigger: Codacy Cloud workflow for this repository -- pre-push local analysis (`codacy-analysis-cli` via docker or local binary) and read-only PR-issue fetching via the v3 API.
@@ -406,11 +406,15 @@ When working on collectors (especially Go collectors), ALL of the following file
    - How it works
    - Configuration options
    - Troubleshooting
+7. **taxonomy.yaml** - Dashboard table-of-contents placement for the collector's chart contexts
 
 These files MUST be consistent with each other. For example:
 - If units change in code, they MUST be updated in metadata.yaml
 - If new metrics are added, they MUST be documented in metadata.yaml and README.md
 - If configuration options change, they MUST be updated in config_schema.json, stock config, and documentation
+- If chart contexts are added, removed, or renamed, taxonomy.yaml MUST still resolve to real metadata.yaml contexts or declared dynamic selectors
+
+Unlike the other consistency artifacts, taxonomy.yaml coverage is enforced fatally in CI by `integrations/check_collector_taxonomy.py` running in `.github/workflows/check-markdown.yml`.
 
 ## C code
 - gcc, clang, glibc and muslc

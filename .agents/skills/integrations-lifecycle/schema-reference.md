@@ -1,6 +1,6 @@
 # Schema reference
 
-Exhaustive per-field reference for all 12 JSON Schemas under
+Per-field reference for JSON Schemas under
 `integrations/schemas/`. Each schema is JSON Schema Draft 7;
 cross-refs use `./shared.json#/$defs/...` resolved by
 `Registry(retrieve=retrieve_from_filesystem)`
@@ -162,6 +162,10 @@ where each module is one collector integration.
 | `modules[].metrics.folding` | $ref `_folding` | yes | -- | learn (clean strips) | Folding for the entire metrics section. |
 | `modules[].metrics.description` | string | yes | markdown | learn | Intro to the metrics block. |
 | `modules[].metrics.availability` | array<string> | yes | -- | metrics table column-set | Defines which "availability" columns the table will have. |
+| `modules[].metrics.dynamic_context_prefixes[].prefix` | string | no | `minLength: 1` | taxonomy | Opt-in guardrail for `taxonomy.yaml` `context_prefix:` selectors. |
+| `modules[].metrics.dynamic_context_prefixes[].reason` | string | no | `minLength: 1` | taxonomy | Required explanation for each dynamic context prefix. |
+| `modules[].metrics.dynamic_collect_plugins[].plugin` | string | no | `minLength: 1` | taxonomy | Opt-in guardrail for `taxonomy.yaml` `collect_plugin:` selectors. |
+| `modules[].metrics.dynamic_collect_plugins[].reason` | string | no | `minLength: 1` | taxonomy | Required explanation for each dynamic collect-plugin selector. |
 | `modules[].metrics.scopes[].name` | string | yes | -- | learn metrics table | Special: `global` is rewritten to `<instance> instance` at `gen_integrations.py:914-916`. |
 | `modules[].metrics.scopes[].description` | string | yes | markdown | learn metrics table | |
 | `modules[].metrics.scopes[].labels[].name` | string | yes | -- | learn | Label name. |
@@ -205,6 +209,106 @@ Required at module root: `meta`, `overview`, `setup`,
 Required on `meta`: `plugin_name`, `module_name`,
 `monitored_instance`, `keywords`, `related_resources`,
 `info_provided_to_referring_integrations` (`collector.json:94-101`).
+
+## taxonomy_collector.json
+
+Sibling authoring file for collector dashboard placement:
+`<collector>/taxonomy.yaml`. The schema is intentionally closed
+(`additionalProperties: false` plus `x_*` extension keys on core
+nodes). `section_id:` is the only accepted section reference in v1;
+`section_path:` is rejected.
+
+| Field | Type | Req | Values | Surface | Notes |
+|---|---|---|---|---|---|
+| `taxonomy_version` | integer | yes | `1` | taxonomy | Authoring schema version. |
+| `plugin_name` | string | yes | -- | taxonomy | Must match owning `metadata.yaml`. |
+| `module_name` | string | yes | -- | taxonomy | Must match owning `metadata.yaml` module. |
+| `taxonomy_optout.reason` | string | conditional | `minLength: 1` | taxonomy | Mutually exclusive with `placements`. |
+| `inline_dynamic_declarations.dynamic_context_prefixes[]` | array<object> | no | `prefix`, `reason` | taxonomy | For no-metadata plugins only. Fails when sibling metadata exists. |
+| `inline_dynamic_declarations.dynamic_collect_plugins[]` | array<object> | no | `plugin`, `reason` | taxonomy | For no-metadata plugins only. |
+| `placements[].id` | string | yes | `^[a-z0-9][a-z0-9_.-]*$` | taxonomy | Leaf id under the target section. |
+| `placements[].section_id` | string | yes | registered section id | taxonomy | Resolved against `integrations/taxonomy/sections.yaml`. |
+| `placements[].title` | string | yes | -- | taxonomy | Multi-node canonical title. |
+| `placements[].icon` | string | no | registered icon id | taxonomy | Resolved against `integrations/taxonomy/icons.yaml`. |
+| `placements[].families` | boolean / array<string> | no | -- | taxonomy | Preserved for the dashboard TOC consumer. |
+| `placements[].items[]` | array | yes | recursive item tree | taxonomy | Ordered TOC tree; strings in structural positions own contexts. |
+| `items[].type` | string | conditional | `owned_context`, `group`, `flatten`, `selector`, `context`, `grid`, `first_available`, `view_switch` | taxonomy | Plain strings normalize to `owned_context`. |
+| `owned_context.context` | string | yes | real context | taxonomy | Must exist in metadata. |
+| `selector.context_prefix[]` | array<string> | conditional | unique | taxonomy | Dynamic selector; requires metadata opt-in. May narrow a declared metadata namespace, e.g. `snmp.device_prof_` under declared `snmp.`. |
+| `selector.context_prefix_exclude[]` | array<string> | no | unique | taxonomy | Valid only with same-node `context_prefix`. |
+| `selector.collect_plugin[]` | array<string> | conditional | unique | taxonomy | Dynamic selector by `_collect_plugin`; requires metadata opt-in. |
+| `context.contexts[]` | array | yes | literal context, unresolved object, or selector object | taxonomy | Widget references; literal references must resolve or carry `unresolved`. |
+| `context.chart_library` | string | yes | `bars`, `d3pie`, `dygraph`, `easypiechart`, `gauge`, `groupBoxes`, `number`, `table` | taxonomy | Display widget renderer. |
+| `context.group_by[]` | array<string> | no | unique | taxonomy | Widget grouping axes, e.g. `selected`, `dimension`, `label`, `node`, `context`. |
+| `context.group_by_label[]` | array<string> | no | unique | taxonomy | Label names used when `group_by` includes `label`. |
+| `context.aggregation_method` | string | no | `avg`, `max`, `min`, `sum` | taxonomy | Aggregation method for grouped widgets. |
+| `context.selected_dimensions[]` | array<string> | no | unique | taxonomy | Explicit dimensions to show in the widget. |
+| `context.dimensions_sort` | string | no | non-empty | taxonomy | FE dimension sort directive, e.g. `valueDesc`. |
+| `context.colors[]` | array<string> | no | non-empty strings | taxonomy | Renderer color palette values. |
+| `context.layout` | object | no | `left`, `top`, `width`, `height` | taxonomy | Grid coordinates for `grid.items` widgets. |
+| `context.table_columns[]` | array<string> | no | unique | taxonomy | Table widget column axes, e.g. `context`, `dimension`. |
+| `context.table_sort_by[]` | array<object> | no | `{id, desc}` | taxonomy | Table sort directives. |
+| `context.labels` | object | no | string map | taxonomy | Context or dimension display labels. |
+| `context.value_range[]` | array<number|null> | no | at least one item | taxonomy | Numeric renderer bounds, usually `[0, null]` or `[0, 100]`. |
+| `context.eliminate_zero_dimensions` | boolean | no | -- | taxonomy | Renderer hint to hide all-zero dimensions. |
+| `context.context_items[]` | array<object> | no | `{value, label}` | taxonomy | Per-widget context item labels for selector-like UI. |
+| `context.post_group_by[]` | array<string> | no | unique | taxonomy | Post-aggregation grouping axes. |
+| `context.show_post_aggregations` | boolean | no | -- | taxonomy | FE post-aggregation display toggle. |
+| `context.grouping_method` | string | no | non-empty | taxonomy | FE grouping-method override. |
+| `context.sparkline` | boolean | no | -- | taxonomy | Render compact sparkline form when supported. |
+| `renderer` | object | no | `overlays`, `url_options`, `toolbox_elements`, `x_*` | taxonomy | Renderer-private payload envelope. |
+| `placements[].single_node` | object | no | closed field set | taxonomy | Sparse override block; top-level fields are multi-node defaults. |
+
+Item-kind matrix:
+
+| Item kind | Required fields | Allowed children / references | Notes |
+|---|---|---|---|
+| string shorthand | string value | none | Structural positions only; normalizes to `owned_context`. |
+| `owned_context` | `type`, `context` | none | Owns one literal context. |
+| `group` | `type`, `id`, `title`, `items` | structural `items` | `id` is stable across title renames. |
+| `flatten` | `type`, `id`, `title`, `items` | non-flatten structural `items` | Equivalent to legacy `justGroup`; nested flatten is invalid. |
+| `selector` | `type`, `id`, `title`, one of `context_prefix` or `collect_plugin` | none | Owns the resolved selector snapshot. |
+| `context` | `type`, `contexts`, `chart_library` | widget `contexts` references | References contexts but does not own them. |
+| `grid` | `type`, `id`, `items` | `context`, `first_available`, display `view_switch` | Grid children are display-only. |
+| `first_available` | `type`, `items` | `context`, `grid`, display `view_switch` | Alternatives are ordered and display-only. |
+| `view_switch` | `type`, `multi_node`, `single_node` | concrete object branches except `flatten` or nested `view_switch` | Branches are whole-body replacements; no string branches. |
+
+For a rich collector example with grids, table widgets, nested groups,
+and ownership leaves, read
+`src/go/plugin/go.d/collector/mysql/taxonomy.yaml`.
+
+Widget `contexts[]` entries may be:
+
+- a literal context string;
+- an unresolved literal reference object:
+  `{context, unresolved: {reason, owner, expires}}`, where
+  `expires` is `YYYY-MM-DD`;
+- a selector reference object with `context_prefix` or
+  `collect_plugin`.
+
+Generated output adds `unresolved_references[]` to each placement and
+item that aggregates unresolved escape hatches with `context`,
+`reason`, `owner`, `expires`, and `item_path`.
+
+## taxonomy_sections.json
+
+Schema for `integrations/taxonomy/sections.yaml`. Sections have
+stable opaque `id` values and parentage through `parent_id`.
+Moving a section means changing `parent_id`, not editing collector
+`taxonomy.yaml` files.
+
+Required fields per section: `id`, `title`, `section_order`,
+`status`. Optional fields: `parent_id`, `short_name`, `icon`,
+`deprecation`, and `x_*` extensions.
+
+## taxonomy_output.json
+
+Schema for generated `integrations/taxonomy.json`. The artifact
+contains `taxonomy_schema_version`, `source`, normalized `sections`,
+normalized `placements`, and `opted_out_collectors`. Each placement
+preserves the ordered item tree and includes `resolved_contexts`
+(owned contexts), `referenced_contexts` (display references), and
+`unresolved_references` snapshots for CI/review diffing.
 
 ## agent_notification.json
 

@@ -87,7 +87,8 @@ bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops);
 QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id);
 void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS *ops);
-time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted, RRDR_OPTIONS options, size_t tier);
+time_t query_target_min_update_every_for_tier(QUERY_TARGET *qt, size_t tier);
+int query_plan_unittest(void);
 void rrd2rrdr_query_ops_freeall(RRDR *r);
 
 // query execution

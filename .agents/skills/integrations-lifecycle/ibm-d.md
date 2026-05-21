@@ -156,10 +156,11 @@ consistency between:
 - the user-facing documentation (`README.md`).
 
 It is the closest thing this repo has to enforcement of the
-five-file consistency rule for the integration-page side
+collector consistency rule for the integration-page side
 (metadata + README + config_schema), but it does NOT cover
-the stock `.conf` or `health.d/<...>.conf` -- those still
-need manual sync.
+taxonomy.yaml, the stock `.conf`, or `health.d/<...>.conf` --
+those still need manual sync unless a module-specific generator
+adds coverage.
 
 ## Risks and gotchas
 

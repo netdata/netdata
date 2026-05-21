@@ -1300,13 +1300,16 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
 
     if (client->max_msg_size && PUBLISH_SP_SIZE + mqtt_ng_publish_size(topic, msg_len, topic_id) > client->max_msg_size) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Message too big for server: %zu", msg_len);
-        if (msg_free)
-            msg_free(msg);
         return MQTT_NG_MSGGEN_MSG_TOO_BIG;
     }
 
+    // Ownership contract on failure: do NOT free msg or clear *packet_id here.
+    // The sole caller (mqtt_wss_publish5) owns cleanup on every non-OK return.
+    // On MQTT_NG_MSGGEN_OK, msg is attached to a buffer fragment and freed by
+    // the transaction-buffer GC after ack; *packet_id has been written by the
+    // generator. See the long comment in mqtt_wss_publish5 for the invariant.
     int rc = TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
-    if (rc == MQTT_NG_MSGGEN_OK)
+    if (rc == MQTT_NG_MSGGEN_OK && packet_id)
         add_packet_to_timeout_monitor_list(client, *packet_id);
     return rc;
 }

@@ -131,9 +131,9 @@ void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
         // "replication finished" decrement at stream-replication-sender.c will
         // never fire for this chart. Release any pending replication slot now,
         // otherwise rrdhost_sender_replicating_charts pins above zero and
-        // permanently blocks svc_rrd_cleanup_obsolete_charts_from_all_hosts.
-        // Mirror the natural-finalize path's pulse-status flip on the 0/1
-        // boundary so SND_REPLICATING -> SND_RUNNING is observed by pulse.
+        // observability (SND_REPLICATING vs SND_RUNNING) stays stuck on the
+        // wrong state. Mirror the natural-finalize path's pulse-status flip on
+        // the 0/1 boundary so SND_REPLICATING -> SND_RUNNING is observed.
         RRDSET_FLAGS old_repl = rrdset_flag_set_and_clear(
             st,
             RRDSET_FLAG_SENDER_REPLICATION_FINISHED,

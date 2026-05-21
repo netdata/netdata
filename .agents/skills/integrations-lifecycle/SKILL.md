@@ -1,6 +1,6 @@
 ---
 name: integrations-lifecycle
-description: Authoritative reference for Netdata's integrations pipeline -- how `metadata.yaml` drives per-integration pages, the `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md` umbrellas, the `integrations.js` artifact consumed by the cloud-frontend, and per-integration `.md` files committed to the repo. Use when adding/modifying any integration (collector, exporter, agent or cloud notification, authentication, secretstore, service-discovery, log type, deploy method); editing `metadata.yaml`; checking whether `integrations/*.md` should be hand-edited; reading the four generator scripts under `integrations/`, schemas under `integrations/schemas/`, templates under `integrations/templates/`, the workflows `generate-integrations.yml` or `check-markdown.yml`; ibm.d modules where `metadata.yaml` is generated from `contexts.yaml`; the 5-file consistency rule (metadata.yaml + config_schema.json + stock conf + alerts + README move together).
+description: Authoritative reference for Netdata's integrations pipeline -- how `metadata.yaml` drives per-integration pages, collector `taxonomy.yaml` drives dashboard TOC placement, the `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md` umbrellas, the `integrations.js` and `integrations/taxonomy.json` artifacts consumed by downstream systems, and per-integration `.md` files committed to the repo. Use when adding/modifying any integration (collector, exporter, agent or cloud notification, authentication, secretstore, service-discovery, log type, deploy method); editing `metadata.yaml` or `taxonomy.yaml`; checking whether `integrations/*.md` should be hand-edited; reading generator scripts under `integrations/`, schemas under `integrations/schemas/`, taxonomy registries under `integrations/taxonomy/`, templates under `integrations/templates/`, the workflows `generate-integrations.yml` or `check-markdown.yml`; ibm.d modules where `metadata.yaml` is generated from `contexts.yaml`; the collector-consistency rule (metadata.yaml + taxonomy.yaml + config_schema.json + stock conf + alerts + README move together).
 ---
 
 # integrations-lifecycle
@@ -8,10 +8,12 @@ description: Authoritative reference for Netdata's integrations pipeline -- how 
 This skill is the **single place** to learn how Netdata's
 integrations pipeline works end to end. It documents:
 
-- the four-stage generator pipeline rooted in
+- the generator pipeline rooted in
   `integrations/gen_integrations.py`;
-- the 12 JSON-Schema contracts every `metadata.yaml` is validated
-  against;
+- the collector taxonomy pipeline rooted in
+  `integrations/gen_taxonomy.py`;
+- the JSON-Schema contracts every `metadata.yaml` and
+  `taxonomy.yaml` is validated against;
 - every artifact the pipeline produces (gitignored runtime files
   AND committed `.md` documentation);
 - the `<!--startmeta` banner conventions and DO-NOT-EDIT rules;
@@ -19,9 +21,10 @@ integrations pipeline works end to end. It documents:
   (`generate-integrations.yml`, `check-markdown.yml`);
 - the secondary ibm.d generation chain
   (`contexts.yaml` -> `metadata.yaml`);
-- the contract by which the cloud-frontend dashboard consumes
-  `integrations.js`;
-- the collector-consistency rule (5 files must move together)
+- the contract by which downstream dashboard code consumes
+  `integrations.js` and, when opted in, `integrations/taxonomy.json`;
+- the collector-consistency rule (`taxonomy.yaml` moves with
+  metadata and docs)
   and what is and is NOT enforced by tooling;
 - every surprising/dead/edge-case behavior an assistant or
   maintainer is likely to hit.
@@ -79,10 +82,11 @@ does the in-app integrations page get its data?".
    regenerate locally and include the changes in the same PR;
    that is preferred to avoid two PRs per change.
 
-4. **The five-file consistency rule.** Anything that touches a
+4. **The collector consistency rule.** Anything that touches a
    collector's runtime behavior MUST land in one PR with
    matching changes to:
    - `metadata.yaml` (the integration page driver),
+   - `taxonomy.yaml` (dashboard TOC placement for chart contexts),
    - `config_schema.json` (the dashboard's DYNCFG editor),
    - the stock `.conf` (what `/etc/netdata/...` ships),
    - `health.d/*.conf` (the alert definitions),
@@ -96,26 +100,28 @@ does the in-app integrations page get its data?".
    `contexts.yaml` + `config.go` + `module.yaml` via
    `go generate`. NEVER hand-edit them. See `ibm-d.md`.
 
-6. **The dashboard consumes `integrations/integrations.js`.**
+6. **The dashboard consumes generated integration artifacts.**
    The cloud-frontend at
    `${NETDATA_REPOS_DIR}/dashboard/cloud-frontend/` runs
    `gen_integrations.py` in its own CI to copy
-   `integrations.js` into its source tree. The contract is
+   `integrations.js` into its source tree. The historical contract is
    that `.js` file's exact shape:
    `export const categories = [...]; export const integrations
-   = [...]`. See `in-app-contract.md`.
+   = [...]`. Collector taxonomy is emitted separately as
+   `integrations/taxonomy.json` by `gen_taxonomy.py`; downstream
+   consumers opt in to that JSON contract. See `in-app-contract.md`.
 
 ## Table of contents
 
 | Guide | Purpose |
 |---|---|
 | `pipeline.md` | The 4-stage pipeline graph, every script, every artifact, the CI workflows. |
-| `schema-reference.md` | Exhaustive per-field reference for all 12 JSON Schemas under `integrations/schemas/`. |
+| `schema-reference.md` | Per-field reference for JSON Schemas under `integrations/schemas/`, including collector taxonomy schemas. |
 | `description-authoring.md` | Product-copy rules for `metadata.yaml` descriptions and the Monitor Anything table text. |
 | `per-type-matrix.md` | One-row-per-integration-type quick lookup: source paths, validator, render keys, output location. |
 | `artifacts-and-banners.md` | Every committed and gitignored artifact; banner conventions; symlink rules. |
 | `ibm-d.md` | The `contexts.yaml` -> `metadata.yaml` chain for ibm.d modules. |
-| `consistency.md` | The 5-file consistency rule and what tooling enforces (mostly nothing). |
+| `consistency.md` | The collector consistency rule and what tooling enforces. |
 | `in-app-contract.md` | How the cloud-frontend dashboard consumes `integrations.js`. |
 | `gotchas.md` | Every surprise, dead-code reference, hardcoded marketing anchor, custom Jinja delimiter. |
 | `recipes/INDEX.md` | Step-by-step recipes for adding/updating each integration type. |

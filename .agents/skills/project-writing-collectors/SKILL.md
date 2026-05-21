@@ -179,13 +179,16 @@ A new or modified collector ships these in sync:
 
 - the code
 - `metadata.yaml` — drives integration pages, in-app help, alert references
+- `taxonomy.yaml` — places emitted chart contexts in the dashboard TOC
+  with an ordered `items:` tree; structural strings/`owned_context`
+  entries own contexts, widgets reference them
 - `config_schema.json` — DYNCFG schema rendered by the dashboard
 - stock `.conf` — safe, representative example
 - `health.d/*.conf` — alert templates bound to chart `context`
 - `README.md` — concise narrative
 - if exposing a Function: response shape conforming to `src/plugins.d/FUNCTION_UI_SCHEMA.json`
 
-Treat them as one unit. Change a unit in code → update `metadata.yaml` in the same commit. Add a config knob → update schema, stock conf, and metadata together.
+Treat them as one unit. Change a unit in code → update `metadata.yaml` in the same commit. Add or rename a chart context → update `taxonomy.yaml` or a declared dynamic selector. Add a config knob → update schema, stock conf, and metadata together.
 
 ### 2.9 Cross-plugin enrichment via netipc
 
@@ -282,20 +285,21 @@ A collector is *production-quality* when it satisfies all of:
 5. Does the collection cycle allocate, log per iteration, or reconnect every cycle?
 6. Do error logs answer *what operation, what target, what was expected vs observed*?
 7. Are config knobs in `config_schema.json` and `metadata.yaml`? Does the stock `.conf` show a representative example?
-8. Are alerts present in `health.d/`?
-9. Is `README.md` updated? (Not the generated `integrations/<name>.md`.)
-10. For remote targets: is vnode wiring done?
-11. For SNMP: did I extend a profile rather than hardcode OIDs?
-12. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
-13. For Prometheus scraping: are selectors correct? Are untyped metrics handled?
-14. For cross-plugin enrichment: am I using netipc?
-15. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
-16. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?
-17. For new go.d modules: are all four wiring steps done (init.go, go.d.conf, stock conf, README)?
-18. Tests: real fixtures or real instances? Would they catch the bug I just fixed?
-19. High-cardinality labels / instances: bounded by `max_*` + selectors? Aggregated "Other" bucket or upstream-supplied aggregation present where applicable?
-20. Entities that can go away: obsoleted when the collector knows they're gone? Anti-flip-flop window applied where churn is expected?
-21. Production-quality criteria above — would this collector survive hours of target outage without leaks or log floods?
+8. Does `taxonomy.yaml` cover every emitted chart context, or are dynamic contexts declared with `metrics.dynamic_context_prefixes` / `metrics.dynamic_collect_plugins`?
+9. Are alerts present in `health.d/`?
+10. Is `README.md` updated? (Not the generated `integrations/<name>.md`.)
+11. For remote targets: is vnode wiring done?
+12. For SNMP: did I extend a profile rather than hardcode OIDs?
+13. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
+14. For Prometheus scraping: are selectors correct? Are untyped metrics handled?
+15. For cross-plugin enrichment: am I using netipc?
+16. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
+17. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?
+18. For new go.d modules: are all four wiring steps done (init.go, go.d.conf, stock conf, README)?
+19. Tests: real fixtures or real instances? Would they catch the bug I just fixed?
+20. High-cardinality labels / instances: bounded by `max_*` + selectors? Aggregated "Other" bucket or upstream-supplied aggregation present where applicable?
+21. Entities that can go away: obsoleted when the collector knows they're gone? Anti-flip-flop window applied where churn is expected?
+22. Production-quality criteria above — would this collector survive hours of target outage without leaks or log floods?
 
 ## 5. Plugins and frameworks — what's available and where
 

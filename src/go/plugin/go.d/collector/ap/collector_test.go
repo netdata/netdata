@@ -22,17 +22,19 @@ var (
 
 	dataIwDevManaged, _ = os.ReadFile("testdata/iw_dev_managed.txt")
 
-	dataIwDevAP, _       = os.ReadFile("testdata/iw_dev_ap.txt")
-	dataIwStationDump, _ = os.ReadFile("testdata/station_dump.txt")
+	dataIwDevAP, _               = os.ReadFile("testdata/iw_dev_ap.txt")
+	dataIwDevAPSsidWithSpaces, _ = os.ReadFile("testdata/iw_dev_ap_ssid_with_spaces.txt")
+	dataIwStationDump, _         = os.ReadFile("testdata/station_dump.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON":    dataConfigJSON,
-		"dataConfigYAML":    dataConfigYAML,
-		"dataIwDevManaged":  dataIwDevManaged,
-		"dataIwDevAP":       dataIwDevAP,
-		"dataIwStationDump": dataIwStationDump,
+		"dataConfigJSON":            dataConfigJSON,
+		"dataConfigYAML":            dataConfigYAML,
+		"dataIwDevManaged":          dataIwDevManaged,
+		"dataIwDevAP":               dataIwDevAP,
+		"dataIwDevAPSsidWithSpaces": dataIwDevAPSsidWithSpaces,
+		"dataIwStationDump":         dataIwStationDump,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -124,6 +126,10 @@ func TestCollector_Check(t *testing.T) {
 			wantFail:    false,
 			prepareMock: prepareMockOk,
 		},
+		"success case ssid with spaces": {
+			wantFail:    false,
+			prepareMock: prepareMockOkSsidWithSpaces,
+		},
 		"no ap devices": {
 			wantFail:    true,
 			prepareMock: prepareMockNoAPDevices,
@@ -188,6 +194,22 @@ func TestCollector_Collect(t *testing.T) {
 				"ap_wlp1s1_testing_packets_sent":     51,
 			},
 		},
+		"success case ssid with spaces": {
+			prepareMock: prepareMockOkSsidWithSpaces,
+			wantCharts:  len(apChartsTmpl) * 1,
+			wantMetrics: map[string]int64{
+				"ap_wlp1s0_My_AP_1_average_signal":   -50666,
+				"ap_wlp1s0_My_AP_1_bitrate_receive":  49400,
+				"ap_wlp1s0_My_AP_1_bitrate_transmit": 43333,
+				"ap_wlp1s0_My_AP_1_bw_received":      101822,
+				"ap_wlp1s0_My_AP_1_bw_sent":          9284,
+				"ap_wlp1s0_My_AP_1_clients":          3,
+				"ap_wlp1s0_My_AP_1_issues_failures":  1,
+				"ap_wlp1s0_My_AP_1_issues_retries":   1,
+				"ap_wlp1s0_My_AP_1_packets_received": 2670,
+				"ap_wlp1s0_My_AP_1_packets_sent":     51,
+			},
+		},
 		"no ap devices": {
 			prepareMock: prepareMockNoAPDevices,
 			wantMetrics: nil,
@@ -225,6 +247,13 @@ func TestCollector_Collect(t *testing.T) {
 func prepareMockOk() *mockIwExec {
 	return &mockIwExec{
 		devicesData:      dataIwDevAP,
+		stationStatsData: dataIwStationDump,
+	}
+}
+
+func prepareMockOkSsidWithSpaces() *mockIwExec {
+	return &mockIwExec{
+		devicesData:      dataIwDevAPSsidWithSpaces,
 		stationStatsData: dataIwStationDump,
 	}
 }

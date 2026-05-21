@@ -163,6 +163,7 @@ static void dyncfg_function_intercept_job_successfully_updated(DYNCFG *df, int c
     dyncfg_set_dyncfg_source_from_txt(df, dc->source);
 
     dyncfg_update_status_on_successful_add_or_update(df, code);
+    df->cmds = dyncfg_sanitize_cmds(df->type, df->current.source_type, df->cmds);
 }
 
 void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_data) {

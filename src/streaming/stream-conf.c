@@ -234,8 +234,8 @@ void stream_conf_load() {
     if(!netdata_ssl_validate_certificate_sender)
         nd_log_daemon(NDLP_NOTICE, "SSL: streaming senders will skip SSL certificates verification.");
 
-    stream_send.parents.ssl_ca_path = string_strdupz(inicfg_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL));
-    stream_send.parents.ssl_ca_file = string_strdupz(inicfg_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL));
+    stream_send.parents.ssl_ca_path = string_strdupz(inicfg_get_path(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL));
+    stream_send.parents.ssl_ca_file = string_strdupz(inicfg_get_filename(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL));
 
     if(stream_send.enabled && (!stream_send.parents.destination || !stream_send.api_key)) {
         nd_log_daemon(

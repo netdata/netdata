@@ -15,7 +15,7 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
         if (!rrdset_is_available_for_viewers(st))
             continue;
 
-        sprintf(name, "%s:%s", rrdset_plugin_name(st), rrdset_module_name(st));
+        snprintfz(name, sizeof(name), "%s:%s", rrdset_plugin_name(st), rrdset_module_name(st));
 
         bool old = 0;
         bool *set = dictionary_set(dict, name, &old, sizeof(bool));

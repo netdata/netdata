@@ -226,6 +226,7 @@ int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
+int query_plan_unittest(void);
 #ifdef ENABLE_ML
 int ml_unittest(void);
 #endif
@@ -441,6 +442,7 @@ int netdata_main(int argc, char **argv) {
                             if (rrdlabels_unittest()) return 1;
                             if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
+                            if (query_plan_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
@@ -550,6 +552,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return utf8_sanitizer_unittest();
                         }
+                        else if(strcmp(optarg, "queryplantest") == 0) {
+                            unittest_running = true;
+                            return query_plan_unittest();
+                        }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;
@@ -601,9 +607,18 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
-                            if(unittest_prepare_rrd(&user))
+                            if(sqlite_library_init())
                                 return 1;
-                            return dyncfg_unittest();
+                            rrdlabels_aral_init(false);
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if (!rc)
+                                rc = dyncfg_unittest();
+
+                            sqlite_close_databases();
+                            sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
+                            return rc;
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -1086,10 +1101,10 @@ int netdata_main(int argc, char **argv) {
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
     struct passwd *pw = getpwuid(getuid());
     if (inicfg_exists(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
     }
     else
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
 
     nd_setenv("HOME", netdata_configured_home_dir, 1);
 
