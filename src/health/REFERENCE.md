@@ -1001,12 +1001,12 @@ Several stock health configurations use host variables to reference dimensions f
 
 | Alert | File | Expression | Cross-chart reference |
 |-------|------|------------|-----------------------|
-| `30min_ram_swapped_out` | `health.d/swap.conf` | `calc: $this / 1024 * 100 / ( $system.ram.used + $system.ram.cached + $system.ram.free )` | `$system.ram.*` from within a `mem.swapio` alarm |
-| `ram_available` | `health.d/ram.conf` | `calc: $avail * 100 / ($system.ram.used + $system.ram.cached + $system.ram.free + $system.ram.buffers)` | `$system.ram.*` from within a `mem.available` alarm |
-| `system_clock_sync_state` | `health.d/timex.conf` | `warn: $system.uptime.uptime > 17 * 60 AND $this == 0` | `$system.uptime.uptime` from within a `system.clock_sync_state` alarm |
-| `audit_backlog_utilization` | `health.d/audit.conf` | `warn: $this > 50 AND $audit.failure.panic == 1` | `$audit.failure.panic` from within an `audit.backlog_utilization` alarm |
-| `10s_ip_tcp_resets_sent` | `health.d/tcp_resets.conf` | `warn: $netdata.uptime.uptime > (1 * 60) AND ...` | `$netdata.uptime.uptime` from within an `ip.tcphandshake` alarm |
-| `streaming_never_connected` | `health.d/streaming.conf` | `warn: $netdata.uptime.uptime > 30 * 60 AND $this > 0` | `$netdata.uptime.uptime` from within a `netdata.streaming_inbound` alarm |
+| `30min_ram_swapped_out` | `health.d/swap.conf` | `calc: $this / 1024 * 100 / ( $system.ram.used + $system.ram.cached + $system.ram.free )` | `$system.ram.*` from within an alert on the `mem.swapio` chart |
+| `ram_available` | `health.d/ram.conf` | `calc: $avail * 100 / ($system.ram.used + $system.ram.cached + $system.ram.free + $system.ram.buffers)` | `$system.ram.*` from within an alert on the `mem.available` chart |
+| `system_clock_sync_state` | `health.d/timex.conf` | `warn: $system.uptime.uptime > 17 * 60 AND $this == 0` | `$system.uptime.uptime` from within an alert on the `system.clock_sync_state` chart |
+| `audit_backlog_utilization` | `health.d/audit.conf` | `warn: $this > 50 AND $audit.failure.panic == 1` | `$audit.failure.panic` from within an alert on the `audit.backlog_utilization` chart |
+| `10s_ip_tcp_resets_sent` | `health.d/tcp_resets.conf` | `warn: $netdata.uptime.uptime > (1 * 60) AND ...` | `$netdata.uptime.uptime` from within an alert on the `ip.tcphandshake` chart |
+| `streaming_never_connected` | `health.d/streaming.conf` | `warn: $netdata.uptime.uptime > 30 * 60 AND $this > 0` | `$netdata.uptime.uptime` from within an alert on the `netdata.streaming_inbound` chart |
 
 ##### Prometheus Collector Variables
 
@@ -1034,7 +1034,7 @@ Because Prometheus chart IDs typically contain hyphens and `=` characters, use t
 The exact chart ID and dimension names depend on your endpoint's label sets. Use the alarm variables API to discover the correct names:
 
 ```text
-http://NODE:19999/api/v1/alarm_variables?chart=prometheus.kubelet_volume_stats_used_bytes-persistentvolumeclaim%3Dmy-pvc
+http://NODE:19999/api/v1/alarm_variables?chart=prometheus_kubelet.kubelet_volume_stats_used_bytes-persistentvolumeclaim%3Dmy-pvc
 ```
 
 URL-encode the chart ID only in API query parameters. In alert expressions, use the chart ID as-is inside `${...}` braces.
