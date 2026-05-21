@@ -540,6 +540,11 @@ static void rrdhost_update(RRDHOST *host
 {
     UNUSED(guid);
 
+    // Streaming children may omit the User-Agent header, leaving prog_name/prog_version NULL.
+    // Match the create path in rrdhost_create_initialize() so the strcmp/string_strdupz calls below are safe.
+    if(!prog_name || !*prog_name)       prog_name = "unknown";
+    if(!prog_version || !*prog_version) prog_version = "unknown";
+
     spinlock_lock(&host->rrdhost_update_lock);
 
     host->health.enabled = (mode == RRD_DB_MODE_NONE) ? 0 : health;
