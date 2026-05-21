@@ -100,6 +100,8 @@ You can collect custom metrics from PowerShell scripts using the [Nagios Plugins
    echo "Exit code: $LASTEXITCODE"
    ```
 
+   If Netdata runs as a Windows service under a different account, test the script under that same account to catch permission and path issues before enabling the collector.
+
 3. **Configure the collector** — in the Netdata MSYS2 environment, edit `scripts.d/nagios.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files):
 
    ```bash
@@ -116,6 +118,8 @@ You can collect custom metrics from PowerShell scripts using the [Nagios Plugins
        timeout: 10s
        check_interval: 1m
    ```
+
+   `plugin:` must use a native Windows path (not MSYS-style `/c/...`) because the `scripts.d` collector executes the command in the Windows environment. Quote the path if it contains spaces (for example under `C:\Program Files\...`).
 
 4. [Restart the Netdata Agent](/docs/netdata-agent/start-stop-restart.md) for the new configuration to take effect.
 
