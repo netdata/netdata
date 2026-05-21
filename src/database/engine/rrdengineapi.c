@@ -1384,6 +1384,10 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
                 stats->pages_duration_secs += duration_s;
                 stats->points += points;
 
+                // descr->type is uint8_t (range [0, 255]); page_types is sized
+                // [256]. The index is bounded by the type width, so no runtime
+                // check is needed -- a `descr->type < 256` guard would be a
+                // tautology. Note for static analyzers flagging this site.
                 stats->page_types[descr->type].pages++;
                 stats->page_types[descr->type].pages_uncompressed_bytes += descr->page_length;
                 stats->page_types[descr->type].pages_duration_secs += duration_s;
