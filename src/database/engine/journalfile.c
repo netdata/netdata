@@ -497,6 +497,7 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
             journalfile->v2.first_time_s = 0;
             journalfile->v2.last_time_s = 0;
             journalfile->v2.flags = 0;
+            has_references = false;
         }
         else {
             has_references = true;
