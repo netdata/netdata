@@ -368,16 +368,16 @@ int main(int argc, char **argv)
 
     PerflibNamesRegistryInitialize();
 
-    int update_every = 1;
+    int timeout = 1;
     if (argc >= 2) {
-        update_every = atoi(argv[1]);
-        if (update_every < 1)
-            update_every = 1;
+        timeout = atoi(argv[1]);
+        if (timeout < 1)
+            timeout = 1;
     }
 
     fprintf(stdout,
             PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
-            NV_WIN_FUNCTION_PROTO, update_every, NV_WIN_FUNCTION_PROTO_HELP,
+            NV_WIN_FUNCTION_PROTO, timeout, NV_WIN_FUNCTION_PROTO_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
             NV_WIN_FUNCTION_PRIORITY);
     fflush(stdout);
