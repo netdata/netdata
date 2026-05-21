@@ -18,6 +18,11 @@ static inline void send_END(void) {
     fprintf(stdout, "END\n\n");
 }
 
+static inline void send_CLABEL_COMMIT(const char *lbl_name, const char *name) {
+    fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, name);
+    fprintf(stdout, "CLABEL_COMMIT\n");
+}
+
 void send_resource_usage_to_netdata(usec_t dt) {
     static struct timeval last = { 0, 0 };
     static struct rusage me_last;
@@ -267,8 +272,7 @@ static void send_file_charts_to_netdata(struct target *w, const char *type, cons
             type, string2str(w->clean_name), title, type, update_every, obsolete ? "obsolete" : "");
 
     if(!obsolete) {
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION limit '' absolute 1 100\n");
     }
 #endif
@@ -278,8 +282,7 @@ static void send_file_charts_to_netdata(struct target *w, const char *type, cons
             type, string2str(w->clean_name), title, type, update_every, obsolete ? "obsolete" : "");
 
     if(!obsolete) {
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
 #if (PROCESSES_HAVE_FDS == 1)
         fprintf(stdout, "DIMENSION files '' absolute 1 1\n");
         fprintf(stdout, "DIMENSION sockets '' absolute 1 1\n");
@@ -306,29 +309,25 @@ static void send_cachestat_charts_to_netdata(struct target *w, const char *type,
     fprintf(stdout,
             "CHART %s.%s_ebpf_cachestat_hit_ratio '' 'Hit ratio' '%%' page_cache %s.ebpf_cachestat_hit_ratio line 20260 %d\n",
             type, string2str(w->clean_name), type, update_every);
-    fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-    fprintf(stdout, "CLABEL_COMMIT\n");
+    send_CLABEL_COMMIT(lbl_name, string2str(w->name));
     fprintf(stdout, "DIMENSION ratio '' absolute 1 1\n");
 
     fprintf(stdout,
             "CHART %s.%s_ebpf_cachestat_dirty_pages '' 'Number of dirty pages' 'page/s' page_cache %s.ebpf_cachestat_dirty_pages stacked 20261 %d\n",
             type, string2str(w->clean_name), type, update_every);
-    fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-    fprintf(stdout, "CLABEL_COMMIT\n");
+    send_CLABEL_COMMIT(lbl_name, string2str(w->name));
     fprintf(stdout, "DIMENSION pages '' incremental 1 1\n");
 
     fprintf(stdout,
             "CHART %s.%s_ebpf_cachestat_access '' 'Number of accessed files' 'hits/s' page_cache %s.ebpf_cachestat_access stacked 20262 %d\n",
             type, string2str(w->clean_name), type, update_every);
-    fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-    fprintf(stdout, "CLABEL_COMMIT\n");
+    send_CLABEL_COMMIT(lbl_name, string2str(w->name));
     fprintf(stdout, "DIMENSION hits '' absolute 1 1\n");
 
     fprintf(stdout,
             "CHART %s.%s_ebpf_cachestat_misses '' 'Files out of page cache' 'misses/s' page_cache %s.ebpf_cachestat_misses stacked 20263 %d\n",
             type, string2str(w->clean_name), type, update_every);
-    fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-    fprintf(stdout, "CLABEL_COMMIT\n");
+    send_CLABEL_COMMIT(lbl_name, string2str(w->name));
     fprintf(stdout, "DIMENSION misses '' absolute 1 1\n");
 }
 
@@ -371,8 +370,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 
         fprintf(stdout, "CHART %s.%s_cpu_utilization '' '%s CPU utilization (100%% = 1 core)' 'percentage' cpu %s.cpu_utilization stacked 20001 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
         fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
 
@@ -380,8 +378,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         if (enable_guest_charts) {
             fprintf(stdout, "CHART %s.%s_cpu_guest_utilization '' '%s CPU guest utlization (100%% = 1 core)' 'percentage' cpu %s.cpu_guest_utilization line 20005 %d\n",
                     type, string2str(w->clean_name), title, type, update_every);
-            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-            fprintf(stdout, "CLABEL_COMMIT\n");
+            send_CLABEL_COMMIT(lbl_name, string2str(w->name));
             fprintf(stdout, "DIMENSION guest '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
         }
 #endif
@@ -389,16 +386,14 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 #ifndef OS_WINDOWS
         fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20050 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 #endif //OS_WINDOWS
 
 #if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
         fprintf(stdout, "CHART %s.%s_cpu_context_switches '' '%s CPU context switches' 'switches/s' cpu %s.cpu_context_switches stacked 20010 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
 #if (PROCESSES_HAVE_VOLCTX == 1)
         fprintf(stdout, "DIMENSION voluntary '' absolute 1 %llu\n", RATES_DETAIL);
 #endif
@@ -411,28 +406,24 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         if(pss_refresh_period > 0) {
             fprintf(stdout, "CHART %s.%s_estimated_mem_usage '' '%s estimated memory usage (RSS with shared scaling)' 'MiB' mem %s.estimated_mem_usage area 20055 %d\n",
                     type, string2str(w->clean_name), title, type, update_every);
-            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-            fprintf(stdout, "CLABEL_COMMIT\n");
+            send_CLABEL_COMMIT(lbl_name, string2str(w->name));
             fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
         }
 #endif
 
         fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20055 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 
         fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 
         fprintf(stdout, "CHART %s.%s_mem_page_faults '' '%s memory page faults' 'pgfaults/s' mem %s.mem_page_faults stacked 20060 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION minor '' absolute 1 %llu\n", RATES_DETAIL);
 #if (PROCESSES_HAVE_MAJFLT == 1)
         fprintf(stdout, "DIMENSION major '' absolute 1 %llu\n", RATES_DETAIL);
@@ -441,16 +432,14 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 #if (PROCESSES_HAVE_VMSWAP == 1)
         fprintf(stdout, "CHART %s.%s_swap_usage '' '%s swap usage' 'MiB' mem %s.swap_usage area 20065 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 #endif
 
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
         fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
 #endif
@@ -458,22 +447,19 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
         fprintf(stdout, "CHART %s.%s_disk_logical_io '' '%s disk logical IO' 'KiB/s' disk %s.disk_logical_io area 20105 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
         fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
 #endif
 
         fprintf(stdout, "CHART %s.%s_processes '' '%s processes' 'processes' processes %s.processes line 20150 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION processes '' absolute 1 1\n");
 
         fprintf(stdout, "CHART %s.%s_threads '' '%s threads' 'threads' processes %s.threads line 20155 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION threads '' absolute 1 1\n");
 
         if (enable_file_charts)
@@ -485,15 +471,13 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 
         fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
+        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
         fprintf(stdout, "DIMENSION uptime '' absolute 1 1\n");
 
         if (enable_detailed_uptime_charts) {
             fprintf(stdout, "CHART %s.%s_uptime_summary '' '%s uptime summary' 'seconds' uptime %s.uptime_summary area 20255 %d\n",
                     type, string2str(w->clean_name), title, type, update_every);
-            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-            fprintf(stdout, "CLABEL_COMMIT\n");
+            send_CLABEL_COMMIT(lbl_name, string2str(w->name));
             fprintf(stdout, "DIMENSION min '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION avg '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION max '' absolute 1 1\n");
