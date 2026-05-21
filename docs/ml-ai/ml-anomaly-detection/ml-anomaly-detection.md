@@ -276,7 +276,7 @@ An anomaly-rate alert tells you *something is unusual*, but not *what the actual
 ```text
  alarm: cpu_usage_5min
     on: system.cpu
-lookup: average -5m of user,system
+lookup: average -5m of user system
  units: %
  every: 30s
   warn: $this > 80
