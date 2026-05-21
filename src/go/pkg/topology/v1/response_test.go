@@ -42,7 +42,7 @@ func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 							Style:     "ring",
 						},
 						Border: &BorderPresentation{
-							Enabled: Bool(true),
+							Enabled: new(true),
 							Style:   "solid",
 						},
 						LabelPolicy: &LabelPolicy{
@@ -66,7 +66,7 @@ func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 							Fields: []PresentationField{{Key: "name", Label: "Name"}},
 						},
 						Modal: &ModalPresentation{
-							Enabled: Bool(true),
+							Enabled: new(true),
 							Labels: &ModalLabelsPresentation{
 								Table:       "actor_labels",
 								ActorColumn: "actor",
@@ -74,7 +74,7 @@ func TestResponseValidatesAgainstSchemaAndSemanticChecks(t *testing.T) {
 								ValueColumn: "value",
 							},
 							MiniTopology: &ModalMiniTopologyPresentation{
-								Enabled: Bool(true),
+								Enabled: new(true),
 								Depth:   1,
 							},
 							Sections: []ModalSection{

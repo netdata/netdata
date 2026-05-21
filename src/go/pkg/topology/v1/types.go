@@ -436,8 +436,9 @@ type AggregationScope struct {
 	EvidencePolicy string   `json:"evidence_policy,omitempty"`
 }
 
+//go:fix inline
 func Bool(value bool) *bool {
-	return &value
+	return new(value)
 }
 
 type EvidenceMap map[string]EvidenceSection

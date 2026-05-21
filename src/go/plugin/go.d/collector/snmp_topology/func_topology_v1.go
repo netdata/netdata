@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"reflect"
 	"regexp"
@@ -52,7 +53,7 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 				Role:      "actor",
 				Icon:      icon,
 				ColorSlot: colorSlot,
-				Border:    &topologyv1.BorderPresentation{Enabled: topologyv1.Bool(true)},
+				Border:    &topologyv1.BorderPresentation{Enabled: new(true)},
 				Size:      &topologyv1.ActorSizePresentation{Mode: "link_count", Scale: "emphasized"},
 				Layout:    &topologyv1.ActorLayoutPresentation{Repulsion: "stronger"},
 				LabelPolicy: &topologyv1.LabelPolicy{
@@ -106,7 +107,7 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 			Role:      "endpoint",
 			Icon:      "remote-endpoint",
 			ColorSlot: "derived",
-			Border:    &topologyv1.BorderPresentation{Enabled: topologyv1.Bool(true)},
+			Border:    &topologyv1.BorderPresentation{Enabled: new(true)},
 			Size:      &topologyv1.ActorSizePresentation{Mode: "fixed", Scale: "compact"},
 			Layout:    &topologyv1.ActorLayoutPresentation{Repulsion: "weaker"},
 			LabelPolicy: &topologyv1.LabelPolicy{
@@ -124,7 +125,7 @@ func snmpTopologyV1ActorTypes() map[string]topologyv1.ActorType {
 		MergeIdentity:     []string{"id"},
 		ParentIdentity:    []string{"parent_devices"},
 		AggregationScopes: []string{"segment", "network"},
-		Search:            &topologyv1.ActorSearchPolicy{Enabled: topologyv1.Bool(false)},
+		Search:            &topologyv1.ActorSearchPolicy{Enabled: new(false)},
 		Presentation: &topologyv1.ActorPresentation{
 			Label:     "Network segment",
 			Role:      "group",
@@ -2132,8 +2133,6 @@ func cloneAnyMapForTopologyV1(in map[string]any) map[string]any {
 		return nil
 	}
 	out := make(map[string]any, len(in))
-	for key, value := range in {
-		out[key] = value
-	}
+	maps.Copy(out, in)
 	return out
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 )
 
 type validationContext struct {
@@ -2200,12 +2201,7 @@ func validateRequiredString(path string, raw any) error {
 }
 
 func stringInSet(value string, allowed []string) bool {
-	for _, item := range allowed {
-		if value == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowed, value)
 }
 
 func isNumericColumnType(columnType string) bool {
