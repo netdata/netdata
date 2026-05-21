@@ -1439,7 +1439,16 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
 
             for (size_t index = 0; index < count; ++index) {
-                METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &uuid_list[index].uuid, (Word_t)ctx);
+                // Copy uuid out of the mmap onto the stack BEFORE calling mrg.
+                // If a backing page is unreadable, uuid_copy SIGBUSes here and
+                // the protected region recovers cleanly; the mrg call then
+                // never executes. If we passed &uuid_list[index].uuid into
+                // mrg, a SIGBUS could fire INSIDE mrg while it holds internal
+                // locks, and siglongjmp would skip mrg's unlock paths.
+                nd_uuid_t local_uuid;
+                uuid_copy(local_uuid, uuid_list[index].uuid);
+
+                METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &local_uuid, (Word_t)ctx);
                 if (!metric)
                     continue;
 

@@ -1066,7 +1066,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     // (file truncated, sparse hole, transient I/O error) the kernel raises
     // SIGBUS; without a protected region active the process aborts. Same
     // pattern as journalfile_v2_validate() in journalfile_v2_load().
-    PROTECTED_ACCESS_SETUP(data_start, journalfile->mmap.size, path_v2, "mrg-load");
+    PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, path_v2, "mrg-load");
     if(no_signal_received) {
         // Validate header-controlled offsets against the actual mapping size
         // BEFORE reading through them. PROTECTED_ACCESS_SETUP only catches
@@ -1114,16 +1114,25 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
             global_first_time_s = header_start_time_s;
             time_t now_s = max_acceptable_collected_time();
             for (size_t i=0; i < entries; i++) {
+                // Copy uuid out of the mmap onto the stack BEFORE calling mrg.
+                // If a backing page is unreadable, uuid_copy SIGBUSes here and
+                // the protected region recovers cleanly; the mrg call then
+                // never executes. If we passed &metric->uuid into mrg, a
+                // SIGBUS could fire INSIDE mrg while it holds internal locks,
+                // and siglongjmp would skip mrg's unlock paths.
+                nd_uuid_t local_uuid;
+                uuid_copy(local_uuid, metric->uuid);
                 time_t start_time_s = header_start_time_s + metric->delta_start_s;
                 time_t end_time_s = header_start_time_s + metric->delta_end_s;
+                uint32_t update_every_s = metric->update_every_s;
 
                 mrg_update_metric_retention_and_granularity_by_uuid(
                     main_mrg,
                     (Word_t)ctx,
-                    &metric->uuid,
+                    &local_uuid,
                     start_time_s,
                     end_time_s,
-                    metric->update_every_s,
+                    update_every_s,
                     now_s,
                     &journal_samples);
 
