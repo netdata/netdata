@@ -1067,10 +1067,24 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     // pattern as journalfile_v2_validate() in journalfile_v2_load().
     PROTECTED_ACCESS_SETUP(data_start, journalfile->mmap.size, path_v2, "mrg-load");
     if(no_signal_received) {
-        if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
+        // Validate header-controlled offsets against the actual mapping size
+        // BEFORE reading through them. PROTECTED_ACCESS_SETUP only catches
+        // faults whose address falls within [data_start, data_start+mmap.size);
+        // an over-read driven by a corrupted offset past the registered range
+        // would not be recovered and the process would still abort. Out-of-
+        // range offsets are treated as a rebuild trigger (same outcome as a
+        // CRC failure).
+        size_t mmap_size = journalfile->mmap.size;
+        size_t metric_list_bytes = (size_t)j2_header->metric_count * sizeof(struct journal_metric_list);
+        if ((size_t)j2_header->metric_offset > mmap_size ||
+            metric_list_bytes > mmap_size - (size_t)j2_header->metric_offset ||
+            (size_t)j2_header->metric_trailer_offset > mmap_size - sizeof(struct journal_v2_block_trailer)) {
+            // header offsets out of range -- needs rebuild
+            failed = true;
+        }
+        else if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
             journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
             if (journalfile_check_v2_metric_list(data_start, j2_header->journal_v2_file_size)) {
-                journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
                 // needs rebuild
                 failed = true;
             }
@@ -1101,23 +1115,25 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         }
     }
     else {
-        // SIGBUS/SIGSEGV inside the mmap walk -- mark the file as not-available
-        // so the next pass rebuilds it. The PROTECTED_ACCESS_SETUP macro
-        // already rate-limits the error log.
-        journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
+        // SIGBUS/SIGSEGV inside the mmap walk. The PROTECTED_ACCESS_SETUP
+        // macro already rate-limits the error log.
         failed = true;
     }
 
     journalfile_v2_data_release(journalfile);
 
     if (unlikely(failed)) {
-        // The journalfile is marked not-available but its fd/mmap are still
-        // bound and it is still registered in njfv2idx. If we leave it in this
-        // state, journalfile_close()/journalfile_destroy_unsafe() will skip
-        // journalfile_v2_data_unmap_permanently() (they gate on IS_AVAILABLE)
-        // and the rebuild path's journalfile_v2_data_set() will overwrite the
-        // fd/mmap and add a second njfv2idx entry. Tear it down now so a
-        // subsequent rebuild starts from a clean slate.
+        // Single point for the not-available transition: clear IS_AVAILABLE
+        // under the data spinlock, then unmap permanently. Without
+        // unmap_permanently, the fd/mmap stay bound and the journalfile
+        // stays in njfv2idx; later teardown (journalfile_close /
+        // journalfile_destroy_unsafe) gates the unmap on IS_AVAILABLE and
+        // would skip it, leaving a dangling index entry, an unclosed fd, and
+        // an unmapped region. Centralizing here keeps the CRC, bounds, and
+        // signal-recovery paths in lockstep.
+        spinlock_lock(&journalfile->data_spinlock);
+        journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
+        spinlock_unlock(&journalfile->data_spinlock);
         journalfile_v2_data_unmap_permanently(journalfile);
         return;
     }
