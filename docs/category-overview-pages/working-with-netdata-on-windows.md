@@ -2,6 +2,32 @@
 
 This section introduces Windows-specific workflows for working with a local Netdata installation.
 
+## Verify your installation and access the dashboard
+
+After installing Netdata on Windows, confirm the service is running and open the local dashboard.
+
+**Check that the service is running.** Open PowerShell and run:
+
+```powershell
+Get-Service Netdata
+```
+
+If the status shows `Running`, Netdata is active. If it shows `Stopped`, start it with:
+
+```powershell
+Start-Service Netdata
+```
+
+For more service management options, see [Service Control](/docs/netdata-agent/start-stop-restart.md).
+
+**Open the dashboard.** In your browser, navigate to:
+
+```text
+http://localhost:19999
+```
+
+You should see the Netdata Dashboard — a real-time metrics overview with system CPU, memory, disk, and network charts updating every second.
+
 ## First step: open the bundled MSYS2 environment
 
 If Netdata is installed in the default location, you can launch its bundled MSYS2 environment by running:
