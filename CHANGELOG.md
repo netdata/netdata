@@ -196,6 +196,8 @@
 - Build(deps): bump azure/artifact-signing-action from 1.2.0 to 2.0.0 ([#22498](https://github.com/netdata/netdata/issues/22498))
 - Avoid returning uninitialized packet_id on ACLK publish failure ([#22504](https://github.com/netdata/netdata/issues/22504))
 - Fix dynamic configuration unittest  ([#22506](https://github.com/netdata/netdata/issues/22506))
+- Fix SonarCloud security hotspots and cgroup-network namespace handling ([#22460](https://github.com/netdata/netdata/issues/22460))
+- Fix pipe cleanup logic during shutdown to handle ENOENT case ([#22509](https://github.com/netdata/netdata/issues/22509))
 
 ## [2.10.0] - 2026-04-09
 

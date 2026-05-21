@@ -1300,30 +1300,17 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
 
     if (client->max_msg_size && PUBLISH_SP_SIZE + mqtt_ng_publish_size(topic, msg_len, topic_id) > client->max_msg_size) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Message too big for server: %zu", msg_len);
-        if (packet_id)
-            *packet_id = 0;
-        if (msg_free)
-            msg_free(msg);
         return MQTT_NG_MSGGEN_MSG_TOO_BIG;
     }
 
+    // Ownership contract on failure: do NOT free msg or clear *packet_id here.
+    // The sole caller (mqtt_wss_publish5) owns cleanup on every non-OK return.
+    // On MQTT_NG_MSGGEN_OK, msg is attached to a buffer fragment and freed by
+    // the transaction-buffer GC after ack; *packet_id has been written by the
+    // generator. See the long comment in mqtt_wss_publish5 for the invariant.
     int rc = TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
-    if (rc == MQTT_NG_MSGGEN_OK) {
+    if (rc == MQTT_NG_MSGGEN_OK && packet_id)
         add_packet_to_timeout_monitor_list(client, *packet_id);
-    } else {
-        // generator may have written *packet_id before rolling back; clear it so callers
-        // don't observe a stale id on failure
-        if (packet_id)
-            *packet_id = 0;
-        if (msg_free) {
-            // mqtt_ng_generate_publish has no fail_rollback path after frag_set_external_data
-            // succeeds, so on non-OK return msg was never linked to a fragment and the rollback
-            // cannot have freed it. Free here to keep the publish-layer contract (msg freed on
-            // every non-OK return) holding for all callers. If a future change adds a fallible
-            // step after frag_set_external_data, this branch will double-free and must be revisited.
-            msg_free(msg);
-        }
-    }
     return rc;
 }
 
