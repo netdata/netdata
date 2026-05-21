@@ -1079,16 +1079,27 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         // subtraction below cannot underflow, then compare metric_count against
         // the available slot capacity via division rather than multiplying out
         // metric_count * sizeof(...), which would wrap size_t on 32-bit builds
-        // and silently pass a malformed header.
+        // and silently pass a malformed header. Only after those two checks is
+        // metric_count * sizeof(...) known to fit in size_t, which lets the
+        // trailer-ordering check below compute the expected trailer offset
+        // safely. The on-disk layout (see journalfile_migrate_to_v2_callback)
+        // places the metric-list trailer immediately after the metric list, so
+        // any deviation indicates a corrupted header that would otherwise let
+        // the CRC compare against bytes inside the metric list itself.
         if ((size_t)j2_header->metric_offset > mmap_size ||
             (size_t)j2_header->metric_count > (mmap_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list) ||
-            (size_t)j2_header->metric_trailer_offset > mmap_size - sizeof(struct journal_v2_block_trailer)) {
+            (size_t)j2_header->metric_trailer_offset > mmap_size - sizeof(struct journal_v2_block_trailer) ||
+            (size_t)j2_header->metric_trailer_offset != (size_t)j2_header->metric_offset + (size_t)j2_header->metric_count * sizeof(struct journal_metric_list)) {
             // header offsets out of range -- needs rebuild
             failed = true;
         }
         else if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
             journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
-            if (journalfile_check_v2_metric_list(data_start, j2_header->journal_v2_file_size)) {
+            // Pass the verified mmap_size, not the header-controlled
+            // j2_header->journal_v2_file_size; the helper currently ignores the
+            // size argument (UNUSED) but the value at the call site should
+            // still reflect the trusted bound for clarity and future-proofing.
+            if (journalfile_check_v2_metric_list(data_start, mmap_size)) {
                 // needs rebuild
                 failed = true;
             }
@@ -1124,20 +1135,24 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         failed = true;
     }
 
-    journalfile_v2_data_release(journalfile);
-
     if (unlikely(failed)) {
-        // Single point for the not-available transition: clear IS_AVAILABLE
-        // under the data spinlock, then unmap permanently. Without
-        // unmap_permanently, the fd/mmap stay bound and the journalfile
-        // stays in njfv2idx; later teardown (journalfile_close /
-        // journalfile_destroy_unsafe) gates the unmap on IS_AVAILABLE and
-        // would skip it, leaving a dangling index entry, an unclosed fd, and
-        // an unmapped region. Centralizing here keeps the CRC, bounds, and
-        // signal-recovery paths in lockstep.
+        // Clear IS_AVAILABLE under the data spinlock BEFORE releasing our
+        // refcount, so no concurrent journalfile_v2_data_acquire_with_hint()
+        // can succeed and walk the (potentially corrupted) mmap between here
+        // and the permanent unmap. The bounds, CRC, and signal-recovery paths
+        // all converge through this single transition; without it, teardown
+        // (journalfile_close / journalfile_destroy_unsafe) would gate on
+        // IS_AVAILABLE and skip journalfile_v2_data_unmap_permanently(),
+        // leaving a dangling njfv2idx entry, an unclosed fd, and an unmapped
+        // region.
         spinlock_lock(&journalfile->data_spinlock);
         journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
         spinlock_unlock(&journalfile->data_spinlock);
+    }
+
+    journalfile_v2_data_release(journalfile);
+
+    if (unlikely(failed)) {
         journalfile_v2_data_unmap_permanently(journalfile);
         return;
     }
