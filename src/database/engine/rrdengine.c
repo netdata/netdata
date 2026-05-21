@@ -1387,24 +1387,58 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
 
-    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
+    char file_path[RRDENG_PATH_MAX];
+    journalfile_v2_generate_path(datafile_to_delete, file_path, sizeof(file_path));
 
-    size_t count = j2_header->metric_count;
     struct uuid_first_time_s *uuid_first_t_entry;
-    struct uuid_first_time_s *uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
-
+    struct uuid_first_time_s *uuid_first_entry_list = NULL;
+    size_t count = 0;
     size_t added = 0;
-    for (size_t index = 0; index < count; ++index) {
-        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &uuid_list[index].uuid, (Word_t)ctx);
-        if (!metric)
-            continue;
+    bool journal_access_failed = false;
 
-        uuid_first_entry_list[added].metric = metric;
-        uuid_first_entry_list[added].first_time_s = LONG_MAX;
-        uuid_first_entry_list[added].df_matched = 0;
-        uuid_first_entry_list[added].df_index_oldest = 0;
-        uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
-        added++;
+    // Protect the mmap walk: reading j2_header->metric_offset, metric_count,
+    // and the per-metric uuid_list[] entries can SIGBUS if the underlying v2
+    // file has any unreadable page (truncated, sparse hole, transient I/O
+    // error). Without a protected region active the process aborts. Same
+    // pattern as find_uuid_first_time() added by commit 26b26ac25a (#22310);
+    // this caller was missed at the time.
+    PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, file_path, "mrg-retention");
+    if(no_signal_received) {
+        size_t journal_v2_file_size = journalfile->mmap.size;
+        size_t metric_offset = j2_header->metric_offset;
+        count = j2_header->metric_count;
+        size_t metric_list_size;
+        if (__builtin_mul_overflow(count, sizeof(struct journal_metric_list), &metric_list_size) ||
+            metric_offset > journal_v2_file_size ||
+            metric_list_size > journal_v2_file_size - metric_offset) {
+            nd_log_daemon(NDLP_ERR,
+                          "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
+                          "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping retention update",
+                          file_path, metric_offset, metric_list_size, journal_v2_file_size);
+            journal_access_failed = true;
+        }
+        else {
+            struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + metric_offset);
+            uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
+
+            for (size_t index = 0; index < count; ++index) {
+                METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &uuid_list[index].uuid, (Word_t)ctx);
+                if (!metric)
+                    continue;
+
+                uuid_first_entry_list[added].metric = metric;
+                uuid_first_entry_list[added].first_time_s = LONG_MAX;
+                uuid_first_entry_list[added].df_matched = 0;
+                uuid_first_entry_list[added].df_index_oldest = 0;
+                uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
+                added++;
+            }
+        }
+    }
+    else {
+        // SIGBUS/SIGSEGV inside the mmap walk -- bail cleanly. The
+        // PROTECTED_ACCESS_SETUP macro already rate-limits the error log.
+        journal_access_failed = true;
     }
 
     netdata_log_info(
@@ -1414,6 +1448,14 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         first_datafile_remaining ? first_datafile_remaining->fileno : 0);
 
     journalfile_v2_data_release(journalfile);
+
+    if (unlikely(journal_access_failed)) {
+        // Release any partially-acquired metrics; uuid_first_entry_list may
+        // be NULL (signal received before callocz).
+        for (size_t index = 0; index < added; ++index)
+            mrg_metric_release(main_mrg, uuid_first_entry_list[index].metric);
+        goto done;
+    }
 
     // Update the first time / last time for all metrics we plan to delete
 
