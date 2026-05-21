@@ -39,7 +39,7 @@ Netdata provides three API versions that you can access with API tokens:
 
 :::tip
 
-**v3 is the recommended version for Netdata Cloud queries.** v3 endpoints use POST with a JSON body and provide the most control over scoping, filtering, and aggregation. See the [Common Endpoints section](#common-endpoints) for a v3 data query endpoint.
+**v3 is the recommended version for Netdata Cloud queries.** Netdata Cloud v3 endpoints use POST with a JSON body and provide the most control over scoping, filtering, and aggregation. Local Agent v3 endpoints are also available via GET. See the [Common Endpoints section](#common-endpoints) for v3 endpoint details.
 
 :::
 
