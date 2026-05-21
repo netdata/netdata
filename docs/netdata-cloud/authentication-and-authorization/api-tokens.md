@@ -45,7 +45,8 @@ Netdata provides three API versions that you can access with API tokens:
 
 ## Common Endpoints
 
-With appropriate API tokens, you can access endpoints including:
+With the appropriate token type, you can access endpoints including:
+Cloud API tokens authenticate Netdata Cloud endpoints, while direct Local Agent endpoints use per-agent bearer tokens only when Agent bearer protection is enabled (and may not require a token when unprotected).
 
 | Surface                     | Method | Endpoint                                           | Purpose                                                          |
 |:----------------------------|:-------|:---------------------------------------------------|:-----------------------------------------------------------------|
