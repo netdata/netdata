@@ -3047,7 +3047,8 @@ if(ENABLE_PLUGIN_EBPF)
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
             "${CMAKE_SOURCE_DIR}/go.work"
-            "${CMAKE_SOURCE_DIR}/src/go/pkg/netipc/*.go")
+            "${CMAKE_SOURCE_DIR}/src/go/pkg/netipc/*.go"
+            "${CMAKE_SOURCE_DIR}/src/go/pkg/netdataapi/*.go")
 
     set(EBPF_GO_LIBBPF_LIB_DIR lib)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
