@@ -11,6 +11,20 @@
 #include <time.h>
 #include <unistd.h>
 
+static inline size_t ebpfgo_shm_nbytes(size_t total)
+{
+    return total * sizeof(struct ebpf_pid_stat);
+}
+
+/* Returns the number of entries the SHM segment can hold, or 0 if the size is
+ * invalid (too small to hold even one entry). */
+static inline size_t ebpfgo_shm_stat_entry_count(const struct stat *st)
+{
+    if (st->st_size <= 0 || (size_t)st->st_size < sizeof(struct ebpf_pid_stat))
+        return 0;
+    return (size_t)st->st_size / sizeof(struct ebpf_pid_stat);
+}
+
 static int netdata_ebpfgo_shared_pid_memory_compare_pid(const void *a, const void *b)
 {
     const struct ebpf_pid_stat *pa = a;
@@ -78,7 +92,7 @@ static void netdata_ebpfgo_shared_pid_memory_close_internal(netdata_ebpfgo_share
     }
 
     if (ctx->shm) {
-        nd_munmap(ctx->shm, ctx->shm_total * sizeof(struct ebpf_pid_stat));
+        nd_munmap(ctx->shm, ebpfgo_shm_nbytes(ctx->shm_total));
         ctx->shm = NULL;
     }
 
@@ -112,12 +126,15 @@ static bool netdata_ebpfgo_shared_pid_memory_open(
         return false;
 
     struct stat st;
-    if (fstat(ctx->shm_fd, &st) != 0 || st.st_size <= 0 || (size_t)st.st_size < sizeof(struct ebpf_pid_stat))
+    if (fstat(ctx->shm_fd, &st) != 0)
+        goto fail;
+
+    ctx->shm_total = ebpfgo_shm_stat_entry_count(&st);
+    if (!ctx->shm_total)
         goto fail;
 
     ctx->shm_dev = st.st_dev;
     ctx->shm_ino = st.st_ino;
-    ctx->shm_total = (size_t)st.st_size / sizeof(struct ebpf_pid_stat);
     ctx->shm = nd_mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_SHARED, ctx->shm_fd, 0);
     if (ctx->shm == MAP_FAILED) {
         ctx->shm = NULL;
@@ -140,11 +157,11 @@ static bool netdata_ebpfgo_shared_pid_memory_copy_snapshot(netdata_ebpfgo_shared
         return false;
 
     if (ctx->snapshot_total != ctx->shm_total) {
-        ctx->snapshot = reallocz(ctx->snapshot, ctx->shm_total * sizeof(*ctx->snapshot));
+        ctx->snapshot = reallocz(ctx->snapshot, ebpfgo_shm_nbytes(ctx->shm_total));
         ctx->snapshot_total = ctx->shm_total;
     }
 
-    memcpy(ctx->snapshot, ctx->shm, ctx->shm_total * sizeof(*ctx->snapshot));
+    memcpy(ctx->snapshot, ctx->shm, ebpfgo_shm_nbytes(ctx->shm_total));
     qsort(ctx->snapshot, ctx->shm_total, sizeof(*ctx->snapshot), netdata_ebpfgo_shared_pid_memory_compare_pid);
     return true;
 }
@@ -175,8 +192,7 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
 
         bool changed =
             (st.st_dev != ctx->shm_dev || st.st_ino != ctx->shm_ino ||
-             st.st_size <= 0 || (size_t)st.st_size < sizeof(struct ebpf_pid_stat) ||
-             (size_t)st.st_size / sizeof(struct ebpf_pid_stat) != ctx->shm_total);
+             ebpfgo_shm_stat_entry_count(&st) != ctx->shm_total);
         close(fd);
 
         if (changed) {
