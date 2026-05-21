@@ -50,9 +50,13 @@ With appropriate API tokens, you can access endpoints including:
 - `/api/v1/charts` - Chart information
 - `/api/v1/data` - Single node data queries
 
-:::info
+:::warning
 
-Currently, Netdata Cloud is not exposing the stable API.
+Not all Cloud API endpoints are currently available. If you receive **404** responses from `https://app.netdata.cloud/api/v2/` or `https://app.netdata.cloud/api/v3/` endpoints, this is because Netdata Cloud is not yet exposing the full stable API.
+
+For accessing metric data, you can use your local Netdata Agent API at `http://<agent-ip>:19999/api/v2/data` or `http://<agent-ip>:19999/api/v1/data` instead.
+
+If you need help with Cloud API access, visit [Netdata Support](https://www.netdata.cloud/support/).
 
 :::
 
