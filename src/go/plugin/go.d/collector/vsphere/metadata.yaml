@@ -311,6 +311,18 @@ modules:
                     url      : https://203.0.113.10
                     username : admin@vsphere.local
                     password : somepassword
+            - name: With Virtual Node
+              description: |
+                Associates a vSphere data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+
+                Requires first defining the vnode in `/etc/netdata/vnodes/vnodes.conf`.
+              config: |
+                jobs:
+                  - name     : vcenter1
+                    url      : https://203.0.113.1
+                    username : admin@vsphere.local
+                    password : somepassword
+                    vnode    : vcenter_host_node
     troubleshooting:
       problems:
         list: []
