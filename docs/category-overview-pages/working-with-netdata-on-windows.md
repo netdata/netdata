@@ -81,7 +81,7 @@ When `edit-config` opens the file on Windows, it uses the `nano` editor.
 
 ## Custom metrics with PowerShell scripts
 
-You can collect custom metrics from PowerShell scripts using the [Nagios Plugins and Custom Scripts](/src/go/plugin/scripts.d/collector/nagios/integrations/nagios_plugins_and_custom_scripts.md) integration. Netdata automatically invokes `.ps1` scripts through `powershell.exe` with `-NoProfile -ExecutionPolicy Bypass` — your script just needs to follow the Nagios plugin output format (exit code and optional performance data).
+You can collect custom metrics from PowerShell scripts using the [Nagios Plugins and Custom Scripts](/src/go/plugin/scripts.d/collector/nagios/integrations/nagios_plugins_and_custom_scripts.md) integration. Netdata automatically invokes `.ps1` scripts through `powershell.exe` with `-NoProfile -ExecutionPolicy Bypass -File` — your script just needs to follow the Nagios plugin output format (exit code and optional performance data).
 
 ### Quick setup
 
