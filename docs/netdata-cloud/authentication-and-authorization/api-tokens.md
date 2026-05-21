@@ -39,7 +39,7 @@ Netdata provides three API versions that you can access with API tokens:
 
 :::tip
 
-**v3 is the recommended version for Netdata Cloud queries.** Netdata Cloud v3 endpoints use POST with a JSON body and provide the most control over scoping, filtering, and aggregation. Local Agent v3 endpoints are also available via GET. See the [Common Endpoints section](#common-endpoints) for v3 endpoint details.
+**v3 is the recommended version for Netdata Cloud queries.** Netdata Cloud v3 endpoints use POST with a JSON body and provide the most control over scoping, filtering, and aggregation. Local Agent v3 endpoints are available via GET; for example, `/api/v3/data` is query-parameter driven and does not use the Cloud v3 JSON body shape. See the [Common Endpoints section](#common-endpoints) for v3 endpoint details.
 
 :::
 
@@ -101,7 +101,7 @@ curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://ap
 
 :::tip
 
-The examples above use v2 endpoints. For metric data queries, the v3 equivalent (`/api/v3/data`) is also available on local Agents. On Netdata Cloud, use the room-scoped v3 POST endpoint — see the Advanced Metric Queries example below.
+The examples above use v2 endpoints. For metric data queries, the v3 equivalent (`/api/v3/data`) is also available on local Agents and is used with query parameters. On Netdata Cloud, use the room-scoped v3 POST endpoint and JSON body — see the Advanced Metric Queries example below.
 
 :::
 
