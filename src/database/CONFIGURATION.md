@@ -30,6 +30,12 @@ You can fine-tune retention for each tier by setting a time limit or size limit.
 | Time Limit = 0, Size Limit > 0 | **Space based:** data is stored with a disk space limit, regardless of time                                                              |
 | Time Limit > 0, Size Limit > 0 | **Combined time and space limits:** data is deleted once it reaches either the time limit or the disk space limit, whichever comes first |
 
+:::note
+
+Retention size limits are soft targets enforced periodically (approximately every 60 seconds), not hard caps enforced at write time. Actual disk usage can temporarily exceed the configured limit between enforcement cycles. This is most noticeable on tier 0 with high metric volumes, such as parent nodes receiving streams from many children. Provision more disk space than your configured limit to accommodate temporary overshoot.
+
+:::
+
 You can change these limits using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) to open `netdata.conf`:
 
 ```text
