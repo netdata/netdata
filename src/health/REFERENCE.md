@@ -995,12 +995,12 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 - `$system.cpu.user` - User CPU from system.cpu chart
 - `$disk.sda.reads` - Read operations from sda disk chart
 
-##### Cross-Chart Variable Examples from Stock Alerts
+##### Cross-Chart Variable Examples from Stock Health Entities
 
 Several stock health configurations use host variables to reference dimensions from **other charts** in their `calc`, `warn`, and `crit` expressions.
 
-| Alert | File | Expression | Cross-chart reference |
-|-------|------|------------|-----------------------|
+| Health entity | File | Expression | Cross-chart reference |
+|---------------|------|------------|-----------------------|
 | `30min_ram_swapped_out` | `health.d/swap.conf` | `calc: $this / 1024 * 100 / ( $system.ram.used + $system.ram.cached + $system.ram.free )` | `$system.ram.*` from within an alert on the `mem.swapio` chart |
 | `ram_available` | `health.d/ram.conf` | `calc: $avail * 100 / ($system.ram.used + $system.ram.cached + $system.ram.free + $system.ram.buffers)` | `$system.ram.*` from within an alert on the `mem.available` chart |
 | `system_clock_sync_state` | `health.d/timex.conf` | `warn: $system.uptime.uptime > 17 * 60 AND $this == 0` | `$system.uptime.uptime` from within an alert on the `system.clock_sync_state` chart |
@@ -1010,9 +1010,9 @@ Several stock health configurations use host variables to reference dimensions f
 
 ##### Prometheus Collector Variables
 
-For metrics collected by the go.d `prometheus` collector, each unique Prometheus label set usually produces a separate chart. The chart ID is built from the metric name followed by `-label=value` pairs for every label (e.g. `kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc`). In the Netdata chart registry, the prefix comes from the go.d `prometheus` job name (`name:`): `prometheus.<metric_name>-<label_set>` for the default job name, or `prometheus_<job_name>.<metric_name>-<label_set>` when the job has an explicit `name:`. For summary and histogram metric families, the collector may also emit related chart IDs such as `<id>`, `<id>_sum`, and `<id>_count`, so verify the exact chart ID you want to reference.
+For metrics collected by the go.d `prometheus` collector, each unique Prometheus label set usually produces a separate chart. The chart ID is built from the metric name followed by `-label=value` pairs for every label (e.g. `kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc`). In the Netdata chart registry, the prefix comes from the go.d job `FullName`: it is `prometheus.<metric_name>-<label_set>` only when the job name is literally `prometheus`; otherwise it is `prometheus_<job_name>.<metric_name>-<label_set>` (for example, `prometheus_local.<metric_name>-<label_set>` or `prometheus_kubelet.<metric_name>-<label_set>`). For summary and histogram metric families, the collector may also emit related chart IDs such as `<id>`, `<id>_sum`, and `<id>_count`, so verify the exact chart ID you want to reference.
 
-Because Prometheus chart IDs typically contain hyphens and `=` characters, use the `${...}` brace form to reference them in `calc`/`warn`/`crit` expressions — the unbraced `$var` form stops parsing at `-`. Apply the same rule whether the chart ID prefix is `prometheus` or `prometheus_<job_name>`, including any `_sum` or `_count` chart variants.
+Because Prometheus chart IDs typically contain hyphens and `=` characters, use the `${...}` brace form to reference them in `calc`/`warn`/`crit` expressions — the unbraced `$var` form stops parsing at `-`. Apply the same rule for both the common `prometheus_<job_name>` prefix and the special-case plain `prometheus` prefix, including any `_sum` or `_count` chart variants.
 
 **Example — PVC volume usage alert using kubelet metrics from a named Prometheus job (`name: kubelet`):**
 
