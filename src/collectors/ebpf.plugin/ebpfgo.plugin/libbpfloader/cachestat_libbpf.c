@@ -1,8 +1,10 @@
 //go:build netdata_ebpf_libbpf
 // +build netdata_ebpf_libbpf
 
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -89,10 +91,12 @@ struct netdata_ebpf_cachestat_runtime {
         struct cachestat_buffer_bpf *buffer;
         struct cachestat_arena_bpf *arena;
     } core;
-    /* Ring buffer consumer and per-TGID accumulator (buffer flavor only).
-     * The buffer BPF flavor emits events via ring buffer instead of writing
-     * directly to cstat_pid, so per-app counters must be accumulated here. */
-    struct ring_buffer *rb;
+    /* Event consumer and per-TGID accumulator (buffer and arena flavors).
+     * These flavors emit ring buffer / arena events rather than writing
+     * directly to cstat_pid, so per-app counters are accumulated here. */
+    struct ring_buffer *rb;        /* non-NULL for buffer flavor */
+    void              *arena_state; /* mmap'd arena pointer (arena flavor) */
+    uint32_t           arena_tail;  /* last consumed head for arena flavor */
     struct netdata_ebpf_cachestat_pid_entry *acc;
     size_t acc_cap;
     size_t acc_count;
@@ -546,14 +550,20 @@ static void cachestat_setup_ring_buffer(struct netdata_ebpf_cachestat_runtime *r
         return;
 
     struct bpf_map *map = bpf_object__find_map_by_name(obj, "cachestat_events");
-    if (!map)
+    if (!map) {
+        fprintf(stderr, "ebpf-go: cachestat ring buffer map 'cachestat_events' not found\n");
         return;
+    }
 
     int fd = bpf_map__fd(map);
-    if (fd < 0)
+    if (fd < 0) {
+        fprintf(stderr, "ebpf-go: cachestat ring buffer map fd invalid (%d)\n", fd);
         return;
+    }
 
     rt->rb = ring_buffer__new(fd, cachestat_rb_callback, rt, NULL);
+    if (!rt->rb)
+        fprintf(stderr, "ebpf-go: ring_buffer__new failed for cachestat (errno %d)\n", errno);
 }
 
 static void cachestat_destroy_ring_buffer(struct netdata_ebpf_cachestat_runtime *rt)
@@ -566,6 +576,47 @@ static void cachestat_destroy_ring_buffer(struct netdata_ebpf_cachestat_runtime 
     rt->acc     = NULL;
     rt->acc_cap   = 0;
     rt->acc_count = 0;
+}
+
+/*
+ * Arena flavor: the BPF programs write events into a shared-memory circular
+ * slot buffer (BPF arena, mmap-able) instead of a ring buffer.
+ *
+ * Layout of struct netdata_cachestat_arena_state_t (must match the macro
+ * expansion in netdata_arena_common.h / netdata_cachestat_arena.h):
+ *   __u32 head          (4 bytes)
+ *   [4 bytes padding to align events[] to 8 bytes]
+ *   cachestat_rb_event events[1024]  (1024 × 48 = 49152 bytes)
+ *   total = 49160 bytes  (verified by skeleton _Static_assert)
+ */
+#define CACHESTAT_ARENA_EVENT_SLOTS 1024
+
+struct cachestat_arena_state {
+    uint32_t head;
+    uint32_t _pad;
+    struct cachestat_rb_event events[CACHESTAT_ARENA_EVENT_SLOTS];
+};
+
+_Static_assert(
+    sizeof(struct cachestat_arena_state) == 49160,
+    "cachestat_arena_state size does not match BPF-side layout");
+
+/* Capture the mmap'd arena state pointer once at load time.
+ *
+ * bpf_map__initial_value() on a BPF_MAP_TYPE_ARENA map returns the arena
+ * region start (mmap offset 0).  The actual data section is placed at
+ * (arena_sz - roundup(arena_data_sz, page_sz)) bytes into the region — for a
+ * 1 MB arena with a 49 160-byte data section that is offset 995 328.  Using
+ * the arena map pointer directly therefore reads uninitialized memory.
+ *
+ * The arena skeleton wires a companion BSS map ("cachesta.bss") whose mmaped
+ * pointer libbpf resolves to the correct offset after load.  Use that. */
+static void cachestat_setup_arena(struct netdata_ebpf_cachestat_runtime *rt)
+{
+    if (!rt->core.arena || !rt->core.arena->bss)
+        return;
+
+    rt->arena_state = (void *)&rt->core.arena->bss->cachestat_arena_state;
 }
 
 static int cachestat_snapshot_from_acc(
@@ -602,6 +653,27 @@ static int cachestat_snapshot_from_acc(
     return 0;
 }
 
+static void cachestat_drain_arena(struct netdata_ebpf_cachestat_runtime *rt)
+{
+    if (!rt->arena_state)
+        return;
+
+    struct cachestat_arena_state *state =
+        (struct cachestat_arena_state *)rt->arena_state;
+
+    uint32_t head = __atomic_load_n(&state->head, __ATOMIC_ACQUIRE);
+    uint32_t tail = rt->arena_tail;
+
+    while (tail != head) {
+        const struct cachestat_rb_event *ev =
+            &state->events[tail % CACHESTAT_ARENA_EVENT_SLOTS];
+        cachestat_rb_callback(rt, (void *)ev, sizeof(*ev));
+        tail++;
+    }
+
+    rt->arena_tail = head;
+}
+
 #endif /* NETDATA_LIBBPF_CORE_SUPPORTED */
 
 int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
@@ -616,6 +688,8 @@ int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
             return rc;
         if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER)
             cachestat_setup_ring_buffer(rt);
+        else if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA)
+            cachestat_setup_arena(rt);
         return 0;
     }
 #endif
@@ -793,11 +867,17 @@ int netdata_cachestat_runtime_snapshot_apps(
     struct bpf_map *map = bpf_object__find_map_by_name(obj, "cstat_pid");
 
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
-    if (!map && rt->rb) {
-        /* Buffer flavor: no cstat_pid map; drain the ring buffer into the
-         * userspace accumulator and convert it to snapshot format. */
-        ring_buffer__consume(rt->rb);
-        return cachestat_snapshot_from_acc(rt, out);
+    if (!map) {
+        /* Buffer and arena flavors have no cstat_pid map; drain events into
+         * the userspace accumulator and convert to snapshot format. */
+        if (rt->rb) {
+            ring_buffer__consume(rt->rb);
+            return cachestat_snapshot_from_acc(rt, out);
+        }
+        if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
+            cachestat_drain_arena(rt);
+            return cachestat_snapshot_from_acc(rt, out);
+        }
     }
 #endif
 
