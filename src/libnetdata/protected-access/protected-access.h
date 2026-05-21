@@ -3,8 +3,10 @@
 #ifndef PROTECTED_ACCESS_H
 #define PROTECTED_ACCESS_H
 
-#include "libnetdata/libnetdata.h"
+#include "../common.h"
+#include "../signals/signals.h"
 #include <setjmp.h>
+#include <signal.h>
 
 // Maximum nesting depth for protected access regions
 #define PROTECTED_ACCESS_MAX_NESTING 8

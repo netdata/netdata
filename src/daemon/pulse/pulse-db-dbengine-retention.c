@@ -2,6 +2,7 @@
 
 #include "pulse-db-dbengine-retention.h"
 #ifdef ENABLE_DBENGINE
+#include "database/rrd.h"
 #include "database/engine/rrdengineapi.h"
 
 void dbengine_retention_statistics(bool extended __maybe_unused) {

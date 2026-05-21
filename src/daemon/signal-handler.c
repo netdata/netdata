@@ -2,7 +2,6 @@
 
 #include "common.h"
 #include "daemon/status-file.h"
-#include "protected-access.h"
 
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"

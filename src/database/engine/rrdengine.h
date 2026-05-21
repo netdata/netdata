@@ -8,7 +8,7 @@
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include "../rrd.h"
+#include "../storage-engine-types.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
 #include "datafile.h"
@@ -19,8 +19,6 @@
 #include "cache.h"
 #include "pdc.h"
 #include "page.h"
-
-#include "daemon/protected-access.h"
 
 extern unsigned rrdeng_pages_per_extent;
 

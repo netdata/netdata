@@ -1191,6 +1191,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/mmap_limit.h
         src/libnetdata/signals/signals.c
         src/libnetdata/signals/signals.h
+        src/libnetdata/protected-access/protected-access.c
+        src/libnetdata/protected-access/protected-access.h
         src/libnetdata/os/machine_id.c
         src/libnetdata/os/machine_id.h
         src/libnetdata/os/process_memory.c
@@ -1353,8 +1355,6 @@ set(DAEMON_FILES
         src/daemon/status-file-dmi.h
         src/daemon/status-file-product.c
         src/daemon/status-file-product.h
-        src/daemon/protected-access.c
-        src/daemon/protected-access.h
 )
 
 set(DAEMON_SYSTEMD_WATCHER_FILES
@@ -1671,6 +1671,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
+        src/database/storage-engine-types.h
         src/database/ram/rrddim_mem.c
         src/database/ram/rrddim_mem.h
         src/database/sqlite/sqlite_metadata.c

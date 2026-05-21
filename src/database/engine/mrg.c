@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "../rrd.h"
 #include "mrg-internals.h"
 
 struct aral_statistics mrg_aral_statistics;
