@@ -393,15 +393,8 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_
         endif()
     endif()
 
-    # ebpf-go.plugin is a separate Go module with its own (lower) minimum Go version.
-    # Re-check against that module so the eBPF plugin builds with older toolchains
-    # even when go.d.plugin requires a newer one.
-    find_min_go_version("${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin")
-    find_package(Go "${MIN_GO_VERSION}" QUIET)
-    if(GO_FOUND AND GO_VERSION_STRING VERSION_GREATER_EQUAL MIN_GO_VERSION)
+    if(GO_FOUND)
         set(ENABLE_PLUGIN_EBPF_GO ON)
-    else()
-        message(STATUS "Go ${MIN_GO_VERSION} is unavailable or too old; ebpf-go.plugin will not be built")
     endif()
 endif()
 
@@ -3052,7 +3045,9 @@ if(ENABLE_PLUGIN_EBPF)
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.go"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.c"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
-            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod")
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
+            "${CMAKE_SOURCE_DIR}/go.work"
+            "${CMAKE_SOURCE_DIR}/src/go/pkg/netipc/*.go")
 
     set(EBPF_GO_LIBBPF_LIB_DIR lib)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
