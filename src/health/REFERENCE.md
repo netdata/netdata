@@ -1010,15 +1010,17 @@ Several stock health configurations use host variables to reference dimensions f
 
 ##### Prometheus Collector Variables
 
-For Prometheus collector metrics, use the exact Netdata chart ID generated for your endpoint, as returned by `/api/v1/alarm_variables` or `/api/v1/charts`. For Prometheus-scraped metrics, chart IDs are derived from the metric name and may also include an encoded label set, so do not assume a generic `prometheus.<metric_family>` pattern. Use the `$prometheus.<chart_id>.<dimension>` syntax (without braces) in `calc`/`warn`/`crit` expressions.
+For metrics collected by the go.d `prometheus` collector, each unique Prometheus label set produces a separate chart. The chart ID is built from the metric name followed by `-label=value` pairs for every label (e.g. `kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc`). In the Netdata chart registry, these are prefixed with `prometheus.`, so the full chart ID becomes `prometheus.<metric_name>-<label_set>`.
+
+Because Prometheus chart IDs typically contain hyphens and `=` characters, use the `${...}` brace form to reference them in `calc`/`warn`/`crit` expressions — the unbraced `$var` form stops parsing at `-`.
 
 **Example — PVC volume usage alert using kubelet metrics:**
 
 ```text
    alarm: kubelet_pvc_volume_usage
-      on: prometheus.kubelet_volume_stats_used_bytes  # replace with the exact chart id returned by /api/v1/alarm_variables or /api/v1/charts
+      on: prometheus.kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc
    lookup: max -1m unaligned of kubelet_volume_stats_used_bytes
-     calc: $kubelet_volume_stats_used_bytes * 100 / $kubelet_volume_stats_capacity_bytes
+     calc: $this * 100 / ${prometheus.kubelet_volume_stats_capacity_bytes-persistentvolumeclaim=my-pvc.kubelet_volume_stats_capacity_bytes}
      warn: $this > 80
      crit: $this > 95
    units: %
@@ -1029,13 +1031,13 @@ For Prometheus collector metrics, use the exact Netdata chart ID generated for y
 
 :::note
 
-The exact chart ID and dimension names depend on how the Prometheus collector registers them for your endpoint. Use the alarm variables API to discover the correct names:
+The exact chart ID and dimension names depend on your endpoint's label sets. Use the alarm variables API to discover the correct names:
 
 ```text
-http://NODE:19999/api/v1/alarm_variables?chart=prometheus.kubelet-pvc-volumes
+http://NODE:19999/api/v1/alarm_variables?chart=prometheus.kubelet_volume_stats_used_bytes-persistentvolumeclaim%3Dmy-pvc
 ```
 
-If the chart ID contains special characters (e.g. hyphens), URL-encode it only in the API query parameter. Do not percent-encode it in the `$prometheus...` variable syntax.
+URL-encode the chart ID only in API query parameters. In alert expressions, use the chart ID as-is inside `${...}` braces.
 
 :::
 
