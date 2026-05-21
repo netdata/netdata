@@ -72,7 +72,7 @@ modules:
       description: ""
       availability: []
       scopes: []
-      functions:
+    functions:
         description: |
           This plugin exposes a real-time function for viewing active network connections.
         list:
@@ -166,7 +166,7 @@ modules:
       description: ""
       availability: []
       scopes: []
-      functions:
+    functions:
         description: |
           This collector exposes a real-time function for viewing Windows TCP and UDP stack statistics.
         list:
