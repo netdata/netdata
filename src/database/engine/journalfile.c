@@ -1075,9 +1075,13 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         // range offsets are treated as a rebuild trigger (same outcome as a
         // CRC failure).
         size_t mmap_size = journalfile->mmap.size;
-        size_t metric_list_bytes = (size_t)j2_header->metric_count * sizeof(struct journal_metric_list);
+        // Order matters: short-circuit on metric_offset > mmap_size first so the
+        // subtraction below cannot underflow, then compare metric_count against
+        // the available slot capacity via division rather than multiplying out
+        // metric_count * sizeof(...), which would wrap size_t on 32-bit builds
+        // and silently pass a malformed header.
         if ((size_t)j2_header->metric_offset > mmap_size ||
-            metric_list_bytes > mmap_size - (size_t)j2_header->metric_offset ||
+            (size_t)j2_header->metric_count > (mmap_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list) ||
             (size_t)j2_header->metric_trailer_offset > mmap_size - sizeof(struct journal_v2_block_trailer)) {
             // header offsets out of range -- needs rebuild
             failed = true;
