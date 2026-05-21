@@ -52,7 +52,7 @@ With appropriate API tokens, you can access endpoints including:
 | Netdata Cloud               | `POST` | `/api/v3/spaces/{spaceID}/rooms/{roomID}/data`     | Time-series metric data queries                      |
 | Netdata Cloud               | `POST` | `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes`    | List nodes in a room                                 |
 | Netdata Cloud               | `POST` | `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts` | List available metric contexts                       |
-| Local Agent                 | `POST` | `/api/v3/data`                                     | Single-node v3 data queries                          |
+| Local Agent                 | `GET`  | `/api/v3/data`                                     | Single-node v3 data queries                          |
 | Local Agent                 | `GET`  | `/api/v3/nodes`                                    | Multi-host node listing on a parent Agent            |
 | Local Agent                 | `GET`  | `/api/v3/contexts`                                 | List available metric contexts on an Agent           |
 | Netdata Cloud, Local Agent  | `GET`  | `/api/v2/nodes`                                    | Node information                                     |
