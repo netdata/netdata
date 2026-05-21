@@ -1101,10 +1101,10 @@ int netdata_main(int argc, char **argv) {
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
     struct passwd *pw = getpwuid(getuid());
     if (inicfg_exists(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
     }
     else
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
 
     nd_setenv("HOME", netdata_configured_home_dir, 1);
 

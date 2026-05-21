@@ -195,6 +195,7 @@ USAGE: ${PROGRAM} [options]
        where options include:
 
   --install-prefix <path>    Install netdata in <path>. Ex. --install-prefix /opt will put netdata in /opt/netdata.
+  --windows-path-prefix <path> Override NETDATA_WINDOWS_PATH_PREFIX for the CMake build.
   --dont-start-it            Do not (re)start netdata after installation.
   --dont-wait                Run installation in non-interactive mode.
   --stable-channel           Use packages from GitHub release pages instead of nightly updates.
@@ -259,6 +260,7 @@ fi
 DONOTSTART=0
 DONOTWAIT=0
 NETDATA_PREFIX=
+NETDATA_WINDOWS_PATH_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
@@ -358,6 +360,10 @@ while [ -n "${1}" ]; do
       ;;
     "--install-prefix")
       NETDATA_PREFIX="${2}/netdata"
+      shift 1
+      ;;
+    "--windows-path-prefix")
+      NETDATA_WINDOWS_PATH_PREFIX="${2}"
       shift 1
       ;;
     "--install-no-prefix")
@@ -652,9 +658,47 @@ echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
 prepare_cmake_options
 
+print_cmake_configure_command() {
+  printf "Would have used the following CMake command line for configuration: "
+  # shellcheck disable=SC2086
+  case "${NETDATA_CMAKE_INSTALL_PREFIX_OPTION:+I}${NETDATA_WINDOWS_PATH_PREFIX_OPTION:+W}" in
+    "IW")
+      escaped_print "${cmake}" ${NETDATA_CMAKE_OPTIONS} "${NETDATA_CMAKE_INSTALL_PREFIX_OPTION}" "${NETDATA_WINDOWS_PATH_PREFIX_OPTION}"
+      ;;
+    "I")
+      escaped_print "${cmake}" ${NETDATA_CMAKE_OPTIONS} "${NETDATA_CMAKE_INSTALL_PREFIX_OPTION}"
+      ;;
+    "W")
+      escaped_print "${cmake}" ${NETDATA_CMAKE_OPTIONS} "${NETDATA_WINDOWS_PATH_PREFIX_OPTION}"
+      ;;
+    *)
+      escaped_print "${cmake}" ${NETDATA_CMAKE_OPTIONS}
+      ;;
+  esac
+  printf "\n"
+}
+
+run_cmake_configure() {
+  # shellcheck disable=SC2086
+  case "${NETDATA_CMAKE_INSTALL_PREFIX_OPTION:+I}${NETDATA_WINDOWS_PATH_PREFIX_OPTION:+W}" in
+    "IW")
+      run ${cmake} ${NETDATA_CMAKE_OPTIONS} "${NETDATA_CMAKE_INSTALL_PREFIX_OPTION}" "${NETDATA_WINDOWS_PATH_PREFIX_OPTION}"
+      ;;
+    "I")
+      run ${cmake} ${NETDATA_CMAKE_OPTIONS} "${NETDATA_CMAKE_INSTALL_PREFIX_OPTION}"
+      ;;
+    "W")
+      run ${cmake} ${NETDATA_CMAKE_OPTIONS} "${NETDATA_WINDOWS_PATH_PREFIX_OPTION}"
+      ;;
+    *)
+      run ${cmake} ${NETDATA_CMAKE_OPTIONS}
+      ;;
+  esac
+}
+
 if [ -n "${NETDATA_PREPARE_ONLY}" ]; then
     progress "Exiting before building Netdata as requested."
-    printf "Would have used the following CMake command line for configuration: %s\n" "${cmake} ${NETDATA_CMAKE_OPTIONS}"
+    print_cmake_configure_command
     trap - EXIT
     exit 0
 fi
@@ -665,7 +709,7 @@ if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
 fi
 
 # shellcheck disable=SC2086
-if ! run ${cmake} ${NETDATA_CMAKE_OPTIONS}; then
+if ! run_cmake_configure; then
   fatal "Failed to configure Netdata sources." I000A
 fi
 

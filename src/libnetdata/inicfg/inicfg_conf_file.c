@@ -26,6 +26,134 @@ ENUM_STR_MAP_DEFINE(CONFIG_VALUE_TYPES) = {
 
 ENUM_STR_DEFINE_FUNCTIONS(CONFIG_VALUE_TYPES, CONFIG_VALUE_TYPE_UNKNOWN, "unknown");
 
+#if defined(OS_WINDOWS)
+static bool inicfg_windows_is_path_list_env_var(const struct config_section *sect, const struct config_option *opt) {
+    return !string_strcmp(sect->name, CONFIG_SECTION_ENV_VARS) &&
+           (!string_strcmp(opt->name, "PATH") || !string_strcmp(opt->name, "PYTHONPATH"));
+}
+
+static bool inicfg_windows_is_quoted_path_list_dir_var(const struct config_section *sect, const struct config_option *opt) {
+    return !string_strcmp(sect->name, CONFIG_SECTION_DIRECTORIES) &&
+           !string_strcmp(opt->name, "plugins");
+}
+
+static bool inicfg_windows_is_log_path_setting(const struct config_section *sect, const struct config_option *opt) {
+    return ((!string_strcmp(sect->name, CONFIG_SECTION_LOGS) &&
+             (!string_strcmp(opt->name, "debug") ||
+              !string_strcmp(opt->name, "daemon") ||
+              !string_strcmp(opt->name, "collector") ||
+              !string_strcmp(opt->name, "access") ||
+              !string_strcmp(opt->name, "health"))) ||
+            (!string_strcmp(sect->name, CONFIG_SECTION_CLOUD) &&
+             !string_strcmp(opt->name, "conversation log file")));
+}
+
+static const char *inicfg_windows_path_list_for_display(const char *value, char *dst, size_t dst_size) {
+    if (!value || !*value || !dst || dst_size == 0)
+        return value ? value : "";
+
+    // Internal storage always uses ':' as separator (normalized on read).
+    // A ';' here means the value was never normalized, so treat it as already Windows-format.
+    if (strchr(value, ';')) {
+        snprintfz(dst, dst_size, "%s", value);
+        return dst;
+    }
+
+    dst[0] = '\0';
+    size_t len = 0;
+    size_t value_len = strnlen(value, CONFIG_MAX_VALUE);
+    const char *value_end = value + value_len;
+    bool first = true;
+
+    const char *segment_start = value;
+    while (segment_start <= value_end) {
+        if (segment_start == value_end)
+            break;
+
+        const char *separator = memchr(segment_start, ':', (size_t)(value_end - segment_start));
+        size_t segment_len = separator
+            ? (size_t)(separator - segment_start)
+            : value_len - (size_t)(segment_start - value);
+
+        char segment[CONFIG_MAX_VALUE + 1];
+        if (segment_len > CONFIG_MAX_VALUE)
+            segment_len = CONFIG_MAX_VALUE;
+
+        memcpy(segment, segment_start, segment_len);
+        segment[segment_len] = '\0';
+
+        CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(segment);
+        if (!first)
+            len = strcatz(dst, len, ";", dst_size);
+        len = strcatz(dst, len, translated, dst_size);
+        first = false;
+
+        if (!separator)
+            break;
+
+        segment_start = separator + 1;
+    }
+
+    return dst;
+}
+
+static const char *inicfg_windows_quoted_path_list_for_display(const char *value, char *dst, size_t dst_size) {
+    if (!value || !*value || !dst || dst_size == 0)
+        return value ? value : "";
+
+    CLEAN_CHAR_P *copy = strdupz(value);
+    // 256 slots matches the limit in reformat_quoted_path_list; entries beyond this are silently ignored.
+    char *words[256] = { 0 };
+    size_t num_words = quoted_strings_splitter_config(copy, words, _countof(words));
+    if (!num_words) {
+        snprintfz(dst, dst_size, "%s", value);
+        return dst;
+    }
+
+    dst[0] = '\0';
+    size_t len = 0;
+    for(size_t i = 0; i < num_words; i++) {
+        CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(words[i]);
+        if (i)
+            len = strcatz(dst, len, " ", dst_size);
+        len = strcatz(dst, len, "\"", dst_size);
+        len = strcatz(dst, len, translated, dst_size);
+        len = strcatz(dst, len, "\"", dst_size);
+    }
+
+    return dst;
+}
+
+static const char *inicfg_windows_value_for_display(
+    const struct config_section *sect,
+    const struct config_option *opt,
+    const char *value,
+    char *dst,
+    size_t dst_size)
+{
+    if (!value || !*value)
+        return value ? value : "";
+
+    if (inicfg_windows_is_path_list_env_var(sect, opt))
+        return inicfg_windows_path_list_for_display(value, dst, dst_size);
+
+    if (inicfg_windows_is_quoted_path_list_dir_var(sect, opt))
+        return inicfg_windows_quoted_path_list_for_display(value, dst, dst_size);
+
+    if (inicfg_windows_is_log_path_setting(sect, opt))
+        return inicfg_log_path_setting_for_display(value, dst, dst_size);
+
+    // Translate all PATH/FILENAME-typed options, plus all remaining DIRECTORIES keys.
+    // The list-type keys handled above are ENV_VARS.PATH/PYTHONPATH and DIRECTORIES.plugins.
+    // If a new list-type key is added to either section, add a dedicated check before this fallback.
+    if ((opt->type != CONFIG_VALUE_TYPE_PATH && opt->type != CONFIG_VALUE_TYPE_FILENAME) &&
+        string_strcmp(sect->name, CONFIG_SECTION_DIRECTORIES) != 0)
+        return value;
+
+    return os_translate_path(dst, value, dst_size);
+}
+#endif
+
 
 // ----------------------------------------------------------------------------
 // config load/save
@@ -62,7 +190,7 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
         line++;
 
         s = trim(buffer);
-        if(!s || *s == '#') {
+        if(!s || !*s || *s == '#') {
             netdata_log_debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
             continue;
         }
@@ -296,10 +424,23 @@ void inicfg_generate(struct config *root, BUFFER *wb, int only_changed, bool net
                                            string2str(opt->value_original));
                     }
 
+                    const char *current_value = string2str(opt->value);
+                    const char *default_value = opt->value_default ? string2str(opt->value_default) : "";
+#if defined(OS_WINDOWS)
+                    char current_value_windows[CONFIG_MAX_VALUE + 1];
+                    char default_value_windows[CONFIG_MAX_VALUE + 1];
+
+                    current_value = inicfg_windows_value_for_display(
+                        sect, opt, current_value, current_value_windows, sizeof(current_value_windows));
+                    if(opt->value_default)
+                        default_value = inicfg_windows_value_for_display(
+                            sect, opt, default_value, default_value_windows, sizeof(default_value_windows));
+#endif
+
                     if(show_default)
                         buffer_sprintf(wb, "\t#| datatype: %s, default value: %s\n",
                                        CONFIG_VALUE_TYPES_2str(opt->type),
-                                       string2str(opt->value_default));
+                                       default_value);
 
                     buffer_sprintf(wb, "\t%s%s = %s\n",
                                    (
@@ -308,7 +449,7 @@ void inicfg_generate(struct config *root, BUFFER *wb, int only_changed, bool net
                                        (opt->flags & CONFIG_VALUE_USED)
                                            ) ? "# " : "",
                                    string2str(opt->name),
-                                   string2str(opt->value));
+                                   current_value);
 
                     options_added++;
                 }

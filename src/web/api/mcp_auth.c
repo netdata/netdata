@@ -114,7 +114,13 @@ void mcp_api_key_initialize(void) {
 
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
+#if defined(OS_WINDOWS)
+    char display_path[PATH_MAX];
+    netdata_log_info("MCP: Developer preview API key initialized. Location: %s",
+                     os_translate_path(display_path, path, sizeof(display_path)));
+#else
     netdata_log_info("MCP: Developer preview API key initialized. Location: %s", path);
+#endif
 }
 
 bool mcp_api_key_verify(const char *api_key, bool silent) {

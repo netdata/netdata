@@ -95,6 +95,47 @@ include(NetdataCompilerFlags)
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
+function(netdata_windows_path_to_runtime_path output_var input_path)
+  set(_converted_path "")
+  set(_cygpath_result 1)
+
+  find_program(_cygpath_executable NAMES cygpath)
+  if(_cygpath_executable)
+    execute_process(
+      COMMAND ${_cygpath_executable} -u "${input_path}"
+      RESULT_VARIABLE _cygpath_result
+      OUTPUT_VARIABLE _converted_path
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  endif()
+
+  if(NOT _converted_path OR NOT _cygpath_result EQUAL 0)
+    string(REPLACE "\\" "/" _converted_path "${input_path}")
+
+    if(_converted_path MATCHES "^([A-Za-z]):(.*)$")
+      string(TOLOWER "${CMAKE_MATCH_1}" _drive_letter)
+      set(_converted_path "/${_drive_letter}${CMAKE_MATCH_2}")
+    endif()
+  endif()
+
+  if(NOT _converted_path STREQUAL "")
+    string(REGEX REPLACE "/$" "" _converted_path "${_converted_path}")
+  endif()
+
+  set(${output_var} "${_converted_path}" PARENT_SCOPE)
+endfunction()
+
+if(OS_WINDOWS)
+  set(NETDATA_WINDOWS_PATH_PREFIX "C:\\Program Files\\Netdata" CACHE STRING
+      "Native Windows install prefix used to derive runtime paths")
+  string(REGEX REPLACE "[/\\\\]+$" "" NETDATA_WINDOWS_PATH_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
+  string(REPLACE "\\" "\\\\" NETDATA_WINDOWS_PATH_PREFIX_ESCAPED "${NETDATA_WINDOWS_PATH_PREFIX}")
+
+  if(NOT BUILD_FOR_PACKAGING)
+    netdata_windows_path_to_runtime_path(NETDATA_RUNTIME_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
+  endif()
+endif()
+
 if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")
   string(REGEX REPLACE "/$" "" NETDATA_RUNTIME_PREFIX "${NETDATA_RUNTIME_PREFIX}")
 endif()
