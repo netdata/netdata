@@ -1019,7 +1019,7 @@ Because Prometheus chart IDs typically contain hyphens and `=` characters, use t
 ```text
    alarm: kubelet_pvc_volume_usage
       on: prometheus_kubelet.kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc
-   lookup: max -1m unaligned of kubelet_volume_stats_used_bytes
+   lookup: max -1m unaligned match-names of kubelet_volume_stats_used_bytes
      calc: $this * 100 / ${prometheus_kubelet.kubelet_volume_stats_capacity_bytes-persistentvolumeclaim=my-pvc.kubelet_volume_stats_capacity_bytes}
      warn: $this > 80
      crit: $this > 95
