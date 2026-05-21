@@ -75,7 +75,7 @@ The local Agent `/api/v1/charts` endpoint is still available for backward compat
 
 :::note
 
-For Netdata Cloud metric queries, use the room-scoped **v3 POST endpoints** with a JSON body. Local Agents expose their own unscoped v3 endpoints such as `/api/v3/data`, `/api/v3/nodes`, `/api/v3/contexts`, `/api/v3/weights`, and `/api/v3/q`. v1 endpoints such as `/api/v1/data` and `/api/v1/charts` remain local-Agent only and return **404** when called against `app.netdata.cloud`. v2 endpoints work on both Cloud and local Agents for backward compatibility, but v3 is recommended for Cloud.
+For Netdata Cloud metric queries, use the room-scoped **v3 POST endpoints** with a JSON body. Local Agents expose their own unscoped v3 endpoints such as `/api/v3/data`, `/api/v3/nodes`, `/api/v3/contexts`, `/api/v3/weights`, and `/api/v3/q`. Legacy metrics v1 endpoints such as `/api/v1/data` and `/api/v1/charts` remain local-Agent only and return **404** when called against `app.netdata.cloud`. v2 endpoints work on both Cloud and local Agents for backward compatibility, but v3 is recommended for Cloud.
 
 :::
 
