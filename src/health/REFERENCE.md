@@ -1010,9 +1010,9 @@ Several stock health configurations use host variables to reference dimensions f
 
 ##### Prometheus Collector Variables
 
-For metrics collected by the go.d `prometheus` collector, each unique Prometheus label set produces a separate chart. The chart ID is built from the metric name followed by `-label=value` pairs for every label (e.g. `kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc`). In the Netdata chart registry, the prefix is the collector chart type: `prometheus.<metric_name>-<label_set>` when the Prometheus job name matches the module name, or `prometheus_<job_name>.<metric_name>-<label_set>` when the job has an explicit name.
+For metrics collected by the go.d `prometheus` collector, each unique Prometheus label set usually produces a separate chart. The chart ID is built from the metric name followed by `-label=value` pairs for every label (e.g. `kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc`). In the Netdata chart registry, the prefix comes from the go.d `prometheus` job name (`name:`): `prometheus.<metric_name>-<label_set>` for the default job name, or `prometheus_<job_name>.<metric_name>-<label_set>` when the job has an explicit `name:`. For summary and histogram metric families, the collector may also emit related chart IDs such as `<id>`, `<id>_sum`, and `<id>_count`, so verify the exact chart ID you want to reference.
 
-Because Prometheus chart IDs typically contain hyphens and `=` characters, use the `${...}` brace form to reference them in `calc`/`warn`/`crit` expressions — the unbraced `$var` form stops parsing at `-`. Apply the same rule whether the chart ID prefix is `prometheus` or `prometheus_<job_name>`.
+Because Prometheus chart IDs typically contain hyphens and `=` characters, use the `${...}` brace form to reference them in `calc`/`warn`/`crit` expressions — the unbraced `$var` form stops parsing at `-`. Apply the same rule whether the chart ID prefix is `prometheus` or `prometheus_<job_name>`, including any `_sum` or `_count` chart variants.
 
 **Example — PVC volume usage alert using kubelet metrics from a named Prometheus job (`name: kubelet`):**
 
