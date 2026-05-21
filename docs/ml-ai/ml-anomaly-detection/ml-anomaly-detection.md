@@ -23,7 +23,7 @@ A dedicated process correlates anomalies across all metrics within each node, ge
 | **Time-series Integrity** | Immutable anomaly history                                                                 | No hindsight bias — shows what was detectable then   |
 | **Coverage**            | Every metric, every dimension                                                                | No sampling, no blind spots                          |
 | **Correlation Engine**  | Real-time anomaly correlation across metrics                                                 | Powers Anomaly Advisor for root cause analysis       |
-| **Alert Philosophy**    | Investigation aid, not alert source                                                          | Reduces alert fatigue                                |
+| **Alert Philosophy**    | Primarily an investigation aid; anomaly bits and anomaly rate can also drive health alerts   | Reduces alert fatigue while enabling anomaly-based alerting |
 
 :::note
 Netdata avoids deep learning models to maintain lightweight operation on any Linux system. The entire ML system is designed to run efficiently without specialized hardware or dependencies.
@@ -265,7 +265,7 @@ The following template triggers when the anomaly rate on `system.cpu` exceeds th
     units: %
     every: 30s
      warn: $this > (($status >= $WARNING)  ? (5) : (20))
-     crit: $this > (($status == $CRITICAL) ? (20) : (100))
+     crit: $this >= (($status == $CRITICAL) ? (20) : (100))
      info: rolling 5min anomaly rate for system.cpu chart
 ```
 
@@ -281,14 +281,14 @@ lookup: average -5m of user,system
  every: 30s
   warn: $this > 80
   crit: $this > 95
-  info: average CPU utilization over the last 5 minutes
+  info: average user+system CPU utilization over the last 5 minutes
 ```
 
 When the anomaly alert fires, the companion alert provides the concrete values — for example, "CPU anomaly rate 35%" together with "CPU utilization 92%".
 
 :::tip
 
-Use `foreach` instead of `of` to get a separate alert per dimension (e.g., per CPU state). For the full alert syntax, see the [health configuration reference](/src/health/REFERENCE.md).
+Use `foreach` in a template to generate one alert instance per dimension (e.g., one per CPU state). Note that `foreach` and `of` serve different purposes: `of` selects which dimensions the `lookup` aggregates, while `foreach` creates separate alert instances for each matching dimension in a template. For the full alert syntax, see the [health configuration reference](/src/health/REFERENCE.md).
 
 :::
 
