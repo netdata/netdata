@@ -55,6 +55,8 @@ With appropriate API tokens, you can access endpoints including:
 | Local Agent                 | `GET`  | `/api/v3/data`                                     | Single-node v3 data queries                          |
 | Local Agent                 | `GET`  | `/api/v3/nodes`                                    | Multi-host node listing on a parent Agent            |
 | Local Agent                 | `GET`  | `/api/v3/contexts`                                 | List available metric contexts on an Agent           |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v3/weights`                                  | Metric scoring/correlation                           |
+| Netdata Cloud, Local Agent  | `GET`  | `/api/v3/q`                                        | Full-text search                                     |
 | Netdata Cloud, Local Agent  | `GET`  | `/api/v2/nodes`                                    | Node information                                     |
 | Netdata Cloud, Local Agent  | `GET`  | `/api/v2/data`                                     | Multi-dimensional data queries                       |
 | Netdata Cloud, Local Agent  | `GET`  | `/api/v2/contexts`                                 | Context metadata                                     |
@@ -72,7 +74,7 @@ The local Agent `/api/v1/charts` endpoint is still available for backward compat
 
 :::note
 
-For Netdata Cloud metric queries, use the room-scoped **v3 POST endpoints** with a JSON body. Local Agents expose their own unscoped v3 endpoints such as `/api/v3/data`, `/api/v3/nodes`, and `/api/v3/contexts`. v1 endpoints such as `/api/v1/data` and `/api/v1/charts` remain local-Agent only and return **404** when called against `app.netdata.cloud`. v2 endpoints work on both Cloud and local Agents for backward compatibility, but v3 is recommended for Cloud.
+For Netdata Cloud metric queries, use the room-scoped **v3 POST endpoints** with a JSON body. Local Agents expose their own unscoped v3 endpoints such as `/api/v3/data`, `/api/v3/nodes`, `/api/v3/contexts`, `/api/v3/weights`, and `/api/v3/q`. v1 endpoints such as `/api/v1/data` and `/api/v1/charts` remain local-Agent only and return **404** when called against `app.netdata.cloud`. v2 endpoints work on both Cloud and local Agents for backward compatibility, but v3 is recommended for Cloud.
 
 :::
 
@@ -95,6 +97,12 @@ curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://ap
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/data?contexts=system.cpu&after=-600
 ```
+
+:::tip
+
+The examples above use v2 endpoints. For metric data queries, the v3 equivalent (`/api/v3/data`) is also available on local Agents. On Netdata Cloud, use the room-scoped v3 POST endpoint — see the Advanced Metric Queries example below.
+
+:::
 
 **Advanced Metric Queries with Aggregation**
 
