@@ -1412,59 +1412,71 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     // error). Without a protected region active the process aborts. Same
     // pattern as find_uuid_first_time() added by commit 26b26ac25a (#22310);
     // this caller was missed at the time.
-    PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, file_path, "mrg-retention");
-    if(no_signal_received) {
-        size_t journal_v2_file_size = journalfile->mmap.size;
-        size_t metric_offset = j2_header->metric_offset;
-        count = j2_header->metric_count;
-        size_t metric_list_size;
-        size_t entry_list_size;
-        // Also check count * sizeof(uuid_first_time_s) -- the allocation below
-        // sizes the working array by count, and on 32-bit builds count can
-        // pass the metric_list_size bound while still overflowing the entry
-        // list multiplication (struct uuid_first_time_s is larger than
-        // struct journal_metric_list).
-        if (__builtin_mul_overflow(count, sizeof(struct journal_metric_list), &metric_list_size) ||
-            __builtin_mul_overflow(count, sizeof(struct uuid_first_time_s), &entry_list_size) ||
-            metric_offset > journal_v2_file_size ||
-            metric_list_size > journal_v2_file_size - metric_offset) {
-            nd_log_daemon(NDLP_ERR,
-                          "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
-                          "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping retention update",
-                          file_path, metric_offset, metric_list_size, journal_v2_file_size);
-            journal_access_failed = true;
-        }
-        else {
-            struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + metric_offset);
-            uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
+    // Scope the protected frame tightly to the mmap walk only. The
+    // PROTECTED_ACCESS_AUTO_CLEANUP() guard inside PROTECTED_ACCESS_SETUP
+    // declares a __attribute__((cleanup)) local; when this inner block exits
+    // (normally or via the SIGBUS recovery else-branch falling through), the
+    // cleanup runs and the protected-access depth drops back to its prior
+    // value. Without this scoping, the frame would stay live through the
+    // post-walk log, the data_release, the cleanup loop, the nested
+    // find_uuid_first_time() (which registers its own frame), and the final
+    // cleanup -- masking unrelated faults that might land in the mmap range
+    // and inflating nesting depth unnecessarily.
+    {
+        PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, file_path, "mrg-retention");
+        if(no_signal_received) {
+            size_t journal_v2_file_size = journalfile->mmap.size;
+            size_t metric_offset = j2_header->metric_offset;
+            count = j2_header->metric_count;
+            size_t metric_list_size;
+            size_t entry_list_size;
+            // Also check count * sizeof(uuid_first_time_s) -- the allocation below
+            // sizes the working array by count, and on 32-bit builds count can
+            // pass the metric_list_size bound while still overflowing the entry
+            // list multiplication (struct uuid_first_time_s is larger than
+            // struct journal_metric_list).
+            if (__builtin_mul_overflow(count, sizeof(struct journal_metric_list), &metric_list_size) ||
+                __builtin_mul_overflow(count, sizeof(struct uuid_first_time_s), &entry_list_size) ||
+                metric_offset > journal_v2_file_size ||
+                metric_list_size > journal_v2_file_size - metric_offset) {
+                nd_log_daemon(NDLP_ERR,
+                              "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
+                              "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping retention update",
+                              file_path, metric_offset, metric_list_size, journal_v2_file_size);
+                journal_access_failed = true;
+            }
+            else {
+                struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + metric_offset);
+                uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
 
-            for (size_t index = 0; index < count; ++index) {
-                // Copy uuid out of the mmap onto the stack BEFORE calling mrg.
-                // If a backing page is unreadable, uuid_copy SIGBUSes here and
-                // the protected region recovers cleanly; the mrg call then
-                // never executes. If we passed &uuid_list[index].uuid into
-                // mrg, a SIGBUS could fire INSIDE mrg while it holds internal
-                // locks, and siglongjmp would skip mrg's unlock paths.
-                nd_uuid_t local_uuid;
-                uuid_copy(local_uuid, uuid_list[index].uuid);
+                for (size_t index = 0; index < count; ++index) {
+                    // Copy uuid out of the mmap onto the stack BEFORE calling mrg.
+                    // If a backing page is unreadable, uuid_copy SIGBUSes here and
+                    // the protected region recovers cleanly; the mrg call then
+                    // never executes. If we passed &uuid_list[index].uuid into
+                    // mrg, a SIGBUS could fire INSIDE mrg while it holds internal
+                    // locks, and siglongjmp would skip mrg's unlock paths.
+                    nd_uuid_t local_uuid;
+                    uuid_copy(local_uuid, uuid_list[index].uuid);
 
-                METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &local_uuid, (Word_t)ctx);
-                if (!metric)
-                    continue;
+                    METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &local_uuid, (Word_t)ctx);
+                    if (!metric)
+                        continue;
 
-                uuid_first_entry_list[added].metric = metric;
-                uuid_first_entry_list[added].first_time_s = LONG_MAX;
-                uuid_first_entry_list[added].df_matched = 0;
-                uuid_first_entry_list[added].df_index_oldest = 0;
-                uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
-                added++;
+                    uuid_first_entry_list[added].metric = metric;
+                    uuid_first_entry_list[added].first_time_s = LONG_MAX;
+                    uuid_first_entry_list[added].df_matched = 0;
+                    uuid_first_entry_list[added].df_index_oldest = 0;
+                    uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
+                    added++;
+                }
             }
         }
-    }
-    else {
-        // SIGBUS/SIGSEGV inside the mmap walk -- bail cleanly. The
-        // PROTECTED_ACCESS_SETUP macro already rate-limits the error log.
-        journal_access_failed = true;
+        else {
+            // SIGBUS/SIGSEGV inside the mmap walk -- bail cleanly. The
+            // PROTECTED_ACCESS_SETUP macro already rate-limits the error log.
+            journal_access_failed = true;
+        }
     }
 
     netdata_log_info(
