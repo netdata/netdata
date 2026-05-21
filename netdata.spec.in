@@ -80,7 +80,7 @@ AutoReqProv: yes
 %{?rhel:%global centos_ver %rhel}
 
 # Only try to build OTEL plugin if we have rust
-%global _nd_rust_cmd %(command -v rustc)
+%global _nd_rustc_cmd %(command -v rustc)
 
 %if "%{_nd_rustc_cmd}" == ""
 %global _have_rust 0
