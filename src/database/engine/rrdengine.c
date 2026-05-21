@@ -1398,10 +1398,13 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     // mutated inside the protected region and then read afterwards (the
     // unconditional log line and the journal_access_failed cleanup loop), so
     // they must be volatile to keep the recovery path well-defined.
+    // journal_access_failed is also marked volatile defensively: although it
+    // is only assigned on a path that does not subsequently SIGBUS, future
+    // edits could break that invariant, and the bool is read once on cleanup.
     struct uuid_first_time_s * volatile uuid_first_entry_list = NULL;
     volatile size_t count = 0;
     volatile size_t added = 0;
-    bool journal_access_failed = false;
+    volatile bool journal_access_failed = false;
 
     // Protect the mmap walk: reading j2_header->metric_offset, metric_count,
     // and the per-metric uuid_list[] entries can SIGBUS if the underlying v2
@@ -1415,7 +1418,14 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         size_t metric_offset = j2_header->metric_offset;
         count = j2_header->metric_count;
         size_t metric_list_size;
+        size_t entry_list_size;
+        // Also check count * sizeof(uuid_first_time_s) -- the allocation below
+        // sizes the working array by count, and on 32-bit builds count can
+        // pass the metric_list_size bound while still overflowing the entry
+        // list multiplication (struct uuid_first_time_s is larger than
+        // struct journal_metric_list).
         if (__builtin_mul_overflow(count, sizeof(struct journal_metric_list), &metric_list_size) ||
+            __builtin_mul_overflow(count, sizeof(struct uuid_first_time_s), &entry_list_size) ||
             metric_offset > journal_v2_file_size ||
             metric_list_size > journal_v2_file_size - metric_offset) {
             nd_log_daemon(NDLP_ERR,
