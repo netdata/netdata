@@ -1293,7 +1293,7 @@ void rrdeng_quiesce(struct rrdengine_instance *ctx)
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
 {
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
-    void *data_start = (void *)j2_header;
+    uint8_t *data_start = (uint8_t *)j2_header;
 
     if(unlikely(!j2_header))
         return;
