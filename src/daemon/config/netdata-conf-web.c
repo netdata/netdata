@@ -152,8 +152,11 @@ void netdata_conf_section_web(void) {
 
         // copy and strip trailing slashes
         char *prefix_copy = strdupz(prefix_raw);
-        char *end = prefix_copy + strlen(prefix_copy) - 1;
-        while(end > prefix_copy && *end == '/') *end-- = '\0';
+        size_t plen = strlen(prefix_copy);
+        if(plen > 0) {
+            char *end = prefix_copy + plen - 1;
+            while(end > prefix_copy && *end == '/') *end-- = '\0';
+        }
 
         if(*prefix_copy)
             web_uri_prefix = prefix_copy;

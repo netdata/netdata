@@ -1173,6 +1173,14 @@ static inline bool web_client_uri_prefix_matches(const char *decoded_path) {
             decoded_path[prefix_len] == '\0');
 }
 
+static inline int web_client_uri_prefix_not_found(struct web_client *w) {
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "Not found.");
+    w->response.data->content_type = CT_TEXT_HTML;
+    w->response.code = HTTP_RESP_NOT_FOUND;
+    return HTTP_RESP_NOT_FOUND;
+}
+
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path) {
     if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
         return web_client_service_unavailable(w);
@@ -1423,10 +1431,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     }
 
                     if(!web_client_uri_prefix_matches(buffer_tostring(w->url_path_decoded))) {
-                        buffer_flush(w->response.data);
-                        buffer_strcat(w->response.data, "Not found.");
-                        w->response.data->content_type = CT_TEXT_HTML;
-                        w->response.code = HTTP_RESP_NOT_FOUND;
+                        web_client_uri_prefix_not_found(w);
                         break;
                     }
 
@@ -1485,10 +1490,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     char *url_to_process = path;
                     if(web_uri_prefix && *web_uri_prefix) {
                         if(!web_client_uri_prefix_matches(path)) {
-                            buffer_flush(w->response.data);
-                            buffer_strcat(w->response.data, "Not found.");
-                            w->response.data->content_type = CT_TEXT_HTML;
-                            w->response.code = HTTP_RESP_NOT_FOUND;
+                            web_client_uri_prefix_not_found(w);
                             break;
                         }
                         // Advance past leading slashes and the prefix segment
