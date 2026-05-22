@@ -12,6 +12,41 @@ Netdata implements a layered access control system to protect sensitive informat
 | **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier) |
 | **Netdata Cloud Business** | Signed in with a paid subscription |
 
+## Self-Hosted Netdata (Without Cloud)
+
+Netdata can be fully self-hosted — every Agent is a complete observability engine with its own dashboard at port 19999, and no data leaves your infrastructure. The **Anonymous** access level in all tables below represents exactly this self-hosted-without-Cloud experience.
+
+### What you get self-hosted
+
+| Capability | Details |
+|------------|---------|
+| Real-time metrics | All collectors, full resolution |
+| Historical data & retention | Local database, configurable retention |
+| Charts & dashboards | Agent dashboard, 1 custom dashboard per Agent |
+| ML anomaly detection | Trained and evaluated locally on each Agent |
+| Alert notifications | All notification integrations, evaluated at the edge |
+| Public functions | Block devices, containers/VMs, network interfaces, mount points, IPMI sensors, systemd services |
+| Multi-node views | Up to 5 nodes |
+| Agent/Parent MCP | Free and open-source, direct access |
+
+### What requires a Cloud connection
+
+| Feature | Cloud tier |
+|---------|------------|
+| Sensitive functions (processes, network connections, systemd journal, Windows events, systemd units, database queries, streaming status, API call tracing) | Community (free) |
+| Alert silencing rules | Community (free) |
+| AI features (alert explanations, configuration suggestions, insights) | Community (free) |
+| Dynamic configuration (collectors, alerts, agent config) | Business (paid) |
+| Notification configuration | Business (paid) |
+| Unlimited multi-node views | Business (paid) |
+| Unlimited custom dashboards | Business (paid) |
+| RBAC & SSO | Business (paid) |
+| Full team management | Business (paid) |
+
+Connecting to Netdata Cloud (free Community tier) unlocks sensitive functions, alert silencing, and AI features. Advanced configuration, unlimited scale, and organization features require a Business subscription.
+
+For self-hosted deployment guidance, see [Standalone deployment](/docs/deployment-guides/standalone-deployment.md) and [Deployment with centralization points](/docs/deployment-guides/deployment-with-centralization-points.md).
+
 ## Why Access Controls Exist
 
 Netdata functions can expose sensitive system information:
