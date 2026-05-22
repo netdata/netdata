@@ -81,6 +81,50 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 3. Grant Administrator privileges when prompted.
 4. Complete the setup wizard.
 
+## Offline (Air-gapped) Installation
+
+Use this method to install Netdata on a Windows system with no internet access.
+
+### Step 1: Download the MSI
+
+On an internet-connected machine, download the MSI installer using one of the links from the [Download the Windows Installer](#download-the-windows-installer-msi) table above.
+
+### Step 2: Transfer to the Offline System
+
+Copy the downloaded `.msi` file to the offline Windows system using a USB drive, network share, or other secure transfer method.
+
+### Step 3: Install Without Cloud Parameters
+
+Open a command prompt as Administrator and run a silent install **without** `TOKEN` or `ROOMS` parameters:
+
+```bash
+msiexec /qn /i netdata-x64.msi
+```
+
+In an air-gapped environment, Netdata Cloud features are unavailable. The Agent runs in standalone local mode.
+
+:::tip
+
+Paid/enterprise users can use the local Dashboard for full monitoring without Cloud connectivity.
+
+:::
+
+:::note
+
+Free users on standalone Agents have limited functionality — the UI is locked and local monitoring is restricted. See [Limitations for Free Users](#limitations-for-free-users) for details.
+
+:::
+
+### Step 4: Access the Local Dashboard
+
+Open your browser and go to `http://localhost:19999`.
+
+:::caution
+
+Automatic updates require internet access and are not possible on air-gapped systems. To update, repeat the transfer process with a newer MSI.
+
+:::
+
 ## Access Netdata Dashboard
 
 After installation, open your browser and go to:
