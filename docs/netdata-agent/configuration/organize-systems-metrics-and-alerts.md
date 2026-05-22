@@ -106,6 +106,8 @@ Netdata automatically generates host labels when it starts, capturing:
 | Environment    | Container details, Kubernetes node status           |
 | Infrastructure | Virtualization layer, Parent-child streaming status |
 
+Use host labels with [Node Rule-Based Room Assignment](/docs/netdata-cloud/node-rule-based-room-assignment.md) to automatically route Kubernetes Nodes into Rooms by environment.
+
 View your automatic labels at `http://HOST-IP:19999/api/v1/info`:
 
 ```json
