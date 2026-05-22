@@ -513,31 +513,19 @@ volumes:
 
 :::note
 
-The `NETDATA_CLAIM_*` environment variables are optional. To connect your nodes to Netdata Cloud, replace the placeholder values with those from the "Add Nodes" dialog in your Space's "Nodes" view. If you don't need Cloud claiming, remove the `environment` block entirely.
+- The `NETDATA_CLAIM_*` environment variables are optional. To connect your nodes to Netdata Cloud, replace the placeholder values with those from the "Add Nodes" dialog in your Space's "Nodes" view. If you don't need Cloud claiming, remove the `environment` block entirely.
 
-:::
+- In Docker Swarm, bind-mounted host paths refer to the filesystem of the node where each container instance lands. With `mode: global`, every node runs its own Netdata Agent, so each container reads from its local host — which is the intended behavior.
 
-:::note
+- In Swarm mode, the `restart` key at the service level is ignored. Use `deploy.restart_policy` instead, as shown in the stack above.
 
-In Docker Swarm, bind-mounted host paths refer to the filesystem of the node where each container instance lands. With `mode: global`, every node runs its own Netdata Agent, so each container reads from its local host — which is the intended behavior.
-
-:::
-
-:::note
-
-In Swarm mode, the `restart` key at the service level is ignored. Use `deploy.restart_policy` instead, as shown in the stack above.
+- All Swarm nodes must have the required host paths and devices available for bind mounts (`/proc`, `/sys`, `/var/run/docker.sock`, and so on). For GPU monitoring, add the `deploy.resources.reservations.devices` configuration shown in the [NVIDIA GPUs section](#with-nvidia-gpus-monitoring) to the stack's `deploy` block.
 
 :::
 
 :::tip
 
 - When using `netdata/netdata` without a tag, Docker pulls the latest image by default. To run the stable version, replace it with `netdata/netdata:stable`.
-
-:::
-
-:::note
-
-All Swarm nodes must have the required host paths and devices available for bind mounts (`/proc`, `/sys`, `/var/run/docker.sock`, and so on). For GPU monitoring, add the `deploy.resources.reservations.devices` configuration shown in the [NVIDIA GPUs section](#with-nvidia-gpus-monitoring) to the stack's `deploy` block.
 
 :::
 
