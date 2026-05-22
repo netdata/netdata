@@ -44,6 +44,14 @@ Netdata v2.3.0 introduces two alerts specific to permanent nodes:
 | `streaming_never_connected` | A permanent node has never connected to a Parent.       |
 | `streaming_disconnected`    | A previously connected permanent node has disconnected. |
 
+:::note
+
+Both alerts are configured with `to: silent` by default, which means they trigger internally but **do not send notifications**. To receive notifications when a permanent node disconnects or never connects, override the `to` recipient in the streaming health configuration.
+
+You can enable notifications by editing `health.d/streaming.conf` using `edit-config` on your Parent node and changing `to: silent` to a notification destination such as `sysadmin` or a specific endpoint. Alternatively, you can use the [Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md) in Netdata Cloud to override alert delivery settings without editing files manually. See the [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md) reference for details on how configuration overrides are resolved.
+
+:::
+
 ## Automatic Node Instance Cleanup in Netdata Cloud
 
 Netdata Cloud automatically removes inactive nodes to keep your dashboards clean and organized.
