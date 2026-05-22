@@ -8,6 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	scrapepkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
@@ -184,10 +185,10 @@ func (c *Collector) writeVSANClusterHealthMetrics(meter metrix.SnapshotMeter) {
 		}
 		health := c.vsanMetrics.Health[id]
 		labels := meter.LabelSet(c.vsanClusterLabels(cluster)...)
-		c.observeGaugeFloat(vsanClusterHealthStatusGreenMetric, boolFloat(health == "green"), labels)
-		c.observeGaugeFloat(vsanClusterHealthStatusYellowMetric, boolFloat(health == "yellow"), labels)
-		c.observeGaugeFloat(vsanClusterHealthStatusRedMetric, boolFloat(health == "red"), labels)
-		c.observeGaugeFloat(vsanClusterHealthStatusUnknownMetric, boolFloat(health != "green" && health != "yellow" && health != "red"), labels)
+		c.observeGaugeFloat(vsanClusterHealthStatusGreenMetric, float64(oldmetrix.Bool(health == "green")), labels)
+		c.observeGaugeFloat(vsanClusterHealthStatusYellowMetric, float64(oldmetrix.Bool(health == "yellow")), labels)
+		c.observeGaugeFloat(vsanClusterHealthStatusRedMetric, float64(oldmetrix.Bool(health == "red")), labels)
+		c.observeGaugeFloat(vsanClusterHealthStatusUnknownMetric, float64(oldmetrix.Bool(health != "green" && health != "yellow" && health != "red")), labels)
 	}
 }
 
@@ -313,11 +314,4 @@ func sortedMapKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-func boolFloat(v bool) float64 {
-	if v {
-		return 1
-	}
-	return 0
 }

@@ -126,13 +126,6 @@ const (
 	logKeyDiscoveryError                = "vsphere:periodic-discovery-error"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	c.collectionLock.Lock()
-	defer c.collectionLock.Unlock()
-
-	return c.collectLocked()
-}
-
 func (c *Collector) collectLocked() (map[string]int64, error) {
 	c.Debug("starting collection process")
 	t := time.Now()

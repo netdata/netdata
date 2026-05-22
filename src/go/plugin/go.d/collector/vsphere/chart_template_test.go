@@ -19,6 +19,12 @@ import (
 
 const chartTemplatePath = "charts.yaml"
 
+const (
+	prioDatastoreClusterBase = 70200
+	prioHostPowerBase        = 70210
+	prioVMPowerBase          = 70220
+)
+
 func TestCollector_ChartTemplateYAML(t *testing.T) {
 	want := buildV2ChartTemplateYAML(t)
 
@@ -31,8 +37,23 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 	collecttest.AssertChartTemplateSchema(t, chartTemplateYAML)
 	spec, err := charttpl.DecodeYAML([]byte(chartTemplateYAML))
 	require.NoError(t, err)
+	assertUniqueChartPriorities(t, spec)
 	_, err = chartengine.Compile(spec, 1)
 	require.NoError(t, err)
+}
+
+func assertUniqueChartPriorities(t *testing.T, spec *charttpl.Spec) {
+	t.Helper()
+
+	seen := make(map[int]string)
+	for _, group := range spec.Groups {
+		for _, chart := range group.Charts {
+			if other, ok := seen[chart.Priority]; ok {
+				require.Failf(t, "duplicate chart priority", "priority %d is used by %s and %s", chart.Priority, other, chart.Context)
+			}
+			seen[chart.Priority] = chart.Context
+		}
+	}
 }
 
 func buildV2ChartTemplateYAML(t *testing.T) []byte {
@@ -101,7 +122,7 @@ func datastoreClusterChartGroups() []charttpl.Group {
 					Units:     "percentage",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioInventoryObjects + 1,
+					Priority:  prioDatastoreClusterBase,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{
@@ -118,7 +139,7 @@ func datastoreClusterChartGroups() []charttpl.Group {
 					Units:     "bytes",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioInventoryObjects + 2,
+					Priority:  prioDatastoreClusterBase + 1,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{Selector: datastoreClusterSpaceUsageCapacityMetric, Name: "capacity"},
@@ -149,7 +170,7 @@ func datastoreClusterChartGroups() []charttpl.Group {
 					Units:     "status",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioInventoryObjects + 3,
+					Priority:  prioDatastoreClusterBase + 2,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{Selector: datastoreClusterStorageDRSEnabledMetric, Name: "enabled"},
@@ -163,7 +184,7 @@ func datastoreClusterChartGroups() []charttpl.Group {
 					Units:     "status",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioInventoryObjects + 4,
+					Priority:  prioDatastoreClusterBase + 3,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{Selector: datastoreClusterOverallStatusGreenMetric, Name: "green"},
@@ -203,7 +224,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Units:     "watts",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioHostDiskMaxLatency + 30,
+					Priority:  prioHostPowerBase,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{Selector: hostPowerUsagePowerMetric, Name: hostPowerUsagePowerDim},
@@ -217,7 +238,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Units:     "watts",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioHostDiskMaxLatency + 31,
+					Priority:  prioHostPowerBase + 1,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{Selector: hostPowerCapacityUsageUsedMetric, Name: hostPowerCapacityUsageUsedDim},
@@ -234,7 +255,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Units:     "percentage",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioHostDiskMaxLatency + 32,
+					Priority:  prioHostPowerBase + 2,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{
@@ -251,7 +272,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Units:     "joules",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioHostDiskMaxLatency + 33,
+					Priority:  prioHostPowerBase + 3,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{Selector: hostEnergyUsageMetric, Name: hostEnergyUsageDim},
@@ -276,7 +297,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Units:     "watts",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioVmNetworkDrops + 4,
+					Priority:  prioVMPowerBase,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{Selector: vmPowerUsagePowerMetric, Name: vmPowerUsagePowerDim},
@@ -289,7 +310,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Units:     "joules",
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
-					Priority:  prioVmNetworkDrops + 5,
+					Priority:  prioVMPowerBase + 1,
 					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
 					Dimensions: []charttpl.Dimension{
 						{Selector: vmEnergyUsageMetric, Name: vmEnergyUsageDim},

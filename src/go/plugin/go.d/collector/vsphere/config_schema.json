@@ -82,7 +82,6 @@
           "null"
         ],
         "uniqueItems": true,
-        "minItems": 1,
         "items": {
           "title": "Datastore cluster selector",
           "type": "string",
@@ -106,7 +105,6 @@
           "null"
         ],
         "uniqueItems": true,
-        "minItems": 1,
         "items": {
           "title": "vSAN cluster selector",
           "type": "string",
@@ -124,7 +122,6 @@
           "null"
         ],
         "uniqueItems": true,
-        "minItems": 1,
         "items": {
           "title": "vSAN host selector",
           "type": "string",
@@ -142,7 +139,6 @@
           "null"
         ],
         "uniqueItems": true,
-        "minItems": 1,
         "items": {
           "title": "vSAN VM selector",
           "type": "string",
@@ -180,7 +176,7 @@
           "title": "Host selector",
           "description": "",
           "type": "string",
-          "default": "/*/*/*",
+          "default": "/*",
           "pattern": "^/"
         },
         "default": [
@@ -199,7 +195,7 @@
           "title": "VM selector",
           "description": "",
           "type": "string",
-          "default": "/*/*/*/*",
+          "default": "/*",
           "pattern": "^/"
         },
         "default": [
@@ -218,7 +214,7 @@
           "title": "Datastore selector",
           "description": "",
           "type": "string",
-          "default": "/*/*",
+          "default": "/*",
           "pattern": "^/"
         },
         "default": [
@@ -237,7 +233,7 @@
           "title": "Cluster selector",
           "description": "",
           "type": "string",
-          "default": "/*/*",
+          "default": "/*",
           "pattern": "^/"
         },
         "default": [
@@ -444,7 +440,7 @@
       "ui:help": "**Important**: vSphere generates real-time statistics every 20 seconds. Setting this value lower won't improve data accuracy. For larger vSphere deployments, consider increasing this value to ensure complete data collection during each cycle. To find the optimal value, run the collector in debug mode and see how long it takes to collect metrics."
     },
     "url": {
-      "ui:placeholder": "https://203.0.113.0"
+      "ui:placeholder": "https://vcenter.local"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."

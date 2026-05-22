@@ -1050,13 +1050,16 @@ func collectV1MapForTest(t *testing.T, collr *Collector) map[string]int64 {
 	cycle := mustCycleController(t, collr.MetricStore())
 	cycle.BeginCycle()
 
-	mx, err := collr.collect()
+	collr.collectionLock.Lock()
+	mx, err := collr.collectLocked()
 	if err != nil {
+		collr.collectionLock.Unlock()
 		cycle.AbortCycle()
 		require.NoError(t, err)
 	}
 
 	collr.writeMetrics(mx)
+	collr.collectionLock.Unlock()
 	require.NoError(t, cycle.CommitCycleSuccess())
 	if len(mx) == 0 {
 		return nil
@@ -1314,78 +1317,6 @@ func (s mockScraperNoDSPerf) ScrapeClusters(clusters rs.Clusters) []performance.
 	return populateMetrics(s.scraper.ScrapeClusters(clusters), 400)
 }
 
-func TestCollector_Collect_DatastoreNoPerfData(t *testing.T) {
-	collr, model, teardown := prepareVSphereSim(t)
-	defer teardown()
-
-	require.NoError(t, collr.Init(context.Background()))
-
-	collr.scraper = mockScraperNoDSPerf{collr.scraper}
-
-	mx := collectV1MapForTest(t, collr)
-	require.NotNil(t, mx)
-
-	count := model.Count()
-
-	// Property metrics should be present.
-	for _, ds := range collr.resources.Datastores {
-		assert.Contains(t, mx, ds.ID+"_capacity")
-		assert.Contains(t, mx, ds.ID+"_free_space")
-		assert.Contains(t, mx, ds.ID+"_used_space")
-		assert.Contains(t, mx, ds.ID+"_used_space_pct")
-		assert.Contains(t, mx, ds.ID+"_uncommitted")
-		assert.Contains(t, mx, ds.ID+"_overall.status.green")
-		assert.Contains(t, mx, ds.ID+"_accessible_status.accessible")
-		assert.Contains(t, mx, ds.ID+"_maintenance.status.normal")
-		assert.Contains(t, mx, ds.ID+"_multiple_host_access.unknown")
-	}
-
-	// Perf metrics should NOT be present.
-	for _, ds := range collr.resources.Datastores {
-		assert.NotContains(t, mx, ds.ID+"_datastore.read.average")
-		assert.NotContains(t, mx, ds.ID+"_datastore.numberReadAveraged.average")
-	}
-
-	numClusters := len(collr.discoveredClusters)
-	numResourcePools := len(collr.discoveredResourcePools)
-
-	// Only property charts created for datastores, no perf charts.
-	assert.Len(t, *collr.Charts(),
-		len(inventoryChartsTmpl)+
-			count.Host*len(hostChartsTmpl)+
-			count.Machine*len(vmChartsTmpl)+
-			count.Datastore*len(datastorePropertyChartsTmpl)+
-			numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
-			numResourcePools*len(resourcePoolChartsTmpl))
-
-	// datastorePerfReceived should be empty.
-	assert.Empty(t, collr.datastorePerfReceived)
-	assert.Empty(t, collr.datastorePerfCharted)
-
-	// Now switch to a scraper that returns perf data — perf charts should appear.
-	collr.scraper = mockScraper{collr.scraper.(mockScraperNoDSPerf).scraper}
-
-	mx = collectV1MapForTest(t, collr)
-	require.NotNil(t, mx)
-
-	// Perf metrics should now be present.
-	for _, ds := range collr.resources.Datastores {
-		assert.Contains(t, mx, ds.ID+"_datastore.read.average")
-	}
-
-	// Both property and perf charts now for datastores.
-	assert.Len(t, *collr.Charts(),
-		len(inventoryChartsTmpl)+
-			count.Host*len(hostChartsTmpl)+
-			count.Machine*len(vmChartsTmpl)+
-			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
-			numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
-			numResourcePools*len(resourcePoolChartsTmpl))
-
-	assert.Len(t, collr.datastorePerfReceived, count.Datastore)
-	assert.Len(t, collr.datastorePerfCharted, count.Datastore)
-}
-
 // mockScraperNoClusterPerf wraps a scraper but returns no perf data for clusters.
 type mockScraperNoClusterPerf struct {
 	scraper
@@ -1404,179 +1335,215 @@ func (s mockScraperNoClusterPerf) ScrapeClusters(_ rs.Clusters) []performance.En
 	return nil
 }
 
-func TestCollector_Collect_ClusterNoPerfData(t *testing.T) {
-	collr, model, teardown := prepareVSphereSim(t)
-	defer teardown()
+func TestCollector_Collect_NoPerfData(t *testing.T) {
+	tests := map[string]struct {
+		setNoPerfScraper func(*Collector)
+		restoreScraper   func(*Collector)
+		checkNoPerf      func(*testing.T, *Collector, map[string]int64, simulator.Model)
+		checkWithPerf    func(*testing.T, *Collector, map[string]int64, simulator.Model)
+	}{
+		"datastores": {
+			setNoPerfScraper: func(c *Collector) { c.scraper = mockScraperNoDSPerf{c.scraper} },
+			restoreScraper:   func(c *Collector) { c.scraper = mockScraper{c.scraper.(mockScraperNoDSPerf).scraper} },
+			checkNoPerf: func(t *testing.T, collr *Collector, mx map[string]int64, count simulator.Model) {
+				for _, ds := range collr.resources.Datastores {
+					assert.Contains(t, mx, ds.ID+"_capacity")
+					assert.Contains(t, mx, ds.ID+"_free_space")
+					assert.Contains(t, mx, ds.ID+"_used_space")
+					assert.Contains(t, mx, ds.ID+"_used_space_pct")
+					assert.Contains(t, mx, ds.ID+"_uncommitted")
+					assert.Contains(t, mx, ds.ID+"_overall.status.green")
+					assert.Contains(t, mx, ds.ID+"_accessible_status.accessible")
+					assert.Contains(t, mx, ds.ID+"_maintenance.status.normal")
+					assert.Contains(t, mx, ds.ID+"_multiple_host_access.unknown")
+					assert.NotContains(t, mx, ds.ID+"_datastore.read.average")
+					assert.NotContains(t, mx, ds.ID+"_datastore.numberReadAveraged.average")
+				}
 
-	require.NoError(t, collr.Init(context.Background()))
+				numClusters := len(collr.discoveredClusters)
+				numResourcePools := len(collr.discoveredResourcePools)
+				assert.Len(t, *collr.Charts(),
+					len(inventoryChartsTmpl)+
+						count.Host*len(hostChartsTmpl)+
+						count.Machine*len(vmChartsTmpl)+
+						count.Datastore*len(datastorePropertyChartsTmpl)+
+						numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
+						numResourcePools*len(resourcePoolChartsTmpl))
+				assert.Empty(t, collr.datastorePerfReceived)
+				assert.Empty(t, collr.datastorePerfCharted)
+			},
+			checkWithPerf: func(t *testing.T, collr *Collector, mx map[string]int64, count simulator.Model) {
+				for _, ds := range collr.resources.Datastores {
+					assert.Contains(t, mx, ds.ID+"_datastore.read.average")
+				}
 
-	collr.scraper = mockScraperNoClusterPerf{collr.scraper}
+				numClusters := len(collr.discoveredClusters)
+				numResourcePools := len(collr.discoveredResourcePools)
+				assert.Len(t, *collr.Charts(),
+					len(inventoryChartsTmpl)+
+						count.Host*len(hostChartsTmpl)+
+						count.Machine*len(vmChartsTmpl)+
+						count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
+						numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
+						numResourcePools*len(resourcePoolChartsTmpl))
+				assert.Len(t, collr.datastorePerfReceived, count.Datastore)
+				assert.Len(t, collr.datastorePerfCharted, count.Datastore)
+			},
+		},
+		"clusters": {
+			setNoPerfScraper: func(c *Collector) { c.scraper = mockScraperNoClusterPerf{c.scraper} },
+			restoreScraper:   func(c *Collector) { c.scraper = mockScraper{c.scraper.(mockScraperNoClusterPerf).scraper} },
+			checkNoPerf: func(t *testing.T, collr *Collector, mx map[string]int64, count simulator.Model) {
+				for _, cl := range collr.resources.Clusters {
+					assert.Contains(t, mx, cl.ID+"_num_hosts")
+					assert.Contains(t, mx, cl.ID+"_total_cpu")
+					assert.Contains(t, mx, cl.ID+"_overall.status.green")
+					assert.NotContains(t, mx, cl.ID+"_cpu.usage.average")
+					assert.NotContains(t, mx, cl.ID+"_clusterServices.cpufairness.latest")
+				}
 
-	mx := collectV1MapForTest(t, collr)
-	require.NotNil(t, mx)
+				numClusters := len(collr.discoveredClusters)
+				numResourcePools := len(collr.discoveredResourcePools)
+				assert.Len(t, *collr.Charts(),
+					len(inventoryChartsTmpl)+
+						count.Host*len(hostChartsTmpl)+
+						count.Machine*len(vmChartsTmpl)+
+						count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
+						numClusters*len(clusterPropertyChartsTmpl)+
+						numResourcePools*len(resourcePoolChartsTmpl))
+				assert.Empty(t, collr.clusterPerfReceived)
+				assert.Empty(t, collr.clusterPerfCharted)
+			},
+			checkWithPerf: func(t *testing.T, collr *Collector, mx map[string]int64, count simulator.Model) {
+				for _, cl := range collr.resources.Clusters {
+					assert.Contains(t, mx, cl.ID+"_cpu.usage.average")
+				}
 
-	count := model.Count()
-
-	// Cluster property metrics should be present.
-	for _, cl := range collr.resources.Clusters {
-		assert.Contains(t, mx, cl.ID+"_num_hosts")
-		assert.Contains(t, mx, cl.ID+"_total_cpu")
-		assert.Contains(t, mx, cl.ID+"_overall.status.green")
+				numClusters := len(collr.discoveredClusters)
+				numResourcePools := len(collr.discoveredResourcePools)
+				assert.Len(t, *collr.Charts(),
+					len(inventoryChartsTmpl)+
+						count.Host*len(hostChartsTmpl)+
+						count.Machine*len(vmChartsTmpl)+
+						count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
+						numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
+						numResourcePools*len(resourcePoolChartsTmpl))
+				assert.Len(t, collr.clusterPerfReceived, numClusters)
+				assert.Len(t, collr.clusterPerfCharted, numClusters)
+			},
+		},
 	}
 
-	// Cluster perf metrics should NOT be present.
-	for _, cl := range collr.resources.Clusters {
-		assert.NotContains(t, mx, cl.ID+"_cpu.usage.average")
-		assert.NotContains(t, mx, cl.ID+"_clusterServices.cpufairness.latest")
-	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, model, teardown := prepareVSphereSim(t)
+			defer teardown()
 
-	numClusters := len(collr.discoveredClusters)
-	numResourcePools := len(collr.discoveredResourcePools)
+			require.NoError(t, collr.Init(context.Background()))
+			tc.setNoPerfScraper(collr)
 
-	// Only property charts created for clusters, no perf charts.
-	assert.Len(t, *collr.Charts(),
-		len(inventoryChartsTmpl)+
-			count.Host*len(hostChartsTmpl)+
-			count.Machine*len(vmChartsTmpl)+
-			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
-			numClusters*len(clusterPropertyChartsTmpl)+
-			numResourcePools*len(resourcePoolChartsTmpl))
+			mx := collectV1MapForTest(t, collr)
+			require.NotNil(t, mx)
+			count := model.Count()
+			tc.checkNoPerf(t, collr, mx, count)
 
-	// clusterPerfReceived should be empty.
-	assert.Empty(t, collr.clusterPerfReceived)
-	assert.Empty(t, collr.clusterPerfCharted)
-
-	// Now switch to a scraper that returns perf data — perf charts should appear.
-	collr.scraper = mockScraper{collr.scraper.(mockScraperNoClusterPerf).scraper}
-
-	mx = collectV1MapForTest(t, collr)
-	require.NotNil(t, mx)
-
-	// Perf metrics should now be present.
-	for _, cl := range collr.resources.Clusters {
-		assert.Contains(t, mx, cl.ID+"_cpu.usage.average")
-	}
-
-	// Both property and perf charts now for clusters.
-	assert.Len(t, *collr.Charts(),
-		len(inventoryChartsTmpl)+
-			count.Host*len(hostChartsTmpl)+
-			count.Machine*len(vmChartsTmpl)+
-			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
-			numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
-			numResourcePools*len(resourcePoolChartsTmpl))
-
-	assert.Len(t, collr.clusterPerfReceived, numClusters)
-	assert.Len(t, collr.clusterPerfCharted, numClusters)
-}
-
-func TestCollector_Collect_ClusterEvictionCleansUpMaps(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-
-	require.NoError(t, collr.Init(context.Background()))
-
-	collr.scraper = mockScraper{collr.scraper}
-
-	// First collect — creates all charts including cluster perf charts.
-	mx := collectV1MapForTest(t, collr)
-	require.NotNil(t, mx)
-
-	assert.NotEmpty(t, collr.discoveredClusters)
-	assert.NotEmpty(t, collr.clusterPerfReceived)
-	assert.NotEmpty(t, collr.clusterPerfCharted)
-
-	// Simulate eviction: disable property collector and perf scraper so the counter isn't reset,
-	// then set the failure counter to the eviction threshold.
-	collr.clusterPropertyCollector = nil
-	collr.scraper = mockScraperNoClusterPerf{collr.scraper.(mockScraper).scraper}
-	for id := range collr.discoveredClusters {
-		collr.discoveredClusters[id] = failedUpdatesLimit
-	}
-
-	// Next collect increments counter past the limit, triggering eviction in updateCharts.
-	collectScalarSeriesForTest(t, collr)
-
-	assert.Empty(t, collr.discoveredClusters)
-	assert.Empty(t, collr.clusterPerfReceived)
-	assert.Empty(t, collr.clusterPerfCharted)
-
-	// Cluster charts should be marked obsolete.
-	for _, c := range *collr.Charts() {
-		if strings.HasPrefix(c.ID, "domain-") {
-			assert.True(t, c.Obsolete, "chart %s should be obsolete", c.ID)
-		}
-	}
-}
-
-func TestCollector_Collect_ResourcePoolEvictionCleansUpMaps(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-
-	require.NoError(t, collr.Init(context.Background()))
-
-	collr.scraper = mockScraper{collr.scraper}
-
-	// First collect — creates resource pool charts.
-	mx := collectScalarSeriesForTest(t, collr)
-	require.NotNil(t, mx)
-
-	assert.NotEmpty(t, collr.discoveredResourcePools)
-
-	// Simulate eviction: disable property collector so the counter isn't reset.
-	collr.rpPropertyCollector = nil
-	for id := range collr.discoveredResourcePools {
-		collr.discoveredResourcePools[id] = failedUpdatesLimit
-	}
-
-	// Next collect increments counter past the limit, triggering eviction.
-	collectScalarSeriesForTest(t, collr)
-
-	assert.Empty(t, collr.discoveredResourcePools)
-
-	// Resource pool charts should be marked obsolete.
-	for _, c := range *collr.Charts() {
-		if strings.HasPrefix(c.ID, "resgroup-") {
-			assert.True(t, c.Obsolete, "chart %s should be obsolete", c.ID)
-		}
+			tc.restoreScraper(collr)
+			mx = collectV1MapForTest(t, collr)
+			require.NotNil(t, mx)
+			tc.checkWithPerf(t, collr, mx, count)
+		})
 	}
 }
 
-func TestCollector_Collect_DatastoreEvictionCleansUpMaps(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-
-	require.NoError(t, collr.Init(context.Background()))
-
-	collr.scraper = mockScraper{collr.scraper}
-
-	// First collect — creates all charts including datastore perf charts.
-	mx := collectScalarSeriesForTest(t, collr)
-	require.NotNil(t, mx)
-
-	assert.NotEmpty(t, collr.discoveredDatastores)
-	assert.NotEmpty(t, collr.datastorePerfReceived)
-	assert.NotEmpty(t, collr.datastorePerfCharted)
-
-	// Simulate eviction: disable property collector and perf scraper so the counter isn't reset,
-	// then set the failure counter to the eviction threshold.
-	collr.dsPropertyCollector = nil
-	collr.scraper = mockScraperNoDSPerf{collr.scraper.(mockScraper).scraper}
-	for id := range collr.discoveredDatastores {
-		collr.discoveredDatastores[id] = failedUpdatesLimit
+func TestCollector_Collect_EvictionCleansUpMaps(t *testing.T) {
+	tests := map[string]struct {
+		prepare    func(*Collector)
+		checkReady func(*testing.T, *Collector)
+		evict      func(*Collector)
+		checkGone  func(*testing.T, *Collector)
+		chartID    string
+	}{
+		"clusters": {
+			checkReady: func(t *testing.T, c *Collector) {
+				assert.NotEmpty(t, c.discoveredClusters)
+				assert.NotEmpty(t, c.clusterPerfReceived)
+				assert.NotEmpty(t, c.clusterPerfCharted)
+			},
+			evict: func(c *Collector) {
+				c.clusterPropertyCollector = nil
+				c.scraper = mockScraperNoClusterPerf{c.scraper.(mockScraper).scraper}
+				for id := range c.discoveredClusters {
+					c.discoveredClusters[id] = failedUpdatesLimit
+				}
+			},
+			checkGone: func(t *testing.T, c *Collector) {
+				assert.Empty(t, c.discoveredClusters)
+				assert.Empty(t, c.clusterPerfReceived)
+				assert.Empty(t, c.clusterPerfCharted)
+			},
+			chartID: "domain-",
+		},
+		"resource pools": {
+			checkReady: func(t *testing.T, c *Collector) {
+				assert.NotEmpty(t, c.discoveredResourcePools)
+			},
+			evict: func(c *Collector) {
+				c.rpPropertyCollector = nil
+				for id := range c.discoveredResourcePools {
+					c.discoveredResourcePools[id] = failedUpdatesLimit
+				}
+			},
+			checkGone: func(t *testing.T, c *Collector) {
+				assert.Empty(t, c.discoveredResourcePools)
+			},
+			chartID: "resgroup-",
+		},
+		"datastores": {
+			checkReady: func(t *testing.T, c *Collector) {
+				assert.NotEmpty(t, c.discoveredDatastores)
+				assert.NotEmpty(t, c.datastorePerfReceived)
+				assert.NotEmpty(t, c.datastorePerfCharted)
+			},
+			evict: func(c *Collector) {
+				c.dsPropertyCollector = nil
+				c.scraper = mockScraperNoDSPerf{c.scraper.(mockScraper).scraper}
+				for id := range c.discoveredDatastores {
+					c.discoveredDatastores[id] = failedUpdatesLimit
+				}
+			},
+			checkGone: func(t *testing.T, c *Collector) {
+				assert.Empty(t, c.discoveredDatastores)
+				assert.Empty(t, c.datastorePerfReceived)
+				assert.Empty(t, c.datastorePerfCharted)
+			},
+			chartID: "datastore-",
+		},
 	}
 
-	// Next collect increments counter past the limit, triggering eviction in updateCharts.
-	collectScalarSeriesForTest(t, collr)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, _, teardown := prepareVSphereSim(t)
+			defer teardown()
 
-	assert.Empty(t, collr.discoveredDatastores)
-	assert.Empty(t, collr.datastorePerfReceived)
-	assert.Empty(t, collr.datastorePerfCharted)
+			require.NoError(t, collr.Init(context.Background()))
+			collr.scraper = mockScraper{collr.scraper}
+			if tc.prepare != nil {
+				tc.prepare(collr)
+			}
 
-	// Datastore charts should be marked obsolete.
-	for _, c := range *collr.Charts() {
-		if strings.HasPrefix(c.ID, "datastore-") {
-			assert.True(t, c.Obsolete, "chart %s should be obsolete", c.ID)
-		}
+			mx := collectScalarSeriesForTest(t, collr)
+			require.NotNil(t, mx)
+			tc.checkReady(t, collr)
+
+			tc.evict(collr)
+			collectScalarSeriesForTest(t, collr)
+			tc.checkGone(t, collr)
+
+			for _, chart := range *collr.Charts() {
+				if strings.HasPrefix(chart.ID, tc.chartID) {
+					assert.True(t, chart.Obsolete, "chart %s should be obsolete", chart.ID)
+				}
+			}
+		})
 	}
 }

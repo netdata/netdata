@@ -198,9 +198,6 @@ type (
 		PowerState               string
 		ToolsRunningStatus       string
 		ToolsVersionStatus       string
-		GuestHostName            string
-		GuestIPAddress           string
-		GuestFullName            string
 		InstanceUUID             string
 		ConsolidationNeeded      bool
 		ConfigCPU                int64

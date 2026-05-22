@@ -7,6 +7,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
@@ -59,16 +60,16 @@ func (c *Collector) writeDatastoreClusterMetrics(meter metrix.SnapshotMeter) {
 		} else {
 			c.observeGauge(datastoreClusterSpaceUtilizationUsedMetric, 0, labels)
 		}
-		c.observeGauge(datastoreClusterStorageDRSEnabledMetric, boolInt(pod.StorageDRSEnabled), labels)
-		c.observeGauge(datastoreClusterStorageDRSDisabledMetric, boolInt(!pod.StorageDRSEnabled), labels)
+		c.observeGauge(datastoreClusterStorageDRSEnabledMetric, oldmetrix.Bool(pod.StorageDRSEnabled), labels)
+		c.observeGauge(datastoreClusterStorageDRSDisabledMetric, oldmetrix.Bool(!pod.StorageDRSEnabled), labels)
 		status := pod.OverallStatus
 		if status == "" {
 			status = "gray"
 		}
-		c.observeGauge(datastoreClusterOverallStatusGreenMetric, boolInt(status == "green"), labels)
-		c.observeGauge(datastoreClusterOverallStatusRedMetric, boolInt(status == "red"), labels)
-		c.observeGauge(datastoreClusterOverallStatusYellowMetric, boolInt(status == "yellow"), labels)
-		c.observeGauge(datastoreClusterOverallStatusGrayMetric, boolInt(status == "gray"), labels)
+		c.observeGauge(datastoreClusterOverallStatusGreenMetric, oldmetrix.Bool(status == "green"), labels)
+		c.observeGauge(datastoreClusterOverallStatusRedMetric, oldmetrix.Bool(status == "red"), labels)
+		c.observeGauge(datastoreClusterOverallStatusYellowMetric, oldmetrix.Bool(status == "yellow"), labels)
+		c.observeGauge(datastoreClusterOverallStatusGrayMetric, oldmetrix.Bool(status == "gray"), labels)
 	}
 }
 
@@ -101,11 +102,4 @@ func sortedStoragePods(pods rs.StoragePods) []*rs.StoragePod {
 		return out[i].ID < out[j].ID
 	})
 	return out
-}
-
-func boolInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }

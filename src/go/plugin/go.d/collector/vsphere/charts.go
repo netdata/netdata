@@ -842,7 +842,7 @@ func (c *Collector) updateCharts() {
 		c.charted[id] = true
 		charts := newHostCharts(host)
 		if err := c.Charts().Add(*charts...); err != nil {
-			c.Error(err)
+			c.logChartAddError(id, err)
 		}
 	}
 
@@ -862,7 +862,7 @@ func (c *Collector) updateCharts() {
 		c.charted[id] = true
 		charts := newVMCHarts(vm)
 		if err := c.Charts().Add(*charts...); err != nil {
-			c.Error(err)
+			c.logChartAddError(id, err)
 		}
 	}
 
@@ -885,7 +885,7 @@ func (c *Collector) updateCharts() {
 			c.charted[id] = true
 			charts := newDatastorePropertyCharts(ds)
 			if err := c.Charts().Add(*charts...); err != nil {
-				c.Error(err)
+				c.logChartAddError(id, err)
 			}
 		}
 
@@ -893,7 +893,7 @@ func (c *Collector) updateCharts() {
 			c.datastorePerfCharted[id] = true
 			charts := newDatastorePerfCharts(ds)
 			if err := c.Charts().Add(*charts...); err != nil {
-				c.Error(err)
+				c.logChartAddError(id, err)
 			}
 		}
 	}
@@ -917,7 +917,7 @@ func (c *Collector) updateCharts() {
 			c.charted[id] = true
 			charts := newClusterPropertyCharts(cl)
 			if err := c.Charts().Add(*charts...); err != nil {
-				c.Error(err)
+				c.logChartAddError(id, err)
 			}
 		}
 
@@ -925,7 +925,7 @@ func (c *Collector) updateCharts() {
 			c.clusterPerfCharted[id] = true
 			charts := newClusterPerfCharts(cl)
 			if err := c.Charts().Add(*charts...); err != nil {
-				c.Error(err)
+				c.logChartAddError(id, err)
 			}
 		}
 	}
@@ -946,9 +946,13 @@ func (c *Collector) updateCharts() {
 		c.charted[id] = true
 		charts := newResourcePoolCharts(rp)
 		if err := c.Charts().Add(*charts...); err != nil {
-			c.Error(err)
+			c.logChartAddError(id, err)
 		}
 	}
+}
+
+func (c *Collector) logChartAddError(id string, err error) {
+	c.Limit("vsphere:add-chart-error:"+id, 1, recurringLogEvery).Error(err)
 }
 
 func newVMCHarts(vm *rs.VM) *collectorapi.Charts {
@@ -1655,17 +1659,3 @@ func (c *Collector) removeFromCharts(prefix string) {
 		}
 	}
 }
-
-//func findMetricSeriesByPrefix(ms []performance.MetricSeries, prefix string) []performance.MetricSeries {
-//	from := sort.Search(len(ms), func(i int) bool { return ms[i].Name >= prefix })
-//
-//	if from == len(ms) || !strings.HasPrefix(ms[from].Name, prefix) {
-//		return nil
-//	}
-//
-//	until := from + 1
-//	for until < len(ms) && strings.HasPrefix(ms[until].Name, prefix) {
-//		until++
-//	}
-//	return ms[from:until]
-//}

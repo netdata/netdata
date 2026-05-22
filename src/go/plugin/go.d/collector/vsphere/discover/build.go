@@ -137,10 +137,6 @@ func newCluster(raw mo.ComputeResource) *rs.Cluster {
 func (d Discoverer) buildHosts(raw []mo.HostSystem) rs.Hosts {
 	hosts := make(rs.Hosts)
 	for _, h := range raw {
-		// connected | notResponding | disconnected
-		//if v.Runtime.ConnectionState == "" {
-		//
-		//}
 		if host := newHost(h); host != nil {
 			hosts.Put(host)
 		}
@@ -176,10 +172,6 @@ func newHost(raw mo.HostSystem) *rs.Host {
 func (d Discoverer) buildVMs(raw []mo.VirtualMachine) rs.VMs {
 	vms := make(rs.VMs)
 	for _, v := range raw {
-		// connected | disconnected | orphaned | inaccessible | invalid
-		//if v.Runtime.ConnectionState == "" {
-		//
-		//}
 		vms.Put(newVM(v))
 	}
 	return vms
@@ -195,13 +187,10 @@ func newVM(raw mo.VirtualMachine) *rs.VM {
 	if raw.Parent != nil {
 		folderID = raw.Parent.Value
 	}
-	var toolsRunningStatus, toolsVersionStatus, guestHostName, guestIPAddress, guestFullName string
+	var toolsRunningStatus, toolsVersionStatus string
 	if raw.Summary.Guest != nil {
 		toolsRunningStatus = raw.Summary.Guest.ToolsRunningStatus
 		toolsVersionStatus = raw.Summary.Guest.ToolsVersionStatus2
-		guestHostName = raw.Summary.Guest.HostName
-		guestIPAddress = raw.Summary.Guest.IpAddress
-		guestFullName = raw.Summary.Guest.GuestFullName
 	}
 	var committed, uncommitted, unshared int64
 	if raw.Summary.Storage != nil {
@@ -224,9 +213,6 @@ func newVM(raw mo.VirtualMachine) *rs.VM {
 		PowerState:               string(raw.Runtime.PowerState),
 		ToolsRunningStatus:       toolsRunningStatus,
 		ToolsVersionStatus:       toolsVersionStatus,
-		GuestHostName:            guestHostName,
-		GuestIPAddress:           guestIPAddress,
-		GuestFullName:            guestFullName,
 		InstanceUUID:             instanceUUID,
 		ConsolidationNeeded:      raw.Runtime.ConsolidationNeeded,
 		ConfigCPU:                int64(raw.Summary.Config.NumCpu),

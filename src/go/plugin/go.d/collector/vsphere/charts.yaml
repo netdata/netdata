@@ -1883,7 +1883,7 @@ groups:
         units: percentage
         algorithm: absolute
         type: line
-        priority: 70090
+        priority: 70200
         lifecycle:
           expire_after_cycles: 10
         dimensions:
@@ -1897,7 +1897,7 @@ groups:
         units: bytes
         algorithm: absolute
         type: line
-        priority: 70091
+        priority: 70201
         lifecycle:
           expire_after_cycles: 10
         dimensions:
@@ -1926,7 +1926,7 @@ groups:
         units: status
         algorithm: absolute
         type: line
-        priority: 70092
+        priority: 70202
         lifecycle:
           expire_after_cycles: 10
         dimensions:
@@ -1940,7 +1940,7 @@ groups:
         units: status
         algorithm: absolute
         type: line
-        priority: 70093
+        priority: 70203
         lifecycle:
           expire_after_cycles: 10
         dimensions:
@@ -1974,7 +1974,7 @@ groups:
         units: watts
         algorithm: absolute
         type: line
-        priority: 70089
+        priority: 70210
         lifecycle:
           expire_after_cycles: 10
         dimensions:
@@ -1988,7 +1988,7 @@ groups:
         units: watts
         algorithm: absolute
         type: line
-        priority: 70090
+        priority: 70211
         lifecycle:
           expire_after_cycles: 10
         dimensions:
@@ -2008,7 +2008,7 @@ groups:
         units: percentage
         algorithm: absolute
         type: line
-        priority: 70091
+        priority: 70212
         lifecycle:
           expire_after_cycles: 10
         dimensions:
@@ -2022,7 +2022,7 @@ groups:
         units: joules
         algorithm: absolute
         type: line
-        priority: 70092
+        priority: 70213
         lifecycle:
           expire_after_cycles: 10
         dimensions:
@@ -2043,7 +2043,7 @@ groups:
         units: watts
         algorithm: absolute
         type: line
-        priority: 70055
+        priority: 70220
         lifecycle:
           expire_after_cycles: 10
         dimensions:
@@ -2055,7 +2055,7 @@ groups:
         units: joules
         algorithm: absolute
         type: line
-        priority: 70056
+        priority: 70221
         lifecycle:
           expire_after_cycles: 10
         dimensions:
