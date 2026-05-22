@@ -110,7 +110,7 @@ Once signed in, you'll have access to all sensitive functions (processes, logs, 
 
 ### Enable Dynamic Configuration
 
-Dynamic Configuration requires a paid subscription:
+Dynamic Configuration requires a paid plan:
 
 1. **Sign in to Netdata Cloud**
 2. **Upgrade to a paid plan** from the billing settings
