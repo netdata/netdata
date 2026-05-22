@@ -80,7 +80,7 @@ Risks:
 - A strict no-widening interpretation preserves mathematical precision but makes sub-frequency historical inspection unreliable for real troubleshooting workflows.
 - Tier-selection behavior may differ across tier 0, tier 1, and tier 2, so tests must not cover only tier 0.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status: diagnosis complete for the verified local reproduction
 

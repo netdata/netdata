@@ -406,13 +406,13 @@ Interactive, on-demand tabular data: process lists, network connections, FDB tab
 
 Build a Function when the answer is **interactive/tabular live data**. If the answer is a numeric time series, that's a metric.
 
-Response shape is one of `info_response`, `data_response`, `topology_response`, `flows_response`, `error_response`, `not_modified_response` (defined in `src/plugins.d/FUNCTION_UI_SCHEMA.json`). For Go, use builders in `src/go/pkg/funcapi/`. For Rust, implement the `FunctionHandler` trait from the SDK runtime (`src/crates/netdata-plugin/rt/`).
+Response shape is one of `info_response`, `data_response`, `topology_response`, `flows_response`, `error_response`, `not_modified_response` (defined in `src/plugins.d/FUNCTION_UI_SCHEMA.json`). New topology payloads use the dedicated production topology contract in `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`. For Go, use builders in `src/go/pkg/funcapi/`; Go topology producers should use `src/go/pkg/topology/v1` for the v1 response model and compact-table helpers. For Rust, implement the `FunctionHandler` trait from the SDK runtime (`src/crates/netdata-plugin/rt/`).
 
 Functions run concurrently with the collection loop — they must not block it. Validate during development with `src/go/tools/functions-validation/`.
 
 Reference implementations: `src/collectors/network-viewer.plugin/` (topology + connections), `src/collectors/systemd-journal.plugin/` (log explorer), `src/collectors/apps.plugin/` (processes).
 
-Backend docs: `src/go/plugin/framework/functions/README.md` (Go), `src/crates/netdata-plugin/rt/src/lib.rs` (Rust `FunctionHandler`). UI/protocol: `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_UI_REFERENCE.md`.
+Backend docs: `src/go/plugin/framework/functions/README.md` (Go), `src/crates/netdata-plugin/rt/src/lib.rs` (Rust `FunctionHandler`). UI/protocol: `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_UI_REFERENCE.md`. Topology contract: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
 
 ### 6.4 Topology / interconnections / links
 
@@ -504,6 +504,7 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | go.d V1 best practices / lifecycle | working in legacy V1 module | `src/go/BEST-PRACTICES.md`, `src/go/COLLECTOR-LIFECYCLE.md` |
 | Functions backend (Go / Rust) | implementing a Function | `src/go/plugin/framework/functions/README.md`, `src/crates/netdata-plugin/rt/src/lib.rs` |
 | Functions UI schema & guides | response shapes and patterns | `src/plugins.d/FUNCTION_UI_SCHEMA.json`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_UI_REFERENCE.md` |
+| Topology Function schema & guide | topology actors, links, evidence, overlays | `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`, `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` |
 | Functions validator | E2E + schema validation | `src/go/tools/functions-validation/README.md` |
 | ibm.d framework | starting `ibm.d` work | `src/go/plugin/ibm.d/AGENTS.md`, `src/go/plugin/ibm.d/framework/README.md` |
 | Rust plugin SDK | new Rust plugin | `src/crates/netdata-plugin/` (`rt/`, `protocol/`, `bridge/`, `charts-derive/`, `schema/`, `types/`, `error/`) |

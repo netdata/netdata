@@ -180,7 +180,7 @@ Risks:
   Always point at the consumer endpoint resolved from
   `${AGENT_EVENTS_HOSTNAME}` and the Cloud space.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status: filled-2026-05-05
 
@@ -192,7 +192,7 @@ This is NOT a generic logs query skill. The two existing `query-netdata-{cloud,a
 
 ### Problem / root-cause model
 
-Maintainers (Costa + team + AI assistants) need to triage 40k-200k status submissions per day across 1.5M agents to find specific crashes, panics, regressions. Naive queries (`--grep PATTERN` over full namespace) are slow because they full-scan. The skill must teach index-friendly patterns AND ship scripts that bake them in.
+Maintainers need to triage 40k-200k status submissions per day across 1.5M agents to find specific crashes, panics, regressions. Naive queries (`--grep PATTERN` over full namespace) are slow because they full-scan. The skill must teach index-friendly patterns AND ship scripts that bake them in.
 
 A second confusion the skill resolves: the after-the-fact event model. Agents POST events ONLY on start (the previous session's exit reason). So "the last hour" misses real crashes; the meaningful unit is "events posted in the last 24h", which (because of 23h client-side dedup) is ~one record per agent per event-class per day.
 
@@ -218,7 +218,7 @@ User clarifications (2026-05-05):
 - Default time: 24h (covers the dedup unit + balances scan cost).
 - Wide windows for rare crashes (1-per-few-days class): up to 7 days.
 - Default version filter: latest stable + latest 2-3 nightlies (auto-compute from observed version distribution).
-- ssh transport: NOT a first-class script flag. Mention in `transports.md` as Costa-only path; do not expand.
+- ssh transport: NOT a first-class script flag. Mention in `transports.md` as operator-only path; do not expand.
 - Group-by dimensions for `analyze-events.sh`: signal, fatal_function, fatal_filename, version, architecture, os_family, os_type, install_type, db_mode, kubernetes, profile, aclk, health, exit_cause, virtualization, chassis_type, host_cpus.
 
 ### Affected contracts and surfaces
@@ -226,7 +226,7 @@ User clarifications (2026-05-05):
 The skill itself is a private developer skill at `<repo>/.agents/skills/query-agent-events/` and a one-line entry in AGENTS.md "Project Skills Index". No code changes. Indirect contracts the skill MUST document accurately:
 
 - The producer's status JSON shape at `STATUS_FILE_VERSION = 28`.
-- The journal namespace name (`agent-events`, hosted on Costa's ingestion server). NOT defined in this repo; documented as deployment convention.
+- The journal namespace name (`agent-events`, hosted on an operator-managed ingestion server). NOT defined in this repo; documented as deployment convention.
 - The systemd-journal Function payload shape (selections / query / histogram / facets).
 - The `query-netdata-cloud` and `query-netdata-agents` skill helper APIs (which this skill consumes).
 
@@ -243,7 +243,7 @@ The skill itself is a private developer skill at `<repo>/.agents/skills/query-ag
 - Skill is read-only documentation + scripts that make outbound queries. Blast radius on this repo: zero. Blast radius on the ingestion server: a query script with a bad default could full-scan the journal and degrade service for 40-200k-events/day query load. Mitigation: every default in `get-events.sh` MUST be index-friendly (structured `selections` filters first); FTS only as narrower.
 - Privacy: every fetched event carries identifying fields (machine GUIDs, claim IDs, hardware DMI). Storage stays under `<repo>/.local/audits/query-agent-events/` (gitignored). No raw values in committed artifacts. `redact-events.sh` ships as opt-in for sharing.
 - Untrusted-doc risk: 14 high-severity divergences found in `.local/agent-events-journals.md`. The skill writes verified ground truth from producer source; the .local doc is treated as a defunct draft and not copied into committed artifacts.
-- Volume: Costa noted 40k-200k events/day on stable releases. Defaults narrow time + version aggressively to keep query weight low.
+- Volume: the user noted 40k-200k events/day on stable releases. Defaults narrow time + version aggressively to keep query weight low.
 
 ### Decisions recorded
 
@@ -251,21 +251,21 @@ D1. **Scoping predicate**: namespace alone (`--namespace=${AGENT_EVENTS_HOSTNAME
 
 D2. **No `AGENT_EVENTS_JOURNAL_NAMESPACE` env key**: keep `${AGENT_EVENTS_HOSTNAME}`'s quadruple-duty (Cloud room name, ssh host, direct-HTTP host, journalctl namespace) per the existing sensitive-data-discipline spec.
 
-D3. **Drop `--via ssh` from script flags** (Costa: A). Mention ssh briefly in `transports.md` as Costa-only path; no scripted ssh transport.
+D3. **Drop `--via ssh` from script flags** (the user: A). Mention ssh briefly in `transports.md` as operator-only path; no scripted ssh transport.
 
 D4. **Privacy default**: raw under `<repo>/.local/audits/query-agent-events/` (gitignored), never shared. Opt-in `redact-events.sh` for sharing.
 
-D5. **Full AE_FIELDS.md coverage** (Costa: A): every producer field with version-gating annotation, every enum verified against source, indexable-vs-FTS guidance per field.
+D5. **Full AE_FIELDS.md coverage** (the user: A): every producer field with version-gating annotation, every enum verified against source, indexable-vs-FTS guidance per field.
 
-D6. **Default time window: 24h** (Costa: C). `--since '24h ago'` is the default. Wider windows (`--since '7d'`) documented for rare-crash investigation.
+D6. **Default time window: 24h** (the user: C). `--since '24h ago'` is the default. Wider windows (`--since '7d'`) documented for rare-crash investigation.
 
-D7. **Default version filter**: latest stable + latest 2-3 nightlies (Costa). `get-events.sh` accepts `--versions auto` (default), `--versions <regex>`, and `--all-versions`. Auto-mode does a lightweight version-list query first, picks top stable + top 3 nightlies by version sort, then runs the main query with that filter.
+D7. **Default version filter**: latest stable + latest 2-3 nightlies (the user). `get-events.sh` accepts `--versions auto` (default), `--versions <regex>`, and `--all-versions`. Auto-mode does a lightweight version-list query first, picks top stable + top 3 nightlies by version sort, then runs the main query with that filter.
 
-D8. **Index-friendly query discipline** (Costa, hard requirement): structured `selections` filters first, FTS via `query` only as residual narrower. Anti-pattern in any recipe: bare FTS without structured slicing. The skill writes this rule into SKILL.md key concepts and into every recipe.
+D8. **Index-friendly query discipline** (hard requirement): structured `selections` filters first, FTS via `query` only as residual narrower. Anti-pattern in any recipe: bare FTS without structured slicing. The skill writes this rule into SKILL.md key concepts and into every recipe.
 
-D9. **Group-by dimensions in `analyze-events.sh`** (Costa: confirmed): signal, fatal_function, fatal_filename, version, architecture, os_family, os_type, install_type, db_mode, kubernetes, profile, aclk, health, exit_cause, virtualization, chassis_type, host_cpus.
+D9. **Group-by dimensions in `analyze-events.sh`** (the user: confirmed): signal, fatal_function, fatal_filename, version, architecture, os_family, os_type, install_type, db_mode, kubernetes, profile, aclk, health, exit_cause, virtualization, chassis_type, host_cpus.
 
-D10. **Filter syntax (Netdata systemd-journal plugin)** (Costa, hard requirement): the Function supports multi-value filters; between fields = AND, between values = OR. Costa described this as pseudo-code `(FIELD1 in A, B, C) AND (FIELD2 in D, E, F) AND ...` -- the **actual JSON shape** (verified at `src/libnetdata/facets/logs_query_status.h:386-466`) is the `selections` POST key:
+D10. **Filter syntax (Netdata systemd-journal plugin)** (hard requirement): the Function supports multi-value filters; between fields = AND, between values = OR. The user described this as pseudo-code `(FIELD1 in A, B, C) AND (FIELD2 in D, E, F) AND ...` -- the **actual JSON shape** (verified at `src/libnetdata/facets/logs_query_status.h:386-466`) is the `selections` POST key:
 
 ```json
 {
@@ -276,7 +276,7 @@ D10. **Filter syntax (Netdata systemd-journal plugin)** (Costa, hard requirement
 }
 ```
 
-D11. **Transport-level abilities live in `query-logs.md`** (Costa, scope clarification): the multi-value `selections` capability is a property of the systemd-journal Function transport, not specific to agent-events. Both `docs/netdata-ai/skills/query-netdata-cloud/query-logs.md` and `docs/netdata-ai/skills/query-netdata-agents/query-logs.md` get updated to mention it (cloud doc carries the full shape; agents doc references the cloud doc). agent-events specifics (which AE_* fields, when to use which, dedup semantics) stay in this skill.
+D11. **Transport-level abilities live in `query-logs.md`** (user scope clarification): the multi-value `selections` capability is a property of the systemd-journal Function transport, not specific to agent-events. Both `docs/netdata-ai/skills/query-netdata-cloud/query-logs.md` and `docs/netdata-ai/skills/query-netdata-agents/query-logs.md` get updated to mention it (cloud doc carries the full shape; agents doc references the cloud doc). agent-events specifics (which AE_* fields, when to use which, dedup semantics) stay in this skill.
 
 Implications for the skill:
 - `transports.md` references `query-logs.md` for the JSON shape rather than re-documenting it.
@@ -290,7 +290,7 @@ Skill structure:
 
 - `SKILL.md` -- entry point. Frontmatter triggers ("agent events", "agent-events", "crash reports", "fatals", "panics", "ingestion server", "status file", "AE_*" fields). Key concepts up front: bug-investigation tool, after-the-fact model, dedup window, structured-filters-first.
 - `AE_FIELDS.md` -- the verified field map (~80 rows): producer source path | JSON path | journal field | enum/values | version-gating | indexable as facet? | bug-triage interpretation. Plus enum-meaning tables (what each `AE_AGENT_HEALTH`, `AE_FATAL_SIGNAL_CODE`, `AE_EXIT_CAUSE` value tells a bug-fixer).
-- `transports.md` -- 3 transports with priority order. For each: how to call the Function via the existing `query-netdata-{cloud,agents}` helpers; what payload shape works for agent-events. ssh path gets a 1-paragraph note (Costa-only).
+- `transports.md` -- 3 transports with priority order. For each: how to call the Function via the existing `query-netdata-{cloud,agents}` helpers; what payload shape works for agent-events. ssh path gets a 1-paragraph operator-only note.
 - `update-cadence.md` -- the after-the-fact model, the 23h client-side dedup, the ≥10 min disk snapshot, the start-only POST. Implications for query design (default 24h, wider for rare).
 - `query-discipline.md` -- the structured-filters-first rule. Worked examples of right-vs-wrong queries. The Function payload's `selections` vs `query` parameters and how each interacts with the journal index.
 - `finding-crashes.md` -- the "find recent signal crashes on stable releases" recipe end-to-end.
@@ -322,7 +322,7 @@ Skill structure:
 
 ### Open decisions
 
-None. All decisions resolved with Costa on 2026-05-05.
+None. All decisions resolved with the user on 2026-05-05.
 
 ### Followup items surfaced (NOT to be left as "deferred")
 

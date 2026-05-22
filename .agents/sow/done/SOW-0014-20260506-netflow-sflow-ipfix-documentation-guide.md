@@ -202,9 +202,9 @@ CPU semantics note (will appear in docs):
 - At saturation on a multi-core host it is well above 100% (e.g. ~600-800% on this workstation when ingest threads + tier-batch threads are all busy)
 - Documentation must call this out explicitly so capacity planners read the metric correctly
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
 Problem / root-cause model:
 
@@ -606,6 +606,9 @@ Open follow-ups, ordered by priority:
 7. **AI skills cross-links to learn docs**: REJECTED for this SOW (not mandatory per user 2026-05-07). Can be picked up in a future skills-maintenance pass; not tracked as a separate SOW because rejected, not deferred.
 
 ## Regression Log
+
+Note: dated regression entries intentionally use `## Regression - YYYY-MM-DD`
+headings to match the repository SOW lifecycle contract.
 
 ## Regression - 2026-05-07
 
@@ -3038,9 +3041,9 @@ but the actual Learn page is
 - The broken link returns a routing/publishing problem only when clicked or
   link-checked against Learn, not during metadata schema validation.
 
-### Pre-Implementation Gate
+### Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
 Problem / root-cause model:
 

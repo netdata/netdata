@@ -131,9 +131,9 @@ Risks:
 - Installing and restarting the local plugin affects the user's running Netdata instance; use the provided script deliberately and record the command/result.
 - Documentation is generated from metadata for integration cards; generated files must not be hand-edited.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
 Problem / root-cause model:
 
@@ -650,7 +650,10 @@ Artifact maintenance for review pass:
 
 ## Regression Log
 
-### Regression - 2026-05-08 - Missing Provider Integration Modules
+Note: dated regression entries intentionally use `## Regression - YYYY-MM-DD`
+headings to match the repository SOW lifecycle contract.
+
+## Regression - 2026-05-08 - Missing Provider Integration Modules
 
 What broke:
 
