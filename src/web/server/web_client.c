@@ -10,6 +10,7 @@
 
 int respect_web_browser_do_not_track_policy = 0;
 const char *web_x_frame_options = NULL;
+const char *web_uri_prefix = NULL;
 
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 
@@ -1396,7 +1397,21 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                         web_client_permission_denied_acl(w);
                         return;
                     }
-                    
+
+                    if(web_uri_prefix && *web_uri_prefix) {
+                        const char *wspath = buffer_tostring(w->url_path_decoded);
+                        while(*wspath == '/') wspath++;
+                        size_t prefix_len = strlen(web_uri_prefix);
+                        if(strncmp(wspath, web_uri_prefix, prefix_len) != 0 ||
+                           (wspath[prefix_len] != '/' && wspath[prefix_len] != '?' && wspath[prefix_len] != '\0')) {
+                            buffer_flush(w->response.data);
+                            buffer_strcat(w->response.data, "Not found.");
+                            w->response.data->content_type = CT_TEXT_HTML;
+                            w->response.code = HTTP_RESP_NOT_FOUND;
+                            break;
+                        }
+                    }
+
                     // Handle WebSocket handshake - this will take over the socket
                     // similar to how stream_receiver_accept_connection works
                     w->response.code = websocket_handle_handshake(w);
@@ -1444,7 +1459,26 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     // find if the URL path has a filename extension
                     char path[FILENAME_MAX + 1];
                     strncpyz(path, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
-                    char *s = path, *e = path;
+
+                    // Strip URI prefix if configured
+                    char *url_to_process = path;
+                    if(web_uri_prefix && *web_uri_prefix) {
+                        char *p = url_to_process;
+                        while(*p == '/') p++;
+                        size_t prefix_len = strlen(web_uri_prefix);
+                        if(strncmp(p, web_uri_prefix, prefix_len) == 0 &&
+                           (p[prefix_len] == '/' || p[prefix_len] == '?' || p[prefix_len] == '\0')) {
+                            url_to_process = p + prefix_len;
+                        } else {
+                            buffer_flush(w->response.data);
+                            buffer_strcat(w->response.data, "Not found.");
+                            w->response.data->content_type = CT_TEXT_HTML;
+                            w->response.code = HTTP_RESP_NOT_FOUND;
+                            break;
+                        }
+                    }
+
+                    char *s = url_to_process, *e = url_to_process;
 
                     // remove the query string and find the last char
                     for (; *e ; e++) {
@@ -1465,7 +1499,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                         }
                     }
 
-                    w->response.code = (short)web_client_process_url(localhost, w, path);
+                    w->response.code = (short)web_client_process_url(localhost, w, url_to_process);
                     break;
 
                 default:

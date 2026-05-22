@@ -139,6 +139,24 @@ void netdata_conf_section_web(void) {
         netdata_log_error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).", web_gzip_level);
         web_gzip_level = 9;
     }
+
+    // URI prefix: an optional secret path prefix to restrict public access.
+    // Strip leading and trailing slashes so comparisons are uniform.
+    const char *prefix_raw = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "uri prefix", "");
+    if(prefix_raw && *prefix_raw) {
+        // skip leading slashes
+        while(*prefix_raw == '/') prefix_raw++;
+
+        // copy and strip trailing slashes
+        char *prefix_copy = strdupz(prefix_raw);
+        char *end = prefix_copy + strlen(prefix_copy) - 1;
+        while(end > prefix_copy && *end == '/') *end-- = '\0';
+
+        if(*prefix_copy)
+            web_uri_prefix = prefix_copy;
+        else
+            freez(prefix_copy);
+    }
 }
 
 void netdata_conf_web_security_init(void) {
