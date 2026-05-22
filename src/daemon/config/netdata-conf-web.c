@@ -142,6 +142,9 @@ void netdata_conf_section_web(void) {
 
     // URI prefix: an optional secret path prefix to restrict public access.
     // Strip leading and trailing slashes so comparisons are uniform.
+    // The resulting string is strdupz'd and stored in web_uri_prefix for the
+    // lifetime of the process (set-once at startup, never freed — same pattern
+    // as web_x_frame_options and similar singleton config values).
     const char *prefix_raw = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "uri prefix", "");
     if(prefix_raw && *prefix_raw) {
         // skip leading slashes

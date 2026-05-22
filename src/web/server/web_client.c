@@ -1149,6 +1149,30 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     return HTTP_RESP_NOT_FOUND;
 }
 
+/**
+ * Check whether a decoded URL path satisfies the configured URI prefix.
+ *
+ * Returns true when:
+ *   - no URI prefix is configured, OR
+ *   - the decoded path starts with /<prefix>/ (or exactly /<prefix> with no
+ *     further path or a query string starting with '?').
+ *
+ * Returns false when the prefix is configured but not present in the path.
+ */
+static inline bool web_client_uri_prefix_matches(const char *decoded_path) {
+    if(!web_uri_prefix || !*web_uri_prefix)
+        return true;
+
+    // Skip leading slashes in the request path
+    while(*decoded_path == '/') decoded_path++;
+
+    size_t prefix_len = strlen(web_uri_prefix);
+    return strncmp(decoded_path, web_uri_prefix, prefix_len) == 0 &&
+           (decoded_path[prefix_len] == '/' ||
+            decoded_path[prefix_len] == '?' ||
+            decoded_path[prefix_len] == '\0');
+}
+
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path) {
     if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
         return web_client_service_unavailable(w);
@@ -1398,22 +1422,15 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                         return;
                     }
 
-                    if(web_uri_prefix && *web_uri_prefix) {
-                        const char *wspath = buffer_tostring(w->url_path_decoded);
-                        while(*wspath == '/') wspath++;
-                        size_t prefix_len = strlen(web_uri_prefix);
-                        if(strncmp(wspath, web_uri_prefix, prefix_len) != 0 ||
-                           (wspath[prefix_len] != '/' && wspath[prefix_len] != '?' && wspath[prefix_len] != '\0')) {
-                            buffer_flush(w->response.data);
-                            buffer_strcat(w->response.data, "Not found.");
-                            w->response.data->content_type = CT_TEXT_HTML;
-                            w->response.code = HTTP_RESP_NOT_FOUND;
-                            break;
-                        }
+                    if(!web_client_uri_prefix_matches(buffer_tostring(w->url_path_decoded))) {
+                        buffer_flush(w->response.data);
+                        buffer_strcat(w->response.data, "Not found.");
+                        w->response.data->content_type = CT_TEXT_HTML;
+                        w->response.code = HTTP_RESP_NOT_FOUND;
+                        break;
                     }
 
                     // Handle WebSocket handshake - this will take over the socket
-                    // similar to how stream_receiver_accept_connection works
                     w->response.code = websocket_handle_handshake(w);
                     
                     // After this point the socket has been taken over
@@ -1460,22 +1477,24 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     char path[FILENAME_MAX + 1];
                     strncpyz(path, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
 
-                    // Strip URI prefix if configured
+                    // Strip URI prefix if configured.
+                    // url_to_process is a pointer into the path[] buffer, past the prefix
+                    // segment. downstream code (web_client_process_url) only reads from
+                    // this pointer and never writes back, so pointing into the middle of
+                    // path[] is safe for the lifetime of this request.
                     char *url_to_process = path;
                     if(web_uri_prefix && *web_uri_prefix) {
-                        char *p = url_to_process;
-                        while(*p == '/') p++;
-                        size_t prefix_len = strlen(web_uri_prefix);
-                        if(strncmp(p, web_uri_prefix, prefix_len) == 0 &&
-                           (p[prefix_len] == '/' || p[prefix_len] == '?' || p[prefix_len] == '\0')) {
-                            url_to_process = p + prefix_len;
-                        } else {
+                        if(!web_client_uri_prefix_matches(path)) {
                             buffer_flush(w->response.data);
                             buffer_strcat(w->response.data, "Not found.");
                             w->response.data->content_type = CT_TEXT_HTML;
                             w->response.code = HTTP_RESP_NOT_FOUND;
                             break;
                         }
+                        // Advance past leading slashes and the prefix segment
+                        char *p = path;
+                        while(*p == '/') p++;
+                        url_to_process = p + strlen(web_uri_prefix);
                     }
 
                     char *s = url_to_process, *e = url_to_process;
