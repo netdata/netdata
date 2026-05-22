@@ -77,49 +77,15 @@ const (
 	vmInstanceUUIDLabel                   = "vm_instance_uuid"
 )
 
-func vsanOptionalMetricNames() []string {
-	return []string{
-		vsanClusterSpaceUsageTotalMetric,
-		vsanClusterSpaceUsageFreeMetric,
-		vsanClusterSpaceUsageUsedMetric,
-		vsanClusterSpaceUtilizationUsedMetric,
-		vsanClusterHealthStatusGreenMetric,
-		vsanClusterHealthStatusYellowMetric,
-		vsanClusterHealthStatusRedMetric,
-		vsanClusterHealthStatusUnknownMetric,
-		vsanClusterOperationsReadMetric,
-		vsanClusterOperationsWriteMetric,
-		vsanClusterThroughputReadMetric,
-		vsanClusterThroughputWriteMetric,
-		vsanClusterLatencyReadMetric,
-		vsanClusterLatencyWriteMetric,
-		vsanClusterCongestionsMetric,
-		vsanHostOperationsReadMetric,
-		vsanHostOperationsWriteMetric,
-		vsanHostThroughputReadMetric,
-		vsanHostThroughputWriteMetric,
-		vsanHostLatencyReadMetric,
-		vsanHostLatencyWriteMetric,
-		vsanHostCongestionsMetric,
-		vsanHostCacheHitRateMetric,
-		vsanVMOperationsReadMetric,
-		vsanVMOperationsWriteMetric,
-		vsanVMThroughputReadMetric,
-		vsanVMThroughputWriteMetric,
-		vsanVMLatencyReadMetric,
-		vsanVMLatencyWriteMetric,
-	}
-}
-
-func (c *Collector) writeVSANMetrics(meter metrix.SnapshotMeter) {
+func (c *Collector) writeVSANMetrics() {
 	if !c.CollectVSAN || c.resources == nil || c.vsanMetrics == nil {
 		return
 	}
-	c.writeVSANClusterSpaceMetrics(meter)
-	c.writeVSANClusterHealthMetrics(meter)
-	c.writeVSANClusterPerformanceMetrics(meter)
-	c.writeVSANHostPerformanceMetrics(meter)
-	c.writeVSANVMPerformanceMetrics(meter)
+	c.writeVSANClusterSpaceMetrics()
+	c.writeVSANClusterHealthMetrics()
+	c.writeVSANClusterPerformanceMetrics()
+	c.writeVSANHostPerformanceMetrics()
+	c.writeVSANVMPerformanceMetrics()
 }
 
 func (c *Collector) vsanResources() (rs.Clusters, rs.Hosts, rs.VMs) {
@@ -157,7 +123,7 @@ func (c *Collector) vsanResources() (rs.Clusters, rs.Hosts, rs.VMs) {
 	return clusters, hosts, vms
 }
 
-func (c *Collector) writeVSANClusterSpaceMetrics(meter metrix.SnapshotMeter) {
+func (c *Collector) writeVSANClusterSpaceMetrics() {
 	for _, id := range sortedMapKeys(c.vsanMetrics.Space) {
 		cluster := c.resources.Clusters.Get(id)
 		if cluster == nil {
@@ -165,26 +131,26 @@ func (c *Collector) writeVSANClusterSpaceMetrics(meter metrix.SnapshotMeter) {
 		}
 		space := c.vsanMetrics.Space[id]
 		used := max(space.Total-space.Free, 0)
-		labels := meter.LabelSet(c.vsanClusterLabels(cluster)...)
+		labels := c.labelSet(c.vsanClusterLabels(cluster))
 		c.observeGaugeFloat(vsanClusterSpaceUsageTotalMetric, float64(space.Total), labels)
 		c.observeGaugeFloat(vsanClusterSpaceUsageFreeMetric, float64(space.Free), labels)
 		c.observeGaugeFloat(vsanClusterSpaceUsageUsedMetric, float64(used), labels)
 		if space.Total > 0 {
-			c.observeGaugeFloat(vsanClusterSpaceUtilizationUsedMetric, float64(used)/float64(space.Total)*10000, labels)
+			c.observeGaugeFloat(vsanClusterSpaceUtilizationUsedMetric, float64(used)/float64(space.Total)*scaledPercent, labels)
 		} else {
 			c.observeGaugeFloat(vsanClusterSpaceUtilizationUsedMetric, 0, labels)
 		}
 	}
 }
 
-func (c *Collector) writeVSANClusterHealthMetrics(meter metrix.SnapshotMeter) {
+func (c *Collector) writeVSANClusterHealthMetrics() {
 	for _, id := range sortedMapKeys(c.vsanMetrics.Health) {
 		cluster := c.resources.Clusters.Get(id)
 		if cluster == nil {
 			continue
 		}
 		health := c.vsanMetrics.Health[id]
-		labels := meter.LabelSet(c.vsanClusterLabels(cluster)...)
+		labels := c.labelSet(c.vsanClusterLabels(cluster))
 		c.observeGaugeFloat(vsanClusterHealthStatusGreenMetric, float64(oldmetrix.Bool(health == "green")), labels)
 		c.observeGaugeFloat(vsanClusterHealthStatusYellowMetric, float64(oldmetrix.Bool(health == "yellow")), labels)
 		c.observeGaugeFloat(vsanClusterHealthStatusRedMetric, float64(oldmetrix.Bool(health == "red")), labels)
@@ -192,35 +158,35 @@ func (c *Collector) writeVSANClusterHealthMetrics(meter metrix.SnapshotMeter) {
 	}
 }
 
-func (c *Collector) writeVSANClusterPerformanceMetrics(meter metrix.SnapshotMeter) {
+func (c *Collector) writeVSANClusterPerformanceMetrics() {
 	for _, id := range sortedMapKeys(c.vsanMetrics.Clusters) {
 		cluster := c.resources.Clusters.Get(id)
 		if cluster == nil {
 			continue
 		}
-		labels := meter.LabelSet(c.vsanClusterLabels(cluster)...)
+		labels := c.labelSet(c.vsanClusterLabels(cluster))
 		writeVSANPerformanceValues(c, labels, c.vsanMetrics.Clusters[id], vsanClusterPerfMetricByName)
 	}
 }
 
-func (c *Collector) writeVSANHostPerformanceMetrics(meter metrix.SnapshotMeter) {
+func (c *Collector) writeVSANHostPerformanceMetrics() {
 	for _, id := range sortedMapKeys(c.vsanMetrics.Hosts) {
 		host := c.resources.Hosts.Get(id)
 		if host == nil {
 			continue
 		}
-		labels := meter.LabelSet(c.vsanHostLabels(host)...)
+		labels := c.labelSet(c.vsanHostLabels(host))
 		writeVSANPerformanceValues(c, labels, c.vsanMetrics.Hosts[id], vsanHostPerfMetricByName)
 	}
 }
 
-func (c *Collector) writeVSANVMPerformanceMetrics(meter metrix.SnapshotMeter) {
+func (c *Collector) writeVSANVMPerformanceMetrics() {
 	for _, id := range sortedMapKeys(c.vsanMetrics.VMs) {
 		vm := c.resources.VMs.Get(id)
 		if vm == nil {
 			continue
 		}
-		labels := meter.LabelSet(c.vsanVMLabels(vm)...)
+		labels := c.labelSet(c.vsanVMLabels(vm))
 		writeVSANPerformanceValues(c, labels, c.vsanMetrics.VMs[id], vsanVMPerfMetricByName)
 	}
 }
@@ -232,12 +198,6 @@ func writeVSANPerformanceValues(c *Collector, labels metrix.LabelSet, values scr
 			continue
 		}
 		c.observeGaugeFloat(metricName, values[name], labels)
-	}
-}
-
-func (c *Collector) observeGaugeFloat(name string, value float64, labels metrix.LabelSet) {
-	if gauge := c.mx.gauge(name); gauge != nil {
-		gauge.Observe(metrix.SampleValue(value), labels)
 	}
 }
 
@@ -272,39 +232,30 @@ var vsanVMPerfMetricByName = map[string]string{
 }
 
 func (c *Collector) vsanClusterLabels(cluster *rs.Cluster) []metrix.Label {
-	labels := []metrix.Label{
-		{Key: "id", Value: cluster.ID},
+	return c.v2MetricLabels(cluster.ID, []metrix.Label{
 		{Key: "datacenter", Value: cluster.Hier.DC.Name},
 		{Key: "cluster", Value: cluster.Name},
 		{Key: vsanUUIDLabel, Value: cluster.VSANUUID},
-	}
-	labels = append(labels, c.resourceEnrichmentLabels(cluster.ID)...)
-	return labels
+	}, cluster.Labels)
 }
 
 func (c *Collector) vsanHostLabels(host *rs.Host) []metrix.Label {
-	labels := []metrix.Label{
-		{Key: "id", Value: host.ID},
+	return c.v2MetricLabels(host.ID, []metrix.Label{
 		{Key: "datacenter", Value: host.Hier.DC.Name},
 		{Key: "cluster", Value: getHostClusterName(host)},
 		{Key: "host", Value: host.Name},
 		{Key: vsanNodeUUIDLabel, Value: host.VSANNodeUUID},
-	}
-	labels = append(labels, c.resourceEnrichmentLabels(host.ID)...)
-	return labels
+	}, host.Labels)
 }
 
 func (c *Collector) vsanVMLabels(vm *rs.VM) []metrix.Label {
-	labels := []metrix.Label{
-		{Key: "id", Value: vm.ID},
+	return c.v2MetricLabels(vm.ID, []metrix.Label{
 		{Key: "datacenter", Value: vm.Hier.DC.Name},
 		{Key: "cluster", Value: getVMClusterName(vm)},
 		{Key: "host", Value: vm.Hier.Host.Name},
 		{Key: "vm", Value: vm.Name},
 		{Key: vmInstanceUUIDLabel, Value: vm.InstanceUUID},
-	}
-	labels = append(labels, c.resourceEnrichmentLabels(vm.ID)...)
-	return labels
+	}, vm.Labels)
 }
 
 func sortedMapKeys[V any](m map[string]V) []string {

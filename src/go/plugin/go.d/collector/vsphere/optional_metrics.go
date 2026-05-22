@@ -5,22 +5,13 @@ package vsphere
 import (
 	"sort"
 
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
-func optionalMetricNames() []string {
-	var names []string
-	names = append(names, datastoreClusterOptionalMetricNames()...)
-	names = append(names, powerMetricsOptionalMetricNames()...)
-	names = append(names, vsanOptionalMetricNames()...)
-	return names
-}
-
-func (c *Collector) writeOptionalMetrics(meter metrix.SnapshotMeter) {
-	c.writeDatastoreClusterMetrics(meter)
-	c.writePowerMetrics(meter)
-	c.writeVSANMetrics(meter)
+func (c *Collector) writeOptionalMetrics() {
+	c.writeDatastoreClusterMetrics()
+	c.writePowerMetrics()
+	c.writeVSANMetrics()
 }
 
 func sortedVMs(vms rs.VMs) []*rs.VM {

@@ -6,27 +6,24 @@ import (
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
-func (c *Collector) resourceEnrichmentLabels(resourceID string) []metrix.Label {
-	if c.resources == nil {
-		return nil
-	}
-
-	labels := make(map[string]string)
-	for key, value := range c.userMetadataLabels(resourceID) {
-		if key != "" && value != "" {
-			labels[key] = value
-		}
-	}
-
+func resourceEnrichmentLabels(labels map[string]string) []metrix.Label {
 	if len(labels) == 0 {
 		return nil
 	}
+
 	keys := make([]string, 0, len(labels))
-	for key := range labels {
-		keys = append(keys, key)
+	for key, value := range labels {
+		if key != "" && value != "" {
+			keys = append(keys, key)
+		}
 	}
+	if len(keys) == 0 {
+		return nil
+	}
+
 	sort.Strings(keys)
 
 	out := make([]metrix.Label, 0, len(keys))
@@ -36,27 +33,16 @@ func (c *Collector) resourceEnrichmentLabels(resourceID string) []metrix.Label {
 	return out
 }
 
-func (c *Collector) userMetadataLabels(resourceID string) map[string]string {
-	if c.resources == nil {
-		return nil
+func getVMClusterName(vm *rs.VM) string {
+	if vm.Hier.Cluster.Name == vm.Hier.Host.Name {
+		return ""
 	}
-	if vm := c.resources.VMs.Get(resourceID); vm != nil {
-		return vm.Labels
+	return vm.Hier.Cluster.Name
+}
+
+func getHostClusterName(host *rs.Host) string {
+	if host.Hier.Cluster.Name == host.Name {
+		return ""
 	}
-	if host := c.resources.Hosts.Get(resourceID); host != nil {
-		return host.Labels
-	}
-	if ds := c.resources.Datastores.Get(resourceID); ds != nil {
-		return ds.Labels
-	}
-	if cluster := c.resources.Clusters.Get(resourceID); cluster != nil {
-		return cluster.Labels
-	}
-	if rp := c.resources.ResourcePools.Get(resourceID); rp != nil {
-		return rp.Labels
-	}
-	if sp := c.resources.StoragePods.Get(resourceID); sp != nil {
-		return sp.Labels
-	}
-	return nil
+	return host.Hier.Cluster.Name
 }

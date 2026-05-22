@@ -231,8 +231,9 @@ Validation after removal:
   code/config/schema/metadata/chart templates or generated integration
   markdown.
 - Aggregate V1-compatible host CPU, disk, and network contexts remain present in
-  `charts.go`, `charts.yaml`, `metadata.yaml`, and
-  `testdata/v1_compat_manifest.json`.
+  `charts.yaml`, `metadata.yaml`, and the V2 compatibility-surface tests. The
+  earlier Go chart mirror was removed by the 2026-05-22 chart source-of-truth
+  cleanup.
 - The host child-instance implementation/test files were deleted after explicit
   user approval to remove the public surface rather than hide it.
 - `UPDATE_VSPHERE_CHARTS=1 go test -count=1 ./collector/vsphere -run TestCollector_ChartTemplateYAML`
@@ -302,6 +303,74 @@ Validation after removal:
   integrations/gen_integrations.py` passed outside the sandbox after the
   sandboxed run could not write `integrations/integrations.js`.
 - `git diff --check` passed.
+
+### 2026-05-22 Runtime Chart Bridge Removal Decision
+
+The user approved removing the mutable runtime `c.charts` bridge in a focused
+cleanup commit.
+
+Removal scope:
+
+- remove `Collector.charts`, `Charts()`, runtime chart mutation, obsolete-chart
+  bookkeeping maps, and the V1 golden runtime-chart fixture;
+- keep the V2 chart template YAML as the chart source of truth;
+- emit metrics directly from the current resource inventory and static chart
+  templates;
+- delegate missing-instance lifecycle to chartengine through the existing
+  `expire_after_cycles: 10` lifecycle in `charts.yaml`.
+
+Evidence and reason:
+
+- Runtime chart mutation existed only as a V1 compatibility bridge during the
+  migration and duplicated chartengine lifecycle responsibilities.
+- The bridge kept stale datastore, cluster, and resource-pool property values
+  alive during refresh failures. The current behavior emits property metrics
+  only after a successful current property refresh; perf samples remain
+  independent and can still be emitted when available.
+- The removed V1 golden fixture was expensive to maintain and no longer matched
+  the clean V2 direction. Current validation uses generated chart-template
+  comparison, chartengine materialization, `collecttest.AssertChartCoverage`,
+  full collection tests, and focused feature tests.
+
+Validation after removal:
+
+- `go test -count=1 ./collector/vsphere -run '^$'` passed from
+  `src/go/plugin/go.d`.
+- `go test -count=1 ./collector/vsphere -run 'TestCollector_(ChartTemplateYAML|V2CompatibilitySurface|DatastoreClustersOptInEmitsCharts|PowerMetricsEmitCharts|VSANMetricsOptInEmitsCharts)$'`
+  passed from `src/go/plugin/go.d`.
+- `go test -count=1 ./collector/vsphere/...` passed from
+  `src/go/plugin/go.d` outside the sandbox after the sandboxed run could not
+  bind govmomi simulator loopback ports.
+- `go test -race -count=1 -timeout 300s ./collector/vsphere/...` passed from
+  `src/go/plugin/go.d` outside the sandbox.
+- `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+- `git diff --check -- collector/vsphere` passed from `src/go/plugin/go.d`.
+- A read-only follow-up review accepted the runtime behavior and identified only
+  durable-artifact cleanup and optional test-depth/performance nits.
+
+### 2026-05-22 V2 Surface Test File Cleanup
+
+The user approved deleting the stale `compat_manifest_test.go` file after the
+V1 compatibility manifest and golden fixture were removed.
+
+Cleanup scope:
+
+- move `TestCollector_V2CompatibilitySurface`, `buildV2PlanForTest`, and
+  `v2CreatedChartsAndDims` into `collector_test.go` beside the other collection
+  and V2 metric-store assertions;
+- delete `src/go/plugin/go.d/collector/vsphere/compat_manifest_test.go` because
+  it no longer contains a compatibility manifest test;
+- keep the V2 surface assertions unchanged: chartengine materialization must
+  create charts, every created chart must have the `id` label, every created
+  chart must have dimensions, and `collecttest.AssertChartCoverage` must pass.
+
+Evidence and reason:
+
+- `compat_manifest_test.go` no longer compared against a manifest after the V1
+  golden fixture was removed.
+- `collector_test.go` already owns the collection/runtime metric-store tests and
+  repeated chart coverage assertions, so keeping one manifest-named file for a
+  V2 chart-surface check was misleading.
 
 ### 2026-05-20 Vnode Removal Decision
 
@@ -1788,10 +1857,10 @@ Implementation decisions derived from feasibility:
 Acceptance criteria evidence:
 
 - Feasibility and decision evidence is recorded in this SOW.
-- The compatibility-manifest prep gate is drafted in `.agents/sow/specs/vsphere-v1-compatibility-manifest.md`.
-- The executable V1 golden baseline is added at `src/go/plugin/go.d/collector/vsphere/testdata/v1_compat_manifest.json` and checked by `TestCollector_V1CompatibilityManifest`.
+- The compatibility-manifest prep gate is retained as historical migration evidence in `.agents/sow/specs/vsphere-v1-compatibility-manifest.md`; it now records that the V1 golden fixture was superseded by the 2026-05-22 runtime chart bridge cleanup.
+- The deleted executable V1 golden baseline `src/go/plugin/go.d/collector/vsphere/testdata/v1_compat_manifest.json` and `TestCollector_V1CompatibilityManifest` are superseded by `TestCollector_ChartTemplateYAML`, `TestCollector_V2CompatibilitySurface`, `collecttest.AssertChartCoverage`, full collection tests, and focused feature-specific tests.
 - The parity-matrix prep gate is drafted in `.agents/sow/specs/vsphere-parity-matrix.md`.
-- Framework V2 migration acceptance is satisfied by `TestCollector_ChartTemplateYAML`, `TestCollector_V2CompatibilitySurface`, and the full vSphere package test. Snapshot, datastore aggregate enrichment, VM/host power-state metrics, VM/host property-status, cluster property-status, inventory-count, opt-in label enrichment, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore-cluster metrics, opt-in vSAN metrics, read-only readiness Function, cached topology Function, and opt-in Network/DVPG topology discovery criteria are satisfied for the currently implemented metrics, controls, and non-metric surfaces.
+- Framework V2 migration acceptance is satisfied by `TestCollector_ChartTemplateYAML`, `TestCollector_V2CompatibilitySurface`, `collecttest.AssertChartCoverage`, focused feature tests, and the full vSphere package test. Snapshot metrics, datastore aggregate enrichment, VM/host power-state metrics, VM/host property-status metrics, cluster property-status metrics, inventory-count metrics, opt-in vSphere tag/custom-attribute labels, aggregate host/VM power metrics, opt-in datastore-cluster metrics, opt-in vSAN metrics, the read-only readiness Function, the cached topology Function, and opt-in Network/DVPG topology discovery criteria are satisfied for the currently implemented metrics, controls, and non-metric surfaces. User-removed vnodes, inventory-path labels, VM guest labels, VM/host child-instance metric surfaces, host/VM power-state config controls, and the host/VM power-metrics config knob are explicitly out of this PR.
 
 Tests or equivalent validation:
 
@@ -2158,6 +2227,21 @@ Implemented regression fixes as of 2026-05-09:
 - Round 2 reference review found re-entrant `Init()` did not clear vSAN selector matchers. `resetRuntimeStateForInit()` now clears `vsanClusterMatcher`, `vsanHostMatcher`, and `vsanVMMatcher`.
 - Round 2/3 reference review found the resource-pool compressed-memory comments were wrong. The comments now say vSphere reports KiB and the chart keeps the V1 MB display scale.
 - Round 3 reference review found empty vSAN health responses produced no health series even though the writer already treats non-green/yellow/red as unknown. Empty health responses are now preserved and covered by `TestScraper_ScrapeVSANRecordsEmptyHealthAsUnknown`.
+
+Chart source-of-truth cleanup as of 2026-05-22:
+
+- User decision: keep all cleanup in this PR and make `src/go/plugin/go.d/collector/vsphere/charts.yaml` authoritative instead of retaining a transitional dual-source model with both `charts.go` and `charts.yaml`.
+- Removed the runtime chart bridge and the Go chart-template mirror: `src/go/plugin/go.d/collector/vsphere/charts.go`, `src/go/plugin/go.d/collector/vsphere/chart_template_sets.go`, and `src/go/plugin/go.d/collector/vsphere/compat_manifest_test.go`.
+- `collect.go` now writes final V2 metric names directly into `metrix` using centralized `id` label construction. The old collection-local `map[string]int64`, `legacyDimID`, `v2MetricName`, `writeMetrics`, and Go-to-YAML regeneration path are gone.
+- Optional vSAN, datastore-cluster, and power metric writers now use the same direct V2 metric write path and the same `id`/resource-enrichment label helper as the core VM/host/datastore/cluster/resource-pool writers.
+- `chart_template_test.go` now validates the embedded YAML directly with schema validation, `charttpl.DecodeYAML`, chart priority uniqueness, and `chartengine.Compile`. It no longer compares YAML against Go-generated templates.
+- Collection tests were rewritten away from legacy-map assertions. They now assert V2 metric-store series, V2 chart materialization, and `collecttest.AssertChartCoverage`.
+- `.agents/sow/specs/vsphere-v1-compatibility-manifest.md` now records that the transitional Go chart mirror is removed and `charts.yaml` is the current source of truth.
+- Validation:
+  - `go test -count=1 -run '^$' ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+  - `go test -count=1 ./collector/vsphere/...` passed from `src/go/plugin/go.d` with loopback permissions for the govmomi simulator.
+  - `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+  - `git diff --check` passed from the repository root.
 
 NIDL/config/metadata verification as of 2026-05-09:
 

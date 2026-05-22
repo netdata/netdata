@@ -29,34 +29,19 @@ const (
 	datastoreClusterNameLabel                  = "datastore_cluster"
 )
 
-func datastoreClusterOptionalMetricNames() []string {
-	return []string{
-		datastoreClusterSpaceUsageCapacityMetric,
-		datastoreClusterSpaceUsageFreeMetric,
-		datastoreClusterSpaceUsageUsedMetric,
-		datastoreClusterSpaceUtilizationUsedMetric,
-		datastoreClusterStorageDRSEnabledMetric,
-		datastoreClusterStorageDRSDisabledMetric,
-		datastoreClusterOverallStatusGreenMetric,
-		datastoreClusterOverallStatusRedMetric,
-		datastoreClusterOverallStatusYellowMetric,
-		datastoreClusterOverallStatusGrayMetric,
-	}
-}
-
-func (c *Collector) writeDatastoreClusterMetrics(meter metrix.SnapshotMeter) {
+func (c *Collector) writeDatastoreClusterMetrics() {
 	if !c.CollectDatastoreClusters || c.resources == nil {
 		return
 	}
 
 	for _, pod := range sortedStoragePods(c.resources.StoragePods) {
-		labels := meter.LabelSet(c.datastoreClusterLabels(pod)...)
+		labels := c.labelSet(c.datastoreClusterLabels(pod))
 		c.observeGauge(datastoreClusterSpaceUsageCapacityMetric, pod.Capacity, labels)
 		c.observeGauge(datastoreClusterSpaceUsageFreeMetric, pod.FreeSpace, labels)
 		used := max(pod.Capacity-pod.FreeSpace, 0)
 		c.observeGauge(datastoreClusterSpaceUsageUsedMetric, used, labels)
 		if pod.Capacity > 0 {
-			c.observeGauge(datastoreClusterSpaceUtilizationUsedMetric, int64(float64(used)/float64(pod.Capacity)*10000), labels)
+			c.observeGauge(datastoreClusterSpaceUtilizationUsedMetric, int64(float64(used)/float64(pod.Capacity)*scaledPercent), labels)
 		} else {
 			c.observeGauge(datastoreClusterSpaceUtilizationUsedMetric, 0, labels)
 		}
@@ -73,21 +58,12 @@ func (c *Collector) writeDatastoreClusterMetrics(meter metrix.SnapshotMeter) {
 	}
 }
 
-func (c *Collector) observeGauge(name string, value int64, labels metrix.LabelSet) {
-	if gauge := c.mx.gauge(name); gauge != nil {
-		gauge.Observe(metrix.SampleValue(value), labels)
-	}
-}
-
 func (c *Collector) datastoreClusterLabels(pod *rs.StoragePod) []metrix.Label {
-	labels := datastoreClusterLabels(pod)
-	labels = append(labels, c.resourceEnrichmentLabels(pod.ID)...)
-	return labels
+	return c.v2MetricLabels(pod.ID, datastoreClusterLabels(pod), pod.Labels)
 }
 
 func datastoreClusterLabels(pod *rs.StoragePod) []metrix.Label {
 	return []metrix.Label{
-		{Key: "id", Value: pod.ID},
 		{Key: "datacenter", Value: pod.Hier.DC.Name},
 		{Key: datastoreClusterNameLabel, Value: pod.Name},
 	}

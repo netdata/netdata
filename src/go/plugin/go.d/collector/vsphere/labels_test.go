@@ -33,11 +33,11 @@ func TestCollector_AddsUserMetadataLabels(t *testing.T) {
 	host := firstSortedHost(t, collr)
 	createdCharts, _ := v2CreatedChartsAndDims(buildV2PlanForTest(t, collr))
 
-	vmChartID := v2ChartTemplateID("vsphere.vm_cpu_utilization") + "_" + vm.ID
+	vmChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.vm_cpu_utilization", map[string]string{"id": vm.ID})
 	require.Equal(t, "platform", createdCharts[vmChartID].Labels["vsphere_custom_attribute_owner"])
 	require.Equal(t, "payments", createdCharts[vmChartID].Labels["vsphere_tag_service"])
 
-	hostChartID := v2ChartTemplateID("vsphere.host_cpu_utilization") + "_" + host.ID
+	hostChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.host_cpu_utilization", map[string]string{"id": host.ID})
 	require.Equal(t, "prod", createdCharts[hostChartID].Labels["vsphere_tag_env"])
 }
 

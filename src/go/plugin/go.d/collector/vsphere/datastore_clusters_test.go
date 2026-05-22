@@ -148,6 +148,7 @@ func testStoragePod(id, name string, capacity, freeSpace int64, storageDRSEnable
 
 func datastoreClusterLabelsMap(pod *rs.StoragePod) metrix.Labels {
 	labels := make(metrix.Labels)
+	labels["id"] = pod.ID
 	for _, label := range datastoreClusterLabels(pod) {
 		labels[label.Key] = label.Value
 	}

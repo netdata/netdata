@@ -21,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -259,377 +260,84 @@ func TestCollector_Collect(t *testing.T) {
 	defer teardown()
 
 	require.NoError(t, collr.Init(context.Background()))
-
 	collr.scraper = mockScraper{collr.scraper}
 
-	expected := map[string]int64{
-		"inventory_datacenters":                               1,
-		"inventory_folders":                                   4,
-		"inventory_clusters":                                  1,
-		"inventory_hosts":                                     4,
-		"inventory_vms":                                       4,
-		"inventory_datastores":                                1,
-		"inventory_resource_pools":                            1,
-		"host-21_cpu.usage.average":                           100,
-		"host-21_disk.maxTotalLatency.latest":                 100,
-		"host-21_disk.read.average":                           100,
-		"host-21_disk.write.average":                          100,
-		"host-21_mem.active.average":                          100,
-		"host-21_mem.consumed.average":                        100,
-		"host-21_mem.granted.average":                         100,
-		"host-21_mem.shared.average":                          100,
-		"host-21_mem.sharedcommon.average":                    100,
-		"host-21_mem.swapinRate.average":                      100,
-		"host-21_mem.swapoutRate.average":                     100,
-		"host-21_mem.usage.average":                           100,
-		"host-21_net.bytesRx.average":                         100,
-		"host-21_net.bytesTx.average":                         100,
-		"host-21_net.droppedRx.summation":                     100,
-		"host-21_net.droppedTx.summation":                     100,
-		"host-21_net.errorsRx.summation":                      100,
-		"host-21_net.errorsTx.summation":                      100,
-		"host-21_net.packetsRx.summation":                     100,
-		"host-21_net.packetsTx.summation":                     100,
-		"host-21_overall.status.gray":                         1,
-		"host-21_overall.status.green":                        0,
-		"host-21_overall.status.red":                          0,
-		"host-21_overall.status.yellow":                       0,
-		"host-21_power_state.poweredOff":                      0,
-		"host-21_power_state.poweredOn":                       1,
-		"host-21_power_state.standBy":                         0,
-		"host-21_power_state.unknown":                         0,
-		"host-21_sys.uptime.latest":                           100,
-		"host-37_cpu.usage.average":                           100,
-		"host-37_disk.maxTotalLatency.latest":                 100,
-		"host-37_disk.read.average":                           100,
-		"host-37_disk.write.average":                          100,
-		"host-37_mem.active.average":                          100,
-		"host-37_mem.consumed.average":                        100,
-		"host-37_mem.granted.average":                         100,
-		"host-37_mem.shared.average":                          100,
-		"host-37_mem.sharedcommon.average":                    100,
-		"host-37_mem.swapinRate.average":                      100,
-		"host-37_mem.swapoutRate.average":                     100,
-		"host-37_mem.usage.average":                           100,
-		"host-37_net.bytesRx.average":                         100,
-		"host-37_net.bytesTx.average":                         100,
-		"host-37_net.droppedRx.summation":                     100,
-		"host-37_net.droppedTx.summation":                     100,
-		"host-37_net.errorsRx.summation":                      100,
-		"host-37_net.errorsTx.summation":                      100,
-		"host-37_net.packetsRx.summation":                     100,
-		"host-37_net.packetsTx.summation":                     100,
-		"host-37_overall.status.gray":                         1,
-		"host-37_overall.status.green":                        0,
-		"host-37_overall.status.red":                          0,
-		"host-37_overall.status.yellow":                       0,
-		"host-37_power_state.poweredOff":                      0,
-		"host-37_power_state.poweredOn":                       1,
-		"host-37_power_state.standBy":                         0,
-		"host-37_power_state.unknown":                         0,
-		"host-37_sys.uptime.latest":                           100,
-		"host-47_cpu.usage.average":                           100,
-		"host-47_disk.maxTotalLatency.latest":                 100,
-		"host-47_disk.read.average":                           100,
-		"host-47_disk.write.average":                          100,
-		"host-47_mem.active.average":                          100,
-		"host-47_mem.consumed.average":                        100,
-		"host-47_mem.granted.average":                         100,
-		"host-47_mem.shared.average":                          100,
-		"host-47_mem.sharedcommon.average":                    100,
-		"host-47_mem.swapinRate.average":                      100,
-		"host-47_mem.swapoutRate.average":                     100,
-		"host-47_mem.usage.average":                           100,
-		"host-47_net.bytesRx.average":                         100,
-		"host-47_net.bytesTx.average":                         100,
-		"host-47_net.droppedRx.summation":                     100,
-		"host-47_net.droppedTx.summation":                     100,
-		"host-47_net.errorsRx.summation":                      100,
-		"host-47_net.errorsTx.summation":                      100,
-		"host-47_net.packetsRx.summation":                     100,
-		"host-47_net.packetsTx.summation":                     100,
-		"host-47_overall.status.gray":                         1,
-		"host-47_overall.status.green":                        0,
-		"host-47_overall.status.red":                          0,
-		"host-47_overall.status.yellow":                       0,
-		"host-47_power_state.poweredOff":                      0,
-		"host-47_power_state.poweredOn":                       1,
-		"host-47_power_state.standBy":                         0,
-		"host-47_power_state.unknown":                         0,
-		"host-47_sys.uptime.latest":                           100,
-		"host-57_cpu.usage.average":                           100,
-		"host-57_disk.maxTotalLatency.latest":                 100,
-		"host-57_disk.read.average":                           100,
-		"host-57_disk.write.average":                          100,
-		"host-57_mem.active.average":                          100,
-		"host-57_mem.consumed.average":                        100,
-		"host-57_mem.granted.average":                         100,
-		"host-57_mem.shared.average":                          100,
-		"host-57_mem.sharedcommon.average":                    100,
-		"host-57_mem.swapinRate.average":                      100,
-		"host-57_mem.swapoutRate.average":                     100,
-		"host-57_mem.usage.average":                           100,
-		"host-57_net.bytesRx.average":                         100,
-		"host-57_net.bytesTx.average":                         100,
-		"host-57_net.droppedRx.summation":                     100,
-		"host-57_net.droppedTx.summation":                     100,
-		"host-57_net.errorsRx.summation":                      100,
-		"host-57_net.errorsTx.summation":                      100,
-		"host-57_net.packetsRx.summation":                     100,
-		"host-57_net.packetsTx.summation":                     100,
-		"host-57_overall.status.gray":                         1,
-		"host-57_overall.status.green":                        0,
-		"host-57_overall.status.red":                          0,
-		"host-57_overall.status.yellow":                       0,
-		"host-57_power_state.poweredOff":                      0,
-		"host-57_power_state.poweredOn":                       1,
-		"host-57_power_state.standBy":                         0,
-		"host-57_power_state.unknown":                         0,
-		"host-57_sys.uptime.latest":                           100,
-		"vm-62_cpu.usage.average":                             200,
-		"vm-62_disk.maxTotalLatency.latest":                   200,
-		"vm-62_disk.read.average":                             200,
-		"vm-62_disk.write.average":                            200,
-		"vm-62_mem.active.average":                            200,
-		"vm-62_mem.consumed.average":                          200,
-		"vm-62_mem.granted.average":                           200,
-		"vm-62_mem.shared.average":                            200,
-		"vm-62_mem.swapinRate.average":                        200,
-		"vm-62_mem.swapoutRate.average":                       200,
-		"vm-62_mem.swapped.average":                           200,
-		"vm-62_mem.usage.average":                             200,
-		"vm-62_net.bytesRx.average":                           200,
-		"vm-62_net.bytesTx.average":                           200,
-		"vm-62_net.droppedRx.summation":                       200,
-		"vm-62_net.droppedTx.summation":                       200,
-		"vm-62_net.packetsRx.summation":                       200,
-		"vm-62_net.packetsTx.summation":                       200,
-		"vm-62_overall.status.gray":                           0,
-		"vm-62_overall.status.green":                          1,
-		"vm-62_overall.status.red":                            0,
-		"vm-62_overall.status.yellow":                         0,
-		"vm-62_power_state.poweredOff":                        0,
-		"vm-62_power_state.poweredOn":                         1,
-		"vm-62_power_state.suspended":                         0,
-		"vm-62_sys.uptime.latest":                             200,
-		"vm-62_snapshot_count":                                0,
-		"vm-62_snapshot_max_age":                              0,
-		"vm-62_snapshot_max_chain_depth":                      0,
-		"vm-65_cpu.usage.average":                             200,
-		"vm-65_disk.maxTotalLatency.latest":                   200,
-		"vm-65_disk.read.average":                             200,
-		"vm-65_disk.write.average":                            200,
-		"vm-65_mem.active.average":                            200,
-		"vm-65_mem.consumed.average":                          200,
-		"vm-65_mem.granted.average":                           200,
-		"vm-65_mem.shared.average":                            200,
-		"vm-65_mem.swapinRate.average":                        200,
-		"vm-65_mem.swapoutRate.average":                       200,
-		"vm-65_mem.swapped.average":                           200,
-		"vm-65_mem.usage.average":                             200,
-		"vm-65_net.bytesRx.average":                           200,
-		"vm-65_net.bytesTx.average":                           200,
-		"vm-65_net.droppedRx.summation":                       200,
-		"vm-65_net.droppedTx.summation":                       200,
-		"vm-65_net.packetsRx.summation":                       200,
-		"vm-65_net.packetsTx.summation":                       200,
-		"vm-65_overall.status.gray":                           0,
-		"vm-65_overall.status.green":                          1,
-		"vm-65_overall.status.red":                            0,
-		"vm-65_overall.status.yellow":                         0,
-		"vm-65_power_state.poweredOff":                        0,
-		"vm-65_power_state.poweredOn":                         1,
-		"vm-65_power_state.suspended":                         0,
-		"vm-65_sys.uptime.latest":                             200,
-		"vm-65_snapshot_count":                                0,
-		"vm-65_snapshot_max_age":                              0,
-		"vm-65_snapshot_max_chain_depth":                      0,
-		"vm-68_cpu.usage.average":                             200,
-		"vm-68_disk.maxTotalLatency.latest":                   200,
-		"vm-68_disk.read.average":                             200,
-		"vm-68_disk.write.average":                            200,
-		"vm-68_mem.active.average":                            200,
-		"vm-68_mem.consumed.average":                          200,
-		"vm-68_mem.granted.average":                           200,
-		"vm-68_mem.shared.average":                            200,
-		"vm-68_mem.swapinRate.average":                        200,
-		"vm-68_mem.swapoutRate.average":                       200,
-		"vm-68_mem.swapped.average":                           200,
-		"vm-68_mem.usage.average":                             200,
-		"vm-68_net.bytesRx.average":                           200,
-		"vm-68_net.bytesTx.average":                           200,
-		"vm-68_net.droppedRx.summation":                       200,
-		"vm-68_net.droppedTx.summation":                       200,
-		"vm-68_net.packetsRx.summation":                       200,
-		"vm-68_net.packetsTx.summation":                       200,
-		"vm-68_overall.status.gray":                           0,
-		"vm-68_overall.status.green":                          1,
-		"vm-68_overall.status.red":                            0,
-		"vm-68_overall.status.yellow":                         0,
-		"vm-68_power_state.poweredOff":                        0,
-		"vm-68_power_state.poweredOn":                         1,
-		"vm-68_power_state.suspended":                         0,
-		"vm-68_sys.uptime.latest":                             200,
-		"vm-68_snapshot_count":                                0,
-		"vm-68_snapshot_max_age":                              0,
-		"vm-68_snapshot_max_chain_depth":                      0,
-		"vm-71_cpu.usage.average":                             200,
-		"vm-71_disk.maxTotalLatency.latest":                   200,
-		"vm-71_disk.read.average":                             200,
-		"vm-71_disk.write.average":                            200,
-		"vm-71_mem.active.average":                            200,
-		"vm-71_mem.consumed.average":                          200,
-		"vm-71_mem.granted.average":                           200,
-		"vm-71_mem.shared.average":                            200,
-		"vm-71_mem.swapinRate.average":                        200,
-		"vm-71_mem.swapoutRate.average":                       200,
-		"vm-71_mem.swapped.average":                           200,
-		"vm-71_mem.usage.average":                             200,
-		"vm-71_net.bytesRx.average":                           200,
-		"vm-71_net.bytesTx.average":                           200,
-		"vm-71_net.droppedRx.summation":                       200,
-		"vm-71_net.droppedTx.summation":                       200,
-		"vm-71_net.packetsRx.summation":                       200,
-		"vm-71_net.packetsTx.summation":                       200,
-		"vm-71_overall.status.gray":                           0,
-		"vm-71_overall.status.green":                          1,
-		"vm-71_overall.status.red":                            0,
-		"vm-71_overall.status.yellow":                         0,
-		"vm-71_power_state.poweredOff":                        0,
-		"vm-71_power_state.poweredOn":                         1,
-		"vm-71_power_state.suspended":                         0,
-		"vm-71_sys.uptime.latest":                             200,
-		"vm-71_snapshot_count":                                0,
-		"vm-71_snapshot_max_age":                              0,
-		"vm-71_snapshot_max_chain_depth":                      0,
-		"datastore-59_capacity":                               4398046511104,
-		"datastore-59_free_space":                             4355096838144,
-		"datastore-59_used_space":                             42949672960,
-		"datastore-59_used_space_pct":                         97,
-		"datastore-59_uncommitted":                            0,
-		"datastore-59_overall.status.green":                   1,
-		"datastore-59_overall.status.gray":                    0,
-		"datastore-59_overall.status.red":                     0,
-		"datastore-59_overall.status.yellow":                  0,
-		"datastore-59_accessible_status.accessible":           1,
-		"datastore-59_accessible_status.inaccessible":         0,
-		"datastore-59_maintenance.status.normal":              1,
-		"datastore-59_maintenance.status.enteringMaintenance": 0,
-		"datastore-59_maintenance.status.inMaintenance":       0,
-		"datastore-59_maintenance.status.unknown":             0,
-		"datastore-59_multiple_host_access.enabled":           0,
-		"datastore-59_multiple_host_access.disabled":          0,
-		"datastore-59_multiple_host_access.unknown":           1,
-		"datastore-59_datastore.numberReadAveraged.average":   300,
-		"datastore-59_datastore.numberWriteAveraged.average":  300,
-		"datastore-59_datastore.read.average":                 300,
-		"datastore-59_datastore.write.average":                300,
-		"datastore-59_datastore.totalReadLatency.average":     300,
-		"datastore-59_datastore.totalWriteLatency.average":    300,
-		// Cluster property metrics (domain-c28)
-		"domain-c28_num_hosts":                  3,
-		"domain-c28_num_effective_hosts":        3,
-		"domain-c28_total_cpu":                  6882,
-		"domain-c28_effective_cpu":              6882,
-		"domain-c28_total_memory":               12883292160,
-		"domain-c28_effective_memory":           13509110959964160,
-		"domain-c28_num_cpu_cores":              6,
-		"domain-c28_num_cpu_threads":            6,
-		"domain-c28_num_vmotions":               0,
-		"domain-c28_drs_score":                  0,
-		"domain-c28_current_balance":            0,
-		"domain-c28_target_balance":             0,
-		"domain-c28_drs_enabled":                1,
-		"domain-c28_ha_enabled":                 0,
-		"domain-c28_ha_adm_ctrl_enabled":        0,
-		"domain-c28_usage_cpu_demand_mhz":       0,
-		"domain-c28_usage_mem_demand_mb":        0,
-		"domain-c28_usage_cpu_entitled_mhz":     0,
-		"domain-c28_usage_mem_entitled_mb":      0,
-		"domain-c28_usage_cpu_reservation_mhz":  0,
-		"domain-c28_usage_mem_reservation_mb":   0,
-		"domain-c28_usage_total_vm_count":       0,
-		"domain-c28_usage_powered_off_vm_count": 0,
-		"domain-c28_overall.status.green":       1,
-		"domain-c28_overall.status.gray":        0,
-		"domain-c28_overall.status.red":         0,
-		"domain-c28_overall.status.yellow":      0,
-		// Cluster perf metrics (domain-c28)
-		"domain-c28_clusterServices.cpufairness.latest":   400,
-		"domain-c28_clusterServices.effectivecpu.average": 400,
-		"domain-c28_clusterServices.effectivemem.average": 400,
-		"domain-c28_clusterServices.failover.latest":      400,
-		"domain-c28_clusterServices.memfairness.latest":   400,
-		"domain-c28_cpu.totalmhz.average":                 400,
-		"domain-c28_cpu.usage.average":                    400,
-		"domain-c28_cpu.usagemhz.average":                 400,
-		"domain-c28_mem.active.average":                   400,
-		"domain-c28_mem.consumed.average":                 400,
-		"domain-c28_mem.granted.average":                  400,
-		"domain-c28_mem.overhead.average":                 400,
-		"domain-c28_mem.shared.average":                   400,
-		"domain-c28_mem.swapused.average":                 400,
-		"domain-c28_mem.usage.average":                    400,
-		"domain-c28_vmop.numChangeDS.latest":              400,
-		"domain-c28_vmop.numChangeHost.latest":            400,
-		"domain-c28_vmop.numChangeHostDS.latest":          400,
-		"domain-c28_vmop.numClone.latest":                 400,
-		"domain-c28_vmop.numCreate.latest":                400,
-		"domain-c28_vmop.numDeploy.latest":                400,
-		"domain-c28_vmop.numDestroy.latest":               400,
-		"domain-c28_vmop.numPoweroff.latest":              400,
-		"domain-c28_vmop.numPoweron.latest":               400,
-		"domain-c28_vmop.numRebootGuest.latest":           400,
-		"domain-c28_vmop.numReconfigure.latest":           400,
-		"domain-c28_vmop.numRegister.latest":              400,
-		"domain-c28_vmop.numReset.latest":                 400,
-		"domain-c28_vmop.numSVMotion.latest":              400,
-		"domain-c28_vmop.numShutdownGuest.latest":         400,
-		"domain-c28_vmop.numStandbyGuest.latest":          400,
-		"domain-c28_vmop.numSuspend.latest":               400,
-		"domain-c28_vmop.numUnregister.latest":            400,
-		"domain-c28_vmop.numVMotion.latest":               400,
-		"domain-c28_vmop.numXVMotion.latest":              400,
-		// Resource pool metrics (resgroup-27)
-		"resgroup-27_cpu_usage":                   0,
-		"resgroup-27_cpu_demand":                  0,
-		"resgroup-27_cpu_entitlement_distributed": 0,
-		"resgroup-27_mem_usage_guest":             0,
-		"resgroup-27_mem_usage_host":              0,
-		"resgroup-27_mem_entitlement_distributed": 0,
-		"resgroup-27_mem_private":                 0,
-		"resgroup-27_mem_shared":                  0,
-		"resgroup-27_mem_swapped":                 0,
-		"resgroup-27_mem_ballooned":               0,
-		"resgroup-27_mem_overhead":                0,
-		"resgroup-27_mem_consumed_overhead":       0,
-		"resgroup-27_mem_compressed":              0,
-		"resgroup-27_cpu_reservation_used":        0,
-		"resgroup-27_cpu_max_usage":               4121,
-		"resgroup-27_cpu_unreserved_for_vm":       4121,
-		"resgroup-27_mem_reservation_used":        0,
-		"resgroup-27_mem_max_usage":               1007681536,
-		"resgroup-27_mem_unreserved_for_vm":       1007681536,
-		"resgroup-27_cpu_reservation":             4121,
-		"resgroup-27_cpu_limit":                   4121,
-		"resgroup-27_mem_reservation":             961,
-		"resgroup-27_mem_limit":                   961,
-		"resgroup-27_overall.status.green":        1,
-		"resgroup-27_overall.status.gray":         0,
-		"resgroup-27_overall.status.red":          0,
-		"resgroup-27_overall.status.yellow":       0,
-	}
-	for _, id := range []string{"host-21", "host-37", "host-47", "host-57"} {
-		addExpectedHostRuntimeStatus(expected, id)
-	}
-	for _, id := range []string{"vm-62", "vm-65", "vm-68", "vm-71"} {
-		addExpectedVMPropertyStatus(expected, id)
-	}
-	addExpectedClusterConfigStatus(expected, "domain-c28")
+	series := collectScalarSeriesForTest(t, collr)
+	require.NotEmpty(t, series)
 
-	mx := collectLegacyMetricMapForTest(t, collr)
+	requireScalarSeriesValue(t, series, "inventory_objects_datacenters", "inventory", 1)
+	requireScalarSeriesValue(t, series, "inventory_objects_hosts", "inventory", 4)
+	requireScalarSeriesValue(t, series, "inventory_objects_vms", "inventory", 4)
+	requireScalarSeriesValue(t, series, "inventory_objects_datastores", "inventory", 1)
+	requireScalarSeriesValue(t, series, "inventory_objects_resource_pools", "inventory", 1)
 
-	require.Equal(t, expected, mx)
+	requireScalarSeriesValue(t, series, "host_cpu_utilization_used", "host-21", 100)
+	requireScalarSeriesValue(t, series, "host_disk_max_latency_latency", "host-21", 100)
+	requireScalarSeriesValue(t, series, "host_net_errors_received", "host-21", 100)
+	requireScalarSeriesValue(t, series, "host_overall_status_gray", "host-21", 1)
+	requireScalarSeriesValue(t, series, "host_power_state_powered_on", "host-21", 1)
+	requireScalarSeriesValue(t, series, "host_connection_state_connected", "host-21", 1)
+	requireScalarSeriesValue(t, series, "host_maintenance_status_normal", "host-21", 1)
+	requireScalarSeriesValue(t, series, "host_system_uptime_uptime", "host-21", 100)
+
+	requireScalarSeriesValue(t, series, "vm_cpu_utilization_used", "vm-62", 200)
+	requireScalarSeriesValue(t, series, "vm_disk_max_latency_latency", "vm-62", 200)
+	requireScalarSeriesValue(t, series, "vm_net_drops_received", "vm-62", 200)
+	requireScalarSeriesValue(t, series, "vm_overall_status_green", "vm-62", 1)
+	requireScalarSeriesValue(t, series, "vm_power_state_powered_on", "vm-62", 1)
+	requireScalarSeriesValue(t, series, "vm_tools_running_status_unknown", "vm-62", 1)
+	requireScalarSeriesValue(t, series, "vm_tools_version_status_unknown", "vm-62", 1)
+	requireScalarSeriesValue(t, series, "vm_config_cpu_vcpus", "vm-62", 1)
+	requireScalarSeriesValue(t, series, "vm_config_devices_disks", "vm-62", 1)
+	requireScalarSeriesValue(t, series, "vm_storage_usage_uncommitted", "vm-62", 10737418240)
+	requireScalarSeriesValue(t, series, "vm_snapshot_count_count", "vm-62", 0)
+
+	requireScalarSeriesValue(t, series, "datastore_space_usage_capacity", "datastore-59", 4398046511104)
+	requireScalarSeriesValue(t, series, "datastore_space_usage_used", "datastore-59", 42949672960)
+	requireScalarSeriesValue(t, series, "datastore_space_utilization_used", "datastore-59", 97)
+	requireScalarSeriesValue(t, series, "datastore_overall_status_green", "datastore-59", 1)
+	requireScalarSeriesValue(t, series, "datastore_accessibility_status_accessible", "datastore-59", 1)
+	requireScalarSeriesValue(t, series, "datastore_maintenance_status_normal", "datastore-59", 1)
+	requireScalarSeriesValue(t, series, "datastore_multiple_host_access_unknown", "datastore-59", 1)
+	requireScalarSeriesValue(t, series, "datastore_disk_iops_reads", "datastore-59", 300)
+
+	requireScalarSeriesValue(t, series, "cluster_hosts_total", "domain-c28", 3)
+	requireScalarSeriesValue(t, series, "cluster_cpu_capacity_total", "domain-c28", 6882)
+	requireScalarSeriesValue(t, series, "cluster_drs_config_enabled", "domain-c28", 1)
+	requireScalarSeriesValue(t, series, "cluster_drs_mode_unknown", "domain-c28", 1)
+	requireScalarSeriesValue(t, series, "cluster_ha_host_monitoring_unknown", "domain-c28", 1)
+	requireScalarSeriesValue(t, series, "cluster_overall_status_green", "domain-c28", 1)
+	requireScalarSeriesValue(t, series, "cluster_cpu_utilization_used", "domain-c28", 400)
+	requireScalarSeriesValue(t, series, "cluster_services_fairness_cpu", "domain-c28", 400)
+	requireScalarSeriesValue(t, series, "cluster_vm_migrations_vmotion", "domain-c28", 400)
+
+	requireScalarSeriesValue(t, series, "resource_pool_cpu_usage_usage", "resgroup-27", 0)
+	requireScalarSeriesValue(t, series, "resource_pool_cpu_allocation_max_usage", "resgroup-27", 4121)
+	requireScalarSeriesValue(t, series, "resource_pool_mem_allocation_max_usage", "resgroup-27", 1007681536)
+	requireScalarSeriesValue(t, series, "resource_pool_cpu_config_reservation", "resgroup-27", 4121)
+	requireScalarSeriesValue(t, series, "resource_pool_mem_config_limit", "resgroup-27", 961)
+	requireScalarSeriesValue(t, series, "resource_pool_overall_status_green", "resgroup-27", 1)
+
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
+}
+
+func TestCollector_V2CompatibilitySurface(t *testing.T) {
+	collr, _, teardown := prepareVSphereSim(t)
+	defer teardown()
+
+	require.NoError(t, collr.Init(context.Background()))
+	collr.scraper = mockScraper{collr.scraper}
+
+	require.NotEmpty(t, collectScalarSeriesForTest(t, collr))
+
+	plan := buildV2PlanForTest(t, collr)
+	createdCharts, createdDims := v2CreatedChartsAndDims(plan)
+	require.NotEmpty(t, createdCharts)
+
+	for chartID, chart := range createdCharts {
+		require.NotEmpty(t, chart.Labels["id"], "chart %s must have the V2 instance id label", chartID)
+		require.NotEmpty(t, createdDims[chartID], "chart %s must have dimensions", chartID)
+	}
 	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
 }
 
@@ -675,23 +383,22 @@ func TestCollectInventory(t *testing.T) {
 		Datastores:    rs.Datastores{"datastore-1": &rs.Datastore{}},
 		ResourcePools: rs.ResourcePools{"resgroup-1": &rs.ResourcePool{}},
 	}
-	mx := make(map[string]int64)
 
-	collr.collectInventory(mx)
+	series := runMetricWriteForTest(t, collr, collr.collectInventory)
 
-	assert.EqualValues(t, 1, mx["inventory_datacenters"])
-	assert.EqualValues(t, 2, mx["inventory_folders"])
-	assert.EqualValues(t, 1, mx["inventory_clusters"])
-	assert.EqualValues(t, 2, mx["inventory_hosts"])
-	assert.EqualValues(t, 3, mx["inventory_vms"])
-	assert.EqualValues(t, 1, mx["inventory_datastores"])
-	assert.EqualValues(t, 1, mx["inventory_resource_pools"])
+	requireScalarSeriesValue(t, series, "inventory_objects_datacenters", "inventory", 1)
+	requireScalarSeriesValue(t, series, "inventory_objects_folders", "inventory", 2)
+	requireScalarSeriesValue(t, series, "inventory_objects_clusters", "inventory", 1)
+	requireScalarSeriesValue(t, series, "inventory_objects_hosts", "inventory", 2)
+	requireScalarSeriesValue(t, series, "inventory_objects_vms", "inventory", 3)
+	requireScalarSeriesValue(t, series, "inventory_objects_datastores", "inventory", 1)
+	requireScalarSeriesValue(t, series, "inventory_objects_resource_pools", "inventory", 1)
 }
 
 func TestCollector_Collect_NonPoweredResourcePropertyOnly(t *testing.T) {
 	tests := map[string]struct {
 		setup   func(*Collector)
-		collect func(*Collector, map[string]int64) error
+		collect func(*Collector) error
 		want    map[string]int64
 		missing []string
 	}{
@@ -709,11 +416,12 @@ func TestCollector_Collect_NonPoweredResourcePropertyOnly(t *testing.T) {
 			},
 			collect: (*Collector).collectHosts,
 			want: map[string]int64{
-				"host-1_overall.status.gray":    1,
-				"host-1_power_state.poweredOff": 1,
-				"host-1_power_state.poweredOn":  0,
+				"host_overall_status_gray":        1,
+				"host_power_state_powered_off":    1,
+				"host_power_state_powered_on":     0,
+				"host_connection_state_connected": 0,
 			},
-			missing: []string{"host-1_cpu.usage.average"},
+			missing: []string{"host_cpu_utilization_used"},
 		},
 		"VM": {
 			setup: func(c *Collector) {
@@ -731,13 +439,13 @@ func TestCollector_Collect_NonPoweredResourcePropertyOnly(t *testing.T) {
 			},
 			collect: (*Collector).collectVMs,
 			want: map[string]int64{
-				"vm-1_overall.status.yellow":    1,
-				"vm-1_power_state.suspended":    1,
-				"vm-1_power_state.poweredOn":    0,
-				"vm-1_snapshot_count":           2,
-				"vm-1_snapshot_max_chain_depth": 1,
+				"vm_overall_status_yellow":          1,
+				"vm_power_state_suspended":          1,
+				"vm_power_state_powered_on":         0,
+				"vm_snapshot_count_count":           2,
+				"vm_snapshot_max_chain_depth_depth": 1,
 			},
-			missing: []string{"vm-1_cpu.usage.average"},
+			missing: []string{"vm_cpu_utilization_used"},
 		},
 	}
 
@@ -745,15 +453,13 @@ func TestCollector_Collect_NonPoweredResourcePropertyOnly(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := New()
 			tc.setup(collr)
-			mx := make(map[string]int64)
 
-			require.NoError(t, tc.collect(collr, mx))
-
-			for key, want := range tc.want {
-				assert.EqualValues(t, want, mx[key])
+			series := runMetricCollectForTest(t, collr, func() error { return tc.collect(collr) })
+			for metric, want := range tc.want {
+				requireScalarSeriesValue(t, series, metric, firstResourceID(collr), want)
 			}
-			for _, key := range tc.missing {
-				assert.NotContains(t, mx, key)
+			for _, metric := range tc.missing {
+				requireNoScalarSeries(t, series, metric, firstResourceID(collr))
 			}
 		})
 	}
@@ -762,31 +468,31 @@ func TestCollector_Collect_NonPoweredResourcePropertyOnly(t *testing.T) {
 func TestCollector_Collect_NoPerfDataKeepsPropertyMetrics(t *testing.T) {
 	tests := map[string]struct {
 		setup func(*Collector)
-		check func(*testing.T, *Collector, map[string]int64)
+		check func(*testing.T, *Collector, map[string]metrix.SampleValue)
 	}{
 		"hosts": {
 			setup: func(c *Collector) { c.scraper = mockScraperNoHostPerf{mockScraper{c.scraper}} },
-			check: func(t *testing.T, collr *Collector, mx map[string]int64) {
+			check: func(t *testing.T, collr *Collector, series map[string]metrix.SampleValue) {
 				for _, host := range collr.resources.Hosts {
-					assert.Contains(t, mx, host.ID+"_overall.status.green")
-					assert.Contains(t, mx, host.ID+"_power_state.poweredOn")
-					assert.NotContains(t, mx, host.ID+"_cpu.usage.average")
+					requireScalarSeries(t, series, "host_overall_status_green", host.ID)
+					requireScalarSeries(t, series, "host_power_state_powered_on", host.ID)
+					requireNoScalarSeries(t, series, "host_cpu_utilization_used", host.ID)
 				}
 				for _, vm := range collr.resources.VMs {
-					assert.Contains(t, mx, vm.ID+"_cpu.usage.average")
+					requireScalarSeries(t, series, "vm_cpu_utilization_used", vm.ID)
 				}
 			},
 		},
 		"VMs": {
 			setup: func(c *Collector) { c.scraper = mockScraperNoVMPerf{mockScraper{c.scraper}} },
-			check: func(t *testing.T, collr *Collector, mx map[string]int64) {
+			check: func(t *testing.T, collr *Collector, series map[string]metrix.SampleValue) {
 				for _, host := range collr.resources.Hosts {
-					assert.Contains(t, mx, host.ID+"_cpu.usage.average")
+					requireScalarSeries(t, series, "host_cpu_utilization_used", host.ID)
 				}
 				for _, vm := range collr.resources.VMs {
-					assert.Contains(t, mx, vm.ID+"_overall.status.green")
-					assert.Contains(t, mx, vm.ID+"_power_state.poweredOn")
-					assert.NotContains(t, mx, vm.ID+"_cpu.usage.average")
+					requireScalarSeries(t, series, "vm_overall_status_green", vm.ID)
+					requireScalarSeries(t, series, "vm_power_state_powered_on", vm.ID)
+					requireNoScalarSeries(t, series, "vm_cpu_utilization_used", vm.ID)
 				}
 			},
 		},
@@ -800,10 +506,9 @@ func TestCollector_Collect_NoPerfDataKeepsPropertyMetrics(t *testing.T) {
 			require.NoError(t, collr.Init(context.Background()))
 			tc.setup(collr)
 
-			mx := collectLegacyMetricMapForTest(t, collr)
-			require.NotNil(t, mx)
-
-			tc.check(t, collr, mx)
+			series := collectScalarSeriesForTest(t, collr)
+			require.NotNil(t, series)
+			tc.check(t, collr, series)
 		})
 	}
 }
@@ -811,34 +516,34 @@ func TestCollector_Collect_NoPerfDataKeepsPropertyMetrics(t *testing.T) {
 func TestCollector_Collect_PropertyRefreshFailureSkipsStalePropertyMetrics(t *testing.T) {
 	tests := map[string]struct {
 		setup func(*Collector)
-		check func(*testing.T, *Collector, map[string]int64)
+		check func(*testing.T, *Collector, map[string]metrix.SampleValue)
 	}{
 		"datastores": {
 			setup: func(c *Collector) { c.dsPropertyCollector = nil },
-			check: func(t *testing.T, collr *Collector, mx map[string]int64) {
+			check: func(t *testing.T, collr *Collector, series map[string]metrix.SampleValue) {
 				for _, ds := range collr.resources.Datastores {
-					assert.NotContains(t, mx, ds.ID+"_capacity")
-					assert.NotContains(t, mx, ds.ID+"_overall.status.green")
-					assert.Contains(t, mx, ds.ID+"_datastore.read.average")
+					requireNoScalarSeries(t, series, "datastore_space_usage_capacity", ds.ID)
+					requireNoScalarSeries(t, series, "datastore_overall_status_green", ds.ID)
+					requireScalarSeries(t, series, "datastore_disk_io_read", ds.ID)
 				}
 			},
 		},
 		"clusters": {
 			setup: func(c *Collector) { c.clusterPropertyCollector = nil },
-			check: func(t *testing.T, collr *Collector, mx map[string]int64) {
+			check: func(t *testing.T, collr *Collector, series map[string]metrix.SampleValue) {
 				for _, cl := range collr.resources.Clusters {
-					assert.NotContains(t, mx, cl.ID+"_num_hosts")
-					assert.NotContains(t, mx, cl.ID+"_overall.status.green")
-					assert.Contains(t, mx, cl.ID+"_cpu.usage.average")
+					requireNoScalarSeries(t, series, "cluster_hosts_total", cl.ID)
+					requireNoScalarSeries(t, series, "cluster_overall_status_green", cl.ID)
+					requireScalarSeries(t, series, "cluster_cpu_utilization_used", cl.ID)
 				}
 			},
 		},
 		"resource pools": {
 			setup: func(c *Collector) { c.rpPropertyCollector = nil },
-			check: func(t *testing.T, collr *Collector, mx map[string]int64) {
+			check: func(t *testing.T, collr *Collector, series map[string]metrix.SampleValue) {
 				for _, rp := range collr.resources.ResourcePools {
-					assert.NotContains(t, mx, rp.ID+"_cpu_usage")
-					assert.NotContains(t, mx, rp.ID+"_overall.status.green")
+					requireNoScalarSeries(t, series, "resource_pool_cpu_usage_usage", rp.ID)
+					requireNoScalarSeries(t, series, "resource_pool_overall_status_green", rp.ID)
 				}
 			},
 		},
@@ -853,10 +558,9 @@ func TestCollector_Collect_PropertyRefreshFailureSkipsStalePropertyMetrics(t *te
 			collr.scraper = mockScraper{collr.scraper}
 			tc.setup(collr)
 
-			mx := collectLegacyMetricMapForTest(t, collr)
-			require.NotNil(t, mx)
-
-			tc.check(t, collr, mx)
+			series := collectScalarSeriesForTest(t, collr)
+			require.NotNil(t, series)
+			tc.check(t, collr, series)
 		})
 	}
 }
@@ -879,7 +583,7 @@ func TestCollector_Collect_NoPerfDataWarningIsRateLimited(t *testing.T) {
 					},
 				}
 			},
-			collect: func(c *Collector) error { return c.collectHosts(make(map[string]int64)) },
+			collect: (*Collector).collectHosts,
 			wantLog: "collect host performance metrics",
 		},
 		"VMs": {
@@ -894,7 +598,7 @@ func TestCollector_Collect_NoPerfDataWarningIsRateLimited(t *testing.T) {
 					},
 				}
 			},
-			collect: func(c *Collector) error { return c.collectVMs(make(map[string]int64)) },
+			collect: (*Collector).collectVMs,
 			wantLog: "collect VM performance metrics",
 		},
 	}
@@ -906,8 +610,8 @@ func TestCollector_Collect_NoPerfDataWarningIsRateLimited(t *testing.T) {
 			collr.Logger = logger.NewWithWriter(&buf)
 			tc.setup(collr)
 
-			require.NoError(t, tc.collect(collr))
-			require.NoError(t, tc.collect(collr))
+			runMetricCollectForTest(t, collr, func() error { return tc.collect(collr) })
+			runMetricCollectForTest(t, collr, func() error { return tc.collect(collr) })
 
 			assert.Equal(t, 1, strings.Count(buf.String(), tc.wantLog))
 		})
@@ -922,14 +626,14 @@ func TestWriteHostPropertyMetrics_RuntimeStatus(t *testing.T) {
 		InMaintenanceMode: true,
 		OverallStatus:     "yellow",
 	}
-	mx := make(map[string]int64)
+	collr := New()
 
-	writeHostPropertyMetrics(mx, host)
+	series := runMetricWriteForTest(t, collr, func() { collr.writeHostPropertyMetrics(host) })
 
-	assert.EqualValues(t, 1, mx["host-1_connection_state.notResponding"])
-	assert.EqualValues(t, 0, mx["host-1_connection_state.connected"])
-	assert.EqualValues(t, 1, mx["host-1_maintenance_status.inMaintenance"])
-	assert.EqualValues(t, 0, mx["host-1_maintenance_status.normal"])
+	requireScalarSeriesValue(t, series, "host_connection_state_not_responding", host.ID, 1)
+	requireScalarSeriesValue(t, series, "host_connection_state_connected", host.ID, 0)
+	requireScalarSeriesValue(t, series, "host_maintenance_status_in_maintenance", host.ID, 1)
+	requireScalarSeriesValue(t, series, "host_maintenance_status_normal", host.ID, 0)
 }
 
 func TestWriteVMPropertyMetrics_StatusConfigAndStorage(t *testing.T) {
@@ -949,25 +653,25 @@ func TestWriteVMPropertyMetrics_StatusConfigAndStorage(t *testing.T) {
 		StorageUnshared:     300,
 		OverallStatus:       "green",
 	}
-	mx := make(map[string]int64)
+	collr := New()
 
-	writeVMPropertyMetrics(mx, vm)
+	series := runMetricWriteForTest(t, collr, func() { collr.writeVMPropertyMetrics(vm) })
 
-	assert.EqualValues(t, 1, mx["vm-1_connection_state.inaccessible"])
-	assert.EqualValues(t, 0, mx["vm-1_connection_state.connected"])
-	assert.EqualValues(t, 1, mx["vm-1_tools_running_status.running"])
-	assert.EqualValues(t, 0, mx["vm-1_tools_running_status.unknown"])
-	assert.EqualValues(t, 1, mx["vm-1_tools_version_status.tooOld"])
-	assert.EqualValues(t, 0, mx["vm-1_tools_version_status.unknown"])
-	assert.EqualValues(t, 1, mx["vm-1_consolidation_needed.needed"])
-	assert.EqualValues(t, 0, mx["vm-1_consolidation_needed.notNeeded"])
-	assert.EqualValues(t, 4, mx["vm-1_config_cpu"])
-	assert.EqualValues(t, 8192, mx["vm-1_config_memory"])
-	assert.EqualValues(t, 2, mx["vm-1_config_devices.disks"])
-	assert.EqualValues(t, 3, mx["vm-1_config_devices.nics"])
-	assert.EqualValues(t, 100, mx["vm-1_storage.committed"])
-	assert.EqualValues(t, 200, mx["vm-1_storage.uncommitted"])
-	assert.EqualValues(t, 300, mx["vm-1_storage.unshared"])
+	requireScalarSeriesValue(t, series, "vm_connection_state_inaccessible", vm.ID, 1)
+	requireScalarSeriesValue(t, series, "vm_connection_state_connected", vm.ID, 0)
+	requireScalarSeriesValue(t, series, "vm_tools_running_status_running", vm.ID, 1)
+	requireScalarSeriesValue(t, series, "vm_tools_running_status_unknown", vm.ID, 0)
+	requireScalarSeriesValue(t, series, "vm_tools_version_status_too_old", vm.ID, 1)
+	requireScalarSeriesValue(t, series, "vm_tools_version_status_unknown", vm.ID, 0)
+	requireScalarSeriesValue(t, series, "vm_consolidation_needed_needed", vm.ID, 1)
+	requireScalarSeriesValue(t, series, "vm_consolidation_needed_not_needed", vm.ID, 0)
+	requireScalarSeriesValue(t, series, "vm_config_cpu_vcpus", vm.ID, 4)
+	requireScalarSeriesValue(t, series, "vm_config_memory_memory", vm.ID, 8192)
+	requireScalarSeriesValue(t, series, "vm_config_devices_disks", vm.ID, 2)
+	requireScalarSeriesValue(t, series, "vm_config_devices_nics", vm.ID, 3)
+	requireScalarSeriesValue(t, series, "vm_storage_usage_committed", vm.ID, 100)
+	requireScalarSeriesValue(t, series, "vm_storage_usage_uncommitted", vm.ID, 200)
+	requireScalarSeriesValue(t, series, "vm_storage_usage_unshared", vm.ID, 300)
 }
 
 func TestWriteClusterPropertyMetrics_ConfigStates(t *testing.T) {
@@ -983,22 +687,22 @@ func TestWriteClusterPropertyMetrics_ConfigStates(t *testing.T) {
 		HaVMComponentProtection: string(types.ClusterDasConfigInfoServiceStateDisabled),
 		OverallStatus:           "green",
 	}
-	mx := make(map[string]int64)
+	collr := New()
 
-	writeClusterPropertyMetrics(mx, cluster)
+	series := runMetricWriteForTest(t, collr, func() { collr.writeClusterPropertyMetrics(cluster) })
 
-	assert.EqualValues(t, 1, mx["domain-c1_drs_enabled"])
-	assert.EqualValues(t, 1, mx["domain-c1_drs_mode.fullyAutomated"])
-	assert.EqualValues(t, 0, mx["domain-c1_drs_mode.unknown"])
-	assert.EqualValues(t, 3, mx["domain-c1_drs_vmotion_rate"])
-	assert.EqualValues(t, 1, mx["domain-c1_ha_enabled"])
-	assert.EqualValues(t, 1, mx["domain-c1_ha_adm_ctrl_enabled"])
-	assert.EqualValues(t, 1, mx["domain-c1_ha_host_monitoring.enabled"])
-	assert.EqualValues(t, 0, mx["domain-c1_ha_host_monitoring.unknown"])
-	assert.EqualValues(t, 1, mx["domain-c1_ha_vm_monitoring.vmAndAppMonitoring"])
-	assert.EqualValues(t, 0, mx["domain-c1_ha_vm_monitoring.unknown"])
-	assert.EqualValues(t, 1, mx["domain-c1_ha_vm_component_protection.disabled"])
-	assert.EqualValues(t, 0, mx["domain-c1_ha_vm_component_protection.unknown"])
+	requireScalarSeriesValue(t, series, "cluster_drs_config_enabled", cluster.ID, 1)
+	requireScalarSeriesValue(t, series, "cluster_drs_mode_fully_automated", cluster.ID, 1)
+	requireScalarSeriesValue(t, series, "cluster_drs_mode_unknown", cluster.ID, 0)
+	requireScalarSeriesValue(t, series, "cluster_drs_vmotion_rate_rate", cluster.ID, 3)
+	requireScalarSeriesValue(t, series, "cluster_ha_config_enabled", cluster.ID, 1)
+	requireScalarSeriesValue(t, series, "cluster_ha_config_admission_control", cluster.ID, 1)
+	requireScalarSeriesValue(t, series, "cluster_ha_host_monitoring_enabled", cluster.ID, 1)
+	requireScalarSeriesValue(t, series, "cluster_ha_host_monitoring_unknown", cluster.ID, 0)
+	requireScalarSeriesValue(t, series, "cluster_ha_vm_monitoring_vm_and_app_monitoring", cluster.ID, 1)
+	requireScalarSeriesValue(t, series, "cluster_ha_vm_monitoring_unknown", cluster.ID, 0)
+	requireScalarSeriesValue(t, series, "cluster_ha_vm_component_protection_disabled", cluster.ID, 1)
+	requireScalarSeriesValue(t, series, "cluster_ha_vm_component_protection_unknown", cluster.ID, 0)
 }
 
 func TestUpdateResourcePoolFromProperties_ZeroValueOptionalProperties(t *testing.T) {
@@ -1054,6 +758,40 @@ func collectScalarSeriesForTest(t *testing.T, collr *Collector) map[string]metri
 	return mx
 }
 
+func buildV2PlanForTest(t *testing.T, collr *Collector) chartengine.Plan {
+	t.Helper()
+
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+
+	reader := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	attempt, err := engine.PreparePlan(reader)
+	require.NoError(t, err)
+	defer attempt.Abort()
+
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+	return plan
+}
+
+func v2CreatedChartsAndDims(plan chartengine.Plan) (map[string]chartengine.CreateChartAction, map[string]map[string]chartengine.CreateDimensionAction) {
+	charts := make(map[string]chartengine.CreateChartAction)
+	dims := make(map[string]map[string]chartengine.CreateDimensionAction)
+	for _, action := range plan.Actions {
+		switch v := action.(type) {
+		case chartengine.CreateChartAction:
+			charts[v.ChartID] = v
+		case chartengine.CreateDimensionAction:
+			if _, ok := dims[v.ChartID]; !ok {
+				dims[v.ChartID] = make(map[string]chartengine.CreateDimensionAction)
+			}
+			dims[v.ChartID][v.Name] = v
+		}
+	}
+	return charts, dims
+}
+
 func scalarSeriesHasLabel(series map[string]metrix.SampleValue, key, value string) bool {
 	needle := fmt.Sprintf(`%s="%s"`, key, value)
 	for name := range series {
@@ -1064,84 +802,110 @@ func scalarSeriesHasLabel(series map[string]metrix.SampleValue, key, value strin
 	return false
 }
 
-func collectLegacyMetricMapForTest(t *testing.T, collr *Collector) map[string]int64 {
+func runMetricWriteForTest(t *testing.T, collr *Collector, write func()) map[string]metrix.SampleValue {
 	t.Helper()
 
 	cycle := mustCycleController(t, collr.MetricStore())
 	cycle.BeginCycle()
+	write()
+	require.NoError(t, cycle.CommitCycleSuccess())
+	return scalarSeriesFromReaderForTest(collr.MetricStore().Read(metrix.ReadRaw()))
+}
 
-	collr.collectionLock.Lock()
-	mx, err := collr.collectLocked()
-	if err != nil {
-		collr.collectionLock.Unlock()
+func runMetricCollectForTest(t *testing.T, collr *Collector, collect func() error) map[string]metrix.SampleValue {
+	t.Helper()
+
+	cycle := mustCycleController(t, collr.MetricStore())
+	cycle.BeginCycle()
+	if err := collect(); err != nil {
 		cycle.AbortCycle()
 		require.NoError(t, err)
 	}
-
-	collr.writeMetrics(mx)
-	collr.collectionLock.Unlock()
 	require.NoError(t, cycle.CommitCycleSuccess())
-	if len(mx) == 0 {
-		return nil
+	return scalarSeriesFromReaderForTest(collr.MetricStore().Read(metrix.ReadRaw()))
+}
+
+func scalarSeriesFromReaderForTest(reader metrix.Reader) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue)
+	reader.ForEachSeries(func(name string, labels metrix.LabelView, value metrix.SampleValue) {
+		out[scalarSeriesKeyForTest(name, labels)] = value
+	})
+	return out
+}
+
+func scalarSeriesKeyForTest(name string, labels metrix.LabelView) string {
+	if labels == nil || labels.Len() == 0 {
+		return name
 	}
-	return mx
+
+	var b strings.Builder
+	b.WriteString(name)
+	b.WriteByte('{')
+	first := true
+	labels.Range(func(key, value string) bool {
+		if !first {
+			b.WriteByte(',')
+		}
+		first = false
+		b.WriteString(key)
+		b.WriteString(`="`)
+		b.WriteString(value)
+		b.WriteByte('"')
+		return true
+	})
+	b.WriteByte('}')
+	return b.String()
 }
 
-func addExpectedHostRuntimeStatus(mx map[string]int64, id string) {
-	mx[fmt.Sprintf("%s_connection_state.connected", id)] = 1
-	mx[fmt.Sprintf("%s_connection_state.disconnected", id)] = 0
-	mx[fmt.Sprintf("%s_connection_state.notResponding", id)] = 0
-	mx[fmt.Sprintf("%s_maintenance_status.inMaintenance", id)] = 0
-	mx[fmt.Sprintf("%s_maintenance_status.normal", id)] = 1
+func requireScalarSeries(t *testing.T, series map[string]metrix.SampleValue, metric, id string) {
+	t.Helper()
+
+	_, ok := findScalarSeries(series, metric, id)
+	require.Truef(t, ok, "expected metric %s with id=%s in %v", metric, id, scalarSeriesKeys(series))
 }
 
-func addExpectedVMPropertyStatus(mx map[string]int64, id string) {
-	mx[fmt.Sprintf("%s_connection_state.connected", id)] = 1
-	mx[fmt.Sprintf("%s_connection_state.disconnected", id)] = 0
-	mx[fmt.Sprintf("%s_connection_state.inaccessible", id)] = 0
-	mx[fmt.Sprintf("%s_connection_state.invalid", id)] = 0
-	mx[fmt.Sprintf("%s_connection_state.orphaned", id)] = 0
-	mx[fmt.Sprintf("%s_tools_running_status.executingScripts", id)] = 0
-	mx[fmt.Sprintf("%s_tools_running_status.notRunning", id)] = 0
-	mx[fmt.Sprintf("%s_tools_running_status.running", id)] = 0
-	mx[fmt.Sprintf("%s_tools_running_status.unknown", id)] = 1
-	mx[fmt.Sprintf("%s_tools_version_status.blacklisted", id)] = 0
-	mx[fmt.Sprintf("%s_tools_version_status.current", id)] = 0
-	mx[fmt.Sprintf("%s_tools_version_status.needUpgrade", id)] = 0
-	mx[fmt.Sprintf("%s_tools_version_status.notInstalled", id)] = 0
-	mx[fmt.Sprintf("%s_tools_version_status.supportedNew", id)] = 0
-	mx[fmt.Sprintf("%s_tools_version_status.supportedOld", id)] = 0
-	mx[fmt.Sprintf("%s_tools_version_status.tooNew", id)] = 0
-	mx[fmt.Sprintf("%s_tools_version_status.tooOld", id)] = 0
-	mx[fmt.Sprintf("%s_tools_version_status.unknown", id)] = 1
-	mx[fmt.Sprintf("%s_tools_version_status.unmanaged", id)] = 0
-	mx[fmt.Sprintf("%s_consolidation_needed.needed", id)] = 0
-	mx[fmt.Sprintf("%s_consolidation_needed.notNeeded", id)] = 1
-	mx[fmt.Sprintf("%s_config_cpu", id)] = 1
-	mx[fmt.Sprintf("%s_config_memory", id)] = 32
-	mx[fmt.Sprintf("%s_config_devices.disks", id)] = 1
-	mx[fmt.Sprintf("%s_config_devices.nics", id)] = 1
-	mx[fmt.Sprintf("%s_storage.committed", id)] = 234
-	mx[fmt.Sprintf("%s_storage.uncommitted", id)] = 10737418240
-	mx[fmt.Sprintf("%s_storage.unshared", id)] = 202
+func requireNoScalarSeries(t *testing.T, series map[string]metrix.SampleValue, metric, id string) {
+	t.Helper()
+
+	_, ok := findScalarSeries(series, metric, id)
+	require.Falsef(t, ok, "unexpected metric %s with id=%s", metric, id)
 }
 
-func addExpectedClusterConfigStatus(mx map[string]int64, id string) {
-	mx[fmt.Sprintf("%s_drs_mode.fullyAutomated", id)] = 0
-	mx[fmt.Sprintf("%s_drs_mode.manual", id)] = 0
-	mx[fmt.Sprintf("%s_drs_mode.partiallyAutomated", id)] = 0
-	mx[fmt.Sprintf("%s_drs_mode.unknown", id)] = 1
-	mx[fmt.Sprintf("%s_drs_vmotion_rate", id)] = 0
-	mx[fmt.Sprintf("%s_ha_host_monitoring.disabled", id)] = 0
-	mx[fmt.Sprintf("%s_ha_host_monitoring.enabled", id)] = 0
-	mx[fmt.Sprintf("%s_ha_host_monitoring.unknown", id)] = 1
-	mx[fmt.Sprintf("%s_ha_vm_component_protection.disabled", id)] = 0
-	mx[fmt.Sprintf("%s_ha_vm_component_protection.enabled", id)] = 0
-	mx[fmt.Sprintf("%s_ha_vm_component_protection.unknown", id)] = 1
-	mx[fmt.Sprintf("%s_ha_vm_monitoring.unknown", id)] = 1
-	mx[fmt.Sprintf("%s_ha_vm_monitoring.vmAndAppMonitoring", id)] = 0
-	mx[fmt.Sprintf("%s_ha_vm_monitoring.vmMonitoringDisabled", id)] = 0
-	mx[fmt.Sprintf("%s_ha_vm_monitoring.vmMonitoringOnly", id)] = 0
+func requireScalarSeriesValue(t *testing.T, series map[string]metrix.SampleValue, metric, id string, want int64) {
+	t.Helper()
+
+	got, ok := findScalarSeries(series, metric, id)
+	require.Truef(t, ok, "expected metric %s with id=%s in %v", metric, id, scalarSeriesKeys(series))
+	require.EqualValues(t, want, got)
+}
+
+func findScalarSeries(series map[string]metrix.SampleValue, metric, id string) (metrix.SampleValue, bool) {
+	prefix := metric + "{"
+	idLabel := fmt.Sprintf(`id="%s"`, id)
+	for key, value := range series {
+		if (key == metric || strings.HasPrefix(key, prefix)) && strings.Contains(key, idLabel) {
+			return value, true
+		}
+	}
+	return 0, false
+}
+
+func scalarSeriesKeys(series map[string]metrix.SampleValue) []string {
+	keys := make([]string, 0, len(series))
+	for key := range series {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func firstResourceID(collr *Collector) string {
+	for id := range collr.resources.Hosts {
+		return id
+	}
+	for id := range collr.resources.VMs {
+		return id
+	}
+	return ""
 }
 
 func mustCycleController(t *testing.T, store metrix.CollectorStore) metrix.CycleController {
@@ -1288,32 +1052,32 @@ func TestCollector_Collect_NoPerfData(t *testing.T) {
 	tests := map[string]struct {
 		setNoPerfScraper func(*Collector)
 		restoreScraper   func(*Collector)
-		checkNoPerf      func(*testing.T, *Collector, map[string]int64, simulator.Model)
-		checkWithPerf    func(*testing.T, *Collector, map[string]int64, simulator.Model)
+		checkNoPerf      func(*testing.T, *Collector, map[string]metrix.SampleValue, simulator.Model)
+		checkWithPerf    func(*testing.T, *Collector, map[string]metrix.SampleValue, simulator.Model)
 	}{
 		"datastores": {
 			setNoPerfScraper: func(c *Collector) { c.scraper = mockScraperNoDSPerf{c.scraper} },
 			restoreScraper:   func(c *Collector) { c.scraper = mockScraper{c.scraper.(mockScraperNoDSPerf).scraper} },
-			checkNoPerf: func(t *testing.T, collr *Collector, mx map[string]int64, count simulator.Model) {
+			checkNoPerf: func(t *testing.T, collr *Collector, series map[string]metrix.SampleValue, count simulator.Model) {
 				for _, ds := range collr.resources.Datastores {
-					assert.Contains(t, mx, ds.ID+"_capacity")
-					assert.Contains(t, mx, ds.ID+"_free_space")
-					assert.Contains(t, mx, ds.ID+"_used_space")
-					assert.Contains(t, mx, ds.ID+"_used_space_pct")
-					assert.Contains(t, mx, ds.ID+"_uncommitted")
-					assert.Contains(t, mx, ds.ID+"_overall.status.green")
-					assert.Contains(t, mx, ds.ID+"_accessible_status.accessible")
-					assert.Contains(t, mx, ds.ID+"_maintenance.status.normal")
-					assert.Contains(t, mx, ds.ID+"_multiple_host_access.unknown")
-					assert.NotContains(t, mx, ds.ID+"_datastore.read.average")
-					assert.NotContains(t, mx, ds.ID+"_datastore.numberReadAveraged.average")
+					requireScalarSeries(t, series, "datastore_space_usage_capacity", ds.ID)
+					requireScalarSeries(t, series, "datastore_space_usage_free", ds.ID)
+					requireScalarSeries(t, series, "datastore_space_usage_used", ds.ID)
+					requireScalarSeries(t, series, "datastore_space_utilization_used", ds.ID)
+					requireScalarSeries(t, series, "datastore_space_usage_uncommitted", ds.ID)
+					requireScalarSeries(t, series, "datastore_overall_status_green", ds.ID)
+					requireScalarSeries(t, series, "datastore_accessibility_status_accessible", ds.ID)
+					requireScalarSeries(t, series, "datastore_maintenance_status_normal", ds.ID)
+					requireScalarSeries(t, series, "datastore_multiple_host_access_unknown", ds.ID)
+					requireNoScalarSeries(t, series, "datastore_disk_io_read", ds.ID)
+					requireNoScalarSeries(t, series, "datastore_disk_iops_reads", ds.ID)
 				}
 
 				collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
 			},
-			checkWithPerf: func(t *testing.T, collr *Collector, mx map[string]int64, count simulator.Model) {
+			checkWithPerf: func(t *testing.T, collr *Collector, series map[string]metrix.SampleValue, count simulator.Model) {
 				for _, ds := range collr.resources.Datastores {
-					assert.Contains(t, mx, ds.ID+"_datastore.read.average")
+					requireScalarSeries(t, series, "datastore_disk_io_read", ds.ID)
 				}
 
 				collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
@@ -1322,20 +1086,20 @@ func TestCollector_Collect_NoPerfData(t *testing.T) {
 		"clusters": {
 			setNoPerfScraper: func(c *Collector) { c.scraper = mockScraperNoClusterPerf{c.scraper} },
 			restoreScraper:   func(c *Collector) { c.scraper = mockScraper{c.scraper.(mockScraperNoClusterPerf).scraper} },
-			checkNoPerf: func(t *testing.T, collr *Collector, mx map[string]int64, count simulator.Model) {
+			checkNoPerf: func(t *testing.T, collr *Collector, series map[string]metrix.SampleValue, count simulator.Model) {
 				for _, cl := range collr.resources.Clusters {
-					assert.Contains(t, mx, cl.ID+"_num_hosts")
-					assert.Contains(t, mx, cl.ID+"_total_cpu")
-					assert.Contains(t, mx, cl.ID+"_overall.status.green")
-					assert.NotContains(t, mx, cl.ID+"_cpu.usage.average")
-					assert.NotContains(t, mx, cl.ID+"_clusterServices.cpufairness.latest")
+					requireScalarSeries(t, series, "cluster_hosts_total", cl.ID)
+					requireScalarSeries(t, series, "cluster_cpu_capacity_total", cl.ID)
+					requireScalarSeries(t, series, "cluster_overall_status_green", cl.ID)
+					requireNoScalarSeries(t, series, "cluster_cpu_utilization_used", cl.ID)
+					requireNoScalarSeries(t, series, "cluster_services_fairness_cpu", cl.ID)
 				}
 
 				collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
 			},
-			checkWithPerf: func(t *testing.T, collr *Collector, mx map[string]int64, count simulator.Model) {
+			checkWithPerf: func(t *testing.T, collr *Collector, series map[string]metrix.SampleValue, count simulator.Model) {
 				for _, cl := range collr.resources.Clusters {
-					assert.Contains(t, mx, cl.ID+"_cpu.usage.average")
+					requireScalarSeries(t, series, "cluster_cpu_utilization_used", cl.ID)
 				}
 
 				collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
@@ -1351,13 +1115,13 @@ func TestCollector_Collect_NoPerfData(t *testing.T) {
 			require.NoError(t, collr.Init(context.Background()))
 			tc.setNoPerfScraper(collr)
 
-			mx := collectLegacyMetricMapForTest(t, collr)
+			mx := collectScalarSeriesForTest(t, collr)
 			require.NotNil(t, mx)
 			count := model.Count()
 			tc.checkNoPerf(t, collr, mx, count)
 
 			tc.restoreScraper(collr)
-			mx = collectLegacyMetricMapForTest(t, collr)
+			mx = collectScalarSeriesForTest(t, collr)
 			require.NotNil(t, mx)
 			tc.checkWithPerf(t, collr, mx, count)
 		})

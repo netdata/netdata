@@ -74,22 +74,6 @@ type vmPowerPerfSample struct {
 	values map[string]int64
 }
 
-func powerMetricsOptionalMetricNames() []string {
-	return []string{
-		hostPowerUsagePowerMetric,
-		hostPowerUsageCapMetric,
-		hostPowerCapacityUsageUsedMetric,
-		hostPowerCapacityUsageUsableMetric,
-		hostPowerCapacityUsageIdleMetric,
-		hostPowerCapacityUsageSystemMetric,
-		hostPowerCapacityUsageVMMetric,
-		hostPowerCapacityUtilizationMetric,
-		hostEnergyUsageMetric,
-		vmPowerUsagePowerMetric,
-		vmEnergyUsageMetric,
-	}
-}
-
 func (c *Collector) collectHostPowerMetrics(host *rs.Host, metrics []performance.MetricSeries) {
 	for _, metric := range metrics {
 		if len(metric.Value) == 0 || metric.Value[0] == -1 || metric.Instance != "" {
@@ -138,62 +122,52 @@ func (c *Collector) collectVMPowerMetrics(vm *rs.VM, metrics []performance.Metri
 	}
 }
 
-func (c *Collector) writePowerMetrics(meter metrix.SnapshotMeter) {
-	c.writeHostPowerMetrics(meter)
-	c.writeVMPowerMetrics(meter)
+func (c *Collector) writePowerMetrics() {
+	c.writeHostPowerMetrics()
+	c.writeVMPowerMetrics()
 }
 
-func (c *Collector) writeHostPowerMetrics(meter metrix.SnapshotMeter) {
+func (c *Collector) writeHostPowerMetrics() {
 	if len(c.hostPowerPerfSamples) == 0 {
 		return
 	}
 
 	for _, sample := range sortedHostPowerPerfSamples(c.hostPowerPerfSamples) {
-		labels := meter.LabelSet(c.hostPowerLabels(sample.host)...)
+		labels := c.labelSet(c.hostPowerLabels(sample.host))
 		for metricName, value := range sample.values {
-			if gauge := c.mx.gauge(metricName); gauge != nil {
-				gauge.Observe(metrix.SampleValue(value), labels)
-			}
+			c.observeGauge(metricName, value, labels)
 		}
 	}
 }
 
-func (c *Collector) writeVMPowerMetrics(meter metrix.SnapshotMeter) {
+func (c *Collector) writeVMPowerMetrics() {
 	if len(c.vmPowerPerfSamples) == 0 {
 		return
 	}
 
 	for _, sample := range sortedVMPowerPerfSamples(c.vmPowerPerfSamples) {
-		labels := meter.LabelSet(c.vmPowerLabels(sample.vm)...)
+		labels := c.labelSet(c.vmPowerLabels(sample.vm))
 		for metricName, value := range sample.values {
-			if gauge := c.mx.gauge(metricName); gauge != nil {
-				gauge.Observe(metrix.SampleValue(value), labels)
-			}
+			c.observeGauge(metricName, value, labels)
 		}
 	}
 }
 
 func (c *Collector) hostPowerLabels(host *rs.Host) []metrix.Label {
-	labels := []metrix.Label{
-		{Key: "id", Value: host.ID},
+	return c.v2MetricLabels(host.ID, []metrix.Label{
 		{Key: "datacenter", Value: host.Hier.DC.Name},
-		{Key: "cluster", Value: host.Hier.Cluster.Name},
+		{Key: "cluster", Value: getHostClusterName(host)},
 		{Key: "host", Value: host.Name},
-	}
-	labels = append(labels, c.resourceEnrichmentLabels(host.ID)...)
-	return labels
+	}, host.Labels)
 }
 
 func (c *Collector) vmPowerLabels(vm *rs.VM) []metrix.Label {
-	labels := []metrix.Label{
-		{Key: "id", Value: vm.ID},
+	return c.v2MetricLabels(vm.ID, []metrix.Label{
 		{Key: "datacenter", Value: vm.Hier.DC.Name},
-		{Key: "cluster", Value: vm.Hier.Cluster.Name},
+		{Key: "cluster", Value: getVMClusterName(vm)},
 		{Key: "host", Value: vm.Hier.Host.Name},
 		{Key: "vm", Value: vm.Name},
-	}
-	labels = append(labels, c.resourceEnrichmentLabels(vm.ID)...)
-	return labels
+	}, vm.Labels)
 }
 
 func sortedHostPowerPerfSamples(samples map[string]*hostPowerPerfSample) []*hostPowerPerfSample {

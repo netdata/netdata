@@ -1,7 +1,18 @@
 # vSphere Collector V1 Compatibility Manifest
 
-Status: draft baseline for `SOW-0015`; executable chart/metric subset is
-checked by `TestCollector_V1CompatibilityManifest`.
+Status: superseded historical baseline for `SOW-0015`.
+
+The executable V1 golden fixture
+`src/go/plugin/go.d/collector/vsphere/testdata/v1_compat_manifest.json` and
+`TestCollector_V1CompatibilityManifest` were removed on 2026-05-22 with the
+runtime chart bridge cleanup. Current executable coverage is provided by
+`TestCollector_ChartTemplateYAML`, `TestCollector_V2CompatibilitySurface`,
+`collecttest.AssertChartCoverage`, feature-specific V2 plan tests, and full
+vSphere collector tests.
+
+This file is retained as migration-history evidence. Tables below that describe
+pre-merge experiments removed by later user decisions are historical, not the
+current accepted configuration or metric surface.
 
 This manifest records the pre-migration v1 contract that guides the framework v2 migration.
 The migration preserves contexts, dimensions, old labels, units, configuration,
@@ -22,7 +33,7 @@ Runtime substitution:
 ## Sources
 
 - `src/go/plugin/go.d/collector/vsphere/collector.go`
-- `src/go/plugin/go.d/collector/vsphere/charts.go`
+- `src/go/plugin/go.d/collector/vsphere/charts.yaml` (current chart source of truth; the transitional Go chart mirror was removed on 2026-05-22)
 - `src/go/plugin/go.d/collector/vsphere/collect.go`
 - `src/go/plugin/go.d/collector/vsphere/discover/metric_lists.go`
 - `src/go/plugin/go.d/collector/vsphere/config_schema.json`
@@ -30,17 +41,18 @@ Runtime substitution:
 - `src/go/plugin/go.d/config/go.d/vsphere.conf`
 - `src/health/health.d/vsphere.conf`
 - `src/go/plugin/go.d/collector/vsphere/collector_test.go`
-- `src/go/plugin/go.d/collector/vsphere/compat_manifest_test.go`
-- `src/go/plugin/go.d/collector/vsphere/testdata/v1_compat_manifest.json`
 
-Executable golden scope:
+Removed executable golden scope:
 
-- records V1 chart IDs and pins contexts, titles, units, families, chart types,
-  priorities, label keys, label sources, dimension names/algorithms/scales/options,
-  and metric sample keys/values from `vcsim`;
-- does not pin simulator-specific label values because `vcsim` can assign VM
+- the deleted golden fixture recorded V1 chart IDs and pinned contexts, titles,
+  units, families, chart types, priorities, label keys, label sources,
+  dimension names/algorithms/scales/options, and metric sample keys/values from
+  `vcsim`;
+- it did not pin simulator-specific label values because `vcsim` can assign VM
   runtime host labels differently between runs;
-- must be regenerated only with intentional contract changes.
+- it is no longer regenerated. Current V2 validation relies on chart-template
+  generation, chartengine materialization, metric-store coverage, and focused
+  feature tests instead of a large V1 runtime-chart golden.
 
 ## Collector Registration And Defaults
 
@@ -76,9 +88,11 @@ Executable golden scope:
 | Collection output baseline | Pre-migration `Collect(context.Context) map[string]int64`; current public collection path writes to the framework V2 metric store. |
 | Config schema embed | `config_schema.json` |
 
-## Configuration Contract
+## Historical Configuration Contract
 
-Struct fields and YAML/JSON keys that must remain accepted:
+This table records the migration baseline before later cleanup decisions. It is
+not the authoritative current accepted surface after the 2026-05-20 and
+2026-05-22 removals documented in `SOW-0015`.
 
 | YAML key | JSON key | Required by schema | Notes |
 |---|---|---:|---|

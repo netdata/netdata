@@ -193,12 +193,10 @@ func (c *Collector) Collect(context.Context) error {
 	c.collectionLock.Lock()
 	defer c.collectionLock.Unlock()
 
-	mx, err := c.collectLocked()
-	if err != nil {
+	if err := c.collectLocked(); err != nil {
 		return fmt.Errorf("collect vSphere metrics: %w", err)
 	}
 
-	c.writeMetrics(mx)
 	return nil
 }
 

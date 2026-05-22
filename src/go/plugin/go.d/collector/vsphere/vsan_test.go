@@ -18,7 +18,7 @@ func TestCollector_VSANMetricsDefaultOff(t *testing.T) {
 	collr := newVSANTestCollector(false)
 	cycle := mustCycleController(t, collr.MetricStore())
 	cycle.BeginCycle()
-	collr.writeMetrics(nil)
+	collr.writeVSANMetrics()
 	require.NoError(t, cycle.CommitCycleSuccess())
 
 	reader := collr.MetricStore().Read(metrix.ReadRaw())
@@ -31,7 +31,7 @@ func TestCollector_VSANMetricsOptInEmitsCharts(t *testing.T) {
 	collr := newVSANTestCollector(true)
 	cycle := mustCycleController(t, collr.MetricStore())
 	cycle.BeginCycle()
-	collr.writeMetrics(nil)
+	collr.writeVSANMetrics()
 	require.NoError(t, cycle.CommitCycleSuccess())
 
 	cluster := collr.resources.Clusters.Get("domain-c1")
@@ -98,7 +98,7 @@ func TestCollector_VSANSpaceUsageEdgeCases(t *testing.T) {
 			collr.vsanMetrics.Space["domain-c1"] = tc.space
 			cycle := mustCycleController(t, collr.MetricStore())
 			cycle.BeginCycle()
-			collr.writeMetrics(nil)
+			collr.writeVSANMetrics()
 			require.NoError(t, cycle.CommitCycleSuccess())
 
 			labels := labelsFromMetrix(collr.vsanClusterLabels(collr.resources.Clusters.Get("domain-c1")))

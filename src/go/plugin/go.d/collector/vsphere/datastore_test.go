@@ -4,7 +4,6 @@ package vsphere
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/vmware/govmomi/vim25/types"
 
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
@@ -29,24 +28,24 @@ func TestWriteDatastoreMetrics(t *testing.T) {
 				MultipleHostAccess: &yes,
 			},
 			want: map[string]int64{
-				"datastore-1_capacity":                               1000,
-				"datastore-1_free_space":                             400,
-				"datastore-1_used_space":                             600,
-				"datastore-1_used_space_pct":                         6000,
-				"datastore-1_uncommitted":                            250,
-				"datastore-1_overall.status.green":                   0,
-				"datastore-1_overall.status.red":                     1,
-				"datastore-1_overall.status.yellow":                  0,
-				"datastore-1_overall.status.gray":                    0,
-				"datastore-1_accessible_status.accessible":           1,
-				"datastore-1_accessible_status.inaccessible":         0,
-				"datastore-1_maintenance.status.normal":              1,
-				"datastore-1_maintenance.status.enteringMaintenance": 0,
-				"datastore-1_maintenance.status.inMaintenance":       0,
-				"datastore-1_maintenance.status.unknown":             0,
-				"datastore-1_multiple_host_access.enabled":           1,
-				"datastore-1_multiple_host_access.disabled":          0,
-				"datastore-1_multiple_host_access.unknown":           0,
+				"datastore_space_usage_capacity":                    1000,
+				"datastore_space_usage_free":                        400,
+				"datastore_space_usage_used":                        600,
+				"datastore_space_utilization_used":                  6000,
+				"datastore_space_usage_uncommitted":                 250,
+				"datastore_overall_status_green":                    0,
+				"datastore_overall_status_red":                      1,
+				"datastore_overall_status_yellow":                   0,
+				"datastore_overall_status_gray":                     0,
+				"datastore_accessibility_status_accessible":         1,
+				"datastore_accessibility_status_inaccessible":       0,
+				"datastore_maintenance_status_normal":               1,
+				"datastore_maintenance_status_entering_maintenance": 0,
+				"datastore_maintenance_status_in_maintenance":       0,
+				"datastore_maintenance_status_unknown":              0,
+				"datastore_multiple_host_access_enabled":            1,
+				"datastore_multiple_host_access_disabled":           0,
+				"datastore_multiple_host_access_unknown":            0,
 			},
 		},
 		"inaccessible datastore": {
@@ -58,33 +57,35 @@ func TestWriteDatastoreMetrics(t *testing.T) {
 				Uncommitted:   250,
 			},
 			want: map[string]int64{
-				"datastore-2_capacity":                               0,
-				"datastore-2_free_space":                             0,
-				"datastore-2_used_space":                             0,
-				"datastore-2_used_space_pct":                         0,
-				"datastore-2_uncommitted":                            0,
-				"datastore-2_overall.status.green":                   0,
-				"datastore-2_overall.status.red":                     0,
-				"datastore-2_overall.status.yellow":                  0,
-				"datastore-2_overall.status.gray":                    1,
-				"datastore-2_accessible_status.accessible":           0,
-				"datastore-2_accessible_status.inaccessible":         1,
-				"datastore-2_maintenance.status.normal":              0,
-				"datastore-2_maintenance.status.enteringMaintenance": 0,
-				"datastore-2_maintenance.status.inMaintenance":       0,
-				"datastore-2_maintenance.status.unknown":             1,
-				"datastore-2_multiple_host_access.enabled":           0,
-				"datastore-2_multiple_host_access.disabled":          0,
-				"datastore-2_multiple_host_access.unknown":           1,
+				"datastore_space_usage_capacity":                    0,
+				"datastore_space_usage_free":                        0,
+				"datastore_space_usage_used":                        0,
+				"datastore_space_utilization_used":                  0,
+				"datastore_space_usage_uncommitted":                 0,
+				"datastore_overall_status_green":                    0,
+				"datastore_overall_status_red":                      0,
+				"datastore_overall_status_yellow":                   0,
+				"datastore_overall_status_gray":                     1,
+				"datastore_accessibility_status_accessible":         0,
+				"datastore_accessibility_status_inaccessible":       1,
+				"datastore_maintenance_status_normal":               0,
+				"datastore_maintenance_status_entering_maintenance": 0,
+				"datastore_maintenance_status_in_maintenance":       0,
+				"datastore_maintenance_status_unknown":              1,
+				"datastore_multiple_host_access_enabled":            0,
+				"datastore_multiple_host_access_disabled":           0,
+				"datastore_multiple_host_access_unknown":            1,
 			},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			mx := make(map[string]int64)
-			writeDatastoreMetrics(mx, &tc.ds)
-			assert.Equal(t, tc.want, mx)
+			collr := New()
+			series := runMetricWriteForTest(t, collr, func() { collr.writeDatastoreMetrics(&tc.ds) })
+			for metric, want := range tc.want {
+				requireScalarSeriesValue(t, series, metric, tc.ds.ID, want)
+			}
 		})
 	}
 }
