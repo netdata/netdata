@@ -34,31 +34,6 @@
   "datastore_cluster_include": [
     "/*"
   ],
-  "collect_host_nic_performance": true,
-  "host_nic_include": [
-    "vmnic*",
-    "interface:vmnic0"
-  ],
-  "collect_host_disk_performance": true,
-  "host_disk_include": [
-    "naa.*",
-    "instance:naa.123"
-  ],
-  "collect_host_storage_adapter_performance": true,
-  "host_storage_adapter_include": [
-    "vmhba*",
-    "adapter:vmhba0"
-  ],
-  "collect_host_storage_path_performance": true,
-  "host_storage_path_include": [
-    "vmhba*:C0:T0:L0",
-    "path:vmhba0:C0:T0:L0"
-  ],
-  "collect_host_cpu_instance_performance": true,
-  "host_cpu_instance_include": [
-    "0",
-    "cpu:1"
-  ],
   "collect_power_metrics": true,
   "collect_vsan": true,
   "vsan_cluster_include": [

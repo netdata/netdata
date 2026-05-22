@@ -46,46 +46,6 @@ func (c *Collector) validateConfig() error {
 		return err
 	}
 	c.datastoreClusterMatcher = dcMatcher
-	if len(c.HostNICsInclude) == 0 {
-		c.HostNICsInclude = []string{"*"}
-	}
-	hostNICMatcher, err := match.NewPatternListMatcher("host_nic_include", c.HostNICsInclude)
-	if err != nil {
-		return err
-	}
-	c.hostNICMatcher = hostNICMatcher
-	if len(c.HostDisksInclude) == 0 {
-		c.HostDisksInclude = []string{"*"}
-	}
-	hostDiskMatcher, err := match.NewPatternListMatcher("host_disk_include", c.HostDisksInclude)
-	if err != nil {
-		return err
-	}
-	c.hostDiskMatcher = hostDiskMatcher
-	if len(c.HostStorageAdaptersInclude) == 0 {
-		c.HostStorageAdaptersInclude = []string{"*"}
-	}
-	hostStorageAdapterMatcher, err := match.NewPatternListMatcher("host_storage_adapter_include", c.HostStorageAdaptersInclude)
-	if err != nil {
-		return err
-	}
-	c.hostStorageAdapterMatcher = hostStorageAdapterMatcher
-	if len(c.HostStoragePathsInclude) == 0 {
-		c.HostStoragePathsInclude = []string{"*"}
-	}
-	hostStoragePathMatcher, err := match.NewPatternListMatcher("host_storage_path_include", c.HostStoragePathsInclude)
-	if err != nil {
-		return err
-	}
-	c.hostStoragePathMatcher = hostStoragePathMatcher
-	if len(c.HostCPUInstancesInclude) == 0 {
-		c.HostCPUInstancesInclude = []string{"*"}
-	}
-	hostCPUInstanceMatcher, err := match.NewPatternListMatcher("host_cpu_instance_include", c.HostCPUInstancesInclude)
-	if err != nil {
-		return err
-	}
-	c.hostCPUInstanceMatcher = hostCPUInstanceMatcher
 	if len(c.VSANClustersInclude) == 0 {
 		c.VSANClustersInclude = match.VSANClusterIncludes{"/*"}
 	}
@@ -128,11 +88,6 @@ func (c *Collector) initDiscoverer(cli *client.Client) error {
 	d := discover.New(cli)
 	d.Logger = c.Logger
 	d.CollectDatastoreClusters = c.CollectDatastoreClusters
-	d.CollectHostNICPerformance = c.CollectHostNICPerformance
-	d.CollectHostDiskPerformance = c.CollectHostDiskPerformance
-	d.CollectHostStorageAdapterPerformance = c.CollectHostStorageAdapterPerformance
-	d.CollectHostStoragePathPerformance = c.CollectHostStoragePathPerformance
-	d.CollectHostCPUInstancePerformance = c.CollectHostCPUInstancePerformance
 	d.CollectPowerMetrics = c.CollectPowerMetrics
 	d.CollectVSAN = c.CollectVSAN
 	d.CollectNetworkTopology = c.CollectNetworkTopology

@@ -137,13 +137,6 @@ func (c *Collector) collectLocked() (map[string]int64, error) {
 	c.Debug("starting collection process")
 	t := time.Now()
 	mx := make(map[string]int64)
-	c.hostNICPerfSamples = nil
-	c.hostDiskPerfSamples = nil
-	c.hostStorageAdapterPerfSamples = nil
-	c.hostStorageAdapterAggregatePerfSamples = nil
-	c.hostStoragePathPerfSamples = nil
-	c.hostStoragePathAggregatePerfSamples = nil
-	c.hostCPUInstancePerfSamples = nil
 	c.hostPowerPerfSamples = nil
 	c.vmPowerPerfSamples = nil
 	c.vsanMetrics = nil
@@ -234,21 +227,6 @@ func (c *Collector) collectHostsMetrics(mx map[string]int64, metrics []performan
 		if host := c.resources.Hosts.Get(metric.Entity.Value); host != nil {
 			c.discoveredHosts[host.ID] = 0
 			writeHostPerfMetrics(mx, host, metric.Value)
-			if c.CollectHostNICPerformance {
-				c.collectHostNICPerformanceMetrics(host, metric.Value)
-			}
-			if c.CollectHostDiskPerformance {
-				c.collectHostDiskPerformanceMetrics(host, metric.Value)
-			}
-			if c.CollectHostStorageAdapterPerformance {
-				c.collectHostStorageAdapterPerformanceMetrics(host, metric.Value)
-			}
-			if c.CollectHostStoragePathPerformance {
-				c.collectHostStoragePathPerformanceMetrics(host, metric.Value)
-			}
-			if c.CollectHostCPUInstancePerformance {
-				c.collectHostCPUInstancePerformanceMetrics(host, metric.Value)
-			}
 			if c.CollectPowerMetrics {
 				c.collectHostPowerMetrics(host, metric.Value)
 			}

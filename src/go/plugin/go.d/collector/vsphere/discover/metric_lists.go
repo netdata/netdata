@@ -22,7 +22,7 @@ func (d Discoverer) collectMetricLists(res *rs.Resources) error {
 	}
 	d.warnMissingMetricCounters(perfCounters)
 
-	hostML := simpleHostMetricList(perfCounters, d.CollectHostNICPerformance, d.CollectHostDiskPerformance, d.CollectHostStorageAdapterPerformance, d.CollectHostStoragePathPerformance, d.CollectHostCPUInstancePerformance, d.CollectPowerMetrics)
+	hostML := simpleHostMetricList(perfCounters, d.CollectPowerMetrics)
 	for _, h := range res.Hosts {
 		h.MetricList = hostML
 	}
@@ -73,23 +73,6 @@ func expectedMetricCounterNames(d Discoverer) []string {
 	if d.CollectPowerMetrics {
 		names = append(names, hostPowerMetrics...)
 	}
-	if d.CollectHostCPUInstancePerformance {
-		names = append(names, hostCPUInstancePerformanceMetrics...)
-	}
-	if d.CollectHostNICPerformance {
-		names = append(names, hostNICPerformanceMetrics...)
-	}
-	if d.CollectHostDiskPerformance {
-		names = append(names, hostDiskPerformanceMetrics...)
-	}
-	if d.CollectHostStorageAdapterPerformance {
-		names = append(names, hostStorageAdapterPerformanceMetrics...)
-		names = append(names, hostStorageAdapterAggregateMetrics...)
-	}
-	if d.CollectHostStoragePathPerformance {
-		names = append(names, hostStoragePathPerformanceMetrics...)
-		names = append(names, hostStoragePathAggregateMetrics...)
-	}
 	names = append(names, vmMetrics...)
 	if d.CollectPowerMetrics {
 		names = append(names, vmPowerMetrics...)
@@ -110,27 +93,10 @@ func uniqueSortedStrings(in []string) []string {
 	return out
 }
 
-func simpleHostMetricList(pci map[string]*types.PerfCounterInfo, collectNICPerformance, collectDiskPerformance, collectStorageAdapterPerformance, collectStoragePathPerformance, collectCPUInstancePerformance, collectPowerMetrics bool) performance.MetricList {
+func simpleHostMetricList(pci map[string]*types.PerfCounterInfo, collectPowerMetrics bool) performance.MetricList {
 	ml := simpleMetricList(hostMetrics, pci, "")
 	if collectPowerMetrics {
 		ml = append(ml, simpleMetricList(hostPowerMetrics, pci, "")...)
-	}
-	if collectCPUInstancePerformance {
-		ml = append(ml, simpleMetricList(hostCPUInstancePerformanceMetrics, pci, "*")...)
-	}
-	if collectNICPerformance {
-		ml = append(ml, simpleMetricList(hostNICPerformanceMetrics, pci, "*")...)
-	}
-	if collectDiskPerformance {
-		ml = append(ml, simpleMetricList(hostDiskPerformanceMetrics, pci, "*")...)
-	}
-	if collectStorageAdapterPerformance {
-		ml = append(ml, simpleMetricList(hostStorageAdapterPerformanceMetrics, pci, "*")...)
-		ml = append(ml, simpleMetricList(hostStorageAdapterAggregateMetrics, pci, "")...)
-	}
-	if collectStoragePathPerformance {
-		ml = append(ml, simpleMetricList(hostStoragePathPerformanceMetrics, pci, "*")...)
-		ml = append(ml, simpleMetricList(hostStoragePathAggregateMetrics, pci, "")...)
 	}
 	return ml
 }
@@ -235,98 +201,6 @@ var (
 		"disk.maxTotalLatency.latest",
 
 		"sys.uptime.latest",
-	}
-
-	hostNICPerformanceMetrics = []string{
-		"net.broadcastRx.summation",
-		"net.broadcastTx.summation",
-		"net.bytesRx.average",
-		"net.bytesTx.average",
-		"net.droppedRx.summation",
-		"net.droppedTx.summation",
-		"net.errorsRx.summation",
-		"net.errorsTx.summation",
-		"net.multicastRx.summation",
-		"net.multicastTx.summation",
-		"net.packetsRx.summation",
-		"net.packetsTx.summation",
-		"net.unknownProtos.summation",
-		"net.usage.average",
-	}
-
-	hostDiskPerformanceMetrics = []string{
-		"disk.busResets.summation",
-		"disk.commands.summation",
-		"disk.commandsAborted.summation",
-		"disk.commandsAveraged.average",
-		"disk.deviceLatency.average",
-		"disk.deviceReadLatency.average",
-		"disk.deviceWriteLatency.average",
-		"disk.kernelLatency.average",
-		"disk.kernelReadLatency.average",
-		"disk.kernelWriteLatency.average",
-		"disk.maxQueueDepth.average",
-		"disk.numberRead.summation",
-		"disk.numberReadAveraged.average",
-		"disk.numberWrite.summation",
-		"disk.numberWriteAveraged.average",
-		"disk.queueLatency.average",
-		"disk.queueReadLatency.average",
-		"disk.queueWriteLatency.average",
-		"disk.read.average",
-		"disk.scsiReservationCnflctsPct.average",
-		"disk.scsiReservationConflicts.summation",
-		"disk.totalLatency.average",
-		"disk.totalReadLatency.average",
-		"disk.totalWriteLatency.average",
-		"disk.write.average",
-	}
-
-	hostStorageAdapterPerformanceMetrics = []string{
-		"storageAdapter.OIOsPct.average",
-		"storageAdapter.commandsAveraged.average",
-		"storageAdapter.numberReadAveraged.average",
-		"storageAdapter.numberWriteAveraged.average",
-		"storageAdapter.outstandingIOs.average",
-		"storageAdapter.queueDepth.average",
-		"storageAdapter.queueLatency.average",
-		"storageAdapter.queued.average",
-		"storageAdapter.read.average",
-		"storageAdapter.throughput.cont.average",
-		"storageAdapter.throughput.usag.average",
-		"storageAdapter.totalReadLatency.average",
-		"storageAdapter.totalWriteLatency.average",
-		"storageAdapter.write.average",
-	}
-
-	hostStorageAdapterAggregateMetrics = []string{
-		"storageAdapter.maxTotalLatency.latest",
-	}
-
-	hostStoragePathPerformanceMetrics = []string{
-		"storagePath.busResets.summation",
-		"storagePath.commandsAborted.summation",
-		"storagePath.commandsAveraged.average",
-		"storagePath.numberReadAveraged.average",
-		"storagePath.numberWriteAveraged.average",
-		"storagePath.read.average",
-		"storagePath.throughput.cont.average",
-		"storagePath.throughput.usage.average",
-		"storagePath.totalReadLatency.average",
-		"storagePath.totalWriteLatency.average",
-		"storagePath.write.average",
-	}
-
-	hostStoragePathAggregateMetrics = []string{
-		"storagePath.maxTotalLatency.latest",
-	}
-
-	hostCPUInstancePerformanceMetrics = []string{
-		"cpu.coreUtilization.average",
-		"cpu.idle.summation",
-		"cpu.usage.average",
-		"cpu.used.summation",
-		"cpu.utilization.average",
 	}
 
 	hostPowerMetrics = []string{

@@ -177,6 +177,60 @@ Validation after removal:
   appear in the generated vSphere integration markdown.
 - `git diff --check` passed.
 
+### 2026-05-22 Host Child-Instance Metrics Removal Decision
+
+The user approved removing the host child-instance metric public surface from
+this PR.
+
+Removal scope:
+
+- remove `collect_host_nic_performance`, `host_nic_include`,
+  `collect_host_disk_performance`, `host_disk_include`,
+  `collect_host_storage_adapter_performance`,
+  `host_storage_adapter_include`, `collect_host_storage_path_performance`,
+  `host_storage_path_include`, `collect_host_cpu_instance_performance`, and
+  `host_cpu_instance_include`;
+- remove the associated host physical-NIC, disk/LUN/device, storage-adapter,
+  storage-path, and CPU-instance metric surfaces rather than leaving hidden/dead
+  code;
+- preserve the existing default host aggregate CPU, disk, and network charts
+  because those are V1-compatible aggregate host metrics, not the new
+  per-child-instance surfaces.
+
+Evidence and reason:
+
+- Existing V1-compatible host aggregate CPU, disk, and network metrics already
+  provide default host-level visibility.
+- The new surfaces add per-host child-instance detail, request wildcard
+  performance instances from vCenter, and would create a permanent public config
+  surface.
+- The user prefers not to expose genuinely high-cardinality optional surfaces
+  before they are clearly needed because they are hard to remove after release.
+
+Validation after removal:
+
+- Forbidden-symbol grep for the removed host child-instance config keys, Go
+  fields, matchers, sample plumbing, per-instance chart contexts, and the
+  `storageAdapter.throughput.usag` counter name returned no matches in vSphere
+  code/config/schema/metadata/chart templates or generated integration
+  markdown.
+- Aggregate V1-compatible host CPU, disk, and network contexts remain present in
+  `charts.go`, `charts.yaml`, `metadata.yaml`, and
+  `testdata/v1_compat_manifest.json`.
+- The host child-instance implementation/test files were deleted after explicit
+  user approval to remove the public surface rather than hide it.
+- `UPDATE_VSPHERE_CHARTS=1 go test -count=1 ./collector/vsphere -run TestCollector_ChartTemplateYAML`
+  passed from `src/go/plugin/go.d` with
+  `GOCACHE=/private/tmp/netdata-go-build-cache` and regenerated `charts.yaml`.
+- `.venv/bin/python` JSON parsing passed for `config_schema.json` and
+  `testdata/config.json`; `.venv/bin/python` with `ruamel.yaml` parsed
+  `metadata.yaml`, `charts.yaml`, and `testdata/config.yaml`.
+- `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+- `go test -count=1 ./collector/vsphere/...` passed from
+  `src/go/plugin/go.d` outside the sandbox after the sandboxed run failed to let
+  govmomi's `httptest` simulator bind a local loopback port.
+- `git diff --check` passed.
+
 ### 2026-05-20 Vnode Removal Decision
 
 The user directed hard removal of vnode-related vSphere changes before merge.

@@ -55,21 +55,16 @@ func New() *Collector {
 					Timeout: confopt.Duration(time.Second * 20),
 				},
 			},
-			DiscoveryInterval:          confopt.Duration(time.Minute * 5),
-			HostsInclude:               match.HostIncludes{"/*"},
-			VMsInclude:                 match.VMIncludes{"/*"},
-			DatastoresInclude:          match.DatastoreIncludes{"/*"},
-			ClustersInclude:            match.ClusterIncludes{"/*"},
-			DatastoreClustersInclude:   match.DatastoreClusterIncludes{"/*"},
-			HostNICsInclude:            []string{"*"},
-			HostDisksInclude:           []string{"*"},
-			HostStorageAdaptersInclude: []string{"*"},
-			HostStoragePathsInclude:    []string{"*"},
-			HostCPUInstancesInclude:    []string{"*"},
-			CollectVSAN:                false,
-			VSANClustersInclude:        match.VSANClusterIncludes{"/*"},
-			VSANHostsInclude:           match.VSANHostIncludes{"/*"},
-			VSANVMsInclude:             match.VSANVMIncludes{"/*"},
+			DiscoveryInterval:        confopt.Duration(time.Minute * 5),
+			HostsInclude:             match.HostIncludes{"/*"},
+			VMsInclude:               match.VMIncludes{"/*"},
+			DatastoresInclude:        match.DatastoreIncludes{"/*"},
+			ClustersInclude:          match.ClusterIncludes{"/*"},
+			DatastoreClustersInclude: match.DatastoreClusterIncludes{"/*"},
+			CollectVSAN:              false,
+			VSANClustersInclude:      match.VSANClusterIncludes{"/*"},
+			VSANHostsInclude:         match.VSANHostIncludes{"/*"},
+			VSANVMsInclude:           match.VSANVMIncludes{"/*"},
 		},
 		store:                   store,
 		mx:                      mx,
@@ -112,18 +107,6 @@ type Config struct {
 	TagCategories    []string `yaml:"tag_categories,omitempty" json:"tag_categories"`
 	CustomAttributes []string `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
 
-	// Optional host child-instance metrics.
-	CollectHostNICPerformance            bool     `yaml:"collect_host_nic_performance,omitempty" json:"collect_host_nic_performance"`
-	HostNICsInclude                      []string `yaml:"host_nic_include,omitempty" json:"host_nic_include"`
-	CollectHostDiskPerformance           bool     `yaml:"collect_host_disk_performance,omitempty" json:"collect_host_disk_performance"`
-	HostDisksInclude                     []string `yaml:"host_disk_include,omitempty" json:"host_disk_include"`
-	CollectHostStorageAdapterPerformance bool     `yaml:"collect_host_storage_adapter_performance,omitempty" json:"collect_host_storage_adapter_performance"`
-	HostStorageAdaptersInclude           []string `yaml:"host_storage_adapter_include,omitempty" json:"host_storage_adapter_include"`
-	CollectHostStoragePathPerformance    bool     `yaml:"collect_host_storage_path_performance,omitempty" json:"collect_host_storage_path_performance"`
-	HostStoragePathsInclude              []string `yaml:"host_storage_path_include,omitempty" json:"host_storage_path_include"`
-	CollectHostCPUInstancePerformance    bool     `yaml:"collect_host_cpu_instance_performance,omitempty" json:"collect_host_cpu_instance_performance"`
-	HostCPUInstancesInclude              []string `yaml:"host_cpu_instance_include,omitempty" json:"host_cpu_instance_include"`
-
 	// Optional aggregate power metrics.
 	CollectPowerMetrics bool `yaml:"collect_power_metrics,omitempty" json:"collect_power_metrics"`
 
@@ -158,31 +141,19 @@ type (
 		charted                 map[string]bool
 
 		// two-phase chart creation: property charts always, perf charts only when data arrives
-		datastorePerfReceived                  map[string]bool
-		datastorePerfCharted                   map[string]bool
-		clusterPerfReceived                    map[string]bool
-		clusterPerfCharted                     map[string]bool
-		datastoreClusterMatcher                match.DatastoreClusterMatcher
-		hostNICMatcher                         matcher.Matcher
-		hostDiskMatcher                        matcher.Matcher
-		hostStorageAdapterMatcher              matcher.Matcher
-		hostStoragePathMatcher                 matcher.Matcher
-		hostCPUInstanceMatcher                 matcher.Matcher
-		vsanClusterMatcher                     match.VSANClusterMatcher
-		vsanHostMatcher                        match.VSANHostMatcher
-		vsanVMMatcher                          match.VSANVMMatcher
-		vsphereTagCategoryMatcher              matcher.Matcher
-		customAttributeMatcher                 matcher.Matcher
-		hostNICPerfSamples                     map[string]*hostNICPerfSample
-		hostDiskPerfSamples                    map[string]*hostDiskPerfSample
-		hostStorageAdapterPerfSamples          map[string]*hostStorageAdapterPerfSample
-		hostStorageAdapterAggregatePerfSamples map[string]*hostStorageAdapterAggregatePerfSample
-		hostStoragePathPerfSamples             map[string]*hostStoragePathPerfSample
-		hostStoragePathAggregatePerfSamples    map[string]*hostStoragePathAggregatePerfSample
-		hostCPUInstancePerfSamples             map[string]*hostCPUInstancePerfSample
-		hostPowerPerfSamples                   map[string]*hostPowerPerfSample
-		vmPowerPerfSamples                     map[string]*vmPowerPerfSample
-		vsanMetrics                            *scrapepkg.VSANMetrics
+		datastorePerfReceived     map[string]bool
+		datastorePerfCharted      map[string]bool
+		clusterPerfReceived       map[string]bool
+		clusterPerfCharted        map[string]bool
+		datastoreClusterMatcher   match.DatastoreClusterMatcher
+		vsanClusterMatcher        match.VSANClusterMatcher
+		vsanHostMatcher           match.VSANHostMatcher
+		vsanVMMatcher             match.VSANVMMatcher
+		vsphereTagCategoryMatcher matcher.Matcher
+		customAttributeMatcher    matcher.Matcher
+		hostPowerPerfSamples      map[string]*hostPowerPerfSample
+		vmPowerPerfSamples        map[string]*vmPowerPerfSample
+		vsanMetrics               *scrapepkg.VSANMetrics
 	}
 	discoverer interface {
 		Discover() (*rs.Resources, error)
@@ -309,23 +280,11 @@ func (c *Collector) resetRuntimeStateForInit() {
 	c.clusterPerfReceived = make(map[string]bool)
 	c.clusterPerfCharted = make(map[string]bool)
 	c.datastoreClusterMatcher = nil
-	c.hostNICMatcher = nil
-	c.hostDiskMatcher = nil
-	c.hostStorageAdapterMatcher = nil
-	c.hostStoragePathMatcher = nil
-	c.hostCPUInstanceMatcher = nil
 	c.vsanClusterMatcher = nil
 	c.vsanHostMatcher = nil
 	c.vsanVMMatcher = nil
 	c.vsphereTagCategoryMatcher = nil
 	c.customAttributeMatcher = nil
-	c.hostNICPerfSamples = nil
-	c.hostDiskPerfSamples = nil
-	c.hostStorageAdapterPerfSamples = nil
-	c.hostStorageAdapterAggregatePerfSamples = nil
-	c.hostStoragePathPerfSamples = nil
-	c.hostStoragePathAggregatePerfSamples = nil
-	c.hostCPUInstancePerfSamples = nil
 	c.hostPowerPerfSamples = nil
 	c.vmPowerPerfSamples = nil
 	c.vsanMetrics = nil

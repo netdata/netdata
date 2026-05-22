@@ -3,11 +3,26 @@
 package vsphere
 
 import (
+	"sort"
 	"testing"
 
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	"github.com/stretchr/testify/require"
 )
+
+func firstSortedHost(t *testing.T, collr *Collector) *rs.Host {
+	t.Helper()
+
+	hosts := make([]*rs.Host, 0, len(collr.resources.Hosts))
+	for _, host := range collr.resources.Hosts {
+		hosts = append(hosts, host)
+	}
+	sort.Slice(hosts, func(i, j int) bool {
+		return hosts[i].ID < hosts[j].ID
+	})
+	require.NotEmpty(t, hosts)
+	return hosts[0]
+}
 
 func firstSortedVM(t *testing.T, collr *Collector) *rs.VM {
 	t.Helper()

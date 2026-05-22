@@ -92,126 +92,6 @@
           "/*"
         ]
       },
-      "collect_host_nic_performance": {
-        "title": "Collect host physical network interface performance",
-        "description": "If enabled, collects per-physical-NIC traffic, packets, drops, errors, broadcast packets, multicast packets, unknown protocol frames, and usage from vSphere net performance instances. Disabled by default because it adds high-cardinality per-interface performance series and can increase vCenter query load.",
-        "type": "boolean",
-        "default": false
-      },
-      "host_nic_include": {
-        "title": "Host physical network interface selector",
-        "description": "Simple-pattern allowlist for host physical network interfaces when collect_host_nic_performance is enabled. Patterns match the vSphere performance instance or interface:<interface_instance>.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "minItems": 1,
-        "items": {
-          "title": "Host physical network interface selector",
-          "type": "string",
-          "default": "*"
-        },
-        "default": [
-          "*"
-        ]
-      },
-      "collect_host_disk_performance": {
-        "title": "Collect host disk device performance",
-        "description": "If enabled, collects per-host-disk/LUN throughput, IOPS, requests, latency, command events, queue depth, and SCSI reservation conflicts from vSphere disk performance instances. Disabled by default because it adds high-cardinality per-device performance series and can increase vCenter query load.",
-        "type": "boolean",
-        "default": false
-      },
-      "host_disk_include": {
-        "title": "Host disk device selector",
-        "description": "Simple-pattern allowlist for host disk/LUN/device instances when collect_host_disk_performance is enabled. Patterns match the vSphere performance instance or instance:<disk_instance>.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "minItems": 1,
-        "items": {
-          "title": "Host disk device selector",
-          "type": "string",
-          "default": "*"
-        },
-        "default": [
-          "*"
-        ]
-      },
-      "collect_host_storage_adapter_performance": {
-        "title": "Collect host storage adapter performance",
-        "description": "If enabled, collects per-host-storage-adapter I/O, command, latency, queue, outstanding I/O percentage, throughput usage, throughput contention, and aggregate maximum latency metrics from vSphere storageAdapter performance counters. Disabled by default because it adds high-cardinality per-adapter performance series and can increase vCenter query load.",
-        "type": "boolean",
-        "default": false
-      },
-      "host_storage_adapter_include": {
-        "title": "Host storage adapter selector",
-        "description": "Simple-pattern allowlist for host storage adapter instances when collect_host_storage_adapter_performance is enabled. Patterns match the vSphere performance instance, adapter:<adapter_instance>, or instance:<adapter_instance>.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "minItems": 1,
-        "items": {
-          "title": "Host storage adapter selector",
-          "type": "string",
-          "default": "*"
-        },
-        "default": [
-          "*"
-        ]
-      },
-      "collect_host_storage_path_performance": {
-        "title": "Collect host storage path performance",
-        "description": "If enabled, collects per-host-storage-path I/O, command, latency, command-event, throughput usage, throughput contention, and aggregate maximum latency metrics from vSphere storagePath performance counters. Disabled by default because it adds high-cardinality per-path performance series and can increase vCenter query load.",
-        "type": "boolean",
-        "default": false
-      },
-      "host_storage_path_include": {
-        "title": "Host storage path selector",
-        "description": "Simple-pattern allowlist for host storage path instances when collect_host_storage_path_performance is enabled. Patterns match the vSphere performance instance, path:<path_instance>, or instance:<path_instance>.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "minItems": 1,
-        "items": {
-          "title": "Host storage path selector",
-          "type": "string",
-          "default": "*"
-        },
-        "default": [
-          "*"
-        ]
-      },
-      "collect_host_cpu_instance_performance": {
-        "title": "Collect host CPU instance performance",
-        "description": "If enabled, collects per-host CPU instance usage, utilization, core utilization, used time, and idle time from vSphere cpu performance counters. Disabled by default because it adds high-cardinality per-core/logical-CPU performance series and can increase vCenter query load.",
-        "type": "boolean",
-        "default": false
-      },
-      "host_cpu_instance_include": {
-        "title": "Host CPU instance selector",
-        "description": "Simple-pattern allowlist for host CPU instances when collect_host_cpu_instance_performance is enabled. Patterns match the vSphere performance instance, cpu:<cpu_instance>, or instance:<cpu_instance>.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "minItems": 1,
-        "items": {
-          "title": "Host CPU instance selector",
-          "type": "string",
-          "default": "*"
-        },
-        "default": [
-          "*"
-        ]
-      },
       "collect_power_metrics": {
         "title": "Collect power and energy metrics",
         "description": "If enabled, collects aggregate host and VM power usage, energy usage, and host power-capacity metrics from vSphere power performance counters. Disabled by default to preserve existing collection scope and avoid extra vCenter performance queries.",
@@ -494,36 +374,6 @@
           ]
         },
         {
-          "title": "H-Net",
-          "fields": [
-            "collect_host_nic_performance",
-            "host_nic_include"
-          ]
-        },
-        {
-          "title": "H-Disk",
-          "fields": [
-            "collect_host_disk_performance",
-            "host_disk_include"
-          ]
-        },
-        {
-          "title": "H-Store",
-          "fields": [
-            "collect_host_storage_adapter_performance",
-            "host_storage_adapter_include",
-            "collect_host_storage_path_performance",
-            "host_storage_path_include"
-          ]
-        },
-        {
-          "title": "H-CPU",
-          "fields": [
-            "collect_host_cpu_instance_performance",
-            "host_cpu_instance_include"
-          ]
-        },
-        {
           "title": "Power",
           "fields": [
             "collect_power_metrics"
@@ -621,21 +471,6 @@
       "ui:listFlavour": "list"
     },
     "custom_attributes": {
-      "ui:listFlavour": "list"
-    },
-    "host_nic_include": {
-      "ui:listFlavour": "list"
-    },
-    "host_disk_include": {
-      "ui:listFlavour": "list"
-    },
-    "host_storage_adapter_include": {
-      "ui:listFlavour": "list"
-    },
-    "host_storage_path_include": {
-      "ui:listFlavour": "list"
-    },
-    "host_cpu_instance_include": {
       "ui:listFlavour": "list"
     },
     "vsan_cluster_include": {

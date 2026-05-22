@@ -12,11 +12,6 @@ import (
 func optionalMetricNames() []string {
 	var names []string
 	names = append(names, datastoreClusterOptionalMetricNames()...)
-	names = append(names, hostNICPerformanceOptionalMetricNames()...)
-	names = append(names, hostDiskPerformanceOptionalMetricNames()...)
-	names = append(names, hostStorageAdapterPerformanceOptionalMetricNames()...)
-	names = append(names, hostStoragePathPerformanceOptionalMetricNames()...)
-	names = append(names, hostCPUInstancePerformanceOptionalMetricNames()...)
 	names = append(names, powerMetricsOptionalMetricNames()...)
 	names = append(names, vsanOptionalMetricNames()...)
 	return names
@@ -24,11 +19,6 @@ func optionalMetricNames() []string {
 
 func (c *Collector) writeOptionalMetrics(meter metrix.SnapshotMeter) {
 	c.writeDatastoreClusterMetrics(meter)
-	c.writeHostNICPerformanceMetrics(meter)
-	c.writeHostDiskPerformanceMetrics(meter)
-	c.writeHostStorageAdapterPerformanceMetrics(meter)
-	c.writeHostStoragePathPerformanceMetrics(meter)
-	c.writeHostCPUInstancePerformanceMetrics(meter)
 	c.writePowerMetrics(meter)
 	c.writeVSANMetrics(meter)
 }

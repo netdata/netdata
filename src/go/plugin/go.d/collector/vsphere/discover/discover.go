@@ -53,18 +53,13 @@ type Discoverer struct {
 	match.VMMatcher
 	match.DatastoreMatcher
 	match.ClusterMatcher
-	CollectDatastoreClusters             bool
-	CollectHostNICPerformance            bool
-	CollectHostDiskPerformance           bool
-	CollectHostStorageAdapterPerformance bool
-	CollectHostStoragePathPerformance    bool
-	CollectHostCPUInstancePerformance    bool
-	CollectPowerMetrics                  bool
-	CollectVSAN                          bool
-	CollectNetworkTopology               bool
-	TagCategoryMatcher                   matcher.Matcher
-	CustomAttributeMatcher               matcher.Matcher
-	missingPerfCounterWarnings           map[string]bool
+	CollectDatastoreClusters   bool
+	CollectPowerMetrics        bool
+	CollectVSAN                bool
+	CollectNetworkTopology     bool
+	TagCategoryMatcher         matcher.Matcher
+	CustomAttributeMatcher     matcher.Matcher
+	missingPerfCounterWarnings map[string]bool
 }
 
 type resources struct {
