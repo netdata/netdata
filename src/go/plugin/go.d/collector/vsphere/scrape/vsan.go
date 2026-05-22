@@ -375,7 +375,7 @@ func vsanFaultName(err error) string {
 		fault := soap.ToSoapFault(e)
 		if fault.Detail.Fault != nil {
 			t := reflect.TypeOf(fault.Detail.Fault)
-			if t.Kind() == reflect.Ptr {
+			if t.Kind() == reflect.Pointer {
 				t = t.Elem()
 			}
 			return t.Name()
