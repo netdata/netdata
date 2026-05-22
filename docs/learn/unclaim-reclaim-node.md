@@ -39,10 +39,15 @@ You might need to move a node to a different Space when:
 
 ## Step 1: Unclaim from Current Space
 
-See our **[Reconnect Agent](/src/claim/README.md#reconnect-agent)** guide for the exact commands to:
+<details>
+<summary><strong>Linux-based Installations</strong></summary><br/>
 
-- Remove the Cloud connection directory (Linux)
-- Remove connection files and recreate container (Docker)
+Delete the `cloud.d/` directory in your Netdata library directory.
+
+```bash
+cd /var/lib/netdata   # Replace with your Netdata library directory, if not /var/lib/netdata/
+sudo rm -rf cloud.d/
+```
 
 :::warning
 
@@ -57,6 +62,63 @@ sudo systemctl restart netdata
 ```
 
 :::
+
+</details>
+
+<details>
+<summary><strong>Docker-based Installations</strong></summary><br/>
+
+To remove a node from your Space and connect it to another, follow these steps:
+
+1. **Enter the running container** you wish to remove from your Space
+
+   ```bash
+   docker exec -it CONTAINER_NAME sh
+   ```
+
+   Replace `CONTAINER_NAME` with either the container's name or ID.
+
+2. **Delete the connection files and machine GUID**
+
+   ```bash
+   rm -rf /var/lib/netdata/cloud.d/
+   rm /var/lib/netdata/registry/netdata.public.unique.id
+   ```
+
+   :::important
+
+   Docker unclaiming requires deleting **both** `cloud.d/` **and** `netdata.public.unique.id`. The Linux procedure only deletes `cloud.d/`, but Docker-based installations must also remove the machine GUID to ensure a clean reconnection to the new Space.
+
+   :::
+
+3. **Stop and remove the container**
+
+   **Docker CLI:**
+
+   ```bash
+   docker stop CONTAINER_NAME
+   docker rm CONTAINER_NAME
+   ```
+
+   Replace `CONTAINER_NAME` with either the container's name or ID.
+
+   **Docker Compose:**
+
+   Inside the directory that has the `docker-compose.yml` file, run:
+
+   ```bash
+   docker compose down
+   ```
+
+   **Docker Swarm:**
+
+   Run the following, and replace `STACK` with your Stack's name:
+
+   ```bash
+   docker stack rm STACK
+   ```
+
+</details>
 
 ## Step 2: Reclaim to New Space
 
@@ -85,14 +147,29 @@ Then restart the agent or run:
 netdatacli reload-claiming-state
 ```
 
-### Option 3: Environment Variables
+### Option 3: Environment Variables (Docker)
 
-For Docker/container deployments, set:
+For Docker-based installations, you must recreate the container with the new Space's claim token. Go to your new Space in Netdata Cloud, copy the installation command with the new claim token, and recreate the container.
+
+When using `docker run`, include the claiming environment variables:
 
 ```bash
-NETDATA_CLAIM_TOKEN=YOUR_NEW_TOKEN
-NETDATA_CLAIM_ROOMS=ROOM_KEY1,ROOM_KEY2
+docker run -d \
+  -e NETDATA_CLAIM_TOKEN=YOUR_NEW_TOKEN \
+  -e NETDATA_CLAIM_ROOMS=ROOM_KEY1,ROOM_KEY2 \
+  ...other options... \
+  netdata/netdata
 ```
+
+When using `docker-compose.yml`, update the environment section with the new Space's claim token:
+
+```yaml
+environment:
+  NETDATA_CLAIM_TOKEN: YOUR_NEW_TOKEN
+  NETDATA_CLAIM_ROOMS: ROOM_KEY1,ROOM_KEY2
+```
+
+Then start the container with `docker compose up -d`. The node should appear online in the new Space.
 
 ## Verification
 
