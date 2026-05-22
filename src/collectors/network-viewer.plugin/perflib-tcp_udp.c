@@ -277,10 +277,16 @@ void function_network_protocols(
         initialized = true;
     }
 
-    tcp_collect_family(&tcp_ipv4);
-    tcp_collect_family(&tcp_ipv6);
-    udp_collect_family(&udp_ipv4);
-    udp_collect_family(&udp_ipv6);
+    bool have_tcp_ipv4 = tcp_collect_family(&tcp_ipv4);
+    bool have_tcp_ipv6 = tcp_collect_family(&tcp_ipv6);
+    bool have_udp_ipv4 = udp_collect_family(&udp_ipv4);
+    bool have_udp_ipv6 = udp_collect_family(&udp_ipv6);
+
+    if(unlikely(!have_tcp_ipv4 && !have_tcp_ipv6 && !have_udp_ipv4 && !have_udp_ipv6)) {
+        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
+                                               "failed to collect Windows TCP/UDP stack statistics");
+        return;
+    }
 
     time_t now_s = now_realtime_sec();
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -288,10 +294,14 @@ void function_network_protocols(
 
     buffer_json_member_add_array(wb, "data");
     {
-        proto_emit_tcp_row(wb, &tcp_ipv4);
-        proto_emit_tcp_row(wb, &tcp_ipv6);
-        proto_emit_udp_row(wb, &udp_ipv4);
-        proto_emit_udp_row(wb, &udp_ipv6);
+        if(have_tcp_ipv4)
+            proto_emit_tcp_row(wb, &tcp_ipv4);
+        if(have_tcp_ipv6)
+            proto_emit_tcp_row(wb, &tcp_ipv6);
+        if(have_udp_ipv4)
+            proto_emit_udp_row(wb, &udp_ipv4);
+        if(have_udp_ipv6)
+            proto_emit_udp_row(wb, &udp_ipv6);
     }
     buffer_json_array_close(wb); // data
 
