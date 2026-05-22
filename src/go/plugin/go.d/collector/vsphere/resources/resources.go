@@ -268,7 +268,7 @@ type (
 		CustomValues      map[int32]string
 		Capacity          int64
 		FreeSpace         int64
-		StorageDRSEnabled bool
+		StorageDRSEnabled *bool
 		OverallStatus     string
 		Ref               types.ManagedObjectReference
 	}

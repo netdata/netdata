@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
+	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -41,6 +42,54 @@ func TestCollector_AddsUserMetadataLabels(t *testing.T) {
 	hostChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.host_cpu_utilization", map[string]string{"id": host.ID})
 	require.Equal(t, "prod", createdCharts[hostChartID].Labels["vsphere_tag_env"])
 	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
+}
+
+func TestClusterNameLabels(t *testing.T) {
+	tests := map[string]struct {
+		host *rs.Host
+		vm   *rs.VM
+		want string
+	}{
+		"standalone host dummy cluster": {
+			host: &rs.Host{
+				Name: "Host1",
+				Hier: rs.HostHierarchy{Cluster: rs.HierarchyValue{
+					ID:   "domain-s1",
+					Name: "Host1",
+				}},
+			},
+			vm: &rs.VM{
+				Hier: rs.VMHierarchy{
+					Cluster: rs.HierarchyValue{ID: "domain-s1", Name: "Host1"},
+					Host:    rs.HierarchyValue{Name: "Host1"},
+				},
+			},
+			want: "",
+		},
+		"real cluster with same name as host": {
+			host: &rs.Host{
+				Name: "Host1",
+				Hier: rs.HostHierarchy{Cluster: rs.HierarchyValue{
+					ID:   "domain-c1",
+					Name: "Host1",
+				}},
+			},
+			vm: &rs.VM{
+				Hier: rs.VMHierarchy{
+					Cluster: rs.HierarchyValue{ID: "domain-c1", Name: "Host1"},
+					Host:    rs.HierarchyValue{Name: "Host1"},
+				},
+			},
+			want: "Host1",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, getHostClusterName(tc.host))
+			require.Equal(t, tc.want, getVMClusterName(tc.vm))
+		})
+	}
 }
 
 func TestCollector_Init_ReturnsFalseIfInvalidUserMetadataLabelConfig(t *testing.T) {

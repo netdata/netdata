@@ -4,6 +4,7 @@ package vsphere
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
@@ -34,15 +35,19 @@ func resourceEnrichmentLabels(labels map[string]string) []metrix.Label {
 }
 
 func getVMClusterName(vm *rs.VM) string {
-	if vm.Hier.Cluster.Name == vm.Hier.Host.Name {
+	if isStandaloneHostClusterID(vm.Hier.Cluster.ID) {
 		return ""
 	}
 	return vm.Hier.Cluster.Name
 }
 
 func getHostClusterName(host *rs.Host) string {
-	if host.Hier.Cluster.Name == host.Name {
+	if isStandaloneHostClusterID(host.Hier.Cluster.ID) {
 		return ""
 	}
 	return host.Hier.Cluster.Name
+}
+
+func isStandaloneHostClusterID(id string) bool {
+	return strings.HasPrefix(id, "domain-s")
 }

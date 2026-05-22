@@ -38,8 +38,8 @@ func (c *Collector) writeDatastoreClusterMetrics() {
 		} else {
 			c.observeGauge(datastoreClusterSpaceUtilizationUsedMetric, 0, labels)
 		}
-		c.observeGauge(datastoreClusterStorageDRSEnabledMetric, oldmetrix.Bool(pod.StorageDRSEnabled), labels)
-		c.observeGauge(datastoreClusterStorageDRSDisabledMetric, oldmetrix.Bool(!pod.StorageDRSEnabled), labels)
+		c.observeGauge(datastoreClusterStorageDRSEnabledMetric, oldmetrix.Bool(pod.StorageDRSEnabled != nil && *pod.StorageDRSEnabled), labels)
+		c.observeGauge(datastoreClusterStorageDRSDisabledMetric, oldmetrix.Bool(pod.StorageDRSEnabled != nil && !*pod.StorageDRSEnabled), labels)
 		status := pod.OverallStatus
 		if status == "" {
 			status = "gray"

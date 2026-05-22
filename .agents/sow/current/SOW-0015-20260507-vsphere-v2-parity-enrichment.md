@@ -2285,6 +2285,39 @@ Optional chart coverage hardening as of 2026-05-22:
   - `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
   - `git diff --check` passed from `src/go/plugin/go.d`.
 
+GitHub review feedback fixes as of 2026-05-22:
+
+- Accepted and fixed readiness client-state feedback:
+  `readinessRows()` now requires `c.vsClient`, `c.discoverer`, and `c.scraper`
+  before reporting the client row as ready. A regression test covers the
+  cleanup/failed-init shape where discoverer and scraper remain set but the
+  vSphere client is nil.
+- Accepted and fixed opaque network topology feedback:
+  `opaqueNetwork-` managed-object IDs now map to `vsphere_network` actor IDs,
+  matching standard `network-` and distributed-port-group `dvportgroup-` IDs.
+- Accepted and fixed missing-counter warning dedup feedback:
+  `collectMetricLists()` and `warnMissingMetricCounters()` now use pointer
+  receivers so fallback initialization of `missingPerfCounterWarnings` persists.
+- Accepted and fixed Storage DRS state feedback:
+  `StoragePod.StorageDRSEnabled` is now tri-state. Missing Storage DRS config
+  emits both `storage_drs_status_enabled=0` and
+  `storage_drs_status_disabled=0` instead of misclassifying unknown as disabled.
+- Accepted and fixed cluster-label feedback:
+  standalone-host dummy clusters are identified by `domain-s*` cluster IDs
+  instead of cluster/host name equality, preserving labels for real clusters
+  whose name happens to match a host name.
+- Accepted and fixed datastore writer test feedback:
+  `TestWriteDatastoreMetrics` now asserts the exact number of emitted
+  per-datastore series, so unexpected datastore metrics for the resource ID fail
+  the test.
+- Validation:
+  - `go test -count=1 -run 'TestFuncReadiness_Handle|TestVSphereTopologyActorIDForResource|TestCollector_DatastoreClustersStorageDRSUnknown|TestCollector_DatastoreClustersOptInEmitsCharts|TestClusterNameLabels|TestWriteDatastoreMetrics' ./collector/vsphere` passed from `src/go/plugin/go.d`.
+  - `go test -count=1 -run 'TestDiscoverer_warnMissingMetricCountersInitializesWarningMap|TestDiscoverer_collectMetricLists|TestNewStoragePod' ./collector/vsphere/discover` passed from `src/go/plugin/go.d`.
+  - `go test -count=1 -timeout 300s ./collector/vsphere/...` passed from
+    `src/go/plugin/go.d`.
+  - `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+  - `git diff --check` passed from `src/go/plugin/go.d`.
+
 NIDL/config/metadata verification as of 2026-05-09:
 
 - `docs/NIDL-Framework.md:116` through `docs/NIDL-Framework.md:170` require one instance type per context, related dimensions with one unit, hierarchy separation by contexts, and meaningful labels. The generated template has 161 contexts, no detected context/unit mismatch, and contexts are separated by vSphere resource type or child-resource type.

@@ -10,6 +10,7 @@ import (
 	"github.com/vmware/govmomi/performance"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	scrapepkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
 )
 
@@ -93,6 +94,22 @@ func TestFuncReadiness_Handle(t *testing.T) {
 				require.Equal(t, "not_ready", rows["inventory_cache"][2])
 			},
 		},
+		"client row requires vSphere client": {
+			method: "readiness",
+			collector: func() *Collector {
+				collr := New()
+				collr.URL = "https://vcenter.local"
+				collr.Username = "user"
+				collr.Password = "[REDACTED_SECRET]"
+				collr.discoverer = readinessDiscoverer{}
+				collr.scraper = readinessScraper{}
+				return collr
+			},
+			want: 200,
+			check: func(t *testing.T, rows map[string][]any) {
+				require.Equal(t, "not_ready", rows["client"][2])
+			},
+		},
 		"with vSAN cached data": {
 			method: "readiness",
 			collector: func() *Collector {
@@ -168,4 +185,32 @@ func readinessRowsFromResponse(t *testing.T, resp *funcapi.FunctionResponse) map
 		byCheck[check] = row
 	}
 	return byCheck
+}
+
+type readinessDiscoverer struct{}
+
+func (readinessDiscoverer) Discover() (*rs.Resources, error) {
+	return nil, nil
+}
+
+type readinessScraper struct{}
+
+func (readinessScraper) ScrapeHosts(rs.Hosts) []performance.EntityMetric {
+	return nil
+}
+
+func (readinessScraper) ScrapeVMs(rs.VMs) []performance.EntityMetric {
+	return nil
+}
+
+func (readinessScraper) ScrapeDatastores(rs.Datastores) []performance.EntityMetric {
+	return nil
+}
+
+func (readinessScraper) ScrapeClusters(rs.Clusters) []performance.EntityMetric {
+	return nil
+}
+
+func (readinessScraper) ScrapeVSAN(rs.Clusters, rs.Hosts, rs.VMs) *scrapepkg.VSANMetrics {
+	return nil
 }

@@ -129,7 +129,7 @@ func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
 				ID:                "group-p1",
 				Name:              "Pod1",
 				Hier:              rs.StoragePodHierarchy{DC: rs.HierarchyValue{ID: "datacenter-1", Name: "DC1"}},
-				StorageDRSEnabled: true,
+				StorageDRSEnabled: new(true),
 			},
 		},
 		ResourcePools: rs.ResourcePools{
@@ -169,6 +169,32 @@ func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
 	require.Contains(t, topologyLinkKeys(data.Links), "vsphere_host:host-1->vsphere_vm:vm-1:runs")
 	require.Contains(t, topologyLinkKeys(data.Links), "vsphere_host:host-1->vsphere_network:network-1:connects")
 	require.Contains(t, topologyLinkKeys(data.Links), "vsphere_vm:vm-1->vsphere_network:network-1:connects")
+}
+
+func TestVSphereTopologyActorIDForResource(t *testing.T) {
+	tests := map[string]struct {
+		id   string
+		want string
+	}{
+		"opaque network": {
+			id:   "opaqueNetwork-1",
+			want: "vsphere_network:opaqueNetwork-1",
+		},
+		"standard network": {
+			id:   "network-1",
+			want: "vsphere_network:network-1",
+		},
+		"distributed port group": {
+			id:   "dvportgroup-1",
+			want: "vsphere_network:dvportgroup-1",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, vsphereTopologyActorIDForResource(tc.id))
+		})
+	}
 }
 
 func TestFuncTopology_DoesNotLinkToFilteredActors(t *testing.T) {

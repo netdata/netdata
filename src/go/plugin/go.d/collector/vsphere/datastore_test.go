@@ -4,6 +4,7 @@ package vsphere
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/vmware/govmomi/vim25/types"
 
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
@@ -83,6 +84,7 @@ func TestWriteDatastoreMetrics(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := New()
 			series := runMetricWriteForTest(t, collr, func() { collr.writeDatastoreMetrics(&tc.ds) })
+			require.Len(t, series, len(tc.want))
 			for metric, want := range tc.want {
 				requireScalarSeriesValue(t, series, metric, tc.ds.ID, want)
 			}

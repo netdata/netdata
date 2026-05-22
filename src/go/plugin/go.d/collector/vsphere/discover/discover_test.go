@@ -16,6 +16,7 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/client"
@@ -371,7 +372,8 @@ func TestNewStoragePod(t *testing.T) {
 	assert.Equal(t, "group-s1", pod.ParentID)
 	assert.EqualValues(t, 1000, pod.Capacity)
 	assert.EqualValues(t, 400, pod.FreeSpace)
-	assert.True(t, pod.StorageDRSEnabled)
+	require.NotNil(t, pod.StorageDRSEnabled)
+	assert.True(t, *pod.StorageDRSEnabled)
 	assert.Equal(t, "yellow", pod.OverallStatus)
 }
 
@@ -463,6 +465,15 @@ func TestDiscoverer_collectMetricLists(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, isMetricListsCollected(res))
+}
+
+func TestDiscoverer_warnMissingMetricCountersInitializesWarningMap(t *testing.T) {
+	d := &Discoverer{Logger: logger.New()}
+
+	d.warnMissingMetricCounters(map[string]*types.PerfCounterInfo{})
+
+	require.NotNil(t, d.missingPerfCounterWarnings)
+	require.NotEmpty(t, d.missingPerfCounterWarnings)
 }
 
 func TestSimpleMetricListIncludesPowerMetrics(t *testing.T) {

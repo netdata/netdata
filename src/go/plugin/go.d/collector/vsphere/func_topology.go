@@ -189,7 +189,7 @@ func (c *Collector) topologyData(agentID string) (topology.Data, bool) {
 		actors = append(actors, vsphereTopologyActor("vsphere_datastore_cluster", pod.ID, pod.Name, map[string]any{
 			"capacity_bytes":      pod.Capacity,
 			"free_space_bytes":    pod.FreeSpace,
-			"storage_drs_enabled": pod.StorageDRSEnabled,
+			"storage_drs_enabled": optionalBool(pod.StorageDRSEnabled),
 		}, map[string]string{
 			"datacenter": pod.Hier.DC.Name,
 		}))
@@ -306,7 +306,7 @@ func vsphereTopologyActorIDForResource(id string) string {
 		return vsphereTopologyActorID("vsphere_vm", id)
 	case strings.HasPrefix(id, "datastore-"):
 		return vsphereTopologyActorID("vsphere_datastore", id)
-	case strings.HasPrefix(id, "network-"), strings.HasPrefix(id, "dvportgroup-"):
+	case strings.HasPrefix(id, "network-"), strings.HasPrefix(id, "dvportgroup-"), strings.HasPrefix(id, "opaqueNetwork-"):
 		return vsphereTopologyActorID("vsphere_network", id)
 	case strings.HasPrefix(id, "group-p"):
 		return vsphereTopologyActorID("vsphere_datastore_cluster", id)
@@ -315,6 +315,13 @@ func vsphereTopologyActorIDForResource(id string) string {
 	default:
 		return id
 	}
+}
+
+func optionalBool(value *bool) any {
+	if value == nil {
+		return nil
+	}
+	return *value
 }
 
 func cleanTopologyStringMap(in map[string]string) map[string]string {

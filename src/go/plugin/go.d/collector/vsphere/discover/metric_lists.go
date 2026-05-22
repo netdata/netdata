@@ -13,7 +13,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-func (d Discoverer) collectMetricLists(res *rs.Resources) error {
+func (d *Discoverer) collectMetricLists(res *rs.Resources) error {
 	d.Debug("discovering : metric lists : starting resources metric lists collection process")
 	t := time.Now()
 	perfCounters, err := d.CounterInfoByName()
@@ -50,7 +50,7 @@ func (d Discoverer) collectMetricLists(res *rs.Resources) error {
 	return nil
 }
 
-func (d Discoverer) warnMissingMetricCounters(pci map[string]*types.PerfCounterInfo) {
+func (d *Discoverer) warnMissingMetricCounters(pci map[string]*types.PerfCounterInfo) {
 	names := expectedMetricCounterNames()
 	for _, name := range names {
 		if _, ok := pci[name]; ok {

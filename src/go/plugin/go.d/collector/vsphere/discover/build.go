@@ -338,9 +338,9 @@ func newStoragePod(raw mo.StoragePod) *rs.StoragePod {
 		capacity = raw.Summary.Capacity
 		freeSpace = raw.Summary.FreeSpace
 	}
-	var storageDRSEnabled bool
+	var storageDRSEnabled *bool
 	if raw.PodStorageDrsEntry != nil {
-		storageDRSEnabled = raw.PodStorageDrsEntry.StorageDrsConfig.PodConfig.Enabled
+		storageDRSEnabled = new(raw.PodStorageDrsEntry.StorageDrsConfig.PodConfig.Enabled)
 	}
 	return &rs.StoragePod{
 		Name:              raw.Name,

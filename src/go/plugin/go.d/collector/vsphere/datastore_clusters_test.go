@@ -76,6 +76,21 @@ func TestCollector_DatastoreClustersOptInEmitsCharts(t *testing.T) {
 	requireChartSelectorsMatchSeries(t, collr, "vsphere.datastore_cluster_")
 }
 
+func TestCollector_DatastoreClustersStorageDRSUnknown(t *testing.T) {
+	collr := New()
+	collr.CollectDatastoreClusters = true
+	pod := testStoragePod("group-p1", "DC0_POD0", 1000, 400, true)
+	pod.StorageDRSEnabled = nil
+	collr.resources = &rs.Resources{
+		StoragePods: rs.StoragePods{pod.ID: pod},
+	}
+
+	series := runMetricWriteForTest(t, collr, collr.writeDatastoreClusterMetrics)
+
+	requireScalarSeriesValue(t, series, datastoreClusterStorageDRSEnabledMetric, pod.ID, 0)
+	requireScalarSeriesValue(t, series, datastoreClusterStorageDRSDisabledMetric, pod.ID, 0)
+}
+
 func TestCollector_DatastoreClustersSelector(t *testing.T) {
 	tests := map[string]struct {
 		include match.DatastoreClusterIncludes
@@ -144,7 +159,7 @@ func testStoragePod(id, name string, capacity, freeSpace int64, storageDRSEnable
 		Hier:              rs.StoragePodHierarchy{DC: rs.HierarchyValue{ID: "datacenter-1", Name: "DC0"}},
 		Capacity:          capacity,
 		FreeSpace:         freeSpace,
-		StorageDRSEnabled: storageDRSEnabled,
+		StorageDRSEnabled: new(storageDRSEnabled),
 		OverallStatus:     "green",
 	}
 }

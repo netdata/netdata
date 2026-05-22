@@ -215,7 +215,7 @@ func (c *Collector) readinessRows() []readinessRow {
 	rows := []readinessRow{
 		configReadinessRow("target_url", "target", c.URL != "", "target URL is configured", "target URL is not configured"),
 		configReadinessRow("credentials", "target", c.Username != "" && c.Password != "", "credentials are configured", "username or password is not configured"),
-		configReadinessRow("client", "target", c.discoverer != nil && c.scraper != nil, "vSphere client, discoverer, and scraper are initialized", "collector has not completed initialization"),
+		configReadinessRow("client", "target", c.vsClient != nil && c.discoverer != nil && c.scraper != nil, "vSphere client, discoverer, and scraper are initialized", "collector has not completed initialization"),
 	}
 
 	if c.resources == nil {

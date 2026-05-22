@@ -39,3 +39,8 @@ func countMetricSeries(reader metrix.Reader, name string) (count int) {
 	})
 	return count
 }
+
+//go:fix inline
+func boolPtr(value bool) *bool {
+	return new(value)
+}
