@@ -28,12 +28,14 @@ struct interrupt {
 // given a base, get a pointer to each record
 #define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[(line) * recordsize(cpus)])
 
+// Detect IRQ type descriptor tokens that may appear immediately before
+// action names in /proc/interrupts (for example "524288-edge").
 static inline bool interrupt_type_word(const char *word) {
     return (word && *word &&
-            (strstr(word, "-edge") ||
-             strstr(word, "-fasteoi") ||
-             strstr(word, "-level") ||
-             strstr(word, "-percpu")));
+            (strendswith(word, "-edge") ||
+             strendswith(word, "-fasteoi") ||
+             strendswith(word, "-level") ||
+             strendswith(word, "-percpu")));
 }
 
 static inline struct interrupt *get_interrupts_array(size_t lines, int cpus) {
@@ -154,9 +156,8 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 }
 
                 size_t wlen = strnlen(word, MAX_INTERRUPT_NAME - npos);
-                memcpy(&irr->name[npos], word, wlen);
+                strncpyz(&irr->name[npos], word, MAX_INTERRUPT_NAME - npos);
                 npos += wlen;
-                irr->name[npos] = '\0';
             }
 
             size_t nlen = strlen(irr->name);
