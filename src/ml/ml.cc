@@ -726,7 +726,6 @@ bool ml_should_publish_model_update(bool host_running,
     return true;
 }
 
-static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
 void ml_dimension_finalize_constant_state(ml_dimension_t *dim)
 {
     dim->mt = METRIC_TYPE_CONSTANT;
@@ -735,7 +734,7 @@ void ml_dimension_finalize_constant_state(ml_dimension_t *dim)
     dim->suppression_window_counter = 0;
 }
 
-static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
+static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
