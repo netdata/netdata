@@ -242,9 +242,14 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
 # Build a tiny Rust staticlib and link it into the main `netdata` binary so
-# that hosts (notably the MSYS2/UCRT64 Windows path) actually exercise the
-# Rust toolchain. The crate is self-contained and has no runtime
-# dependencies; turn it off with -DENABLE_RUST_DEMO=OFF when bisecting.
+# that hosts actually exercise the Rust toolchain. The crate is self-contained
+# and has no runtime dependencies; turn it off with -DENABLE_RUST_DEMO=OFF when
+# bisecting.
+#
+# The Windows build (packaging/windows/compile-on-windows.sh) currently passes
+# -DENABLE_RUST_DEMO=Off while the UCRT64 migration is in flight. Once that
+# migration lands, the override should be removed and this default will exercise
+# Rust on Windows.
 option(ENABLE_RUST_DEMO "Build the rust-demo smoke crate and link it into netdata" True)
 
 # Setup Rust/Corrosion for plugins that need it

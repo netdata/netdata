@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: in-progress
+Status: paused
 
-Sub-state: Pre-impl gate filled; user confirmed crate placement (standalone), CMake gating (ENABLE_RUST_DEMO default ON), and call site (next to NETDATA STARTUP log).
+Sub-state: Smoke crate is in tree and wired into the main `netdata` target; Linux/macOS continue to exercise it. The Windows path is intentionally opted out via `-DENABLE_RUST_DEMO=Off` in `packaging/windows/compile-on-windows.sh` while SOW-0033 (UCRT64 migration) is in flight. This SOW resumes — and its Windows acceptance criteria are validated — at the close of SOW-0033 by removing that override.
 
 ## Requirements
 
@@ -271,6 +271,23 @@ Open decisions:
 - Not yet validated:
   - The Windows MSYS2/UCRT64 build path. That is the whole point of
     the draft PR the user will open from this branch.
+
+- Scope pivot:
+  - Investigation (in this same thread) showed the current Windows build
+    runs in the MSYS shell (MSYSTEM defaults to MSYS via msys2-runtime
+    /etc/profile), uses `/usr/bin/gcc` linking against `msys-2.0.dll`
+    (LP64, Cygwin POSIX emulation), while UCRT64 rustc produces LLP64
+    UCRT-linked objects. The mismatch is harmless for the trivial smoke
+    crate but blocks any non-trivial in-process Rust use.
+  - The user decided the `rwin` worktree should pivot to migrating the
+    Windows build to UCRT64. The smoke crate stays in tree and is
+    opted out of the Windows build via `-DENABLE_RUST_DEMO=Off` in
+    `compile-on-windows.sh` until the migration lands.
+  - This SOW is paused; SOW-0033 (UCRT64 migration) becomes the active
+    SOW. When SOW-0033 completes, the override in `compile-on-windows.sh`
+    is removed, the Windows build picks up the default `ENABLE_RUST_DEMO=On`,
+    and this SOW's Windows acceptance criteria are validated and moved
+    to `done/`.
 
 ## Validation
 

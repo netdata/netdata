@@ -86,6 +86,7 @@ CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
     -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off \
     -DRust_COMPILER=/ucrt64/bin/rustc \
+    -DENABLE_RUST_DEMO=Off \
     "${windows_path_prefix_arg[@]}" \
     ${EXTRA_CMAKE_OPTIONS:-}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
