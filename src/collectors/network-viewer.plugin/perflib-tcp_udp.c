@@ -59,6 +59,14 @@ static void nv_send_result(const char *transaction, BUFFER *wb, time_t now_s)
     netdata_mutex_unlock(&stdout_mutex);
 }
 
+// Serialize pluginsd JSON errors the same way as success responses.
+static void nv_send_error(const char *transaction, HTTP_RESP response, const char *message)
+{
+    netdata_mutex_lock(&stdout_mutex);
+    pluginsd_function_json_error_to_stdout(transaction, response, message);
+    netdata_mutex_unlock(&stdout_mutex);
+}
+
 // Add a sticky string key column (Transport, Family, etc.).
 static void nv_add_key_field(BUFFER *wb, size_t *field_id, const char *id, const char *label)
 {
@@ -308,43 +316,38 @@ void function_network_protocols(
     }
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
-                                               "Request cancelled.");
+        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
         return;
     }
 
     bool have_tcp_ipv4 = tcp_collect_family(&tcp_ipv4);
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
-                                               "Request cancelled.");
+        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
         return;
     }
 
     bool have_tcp_ipv6 = tcp_collect_family(&tcp_ipv6);
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
-                                               "Request cancelled.");
+        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
         return;
     }
 
     bool have_udp_ipv4 = udp_collect_family(&udp_ipv4);
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
-                                               "Request cancelled.");
+        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
         return;
     }
 
     bool have_udp_ipv6 = udp_collect_family(&udp_ipv6);
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
-                                               "Request cancelled.");
+        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
         return;
     }
 
     if(unlikely(!have_tcp_ipv4 && !have_tcp_ipv6 && !have_udp_ipv4 && !have_udp_ipv6)) {
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
-                                               "failed to collect Windows TCP/UDP stack statistics");
+        nv_send_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
+                      "failed to collect Windows TCP/UDP stack statistics");
         return;
     }
 
