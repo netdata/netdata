@@ -45,7 +45,7 @@ You can choose from different ways to trigger alerts based on your monitoring ne
 | **Metric Variance** | Fires based on variation in values over time                        |
 | **Anomaly Rate**    | Fires when Netdata's ML-derived anomaly rate exceeds a set threshold |
 
-For **Anomaly Rate** alerts, the threshold is the ML anomaly rate on a `0`-`100` scale, where higher values indicate more anomalous behavior. See [ML-powered anomaly detection](/docs/ml-powered-anomaly-detection/anomaly-detection.md) and the [health reference](/src/health/REFERENCE.md) for more details on configuring anomaly-rate checks.
+For **Anomaly Rate** alerts, the threshold is the ML anomaly rate on a `0`-`100` scale, where higher values indicate more anomalous behavior. See [ML-powered anomaly detection](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md) and the [health reference](/src/health/REFERENCE.md) for more details on configuring anomaly-rate checks.
 
 Choose the type that best suits the behavior you want to monitor.
 
