@@ -1134,6 +1134,16 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 
     rrdhost_receiver_lock(host);
 
+    // If the obsolete-all cleanup is running on this host, refuse the attach.
+    // The cleanup walks all charts marking them obsolete without holding
+    // receiver_lock; attaching mid-pass would let it mark the new receiver's
+    // charts obsolete and call ml_host_disconnected() on a connected host.
+    // The child reconnects via normal backoff; by then the pass is done.
+    if (rrdhost_flag_check(host, RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS)) {
+        rrdhost_receiver_unlock(host);
+        return false;
+    }
+
     if (!host->receiver) {
         object_state_activate_if_not_activated(&host->state_id);
 
