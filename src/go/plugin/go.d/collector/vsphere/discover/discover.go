@@ -53,6 +53,7 @@ type Discoverer struct {
 	match.VMMatcher
 	match.DatastoreMatcher
 	match.ClusterMatcher
+	match.DatastoreClusterMatcher
 	CollectDatastoreClusters   bool
 	CollectVSAN                bool
 	CollectNetworkTopology     bool
@@ -73,7 +74,7 @@ type resources struct {
 	resourcePools []mo.ResourcePool
 }
 
-func (d Discoverer) Discover() (*rs.Resources, error) {
+func (d *Discoverer) Discover() (*rs.Resources, error) {
 	startTime := time.Now()
 	raw, err := d.discover()
 	if err != nil {
@@ -130,7 +131,7 @@ var (
 	hostPathSetBase         = []string{"name", "parent", "runtime.connectionState", "runtime.powerState", "runtime.inMaintenanceMode", "summary.overallStatus"}
 	vmPathSetBase           = []string{"name", "parent", "runtime.host", "runtime.connectionState", "runtime.powerState", "runtime.consolidationNeeded", "summary.guest", "summary.config", "summary.storage", "summary.overallStatus", "snapshot"}
 	datastorePathSetBase    = []string{"name", "parent", "summary", "overallStatus"}
-	networkPathSetBase      = []string{"name", "parent", "summary", "host", "vm"}
+	networkPathSetBase      = []string{"name", "parent", "summary", "host", "vm", "overallStatus"}
 	storagePodPathSetBase   = []string{"name", "parent", "summary", "overallStatus", "podStorageDrsEntry.storageDrsConfig.podConfig.enabled"}
 	resourcePoolPathSetBase = []string{"name", "owner"}
 )

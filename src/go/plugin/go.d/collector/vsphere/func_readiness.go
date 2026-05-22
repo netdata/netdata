@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
+	scrapepkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
 )
 
 const (
@@ -339,6 +340,14 @@ func (c *Collector) vsanReadinessRow() readinessRow {
 			details: fmt.Sprintf("vSAN collection is enabled for %d cluster(s), %d host(s), and %d VM(s) after selectors, but no vSAN scrape data is cached yet", len(clusters), len(hosts), len(vms)),
 		}
 	}
+	if vsanMetricsEmpty(c.vsanMetrics) {
+		return readinessRow{
+			check:   "vsan",
+			scope:   "metrics",
+			status:  readinessStatusWarning,
+			details: fmt.Sprintf("vSAN collection is enabled for %d cluster(s), %d host(s), and %d VM(s) after selectors, but the last vSAN scrape returned no data", len(clusters), len(hosts), len(vms)),
+		}
+	}
 
 	return readinessRow{
 		check:  "vsan",
@@ -353,6 +362,11 @@ func (c *Collector) vsanReadinessRow() readinessRow {
 			len(c.vsanMetrics.Health),
 		),
 	}
+}
+
+func vsanMetricsEmpty(metrics *scrapepkg.VSANMetrics) bool {
+	return metrics == nil ||
+		len(metrics.Clusters)+len(metrics.Hosts)+len(metrics.VMs)+len(metrics.Space)+len(metrics.Health) == 0
 }
 
 func (c *Collector) performanceCountersReadinessRow() readinessRow {

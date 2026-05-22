@@ -10,6 +10,7 @@ import (
 	"github.com/vmware/govmomi/performance"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	scrapepkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
 )
 
 func TestVSphereMethods(t *testing.T) {
@@ -93,6 +94,19 @@ func TestFuncReadiness_HandleWithVSANCachedData(t *testing.T) {
 	require.Equal(t, "ok", rows["inventory_cache"][2])
 	require.Equal(t, "ok", rows["vsan"][2])
 	require.Contains(t, rows["vsan"][3], "vSAN data cached")
+}
+
+func TestFuncReadiness_HandleWithEmptyVSANCachedData(t *testing.T) {
+	collr := newVSANTestCollector(true)
+	collr.vsanMetrics = &scrapepkg.VSANMetrics{}
+
+	handler := &funcReadiness{collector: collr}
+	resp := handler.Handle(context.Background(), "readiness", nil)
+
+	require.Equal(t, 200, resp.Status)
+	rows := readinessRowsFromResponse(t, resp)
+	require.Equal(t, "warning", rows["vsan"][2])
+	require.Contains(t, rows["vsan"][3], "last vSAN scrape returned no data")
 }
 
 func TestFuncReadiness_UnknownMethod(t *testing.T) {

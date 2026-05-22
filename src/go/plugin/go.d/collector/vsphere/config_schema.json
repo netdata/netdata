@@ -76,7 +76,7 @@
       },
       "datastore_cluster_include": {
         "title": "Datastore cluster selector",
-        "description": "Simple-pattern allowlist for datastore clusters when collect_datastore_clusters is enabled. Patterns match /Datacenter/DatastoreCluster, the datastore cluster name, or the vSphere managed object ID.",
+        "description": "Simple-pattern allowlist for discovered datastore clusters when collect_datastore_clusters is enabled. Matching datastore clusters are included in metrics, labels, cached discovery state, and topology. Patterns match /Datacenter/DatastoreCluster, the datastore cluster name, or the vSphere managed object ID.",
         "type": [
           "array",
           "null"
@@ -347,7 +347,6 @@
             "url",
             "timeout",
             "discovery_interval",
-            "not_follow_redirects",
             "vnode"
           ]
         },
@@ -404,20 +403,6 @@
             "tls_cert",
             "tls_key"
           ]
-        },
-        {
-          "title": "Proxy",
-          "fields": [
-            "proxy_url",
-            "proxy_username",
-            "proxy_password"
-          ]
-        },
-        {
-          "title": "Headers",
-          "fields": [
-            "headers"
-          ]
         }
       ]
     },
@@ -432,6 +417,21 @@
       "ui:widget": "hidden"
     },
     "force_http2": {
+      "ui:widget": "hidden"
+    },
+    "not_follow_redirects": {
+      "ui:widget": "hidden"
+    },
+    "proxy_url": {
+      "ui:widget": "hidden"
+    },
+    "proxy_username": {
+      "ui:widget": "hidden"
+    },
+    "proxy_password": {
+      "ui:widget": "hidden"
+    },
+    "headers": {
       "ui:widget": "hidden"
     },
     "autodetection_retry": {
@@ -483,13 +483,7 @@
       "ui:placeholder": "admin@vsphere.local",
       "ui:widget": "password"
     },
-    "proxy_username": {
-      "ui:widget": "password"
-    },
     "password": {
-      "ui:widget": "password"
-    },
-    "proxy_password": {
       "ui:widget": "password"
     }
   }

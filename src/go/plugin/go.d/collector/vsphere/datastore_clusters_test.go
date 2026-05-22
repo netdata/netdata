@@ -105,16 +105,26 @@ func TestCollector_DatastoreClustersSelector(t *testing.T) {
 
 			require.NoError(t, collr.Init(context.Background()))
 			collr.scraper = mockScraper{collr.scraper}
-			setOnlyTestStoragePods(collr, []*rs.StoragePod{
+			setOnlyTestStoragePods(collr, matchingTestStoragePods(collr, []*rs.StoragePod{
 				testStoragePod("group-p1", "DC0_POD0", 1000, 400, true),
 				testStoragePod("group-p2", "DC0_POD1", 2000, 500, false),
-			})
+			}))
 
 			require.NotEmpty(t, collectMapForTest(t, collr))
 
 			require.Equal(t, tc.want, countMetricSeries(collr.MetricStore().Read(metrix.ReadRaw()), datastoreClusterSpaceUsageCapacityMetric))
 		})
 	}
+}
+
+func matchingTestStoragePods(collr *Collector, pods []*rs.StoragePod) []*rs.StoragePod {
+	out := make([]*rs.StoragePod, 0, len(pods))
+	for _, pod := range pods {
+		if collr.datastoreClusterMatcher == nil || collr.datastoreClusterMatcher.Match(pod) {
+			out = append(out, pod)
+		}
+	}
+	return out
 }
 
 func setOnlyTestStoragePods(collr *Collector, pods []*rs.StoragePod) {

@@ -145,6 +145,47 @@ func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
 	require.Contains(t, topologyLinkKeys(data.Links), "vsphere_vm:vm-1->vsphere_network:network-1:connects")
 }
 
+func TestFuncTopology_DoesNotLinkToFilteredActors(t *testing.T) {
+	collr := New()
+	collr.resources = &rs.Resources{
+		DataCenters: rs.DataCenters{
+			"datacenter-1": {ID: "datacenter-1", Name: "DC1"},
+		},
+		Clusters: rs.Clusters{},
+		Hosts: rs.Hosts{
+			"host-1": {
+				ID:   "host-1",
+				Name: "Host1",
+				Hier: rs.HostHierarchy{
+					DC:      rs.HierarchyValue{ID: "datacenter-1", Name: "DC1"},
+					Cluster: rs.HierarchyValue{ID: "domain-c-filtered", Name: "Filtered"},
+				},
+			},
+		},
+		VMs: rs.VMs{
+			"vm-1": {
+				ID:   "vm-1",
+				Name: "VM1",
+				Hier: rs.VMHierarchy{
+					DC:      rs.HierarchyValue{ID: "datacenter-1", Name: "DC1"},
+					Cluster: rs.HierarchyValue{ID: "domain-c-filtered", Name: "Filtered"},
+					Host:    rs.HierarchyValue{ID: "host-filtered", Name: "FilteredHost"},
+				},
+			},
+		},
+	}
+
+	data, ok := collr.topologyData("agent")
+
+	require.True(t, ok)
+	require.Len(t, data.Actors, 3)
+	keys := topologyLinkKeys(data.Links)
+	require.Contains(t, keys, "vsphere_datacenter:datacenter-1->vsphere_host:host-1:contains")
+	require.Contains(t, keys, "vsphere_datacenter:datacenter-1->vsphere_vm:vm-1:contains")
+	require.NotContains(t, keys, "vsphere_cluster:domain-c-filtered->vsphere_host:host-1:contains")
+	require.NotContains(t, keys, "vsphere_host:host-filtered->vsphere_vm:vm-1:runs")
+}
+
 func TestFuncTopology_UnknownMethod(t *testing.T) {
 	handler := &funcTopology{collector: New()}
 

@@ -51,7 +51,7 @@ func (d Discoverer) collectMetricLists(res *rs.Resources) error {
 }
 
 func (d Discoverer) warnMissingMetricCounters(pci map[string]*types.PerfCounterInfo) {
-	names := expectedMetricCounterNames(d)
+	names := expectedMetricCounterNames()
 	for _, name := range names {
 		if _, ok := pci[name]; ok {
 			continue
@@ -67,12 +67,10 @@ func (d Discoverer) warnMissingMetricCounters(pci map[string]*types.PerfCounterI
 	}
 }
 
-func expectedMetricCounterNames(d Discoverer) []string {
+func expectedMetricCounterNames() []string {
 	var names []string
 	names = append(names, hostMetrics...)
-	names = append(names, hostPowerMetrics...)
 	names = append(names, vmMetrics...)
-	names = append(names, vmPowerMetrics...)
 	names = append(names, datastoreMetrics...)
 	names = append(names, clusterMetrics...)
 	return uniqueSortedStrings(names)
@@ -106,7 +104,9 @@ func simpleDatastoreMetricList(pci map[string]*types.PerfCounterInfo) performanc
 }
 
 func simpleClusterMetricList(pci map[string]*types.PerfCounterInfo) performance.MetricList {
-	return simpleMetricList(clusterMetrics, pci, "")
+	ml := simpleMetricList(clusterMetrics, pci, "")
+	ml = append(ml, simpleMetricList(clusterOptionalMetrics, pci, "")...)
+	return ml
 }
 
 func simpleMetricList(metrics []string, pci map[string]*types.PerfCounterInfo, instance string) performance.MetricList {
@@ -254,7 +254,9 @@ var (
 		"vmop.numRebootGuest.latest",
 		"vmop.numShutdownGuest.latest",
 		"vmop.numStandbyGuest.latest",
+	}
 
+	clusterOptionalMetrics = []string{
 		// vSphere 7.0+ only — automatically skipped if not available
 		"clusterServices.clusterDrsScore.latest",
 		"clusterServices.vmDrsScore.latest",

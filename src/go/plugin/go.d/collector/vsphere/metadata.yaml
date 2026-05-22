@@ -197,7 +197,9 @@ modules:
                 Applies only when `collect_datastore_clusters` is enabled. Values
                 use Netdata simple patterns and match
                 `/Datacenter/DatastoreCluster`, the datastore-cluster name, or
-                the vSphere managed object ID.
+                the vSphere managed object ID. Matching datastore clusters are
+                included in metrics, labels, cached discovery state, and topology
+                function output.
 
                 ```yaml
                 datastore_cluster_include:
@@ -357,11 +359,6 @@ modules:
               default_value: ""
               required: true
               group: HTTP Auth
-            - name: bearer_token_file
-              description: "Path to a file containing a bearer token (used for `Authorization: Bearer`)."
-              default_value: ""
-              required: false
-              group: HTTP Auth
 
             - name: tls_skip_verify
               description: Skip TLS certificate and hostname verification (insecure).
@@ -383,48 +380,6 @@ modules:
               default_value: ""
               required: false
               group: TLS
-
-            - name: proxy_url
-              description: HTTP proxy URL.
-              default_value: ""
-              required: false
-              group: Proxy
-            - name: proxy_username
-              description: Username for proxy Basic HTTP authentication.
-              default_value: ""
-              required: false
-              group: Proxy
-            - name: proxy_password
-              description: Password for proxy Basic HTTP authentication.
-              default_value: ""
-              required: false
-              group: Proxy
-
-            - name: method
-              description: HTTP method to use.
-              default_value: "GET"
-              required: false
-              group: Request
-            - name: body
-              description: Request body (e.g., for POST/PUT).
-              default_value: ""
-              required: false
-              group: Request
-            - name: headers
-              description: "Additional HTTP headers (one per line as key: value)."
-              default_value: ""
-              required: false
-              group: Request
-            - name: not_follow_redirects
-              description: Do not follow HTTP redirects.
-              default_value: no
-              required: false
-              group: Request
-            - name: force_http2
-              description: Force HTTP/2 (including h2c over TCP).
-              default_value: no
-              required: false
-              group: Request
 
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
@@ -569,7 +524,7 @@ modules:
           performance: |
             Uses cached collector state only:<br/>• No additional vCenter or ESXi API requests are triggered by the function<br/>• Response size grows with discovered inventory object count<br/>• `collect_network_topology` adds Network discovery during normal collector discovery cycles when enabled
           security: |
-            Exposes discovered inventory object names and status attributes already visible through vSphere chart labels and metrics:<br/>• Does not expose the configured vCenter URL, username, or password<br/>• Does not expose guest IP labels unless those labels are separately enabled for metrics
+            Exposes discovered inventory object names and status attributes already visible through vSphere chart labels and metrics:<br/>• Does not expose the configured vCenter URL, username, or password
           availability: |
             Available when:<br/>• The vSphere collector job is running<br/>• Initial discovery has completed successfully<br/>• Returns HTTP 503 while topology data is not cached yet
           require_cloud: true

@@ -155,19 +155,10 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | [cluster_include](#option-filters-cluster-include) | Cluster selector (filter). Resource pools follow their owning cluster. | /* | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | yes |
 |  | password | Password for Basic HTTP authentication. |  | yes |
-|  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
 | **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
 |  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
 |  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
 |  | tls_key | Path to client TLS private key (for mTLS). |  | no |
-| **Proxy** | proxy_url | HTTP proxy URL. |  | no |
-|  | proxy_username | Username for proxy Basic HTTP authentication. |  | no |
-|  | proxy_password | Password for proxy Basic HTTP authentication. |  | no |
-| **Request** | method | HTTP method to use. | GET | no |
-|  | body | Request body (e.g., for POST/PUT). |  | no |
-|  | headers | Additional HTTP headers (one per line as key: value). |  | no |
-|  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
-|  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 <a id="option-labels-tag-categories"></a>
@@ -227,7 +218,9 @@ and Storage DRS status.
 Applies only when `collect_datastore_clusters` is enabled. Values
 use Netdata simple patterns and match
 `/Datacenter/DatastoreCluster`, the datastore-cluster name, or
-the vSphere managed object ID.
+the vSphere managed object ID. Matching datastore clusters are
+included in metrics, labels, cached discovery state, and topology
+function output.
 
 ```yaml
 datastore_cluster_include:
@@ -885,7 +878,7 @@ The public topology function is `topology:vsphere`. The function builds actors a
 | Name | `Vsphere:topology:vsphere` |
 | Require Cloud | yes |
 | Performance | Uses cached collector state only:<br/>• No additional vCenter or ESXi API requests are triggered by the function<br/>• Response size grows with discovered inventory object count<br/>• `collect_network_topology` adds Network discovery during normal collector discovery cycles when enabled |
-| Security | Exposes discovered inventory object names and status attributes already visible through vSphere chart labels and metrics:<br/>• Does not expose the configured vCenter URL, username, or password<br/>• Does not expose guest IP labels unless those labels are separately enabled for metrics |
+| Security | Exposes discovered inventory object names and status attributes already visible through vSphere chart labels and metrics:<br/>• Does not expose the configured vCenter URL, username, or password |
 | Availability | Available when:<br/>• The vSphere collector job is running<br/>• Initial discovery has completed successfully<br/>• Returns HTTP 503 while topology data is not cached yet |
 
 #### Prerequisites

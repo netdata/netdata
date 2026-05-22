@@ -24,6 +24,9 @@ func (c *Collector) validateConfig() error {
 	if c.UpdateEvery < minRecommendedUpdateEvery {
 		c.Warningf("config option update_every=%d is lower than recommended minimum %d", c.UpdateEvery, minRecommendedUpdateEvery)
 	}
+	if c.DiscoveryInterval.Duration() <= 0 {
+		return errors.New("config option discovery_interval must be greater than zero")
+	}
 	if len(c.TagCategories) > 0 {
 		m, err := match.NewPatternListMatcher("tag_categories", c.TagCategories)
 		if err != nil {
@@ -38,14 +41,34 @@ func (c *Collector) validateConfig() error {
 		}
 		c.customAttributeMatcher = m
 	}
+	if err := c.validateDatastoreClusterConfig(); err != nil {
+		return err
+	}
+	if err := c.validateVSANConfig(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Collector) validateDatastoreClusterConfig() error {
+	if !c.CollectDatastoreClusters {
+		return nil
+	}
 	if len(c.DatastoreClustersInclude) == 0 {
 		c.DatastoreClustersInclude = match.DatastoreClusterIncludes{"/*"}
 	}
-	dcMatcher, err := c.DatastoreClustersInclude.Parse()
+	m, err := c.DatastoreClustersInclude.Parse()
 	if err != nil {
 		return err
 	}
-	c.datastoreClusterMatcher = dcMatcher
+	c.datastoreClusterMatcher = m
+	return nil
+}
+
+func (c *Collector) validateVSANConfig() error {
+	if !c.CollectVSAN {
+		return nil
+	}
 	if len(c.VSANClustersInclude) == 0 {
 		c.VSANClustersInclude = match.VSANClusterIncludes{"/*"}
 	}
@@ -90,6 +113,7 @@ func (c *Collector) initDiscoverer(cli *client.Client) error {
 	d.CollectDatastoreClusters = c.CollectDatastoreClusters
 	d.CollectVSAN = c.CollectVSAN
 	d.CollectNetworkTopology = c.CollectNetworkTopology
+	d.DatastoreClusterMatcher = c.datastoreClusterMatcher
 	d.TagCategoryMatcher = c.vsphereTagCategoryMatcher
 	d.CustomAttributeMatcher = c.customAttributeMatcher
 

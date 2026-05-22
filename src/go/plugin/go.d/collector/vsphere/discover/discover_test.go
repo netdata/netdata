@@ -50,6 +50,10 @@ func TestDiscoverer_DiscoverNetworkTopologyOptIn(t *testing.T) {
 	assert.True(t, isHierarchySet(res))
 }
 
+func TestDiscoverer_networkPathSetIncludesOverallStatus(t *testing.T) {
+	assert.Contains(t, Discoverer{}.networkPathSet(), "overallStatus")
+}
+
 func TestDiscoverer_DiscoverNetworkTopologyFailSoft(t *testing.T) {
 	d, _, teardown := prepareDiscovererSim(t)
 	defer teardown()
@@ -425,6 +429,19 @@ func TestDiscoverer_removeUnmatched(t *testing.T) {
 	assert.Lenf(t, res.VMs, 0, "vms")
 }
 
+func TestDiscoverer_removeUnmatchedStoragePods(t *testing.T) {
+	pods := rs.StoragePods{
+		"group-p1": &rs.StoragePod{ID: "group-p1"},
+		"group-p2": &rs.StoragePod{ID: "group-p2"},
+	}
+	d := Discoverer{DatastoreClusterMatcher: falseStoragePodMatcher{}}
+
+	removed := d.removeUnmatchedStoragePods(pods)
+
+	require.Equal(t, 2, removed)
+	require.Empty(t, pods)
+}
+
 func TestDiscoverer_collectMetricLists(t *testing.T) {
 	d, _, teardown := prepareDiscovererSim(t)
 	defer teardown()
@@ -473,6 +490,16 @@ func TestSimpleVMMetricListIncludesPowerMetrics(t *testing.T) {
 	for _, metric := range ml {
 		assert.Empty(t, metric.Instance)
 	}
+}
+
+func TestExpectedMetricCounterNamesSkipsOptionalCounters(t *testing.T) {
+	names := expectedMetricCounterNames()
+
+	assert.Contains(t, names, "cpu.usage.average")
+	assert.NotContains(t, names, "power.power.average")
+	assert.NotContains(t, names, "power.energy.summation")
+	assert.NotContains(t, names, "clusterServices.clusterDrsScore.latest")
+	assert.NotContains(t, names, "clusterServices.vmDrsScore.latest")
 }
 
 func prepareDiscovererSim(t *testing.T) (d *Discoverer, model *simulator.Model, teardown func()) {
@@ -559,6 +586,10 @@ func (falseHostMatcher) Match(*rs.Host) bool { return false }
 type falseVMMatcher struct{}
 
 func (falseVMMatcher) Match(*rs.VM) bool { return false }
+
+type falseStoragePodMatcher struct{}
+
+func (falseStoragePodMatcher) Match(*rs.StoragePod) bool { return false }
 
 type storagePodsErrorClient struct {
 	Client

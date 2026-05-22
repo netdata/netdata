@@ -94,7 +94,7 @@ func (c *Collector) topologyData(agentID string) (topology.Data, bool) {
 		}, map[string]string{
 			"datacenter": cluster.Hier.DC.Name,
 		}))
-		if cluster.Hier.DC.ID != "" {
+		if c.resources.DataCenters.Get(cluster.Hier.DC.ID) != nil {
 			links = append(links, vsphereTopologyLink(cluster.Hier.DC.ID, cluster.ID, "contains", "Datacenter contains cluster"))
 		}
 	}
@@ -108,8 +108,10 @@ func (c *Collector) topologyData(agentID string) (topology.Data, bool) {
 			"datacenter": host.Hier.DC.Name,
 			"cluster":    host.Hier.Cluster.Name,
 		}))
-		if host.Hier.Cluster.ID != "" {
+		if c.resources.Clusters.Get(host.Hier.Cluster.ID) != nil {
 			links = append(links, vsphereTopologyLink(host.Hier.Cluster.ID, host.ID, "contains", "Cluster contains ESXi host"))
+		} else if c.resources.DataCenters.Get(host.Hier.DC.ID) != nil {
+			links = append(links, vsphereTopologyLink(host.Hier.DC.ID, host.ID, "contains", "Datacenter contains ESXi host"))
 		}
 	}
 	for _, vm := range sortedVMs(c.resources.VMs) {
@@ -130,11 +132,11 @@ func (c *Collector) topologyData(agentID string) (topology.Data, bool) {
 			"host":       vm.Hier.Host.Name,
 		}))
 		switch {
-		case vm.Hier.Host.ID != "":
+		case c.resources.Hosts.Get(vm.Hier.Host.ID) != nil:
 			links = append(links, vsphereTopologyLink(vm.Hier.Host.ID, vm.ID, "runs", "ESXi host runs VM"))
-		case vm.Hier.Cluster.ID != "":
+		case c.resources.Clusters.Get(vm.Hier.Cluster.ID) != nil:
 			links = append(links, vsphereTopologyLink(vm.Hier.Cluster.ID, vm.ID, "contains", "Cluster contains VM"))
-		case vm.Hier.DC.ID != "":
+		case c.resources.DataCenters.Get(vm.Hier.DC.ID) != nil:
 			links = append(links, vsphereTopologyLink(vm.Hier.DC.ID, vm.ID, "contains", "Datacenter contains VM"))
 		}
 	}
@@ -153,7 +155,7 @@ func (c *Collector) topologyData(agentID string) (topology.Data, bool) {
 			"datacenter": datastore.Hier.DC.Name,
 			"type":       datastore.Type,
 		}))
-		if datastore.Hier.DC.ID != "" {
+		if c.resources.DataCenters.Get(datastore.Hier.DC.ID) != nil {
 			links = append(links, vsphereTopologyLink(datastore.Hier.DC.ID, datastore.ID, "contains", "Datacenter contains datastore"))
 		}
 	}
@@ -169,7 +171,7 @@ func (c *Collector) topologyData(agentID string) (topology.Data, bool) {
 			"datacenter": network.Hier.DC.Name,
 			"type":       network.Type,
 		}))
-		if network.Hier.DC.ID != "" {
+		if c.resources.DataCenters.Get(network.Hier.DC.ID) != nil {
 			links = append(links, vsphereTopologyLink(network.Hier.DC.ID, network.ID, "contains", "Datacenter contains network"))
 		}
 		for _, hostID := range network.HostIDs {
@@ -191,7 +193,7 @@ func (c *Collector) topologyData(agentID string) (topology.Data, bool) {
 		}, map[string]string{
 			"datacenter": pod.Hier.DC.Name,
 		}))
-		if pod.Hier.DC.ID != "" {
+		if c.resources.DataCenters.Get(pod.Hier.DC.ID) != nil {
 			links = append(links, vsphereTopologyLink(pod.Hier.DC.ID, pod.ID, "contains", "Datacenter contains datastore cluster"))
 		}
 	}
@@ -205,7 +207,7 @@ func (c *Collector) topologyData(agentID string) (topology.Data, bool) {
 			"cluster":       pool.Hier.Cluster.Name,
 			"resource_pool": pool.Name,
 		}))
-		if pool.Hier.Cluster.ID != "" {
+		if c.resources.Clusters.Get(pool.Hier.Cluster.ID) != nil {
 			links = append(links, vsphereTopologyLink(pool.Hier.Cluster.ID, pool.ID, "contains", "Cluster contains resource pool"))
 		}
 	}

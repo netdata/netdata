@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	"github.com/stretchr/testify/require"
 )
@@ -30,4 +31,11 @@ func firstSortedVM(t *testing.T, collr *Collector) *rs.VM {
 	vms := sortedVMs(collr.resources.VMs)
 	require.NotEmpty(t, vms)
 	return vms[0]
+}
+
+func countMetricSeries(reader metrix.Reader, name string) (count int) {
+	reader.ForEachByName(name, func(metrix.LabelView, metrix.SampleValue) {
+		count++
+	})
+	return count
 }

@@ -130,6 +130,14 @@ func TestCollector_Init_ReturnsFalseIfPasswordNotSet(t *testing.T) {
 	assert.Error(t, collr.Init(context.Background()))
 }
 
+func TestCollector_Init_ReturnsFalseIfDiscoveryIntervalNotPositive(t *testing.T) {
+	collr, _, teardown := prepareVSphereSim(t)
+	defer teardown()
+	collr.DiscoveryInterval = 0
+
+	require.ErrorContains(t, collr.Init(context.Background()), "discovery_interval must be greater than zero")
+}
+
 func TestCollector_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
 	collr, _, teardown := prepareVSphereSim(t)
 	defer teardown()
@@ -167,6 +175,67 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostVMIncludeFormat(t *testing.T) {
 
 	collr.ClustersInclude = match.ClusterIncludes{"invalid"}
 	assert.Error(t, collr.Init(context.Background()))
+}
+
+func TestCollector_validateConfig_IgnoresDisabledOptionalSelectors(t *testing.T) {
+	collr := New()
+	collr.URL = "https://vcenter.local"
+	collr.Username = "user"
+	collr.Password = "[REDACTED_SECRET]"
+	collr.DatastoreClustersInclude = match.DatastoreClusterIncludes{"!*"}
+	collr.VSANClustersInclude = match.VSANClusterIncludes{"!*"}
+	collr.VSANHostsInclude = match.VSANHostIncludes{"!*"}
+	collr.VSANVMsInclude = match.VSANVMIncludes{"!*"}
+
+	require.NoError(t, collr.validateConfig())
+}
+
+func TestCollector_validateConfig_ValidatesEnabledOptionalSelectors(t *testing.T) {
+	tests := map[string]struct {
+		setup func(*Collector)
+		want  string
+	}{
+		"datastore clusters": {
+			setup: func(c *Collector) {
+				c.CollectDatastoreClusters = true
+				c.DatastoreClustersInclude = match.DatastoreClusterIncludes{"!*"}
+			},
+			want: "datastore_cluster_include must include at least one positive pattern",
+		},
+		"vSAN clusters": {
+			setup: func(c *Collector) {
+				c.CollectVSAN = true
+				c.VSANClustersInclude = match.VSANClusterIncludes{"!*"}
+			},
+			want: "vsan_cluster_include must include at least one positive pattern",
+		},
+		"vSAN hosts": {
+			setup: func(c *Collector) {
+				c.CollectVSAN = true
+				c.VSANHostsInclude = match.VSANHostIncludes{"!*"}
+			},
+			want: "vsan_host_include must include at least one positive pattern",
+		},
+		"vSAN VMs": {
+			setup: func(c *Collector) {
+				c.CollectVSAN = true
+				c.VSANVMsInclude = match.VSANVMIncludes{"!*"}
+			},
+			want: "vsan_vm_include must include at least one positive pattern",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.URL = "https://vcenter.local"
+			collr.Username = "user"
+			collr.Password = "[REDACTED_SECRET]"
+			tc.setup(collr)
+
+			require.ErrorContains(t, collr.validateConfig(), tc.want)
+		})
+	}
 }
 
 func TestCollector_Check(t *testing.T) {

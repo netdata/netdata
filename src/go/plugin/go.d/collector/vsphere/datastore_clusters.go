@@ -48,12 +48,7 @@ func (c *Collector) writeDatastoreClusterMetrics(meter metrix.SnapshotMeter) {
 		return
 	}
 
-	m := c.datastoreClusterMatcher
 	for _, pod := range sortedStoragePods(c.resources.StoragePods) {
-		if m != nil && !m.Match(pod) {
-			continue
-		}
-
 		labels := meter.LabelSet(c.datastoreClusterLabels(pod)...)
 		c.observeGauge(datastoreClusterSpaceUsageCapacityMetric, pod.Capacity, labels)
 		c.observeGauge(datastoreClusterSpaceUsageFreeMetric, pod.FreeSpace, labels)
