@@ -151,8 +151,6 @@ func (c *Collector) collectLocked() (map[string]int64, error) {
 	c.collectResourcePools(mx)
 	c.collectVSAN()
 
-	c.updateCharts()
-
 	c.Debugf("metrics collected, process took %s", time.Since(t))
 
 	return mx, nil
@@ -205,12 +203,7 @@ func (c *Collector) collectHosts(mx map[string]int64) error {
 }
 
 func (c *Collector) collectHostsPropertyMetrics(mx map[string]int64) {
-	for k := range c.discoveredHosts {
-		c.discoveredHosts[k]++
-	}
-
 	for _, host := range c.resources.Hosts {
-		c.discoveredHosts[host.ID] = 0
 		writeHostPropertyMetrics(mx, host)
 	}
 }
@@ -218,7 +211,6 @@ func (c *Collector) collectHostsPropertyMetrics(mx map[string]int64) {
 func (c *Collector) collectHostsMetrics(mx map[string]int64, metrics []performance.EntityMetric) {
 	for _, metric := range metrics {
 		if host := c.resources.Hosts.Get(metric.Entity.Value); host != nil {
-			c.discoveredHosts[host.ID] = 0
 			writeHostPerfMetrics(mx, host, metric.Value)
 			c.collectHostPowerMetrics(host, metric.Value)
 		}
@@ -292,12 +284,7 @@ func (c *Collector) collectVMs(mx map[string]int64) error {
 }
 
 func (c *Collector) collectVMsPropertyMetrics(mx map[string]int64) {
-	for id := range c.discoveredVMs {
-		c.discoveredVMs[id]++
-	}
-
 	for _, vm := range c.resources.VMs {
-		c.discoveredVMs[vm.ID] = 0
 		writeVMPropertyMetrics(mx, vm)
 	}
 }
@@ -307,7 +294,6 @@ func (c *Collector) collectVMsMetrics(mx map[string]int64, metrics []performance
 		if vm := c.resources.VMs.Get(metric.Entity.Value); vm != nil {
 			writeVMPerfMetrics(mx, vm, metric.Value)
 			c.collectVMPowerMetrics(vm, metric.Value)
-			c.discoveredVMs[vm.ID] = 0
 		}
 	}
 }
@@ -446,21 +432,14 @@ func (c *Collector) refreshDatastoreProperties() map[string]bool {
 }
 
 func (c *Collector) collectDatastoresMetrics(mx map[string]int64, metrics []performance.EntityMetric, refreshed map[string]bool) {
-	for id := range c.discoveredDatastores {
-		c.discoveredDatastores[id]++
-	}
-
 	for _, ds := range c.resources.Datastores {
 		if refreshed[ds.ID] {
-			c.discoveredDatastores[ds.ID] = 0
+			writeDatastoreMetrics(mx, ds)
 		}
-		writeDatastoreMetrics(mx, ds)
 	}
 
 	for _, metric := range metrics {
 		if ds := c.resources.Datastores.Get(metric.Entity.Value); ds != nil {
-			c.discoveredDatastores[ds.ID] = 0
-			c.datastorePerfReceived[ds.ID] = true
 			writeDatastorePerfMetrics(mx, ds, metric.Value)
 		}
 	}
@@ -641,21 +620,14 @@ func updateClusterFromProperties(cl *rs.Cluster, raw mo.ClusterComputeResource) 
 }
 
 func (c *Collector) collectClustersMetrics(mx map[string]int64, metrics []performance.EntityMetric, refreshed map[string]bool) {
-	for id := range c.discoveredClusters {
-		c.discoveredClusters[id]++
-	}
-
 	for _, cl := range c.resources.Clusters {
 		if refreshed[cl.ID] {
-			c.discoveredClusters[cl.ID] = 0
+			writeClusterPropertyMetrics(mx, cl)
 		}
-		writeClusterPropertyMetrics(mx, cl)
 	}
 
 	for _, metric := range metrics {
 		if cl := c.resources.Clusters.Get(metric.Entity.Value); cl != nil {
-			c.discoveredClusters[cl.ID] = 0
-			c.clusterPerfReceived[cl.ID] = true
 			writeClusterPerfMetrics(mx, cl, metric.Value)
 		}
 	}
@@ -850,15 +822,10 @@ func updateResourcePoolFromProperties(rp *rs.ResourcePool, raw mo.ResourcePool) 
 }
 
 func (c *Collector) collectResourcePoolsMetrics(mx map[string]int64, refreshed map[string]bool) {
-	for id := range c.discoveredResourcePools {
-		c.discoveredResourcePools[id]++
-	}
-
 	for _, rp := range c.resources.ResourcePools {
 		if refreshed[rp.ID] {
-			c.discoveredResourcePools[rp.ID] = 0
+			writeResourcePoolMetrics(mx, rp)
 		}
-		writeResourcePoolMetrics(mx, rp)
 	}
 }
 

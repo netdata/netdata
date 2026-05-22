@@ -3,9 +3,6 @@
 package vsphere
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
@@ -823,156 +820,7 @@ var (
 	}
 )
 
-const failedUpdatesLimit = 10
-
-func (c *Collector) updateCharts() {
-	for id, fails := range c.discoveredHosts {
-		if fails >= failedUpdatesLimit {
-			c.removeFromCharts(id)
-			delete(c.charted, id)
-			delete(c.discoveredHosts, id)
-			continue
-		}
-
-		host := c.resources.Hosts.Get(id)
-		if host == nil || c.charted[id] || fails != 0 {
-			continue
-		}
-
-		c.charted[id] = true
-		charts := newHostCharts(host)
-		if err := c.Charts().Add(*charts...); err != nil {
-			c.logChartAddError(id, err)
-		}
-	}
-
-	for id, fails := range c.discoveredVMs {
-		if fails >= failedUpdatesLimit {
-			c.removeFromCharts(id)
-			delete(c.charted, id)
-			delete(c.discoveredVMs, id)
-			continue
-		}
-
-		vm := c.resources.VMs.Get(id)
-		if vm == nil || c.charted[id] || fails != 0 {
-			continue
-		}
-
-		c.charted[id] = true
-		charts := newVMCHarts(vm)
-		if err := c.Charts().Add(*charts...); err != nil {
-			c.logChartAddError(id, err)
-		}
-	}
-
-	for id, fails := range c.discoveredDatastores {
-		if fails >= failedUpdatesLimit {
-			c.removeFromCharts(id)
-			delete(c.charted, id)
-			delete(c.discoveredDatastores, id)
-			delete(c.datastorePerfReceived, id)
-			delete(c.datastorePerfCharted, id)
-			continue
-		}
-
-		ds := c.resources.Datastores.Get(id)
-		if ds == nil || fails != 0 {
-			continue
-		}
-
-		if !c.charted[id] {
-			c.charted[id] = true
-			charts := newDatastorePropertyCharts(ds)
-			if err := c.Charts().Add(*charts...); err != nil {
-				c.logChartAddError(id, err)
-			}
-		}
-
-		if c.datastorePerfReceived[id] && !c.datastorePerfCharted[id] {
-			c.datastorePerfCharted[id] = true
-			charts := newDatastorePerfCharts(ds)
-			if err := c.Charts().Add(*charts...); err != nil {
-				c.logChartAddError(id, err)
-			}
-		}
-	}
-
-	for id, fails := range c.discoveredClusters {
-		if fails >= failedUpdatesLimit {
-			c.removeFromCharts(id)
-			delete(c.charted, id)
-			delete(c.discoveredClusters, id)
-			delete(c.clusterPerfReceived, id)
-			delete(c.clusterPerfCharted, id)
-			continue
-		}
-
-		cl := c.resources.Clusters.Get(id)
-		if cl == nil || fails != 0 {
-			continue
-		}
-
-		if !c.charted[id] {
-			c.charted[id] = true
-			charts := newClusterPropertyCharts(cl)
-			if err := c.Charts().Add(*charts...); err != nil {
-				c.logChartAddError(id, err)
-			}
-		}
-
-		if c.clusterPerfReceived[id] && !c.clusterPerfCharted[id] {
-			c.clusterPerfCharted[id] = true
-			charts := newClusterPerfCharts(cl)
-			if err := c.Charts().Add(*charts...); err != nil {
-				c.logChartAddError(id, err)
-			}
-		}
-	}
-
-	for id, fails := range c.discoveredResourcePools {
-		if fails >= failedUpdatesLimit {
-			c.removeFromCharts(id)
-			delete(c.charted, id)
-			delete(c.discoveredResourcePools, id)
-			continue
-		}
-
-		rp := c.resources.ResourcePools.Get(id)
-		if rp == nil || c.charted[id] || fails != 0 {
-			continue
-		}
-
-		c.charted[id] = true
-		charts := newResourcePoolCharts(rp)
-		if err := c.Charts().Add(*charts...); err != nil {
-			c.logChartAddError(id, err)
-		}
-	}
-}
-
-func (c *Collector) logChartAddError(id string, err error) {
-	c.Limit("vsphere:add-chart-error:"+id, 1, recurringLogEvery).Error(err)
-}
-
-func newVMCHarts(vm *rs.VM) *collectorapi.Charts {
-	charts := vmChartsTmpl.Copy()
-
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, vm.ID)
-		chart.Labels = []collectorapi.Label{
-			{Key: "datacenter", Value: vm.Hier.DC.Name},
-			{Key: "cluster", Value: getVMClusterName(vm)},
-			{Key: "host", Value: vm.Hier.Host.Name},
-			{Key: "vm", Value: vm.Name},
-		}
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, vm.ID)
-		}
-	}
-
-	return charts
-}
+const chartExpireAfterCycles = 10
 
 func getVMClusterName(vm *rs.VM) string {
 	if vm.Hier.Cluster.Name == vm.Hier.Host.Name {
@@ -981,56 +829,11 @@ func getVMClusterName(vm *rs.VM) string {
 	return vm.Hier.Cluster.Name
 }
 
-func newHostCharts(host *rs.Host) *collectorapi.Charts {
-	charts := hostChartsTmpl.Copy()
-
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, host.ID)
-		chart.Labels = []collectorapi.Label{
-			{Key: "datacenter", Value: host.Hier.DC.Name},
-			{Key: "cluster", Value: getHostClusterName(host)},
-			{Key: "host", Value: host.Name},
-		}
-
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, host.ID)
-		}
-	}
-
-	return charts
-}
-
 func getHostClusterName(host *rs.Host) string {
 	if host.Hier.Cluster.Name == host.Name {
 		return ""
 	}
 	return host.Hier.Cluster.Name
-}
-
-func newDatastorePropertyCharts(ds *rs.Datastore) *collectorapi.Charts {
-	charts := datastorePropertyChartsTmpl.Copy()
-	applyDatastoreChartLabels(charts, ds)
-	return charts
-}
-
-func newDatastorePerfCharts(ds *rs.Datastore) *collectorapi.Charts {
-	charts := datastorePerfChartsTmpl.Copy()
-	applyDatastoreChartLabels(charts, ds)
-	return charts
-}
-
-func applyDatastoreChartLabels(charts *collectorapi.Charts, ds *rs.Datastore) {
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, ds.ID)
-		chart.Labels = []collectorapi.Label{
-			{Key: "datacenter", Value: ds.Hier.DC.Name},
-			{Key: "datastore", Value: ds.Name},
-			{Key: "type", Value: ds.Type},
-		}
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, ds.ID)
-		}
-	}
 }
 
 // --- Cluster chart templates ---
@@ -1609,53 +1412,3 @@ var (
 		},
 	}
 )
-
-func newClusterPropertyCharts(cl *rs.Cluster) *collectorapi.Charts {
-	charts := clusterPropertyChartsTmpl.Copy()
-	applyClusterChartLabels(charts, cl)
-	return charts
-}
-
-func newClusterPerfCharts(cl *rs.Cluster) *collectorapi.Charts {
-	charts := clusterPerfChartsTmpl.Copy()
-	applyClusterChartLabels(charts, cl)
-	return charts
-}
-
-func applyClusterChartLabels(charts *collectorapi.Charts, cl *rs.Cluster) {
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, cl.ID)
-		chart.Labels = []collectorapi.Label{
-			{Key: "datacenter", Value: cl.Hier.DC.Name},
-			{Key: "cluster", Value: cl.Name},
-		}
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, cl.ID)
-		}
-	}
-}
-
-func newResourcePoolCharts(rp *rs.ResourcePool) *collectorapi.Charts {
-	charts := resourcePoolChartsTmpl.Copy()
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, rp.ID)
-		chart.Labels = []collectorapi.Label{
-			{Key: "datacenter", Value: rp.Hier.DC.Name},
-			{Key: "cluster", Value: rp.Hier.Cluster.Name},
-			{Key: "resource_pool", Value: rp.Name},
-		}
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, rp.ID)
-		}
-	}
-	return charts
-}
-
-func (c *Collector) removeFromCharts(prefix string) {
-	for _, c := range *c.Charts() {
-		if strings.HasPrefix(c.ID, prefix+"_") {
-			c.MarkRemove()
-			c.MarkNotCreated()
-		}
-	}
-}

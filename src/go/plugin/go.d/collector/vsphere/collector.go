@@ -46,7 +46,6 @@ func init() {
 func New() *Collector {
 	store := metrix.NewCollectorStore()
 	mx := newCollectorMetrics(store)
-	charts := inventoryChartsTmpl.Copy()
 
 	return &Collector{
 		Config: Config{
@@ -66,20 +65,9 @@ func New() *Collector {
 			VSANHostsInclude:         match.VSANHostIncludes{"/*"},
 			VSANVMsInclude:           match.VSANVMIncludes{"/*"},
 		},
-		store:                   store,
-		mx:                      mx,
-		collectionLock:          &sync.RWMutex{},
-		charts:                  charts,
-		discoveredHosts:         make(map[string]int),
-		discoveredVMs:           make(map[string]int),
-		discoveredDatastores:    make(map[string]int),
-		discoveredClusters:      make(map[string]int),
-		discoveredResourcePools: make(map[string]int),
-		charted:                 make(map[string]bool),
-		datastorePerfReceived:   make(map[string]bool),
-		datastorePerfCharted:    make(map[string]bool),
-		clusterPerfReceived:     make(map[string]bool),
-		clusterPerfCharted:      make(map[string]bool),
+		store:          store,
+		mx:             mx,
+		collectionLock: &sync.RWMutex{},
 	}
 }
 
@@ -116,9 +104,8 @@ type (
 		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts *collectorapi.Charts
-		store  metrix.CollectorStore
-		mx     *collectorMetrics
+		store metrix.CollectorStore
+		mx    *collectorMetrics
 
 		vsClient *clientpkg.Client
 		discoverer
@@ -127,21 +114,9 @@ type (
 		clusterPropertyCollector
 		rpPropertyCollector
 
-		collectionLock          *sync.RWMutex
-		resources               *rs.Resources
-		discoveryTask           *task
-		discoveredHosts         map[string]int
-		discoveredVMs           map[string]int
-		discoveredDatastores    map[string]int
-		discoveredClusters      map[string]int
-		discoveredResourcePools map[string]int
-		charted                 map[string]bool
-
-		// two-phase chart creation: property charts always, perf charts only when data arrives
-		datastorePerfReceived     map[string]bool
-		datastorePerfCharted      map[string]bool
-		clusterPerfReceived       map[string]bool
-		clusterPerfCharted        map[string]bool
+		collectionLock            *sync.RWMutex
+		resources                 *rs.Resources
+		discoveryTask             *task
 		datastoreClusterMatcher   match.DatastoreClusterMatcher
 		vsanClusterMatcher        match.VSANClusterMatcher
 		vsanHostMatcher           match.VSANHostMatcher
@@ -214,10 +189,6 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *collectorapi.Charts {
-	return c.charts
-}
-
 func (c *Collector) Collect(context.Context) error {
 	c.collectionLock.Lock()
 	defer c.collectionLock.Unlock()
@@ -250,32 +221,18 @@ func (c *Collector) ensureRuntimeState() {
 	if c.mx == nil {
 		c.mx = newCollectorMetrics(c.store)
 	}
-	if c.charts == nil {
-		c.charts = inventoryChartsTmpl.Copy()
-	}
 }
 
 func (c *Collector) resetRuntimeStateForInit() {
 	c.collectionLock.Lock()
 	defer c.collectionLock.Unlock()
 
-	c.charts = inventoryChartsTmpl.Copy()
 	c.discoverer = nil
 	c.scraper = nil
 	c.dsPropertyCollector = nil
 	c.clusterPropertyCollector = nil
 	c.rpPropertyCollector = nil
 	c.resources = nil
-	c.discoveredHosts = make(map[string]int)
-	c.discoveredVMs = make(map[string]int)
-	c.discoveredDatastores = make(map[string]int)
-	c.discoveredClusters = make(map[string]int)
-	c.discoveredResourcePools = make(map[string]int)
-	c.charted = make(map[string]bool)
-	c.datastorePerfReceived = make(map[string]bool)
-	c.datastorePerfCharted = make(map[string]bool)
-	c.clusterPerfReceived = make(map[string]bool)
-	c.clusterPerfCharted = make(map[string]bool)
 	c.datastoreClusterMatcher = nil
 	c.vsanClusterMatcher = nil
 	c.vsanHostMatcher = nil

@@ -4,12 +4,12 @@ package vsphere
 
 import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
-type legacyChartTemplateSet struct {
+type chartTemplateSet struct {
 	charts collectorapi.Charts
 }
 
-func legacyChartTemplateSets() []legacyChartTemplateSet {
-	return []legacyChartTemplateSet{
+func chartTemplateSets() []chartTemplateSet {
+	return []chartTemplateSet{
 		{
 			charts: inventoryChartsTmpl,
 		},

@@ -78,7 +78,7 @@ func buildV2ChartTemplateSpec() charttpl.Spec {
 
 func buildV2ChartGroups() []charttpl.Group {
 	var groups []charttpl.Group
-	for _, set := range legacyChartTemplateSets() {
+	for _, set := range chartTemplateSets() {
 		byFamily := make(map[string]int)
 		for _, chart := range set.charts {
 			idx, ok := byFamily[chart.Fam]
@@ -123,7 +123,7 @@ func datastoreClusterChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioDatastoreClusterBase,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{
 							Selector: datastoreClusterSpaceUtilizationUsedMetric,
@@ -140,7 +140,7 @@ func datastoreClusterChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioDatastoreClusterBase + 1,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: datastoreClusterSpaceUsageCapacityMetric, Name: "capacity"},
 						{Selector: datastoreClusterSpaceUsageFreeMetric, Name: "free"},
@@ -171,7 +171,7 @@ func datastoreClusterChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioDatastoreClusterBase + 2,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: datastoreClusterStorageDRSEnabledMetric, Name: "enabled"},
 						{Selector: datastoreClusterStorageDRSDisabledMetric, Name: "disabled"},
@@ -185,7 +185,7 @@ func datastoreClusterChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioDatastoreClusterBase + 3,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: datastoreClusterOverallStatusGreenMetric, Name: "green"},
 						{Selector: datastoreClusterOverallStatusRedMetric, Name: "red"},
@@ -225,7 +225,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioHostPowerBase,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: hostPowerUsagePowerMetric, Name: hostPowerUsagePowerDim},
 						{Selector: hostPowerUsageCapMetric, Name: hostPowerUsageCapDim},
@@ -239,7 +239,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioHostPowerBase + 1,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: hostPowerCapacityUsageUsedMetric, Name: hostPowerCapacityUsageUsedDim},
 						{Selector: hostPowerCapacityUsageUsableMetric, Name: hostPowerCapacityUsageUsableDim},
@@ -256,7 +256,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioHostPowerBase + 2,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{
 							Selector: hostPowerCapacityUtilizationMetric,
@@ -273,7 +273,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioHostPowerBase + 3,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: hostEnergyUsageMetric, Name: hostEnergyUsageDim},
 					},
@@ -298,7 +298,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioVMPowerBase,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: vmPowerUsagePowerMetric, Name: vmPowerUsagePowerDim},
 					},
@@ -311,7 +311,7 @@ func powerMetricsChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioVMPowerBase + 1,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: vmEnergyUsageMetric, Name: vmEnergyUsageDim},
 					},
@@ -347,7 +347,7 @@ func vsanChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioInventoryObjects + 16,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: vsanClusterSpaceUtilizationUsedMetric, Name: "used", Options: &charttpl.DimensionOptions{Divisor: 100}},
 					},
@@ -360,7 +360,7 @@ func vsanChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Stacked.String(),
 					Priority:  prioInventoryObjects + 17,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: vsanClusterSpaceUsageUsedMetric, Name: vsanSpaceUsageUsedDim},
 						{Selector: vsanClusterSpaceUsageFreeMetric, Name: vsanSpaceUsageFreeDim},
@@ -375,7 +375,7 @@ func vsanChartGroups() []charttpl.Group {
 					Algorithm: collectorapi.Absolute.String(),
 					Type:      collectorapi.Line.String(),
 					Priority:  prioInventoryObjects + 18,
-					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+					Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 					Dimensions: []charttpl.Dimension{
 						{Selector: vsanClusterHealthStatusGreenMetric, Name: vsanHealthStatusGreenDim},
 						{Selector: vsanClusterHealthStatusYellowMetric, Name: vsanHealthStatusYellowDim},
@@ -460,7 +460,7 @@ func vsanOperationsChart(ctx, title string, priority int, readMetric, writeMetri
 		Algorithm: collectorapi.Absolute.String(),
 		Type:      collectorapi.Line.String(),
 		Priority:  priority,
-		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 		Dimensions: []charttpl.Dimension{
 			{Selector: readMetric, Name: vsanOperationsReadDim},
 			{Selector: writeMetric, Name: vsanOperationsWriteDim},
@@ -477,7 +477,7 @@ func vsanThroughputChart(ctx, title string, priority int, readMetric, writeMetri
 		Algorithm: collectorapi.Absolute.String(),
 		Type:      collectorapi.Area.String(),
 		Priority:  priority,
-		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 		Dimensions: []charttpl.Dimension{
 			{Selector: readMetric, Name: vsanThroughputReadDim},
 			{Selector: writeMetric, Name: vsanThroughputWriteDim},
@@ -494,7 +494,7 @@ func vsanLatencyChart(ctx, title string, priority int, readMetric, writeMetric s
 		Algorithm: collectorapi.Absolute.String(),
 		Type:      collectorapi.Line.String(),
 		Priority:  priority,
-		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 		Dimensions: []charttpl.Dimension{
 			{Selector: readMetric, Name: vsanLatencyReadDim},
 			{Selector: writeMetric, Name: vsanLatencyWriteDim},
@@ -511,7 +511,7 @@ func vsanSingleMetricChart(ctx, title, units string, priority int, metric, dim s
 		Algorithm: collectorapi.Absolute.String(),
 		Type:      collectorapi.Line.String(),
 		Priority:  priority,
-		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 		Dimensions: []charttpl.Dimension{
 			{Selector: metric, Name: dim},
 		},
@@ -527,7 +527,7 @@ func appendChartToGroup(group *charttpl.Group, chart *collectorapi.Chart) {
 		Algorithm: chartAlgorithm(chart),
 		Type:      chart.Type.String(),
 		Priority:  chart.Priority,
-		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: failedUpdatesLimit},
+		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: chartExpireAfterCycles},
 	}
 
 	for _, dim := range chart.Dims {
