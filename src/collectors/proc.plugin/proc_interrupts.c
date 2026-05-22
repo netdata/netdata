@@ -28,6 +28,14 @@ struct interrupt {
 // given a base, get a pointer to each record
 #define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[(line) * recordsize(cpus)])
 
+static inline bool interrupt_type_word(const char *word) {
+    return (word && *word &&
+            (strstr(word, "-edge") ||
+             strstr(word, "-fasteoi") ||
+             strstr(word, "-level") ||
+             strstr(word, "-percpu")));
+}
+
 static inline struct interrupt *get_interrupts_array(size_t lines, int cpus) {
     static struct interrupt *irrs = NULL;
     static size_t allocated = 0;
@@ -65,7 +73,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/interrupts");
-        ff = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
     if(unlikely(!ff))
         return 1;
@@ -128,7 +136,27 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         }
 
         if(unlikely(isdigit(irr->id[0]) && (uint32_t)(cpus + 2) < words)) {
-            strncpyz(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
+            uint32_t name_start = (uint32_t)(cpus + 2);
+            if(name_start + 1 < words && interrupt_type_word(procfile_lineword(ff, l, name_start)))
+                name_start++;
+
+            irr->name[0] = '\0';
+            size_t npos = 0;
+            for(uint32_t w = name_start; w < words && npos < MAX_INTERRUPT_NAME; w++) {
+                const char *word = procfile_lineword(ff, l, w);
+                if(unlikely(!word || !*word))
+                    continue;
+
+                if(likely(npos)) {
+                    irr->name[npos++] = '_';
+                    if(unlikely(npos >= MAX_INTERRUPT_NAME))
+                        break;
+                }
+
+                strncpyz(&irr->name[npos], word, MAX_INTERRUPT_NAME - npos);
+                npos = strlen(irr->name);
+            }
+
             size_t nlen = strlen(irr->name);
             if(likely(nlen + 1 + idlen <= MAX_INTERRUPT_NAME)) {
                 irr->name[nlen] = '_';
