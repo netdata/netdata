@@ -101,6 +101,36 @@ static void nv_add_group_by(BUFFER *wb, const char *name)
     buffer_json_object_close(wb);
 }
 
+// Convert Perflib rate counters to per-second values and keep raw gauges unchanged.
+static uint64_t nv_perflib_value(const COUNTER_DATA *cd)
+{
+    if(unlikely(!cd->updated))
+        return 0;
+
+    switch(cd->current.CounterType) {
+        case PERF_COUNTER_COUNTER:
+        case PERF_SAMPLE_COUNTER:
+        case PERF_COUNTER_BULK_COUNT: {
+            if(unlikely(!cd->previous.Time || !cd->current.Frequency))
+                return 0;
+
+            ULONGLONG data1 = cd->current.Data;
+            ULONGLONG data0 = cd->previous.Data;
+            LONGLONG time1 = cd->current.Time;
+            LONGLONG time0 = cd->previous.Time;
+            LONGLONG dt = time1 - time0;
+
+            if(unlikely(dt <= 0 || data1 < data0))
+                return 0;
+
+            return (uint64_t)(((double)(data1 - data0) * (double)cd->current.Frequency) / (double)dt);
+        }
+
+        default:
+            return (uint64_t)cd->current.Data;
+    }
+}
+
 // ============================================================
 // TCP
 // ============================================================
@@ -228,15 +258,15 @@ static void proto_emit_tcp_row(BUFFER *wb, const TCP_FAMILY *tcp)
     {
         buffer_json_add_array_item_string(wb, "TCP");
         buffer_json_add_array_item_string(wb, tcp->af);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_received.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_sent.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connection_failures.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_active.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_established.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_passive.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->connections_reset.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_total.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)tcp->segments_retransmitted.current.Data);
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->segments_received));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->segments_sent));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->connection_failures));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->connections_active));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->connections_established));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->connections_passive));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->connections_reset));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->segments_total));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->segments_retransmitted));
         buffer_json_add_array_item_uint64(wb, 0); // DatagramsNoPort — UDP only
     }
     buffer_json_array_close(wb);
@@ -248,16 +278,16 @@ static void proto_emit_udp_row(BUFFER *wb, const UDP_FAMILY *udp)
     {
         buffer_json_add_array_item_string(wb, "UDP");
         buffer_json_add_array_item_string(wb, udp->af);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_received.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_sent.current.Data);
-        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_received_errors.current.Data);
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&udp->datagrams_received));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&udp->datagrams_sent));
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&udp->datagrams_received_errors));
         buffer_json_add_array_item_uint64(wb, 0); // ConnActive        — TCP only
         buffer_json_add_array_item_uint64(wb, 0); // ConnEstablished   — TCP only
         buffer_json_add_array_item_uint64(wb, 0); // ConnPassive       — TCP only
         buffer_json_add_array_item_uint64(wb, 0); // ConnReset         — TCP only
         buffer_json_add_array_item_uint64(wb, 0); // SegsTotal         — TCP only
         buffer_json_add_array_item_uint64(wb, 0); // SegsRetransmitted — TCP only
-        buffer_json_add_array_item_uint64(wb, (uint64_t)udp->datagrams_no_port.current.Data);
+        buffer_json_add_array_item_uint64(wb, nv_perflib_value(&udp->datagrams_no_port));
     }
     buffer_json_array_close(wb);
 }
