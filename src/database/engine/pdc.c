@@ -60,7 +60,7 @@ void pdc_init(void) {
             NULL, NULL, false, false, true
             );
 
-    pulse_aral_register(pdc_globals.pdc.ar, "pdc");
+    dbengine_stats_register_aral(pdc_globals.pdc.ar, "pdc");
 }
 
 ALWAYS_INLINE PDC *pdc_get(void) {
@@ -89,7 +89,7 @@ void page_details_init(void) {
             NULL,
             NULL, NULL, false, false, true
     );
-    pulse_aral_register(pdc_globals.pd.ar, "pd");
+    dbengine_stats_register_aral(pdc_globals.pd.ar, "pd");
 }
 
 ALWAYS_INLINE struct page_details *page_details_get(void) {
@@ -118,7 +118,7 @@ void epdl_init(void) {
             NULL,
             NULL, NULL, false, false, true
     );
-    pulse_aral_register(pdc_globals.epdl.ar, "epdl");
+    dbengine_stats_register_aral(pdc_globals.epdl.ar, "epdl");
 }
 
 static ALWAYS_INLINE EPDL *epdl_get(void) {
@@ -148,7 +148,7 @@ void deol_init(void) {
             NULL, NULL, false, false, true
     );
 
-    pulse_aral_register(pdc_globals.deol.ar, "deol");
+    dbengine_stats_register_aral(pdc_globals.deol.ar, "deol");
 }
 
 static ALWAYS_INLINE DEOL *deol_get(void) {
@@ -178,7 +178,7 @@ void epdl_extent_init(void) {
             NULL, NULL, false, false, true
     );
 
-    pulse_aral_register(pdc_globals.epdl_extent.ar, "epdl_extent");
+    dbengine_stats_register_aral(pdc_globals.epdl_extent.ar, "epdl_extent");
 }
 
 static ALWAYS_INLINE EPDL_EXTENT *epdl_extent_get(void) {

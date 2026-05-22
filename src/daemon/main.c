@@ -9,6 +9,7 @@
 #include "web/mcp/mcp.h"
 
 #include "database/engine/page_test.h"
+#include "database/engine/dbengine-stats.h"
 #include "database/rrdset-slots.h"
 #include <curl/curl.h>
 
@@ -1025,6 +1026,15 @@ int netdata_main(int argc, char **argv) {
         if(st->global_variable)
             *st->global_variable = (st->enabled) ? true : false;
     }
+
+#ifdef ENABLE_DBENGINE
+    // Mirror the final pulse flag states into the engine so cache
+    // creation tracks pulse_enabled and gorilla hot-path counters
+    // tick only when pulse_extended_enabled is on (matching the
+    // pre-refactor behavior of pulse_gorilla_*).
+    dbengine_set_collect_stats(pulse_enabled);
+    dbengine_set_collect_extended_stats(pulse_extended_enabled);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("web server api");
