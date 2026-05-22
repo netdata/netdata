@@ -6,11 +6,11 @@ This document explains the access control policies that govern feature availabil
 
 Netdata implements a layered access control system to protect sensitive information while keeping core monitoring capabilities freely available. The system distinguishes between three access levels:
 
-| Access Level                | Description                                                              |
-|-----------------------------|--------------------------------------------------------------------------|
-| **Anonymous**               | Using the Netdata dashboard without signing in                           |
-| **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier)                                   |
-| **Netdata Cloud (Paid)**    | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
+| Access Level                  | Description                                                              |
+|-------------------------------|--------------------------------------------------------------------------|
+| **Anonymous**                 | Using the Netdata dashboard without signing in                           |
+| **Netdata Cloud Community**   | Signed in to Netdata Cloud (free tier)                                   |
+| **Netdata Cloud paid plan**   | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
 
 ## Why Access Controls Exist
 
