@@ -198,6 +198,14 @@
 - Fix dynamic configuration unittest  ([#22506](https://github.com/netdata/netdata/issues/22506))
 - Fix SonarCloud security hotspots and cgroup-network namespace handling ([#22460](https://github.com/netdata/netdata/issues/22460))
 - Fix pipe cleanup logic during shutdown to handle ENOENT case ([#22509](https://github.com/netdata/netdata/issues/22509))
+- Dyncfg/health: make stock alert override removable without restart ([#22511](https://github.com/netdata/netdata/issues/22511))
+- Reduce memory copies when processing cloud requests ([#22493](https://github.com/netdata/netdata/issues/22493))
+- Exclude ND_REMAPPING bookkeeping entries from journal index ([#22513](https://github.com/netdata/netdata/issues/22513))
+- Docs: task class: improve_docs - add a prometheus/openmetrics example to the ([#22479](https://github.com/netdata/netdata/issues/22479))
+- Docs: task class: improve_docs — add v3 cloud api endpoints to the common ([#22481](https://github.com/netdata/netdata/issues/22481))
+- Fix(packaging): correct rust macro name in spec _have_rust gate ([#22515](https://github.com/netdata/netdata/issues/22515))
+- Translate Path (Windows) ([#22194](https://github.com/netdata/netdata/issues/22194))
+- Modify NetdataYAML.cmake to fix compilation error ([#21295](https://github.com/netdata/netdata/issues/21295))
 
 ## [2.10.0] - 2026-04-09
 
