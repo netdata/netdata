@@ -439,7 +439,7 @@ func TestDiscoverer_collectMetricLists(t *testing.T) {
 	assert.True(t, isMetricListsCollected(res))
 }
 
-func TestSimpleHostMetricListAddsPowerMetricsWhenEnabled(t *testing.T) {
+func TestSimpleHostMetricListIncludesPowerMetrics(t *testing.T) {
 	counters := map[string]*types.PerfCounterInfo{
 		"cpu.usage.average":                  {Key: 1},
 		"power.power.average":                {Key: 2},
@@ -452,33 +452,25 @@ func TestSimpleHostMetricListAddsPowerMetricsWhenEnabled(t *testing.T) {
 		"power.capacity.usageVm.average":     {Key: 9},
 	}
 
-	disabled := simpleHostMetricList(counters, false)
-	enabled := simpleHostMetricList(counters, true)
+	ml := simpleHostMetricList(counters)
 
-	require.Len(t, disabled, 1)
-	assert.Empty(t, disabled[0].Instance)
-
-	require.Len(t, enabled, 9)
-	for _, metric := range enabled {
+	require.Len(t, ml, 9)
+	for _, metric := range ml {
 		assert.Empty(t, metric.Instance)
 	}
 }
 
-func TestSimpleVMMetricListAddsPowerMetricsWhenEnabled(t *testing.T) {
+func TestSimpleVMMetricListIncludesPowerMetrics(t *testing.T) {
 	counters := map[string]*types.PerfCounterInfo{
 		"cpu.usage.average":      {Key: 1},
 		"power.power.average":    {Key: 2},
 		"power.energy.summation": {Key: 3},
 	}
 
-	disabled := simpleVMMetricList(counters, false)
-	enabled := simpleVMMetricList(counters, true)
+	ml := simpleVMMetricList(counters)
 
-	require.Len(t, disabled, 1)
-	assert.Empty(t, disabled[0].Instance)
-
-	require.Len(t, enabled, 3)
-	for _, metric := range enabled {
+	require.Len(t, ml, 3)
+	for _, metric := range ml {
 		assert.Empty(t, metric.Instance)
 	}
 }

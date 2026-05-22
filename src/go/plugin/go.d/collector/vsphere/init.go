@@ -88,7 +88,6 @@ func (c *Collector) initDiscoverer(cli *client.Client) error {
 	d := discover.New(cli)
 	d.Logger = c.Logger
 	d.CollectDatastoreClusters = c.CollectDatastoreClusters
-	d.CollectPowerMetrics = c.CollectPowerMetrics
 	d.CollectVSAN = c.CollectVSAN
 	d.CollectNetworkTopology = c.CollectNetworkTopology
 	d.TagCategoryMatcher = c.vsphereTagCategoryMatcher

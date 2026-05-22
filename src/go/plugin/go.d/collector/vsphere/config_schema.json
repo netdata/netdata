@@ -92,12 +92,6 @@
           "/*"
         ]
       },
-      "collect_power_metrics": {
-        "title": "Collect power and energy metrics",
-        "description": "If enabled, collects aggregate host and VM power usage, energy usage, and host power-capacity metrics from vSphere power performance counters. Disabled by default to preserve existing collection scope and avoid extra vCenter performance queries.",
-        "type": "boolean",
-        "default": false
-      },
       "collect_vsan": {
         "title": "Collect vSAN metrics",
         "description": "If enabled, collects vSAN cluster capacity, vSAN cluster health, and vSAN cluster, host, and VM performance metrics through the vSAN Management API. Disabled by default because it requires vSAN APIs and the vSAN Performance Service, and adds additional vCenter queries. Use the vSAN selectors to choose the concrete vSAN performance entity refs queried.",
@@ -371,12 +365,6 @@
           "fields": [
             "tag_categories",
             "custom_attributes"
-          ]
-        },
-        {
-          "title": "Power",
-          "fields": [
-            "collect_power_metrics"
           ]
         },
         {

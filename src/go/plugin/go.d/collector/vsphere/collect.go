@@ -227,9 +227,7 @@ func (c *Collector) collectHostsMetrics(mx map[string]int64, metrics []performan
 		if host := c.resources.Hosts.Get(metric.Entity.Value); host != nil {
 			c.discoveredHosts[host.ID] = 0
 			writeHostPerfMetrics(mx, host, metric.Value)
-			if c.CollectPowerMetrics {
-				c.collectHostPowerMetrics(host, metric.Value)
-			}
+			c.collectHostPowerMetrics(host, metric.Value)
 		}
 	}
 }
@@ -245,6 +243,9 @@ func numPoweredOnHosts(hosts rs.Hosts) (num int) {
 
 func writeHostPerfMetrics(mx map[string]int64, host *rs.Host, metrics []performance.MetricSeries) {
 	for _, metric := range metrics {
+		if _, ok := hostPowerMetricByCounter[metric.Name]; ok {
+			continue
+		}
 		if metric.Instance != "" {
 			continue
 		}
@@ -312,9 +313,7 @@ func (c *Collector) collectVMsMetrics(mx map[string]int64, metrics []performance
 	for _, metric := range metrics {
 		if vm := c.resources.VMs.Get(metric.Entity.Value); vm != nil {
 			writeVMPerfMetrics(mx, vm, metric.Value)
-			if c.CollectPowerMetrics {
-				c.collectVMPowerMetrics(vm, metric.Value)
-			}
+			c.collectVMPowerMetrics(vm, metric.Value)
 			c.discoveredVMs[vm.ID] = 0
 		}
 	}
@@ -331,6 +330,9 @@ func numPoweredOnVMs(vms rs.VMs) (num int) {
 
 func writeVMPerfMetrics(mx map[string]int64, vm *rs.VM, metrics []performance.MetricSeries) {
 	for _, metric := range metrics {
+		if _, ok := vmPowerMetricByCounter[metric.Name]; ok {
+			continue
+		}
 		if metric.Instance != "" {
 			continue
 		}

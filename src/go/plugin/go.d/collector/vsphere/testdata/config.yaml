@@ -29,7 +29,6 @@ custom_attributes:
 collect_datastore_clusters: yes
 datastore_cluster_include:
   - "/*"
-collect_power_metrics: yes
 collect_vsan: yes
 vsan_cluster_include:
   - "/DC1/Cluster*"

@@ -4,7 +4,23 @@
 
 Status: in-progress
 
-Sub-state: Reopened on 2026-05-09 for PR CI regression triage and pre-merge hardening. Framework V2 migration, VM snapshot aggregate metrics/alerts, datastore aggregate enrichment, VM/host power-state metrics, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory object counts, opt-in vSphere tag/custom-attribute labels, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in vSAN cluster space/health plus cluster/host/VM performance metrics, read-only readiness Function, cached vSphere inventory topology Function, and opt-in Network/DVPG topology discovery are implemented. Local fixes are in progress for yamllint, SonarCloud, DynCfg tab layout, metadata linting, supportable vSphere error messages, and hard removal of optional ESXi/VM vnode support, host/VM power-state config controls, inventory-path labels, VM guest labels, and VM child-instance metric surfaces before closing again. Remaining parity feasibility is complete; vCenter/ESXi events, collector-generated vSphere vnodes, host/VM power-state config controls, inventory-path labels, VM guest labels, and VM child-instance metric surfaces are explicitly out of this PR by user decision.
+Sub-state: Reopened on 2026-05-09 for PR CI regression triage and pre-merge
+hardening. Framework V2 migration, VM snapshot aggregate metrics/alerts,
+datastore aggregate enrichment, VM/host power-state metrics, VM/host
+property-status metrics, cluster DRS/HA property-status metrics, inventory
+object counts, opt-in vSphere tag/custom-attribute labels, aggregate host/VM
+power metrics, opt-in datastore cluster metrics, opt-in vSAN cluster
+space/health plus cluster/host/VM performance metrics, read-only readiness
+Function, cached vSphere inventory topology Function, and opt-in Network/DVPG
+topology discovery are implemented. Local fixes are in progress for yamllint,
+SonarCloud, DynCfg tab layout, metadata linting, supportable vSphere error
+messages, and hard removal of optional ESXi/VM vnode support, host/VM
+power-state config controls, inventory-path labels, VM guest labels,
+VM/host child-instance metric surfaces, and the host/VM power-metrics config
+knob before closing again. Remaining parity feasibility is complete;
+vCenter/ESXi events, collector-generated vSphere vnodes, host/VM power-state
+config controls, inventory-path labels, VM guest labels, and VM/host
+child-instance metric surfaces are explicitly out of this PR by user decision.
 
 ### 2026-05-22 Matcher Simplification Decision
 
@@ -229,6 +245,62 @@ Validation after removal:
 - `go test -count=1 ./collector/vsphere/...` passed from
   `src/go/plugin/go.d` outside the sandbox after the sandboxed run failed to let
   govmomi's `httptest` simulator bind a local loopback port.
+- `git diff --check` passed.
+
+### 2026-05-22 Power Metrics Config Removal Decision
+
+The user approved removing the `collect_power_metrics` public config option
+while keeping the aggregate host/VM power metric implementation.
+
+Removal scope:
+
+- remove `collect_power_metrics` from `Config`, schema, metadata, stock config,
+  readiness output, and config serialization fixtures;
+- request aggregate host and VM `power.*` performance counters as part of the
+  normal host/VM aggregate metric lists when vSphere exposes those counters;
+- preserve the aggregate power chart contexts:
+  `vsphere.host_power_usage`, `vsphere.host_power_capacity_usage`,
+  `vsphere.host_power_capacity_utilization`, `vsphere.host_energy_usage`,
+  `vsphere.vm_power_usage`, and `vsphere.vm_energy_usage`.
+
+Evidence and reason:
+
+- These counters use empty-instance host/VM performance metrics and do not add
+  child-instance cardinality or wildcard instance queries.
+- The only added cardinality is one aggregate power metric set per included
+  powered-on host or VM, bounded by the existing host/VM selectors.
+- The user prefers not to introduce a public config option before there is clear
+  evidence it is needed, because such options are hard to remove after release.
+
+Validation after removal:
+
+- Forbidden-symbol grep for `CollectPowerMetrics`, `collect_power_metrics`,
+  default-off/opt-in power-metric test names, and the readiness strings returned
+  no matches in vSphere code, stock config, or generated integration markdown.
+  The only remaining `collect_power_metrics` references are SOW/spec/TODO notes
+  documenting the removed option.
+- Aggregate host/VM power contexts remain present in `charts.yaml`,
+  `metadata.yaml`, and generated vSphere integration markdown.
+- `go test -count=1 ./collector/vsphere -run 'TestCollector_(PowerMetrics|ConfigurationSerialize|ChartTemplateYAML)'`
+  passed from `src/go/plugin/go.d` with
+  `GOCACHE=/private/tmp/netdata-go-build-cache`.
+- `go test -count=1 ./collector/vsphere -run TestCollector_Collect` passed
+  from `src/go/plugin/go.d` after filtering power counters out of the legacy
+  V1-compatibility map.
+- `go test -count=1 ./collector/vsphere -run TestCollector_V2CompatibilitySurface`
+  passed from `src/go/plugin/go.d` after updating the compatibility-surface
+  guard to allow only the known additive power contexts as extra V2 charts.
+- `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+- `go test -count=1 ./collector/vsphere/...` passed from
+  `src/go/plugin/go.d` outside the sandbox after the sandboxed run failed to let
+  govmomi's `httptest` simulator bind a local loopback port.
+- `.venv/bin/python` JSON parsing passed for `config_schema.json` and
+  `testdata/config.json`; `.venv/bin/python` with `ruamel.yaml` parsed
+  `metadata.yaml`, `charts.yaml`, and `testdata/config.yaml`.
+- `.venv/bin/python integrations/gen_docs_integrations.py -c go.d.plugin/vsphere`
+  regenerated the scoped vSphere integration markdown; `.venv/bin/python
+  integrations/gen_integrations.py` passed outside the sandbox after the
+  sandboxed run could not write `integrations/integrations.js`.
 - `git diff --check` passed.
 
 ### 2026-05-20 Vnode Removal Decision
@@ -1607,7 +1679,11 @@ Implementation decisions derived from feasibility:
   - labels are `id`, `datacenter`, `cluster`, `host`, `cpu`, and `cpu_instance`, plus opt-in enrichment labels;
 - Added optional aggregate host/VM power metric collection:
   - `collect_power_metrics` defaults to `false`;
-  - host and VM power counters are requested only when the option is enabled;
+  - superseded on 2026-05-22: the config option was removed before merge by
+    user decision, and aggregate host/VM power counters are now requested when
+    vSphere exposes them;
+  - historical note: host and VM power counters were originally requested only
+    when the option was enabled;
   - this is not a per-child high-cardinality group, so it uses the existing host/VM include selectors instead of a child selector;
   - host contexts `vsphere.host_power_usage`, `vsphere.host_power_capacity_usage`, `vsphere.host_power_capacity_utilization`, and `vsphere.host_energy_usage` emit current power, power cap, capacity used/usable/idle/system/VM breakdown, capacity utilization, and energy;
   - VM contexts `vsphere.vm_power_usage` and `vsphere.vm_energy_usage` emit current power and energy;

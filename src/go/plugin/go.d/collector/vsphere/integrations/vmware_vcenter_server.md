@@ -144,8 +144,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | [custom_attributes](#option-labels-custom-attributes) | vSphere custom attribute allowlist. |  | no |
 | **High Cardinality** | [collect_datastore_clusters](#option-high-cardinality-collect-datastore-clusters) | Collect datastore cluster capacity and Storage DRS status. | no | no |
 |  | [datastore_cluster_include](#option-high-cardinality-datastore-cluster-include) | Datastore cluster selector. | /* | no |
-| **Collection** | [collect_power_metrics](#option-collection-collect-power-metrics) | Collect host and VM power metrics. | no | no |
-| **High Cardinality** | [collect_vsan](#option-high-cardinality-collect-vsan) | Collect vSAN metrics. | no | no |
+|  | [collect_vsan](#option-high-cardinality-collect-vsan) | Collect vSAN metrics. | no | no |
 |  | [vsan_cluster_include](#option-high-cardinality-vsan-cluster-include) | vSAN cluster selector. | /* | no |
 |  | [vsan_host_include](#option-high-cardinality-vsan-host-include) | vSAN host selector. | /* | no |
 |  | [vsan_vm_include](#option-high-cardinality-vsan-vm-include) | vSAN VM selector. | /* | no |
@@ -234,15 +233,6 @@ the vSphere managed object ID.
 datastore_cluster_include:
   - "/*"
 ```
-
-
-<a id="option-collection-collect-power-metrics"></a>
-##### collect_power_metrics
-
-Disabled by default to preserve existing collection scope and
-avoid extra vCenter performance queries. When enabled, it emits
-aggregate ESXi host and VM power usage, energy usage, and host
-power-capacity metrics for discovered powered-on resources.
 
 
 <a id="option-high-cardinality-collect-vsan"></a>
@@ -543,7 +533,7 @@ Metrics:
 
 ### Per virtual machine power
 
-These optional aggregate metrics refer to VM power and energy and are collected only when `collect_power_metrics` is enabled.
+These aggregate metrics refer to VM power and energy and are collected for discovered powered-on VMs when vSphere exposes the corresponding power counters.
 
 Labels:
 
@@ -591,7 +581,7 @@ Metrics:
 
 ### Per host power
 
-These optional aggregate metrics refer to ESXi host power, energy, and power capacity and are collected only when `collect_power_metrics` is enabled.
+These aggregate metrics refer to ESXi host power, energy, and power capacity and are collected for discovered powered-on hosts when vSphere exposes the corresponding power counters.
 
 Labels:
 

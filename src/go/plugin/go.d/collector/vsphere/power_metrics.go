@@ -139,9 +139,6 @@ func (c *Collector) collectVMPowerMetrics(vm *rs.VM, metrics []performance.Metri
 }
 
 func (c *Collector) writePowerMetrics(meter metrix.SnapshotMeter) {
-	if !c.CollectPowerMetrics {
-		return
-	}
 	c.writeHostPowerMetrics(meter)
 	c.writeVMPowerMetrics(meter)
 }

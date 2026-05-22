@@ -203,16 +203,6 @@ modules:
                 datastore_cluster_include:
                   - "/*"
                 ```
-            - name: collect_power_metrics
-              description: Collect host and VM power metrics.
-              default_value: no
-              required: false
-              group: Collection
-              detailed_description: |
-                Disabled by default to preserve existing collection scope and
-                avoid extra vCenter performance queries. When enabled, it emits
-                aggregate ESXi host and VM power usage, energy usage, and host
-                power-capacity metrics for discovered powered-on resources.
             - name: collect_vsan
               description: Collect vSAN metrics.
               default_value: no
@@ -804,7 +794,7 @@ modules:
               dimensions:
                 - name: depth
         - name: virtual machine power
-          description: These optional aggregate metrics refer to VM power and energy and are collected only when `collect_power_metrics` is enabled.
+          description: These aggregate metrics refer to VM power and energy and are collected for discovered powered-on VMs when vSphere exposes the corresponding power counters.
           labels:
             - name: id
               description: vSphere managed object reference ID of the VM
@@ -875,7 +865,7 @@ modules:
                 - name: read
                 - name: write
         - name: host power
-          description: These optional aggregate metrics refer to ESXi host power, energy, and power capacity and are collected only when `collect_power_metrics` is enabled.
+          description: These aggregate metrics refer to ESXi host power, energy, and power capacity and are collected for discovered powered-on hosts when vSphere exposes the corresponding power counters.
           labels:
             - name: id
               description: vSphere managed object reference ID of the host

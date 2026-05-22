@@ -34,7 +34,6 @@
   "datastore_cluster_include": [
     "/*"
   ],
-  "collect_power_metrics": true,
   "collect_vsan": true,
   "vsan_cluster_include": [
     "/DC1/Cluster*",

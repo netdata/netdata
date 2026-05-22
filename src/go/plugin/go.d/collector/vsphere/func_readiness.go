@@ -247,7 +247,6 @@ func (c *Collector) readinessRows() []readinessRow {
 	rows = append(rows,
 		c.userMetadataReadinessRow(),
 		c.optionalMetricReadinessRow("datastore_clusters", "metrics", c.CollectDatastoreClusters, len(c.DatastoreClustersInclude)),
-		c.booleanReadinessRow("power_metrics", "metrics", c.CollectPowerMetrics, "host and VM power metrics are enabled", "host and VM power metrics are disabled"),
 		c.booleanReadinessRow("network_topology", "topology", c.CollectNetworkTopology, "vSphere Network topology discovery is enabled", "vSphere Network topology discovery is disabled"),
 		c.vsanReadinessRow(),
 	)

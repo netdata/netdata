@@ -13,32 +13,9 @@ import (
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
-func TestCollector_PowerMetricsDefaultOff(t *testing.T) {
+func TestCollector_PowerMetricsEmitCharts(t *testing.T) {
 	collr, _, teardown := prepareVSphereSim(t)
 	defer teardown()
-
-	require.NoError(t, collr.Init(context.Background()))
-	host := firstSortedHost(t, collr)
-	vm := firstSortedVM(t, collr)
-	collr.scraper = mockPowerMetricsScraper{
-		mockScraper: mockScraper{collr.scraper},
-		hostID:      host.ID,
-		vmID:        vm.ID,
-		hostSeries:  testHostPowerSeries(),
-		vmSeries:    testVMPowerSeries(),
-	}
-
-	require.NotEmpty(t, collectMapForTest(t, collr))
-
-	reader := collr.MetricStore().Read(metrix.ReadRaw())
-	require.Zero(t, countMetricSeries(reader, hostPowerUsagePowerMetric))
-	require.Zero(t, countMetricSeries(reader, vmPowerUsagePowerMetric))
-}
-
-func TestCollector_PowerMetricsOptInEmitsCharts(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.CollectPowerMetrics = true
 
 	require.NoError(t, collr.Init(context.Background()))
 	host := firstSortedHost(t, collr)

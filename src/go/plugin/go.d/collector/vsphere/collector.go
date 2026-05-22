@@ -107,9 +107,6 @@ type Config struct {
 	TagCategories    []string `yaml:"tag_categories,omitempty" json:"tag_categories"`
 	CustomAttributes []string `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
 
-	// Optional aggregate power metrics.
-	CollectPowerMetrics bool `yaml:"collect_power_metrics,omitempty" json:"collect_power_metrics"`
-
 	// Optional cached topology Function data.
 	CollectNetworkTopology bool `yaml:"collect_network_topology,omitempty" json:"collect_network_topology"`
 }

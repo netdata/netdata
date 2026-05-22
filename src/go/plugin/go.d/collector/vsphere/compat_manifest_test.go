@@ -97,13 +97,14 @@ func TestCollector_V2CompatibilitySurface(t *testing.T) {
 
 	plan := buildV2PlanForTest(t, collr)
 	createdCharts, createdDims := v2CreatedChartsAndDims(plan)
-	require.Len(t, createdCharts, len(*collr.Charts()))
+	expectedV1ChartIDs := make(map[string]bool, len(*collr.Charts()))
 
 	for _, chart := range *collr.Charts() {
 		resourceID, ok := chartResourceID(chart)
 		require.True(t, ok, "chart %s must have a resource ID", chart.ID)
 
 		v2ChartID := v2ChartTemplateID(chart.Ctx) + "_" + resourceID
+		expectedV1ChartIDs[v2ChartID] = true
 		require.NotEqual(t, chart.ID, v2ChartID, "chart IDs are the accepted V2 break")
 
 		created, ok := createdCharts[v2ChartID]
@@ -127,6 +128,21 @@ func TestCollector_V2CompatibilitySurface(t *testing.T) {
 			require.Equal(t, dim.Hidden, createdDim.Hidden)
 			require.Equal(t, dim.Float, createdDim.Float)
 		}
+	}
+
+	allowedExtraContexts := map[string]bool{
+		hostPowerUsageContext:               true,
+		hostPowerCapacityUsageContext:       true,
+		hostPowerCapacityUtilizationContext: true,
+		hostEnergyUsageContext:              true,
+		vmPowerUsageContext:                 true,
+		vmEnergyUsageContext:                true,
+	}
+	for id, chart := range createdCharts {
+		if expectedV1ChartIDs[id] {
+			continue
+		}
+		require.True(t, allowedExtraContexts[chart.Meta.Context], "unexpected extra V2 chart %s with context %s", id, chart.Meta.Context)
 	}
 }
 

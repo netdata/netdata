@@ -22,11 +22,11 @@ func (d Discoverer) collectMetricLists(res *rs.Resources) error {
 	}
 	d.warnMissingMetricCounters(perfCounters)
 
-	hostML := simpleHostMetricList(perfCounters, d.CollectPowerMetrics)
+	hostML := simpleHostMetricList(perfCounters)
 	for _, h := range res.Hosts {
 		h.MetricList = hostML
 	}
-	vmML := simpleVMMetricList(perfCounters, d.CollectPowerMetrics)
+	vmML := simpleVMMetricList(perfCounters)
 	for _, v := range res.VMs {
 		v.MetricList = vmML
 	}
@@ -70,13 +70,9 @@ func (d Discoverer) warnMissingMetricCounters(pci map[string]*types.PerfCounterI
 func expectedMetricCounterNames(d Discoverer) []string {
 	var names []string
 	names = append(names, hostMetrics...)
-	if d.CollectPowerMetrics {
-		names = append(names, hostPowerMetrics...)
-	}
+	names = append(names, hostPowerMetrics...)
 	names = append(names, vmMetrics...)
-	if d.CollectPowerMetrics {
-		names = append(names, vmPowerMetrics...)
-	}
+	names = append(names, vmPowerMetrics...)
 	names = append(names, datastoreMetrics...)
 	names = append(names, clusterMetrics...)
 	return uniqueSortedStrings(names)
@@ -93,19 +89,15 @@ func uniqueSortedStrings(in []string) []string {
 	return out
 }
 
-func simpleHostMetricList(pci map[string]*types.PerfCounterInfo, collectPowerMetrics bool) performance.MetricList {
+func simpleHostMetricList(pci map[string]*types.PerfCounterInfo) performance.MetricList {
 	ml := simpleMetricList(hostMetrics, pci, "")
-	if collectPowerMetrics {
-		ml = append(ml, simpleMetricList(hostPowerMetrics, pci, "")...)
-	}
+	ml = append(ml, simpleMetricList(hostPowerMetrics, pci, "")...)
 	return ml
 }
 
-func simpleVMMetricList(pci map[string]*types.PerfCounterInfo, collectPowerMetrics bool) performance.MetricList {
+func simpleVMMetricList(pci map[string]*types.PerfCounterInfo) performance.MetricList {
 	ml := simpleMetricList(vmMetrics, pci, "")
-	if collectPowerMetrics {
-		ml = append(ml, simpleMetricList(vmPowerMetrics, pci, "")...)
-	}
+	ml = append(ml, simpleMetricList(vmPowerMetrics, pci, "")...)
 	return ml
 }
 

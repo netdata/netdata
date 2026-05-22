@@ -54,7 +54,6 @@ type Discoverer struct {
 	match.DatastoreMatcher
 	match.ClusterMatcher
 	CollectDatastoreClusters   bool
-	CollectPowerMetrics        bool
 	CollectVSAN                bool
 	CollectNetworkTopology     bool
 	TagCategoryMatcher         matcher.Matcher

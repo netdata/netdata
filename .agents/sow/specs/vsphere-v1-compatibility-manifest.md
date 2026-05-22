@@ -97,7 +97,6 @@ Struct fields and YAML/JSON keys that must remain accepted:
 | `custom_attributes` | `custom_attributes` | no | Optional vSphere custom attribute label allowlist. Default empty; each YAML list item is one glob pattern matching a custom attribute name. Matching attributes become labels named `vsphere_custom_attribute_<sanitized_name>`. |
 | `collect_datastore_clusters` | `collect_datastore_clusters` | no | Optional datastore cluster / StoragePod metrics. Default `false`. |
 | `datastore_cluster_include` | `datastore_cluster_include` | no | Optional simple-pattern allowlist for datastore clusters. Default `/*`; matches `/Datacenter/DatastoreCluster`, datastore-cluster name, or managed object ID. |
-| `collect_power_metrics` | `collect_power_metrics` | no | Optional aggregate host/VM power and energy metrics. Default `false`; requests selected `power.*` counters with empty instance for included powered-on hosts and VMs. |
 | `collect_vsan` | `collect_vsan` | no | Optional vSAN metrics. Default `false`; requests vSAN cluster space/health and vSAN cluster, host, and VM performance metrics through the vSAN Management API for vSAN-enabled clusters. |
 | `vsan_cluster_include` | `vsan_cluster_include` | no | Optional simple-pattern allowlist for vSAN-enabled clusters. Default `/*`; matches `/Datacenter/Cluster`, cluster name, managed object ID, or `vsan_uuid:<uuid>`. |
 | `vsan_host_include` | `vsan_host_include` | no | Optional simple-pattern allowlist for vSAN host performance entities. Default `/*`; matches `/Datacenter/Cluster/Host`, host name, managed object ID, or `vsan_node_uuid:<uuid>`. |
@@ -344,7 +343,7 @@ Host performance counters:
 - `disk.maxTotalLatency.latest`
 - `sys.uptime.latest`
 
-Optional power counters requested only when `collect_power_metrics` is enabled:
+Power counters requested with empty instance when vSphere exposes them:
 
 - VM: `power.power.average`
 - VM: `power.energy.summation`
@@ -411,8 +410,8 @@ Cluster performance counters:
 
 | Resource | Property path requested | Metric behavior |
 |---|---|---|
-| VM | discovery requests `name`, `parent`, `runtime.host`, `runtime.connectionState`, `runtime.powerState`, `runtime.consolidationNeeded`, `summary.guest`, `summary.config`, `summary.storage`, `summary.overallStatus`, `snapshot`; also `config.instanceUuid` only when `collect_vsan` is enabled | Emits `overall.status.{green,red,yellow,gray}`, `power_state.*`, `connection_state.*`, VMware Tools running/version state, disk consolidation-needed state, configured CPU/memory/device counts, aggregate storage usage, and snapshot aggregate metrics for all discovered VMs. Emits real-time aggregate performance counters only when the VM is `poweredOn`. If `runtime.host` is absent for a non-running VM, the VM folder parent is used to recover the datacenter label when possible. Guest hostname/IP and guest OS labels are excluded from this PR by user decision. Per-virtual-disk capacity/performance and per-vNIC performance are excluded from this PR by 2026-05-22 user decision. VM power and energy metrics are emitted only when `collect_power_metrics` is enabled and vSphere returns aggregate `power.*` counters. VM vSAN performance is emitted only when `collect_vsan` is enabled and vSAN returns a matching VM instance UUID. |
-| Host | discovery requests `name`, `parent`, `runtime.connectionState`, `runtime.powerState`, `runtime.inMaintenanceMode`, `summary.overallStatus`; also `config.vsanHostConfig.clusterInfo.nodeUuid` only when `collect_vsan` is enabled | Emits `overall.status.{green,red,yellow,gray}`, `power_state.*`, `connection_state.*`, and `maintenance_status.*` for all discovered hosts. Emits real-time aggregate performance counters only when the host is `poweredOn`. Per-host child-instance NIC, disk, storage-adapter, storage-path, and CPU-instance performance metrics are excluded from this PR by 2026-05-22 user decision. Host power, energy, and power-capacity metrics are emitted only when `collect_power_metrics` is enabled and vSphere returns aggregate `power.*` counters. Host vSAN performance is emitted only when `collect_vsan` is enabled and vSAN returns a matching host node UUID. |
+| VM | discovery requests `name`, `parent`, `runtime.host`, `runtime.connectionState`, `runtime.powerState`, `runtime.consolidationNeeded`, `summary.guest`, `summary.config`, `summary.storage`, `summary.overallStatus`, `snapshot`; also `config.instanceUuid` only when `collect_vsan` is enabled | Emits `overall.status.{green,red,yellow,gray}`, `power_state.*`, `connection_state.*`, VMware Tools running/version state, disk consolidation-needed state, configured CPU/memory/device counts, aggregate storage usage, and snapshot aggregate metrics for all discovered VMs. Emits real-time aggregate performance counters only when the VM is `poweredOn`. If `runtime.host` is absent for a non-running VM, the VM folder parent is used to recover the datacenter label when possible. Guest hostname/IP and guest OS labels are excluded from this PR by user decision. Per-virtual-disk capacity/performance and per-vNIC performance are excluded from this PR by 2026-05-22 user decision. VM power and energy metrics are emitted when vSphere returns aggregate `power.*` counters. VM vSAN performance is emitted only when `collect_vsan` is enabled and vSAN returns a matching VM instance UUID. |
+| Host | discovery requests `name`, `parent`, `runtime.connectionState`, `runtime.powerState`, `runtime.inMaintenanceMode`, `summary.overallStatus`; also `config.vsanHostConfig.clusterInfo.nodeUuid` only when `collect_vsan` is enabled | Emits `overall.status.{green,red,yellow,gray}`, `power_state.*`, `connection_state.*`, and `maintenance_status.*` for all discovered hosts. Emits real-time aggregate performance counters only when the host is `poweredOn`. Per-host child-instance NIC, disk, storage-adapter, storage-path, and CPU-instance performance metrics are excluded from this PR by 2026-05-22 user decision. Host power, energy, and power-capacity metrics are emitted when vSphere returns aggregate `power.*` counters. Host vSAN performance is emitted only when `collect_vsan` is enabled and vSAN returns a matching host node UUID. |
 | Datastore | refresh requests `summary`, `overallStatus` | Emits `capacity`, `free_space`, `used_space`, `used_space_pct`, and `overall.status.*`. Capacity/free/used are zeroed when `Accessible=false`. |
 | Network | discovery requests `name`, `parent`, `summary`, `host`, and `vm` only when `collect_network_topology` is enabled | Emits no metrics. Cached Network and Distributed Virtual Port Group status/relationships are used only by the topology Function. |
 | Datastore cluster | discovery requests `StoragePod` `name`, `parent`, `summary`, `podStorageDrsEntry`; only when `collect_datastore_clusters` is enabled | Emits optional StoragePod capacity, free, used, utilization, and Storage DRS enabled/disabled status for datastore clusters matching `datastore_cluster_include`. |
@@ -445,12 +444,13 @@ Cluster performance counters:
   metrics are not part of this PR. They were hard-removed before merge by
   2026-05-22 user decision. Existing aggregate host disk, network, CPU, memory,
   and uptime contexts remain default-on.
-- Optional host/VM power metrics are not part of the legacy V1 surface. They
-  are requested only when `collect_power_metrics` is enabled by adding selected
-  aggregate `power.*` counters with empty instance to powered-on host and VM
-  performance queries. They emit one aggregate set per included host or VM and
-  therefore use the existing host/VM include selectors instead of a new child
-  selector.
+- Host/VM power metrics are not part of the legacy V1 surface. They are
+  requested by adding selected aggregate `power.*` counters with empty instance
+  to powered-on host and VM performance queries when vSphere exposes those
+  counters. They emit one aggregate set per included host or VM and therefore
+  use the existing host/VM include selectors instead of a new child selector.
+  The `collect_power_metrics` option was removed before merge by 2026-05-22
+  user decision.
 - Optional vSAN metrics are not part of the legacy V1 surface. They are queried
   only when `collect_vsan` is enabled, only for clusters whose vSAN config is
   enabled and match the dedicated vSAN selectors, and only through the
