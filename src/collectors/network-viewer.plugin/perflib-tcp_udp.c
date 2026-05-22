@@ -60,10 +60,10 @@ static void nv_send_result(const char *transaction, BUFFER *wb, time_t now_s)
 }
 
 // Serialize pluginsd JSON errors the same way as success responses.
-static void nv_send_error(const char *transaction, HTTP_RESP response, const char *message)
+static void nv_send_error(const char *transaction, int code, const char *message)
 {
     netdata_mutex_lock(&stdout_mutex);
-    pluginsd_function_json_error_to_stdout(transaction, response, message);
+    pluginsd_function_json_error_to_stdout(transaction, code, message);
     netdata_mutex_unlock(&stdout_mutex);
 }
 
