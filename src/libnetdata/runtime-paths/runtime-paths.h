@@ -21,4 +21,14 @@ extern const char *netdata_configured_cloud_dir;
 extern const char *netdata_configured_home_dir;
 extern const char *netdata_configured_host_prefix;
 
+// Re-resolve the directory globals from the loaded netdata_config.
+// Values absent from the config keep their compile-time defaults.
+// Idempotent.
+void nd_runtime_paths_load_directories_from_inicfg(void);
+
+// Re-resolve host_prefix and hostname from netdata_config.
+// host_prefix is loaded first because os_hostname uses it.
+// Idempotent.
+void nd_runtime_paths_load_hostname_from_inicfg(void);
+
 #endif // NETDATA_RUNTIME_PATHS_H
