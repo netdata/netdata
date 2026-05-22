@@ -313,13 +313,3 @@ When an anomaly alert fires, use Netdata's built-in tools to investigate the roo
 
 - **[Alert Troubleshooting](/docs/netdata-ai/troubleshooting/index.md)** — generate a one-click report from any fired alert, assessing its validity, uncovering correlated signals, and proposing a root-cause hypothesis
 - **[Investigations](/docs/netdata-ai/investigations/index.md)** — ask open-ended questions about your infrastructure for deeper analysis beyond a single alert
-
-## Getting Started
-
-ML is enabled by default in recent Netdata versions. To use anomaly detection:
-
-1. **View anomaly ribbons** - Purple overlays on all charts show anomaly rates
-2. **Access Anomaly Advisor** - Click the Anomalies tab for guided troubleshooting
-3. **Query historical anomalies** - Use the query engine to analyze past incidents
-
-[Learn more about the Anomaly Advisor →](/docs/ml-ai/anomaly-advisor.md)
