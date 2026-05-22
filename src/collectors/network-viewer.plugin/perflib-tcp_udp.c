@@ -120,16 +120,6 @@ typedef struct {
     COUNTER_DATA segments_sent;
 } TCP_FAMILY;
 
-static TCP_FAMILY tcp_ipv4 = {
-    .af = "IPv4",
-    .object_name = "TCPv4",
-};
-
-static TCP_FAMILY tcp_ipv6 = {
-    .af = "IPv6",
-    .object_name = "TCPv6",
-};
-
 static void initialize_tcp_keys(TCP_FAMILY *tcp)
 {
     tcp->connection_failures.key     = "Connection Failures";
@@ -178,16 +168,6 @@ typedef struct {
     COUNTER_DATA datagrams_received;
     COUNTER_DATA datagrams_sent;
 } UDP_FAMILY;
-
-static UDP_FAMILY udp_ipv4 = {
-    .af = "IPv4",
-    .object_name = "UDPv4",
-};
-
-static UDP_FAMILY udp_ipv6 = {
-    .af = "IPv6",
-    .object_name = "UDPv6",
-};
 
 static void initialize_udp_keys(UDP_FAMILY *udp)
 {
@@ -268,14 +248,27 @@ void function_network_protocols(
     BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
     const char *source __maybe_unused, void *data __maybe_unused)
 {
-    static bool initialized = false;
-    if (unlikely(!initialized)) {
-        initialize_tcp_keys(&tcp_ipv4);
-        initialize_tcp_keys(&tcp_ipv6);
-        initialize_udp_keys(&udp_ipv4);
-        initialize_udp_keys(&udp_ipv6);
-        initialized = true;
-    }
+    TCP_FAMILY tcp_ipv4 = {
+        .af = "IPv4",
+        .object_name = "TCPv4",
+    };
+    TCP_FAMILY tcp_ipv6 = {
+        .af = "IPv6",
+        .object_name = "TCPv6",
+    };
+    UDP_FAMILY udp_ipv4 = {
+        .af = "IPv4",
+        .object_name = "UDPv4",
+    };
+    UDP_FAMILY udp_ipv6 = {
+        .af = "IPv6",
+        .object_name = "UDPv6",
+    };
+
+    initialize_tcp_keys(&tcp_ipv4);
+    initialize_tcp_keys(&tcp_ipv6);
+    initialize_udp_keys(&udp_ipv4);
+    initialize_udp_keys(&udp_ipv6);
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
