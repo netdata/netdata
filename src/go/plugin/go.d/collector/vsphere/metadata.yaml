@@ -276,7 +276,7 @@ modules:
               group: Request
 
             - name: vnode
-              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              description: Associates this data collection job with a [Virtual Node](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md#virtual-nodes).
               default_value: ""
               required: false
               group: Virtual Node
@@ -313,7 +313,7 @@ modules:
                     password : somepassword
             - name: With Virtual Node
               description: |
-                Associates a vSphere data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+                Associates a vSphere data collection job with a [Virtual Node](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md#virtual-nodes).
 
                 Requires first defining the vnode in `/etc/netdata/vnodes/vnodes.conf`.
               config: |
