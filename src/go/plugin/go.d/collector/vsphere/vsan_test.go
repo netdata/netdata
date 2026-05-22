@@ -63,12 +63,12 @@ func TestCollector_VSANMetricsOptInEmitsCharts(t *testing.T) {
 	requireMetricValue(t, reader, vsanVMLatencyReadMetric, vmLabels, 32)
 
 	createdCharts, createdDims := v2CreatedChartsAndDims(buildV2PlanForTest(t, collr))
-	chartID := findChartIDByLabelsAndContext(t, createdCharts, vsanClusterSpaceUsageContext, map[string]string{"id": cluster.ID})
-	require.Contains(t, createdDims[chartID], vsanSpaceUsageUsedDim)
-	hostChartID := findChartIDByLabelsAndContext(t, createdCharts, vsanHostOperationsContext, map[string]string{"id": host.ID})
-	require.Contains(t, createdDims[hostChartID], vsanOperationsReadDim)
-	vmChartID := findChartIDByLabelsAndContext(t, createdCharts, vsanVMOperationsContext, map[string]string{"id": vm.ID})
-	require.Contains(t, createdDims[vmChartID], vsanOperationsReadDim)
+	chartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.vsan_cluster_space_usage", map[string]string{"id": cluster.ID})
+	require.Contains(t, createdDims[chartID], "used")
+	hostChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.vsan_host_operations", map[string]string{"id": host.ID})
+	require.Contains(t, createdDims[hostChartID], "read")
+	vmChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.vsan_vm_operations", map[string]string{"id": vm.ID})
+	require.Contains(t, createdDims[vmChartID], "read")
 }
 
 func TestCollector_VSANSpaceUsageEdgeCases(t *testing.T) {

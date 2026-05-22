@@ -3,19 +3,12 @@
 package vsphere
 
 import (
-	"sort"
-
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
-	datastoreClusterSpaceUsageContext       = "vsphere.datastore_cluster_space_usage"
-	datastoreClusterSpaceUtilizationContext = "vsphere.datastore_cluster_space_utilization"
-	datastoreClusterStorageDRSContext       = "vsphere.datastore_cluster_storage_drs_status"
-	datastoreClusterOverallStatusContext    = "vsphere.datastore_cluster_overall_status"
-
 	datastoreClusterSpaceUsageCapacityMetric   = "datastore_cluster_space_usage_capacity"
 	datastoreClusterSpaceUsageFreeMetric       = "datastore_cluster_space_usage_free"
 	datastoreClusterSpaceUsageUsedMetric       = "datastore_cluster_space_usage_used"
@@ -67,15 +60,4 @@ func datastoreClusterLabels(pod *rs.StoragePod) []metrix.Label {
 		{Key: "datacenter", Value: pod.Hier.DC.Name},
 		{Key: datastoreClusterNameLabel, Value: pod.Name},
 	}
-}
-
-func sortedStoragePods(pods rs.StoragePods) []*rs.StoragePod {
-	out := make([]*rs.StoragePod, 0, len(pods))
-	for _, pod := range pods {
-		out = append(out, pod)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].ID < out[j].ID
-	})
-	return out
 }

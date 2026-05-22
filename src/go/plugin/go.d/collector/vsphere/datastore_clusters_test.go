@@ -66,10 +66,10 @@ func TestCollector_DatastoreClustersOptInEmitsCharts(t *testing.T) {
 	requireMetricValue(t, reader, datastoreClusterOverallStatusGrayMetric, labels, 0)
 
 	createdCharts, createdDims := v2CreatedChartsAndDims(buildV2PlanForTest(t, collr))
-	chartID := findChartIDByLabelsAndContext(t, createdCharts, datastoreClusterSpaceUsageContext, map[string]string{"id": pod.ID})
+	chartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.datastore_cluster_space_usage", map[string]string{"id": pod.ID})
 	require.Equal(t, pod.Name, createdCharts[chartID].Labels[datastoreClusterNameLabel])
 	require.Contains(t, createdDims[chartID], "capacity")
-	statusChartID := findChartIDByLabelsAndContext(t, createdCharts, datastoreClusterOverallStatusContext, map[string]string{"id": pod.ID})
+	statusChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.datastore_cluster_overall_status", map[string]string{"id": pod.ID})
 	require.Contains(t, createdDims[statusChartID], "green")
 }
 

@@ -245,7 +245,9 @@ func (c *Collector) collectLocked() error {
 	c.collectClusters()
 	c.collectResourcePools()
 	c.collectVSAN()
-	c.writeOptionalMetrics()
+	c.writeDatastoreClusterMetrics()
+	c.writePowerMetrics()
+	c.writeVSANMetrics()
 
 	c.Debugf("metrics collected, process took %s", time.Since(t))
 

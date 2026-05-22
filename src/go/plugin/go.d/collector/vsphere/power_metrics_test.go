@@ -47,16 +47,16 @@ func TestCollector_PowerMetricsEmitCharts(t *testing.T) {
 	requireMetricValue(t, reader, vmEnergyUsageMetric, vmLabels, 202)
 
 	createdCharts, createdDims := v2CreatedChartsAndDims(buildV2PlanForTest(t, collr))
-	hostPowerChartID := findChartIDByLabelsAndContext(t, createdCharts, hostPowerUsageContext, map[string]string{
+	hostPowerChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.host_power_usage", map[string]string{
 		"id": host.ID,
 	})
-	require.Contains(t, createdDims[hostPowerChartID], hostPowerUsagePowerDim)
-	require.Contains(t, createdDims[hostPowerChartID], hostPowerUsageCapDim)
+	require.Contains(t, createdDims[hostPowerChartID], "power")
+	require.Contains(t, createdDims[hostPowerChartID], "cap")
 
-	vmPowerChartID := findChartIDByLabelsAndContext(t, createdCharts, vmPowerUsageContext, map[string]string{
+	vmPowerChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.vm_power_usage", map[string]string{
 		"id": vm.ID,
 	})
-	require.Contains(t, createdDims[vmPowerChartID], vmPowerUsagePowerDim)
+	require.Contains(t, createdDims[vmPowerChartID], "power")
 }
 
 type mockPowerMetricsScraper struct {

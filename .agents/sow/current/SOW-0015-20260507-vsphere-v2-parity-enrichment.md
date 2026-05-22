@@ -2243,6 +2243,27 @@ Chart source-of-truth cleanup as of 2026-05-22:
   - `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
   - `git diff --check` passed from the repository root.
 
+Post-chart-cleanup file/symbol cleanup as of 2026-05-22:
+
+- Removed production chart-context and dimension constants that became unused or
+  test-only after `charts.yaml` became authoritative. Runtime files now retain
+  metric-name and label-name constants only where writers use them.
+- Deleted `src/go/plugin/go.d/collector/vsphere/optional_metrics.go`; the
+  optional datastore-cluster, power, and vSAN writer calls are explicit in the
+  collection sequence.
+- Moved shared deterministic sorting helpers to
+  `src/go/plugin/go.d/collector/vsphere/sort.go` instead of scattering them
+  across topology, vSAN, datastore-cluster, and optional-metric files.
+- Deleted the unreferenced developer counter dump
+  `src/go/plugin/go.d/collector/vsphere/metrics.txt`.
+- Validation:
+  - `go test -count=1 -run '^$' ./collector/vsphere/...` passed from
+    `src/go/plugin/go.d`.
+  - `go test -count=1 ./collector/vsphere/...` passed from
+    `src/go/plugin/go.d`.
+  - `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+  - `git diff --check` passed from the repository root.
+
 NIDL/config/metadata verification as of 2026-05-09:
 
 - `docs/NIDL-Framework.md:116` through `docs/NIDL-Framework.md:170` require one instance type per context, related dimensions with one unit, hierarchy separation by contexts, and meaningful labels. The generated template has 161 contexts, no detected context/unit mismatch, and contexts are separated by vSphere resource type or child-resource type.

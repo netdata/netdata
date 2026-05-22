@@ -3,8 +3,6 @@
 package vsphere
 
 import (
-	"sort"
-
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	scrapepkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
@@ -12,22 +10,6 @@ import (
 )
 
 const (
-	vsanClusterSpaceUsageContext       = "vsphere.vsan_cluster_space_usage"
-	vsanClusterSpaceUtilizationContext = "vsphere.vsan_cluster_space_utilization"
-	vsanClusterHealthStatusContext     = "vsphere.vsan_cluster_health_status"
-	vsanClusterOperationsContext       = "vsphere.vsan_cluster_operations"
-	vsanClusterThroughputContext       = "vsphere.vsan_cluster_throughput"
-	vsanClusterLatencyContext          = "vsphere.vsan_cluster_latency"
-	vsanClusterCongestionsContext      = "vsphere.vsan_cluster_congestions"
-	vsanHostOperationsContext          = "vsphere.vsan_host_operations"
-	vsanHostThroughputContext          = "vsphere.vsan_host_throughput"
-	vsanHostLatencyContext             = "vsphere.vsan_host_latency"
-	vsanHostCongestionsContext         = "vsphere.vsan_host_congestions"
-	vsanHostCacheHitRateContext        = "vsphere.vsan_host_cache_hit_rate"
-	vsanVMOperationsContext            = "vsphere.vsan_vm_operations"
-	vsanVMThroughputContext            = "vsphere.vsan_vm_throughput"
-	vsanVMLatencyContext               = "vsphere.vsan_vm_latency"
-
 	vsanClusterSpaceUsageTotalMetric      = "vsan_cluster_space_usage_total"
 	vsanClusterSpaceUsageFreeMetric       = "vsan_cluster_space_usage_free"
 	vsanClusterSpaceUsageUsedMetric       = "vsan_cluster_space_usage_used"
@@ -57,21 +39,6 @@ const (
 	vsanVMThroughputWriteMetric           = "vsan_vm_throughput_write"
 	vsanVMLatencyReadMetric               = "vsan_vm_latency_read"
 	vsanVMLatencyWriteMetric              = "vsan_vm_latency_write"
-	vsanSpaceUsageTotalDim                = "total"
-	vsanSpaceUsageFreeDim                 = "free"
-	vsanSpaceUsageUsedDim                 = "used"
-	vsanHealthStatusGreenDim              = "green"
-	vsanHealthStatusYellowDim             = "yellow"
-	vsanHealthStatusRedDim                = "red"
-	vsanHealthStatusUnknownDim            = "unknown"
-	vsanOperationsReadDim                 = "read"
-	vsanOperationsWriteDim                = "write"
-	vsanThroughputReadDim                 = "read"
-	vsanThroughputWriteDim                = "write"
-	vsanLatencyReadDim                    = "read"
-	vsanLatencyWriteDim                   = "write"
-	vsanCongestionsDim                    = "congestions"
-	vsanCacheHitRateDim                   = "hit_rate"
 	vsanUUIDLabel                         = "vsan_uuid"
 	vsanNodeUUIDLabel                     = "vsan_node_uuid"
 	vmInstanceUUIDLabel                   = "vm_instance_uuid"
@@ -256,13 +223,4 @@ func (c *Collector) vsanVMLabels(vm *rs.VM) []metrix.Label {
 		{Key: "vm", Value: vm.Name},
 		{Key: vmInstanceUUIDLabel, Value: vm.InstanceUUID},
 	}, vm.Labels)
-}
-
-func sortedMapKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
