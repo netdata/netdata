@@ -134,65 +134,84 @@ No user decision required; applying minimal parser behavior fix.
 ### 2026-05-22
 
 - Created SOW and documented root cause and implementation/validation plan.
+- Updated `src/collectors/proc.plugin/proc_interrupts.c` to:
+  - stop splitting `/proc/interrupts` tokens on `:`
+  - join trailing interrupt name tokens with `_` instead of taking only the last token
+  - skip a leading IRQ-type descriptor token (e.g. `*-edge`) when present before the name
+- Ran CI-log triage with GitHub Actions MCP:
+  - listed recent runs
+  - fetched failed job logs for run `26278726985` (`Docs Broken Link Check`) and confirmed it is unrelated to this proc interrupt parser change
+  - fetched failed-job logs for this branch build run `26279548573` and confirmed no failed jobs were present (`action_required` state)
 
 ## Validation
 
 Acceptance criteria evidence:
 
-- Pending.
+- Numeric interrupt names are no longer derived from only the last token:
+  - logic now joins trailing tokens (`for w = name_start; ...`) in `src/collectors/proc.plugin/proc_interrupts.c`.
+- Colons are preserved in names:
+  - `/proc/interrupts` procfile separator changed from `" \t:"` to `" \t"` in the same file.
+- Existing CPU counter parsing path remains unchanged:
+  - per-CPU value parsing loop over `procfile_lineword(..., c + 1)` is unchanged.
 
 Tests or equivalent validation:
 
-- Pending.
+- `cmake -S . -B /tmp/netdata-build -DCMAKE_BUILD_TYPE=RelWithDebInfo` (failed before implementation due environment Go version below required minimum: found `1.24.13`, required `1.26.0`).
+- `cmake -S . -B /tmp/netdata-build ... -DENABLE_PLUGIN_GO=OFF ...` (failed due missing system dependency `libelf` in sandbox).
+- `git diff --check` (passed after changes).
+- Manual parser verification with representative sample lines (Python simulation of updated logic):
+  - `mlx5_comp40@pci:0000:86:00.0_240`
+  - `nvme_0_io5_250`
 
 Real-use evidence:
 
-- Pending.
+- Validated parser outcome on issue-representative `/proc/interrupts` line samples using the same separator and join behavior as implemented in C code.
 
 Reviewer findings:
 
-- Pending.
+- `parallel_validation` Code Review flagged boundary/clarity improvements in name-join loop.
+- Addressed by tightening underscore insertion bounds and replacing repeated `strlen()` updates with bounded `strnlen()` + `memcpy()` position tracking.
 
 Same-failure scan:
 
-- Pending.
+- Searched `src/collectors/proc.plugin/proc_interrupts.c` for old `words - 1` extraction usage; replaced the only affected interrupt name extraction path.
 
 Sensitive data gate:
 
-- Pending.
+- No secrets, customer data, private endpoints, or tokens were added to durable artifacts.
 
 Artifact maintenance gate:
 
-- AGENTS.md: Pending.
-- Runtime project skills: Pending.
-- Specs: Pending.
-- End-user/operator docs: Pending.
-- End-user/operator skills: Pending.
-- SOW lifecycle: Pending.
+- AGENTS.md: no update needed (workflow/policy unchanged).
+- Runtime project skills: no update needed (no new cross-task collector authoring rule discovered).
+- Specs: no update needed (bug fix preserves intended collector behavior).
+- End-user/operator docs: no update needed (no user-facing configuration/API change).
+- End-user/operator skills: no update needed.
+- SOW lifecycle: still `in-progress` in `current/` until final close decision.
 
 Specs update:
 
-- Pending.
+- No spec update needed; this is a parser correctness fix to align behavior with existing intent.
 
 Project skills update:
 
-- Pending.
+- No project skill update needed; no new durable process guidance was discovered.
 
 End-user/operator docs update:
 
-- Pending.
+- No end-user/operator doc update needed; no configuration or external interface changed.
 
 End-user/operator skills update:
 
-- Pending.
+- No end-user/operator skill updates needed; skill behavior/contracts unaffected.
 
 Lessons:
 
-- Pending.
+- For `/proc/interrupts`, choosing procfile separators directly affects semantic fidelity of interrupt names; avoid splitting on `:` when names can contain PCI-style addresses.
 
 Follow-up mapping:
 
-- Pending.
+- Implemented in this SOW; no deferred follow-up items.
 
 ## Outcome
 

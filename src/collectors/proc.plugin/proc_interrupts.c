@@ -148,13 +148,15 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                     continue;
 
                 if(likely(npos)) {
-                    irr->name[npos++] = '_';
-                    if(unlikely(npos >= MAX_INTERRUPT_NAME))
+                    if(unlikely(npos + 1 >= MAX_INTERRUPT_NAME))
                         break;
+                    irr->name[npos++] = '_';
                 }
 
-                strncpyz(&irr->name[npos], word, MAX_INTERRUPT_NAME - npos);
-                npos = strlen(irr->name);
+                size_t wlen = strnlen(word, MAX_INTERRUPT_NAME - npos);
+                memcpy(&irr->name[npos], word, wlen);
+                npos += wlen;
+                irr->name[npos] = '\0';
             }
 
             size_t nlen = strlen(irr->name);
