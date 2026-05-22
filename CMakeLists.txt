@@ -241,8 +241,14 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
+# Build a tiny Rust staticlib and link it into the main `netdata` binary so
+# that hosts (notably the MSYS2/UCRT64 Windows path) actually exercise the
+# Rust toolchain. The crate is self-contained and has no runtime
+# dependencies; turn it off with -DENABLE_RUST_DEMO=OFF when bisecting.
+option(ENABLE_RUST_DEMO "Build the rust-demo smoke crate and link it into netdata" True)
+
 # Setup Rust/Corrosion for plugins that need it
-if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW)
+if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW OR ENABLE_RUST_DEMO)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
@@ -260,6 +266,11 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
     if(ENABLE_NETDATA_JOURNAL_FILE_READER)
         corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
                                CRATES journal_reader_ffi)
+    endif()
+
+    if(ENABLE_RUST_DEMO)
+        corrosion_import_crate(MANIFEST_PATH src/crates/rust-demo/Cargo.toml
+                               CRATES rust_demo)
     endif()
 
     # Import crates from the main cargo workspace
@@ -3302,6 +3313,11 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
         "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi>"
 )
+
+if(ENABLE_RUST_DEMO)
+        target_compile_definitions(netdata PRIVATE HAVE_RUST_DEMO)
+        target_link_libraries(netdata PRIVATE rust_demo)
+endif()
 
 netdata_add_protobuf(netdata)
 

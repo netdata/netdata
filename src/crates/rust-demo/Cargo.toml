@@ -1,0 +1,21 @@
+# Empty [workspace] makes this Cargo.toml a workspace root in its own right,
+# so the parent workspace at src/crates/Cargo.toml does not try to claim it.
+# This is the same trick used by src/crates/jf (via the parent's `exclude`).
+[workspace]
+
+[package]
+name = "rust_demo"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+publish = false
+description = "Smoke-test Rust staticlib linked into the netdata Agent to verify the host (notably MSYS2/UCRT64 on Windows) can build and link Rust code."
+
+[lib]
+crate-type = ["staticlib"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
