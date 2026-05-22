@@ -353,10 +353,11 @@ extern RRDHOST *localhost;
 // obsolete-all cleanup pass (service.c) used to violate this; it now sets
 // RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS under the lock and runs the heavy
 // work without holding it. rrdhost_set_receiver() checks that flag under
-// the lock and returns false on contention; the child reconnects via normal
-// backoff. With cleanup off the lock, all other readers (status, ACLK,
-// capabilities, paths, event-driven sends) keep blocking-lock semantics and
-// stay truthful.
+// the lock and returns RRDHOST_SET_RECEIVER_CLEANUP_BUSY when the cleanup
+// pass is in progress; the caller answers the child with BUSY_TRY_LATER and
+// the child reconnects via normal backoff. With cleanup off the lock, all
+// other readers (status, ACLK, capabilities, paths, event-driven sends)
+// keep blocking-lock semantics and stay truthful.
 #define rrdhost_receiver_lock(host) spinlock_lock(&(host)->receiver_lock)
 #define rrdhost_receiver_unlock(host) spinlock_unlock(&(host)->receiver_lock)
 
