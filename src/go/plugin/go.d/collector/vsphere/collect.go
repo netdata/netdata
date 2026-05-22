@@ -137,8 +137,6 @@ func (c *Collector) collectLocked() (map[string]int64, error) {
 	c.Debug("starting collection process")
 	t := time.Now()
 	mx := make(map[string]int64)
-	c.vmDiskPerfSamples = nil
-	c.vmNICPerfSamples = nil
 	c.hostNICPerfSamples = nil
 	c.hostDiskPerfSamples = nil
 	c.hostStorageAdapterPerfSamples = nil
@@ -336,12 +334,6 @@ func (c *Collector) collectVMsMetrics(mx map[string]int64, metrics []performance
 	for _, metric := range metrics {
 		if vm := c.resources.VMs.Get(metric.Entity.Value); vm != nil {
 			writeVMPerfMetrics(mx, vm, metric.Value)
-			if c.CollectVMDiskPerformance {
-				c.collectVMDiskPerformanceMetrics(vm, metric.Value)
-			}
-			if c.CollectVMNICPerformance {
-				c.collectVMNICPerformanceMetrics(vm, metric.Value)
-			}
 			if c.CollectPowerMetrics {
 				c.collectVMPowerMetrics(vm, metric.Value)
 			}
@@ -361,7 +353,7 @@ func numPoweredOnVMs(vms rs.VMs) (num int) {
 
 func writeVMPerfMetrics(mx map[string]int64, vm *rs.VM, metrics []performance.MetricSeries) {
 	for _, metric := range metrics {
-		if metric.Instance != "" || isVMDiskPerformanceMetric(metric.Name) {
+		if metric.Instance != "" {
 			continue
 		}
 		if len(metric.Value) == 0 || metric.Value[0] == -1 {

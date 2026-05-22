@@ -4,7 +4,7 @@
 
 Status: in-progress
 
-Sub-state: Reopened on 2026-05-09 for PR CI regression triage and pre-merge hardening. Framework V2 migration, VM snapshot aggregate metrics/alerts, datastore aggregate enrichment, VM/host power-state metrics, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory object counts, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in vSAN cluster space/health plus cluster/host/VM performance metrics, read-only readiness Function, cached vSphere inventory topology Function, and opt-in Network/DVPG topology discovery are implemented. Local fixes are in progress for yamllint, SonarCloud, DynCfg tab layout, metadata linting, supportable vSphere error messages, and hard removal of optional ESXi/VM vnode support, host/VM power-state config controls, inventory-path labels, and VM guest labels before closing again. Remaining parity feasibility is complete; vCenter/ESXi events, collector-generated vSphere vnodes, host/VM power-state config controls, inventory-path labels, and VM guest labels are explicitly out of this PR by user decision.
+Sub-state: Reopened on 2026-05-09 for PR CI regression triage and pre-merge hardening. Framework V2 migration, VM snapshot aggregate metrics/alerts, datastore aggregate enrichment, VM/host power-state metrics, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory object counts, opt-in vSphere tag/custom-attribute labels, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in vSAN cluster space/health plus cluster/host/VM performance metrics, read-only readiness Function, cached vSphere inventory topology Function, and opt-in Network/DVPG topology discovery are implemented. Local fixes are in progress for yamllint, SonarCloud, DynCfg tab layout, metadata linting, supportable vSphere error messages, and hard removal of optional ESXi/VM vnode support, host/VM power-state config controls, inventory-path labels, VM guest labels, and VM child-instance metric surfaces before closing again. Remaining parity feasibility is complete; vCenter/ESXi events, collector-generated vSphere vnodes, host/VM power-state config controls, inventory-path labels, VM guest labels, and VM child-instance metric surfaces are explicitly out of this PR by user decision.
 
 ### 2026-05-22 Matcher Simplification Decision
 
@@ -122,6 +122,59 @@ Validation after regrouping:
 - `go test -count=1 ./collector/vsphere/...` passed from
   `src/go/plugin/go.d`.
 - `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+- `git diff --check` passed.
+
+### 2026-05-22 VM Child-Instance Metrics Removal Decision
+
+The user approved removing the VM child-instance metric public surface from
+this PR.
+
+Removal scope:
+
+- remove `collect_vm_disks`, `collect_vm_disk_performance`, `vm_disk_include`,
+  `collect_vm_nic_performance`, and `vm_nic_include`;
+- remove the associated VM virtual-disk capacity, VM virtual-disk performance,
+  and VM network-interface performance metric surfaces rather than leaving
+  hidden/dead code;
+- preserve the existing default VM aggregate disk/network charts because those
+  are V1-compatible aggregate VM metrics, not the new per-child-instance
+  surfaces.
+
+Evidence and reason:
+
+- Existing V1-compatible VM aggregate disk/network metrics already provide
+  default VM disk I/O, disk max latency, network traffic, network packets, and
+  network drops.
+- The new surfaces add per-disk/per-NIC detail and per-disk capacity, with
+  extra discovery/performance payload and a permanent public config surface.
+- The user prefers not to introduce config options before they are clearly
+  needed because they are hard to remove after release.
+
+Validation after removal:
+
+- Forbidden-symbol grep for the removed config keys, Go fields, metric
+  constants, VM disk/NIC sample plumbing, `VMDisk`, and `virtualDisk.*` usage
+  returned no matches in vSphere code/config/schema/metadata/chart templates or
+  generated integration markdown. The static `metrics.txt` counter reference was
+  intentionally excluded from this grep because it documents upstream vCenter
+  counters, not collector behavior.
+- The now-empty `vm_disk_performance.go`, `vm_nic_performance.go`, and
+  `vm_nic_performance_test.go` files were deleted after explicit user approval.
+- `UPDATE_VSPHERE_CHARTS=1 go test -count=1 ./collector/vsphere -run TestCollector_ChartTemplateYAML`
+  passed from `src/go/plugin/go.d` with `GOCACHE=/private/tmp/netdata-go-build-cache`
+  and regenerated `charts.yaml`.
+- `go test -count=1 ./collector/vsphere -run 'TestCollector_(ConfigurationSerialize|ChartTemplateYAML)'`
+  passed from `src/go/plugin/go.d`.
+- `go test -count=1 ./collector/vsphere/...` passed from
+  `src/go/plugin/go.d` outside the sandbox after the sandboxed run failed to
+  let govmomi's `httptest` simulator bind a local loopback port.
+- `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+- `.venv/bin/python` JSON parsing passed for `config_schema.json`; Ruby YAML
+  parsing passed for `metadata.yaml` and `charts.yaml`.
+- `.venv/bin/python integrations/gen_docs_integrations.py -c go.d.plugin/vsphere`
+  regenerated the scoped vSphere integration markdown after the metadata
+  removal; grep confirmed the removed VM child-instance config keys no longer
+  appear in the generated vSphere integration markdown.
 - `git diff --check` passed.
 
 ### 2026-05-20 Vnode Removal Decision

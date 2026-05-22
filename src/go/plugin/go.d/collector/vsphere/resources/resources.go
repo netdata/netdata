@@ -214,14 +214,8 @@ type (
 		SnapshotCount            int64
 		SnapshotMaxChainDepth    int64
 		SnapshotOldestCreateTime time.Time
-		Disks                    []VMDisk
 		MetricList               performance.MetricList
 		Ref                      types.ManagedObjectReference
-	}
-	VMDisk struct {
-		Key           int32
-		Label         string
-		CapacityBytes int64
 	}
 
 	DatastoreHierarchy struct {

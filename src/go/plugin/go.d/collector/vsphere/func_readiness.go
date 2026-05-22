@@ -247,8 +247,6 @@ func (c *Collector) readinessRows() []readinessRow {
 	rows = append(rows,
 		c.userMetadataReadinessRow(),
 		c.optionalMetricReadinessRow("datastore_clusters", "metrics", c.CollectDatastoreClusters, len(c.DatastoreClustersInclude)),
-		c.optionalMetricReadinessRow("vm_disks", "metrics", c.CollectVMDisks || c.CollectVMDiskPerformance, len(c.VMDisksInclude)),
-		c.optionalMetricReadinessRow("vm_nics", "metrics", c.CollectVMNICPerformance, len(c.VMNICsInclude)),
 		c.optionalMetricReadinessRow("host_nics", "metrics", c.CollectHostNICPerformance, len(c.HostNICsInclude)),
 		c.optionalMetricReadinessRow("host_disks", "metrics", c.CollectHostDiskPerformance, len(c.HostDisksInclude)),
 		c.optionalMetricReadinessRow("host_storage_adapters", "metrics", c.CollectHostStorageAdapterPerformance, len(c.HostStorageAdaptersInclude)),

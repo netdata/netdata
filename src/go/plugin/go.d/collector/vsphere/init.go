@@ -46,22 +46,6 @@ func (c *Collector) validateConfig() error {
 		return err
 	}
 	c.datastoreClusterMatcher = dcMatcher
-	if len(c.VMDisksInclude) == 0 {
-		c.VMDisksInclude = []string{"*"}
-	}
-	m, err := match.NewPatternListMatcher("vm_disk_include", c.VMDisksInclude)
-	if err != nil {
-		return err
-	}
-	c.vmDiskMatcher = m
-	if len(c.VMNICsInclude) == 0 {
-		c.VMNICsInclude = []string{"*"}
-	}
-	nicMatcher, err := match.NewPatternListMatcher("vm_nic_include", c.VMNICsInclude)
-	if err != nil {
-		return err
-	}
-	c.vmNICMatcher = nicMatcher
 	if len(c.HostNICsInclude) == 0 {
 		c.HostNICsInclude = []string{"*"}
 	}
@@ -144,9 +128,6 @@ func (c *Collector) initDiscoverer(cli *client.Client) error {
 	d := discover.New(cli)
 	d.Logger = c.Logger
 	d.CollectDatastoreClusters = c.CollectDatastoreClusters
-	d.CollectVMDisks = c.CollectVMDisks
-	d.CollectVMDiskPerformance = c.CollectVMDiskPerformance
-	d.CollectVMNICPerformance = c.CollectVMNICPerformance
 	d.CollectHostNICPerformance = c.CollectHostNICPerformance
 	d.CollectHostDiskPerformance = c.CollectHostDiskPerformance
 	d.CollectHostStorageAdapterPerformance = c.CollectHostStorageAdapterPerformance

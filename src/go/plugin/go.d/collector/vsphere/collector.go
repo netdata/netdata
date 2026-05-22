@@ -61,8 +61,6 @@ func New() *Collector {
 			DatastoresInclude:          match.DatastoreIncludes{"/*"},
 			ClustersInclude:            match.ClusterIncludes{"/*"},
 			DatastoreClustersInclude:   match.DatastoreClusterIncludes{"/*"},
-			VMDisksInclude:             []string{"*"},
-			VMNICsInclude:              []string{"*"},
 			HostNICsInclude:            []string{"*"},
 			HostDisksInclude:           []string{"*"},
 			HostStorageAdaptersInclude: []string{"*"},
@@ -113,13 +111,6 @@ type Config struct {
 	// Opt-in label enrichment.
 	TagCategories    []string `yaml:"tag_categories,omitempty" json:"tag_categories"`
 	CustomAttributes []string `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
-
-	// Optional VM child-instance metrics.
-	CollectVMDisks           bool     `yaml:"collect_vm_disks,omitempty" json:"collect_vm_disks"`
-	CollectVMDiskPerformance bool     `yaml:"collect_vm_disk_performance,omitempty" json:"collect_vm_disk_performance"`
-	VMDisksInclude           []string `yaml:"vm_disk_include,omitempty" json:"vm_disk_include"`
-	CollectVMNICPerformance  bool     `yaml:"collect_vm_nic_performance,omitempty" json:"collect_vm_nic_performance"`
-	VMNICsInclude            []string `yaml:"vm_nic_include,omitempty" json:"vm_nic_include"`
 
 	// Optional host child-instance metrics.
 	CollectHostNICPerformance            bool     `yaml:"collect_host_nic_performance,omitempty" json:"collect_host_nic_performance"`
@@ -172,8 +163,6 @@ type (
 		clusterPerfReceived                    map[string]bool
 		clusterPerfCharted                     map[string]bool
 		datastoreClusterMatcher                match.DatastoreClusterMatcher
-		vmDiskMatcher                          matcher.Matcher
-		vmNICMatcher                           matcher.Matcher
 		hostNICMatcher                         matcher.Matcher
 		hostDiskMatcher                        matcher.Matcher
 		hostStorageAdapterMatcher              matcher.Matcher
@@ -184,8 +173,6 @@ type (
 		vsanVMMatcher                          match.VSANVMMatcher
 		vsphereTagCategoryMatcher              matcher.Matcher
 		customAttributeMatcher                 matcher.Matcher
-		vmDiskPerfSamples                      map[string]*vmDiskPerfSample
-		vmNICPerfSamples                       map[string]*vmNICPerfSample
 		hostNICPerfSamples                     map[string]*hostNICPerfSample
 		hostDiskPerfSamples                    map[string]*hostDiskPerfSample
 		hostStorageAdapterPerfSamples          map[string]*hostStorageAdapterPerfSample
@@ -322,8 +309,6 @@ func (c *Collector) resetRuntimeStateForInit() {
 	c.clusterPerfReceived = make(map[string]bool)
 	c.clusterPerfCharted = make(map[string]bool)
 	c.datastoreClusterMatcher = nil
-	c.vmDiskMatcher = nil
-	c.vmNICMatcher = nil
 	c.hostNICMatcher = nil
 	c.hostDiskMatcher = nil
 	c.hostStorageAdapterMatcher = nil
@@ -334,8 +319,6 @@ func (c *Collector) resetRuntimeStateForInit() {
 	c.vsanVMMatcher = nil
 	c.vsphereTagCategoryMatcher = nil
 	c.customAttributeMatcher = nil
-	c.vmDiskPerfSamples = nil
-	c.vmNICPerfSamples = nil
 	c.hostNICPerfSamples = nil
 	c.hostDiskPerfSamples = nil
 	c.hostStorageAdapterPerfSamples = nil

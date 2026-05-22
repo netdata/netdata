@@ -142,13 +142,8 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Discovery** | discovery_interval | Hosts, VMs, datastores, clusters, and resource pools discovery interval (seconds). | 300 | no |
 | **Labels** | [tag_categories](#option-labels-tag-categories) | vSphere tag category allowlist. |  | no |
 |  | [custom_attributes](#option-labels-custom-attributes) | vSphere custom attribute allowlist. |  | no |
-| **High Cardinality** | [collect_vm_disks](#option-high-cardinality-collect-vm-disks) | Collect VM virtual disk capacity. | no | no |
-|  | [collect_vm_disk_performance](#option-high-cardinality-collect-vm-disk-performance) | Collect VM virtual disk performance. | no | no |
-|  | [collect_datastore_clusters](#option-high-cardinality-collect-datastore-clusters) | Collect datastore cluster capacity and Storage DRS status. | no | no |
+| **High Cardinality** | [collect_datastore_clusters](#option-high-cardinality-collect-datastore-clusters) | Collect datastore cluster capacity and Storage DRS status. | no | no |
 |  | [datastore_cluster_include](#option-high-cardinality-datastore-cluster-include) | Datastore cluster selector. | /* | no |
-|  | [vm_disk_include](#option-high-cardinality-vm-disk-include) | VM virtual disk selector. | * | no |
-|  | [collect_vm_nic_performance](#option-high-cardinality-collect-vm-nic-performance) | Collect VM network interface performance. | no | no |
-|  | [vm_nic_include](#option-high-cardinality-vm-nic-include) | VM network interface selector. | * | no |
 |  | [collect_host_nic_performance](#option-high-cardinality-collect-host-nic-performance) | Collect host physical network interface performance. | no | no |
 |  | [host_nic_include](#option-high-cardinality-host-nic-include) | Host physical network interface selector. | * | no |
 |  | [collect_host_disk_performance](#option-high-cardinality-collect-host-disk-performance) | Collect host disk device performance. | no | no |
@@ -228,25 +223,6 @@ custom_attributes:
 ```
 
 
-<a id="option-high-cardinality-collect-vm-disks"></a>
-##### collect_vm_disks
-
-Disabled by default because it emits one time series per VM
-virtual disk. Enable it only when vCenter-level disk capacity
-inventory is useful in addition to metrics collected by Agents
-running inside the VMs.
-
-
-<a id="option-high-cardinality-collect-vm-disk-performance"></a>
-##### collect_vm_disk_performance
-
-Disabled by default because it emits per-virtual-disk I/O,
-IOPS, latency, and outstanding-I/O series and can increase
-vCenter performance-query load. Values are keyed by the
-vSphere `virtualDisk` performance instance, for example
-`scsi0:0`.
-
-
 <a id="option-high-cardinality-collect-datastore-clusters"></a>
 ##### collect_datastore_clusters
 
@@ -267,48 +243,6 @@ the vSphere managed object ID.
 ```yaml
 datastore_cluster_include:
   - "/*"
-```
-
-
-<a id="option-high-cardinality-vm-disk-include"></a>
-##### vm_disk_include
-
-Applies only when `collect_vm_disks` or
-`collect_vm_disk_performance` is enabled. Values use Netdata
-simple patterns. Capacity collection matches the vSphere disk
-label, the numeric vSphere disk key, or `key:<disk_key>`.
-Performance collection matches the vSphere performance
-instance or `instance:<disk_instance>`.
-
-```yaml
-vm_disk_include:
-  - "Hard*"
-  - "key:2000"
-  - "instance:scsi0:0"
-```
-
-
-<a id="option-high-cardinality-collect-vm-nic-performance"></a>
-##### collect_vm_nic_performance
-
-Disabled by default because it emits per-vNIC traffic, packet,
-drop, broadcast, and multicast series and can increase vCenter
-performance-query load. Packet error counters are not emitted
-for VMs because Broadcom's network counter table lists them for
-`HostSystem` only.
-
-
-<a id="option-high-cardinality-vm-nic-include"></a>
-##### vm_nic_include
-
-Applies only when `collect_vm_nic_performance` is enabled.
-Values use Netdata simple patterns and match the vSphere
-performance instance or `interface:<interface_instance>`.
-
-```yaml
-vm_nic_include:
-  - "*"
-  - "interface:4000"
 ```
 
 
@@ -733,63 +667,6 @@ Metrics:
 | vsphere.vm_snapshot_count | count | snapshots |
 | vsphere.vm_snapshot_max_age | age | seconds |
 | vsphere.vm_snapshot_max_chain_depth | depth | snapshots |
-
-### Per virtual machine disk
-
-These optional metrics refer to VM virtual disks and are collected only when `collect_vm_disks` and/or `collect_vm_disk_performance` is enabled.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| id | vSphere managed object reference ID of the VM |
-| datacenter | Datacenter name |
-| cluster | Cluster name |
-| host | Host name |
-| vm | Virtual Machine name |
-| disk | vSphere virtual disk label for capacity metrics and vSphere disk performance instance for performance metrics |
-| disk_key | vSphere virtual disk device key; present only for `collect_vm_disks` capacity metrics |
-| disk_instance | vSphere virtual disk performance instance; present only for `collect_vm_disk_performance` metrics |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.vm_disk_capacity | capacity | bytes |
-| vsphere.vm_disk_device_io | read, write | KiB/s |
-| vsphere.vm_disk_device_iops | read, write | operations/s |
-| vsphere.vm_disk_device_latency | read, write | milliseconds |
-| vsphere.vm_disk_device_outstanding_io | read, write | operations |
-
-### Per virtual machine network interface
-
-These optional metrics refer to VM network interfaces and are collected only when `collect_vm_nic_performance` is enabled.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| id | vSphere managed object reference ID of the VM |
-| datacenter | Datacenter name |
-| cluster | Cluster name |
-| host | Host name |
-| vm | Virtual Machine name |
-| interface | vSphere network interface performance instance |
-| interface_instance | vSphere network interface performance instance |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.vm_net_interface_traffic | received, sent | KiB/s |
-| vsphere.vm_net_interface_packets | received, sent | packets |
-| vsphere.vm_net_interface_drops | received, sent | drops |
-| vsphere.vm_net_interface_broadcast_packets | received, sent | packets |
-| vsphere.vm_net_interface_multicast_packets | received, sent | packets |
 
 ### Per virtual machine power
 

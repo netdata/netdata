@@ -26,18 +26,9 @@ tag_categories:
 custom_attributes:
   - "Owner"
   - "Cost Center"
-collect_vm_disks: yes
-collect_vm_disk_performance: yes
 collect_datastore_clusters: yes
 datastore_cluster_include:
   - "/*"
-vm_disk_include:
-  - "Hard*"
-  - "key:2000"
-collect_vm_nic_performance: yes
-vm_nic_include:
-  - "Network adapter*"
-  - "interface:4000"
 collect_host_nic_performance: yes
 host_nic_include:
   - "vmnic*"

@@ -54,9 +54,6 @@ type Discoverer struct {
 	match.DatastoreMatcher
 	match.ClusterMatcher
 	CollectDatastoreClusters             bool
-	CollectVMDisks                       bool
-	CollectVMDiskPerformance             bool
-	CollectVMNICPerformance              bool
 	CollectHostNICPerformance            bool
 	CollectHostDiskPerformance           bool
 	CollectHostStorageAdapterPerformance bool
@@ -162,9 +159,6 @@ func (d Discoverer) hostPathSet() []string {
 
 func (d Discoverer) vmPathSet() []string {
 	pathSet := append([]string(nil), vmPathSetBase...)
-	if d.CollectVMDisks || d.CollectVMDiskPerformance {
-		pathSet = append(pathSet, "config.hardware.device")
-	}
 	if d.CollectVSAN {
 		pathSet = append(pathSet, "config.instanceUuid")
 	}

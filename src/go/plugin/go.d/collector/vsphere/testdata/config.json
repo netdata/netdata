@@ -30,20 +30,9 @@
     "Owner",
     "Cost Center"
   ],
-  "collect_vm_disks": true,
-  "collect_vm_disk_performance": true,
   "collect_datastore_clusters": true,
   "datastore_cluster_include": [
     "/*"
-  ],
-  "vm_disk_include": [
-    "Hard*",
-    "key:2000"
-  ],
-  "collect_vm_nic_performance": true,
-  "vm_nic_include": [
-    "Network adapter*",
-    "interface:4000"
   ],
   "collect_host_nic_performance": true,
   "host_nic_include": [

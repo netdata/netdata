@@ -3,7 +3,6 @@
 package discover
 
 import (
-	"fmt"
 	"time"
 
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
@@ -241,36 +240,8 @@ func newVM(raw mo.VirtualMachine) *rs.VM {
 		SnapshotCount:            snapshot.count,
 		SnapshotMaxChainDepth:    snapshot.maxChainDepth,
 		SnapshotOldestCreateTime: snapshot.oldestCreateTime,
-		Disks:                    newVMDisks(raw.Config),
 		Ref:                      raw.Reference(),
 	}
-}
-
-func newVMDisks(config *types.VirtualMachineConfigInfo) []rs.VMDisk {
-	if config == nil {
-		return nil
-	}
-	var disks []rs.VMDisk
-	for _, device := range config.Hardware.Device {
-		disk, ok := device.(*types.VirtualDisk)
-		if !ok {
-			continue
-		}
-		label := fmt.Sprintf("disk-%d", disk.Key)
-		if disk.DeviceInfo != nil && disk.DeviceInfo.GetDescription() != nil && disk.DeviceInfo.GetDescription().Label != "" {
-			label = disk.DeviceInfo.GetDescription().Label
-		}
-		capacity := disk.CapacityInBytes
-		if capacity == 0 && disk.CapacityInKB > 0 {
-			capacity = disk.CapacityInKB * 1024
-		}
-		disks = append(disks, rs.VMDisk{
-			Key:           disk.Key,
-			Label:         label,
-			CapacityBytes: capacity,
-		})
-	}
-	return disks
 }
 
 func (d Discoverer) buildDatastores(raw []mo.Datastore) rs.Datastores {

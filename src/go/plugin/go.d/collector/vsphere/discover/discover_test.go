@@ -264,37 +264,6 @@ func TestDiscoverer_buildVMsKeepsNonPoweredVMsAndNilHost(t *testing.T) {
 	assert.Equal(t, map[int32]string{7: "owner-a"}, vm.CustomValues)
 }
 
-func TestNewVMDisks(t *testing.T) {
-	disks := newVMDisks(&types.VirtualMachineConfigInfo{
-		Hardware: types.VirtualHardware{
-			Device: []types.BaseVirtualDevice{
-				&types.VirtualDisk{
-					VirtualDevice: types.VirtualDevice{
-						Key:        2000,
-						DeviceInfo: &types.Description{Label: "Hard disk 1"},
-					},
-					CapacityInBytes: 1024,
-				},
-				&types.VirtualDisk{
-					VirtualDevice: types.VirtualDevice{
-						Key: 2001,
-					},
-					CapacityInKB: 2,
-				},
-				&types.VirtualEthernetCard{
-					VirtualDevice: types.VirtualDevice{Key: 4000},
-				},
-			},
-		},
-	})
-
-	require.Len(t, disks, 2)
-	assert.Equal(t, "Hard disk 1", disks[0].Label)
-	assert.EqualValues(t, 1024, disks[0].CapacityBytes)
-	assert.Equal(t, "disk-2001", disks[1].Label)
-	assert.EqualValues(t, 2048, disks[1].CapacityBytes)
-}
-
 func TestDiscoverer_buildDatastoresKeepsInaccessible(t *testing.T) {
 	yes := true
 	raw := []mo.Datastore{
@@ -468,57 +437,6 @@ func TestDiscoverer_collectMetricLists(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, isMetricListsCollected(res))
-}
-
-func TestSimpleVMMetricListAddsVirtualDiskInstanceMetricsWhenEnabled(t *testing.T) {
-	counters := map[string]*types.PerfCounterInfo{
-		"cpu.usage.average":                      {Key: 1},
-		"virtualDisk.read.average":               {Key: 2},
-		"virtualDisk.totalReadLatency.average":   {Key: 3},
-		"virtualDisk.numberReadAveraged.average": {Key: 4},
-	}
-
-	disabled := simpleVMMetricList(counters, false, false, false)
-	enabled := simpleVMMetricList(counters, true, false, false)
-
-	require.Len(t, disabled, 1)
-	assert.Equal(t, int32(1), disabled[0].CounterId)
-	assert.Empty(t, disabled[0].Instance)
-
-	require.Len(t, enabled, 4)
-	var wildcard int
-	for _, metric := range enabled {
-		if metric.Instance == "*" {
-			wildcard++
-		}
-	}
-	assert.Equal(t, 3, wildcard)
-}
-
-func TestSimpleVMMetricListAddsNetworkInstanceMetricsWhenEnabled(t *testing.T) {
-	counters := map[string]*types.PerfCounterInfo{
-		"cpu.usage.average":       {Key: 1},
-		"net.bytesRx.average":     {Key: 2},
-		"net.packetsTx.summation": {Key: 3},
-		"net.droppedRx.summation": {Key: 4},
-	}
-
-	disabled := simpleVMMetricList(counters, false, false, false)
-	enabled := simpleVMMetricList(counters, false, true, false)
-
-	require.Len(t, disabled, 4)
-	for _, metric := range disabled {
-		assert.Empty(t, metric.Instance)
-	}
-
-	require.Len(t, enabled, 7)
-	var wildcard int
-	for _, metric := range enabled {
-		if metric.Instance == "*" {
-			wildcard++
-		}
-	}
-	assert.Equal(t, 3, wildcard)
 }
 
 func TestSimpleHostMetricListAddsNetworkInstanceMetricsWhenEnabled(t *testing.T) {
@@ -701,8 +619,8 @@ func TestSimpleVMMetricListAddsPowerMetricsWhenEnabled(t *testing.T) {
 		"power.energy.summation": {Key: 3},
 	}
 
-	disabled := simpleVMMetricList(counters, false, false, false)
-	enabled := simpleVMMetricList(counters, false, false, true)
+	disabled := simpleVMMetricList(counters, false)
+	enabled := simpleVMMetricList(counters, true)
 
 	require.Len(t, disabled, 1)
 	assert.Empty(t, disabled[0].Instance)

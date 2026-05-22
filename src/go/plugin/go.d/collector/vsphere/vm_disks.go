@@ -4,29 +4,14 @@ package vsphere
 
 import (
 	"sort"
-	"strconv"
-	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
-const (
-	vmDiskCapacityContext  = "vsphere.vm_disk_capacity"
-	vmDiskCapacityDim      = "capacity"
-	vmDiskCapacityMetric   = "vm_disk_capacity_capacity"
-	vmDiskKeyLabel         = "disk_key"
-	vmDiskDisplayNameLabel = "disk"
-)
-
 func optionalMetricNames() []string {
-	names := []string{
-		vmDiskCapacityMetric,
-	}
+	var names []string
 	names = append(names, datastoreClusterOptionalMetricNames()...)
-	names = append(names, vmDiskPerformanceOptionalMetricNames()...)
-	names = append(names, vmNICPerformanceOptionalMetricNames()...)
 	names = append(names, hostNICPerformanceOptionalMetricNames()...)
 	names = append(names, hostDiskPerformanceOptionalMetricNames()...)
 	names = append(names, hostStorageAdapterPerformanceOptionalMetricNames()...)
@@ -39,9 +24,6 @@ func optionalMetricNames() []string {
 
 func (c *Collector) writeOptionalMetrics(meter metrix.SnapshotMeter) {
 	c.writeDatastoreClusterMetrics(meter)
-	c.writeVMDiskMetrics(meter)
-	c.writeVMDiskPerformanceMetrics(meter)
-	c.writeVMNICPerformanceMetrics(meter)
 	c.writeHostNICPerformanceMetrics(meter)
 	c.writeHostDiskPerformanceMetrics(meter)
 	c.writeHostStorageAdapterPerformanceMetrics(meter)
@@ -51,61 +33,6 @@ func (c *Collector) writeOptionalMetrics(meter metrix.SnapshotMeter) {
 	c.writeVSANMetrics(meter)
 }
 
-func (c *Collector) writeVMDiskMetrics(meter metrix.SnapshotMeter) {
-	if !c.CollectVMDisks || c.resources == nil {
-		return
-	}
-
-	m := c.vmDiskMatcher
-	if m == nil {
-		m = matcher.TRUE()
-	}
-
-	gaugeName := v2MetricName(vmDiskCapacityContext, vmDiskCapacityDim)
-	for _, vm := range sortedVMs(c.resources.VMs) {
-		for _, disk := range sortedVMDiskCopy(vm.Disks) {
-			if !vmDiskMatches(m, disk) {
-				continue
-			}
-
-			if gauge := c.mx.gauge(gaugeName); gauge != nil {
-				gauge.Observe(metrix.SampleValue(disk.CapacityBytes), meter.LabelSet(c.vmDiskLabels(vm, disk)...))
-			}
-		}
-	}
-}
-
-func (c *Collector) vmDiskLabels(vm *rs.VM, disk rs.VMDisk) []metrix.Label {
-	labels := []metrix.Label{
-		{Key: "id", Value: vm.ID},
-		{Key: "datacenter", Value: vm.Hier.DC.Name},
-		{Key: "cluster", Value: vm.Hier.Cluster.Name},
-		{Key: "host", Value: vm.Hier.Host.Name},
-		{Key: "vm", Value: vm.Name},
-		{Key: vmDiskDisplayNameLabel, Value: diskDisplayName(disk)},
-		{Key: vmDiskKeyLabel, Value: vmDiskKey(disk)},
-	}
-	labels = append(labels, c.resourceEnrichmentLabels(vm.ID)...)
-	return labels
-}
-
-func vmDiskMatches(m matcher.Matcher, disk rs.VMDisk) bool {
-	label := diskDisplayName(disk)
-	key := vmDiskKey(disk)
-	return m.MatchString(label) || m.MatchString(key) || m.MatchString("key:"+key)
-}
-
-func diskDisplayName(disk rs.VMDisk) string {
-	if strings.TrimSpace(disk.Label) != "" {
-		return disk.Label
-	}
-	return "disk-" + vmDiskKey(disk)
-}
-
-func vmDiskKey(disk rs.VMDisk) string {
-	return strconv.FormatInt(int64(disk.Key), 10)
-}
-
 func sortedVMs(vms rs.VMs) []*rs.VM {
 	out := make([]*rs.VM, 0, len(vms))
 	for _, vm := range vms {
@@ -113,17 +40,6 @@ func sortedVMs(vms rs.VMs) []*rs.VM {
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].ID < out[j].ID
-	})
-	return out
-}
-
-func sortedVMDiskCopy(disks []rs.VMDisk) []rs.VMDisk {
-	out := append([]rs.VMDisk(nil), disks...)
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Key != out[j].Key {
-			return out[i].Key < out[j].Key
-		}
-		return out[i].Label < out[j].Label
 	})
 	return out
 }

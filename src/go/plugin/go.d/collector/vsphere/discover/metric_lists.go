@@ -26,7 +26,7 @@ func (d Discoverer) collectMetricLists(res *rs.Resources) error {
 	for _, h := range res.Hosts {
 		h.MetricList = hostML
 	}
-	vmML := simpleVMMetricList(perfCounters, d.CollectVMDiskPerformance, d.CollectVMNICPerformance, d.CollectPowerMetrics)
+	vmML := simpleVMMetricList(perfCounters, d.CollectPowerMetrics)
 	for _, v := range res.VMs {
 		v.MetricList = vmML
 	}
@@ -94,12 +94,6 @@ func expectedMetricCounterNames(d Discoverer) []string {
 	if d.CollectPowerMetrics {
 		names = append(names, vmPowerMetrics...)
 	}
-	if d.CollectVMDiskPerformance {
-		names = append(names, vmDiskPerformanceMetrics...)
-	}
-	if d.CollectVMNICPerformance {
-		names = append(names, vmNICPerformanceMetrics...)
-	}
 	names = append(names, datastoreMetrics...)
 	names = append(names, clusterMetrics...)
 	return uniqueSortedStrings(names)
@@ -141,16 +135,10 @@ func simpleHostMetricList(pci map[string]*types.PerfCounterInfo, collectNICPerfo
 	return ml
 }
 
-func simpleVMMetricList(pci map[string]*types.PerfCounterInfo, collectDiskPerformance, collectNICPerformance, collectPowerMetrics bool) performance.MetricList {
+func simpleVMMetricList(pci map[string]*types.PerfCounterInfo, collectPowerMetrics bool) performance.MetricList {
 	ml := simpleMetricList(vmMetrics, pci, "")
 	if collectPowerMetrics {
 		ml = append(ml, simpleMetricList(vmPowerMetrics, pci, "")...)
-	}
-	if collectDiskPerformance {
-		ml = append(ml, simpleMetricList(vmDiskPerformanceMetrics, pci, "*")...)
-	}
-	if collectNICPerformance {
-		ml = append(ml, simpleMetricList(vmNICPerformanceMetrics, pci, "*")...)
 	}
 	return ml
 }
@@ -205,30 +193,6 @@ var (
 		"disk.maxTotalLatency.latest",
 
 		"sys.uptime.latest",
-	}
-
-	vmDiskPerformanceMetrics = []string{
-		"virtualDisk.numberReadAveraged.average",
-		"virtualDisk.numberWriteAveraged.average",
-		"virtualDisk.read.average",
-		"virtualDisk.readOIO.latest",
-		"virtualDisk.totalReadLatency.average",
-		"virtualDisk.totalWriteLatency.average",
-		"virtualDisk.write.average",
-		"virtualDisk.writeOIO.latest",
-	}
-
-	vmNICPerformanceMetrics = []string{
-		"net.broadcastRx.summation",
-		"net.broadcastTx.summation",
-		"net.bytesRx.average",
-		"net.bytesTx.average",
-		"net.droppedRx.summation",
-		"net.droppedTx.summation",
-		"net.multicastRx.summation",
-		"net.multicastTx.summation",
-		"net.packetsRx.summation",
-		"net.packetsTx.summation",
 	}
 
 	datastoreMetrics = []string{

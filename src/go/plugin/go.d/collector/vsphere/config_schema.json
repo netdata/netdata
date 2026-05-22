@@ -68,18 +68,6 @@
         },
         "default": []
       },
-      "collect_vm_disks": {
-        "title": "Collect VM virtual disks",
-        "description": "If enabled, collects one capacity series per VM virtual disk. Disabled by default because it can create many time series in large vCenters.",
-        "type": "boolean",
-        "default": false
-      },
-      "collect_vm_disk_performance": {
-        "title": "Collect VM virtual disk performance",
-        "description": "If enabled, collects per-virtual-disk I/O, IOPS, latency, and outstanding I/O metrics from vSphere virtualDisk performance instances. Disabled by default because it adds high-cardinality per-disk performance series and can increase vCenter query load.",
-        "type": "boolean",
-        "default": false
-      },
       "collect_datastore_clusters": {
         "title": "Collect datastore clusters",
         "description": "If enabled, collects aggregate capacity and Storage DRS status for datastore clusters (StoragePod objects). Disabled by default because it adds another discovered resource class.",
@@ -102,48 +90,6 @@
         },
         "default": [
           "/*"
-        ]
-      },
-      "vm_disk_include": {
-        "title": "VM virtual disk selector",
-        "description": "Simple-pattern allowlist for VM virtual disks when collect_vm_disks or collect_vm_disk_performance is enabled. Capacity collection patterns match the vSphere disk label, the numeric disk key, or key:<disk_key>. Performance collection patterns match the vSphere performance instance or instance:<disk_instance>.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "minItems": 1,
-        "items": {
-          "title": "VM disk selector",
-          "type": "string",
-          "default": "*"
-        },
-        "default": [
-          "*"
-        ]
-      },
-      "collect_vm_nic_performance": {
-        "title": "Collect VM network interface performance",
-        "description": "If enabled, collects per-vNIC traffic, packets, drops, broadcast packets, and multicast packets from vSphere net performance instances. Disabled by default because it adds high-cardinality per-interface performance series and can increase vCenter query load.",
-        "type": "boolean",
-        "default": false
-      },
-      "vm_nic_include": {
-        "title": "VM network interface selector",
-        "description": "Simple-pattern allowlist for VM network interfaces when collect_vm_nic_performance is enabled. Patterns match the vSphere performance instance or interface:<interface_instance>.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "minItems": 1,
-        "items": {
-          "title": "VM network interface selector",
-          "type": "string",
-          "default": "*"
-        },
-        "default": [
-          "*"
         ]
       },
       "collect_host_nic_performance": {
@@ -548,16 +494,6 @@
           ]
         },
         {
-          "title": "VMs",
-          "fields": [
-            "collect_vm_disks",
-            "collect_vm_disk_performance",
-            "vm_disk_include",
-            "collect_vm_nic_performance",
-            "vm_nic_include"
-          ]
-        },
-        {
           "title": "H-Net",
           "fields": [
             "collect_host_nic_performance",
@@ -685,12 +621,6 @@
       "ui:listFlavour": "list"
     },
     "custom_attributes": {
-      "ui:listFlavour": "list"
-    },
-    "vm_disk_include": {
-      "ui:listFlavour": "list"
-    },
-    "vm_nic_include": {
       "ui:listFlavour": "list"
     },
     "host_nic_include": {
