@@ -1,6 +1,6 @@
 # Netdata Plans & Billing
 
-Netdata offers a **Community plan**, a free SaaS, Open Source Agent, and paid plans — **Homelab**, **Business**, and **Enterprise On-Premise** — providing key business features and unlimited access to your dashboards.
+Netdata offers a **Community plan**, a free SaaS, Open Source Agent, and paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — providing key business features and unlimited access to your dashboards.
 
 For more info visit the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page.
 

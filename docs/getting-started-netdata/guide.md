@@ -322,7 +322,7 @@ Generate comprehensive reports in 2-3 minutes that explain what happened, why it
 - **Performance Optimization** - Bottleneck identification and tuning suggestions
 - **Anomaly Analysis** - Deep dive into unusual patterns and their impacts
 
-**Access:** Paid subscriptions get unlimited reports, free trial users get full access during trial, Community users get 10 free reports.
+**Access:** Paid plans get unlimited reports, free trial users get full access during trial, Community users get 10 free reports.
 
 </details>
 
