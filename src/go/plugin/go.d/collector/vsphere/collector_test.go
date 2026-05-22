@@ -21,7 +21,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -773,6 +775,69 @@ func buildV2PlanForTest(t *testing.T, collr *Collector) chartengine.Plan {
 	plan := attempt.Plan()
 	require.NoError(t, attempt.Commit())
 	return plan
+}
+
+func requireChartSelectorsMatchSeries(t *testing.T, collr *Collector, contextPrefixes ...string) {
+	t.Helper()
+
+	spec, err := charttpl.DecodeYAML([]byte(collr.ChartTemplateYAML()))
+	require.NoError(t, err)
+
+	reader := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	require.NotZero(t, requireChartGroupSelectorsMatchSeries(t, reader, spec.Groups, contextParts(spec.ContextNamespace), contextPrefixes))
+}
+
+func requireChartGroupSelectorsMatchSeries(t *testing.T, reader metrix.Reader, groups []charttpl.Group, parent, contextPrefixes []string) int {
+	t.Helper()
+
+	matchedContexts := 0
+	for _, group := range groups {
+		parts := append(append([]string(nil), parent...), contextParts(group.ContextNamespace)...)
+		for _, chart := range group.Charts {
+			contextName := strings.Join(append(append([]string(nil), parts...), strings.TrimSpace(chart.Context)), ".")
+			if !matchesAnyContextPrefix(contextName, contextPrefixes) {
+				continue
+			}
+			matchedContexts++
+			for _, dim := range chart.Dimensions {
+				requireSelectorMatchesSeries(t, reader, contextName, dim.Selector)
+			}
+		}
+		matchedContexts += requireChartGroupSelectorsMatchSeries(t, reader, group.Groups, parts, contextPrefixes)
+	}
+	return matchedContexts
+}
+
+func matchesAnyContextPrefix(contextName string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if contextName == prefix || strings.HasPrefix(contextName, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func requireSelectorMatchesSeries(t *testing.T, reader metrix.Reader, contextName, selector string) {
+	t.Helper()
+
+	sel, err := metrixselector.Parse(selector)
+	require.NoErrorf(t, err, "chart context %s selector %q", contextName, selector)
+
+	matched := false
+	reader.ForEachSeriesIdentity(func(_ metrix.SeriesIdentity, _ metrix.SeriesMeta, metricName string, labels metrix.LabelView, _ metrix.SampleValue) {
+		if sel.Matches(metricName, labels) {
+			matched = true
+		}
+	})
+	require.Truef(t, matched, "chart context %s selector %q matches no series", contextName, selector)
+}
+
+func contextParts(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return []string{value}
 }
 
 func v2CreatedChartsAndDims(plan chartengine.Plan) (map[string]chartengine.CreateChartAction, map[string]map[string]chartengine.CreateDimensionAction) {

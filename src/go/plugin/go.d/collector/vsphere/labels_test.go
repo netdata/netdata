@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 func TestCollector_AddsUserMetadataLabels(t *testing.T) {
@@ -39,6 +40,7 @@ func TestCollector_AddsUserMetadataLabels(t *testing.T) {
 
 	hostChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.host_cpu_utilization", map[string]string{"id": host.ID})
 	require.Equal(t, "prod", createdCharts[hostChartID].Labels["vsphere_tag_env"])
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
 }
 
 func TestCollector_Init_ReturnsFalseIfInvalidUserMetadataLabelConfig(t *testing.T) {

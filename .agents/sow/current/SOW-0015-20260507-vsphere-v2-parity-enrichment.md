@@ -2264,6 +2264,27 @@ Post-chart-cleanup file/symbol cleanup as of 2026-05-22:
   - `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
   - `git diff --check` passed from the repository root.
 
+Optional chart coverage hardening as of 2026-05-22:
+
+- Added `collecttest.AssertChartCoverage` to the opt-in datastore-cluster,
+  vSAN, power-metric, and user-metadata-label tests so those scenarios exercise
+  the same chartengine materialization check as the default collection path.
+- Added a targeted selector-match test helper that decodes `charts.yaml`, parses
+  selected dimension selectors, and fails if a selector in the exercised
+  optional family matches no emitted metric-store series. This complements
+  `AssertChartCoverage`, which only validates selectors that already matched
+  observed series.
+- Applied the selector-match helper to the datastore-cluster, vSAN, and power
+  optional metric families.
+- Expanded the vSAN fixture with write operation, throughput, and latency
+  samples so the vSAN read/write chart dimensions are all exercised.
+- Validation:
+  - `go test -count=1 -run 'TestCollector_DatastoreClustersOptInEmitsCharts|TestCollector_VSANMetricsOptInEmitsCharts|TestCollector_PowerMetricsEmitCharts|TestCollector_AddsUserMetadataLabels' ./collector/vsphere` passed from `src/go/plugin/go.d`.
+  - `go test -count=1 -timeout 300s ./collector/vsphere/...` passed from
+    `src/go/plugin/go.d`.
+  - `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+  - `git diff --check` passed from `src/go/plugin/go.d`.
+
 NIDL/config/metadata verification as of 2026-05-09:
 
 - `docs/NIDL-Framework.md:116` through `docs/NIDL-Framework.md:170` require one instance type per context, related dimensions with one unit, hierarchy separation by contexts, and meaningful labels. The generated template has 161 contexts, no detected context/unit mismatch, and contexts are separated by vSphere resource type or child-resource type.

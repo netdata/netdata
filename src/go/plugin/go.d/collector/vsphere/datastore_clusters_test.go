@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 func TestCollector_Init_ReturnsFalseIfInvalidDatastoreClusterConfig(t *testing.T) {
@@ -71,6 +72,8 @@ func TestCollector_DatastoreClustersOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[chartID], "capacity")
 	statusChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.datastore_cluster_overall_status", map[string]string{"id": pod.ID})
 	require.Contains(t, createdDims[statusChartID], "green")
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
+	requireChartSelectorsMatchSeries(t, collr, "vsphere.datastore_cluster_")
 }
 
 func TestCollector_DatastoreClustersSelector(t *testing.T) {

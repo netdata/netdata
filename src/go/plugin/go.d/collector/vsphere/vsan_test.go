@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	scrapepkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 func TestCollector_VSANMetricsDefaultOff(t *testing.T) {
@@ -49,6 +50,9 @@ func TestCollector_VSANMetricsOptInEmitsCharts(t *testing.T) {
 	requireMetricValue(t, reader, vsanClusterThroughputReadMetric, clusterLabels, 11)
 	requireMetricValue(t, reader, vsanClusterLatencyReadMetric, clusterLabels, 12)
 	requireMetricValue(t, reader, vsanClusterCongestionsMetric, clusterLabels, 13)
+	requireMetricValue(t, reader, vsanClusterOperationsWriteMetric, clusterLabels, 14)
+	requireMetricValue(t, reader, vsanClusterThroughputWriteMetric, clusterLabels, 15)
+	requireMetricValue(t, reader, vsanClusterLatencyWriteMetric, clusterLabels, 16)
 
 	hostLabels := labelsFromMetrix(collr.vsanHostLabels(host))
 	requireMetricValue(t, reader, vsanHostOperationsReadMetric, hostLabels, 20)
@@ -56,11 +60,17 @@ func TestCollector_VSANMetricsOptInEmitsCharts(t *testing.T) {
 	requireMetricValue(t, reader, vsanHostLatencyReadMetric, hostLabels, 22)
 	requireMetricValue(t, reader, vsanHostCongestionsMetric, hostLabels, 23)
 	requireMetricValue(t, reader, vsanHostCacheHitRateMetric, hostLabels, 95)
+	requireMetricValue(t, reader, vsanHostOperationsWriteMetric, hostLabels, 24)
+	requireMetricValue(t, reader, vsanHostThroughputWriteMetric, hostLabels, 25)
+	requireMetricValue(t, reader, vsanHostLatencyWriteMetric, hostLabels, 26)
 
 	vmLabels := labelsFromMetrix(collr.vsanVMLabels(vm))
 	requireMetricValue(t, reader, vsanVMOperationsReadMetric, vmLabels, 30)
 	requireMetricValue(t, reader, vsanVMThroughputReadMetric, vmLabels, 31)
 	requireMetricValue(t, reader, vsanVMLatencyReadMetric, vmLabels, 32)
+	requireMetricValue(t, reader, vsanVMOperationsWriteMetric, vmLabels, 33)
+	requireMetricValue(t, reader, vsanVMThroughputWriteMetric, vmLabels, 34)
+	requireMetricValue(t, reader, vsanVMLatencyWriteMetric, vmLabels, 35)
 
 	createdCharts, createdDims := v2CreatedChartsAndDims(buildV2PlanForTest(t, collr))
 	chartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.vsan_cluster_space_usage", map[string]string{"id": cluster.ID})
@@ -69,6 +79,8 @@ func TestCollector_VSANMetricsOptInEmitsCharts(t *testing.T) {
 	require.Contains(t, createdDims[hostChartID], "read")
 	vmChartID := findChartIDByLabelsAndContext(t, createdCharts, "vsphere.vsan_vm_operations", map[string]string{"id": vm.ID})
 	require.Contains(t, createdDims[vmChartID], "read")
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
+	requireChartSelectorsMatchSeries(t, collr, "vsphere.vsan_")
 }
 
 func TestCollector_VSANSpaceUsageEdgeCases(t *testing.T) {
@@ -170,13 +182,37 @@ func newVSANTestCollector(enabled bool) *Collector {
 	}
 	collr.vsanMetrics = &scrapepkg.VSANMetrics{
 		Clusters: map[string]scrapepkg.VSANEntityMetrics{
-			"domain-c1": {"read_operations": 10, "read_throughput": 11, "read_latency": 12, "congestions": 13},
+			"domain-c1": {
+				"read_operations":  10,
+				"read_throughput":  11,
+				"read_latency":     12,
+				"congestions":      13,
+				"write_operations": 14,
+				"write_throughput": 15,
+				"write_latency":    16,
+			},
 		},
 		Hosts: map[string]scrapepkg.VSANEntityMetrics{
-			"host-1": {"read_operations": 20, "read_throughput": 21, "read_latency": 22, "congestions": 23, "cache_hit_rate": 95},
+			"host-1": {
+				"read_operations":  20,
+				"read_throughput":  21,
+				"read_latency":     22,
+				"congestions":      23,
+				"write_operations": 24,
+				"write_throughput": 25,
+				"write_latency":    26,
+				"cache_hit_rate":   95,
+			},
 		},
 		VMs: map[string]scrapepkg.VSANEntityMetrics{
-			"vm-1": {"read_operations": 30, "read_throughput": 31, "read_latency": 32},
+			"vm-1": {
+				"read_operations":  30,
+				"read_throughput":  31,
+				"read_latency":     32,
+				"write_operations": 33,
+				"write_throughput": 34,
+				"write_latency":    35,
+			},
 		},
 		Space: map[string]scrapepkg.VSANSpaceUsage{
 			"domain-c1": {Total: 1000, Free: 400},

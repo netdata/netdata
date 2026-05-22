@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 func TestCollector_PowerMetricsEmitCharts(t *testing.T) {
@@ -57,6 +58,13 @@ func TestCollector_PowerMetricsEmitCharts(t *testing.T) {
 		"id": vm.ID,
 	})
 	require.Contains(t, createdDims[vmPowerChartID], "power")
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
+	requireChartSelectorsMatchSeries(t, collr,
+		"vsphere.host_power_",
+		"vsphere.host_energy_usage",
+		"vsphere.vm_power_usage",
+		"vsphere.vm_energy_usage",
+	)
 }
 
 type mockPowerMetricsScraper struct {
