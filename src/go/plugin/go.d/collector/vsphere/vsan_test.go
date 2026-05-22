@@ -9,6 +9,7 @@ import (
 	"github.com/vmware/govmomi/performance"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	scrapepkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
 )
@@ -115,9 +116,9 @@ func TestCollector_CollectVSANUsesSelectors(t *testing.T) {
 	collr.Username = "user"
 	collr.Password = "pass"
 	collr.CollectVSAN = true
-	collr.VSANClustersInclude = []string{"vsan_uuid:cluster-uuid-2"}
-	collr.VSANHostsInclude = []string{"vsan_node_uuid:host-uuid-2"}
-	collr.VSANVMsInclude = []string{"instance_uuid:vm-uuid-2"}
+	collr.VSANClustersInclude = match.VSANClusterIncludes{"vsan_uuid:cluster-uuid-2"}
+	collr.VSANHostsInclude = match.VSANHostIncludes{"vsan_node_uuid:host-uuid-2"}
+	collr.VSANVMsInclude = match.VSANVMIncludes{"instance_uuid:vm-uuid-2"}
 	collr.resources = newVSANFilterTestResources()
 	scraper := &capturingVSANScraper{}
 	collr.scraper = scraper

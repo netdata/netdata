@@ -5,7 +5,6 @@ package vsphere
 import (
 	"sort"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 	scrapepkg "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
@@ -128,21 +127,12 @@ func (c *Collector) vsanResources() (rs.Clusters, rs.Hosts, rs.VMs) {
 	vms := make(rs.VMs)
 
 	clusterMatcher := c.vsanClusterMatcher
-	if clusterMatcher == nil {
-		clusterMatcher = matcher.TRUE()
-	}
 	hostMatcher := c.vsanHostMatcher
-	if hostMatcher == nil {
-		hostMatcher = matcher.TRUE()
-	}
 	vmMatcher := c.vsanVMMatcher
-	if vmMatcher == nil {
-		vmMatcher = matcher.TRUE()
-	}
 
 	selectedClusters := make(map[string]bool)
 	for _, cluster := range sortedClusters(c.resources.Clusters) {
-		if !cluster.VSANEnabled || !vsanClusterMatches(clusterMatcher, cluster) {
+		if !cluster.VSANEnabled || (clusterMatcher != nil && !clusterMatcher.Match(cluster)) {
 			continue
 		}
 		clusters[cluster.ID] = cluster
@@ -150,56 +140,20 @@ func (c *Collector) vsanResources() (rs.Clusters, rs.Hosts, rs.VMs) {
 	}
 
 	for _, host := range sortedHosts(c.resources.Hosts) {
-		if !selectedClusters[host.Hier.Cluster.ID] || host.VSANNodeUUID == "" || !vsanHostMatches(hostMatcher, host) {
+		if !selectedClusters[host.Hier.Cluster.ID] || host.VSANNodeUUID == "" || (hostMatcher != nil && !hostMatcher.Match(host)) {
 			continue
 		}
 		hosts[host.ID] = host
 	}
 
 	for _, vm := range sortedVMs(c.resources.VMs) {
-		if !selectedClusters[vm.Hier.Cluster.ID] || vm.InstanceUUID == "" || !vsanVMMatches(vmMatcher, vm) {
+		if !selectedClusters[vm.Hier.Cluster.ID] || vm.InstanceUUID == "" || (vmMatcher != nil && !vmMatcher.Match(vm)) {
 			continue
 		}
 		vms[vm.ID] = vm
 	}
 
 	return clusters, hosts, vms
-}
-
-func vsanClusterMatches(m matcher.Matcher, cluster *rs.Cluster) bool {
-	return m.MatchString(vsanClusterPath(cluster)) ||
-		m.MatchString(cluster.Name) ||
-		m.MatchString(cluster.ID) ||
-		m.MatchString("vsan_uuid:"+cluster.VSANUUID)
-}
-
-func vsanHostMatches(m matcher.Matcher, host *rs.Host) bool {
-	return m.MatchString(vsanHostPath(host)) ||
-		m.MatchString(host.Name) ||
-		m.MatchString(host.ID) ||
-		m.MatchString("vsan_node_uuid:"+host.VSANNodeUUID)
-}
-
-func vsanVMMatches(m matcher.Matcher, vm *rs.VM) bool {
-	return m.MatchString(vsanVMPath(vm)) ||
-		m.MatchString(vm.Name) ||
-		m.MatchString(vm.ID) ||
-		m.MatchString("instance_uuid:"+vm.InstanceUUID)
-}
-
-func vsanClusterPath(cluster *rs.Cluster) string {
-	if cluster.Hier.DC.Name == "" {
-		return "/" + cluster.Name
-	}
-	return "/" + cluster.Hier.DC.Name + "/" + cluster.Name
-}
-
-func vsanHostPath(host *rs.Host) string {
-	return "/" + host.Hier.DC.Name + "/" + host.Hier.Cluster.Name + "/" + host.Name
-}
-
-func vsanVMPath(vm *rs.VM) string {
-	return "/" + vm.Hier.DC.Name + "/" + vm.Hier.Cluster.Name + "/" + vm.Hier.Host.Name + "/" + vm.Name
 }
 
 func (c *Collector) writeVSANClusterSpaceMetrics(meter metrix.SnapshotMeter) {

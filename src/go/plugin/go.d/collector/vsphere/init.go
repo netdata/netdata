@@ -8,6 +8,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/client"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/discover"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
 )
 
@@ -24,23 +25,23 @@ func (c *Collector) validateConfig() error {
 		c.Warningf("config option update_every=%d is lower than recommended minimum %d", c.UpdateEvery, minRecommendedUpdateEvery)
 	}
 	if len(c.TagCategories) > 0 {
-		m, err := newUserMetadataPatternMatcher("tag_categories", c.TagCategories)
+		m, err := match.NewPatternListMatcher("tag_categories", c.TagCategories)
 		if err != nil {
 			return err
 		}
 		c.vsphereTagCategoryMatcher = m
 	}
 	if len(c.CustomAttributes) > 0 {
-		m, err := newUserMetadataPatternMatcher("custom_attributes", c.CustomAttributes)
+		m, err := match.NewPatternListMatcher("custom_attributes", c.CustomAttributes)
 		if err != nil {
 			return err
 		}
 		c.customAttributeMatcher = m
 	}
 	if len(c.DatastoreClustersInclude) == 0 {
-		c.DatastoreClustersInclude = []string{"/*"}
+		c.DatastoreClustersInclude = match.DatastoreClusterIncludes{"/*"}
 	}
-	dcMatcher, err := newSimplePatternsMatcher("datastore_cluster_include", c.DatastoreClustersInclude)
+	dcMatcher, err := c.DatastoreClustersInclude.Parse()
 	if err != nil {
 		return err
 	}
@@ -48,7 +49,7 @@ func (c *Collector) validateConfig() error {
 	if len(c.VMDisksInclude) == 0 {
 		c.VMDisksInclude = []string{"*"}
 	}
-	m, err := newSimplePatternsMatcher("vm_disk_include", c.VMDisksInclude)
+	m, err := match.NewPatternListMatcher("vm_disk_include", c.VMDisksInclude)
 	if err != nil {
 		return err
 	}
@@ -56,7 +57,7 @@ func (c *Collector) validateConfig() error {
 	if len(c.VMNICsInclude) == 0 {
 		c.VMNICsInclude = []string{"*"}
 	}
-	nicMatcher, err := newSimplePatternsMatcher("vm_nic_include", c.VMNICsInclude)
+	nicMatcher, err := match.NewPatternListMatcher("vm_nic_include", c.VMNICsInclude)
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,7 @@ func (c *Collector) validateConfig() error {
 	if len(c.HostNICsInclude) == 0 {
 		c.HostNICsInclude = []string{"*"}
 	}
-	hostNICMatcher, err := newSimplePatternsMatcher("host_nic_include", c.HostNICsInclude)
+	hostNICMatcher, err := match.NewPatternListMatcher("host_nic_include", c.HostNICsInclude)
 	if err != nil {
 		return err
 	}
@@ -72,7 +73,7 @@ func (c *Collector) validateConfig() error {
 	if len(c.HostDisksInclude) == 0 {
 		c.HostDisksInclude = []string{"*"}
 	}
-	hostDiskMatcher, err := newSimplePatternsMatcher("host_disk_include", c.HostDisksInclude)
+	hostDiskMatcher, err := match.NewPatternListMatcher("host_disk_include", c.HostDisksInclude)
 	if err != nil {
 		return err
 	}
@@ -80,7 +81,7 @@ func (c *Collector) validateConfig() error {
 	if len(c.HostStorageAdaptersInclude) == 0 {
 		c.HostStorageAdaptersInclude = []string{"*"}
 	}
-	hostStorageAdapterMatcher, err := newSimplePatternsMatcher("host_storage_adapter_include", c.HostStorageAdaptersInclude)
+	hostStorageAdapterMatcher, err := match.NewPatternListMatcher("host_storage_adapter_include", c.HostStorageAdaptersInclude)
 	if err != nil {
 		return err
 	}
@@ -88,7 +89,7 @@ func (c *Collector) validateConfig() error {
 	if len(c.HostStoragePathsInclude) == 0 {
 		c.HostStoragePathsInclude = []string{"*"}
 	}
-	hostStoragePathMatcher, err := newSimplePatternsMatcher("host_storage_path_include", c.HostStoragePathsInclude)
+	hostStoragePathMatcher, err := match.NewPatternListMatcher("host_storage_path_include", c.HostStoragePathsInclude)
 	if err != nil {
 		return err
 	}
@@ -96,31 +97,31 @@ func (c *Collector) validateConfig() error {
 	if len(c.HostCPUInstancesInclude) == 0 {
 		c.HostCPUInstancesInclude = []string{"*"}
 	}
-	hostCPUInstanceMatcher, err := newSimplePatternsMatcher("host_cpu_instance_include", c.HostCPUInstancesInclude)
+	hostCPUInstanceMatcher, err := match.NewPatternListMatcher("host_cpu_instance_include", c.HostCPUInstancesInclude)
 	if err != nil {
 		return err
 	}
 	c.hostCPUInstanceMatcher = hostCPUInstanceMatcher
 	if len(c.VSANClustersInclude) == 0 {
-		c.VSANClustersInclude = []string{"/*"}
+		c.VSANClustersInclude = match.VSANClusterIncludes{"/*"}
 	}
-	vsanClusterMatcher, err := newSimplePatternsMatcher("vsan_cluster_include", c.VSANClustersInclude)
+	vsanClusterMatcher, err := c.VSANClustersInclude.Parse()
 	if err != nil {
 		return err
 	}
 	c.vsanClusterMatcher = vsanClusterMatcher
 	if len(c.VSANHostsInclude) == 0 {
-		c.VSANHostsInclude = []string{"/*"}
+		c.VSANHostsInclude = match.VSANHostIncludes{"/*"}
 	}
-	vsanHostMatcher, err := newSimplePatternsMatcher("vsan_host_include", c.VSANHostsInclude)
+	vsanHostMatcher, err := c.VSANHostsInclude.Parse()
 	if err != nil {
 		return err
 	}
 	c.vsanHostMatcher = vsanHostMatcher
 	if len(c.VSANVMsInclude) == 0 {
-		c.VSANVMsInclude = []string{"/*"}
+		c.VSANVMsInclude = match.VSANVMIncludes{"/*"}
 	}
-	vsanVMMatcher, err := newSimplePatternsMatcher("vsan_vm_include", c.VSANVMsInclude)
+	vsanVMMatcher, err := c.VSANVMsInclude.Parse()
 	if err != nil {
 		return err
 	}

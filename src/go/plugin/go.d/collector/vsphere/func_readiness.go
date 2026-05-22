@@ -246,14 +246,14 @@ func (c *Collector) readinessRows() []readinessRow {
 
 	rows = append(rows,
 		c.userMetadataReadinessRow(),
-		c.optionalMetricReadinessRow("datastore_clusters", "metrics", c.CollectDatastoreClusters, c.DatastoreClustersInclude),
-		c.optionalMetricReadinessRow("vm_disks", "metrics", c.CollectVMDisks || c.CollectVMDiskPerformance, c.VMDisksInclude),
-		c.optionalMetricReadinessRow("vm_nics", "metrics", c.CollectVMNICPerformance, c.VMNICsInclude),
-		c.optionalMetricReadinessRow("host_nics", "metrics", c.CollectHostNICPerformance, c.HostNICsInclude),
-		c.optionalMetricReadinessRow("host_disks", "metrics", c.CollectHostDiskPerformance, c.HostDisksInclude),
-		c.optionalMetricReadinessRow("host_storage_adapters", "metrics", c.CollectHostStorageAdapterPerformance, c.HostStorageAdaptersInclude),
-		c.optionalMetricReadinessRow("host_storage_paths", "metrics", c.CollectHostStoragePathPerformance, c.HostStoragePathsInclude),
-		c.optionalMetricReadinessRow("host_cpu_instances", "metrics", c.CollectHostCPUInstancePerformance, c.HostCPUInstancesInclude),
+		c.optionalMetricReadinessRow("datastore_clusters", "metrics", c.CollectDatastoreClusters, len(c.DatastoreClustersInclude)),
+		c.optionalMetricReadinessRow("vm_disks", "metrics", c.CollectVMDisks || c.CollectVMDiskPerformance, len(c.VMDisksInclude)),
+		c.optionalMetricReadinessRow("vm_nics", "metrics", c.CollectVMNICPerformance, len(c.VMNICsInclude)),
+		c.optionalMetricReadinessRow("host_nics", "metrics", c.CollectHostNICPerformance, len(c.HostNICsInclude)),
+		c.optionalMetricReadinessRow("host_disks", "metrics", c.CollectHostDiskPerformance, len(c.HostDisksInclude)),
+		c.optionalMetricReadinessRow("host_storage_adapters", "metrics", c.CollectHostStorageAdapterPerformance, len(c.HostStorageAdaptersInclude)),
+		c.optionalMetricReadinessRow("host_storage_paths", "metrics", c.CollectHostStoragePathPerformance, len(c.HostStoragePathsInclude)),
+		c.optionalMetricReadinessRow("host_cpu_instances", "metrics", c.CollectHostCPUInstancePerformance, len(c.HostCPUInstancesInclude)),
 		c.booleanReadinessRow("power_metrics", "metrics", c.CollectPowerMetrics, "host and VM power metrics are enabled", "host and VM power metrics are disabled"),
 		c.booleanReadinessRow("network_topology", "topology", c.CollectNetworkTopology, "vSphere Network topology discovery is enabled", "vSphere Network topology discovery is disabled"),
 		c.vsanReadinessRow(),
@@ -276,7 +276,7 @@ func (c *Collector) booleanReadinessRow(check, scope string, enabled bool, enabl
 	return readinessRow{check: check, scope: scope, status: readinessStatusDisabled, details: disabledDetails}
 }
 
-func (c *Collector) optionalMetricReadinessRow(check, scope string, enabled bool, includes []string) readinessRow {
+func (c *Collector) optionalMetricReadinessRow(check, scope string, enabled bool, includePatterns int) readinessRow {
 	if !enabled {
 		return readinessRow{
 			check:   check,
@@ -289,7 +289,7 @@ func (c *Collector) optionalMetricReadinessRow(check, scope string, enabled bool
 		check:   check,
 		scope:   scope,
 		status:  readinessStatusOK,
-		details: fmt.Sprintf("enabled with include_patterns=%d", len(includes)),
+		details: fmt.Sprintf("enabled with include_patterns=%d", includePatterns),
 	}
 }
 

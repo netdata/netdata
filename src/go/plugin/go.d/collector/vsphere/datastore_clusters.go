@@ -5,7 +5,6 @@ package vsphere
 import (
 	"sort"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
@@ -50,12 +49,8 @@ func (c *Collector) writeDatastoreClusterMetrics(meter metrix.SnapshotMeter) {
 	}
 
 	m := c.datastoreClusterMatcher
-	if m == nil {
-		m = matcher.TRUE()
-	}
-
 	for _, pod := range sortedStoragePods(c.resources.StoragePods) {
-		if !datastoreClusterMatches(m, pod) {
+		if m != nil && !m.Match(pod) {
 			continue
 		}
 
@@ -100,17 +95,6 @@ func datastoreClusterLabels(pod *rs.StoragePod) []metrix.Label {
 		{Key: "datacenter", Value: pod.Hier.DC.Name},
 		{Key: datastoreClusterNameLabel, Value: pod.Name},
 	}
-}
-
-func datastoreClusterMatches(m matcher.Matcher, pod *rs.StoragePod) bool {
-	return m.MatchString(datastoreClusterPath(pod)) || m.MatchString(pod.Name) || m.MatchString(pod.ID)
-}
-
-func datastoreClusterPath(pod *rs.StoragePod) string {
-	if pod.Hier.DC.Name == "" {
-		return "/" + pod.Name
-	}
-	return "/" + pod.Hier.DC.Name + "/" + pod.Name
 }
 
 func sortedStoragePods(pods rs.StoragePods) []*rs.StoragePod {

@@ -6,6 +6,102 @@ Status: in-progress
 
 Sub-state: Reopened on 2026-05-09 for PR CI regression triage and pre-merge hardening. Framework V2 migration, VM snapshot aggregate metrics/alerts, datastore aggregate enrichment, VM/host power-state metrics, VM/host property-status metrics, cluster DRS/HA property-status metrics, inventory object counts, opt-in vSphere tag/custom-attribute labels, opt-in VM disk capacity/performance, opt-in VM network-interface performance, opt-in host physical network-interface performance, opt-in host disk/LUN/device performance, opt-in host storage-adapter performance, opt-in host storage-path performance, opt-in host CPU-instance performance, opt-in host/VM power metrics, opt-in datastore cluster metrics, opt-in vSAN cluster space/health plus cluster/host/VM performance metrics, read-only readiness Function, cached vSphere inventory topology Function, and opt-in Network/DVPG topology discovery are implemented. Local fixes are in progress for yamllint, SonarCloud, DynCfg tab layout, metadata linting, supportable vSphere error messages, and hard removal of optional ESXi/VM vnode support, host/VM power-state config controls, inventory-path labels, and VM guest labels before closing again. Remaining parity feasibility is complete; vCenter/ESXi events, collector-generated vSphere vnodes, host/VM power-state config controls, inventory-path labels, and VM guest labels are explicitly out of this PR by user decision.
 
+### 2026-05-22 Matcher Simplification Decision
+
+The user approved simplifying the internal vSphere include matcher
+implementation in this WIP PR as a focused cleanup change.
+
+Refactor scope:
+
+- use private generic helpers for the older Host/VM/Datastore/Cluster
+  path-segment include matchers;
+- keep public matcher interfaces, named `*Includes` config types, `Parse()`
+  method signatures, YAML/JSON config keys, nil-matcher behavior, and
+  error-message shapes unchanged;
+- keep the datastore-cluster/vSAN multi-field include matchers explicit because
+  their resource-specific matching is already small and readable;
+- rewrite white-box matcher tests into behavior tests that lock selector
+  semantics instead of concrete internal struct trees.
+
+Evidence and reason:
+
+- The existing path-segment matcher family repeats single-field matcher structs,
+  boolean combinator structs/builders, parse loops, and segment parsers for
+  host, VM, datastore, and cluster selectors.
+- A second-opinion review agreed private generics fit this repetition, while
+  public interfaces and config types should remain stable.
+
+Validation after refactor:
+
+- `go test -count=1 ./collector/vsphere/match` passed from
+  `src/go/plugin/go.d`.
+- `go test -count=1 ./collector/vsphere/...` passed from
+  `src/go/plugin/go.d`.
+- `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+- `git diff --check` passed.
+- Grep for removed concrete Host/VM/Datastore/Cluster matcher structs and
+  builder helpers under `collector/vsphere/match` returned no matches.
+
+### 2026-05-22 Matcher Package Extraction Decision
+
+The user approved extracting only the reusable ordered pre-split
+glob-pattern-list matcher to `src/go/pkg/matcher` for a clean end state.
+
+Extraction scope:
+
+- add a `pkg/matcher` constructor for `[]string` pattern lists where individual
+  entries may contain spaces;
+- preserve first-match-wins semantics, `!` negation, empty-list behavior, and
+  vSphere validation for empty negative patterns and all-negative lists;
+- use the shared helper from vSphere user-metadata label allowlists and
+  include-selector pattern lists;
+- keep vSphere's typed generic resource matcher helpers, path parsing, resource
+  interfaces, named `*Includes` types, and `Parse()` methods local to
+  `collector/vsphere/match`.
+
+Evidence and reason:
+
+- `pkg/matcher` already owns the string/byte matcher API and
+  `NewSimplePatternsMatcher`, but that constructor whitespace-splits one string
+  and cannot preserve config list entries such as `Business Unit`.
+- The branch currently contains two vSphere-local copies of the same ordered
+  `[]string` glob-list algorithm: one for tag/custom-attribute allowlists and
+  one for include selectors.
+- The typed resource matcher helpers have one caller and are tied to vSphere
+  resource hierarchy/path semantics, so moving them would add shared API bloat
+  without a second consumer.
+
+Validation after extraction:
+
+- `go test -count=1 ./pkg/matcher/...` passed from `src/go`.
+- `go test -count=1 ./plugin/go.d/collector/vsphere/match` passed from
+  `src/go`.
+- `go test -count=1 ./plugin/go.d/collector/vsphere/...` passed from
+  `src/go`.
+- `go vet ./pkg/matcher/... ./plugin/go.d/collector/vsphere/...` passed from
+  `src/go`.
+- `git diff --check` passed.
+- Grep for the removed vSphere-local matcher implementations
+  (`userMetadataPattern*`, `patternListTerm`, `patternListMatcher`,
+  `newUserMetadataPatternMatcher`) returned no matches under
+  `src/go/pkg/matcher` and `src/go/plugin/go.d/collector/vsphere`.
+- `go test -race -timeout 300s ./pkg/matcher/... ./plugin/go.d/collector/vsphere/...`
+  did not run in the local toolchain: the race runtime failed during package
+  build with `runtime/race: package testmain: cannot find package`.
+
+Read-only review after extraction:
+
+- Verdict: **CLEAN**.
+- The review accepted the named include selector types, private generic path
+  matcher refactor, shared `pkg/matcher` pattern-list constructor, vSphere
+  wrapper preserving config-specific error messages, behavior-test rewrite, and
+  absence of schema/metadata/stock-config churn.
+- No behavior or compatibility regressions were found.
+- Non-blocking robustness notes were limited to optional follow-up work:
+  replacing string-based wrapper error classification with exported matcher
+  sentinel errors, adding compile-time interface guards, adding explicit Family B
+  empty-input tests, and adding a multi-item all-negative pattern-list test.
+
 ### 2026-05-20 Vnode Removal Decision
 
 The user directed hard removal of vnode-related vSphere changes before merge.

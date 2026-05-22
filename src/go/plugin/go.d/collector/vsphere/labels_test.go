@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
@@ -87,8 +88,8 @@ func firstVMWithMetric(t *testing.T, vms rs.VMs, mx map[string]int64, metric str
 	return nil
 }
 
-func TestUserMetadataPatternMatcherPreservesListItems(t *testing.T) {
-	m, err := newUserMetadataPatternMatcher("custom_attributes", []string{"!Business Secret", "Cost Center", "Business*"})
+func TestPatternListMatcherPreservesUserMetadataListItems(t *testing.T) {
+	m, err := match.NewPatternListMatcher("custom_attributes", []string{"!Business Secret", "Cost Center", "Business*"})
 	require.NoError(t, err)
 
 	require.True(t, m.MatchString("Cost Center"))

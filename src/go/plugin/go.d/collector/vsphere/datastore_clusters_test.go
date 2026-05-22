@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
@@ -20,7 +21,7 @@ func TestCollector_Init_ReturnsFalseIfInvalidDatastoreClusterConfig(t *testing.T
 	collr.Password = "pass"
 	collr.CollectDatastoreClusters = true
 
-	collr.DatastoreClustersInclude = []string{"["}
+	collr.DatastoreClustersInclude = match.DatastoreClusterIncludes{"["}
 	require.ErrorContains(t, collr.Init(context.Background()), "datastore_cluster_include has invalid pattern")
 }
 
@@ -74,23 +75,23 @@ func TestCollector_DatastoreClustersOptInEmitsCharts(t *testing.T) {
 
 func TestCollector_DatastoreClustersSelector(t *testing.T) {
 	tests := map[string]struct {
-		include []string
+		include match.DatastoreClusterIncludes
 		want    int
 	}{
 		"selector keeps matching path": {
-			include: []string{"/DC0/DC0_POD1"},
+			include: match.DatastoreClusterIncludes{"/DC0/DC0_POD1"},
 			want:    1,
 		},
 		"selector keeps matching name": {
-			include: []string{"DC0_POD1"},
+			include: match.DatastoreClusterIncludes{"DC0_POD1"},
 			want:    1,
 		},
 		"selector keeps all datastore clusters": {
-			include: []string{"/*"},
+			include: match.DatastoreClusterIncludes{"/*"},
 			want:    2,
 		},
 		"selector can exclude all datastore clusters": {
-			include: []string{"NoSuchPod"},
+			include: match.DatastoreClusterIncludes{"NoSuchPod"},
 			want:    0,
 		},
 	}

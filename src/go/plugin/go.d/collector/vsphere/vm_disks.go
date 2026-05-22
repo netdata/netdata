@@ -3,7 +3,6 @@
 package vsphere
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,59 +35,6 @@ func optionalMetricNames() []string {
 	names = append(names, powerMetricsOptionalMetricNames()...)
 	names = append(names, vsanOptionalMetricNames()...)
 	return names
-}
-
-func newSimplePatternsMatcher(name string, patterns []string) (matcher.Matcher, error) {
-	var terms simplePatternListMatcher
-	hasPositive := false
-	for _, pattern := range patterns {
-		pattern = strings.TrimSpace(pattern)
-		if pattern == "" {
-			continue
-		}
-		term := simplePatternListTerm{positive: true}
-		if strings.HasPrefix(pattern, "!") {
-			term.positive = false
-			pattern = strings.TrimSpace(strings.TrimPrefix(pattern, "!"))
-		}
-		if pattern == "" {
-			return nil, fmt.Errorf("%s has invalid empty negative pattern", name)
-		}
-		hasPositive = hasPositive || term.positive
-		m, err := matcher.NewGlobMatcher(pattern)
-		if err != nil {
-			return nil, fmt.Errorf("%s has invalid pattern: %w", name, err)
-		}
-		term.matcher = m
-		terms = append(terms, term)
-	}
-	if len(terms) == 0 {
-		return matcher.FALSE(), nil
-	}
-	if !hasPositive {
-		return nil, fmt.Errorf("%s must include at least one positive pattern", name)
-	}
-	return terms, nil
-}
-
-type simplePatternListTerm struct {
-	matcher  matcher.Matcher
-	positive bool
-}
-
-type simplePatternListMatcher []simplePatternListTerm
-
-func (m simplePatternListMatcher) Match(b []byte) bool {
-	return m.MatchString(string(b))
-}
-
-func (m simplePatternListMatcher) MatchString(line string) bool {
-	for _, term := range m {
-		if term.matcher.MatchString(line) {
-			return term.positive
-		}
-	}
-	return false
 }
 
 func (c *Collector) writeOptionalMetrics(meter metrix.SnapshotMeter) {

@@ -60,7 +60,7 @@ func New() *Collector {
 			VMsInclude:                 []string{"/*"},
 			DatastoresInclude:          []string{"/*"},
 			ClustersInclude:            []string{"/*"},
-			DatastoreClustersInclude:   []string{"/*"},
+			DatastoreClustersInclude:   match.DatastoreClusterIncludes{"/*"},
 			VMDisksInclude:             []string{"*"},
 			VMNICsInclude:              []string{"*"},
 			HostNICsInclude:            []string{"*"},
@@ -69,9 +69,9 @@ func New() *Collector {
 			HostStoragePathsInclude:    []string{"*"},
 			HostCPUInstancesInclude:    []string{"*"},
 			CollectVSAN:                false,
-			VSANClustersInclude:        []string{"/*"},
-			VSANHostsInclude:           []string{"/*"},
-			VSANVMsInclude:             []string{"/*"},
+			VSANClustersInclude:        match.VSANClusterIncludes{"/*"},
+			VSANHostsInclude:           match.VSANHostIncludes{"/*"},
+			VSANVMsInclude:             match.VSANVMIncludes{"/*"},
 		},
 		store:                   store,
 		mx:                      mx,
@@ -109,8 +109,8 @@ type Config struct {
 	CustomAttributes []string `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
 
 	// Optional datastore cluster metrics.
-	CollectDatastoreClusters bool     `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
-	DatastoreClustersInclude []string `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
+	CollectDatastoreClusters bool                           `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
+	DatastoreClustersInclude match.DatastoreClusterIncludes `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
 
 	// Optional VM child-instance metrics.
 	CollectVMDisks           bool     `yaml:"collect_vm_disks,omitempty" json:"collect_vm_disks"`
@@ -135,10 +135,10 @@ type Config struct {
 	CollectPowerMetrics bool `yaml:"collect_power_metrics,omitempty" json:"collect_power_metrics"`
 
 	// Optional vSAN metrics.
-	CollectVSAN         bool     `yaml:"collect_vsan,omitempty" json:"collect_vsan"`
-	VSANClustersInclude []string `yaml:"vsan_cluster_include,omitempty" json:"vsan_cluster_include"`
-	VSANHostsInclude    []string `yaml:"vsan_host_include,omitempty" json:"vsan_host_include"`
-	VSANVMsInclude      []string `yaml:"vsan_vm_include,omitempty" json:"vsan_vm_include"`
+	CollectVSAN         bool                      `yaml:"collect_vsan,omitempty" json:"collect_vsan"`
+	VSANClustersInclude match.VSANClusterIncludes `yaml:"vsan_cluster_include,omitempty" json:"vsan_cluster_include"`
+	VSANHostsInclude    match.VSANHostIncludes    `yaml:"vsan_host_include,omitempty" json:"vsan_host_include"`
+	VSANVMsInclude      match.VSANVMIncludes      `yaml:"vsan_vm_include,omitempty" json:"vsan_vm_include"`
 
 	// Optional cached topology Function data.
 	CollectNetworkTopology bool `yaml:"collect_network_topology,omitempty" json:"collect_network_topology"`
@@ -175,7 +175,7 @@ type (
 		datastorePerfCharted                   map[string]bool
 		clusterPerfReceived                    map[string]bool
 		clusterPerfCharted                     map[string]bool
-		datastoreClusterMatcher                matcher.Matcher
+		datastoreClusterMatcher                match.DatastoreClusterMatcher
 		vmDiskMatcher                          matcher.Matcher
 		vmNICMatcher                           matcher.Matcher
 		hostNICMatcher                         matcher.Matcher
@@ -183,9 +183,9 @@ type (
 		hostStorageAdapterMatcher              matcher.Matcher
 		hostStoragePathMatcher                 matcher.Matcher
 		hostCPUInstanceMatcher                 matcher.Matcher
-		vsanClusterMatcher                     matcher.Matcher
-		vsanHostMatcher                        matcher.Matcher
-		vsanVMMatcher                          matcher.Matcher
+		vsanClusterMatcher                     match.VSANClusterMatcher
+		vsanHostMatcher                        match.VSANHostMatcher
+		vsanVMMatcher                          match.VSANVMMatcher
 		vsphereTagCategoryMatcher              matcher.Matcher
 		customAttributeMatcher                 matcher.Matcher
 		vmDiskPerfSamples                      map[string]*vmDiskPerfSample
