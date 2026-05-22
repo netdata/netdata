@@ -272,7 +272,7 @@ static struct {
     SPINLOCK spinlock;
     size_t count;
     nd_thread_cleanup_fn fns[ND_THREAD_CLEANUP_MAX];
-} nd_thread_cleanup_registry = { 0 };
+} nd_thread_cleanup_registry = { .spinlock = SPINLOCK_INITIALIZER };
 
 void nd_thread_register_cleanup(nd_thread_cleanup_fn fn) {
     if(!fn) return;
