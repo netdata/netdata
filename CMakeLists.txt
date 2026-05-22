@@ -3082,12 +3082,18 @@ if(ENABLE_PLUGIN_EBPF)
             COMPONENT plugin-ebpf
             DESTINATION usr/libexec/netdata/plugins.d)
 
+    # GLOB_RECURSE descends into subdirectories, so netipc/*.go covers
+    # protocol/, service/, and transport/ even though no .go files exist at
+    # netipc/'s root level.  go.mod and go.sum are listed explicitly so a
+    # Go-version bump or new transitive dep in go/plugins triggers a rebuild.
     file(GLOB_RECURSE EBPF_GO_PLUGIN_FILES CONFIGURE_DEPENDS
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.go"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.c"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
             "${CMAKE_SOURCE_DIR}/go.work"
+            "${CMAKE_SOURCE_DIR}/src/go/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/go/go.sum"
             "${CMAKE_SOURCE_DIR}/src/go/pkg/netipc/*.go"
             "${CMAKE_SOURCE_DIR}/src/go/pkg/netdataapi/*.go")
 
