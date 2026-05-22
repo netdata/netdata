@@ -10,7 +10,7 @@ Netdata implements a layered access control system to protect sensitive informat
 |--------------|-------------|
 | **Anonymous** | Using the Netdata dashboard without signing in |
 | **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier) |
-| **Netdata Cloud Business** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
+| **Netdata Cloud (Paid)** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
 
 ## Why Access Controls Exist
 
@@ -27,7 +27,7 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 
 ### Metrics and Visualization
 
-| Feature | Anonymous | Community | Business |
+| Feature | Anonymous | Community | Paid |
 |---------|:---------:|:---------:|:--------:|
 | Real-time metrics (all collectors) | ✓ | ✓ | ✓ |
 | Historical data and retention | ✓ | ✓ | ✓ |
@@ -41,7 +41,7 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 
 Functions provide on-demand, detailed information beyond standard metrics.
 
-| Function | Description | Anonymous | Community | Business |
+| Function | Description | Anonymous | Community | Paid |
 |----------|-------------|:---------:|:---------:|:--------:|
 | **Block Devices** | Disk I/O activity | ✓ | ✓ | ✓ |
 | **Containers/VMs** | Container and VM resource usage | ✓ | ✓ | ✓ |
@@ -60,7 +60,7 @@ Functions provide on-demand, detailed information beyond standard metrics.
 
 ### Configuration and Management
 
-| Feature | Anonymous | Community | Business |
+| Feature | Anonymous | Community | Paid |
 |---------|:---------:|:---------:|:--------:|
 | View agent configuration | ✗ | ✗ | ✓ |
 | Dynamic Configuration (collectors) | ✗ | ✗ | ✓ |
@@ -70,7 +70,7 @@ Functions provide on-demand, detailed information beyond standard metrics.
 
 ### AI-Powered Features
 
-| Feature | Anonymous | Community | Business |
+| Feature | Anonymous | Community | Paid |
 |---------|:---------:|:---------:|:--------:|
 | Alert explanations | ✗ | ✓ | ✓ |
 | Alert configuration suggestions | ✗ | ✓ | ✓ |
@@ -78,7 +78,7 @@ Functions provide on-demand, detailed information beyond standard metrics.
 
 ### Organization Features
 
-| Feature | Anonymous | Community | Business |
+| Feature | Anonymous | Community | Paid |
 |---------|:---------:|:---------:|:--------:|
 | Role-based access control (RBAC) | N/A | ✗ | ✓ |
 | Single Sign-On (SSO) | N/A | ✗ | ✓ |
@@ -110,22 +110,22 @@ Once signed in, you'll have access to all sensitive functions (processes, logs, 
 
 ### Enable Dynamic Configuration
 
-Dynamic Configuration requires a Business plan:
+Dynamic Configuration requires a paid subscription:
 
 1. **Sign in to Netdata Cloud**
-2. **Upgrade to Business** from the billing settings
+2. **Upgrade to a paid plan** from the billing settings
 3. **Access Dynamic Configuration** from the settings menu on any connected node
 
 ### Increase Node Limits
 
 The 5-node limit on multi-node dashboards applies to Community plans:
 
-1. **Upgrade to Business** for unlimited nodes
+1. **Upgrade to a paid plan** for unlimited nodes
 2. **Or select preferred nodes** in Space settings to choose which 5 nodes appear in multi-node views
 
 ## Summary
 
-| What You Get | Anonymous | Community | Business |
+| What You Get | Anonymous | Community | Paid |
 |--------------|-----------|-----------|----------|
 | **Metrics & Charts** | Full access | Full access | Full access |
 | **Anomaly Detection** | Full access | Full access | Full access |
@@ -138,4 +138,4 @@ The 5-node limit on multi-node dashboards applies to Community plans:
 | **Custom Dashboards** | 1 per agent | 1 per room | Unlimited |
 | **RBAC & SSO** | N/A | Not available | Full access |
 
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to Business for full configuration control and unlimited scale.
+Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for full configuration control and unlimited scale.
