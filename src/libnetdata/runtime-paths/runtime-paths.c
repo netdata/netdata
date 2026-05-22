@@ -47,7 +47,7 @@ void nd_runtime_paths_load_hostname_from_inicfg(void) {
     netdata_configured_host_prefix = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "host access prefix", "");
     (void) verify_netdata_host_prefix(true);
 
-    char buf[HOST_NAME_MAX * 4 + 1];
+    char buf[HOST_NAME_MAX * 4 + 1] = "";
     if (!os_hostname(buf, sizeof(buf), netdata_configured_host_prefix))
         netdata_log_error("Cannot get machine hostname.");
 
