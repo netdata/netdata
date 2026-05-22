@@ -342,20 +342,20 @@ void function_network_protocols(
         nv_add_key_field(wb, &field_id, "Family",    "IP Protocol Family");
 
         // Normalized columns — TCP: segments, UDP: datagrams
-        nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams)", "packets");
-        nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams)",     "packets");
-        nv_add_int_field(wb, &field_id, "Errors",   "Errors (Failures/Rx Errors)",   "errors");
+        nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams)", "segments/datagrams/s");
+        nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams)",     "segments/datagrams/s");
+        nv_add_int_field(wb, &field_id, "Errors",   "Errors (Failures/Rx Errors)",   "errors/s");
 
         // TCP-only columns (UDP rows carry 0)
-        nv_add_int_field(wb, &field_id, "ConnActive",        "Active Connections Opened",         "connections");
+        nv_add_int_field(wb, &field_id, "ConnActive",        "Active Connections Opened",         "opens/s");
         nv_add_int_field(wb, &field_id, "ConnEstablished",   "Currently Established Connections",  "connections");
-        nv_add_int_field(wb, &field_id, "ConnPassive",       "Passive Connections Opened",         "connections");
-        nv_add_int_field(wb, &field_id, "ConnReset",         "Reset Connections",                  "connections");
-        nv_add_int_field(wb, &field_id, "SegsTotal",         "Total Segments",                     "segments");
-        nv_add_int_field(wb, &field_id, "SegsRetransmitted", "Retransmitted Segments",             "segments");
+        nv_add_int_field(wb, &field_id, "ConnPassive",       "Passive Connections Opened",         "opens/s");
+        nv_add_int_field(wb, &field_id, "ConnReset",         "Reset Connections",                  "resets/s");
+        nv_add_int_field(wb, &field_id, "SegsTotal",         "Total Segments",                     "segments/s");
+        nv_add_int_field(wb, &field_id, "SegsRetransmitted", "Retransmitted Segments",             "segments/s");
 
         // UDP-only column (TCP rows carry 0)
-        nv_add_int_field(wb, &field_id, "DatagramsNoPort", "Datagrams with No Port", "datagrams");
+        nv_add_int_field(wb, &field_id, "DatagramsNoPort", "Datagrams with No Port", "datagrams/s");
     }
     buffer_json_object_close(wb); // columns
     buffer_json_member_add_string(wb, "default_sort_column", "Received");
