@@ -576,12 +576,14 @@ static bool netdata_systemd_filtering_by_journal(NsdJournal *j, FACETS *facets, 
             interesting = facets_key_name_is_facet(facets, field);
 
         if (interesting) {
-            if (nsd_journal_query_unique(j, field) >= 0) {
+            int r = nsd_journal_query_unique(j, field);
+            if (r >= 0) {
                 bool added_this_key = false;
                 size_t added_values = 0;
 
-                NSD_JOURNAL_FOREACH_UNIQUE(j, data, data_length)
-                { // for each value of the key
+                nsd_journal_restart_unique(j);
+                while ((r = nsd_journal_enumerate_available_unique(j, &data, &data_length)) > 0) {
+                    // for each value of the key
                     const char *key, *value;
                     size_t key_length, value_length;
 
@@ -614,6 +616,11 @@ static bool netdata_systemd_filtering_by_journal(NsdJournal *j, FACETS *facets, 
                     added_values++;
                     filters_added++;
                 }
+
+                if (r < 0)
+                    failures++;
+            } else {
+                failures++;
             }
         }
     }
