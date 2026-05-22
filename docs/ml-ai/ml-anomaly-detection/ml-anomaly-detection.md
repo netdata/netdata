@@ -251,7 +251,7 @@ On a freshly installed agent, ML begins detecting anomalies within 10 minutes. H
 
 ## Creating Anomaly-Based Health Alerts
 
-You can create health alerts that trigger based on anomaly rates instead of raw metric values by using the `anomaly-bit` option in your alert's `lookup` line. When `anomaly-bit` is enabled, the lookup returns 100 for anomalous data points and 0 for normal ones, so the average over a time window gives you the anomaly rate as a percentage.
+You can create health alerts that trigger based on anomaly rates instead of raw metric values by using the `anomaly-bit` option in your alert's `lookup` line. Internally, anomaly bits mark samples as anomalous or normal, and the query/health pipeline exposes this as an anomaly-rate percentage in the 0-100 range. For aggregated or tiered data, returned values can be intermediate percentages rather than only 0 or 100, so averaging over a time window gives you the anomaly rate as a percentage.
 
 ### Anomaly-rate alert
 
@@ -276,7 +276,7 @@ An anomaly-rate alert tells you *something is unusual*, but not *what the actual
 ```text
  alarm: cpu_usage_5min
     on: system.cpu
-lookup: average -5m of user system
+lookup: average -5m of user,system
  units: %
  every: 30s
   warn: $this > 80
