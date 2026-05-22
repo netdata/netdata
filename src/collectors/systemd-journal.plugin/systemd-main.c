@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "systemd-internals.h"
-#include "libnetdata/required_dummies.h"
 
 #define ND_SD_JOURNAL_WORKER_THREADS 5
 

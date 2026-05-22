@@ -1012,7 +1012,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/procfile/procfile.h
         src/libnetdata/query_progress/progress.c
         src/libnetdata/query_progress/progress.h
-        src/libnetdata/required_dummies.h
         src/libnetdata/socket/security.c
         src/libnetdata/socket/security.h
         src/libnetdata/simple_hashtable/simple_hashtable.h

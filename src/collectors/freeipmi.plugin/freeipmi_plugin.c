@@ -16,7 +16,6 @@
 
 // #define NETDATA_TIMING_REPORT 1
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 
 #define FREEIPMI_GLOBAL_FUNCTION_SENSORS() do { \
         fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n", \
