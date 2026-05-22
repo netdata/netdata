@@ -404,10 +404,46 @@ CI run.
 - Smoke crate (SOW-0032) committed (`8733eadf75`) with `ENABLE_RUST_DEMO`
   defaulting ON in CMake. `packaging/windows/compile-on-windows.sh` now
   passes `-DENABLE_RUST_DEMO=Off` to opt the Windows path out of the
-  smoke crate while this migration is in flight.
-- Awaiting user confirmation on:
-  - Phase sequencing as written, or any preferred reordering.
-  - Whether to start Phase 1 immediately or socialize the plan first.
+  smoke crate while this migration is in flight (`0b02218107`).
+- User confirmed: start at Phase 2 (shell switch) and use a **hard cut**
+  for developer-experience changes (no MSYS-compatibility fallback).
+- Phase 2 implementation:
+  - `packaging/windows/build.ps1`,
+    `packaging/windows/install-dependencies.ps1`,
+    `packaging/windows/invoke-msys2.ps1`, and
+    `packaging/windows/package.ps1` all now set
+    `$env:MSYSTEM = 'UCRT64'` before invoking msysbash. This is the
+    one-line change that makes `/etc/profile` add `/ucrt64/bin` to
+    PATH and routes `gcc`, `pkg-config`, and friends through the
+    UCRT64 toolchain.
+  - `packaging/cmake/Modules/NetdataPlatform.cmake`:
+    - Dropped the `CYGWIN` and `MSYS` `CMAKE_SYSTEM_NAME` branches.
+      Only `Windows` is accepted now.
+    - Added a `FATAL_ERROR` guard inside `_nd_windows_config()` that
+      refuses to configure unless `MSYSTEM=UCRT64`. Other MSYS2
+      environments (`MSYS`, `MINGW64`, `CLANG64`) now fail fast with
+      a clear message pointing at this SOW.
+    - The CLion `include_directories` branches collapsed to a single
+      `c:/msys64/ucrt64/include` line.
+  - `packaging/windows/compile-on-windows.sh` dropped
+    `-DRust_COMPILER=/ucrt64/bin/rustc`. Under UCRT64,
+    `/ucrt64/bin/{rustc,cargo}` are on PATH and Corrosion's
+    `FindRust.cmake` will discover them automatically.
+  - Deleted `packaging/windows/clion-msys-msys-environment.bat` and
+    `packaging/windows/clion-msys-mingw64-environment.bat`. Added
+    `packaging/windows/clion-msys-ucrt64-environment.bat` as the
+    only supported CLion developer entry point.
+- Expected next CI signal from Phase 2:
+  - `pacman -Syuu` from `msys2-dependencies.sh` may behave differently
+    under UCRT64 vs MSYS (still updates the runtime; should be fine).
+  - The C compile will likely fail on `<sys/cygwin.h>` and
+    `cygwin_conv_path()` calls because `/ucrt64/include` does not
+    provide them. That is the expected entry point for Phase 3
+    (path translation removal).
+  - It may also fail on POSIX↔Winsock2 type mismatches noticed by
+    `/ucrt64/include/winsock2.h` (Phase 4).
+  - Build failure here is informative, not regressive: this is the
+    signal we are migrating to surface.
 
 ## Validation
 

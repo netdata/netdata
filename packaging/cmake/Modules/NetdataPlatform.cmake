@@ -16,6 +16,17 @@ macro(_nd_windows_config)
     message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
   endif()
 
+  # The Windows build only supports the MSYS2 UCRT64 environment. Other
+  # MSYS2 environments (MSYS, MINGW64, CLANG64) are deliberately rejected
+  # to keep the C runtime, data model, and CRT linkage consistent with the
+  # Rust toolchain (which is also UCRT-linked). See SOW-0033.
+  if(NOT "$ENV{MSYSTEM}" STREQUAL "UCRT64")
+    message(FATAL_ERROR
+      "The Windows build requires MSYSTEM=UCRT64. "
+      "Current MSYSTEM='$ENV{MSYSTEM}'. "
+      "Launch the MSYS2 UCRT64 shell (or set MSYSTEM=UCRT64 before invoking bash).")
+  endif()
+
   if(BUILD_FOR_PACKAGING)
     set(NETDATA_RUNTIME_PREFIX "/")
   endif()
@@ -29,18 +40,7 @@ macro(_nd_windows_config)
 
   if($ENV{CLION_IDE})
     set(RUN_UNDER_CLION True)
-
-    # clion needs these to find the includes
-    if("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-      if("$ENV{MSYSTEM}" STREQUAL "MSYS")
-        include_directories(c:/msys64/usr/include)
-        include_directories(c:/msys64/usr/include/w32api)
-      elseif("$ENV{MSYSTEM}" STREQUAL "MINGW64")
-        include_directories(c:/msys64/mingw64/include)
-      elseif("$ENV{MSYSTEM}" STREQUAL "UCRT64")
-        include_directories(c:/msys64/ucrt64/include)
-      endif()
-    endif()
+    include_directories(c:/msys64/ucrt64/include)
   endif()
 
   message(STATUS " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
@@ -69,10 +69,6 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   set(OS_LINUX True)
   add_definitions(-D_GNU_SOURCE)
   message(STATUS " Compiling for Linux... ")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
-  _nd_windows_config()
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS")
-  _nd_windows_config()
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   _nd_windows_config()
 else()

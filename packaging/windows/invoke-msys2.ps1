@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 
 $msysbash = Get-MSYS2Bash "$msysprefix"
 $env:CHERE_INVOKING = 'yes'
+$env:MSYSTEM = 'UCRT64'
 
 & $msysbash -l $args[0]
 
