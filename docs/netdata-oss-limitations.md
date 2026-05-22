@@ -10,7 +10,7 @@ Netdata implements a layered access control system to protect sensitive informat
 |--------------|-------------|
 | **Anonymous** | Using the Netdata dashboard without signing in |
 | **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier) |
-| **Netdata Cloud (Paid)** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
+| **Netdata Cloud Business** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
 
 ## Why Access Controls Exist
 
@@ -110,7 +110,7 @@ Once signed in, you'll have access to all sensitive functions (processes, logs, 
 
 ### Enable Dynamic Configuration
 
-Dynamic Configuration requires a paid plan:
+Dynamic Configuration requires a Business plan:
 
 1. **Sign in to Netdata Cloud**
 2. **Upgrade to Business** from the billing settings
