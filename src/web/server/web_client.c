@@ -1158,6 +1158,9 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
  *     further path or a query string starting with '?').
  *
  * Returns false when the prefix is configured but not present in the path.
+ *
+ * The check is exact at segment boundaries: for prefix "secret",
+ * "/secrethack/" returns false because decoded_path[prefix_len]=='h', not '/'.
  */
 static inline bool web_client_uri_prefix_matches(const char *decoded_path) {
     if(!web_uri_prefix || !*web_uri_prefix)
@@ -1493,7 +1496,10 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                             web_client_uri_prefix_not_found(w);
                             break;
                         }
-                        // Advance past leading slashes and the prefix segment
+                        // Advance past leading slashes and the prefix segment.
+                        // Safe: web_client_uri_prefix_matches() already confirmed the
+                        // prefix is present in path, so p + prefix_len is within the
+                        // path[] buffer bounds.
                         char *p = path;
                         while(*p == '/') p++;
                         url_to_process = p + strlen(web_uri_prefix);
