@@ -159,7 +159,7 @@ Topics where the repo lacks a canonical doc and the skill must either inline gui
 | coverity-audit | 474 |
 | pr-reviews | 508 |
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status: needs-user-decision
 

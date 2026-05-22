@@ -1,6 +1,6 @@
 # Netdata Functions: Developer Guide
 
-> **Note**: This is the practical developer guide. For the complete technical specification, see [Functions v3 Protocol Reference](/src/plugins.d/FUNCTION_UI_REFERENCE.md).
+> **Note**: This is the practical developer guide. For the complete technical specification, see [Functions v3 Protocol Reference](/src/plugins.d/FUNCTION_UI_REFERENCE.md). For topology Functions, use the dedicated [Topology Function Schema](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md).
 
 ## Overview
 
@@ -17,6 +17,7 @@ This guide teaches you how to create Netdata functions that provide interactive 
 - [Part 1: Simple Table Functions](#part-1-simple-table-functions) - Basic monitoring data
 - [Part 2: Log Explorer Functions](#part-2-log-explorer-functions) - Historical data with search
 - [Part 3: Complete Options Reference](#part-3-complete-options-reference) - Every option explained
+- [Topology Functions](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md) - Graph payloads, evidence rows, aggregation policy, and telemetry overlays
 
 ---
 
