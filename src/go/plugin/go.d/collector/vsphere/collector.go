@@ -56,10 +56,10 @@ func New() *Collector {
 				},
 			},
 			DiscoveryInterval:          confopt.Duration(time.Minute * 5),
-			HostsInclude:               []string{"/*"},
-			VMsInclude:                 []string{"/*"},
-			DatastoresInclude:          []string{"/*"},
-			ClustersInclude:            []string{"/*"},
+			HostsInclude:               match.HostIncludes{"/*"},
+			VMsInclude:                 match.VMIncludes{"/*"},
+			DatastoresInclude:          match.DatastoreIncludes{"/*"},
+			ClustersInclude:            match.ClusterIncludes{"/*"},
 			DatastoreClustersInclude:   match.DatastoreClusterIncludes{"/*"},
 			VMDisksInclude:             []string{"*"},
 			VMNICsInclude:              []string{"*"},
@@ -96,21 +96,23 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig     `yaml:",inline" json:""`
-	DiscoveryInterval  confopt.Duration `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
 
-	// Inventory filters.
-	HostsInclude      match.HostIncludes      `yaml:"host_include,omitempty" json:"host_include"`
-	VMsInclude        match.VMIncludes        `yaml:"vm_include,omitempty" json:"vm_include"`
-	DatastoresInclude match.DatastoreIncludes `yaml:"datastore_include,omitempty" json:"datastore_include"`
-	ClustersInclude   match.ClusterIncludes   `yaml:"cluster_include,omitempty" json:"cluster_include"`
+	// Inventory discovery and resource selectors.
+	DiscoveryInterval        confopt.Duration               `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
+	HostsInclude             match.HostIncludes             `yaml:"host_include,omitempty" json:"host_include"`
+	VMsInclude               match.VMIncludes               `yaml:"vm_include,omitempty" json:"vm_include"`
+	DatastoresInclude        match.DatastoreIncludes        `yaml:"datastore_include,omitempty" json:"datastore_include"`
+	ClustersInclude          match.ClusterIncludes          `yaml:"cluster_include,omitempty" json:"cluster_include"`
+	CollectDatastoreClusters bool                           `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
+	DatastoreClustersInclude match.DatastoreClusterIncludes `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
+	CollectVSAN              bool                           `yaml:"collect_vsan,omitempty" json:"collect_vsan"`
+	VSANClustersInclude      match.VSANClusterIncludes      `yaml:"vsan_cluster_include,omitempty" json:"vsan_cluster_include"`
+	VSANHostsInclude         match.VSANHostIncludes         `yaml:"vsan_host_include,omitempty" json:"vsan_host_include"`
+	VSANVMsInclude           match.VSANVMIncludes           `yaml:"vsan_vm_include,omitempty" json:"vsan_vm_include"`
 
 	// Opt-in label enrichment.
 	TagCategories    []string `yaml:"tag_categories,omitempty" json:"tag_categories"`
 	CustomAttributes []string `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
-
-	// Optional datastore cluster metrics.
-	CollectDatastoreClusters bool                           `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
-	DatastoreClustersInclude match.DatastoreClusterIncludes `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
 
 	// Optional VM child-instance metrics.
 	CollectVMDisks           bool     `yaml:"collect_vm_disks,omitempty" json:"collect_vm_disks"`
@@ -133,12 +135,6 @@ type Config struct {
 
 	// Optional aggregate power metrics.
 	CollectPowerMetrics bool `yaml:"collect_power_metrics,omitempty" json:"collect_power_metrics"`
-
-	// Optional vSAN metrics.
-	CollectVSAN         bool                      `yaml:"collect_vsan,omitempty" json:"collect_vsan"`
-	VSANClustersInclude match.VSANClusterIncludes `yaml:"vsan_cluster_include,omitempty" json:"vsan_cluster_include"`
-	VSANHostsInclude    match.VSANHostIncludes    `yaml:"vsan_host_include,omitempty" json:"vsan_host_include"`
-	VSANVMsInclude      match.VSANVMIncludes      `yaml:"vsan_vm_include,omitempty" json:"vsan_vm_include"`
 
 	// Optional cached topology Function data.
 	CollectNetworkTopology bool `yaml:"collect_network_topology,omitempty" json:"collect_network_topology"`

@@ -102,6 +102,28 @@ Read-only review after extraction:
   sentinel errors, adding compile-time interface guards, adding explicit Family B
   empty-input tests, and adding a multi-item all-negative pattern-list test.
 
+### 2026-05-22 Config Struct Grouping Decision
+
+The user approved regrouping the vSphere `Config` struct so mandatory and
+optional inventory/resource selectors sit together.
+
+Scope:
+
+- reorder/comment `Config` fields only;
+- keep every YAML/JSON key, Go type, default, validation path, schema/metadata
+  option, stock-config key, and runtime behavior unchanged;
+- keep child/performance-instance selectors beside the opt-in metric groups they
+  gate because they do not select top-level vSphere inventory resources.
+
+Validation after regrouping:
+
+- `go test -count=1 ./collector/vsphere -run TestCollector_ConfigurationSerialize`
+  passed from `src/go/plugin/go.d`; config fixtures did not need updates.
+- `go test -count=1 ./collector/vsphere/...` passed from
+  `src/go/plugin/go.d`.
+- `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
+- `git diff --check` passed.
+
 ### 2026-05-20 Vnode Removal Decision
 
 The user directed hard removal of vnode-related vSphere changes before merge.
