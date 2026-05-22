@@ -1232,6 +1232,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/mmap_limit.h
         src/libnetdata/signals/signals.c
         src/libnetdata/signals/signals.h
+        src/libnetdata/runtime-paths/runtime-paths.c
+        src/libnetdata/runtime-paths/runtime-paths.h
         src/libnetdata/os/machine_id.c
         src/libnetdata/os/machine_id.h
         src/libnetdata/os/process_memory.c
