@@ -315,7 +315,7 @@ void ml_chart_new(RRDSET *rs)
     // concurrent reader would see chart != NULL with chart->rs still NULL
     // (from value-init in `new ml_chart_t()`), producing the SIGSEGV /
     // MAPERR / 0x80 fault inside ml_chart_is_available_for_ml.
-    __atomic_store_n((rrd_ml_chart_t **)&rs->ml_chart, (rrd_ml_chart_t *)chart, __ATOMIC_RELEASE);
+    __atomic_store_n(&rs->ml_chart, (rrd_ml_chart_t *)chart, __ATOMIC_RELEASE);
 }
 
 void ml_chart_delete(RRDSET *rs)
@@ -329,7 +329,7 @@ void ml_chart_delete(RRDSET *rs)
     // Unpublish BEFORE freeing so a concurrent reader that loads rs->ml_chart
     // observes either the live chart (with chart->rs set) or NULL -- never
     // the freed chart memory.
-    __atomic_store_n((rrd_ml_chart_t **)&rs->ml_chart, (rrd_ml_chart_t *)NULL, __ATOMIC_RELEASE);
+    __atomic_store_n(&rs->ml_chart, (rrd_ml_chart_t *)NULL, __ATOMIC_RELEASE);
     delete chart;
 }
 
