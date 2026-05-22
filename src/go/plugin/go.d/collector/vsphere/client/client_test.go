@@ -137,49 +137,37 @@ func TestNew_LogsOutOnContainerViewFailure(t *testing.T) {
 	require.Len(t, sessionList(t, control), 1)
 }
 
-func TestClient_Datacenters(t *testing.T) {
-	client, teardown := prepareClient(t)
-	defer teardown()
+func TestClient_InventoryMethods(t *testing.T) {
+	tests := map[string]struct {
+		collect func(*Client) (any, error)
+	}{
+		"datacenters": {
+			collect: func(c *Client) (any, error) { return c.Datacenters() },
+		},
+		"folders": {
+			collect: func(c *Client) (any, error) { return c.Folders() },
+		},
+		"compute resources": {
+			collect: func(c *Client) (any, error) { return c.ComputeResources() },
+		},
+		"hosts": {
+			collect: func(c *Client) (any, error) { return c.Hosts() },
+		},
+		"virtual machines": {
+			collect: func(c *Client) (any, error) { return c.VirtualMachines() },
+		},
+	}
 
-	dcs, err := client.Datacenters()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, dcs)
-}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			client, teardown := prepareClient(t)
+			defer teardown()
 
-func TestClient_Folders(t *testing.T) {
-	client, teardown := prepareClient(t)
-	defer teardown()
-
-	folders, err := client.Folders()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, folders)
-}
-
-func TestClient_ComputeResources(t *testing.T) {
-	client, teardown := prepareClient(t)
-	defer teardown()
-
-	computes, err := client.ComputeResources()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, computes)
-}
-
-func TestClient_Hosts(t *testing.T) {
-	client, teardown := prepareClient(t)
-	defer teardown()
-
-	hosts, err := client.Hosts()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, hosts)
-}
-
-func TestClient_VirtualMachines(t *testing.T) {
-	client, teardown := prepareClient(t)
-	defer teardown()
-
-	vms, err := client.VirtualMachines()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, vms)
+			got, err := tc.collect(client)
+			assert.NoError(t, err)
+			assert.NotEmpty(t, got)
+		})
+	}
 }
 
 func TestClient_PerformanceMetrics(t *testing.T) {

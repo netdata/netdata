@@ -48,15 +48,81 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollector_Init(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
+	tests := map[string]struct {
+		setup   func(*Collector)
+		wantErr string
+		check   func(*testing.T, *Collector)
+	}{
+		"success": {
+			check: func(t *testing.T, collr *Collector) {
+				assert.NotNil(t, collr.discoverer)
+				assert.NotNil(t, collr.scraper)
+				assert.NotNil(t, collr.resources)
+				assert.NotNil(t, collr.discoveryTask)
+				assert.True(t, collr.discoveryTask.isRunning())
+			},
+		},
+		"URL not set": {
+			setup:   func(c *Collector) { c.URL = "" },
+			wantErr: "url",
+		},
+		"username not set": {
+			setup:   func(c *Collector) { c.Username = "" },
+			wantErr: "username",
+		},
+		"password not set": {
+			setup:   func(c *Collector) { c.Password = "" },
+			wantErr: "password",
+		},
+		"discovery interval not positive": {
+			setup:   func(c *Collector) { c.DiscoveryInterval = 0 },
+			wantErr: "discovery_interval must be greater than zero",
+		},
+		"wrong TLS CA": {
+			setup:   func(c *Collector) { c.ClientConfig.TLSConfig.TLSCA = "testdata/tls" },
+			wantErr: "testdata/tls",
+		},
+		"connection refused": {
+			setup:   func(c *Collector) { c.URL = "http://127.0.0.1:32001" },
+			wantErr: "connect",
+		},
+		"invalid host include format": {
+			setup:   func(c *Collector) { c.HostsInclude = match.HostIncludes{"invalid"} },
+			wantErr: "host_include",
+		},
+		"invalid VM include format": {
+			setup:   func(c *Collector) { c.VMsInclude = match.VMIncludes{"invalid"} },
+			wantErr: "vm_include",
+		},
+		"invalid datastore include format": {
+			setup:   func(c *Collector) { c.DatastoresInclude = match.DatastoreIncludes{"invalid"} },
+			wantErr: "datastore_include",
+		},
+		"invalid cluster include format": {
+			setup:   func(c *Collector) { c.ClustersInclude = match.ClusterIncludes{"invalid"} },
+			wantErr: "cluster_include",
+		},
+	}
 
-	assert.NoError(t, collr.Init(context.Background()))
-	assert.NotNil(t, collr.discoverer)
-	assert.NotNil(t, collr.scraper)
-	assert.NotNil(t, collr.resources)
-	assert.NotNil(t, collr.discoveryTask)
-	assert.True(t, collr.discoveryTask.isRunning())
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, _, teardown := prepareVSphereSim(t)
+			defer teardown()
+			if tc.setup != nil {
+				tc.setup(collr)
+			}
+
+			err := collr.Init(context.Background())
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tc.check != nil {
+				tc.check(t, collr)
+			}
+		})
+	}
 }
 
 func TestCollector_InitReentrantResetsRuntimeState(t *testing.T) {
@@ -65,7 +131,7 @@ func TestCollector_InitReentrantResetsRuntimeState(t *testing.T) {
 
 	require.NoError(t, collr.Init(context.Background()))
 	collr.scraper = mockScraper{collr.scraper}
-	firstRun := collectMapForTest(t, collr)
+	firstRun := collectScalarSeriesForTest(t, collr)
 	require.NotEmpty(t, firstRun)
 	require.NotEmpty(t, collr.charted)
 	require.Greater(t, len(*collr.Charts()), len(inventoryChartsTmpl))
@@ -86,7 +152,7 @@ func TestCollector_InitReentrantResetsRuntimeState(t *testing.T) {
 	require.Len(t, *collr.Charts(), len(inventoryChartsTmpl))
 
 	collr.scraper = mockScraper{collr.scraper}
-	secondRun := collectMapForTest(t, collr)
+	secondRun := collectScalarSeriesForTest(t, collr)
 	require.NotEmpty(t, secondRun)
 
 	numClusters := len(collr.resources.Clusters)
@@ -104,77 +170,6 @@ func TestCollector_InitReentrantResetsRuntimeState(t *testing.T) {
 			require.True(t, strings.HasPrefix(chart.ID, keepHostID+"_"), chart.ID)
 		}
 	}
-}
-
-func TestCollector_Init_ReturnsFalseIfURLNotSet(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.URL = ""
-
-	assert.Error(t, collr.Init(context.Background()))
-}
-
-func TestCollector_Init_ReturnsFalseIfUsernameNotSet(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.Username = ""
-
-	assert.Error(t, collr.Init(context.Background()))
-}
-
-func TestCollector_Init_ReturnsFalseIfPasswordNotSet(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.Password = ""
-
-	assert.Error(t, collr.Init(context.Background()))
-}
-
-func TestCollector_Init_ReturnsFalseIfDiscoveryIntervalNotPositive(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.DiscoveryInterval = 0
-
-	require.ErrorContains(t, collr.Init(context.Background()), "discovery_interval must be greater than zero")
-}
-
-func TestCollector_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
-
-	assert.Error(t, collr.Init(context.Background()))
-}
-
-func TestCollector_Init_ReturnsFalseIfConnectionRefused(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-	collr.URL = "http://127.0.0.1:32001"
-
-	assert.Error(t, collr.Init(context.Background()))
-}
-
-func TestCollector_Init_ReturnsFalseIfInvalidHostVMIncludeFormat(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-
-	collr.HostsInclude = match.HostIncludes{"invalid"}
-	assert.Error(t, collr.Init(context.Background()))
-
-	collr.HostsInclude = collr.HostsInclude[:0]
-
-	collr.VMsInclude = match.VMIncludes{"invalid"}
-	assert.Error(t, collr.Init(context.Background()))
-
-	collr.VMsInclude = collr.VMsInclude[:0]
-
-	collr.DatastoresInclude = match.DatastoreIncludes{"invalid"}
-	assert.Error(t, collr.Init(context.Background()))
-
-	collr.DatastoresInclude = collr.DatastoresInclude[:0]
-
-	collr.ClustersInclude = match.ClusterIncludes{"invalid"}
-	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_validateConfig_IgnoresDisabledOptionalSelectors(t *testing.T) {
@@ -247,19 +242,41 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
+	tests := map[string]struct {
+		prepare func(t *testing.T) (*Collector, func())
+		check   func(t *testing.T, collr *Collector)
+	}{
+		"initialized": {
+			prepare: func(t *testing.T) (*Collector, func()) {
+				collr, _, teardown := prepareVSphereSim(t)
+				require.NoError(t, collr.Init(context.Background()))
+				return collr, teardown
+			},
+			check: func(t *testing.T, collr *Collector) {
+				assert.True(t, collr.discoveryTask.isStopped())
+				assert.False(t, collr.discoveryTask.isRunning())
+				assert.Nil(t, collr.vsClient)
+			},
+		},
+		"not initialized": {
+			prepare: func(t *testing.T) (*Collector, func()) {
+				return New(), func() {}
+			},
+			check: func(t *testing.T, collr *Collector) {
+				assert.Nil(t, collr.vsClient)
+			},
+		},
+	}
 
-	require.NoError(t, collr.Init(context.Background()))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, cleanup := tc.prepare(t)
+			defer cleanup()
 
-	collr.Cleanup(context.Background())
-	assert.True(t, collr.discoveryTask.isStopped())
-	assert.False(t, collr.discoveryTask.isRunning())
-	assert.Nil(t, collr.vsClient)
-}
-
-func TestCollector_Cleanup_NotPanicsIfNotInitialized(t *testing.T) {
-	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
+			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
+			tc.check(t, collr)
+		})
+	}
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -635,7 +652,7 @@ func TestCollector_Collect(t *testing.T) {
 	}
 	addExpectedClusterConfigStatus(expected, "domain-c28")
 
-	mx := collectMapForTest(t, collr)
+	mx := collectV1MapForTest(t, collr)
 
 	require.Equal(t, expected, mx)
 
@@ -660,9 +677,34 @@ func TestCollector_Collect(t *testing.T) {
 }
 
 func TestSnapshotMaxAgeSeconds(t *testing.T) {
-	assert.Zero(t, snapshotMaxAgeSeconds(time.Time{}))
-	assert.Zero(t, snapshotMaxAgeSeconds(time.Now().Add(time.Hour)))
-	assert.InDelta(t, 7200, snapshotMaxAgeSeconds(time.Now().Add(-2*time.Hour)), 1)
+	now := time.Now()
+	tests := map[string]struct {
+		created time.Time
+		want    int64
+		delta   float64
+	}{
+		"zero time": {
+			created: time.Time{},
+		},
+		"future time": {
+			created: now.Add(time.Hour),
+		},
+		"past time": {
+			created: now.Add(-2 * time.Hour),
+			want:    7200,
+			delta:   1,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tc.delta > 0 {
+				assert.InDelta(t, tc.want, snapshotMaxAgeSeconds(tc.created), tc.delta)
+				return
+			}
+			assert.EqualValues(t, tc.want, snapshotMaxAgeSeconds(tc.created))
+		})
+	}
 }
 
 func TestCollectInventory(t *testing.T) {
@@ -689,65 +731,177 @@ func TestCollectInventory(t *testing.T) {
 	assert.EqualValues(t, 1, mx["inventory_resource_pools"])
 }
 
-func TestCollector_Collect_NonPoweredHostPropertyOnly(t *testing.T) {
-	collr := New()
-	collr.resources = &rs.Resources{
-		Hosts: rs.Hosts{
-			"host-1": &rs.Host{
-				ID:            "host-1",
-				PowerState:    string(types.HostSystemPowerStatePoweredOff),
-				OverallStatus: "gray",
+func TestCollector_Collect_NonPoweredResourcePropertyOnly(t *testing.T) {
+	tests := map[string]struct {
+		setup   func(*Collector)
+		collect func(*Collector, map[string]int64) error
+		want    map[string]int64
+		missing []string
+	}{
+		"host": {
+			setup: func(c *Collector) {
+				c.resources = &rs.Resources{
+					Hosts: rs.Hosts{
+						"host-1": &rs.Host{
+							ID:            "host-1",
+							PowerState:    string(types.HostSystemPowerStatePoweredOff),
+							OverallStatus: "gray",
+						},
+					},
+				}
+			},
+			collect: (*Collector).collectHosts,
+			want: map[string]int64{
+				"host-1_overall.status.gray":    1,
+				"host-1_power_state.poweredOff": 1,
+				"host-1_power_state.poweredOn":  0,
+			},
+			missing: []string{"host-1_cpu.usage.average"},
+		},
+		"VM": {
+			setup: func(c *Collector) {
+				c.resources = &rs.Resources{
+					VMs: rs.VMs{
+						"vm-1": &rs.VM{
+							ID:                    "vm-1",
+							PowerState:            string(types.VirtualMachinePowerStateSuspended),
+							OverallStatus:         "yellow",
+							SnapshotCount:         2,
+							SnapshotMaxChainDepth: 1,
+						},
+					},
+				}
+			},
+			collect: (*Collector).collectVMs,
+			want: map[string]int64{
+				"vm-1_overall.status.yellow":    1,
+				"vm-1_power_state.suspended":    1,
+				"vm-1_power_state.poweredOn":    0,
+				"vm-1_snapshot_count":           2,
+				"vm-1_snapshot_max_chain_depth": 1,
+			},
+			missing: []string{"vm-1_cpu.usage.average"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			tc.setup(collr)
+			mx := make(map[string]int64)
+
+			require.NoError(t, tc.collect(collr, mx))
+
+			for key, want := range tc.want {
+				assert.EqualValues(t, want, mx[key])
+			}
+			for _, key := range tc.missing {
+				assert.NotContains(t, mx, key)
+			}
+		})
+	}
+}
+
+func TestCollector_Collect_NoPerfDataKeepsPropertyMetrics(t *testing.T) {
+	tests := map[string]struct {
+		setup func(*Collector)
+		check func(*testing.T, *Collector, map[string]int64)
+	}{
+		"hosts": {
+			setup: func(c *Collector) { c.scraper = mockScraperNoHostPerf{mockScraper{c.scraper}} },
+			check: func(t *testing.T, collr *Collector, mx map[string]int64) {
+				for _, host := range collr.resources.Hosts {
+					assert.Contains(t, mx, host.ID+"_overall.status.green")
+					assert.Contains(t, mx, host.ID+"_power_state.poweredOn")
+					assert.NotContains(t, mx, host.ID+"_cpu.usage.average")
+				}
+				for _, vm := range collr.resources.VMs {
+					assert.Contains(t, mx, vm.ID+"_cpu.usage.average")
+				}
+			},
+		},
+		"VMs": {
+			setup: func(c *Collector) { c.scraper = mockScraperNoVMPerf{mockScraper{c.scraper}} },
+			check: func(t *testing.T, collr *Collector, mx map[string]int64) {
+				for _, host := range collr.resources.Hosts {
+					assert.Contains(t, mx, host.ID+"_cpu.usage.average")
+				}
+				for _, vm := range collr.resources.VMs {
+					assert.Contains(t, mx, vm.ID+"_overall.status.green")
+					assert.Contains(t, mx, vm.ID+"_power_state.poweredOn")
+					assert.NotContains(t, mx, vm.ID+"_cpu.usage.average")
+				}
 			},
 		},
 	}
-	mx := make(map[string]int64)
 
-	require.NoError(t, collr.collectHosts(mx))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, _, teardown := prepareVSphereSim(t)
+			defer teardown()
 
-	assert.EqualValues(t, 1, mx["host-1_overall.status.gray"])
-	assert.EqualValues(t, 1, mx["host-1_power_state.poweredOff"])
-	assert.EqualValues(t, 0, mx["host-1_power_state.poweredOn"])
-	assert.NotContains(t, mx, "host-1_cpu.usage.average")
-}
+			require.NoError(t, collr.Init(context.Background()))
+			tc.setup(collr)
 
-func TestCollector_Collect_HostNoPerfData(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
+			mx := collectV1MapForTest(t, collr)
+			require.NotNil(t, mx)
 
-	require.NoError(t, collr.Init(context.Background()))
-	collr.scraper = mockScraperNoHostPerf{mockScraper{collr.scraper}}
-
-	mx := collectMapForTest(t, collr)
-	require.NotNil(t, mx)
-
-	for _, host := range collr.resources.Hosts {
-		assert.Contains(t, mx, host.ID+"_overall.status.green")
-		assert.Contains(t, mx, host.ID+"_power_state.poweredOn")
-		assert.NotContains(t, mx, host.ID+"_cpu.usage.average")
-	}
-	for _, vm := range collr.resources.VMs {
-		assert.Contains(t, mx, vm.ID+"_cpu.usage.average")
+			tc.check(t, collr, mx)
+		})
 	}
 }
 
-func TestCollector_Collect_HostNoPerfDataWarningIsRateLimited(t *testing.T) {
-	var buf bytes.Buffer
-	collr := New()
-	collr.Logger = logger.NewWithWriter(&buf)
-	collr.scraper = mockScraperNoHostPerf{}
-	collr.resources = &rs.Resources{
-		Hosts: rs.Hosts{
-			"host-1": &rs.Host{
-				ID:         "host-1",
-				PowerState: string(types.HostSystemPowerStatePoweredOn),
+func TestCollector_Collect_NoPerfDataWarningIsRateLimited(t *testing.T) {
+	tests := map[string]struct {
+		setup   func(*Collector)
+		collect func(*Collector) error
+		wantLog string
+	}{
+		"hosts": {
+			setup: func(c *Collector) {
+				c.scraper = mockScraperNoHostPerf{}
+				c.resources = &rs.Resources{
+					Hosts: rs.Hosts{
+						"host-1": &rs.Host{
+							ID:         "host-1",
+							PowerState: string(types.HostSystemPowerStatePoweredOn),
+						},
+					},
+				}
 			},
+			collect: func(c *Collector) error { return c.collectHosts(make(map[string]int64)) },
+			wantLog: "collect host performance metrics",
+		},
+		"VMs": {
+			setup: func(c *Collector) {
+				c.scraper = mockScraperNoVMPerf{}
+				c.resources = &rs.Resources{
+					VMs: rs.VMs{
+						"vm-1": &rs.VM{
+							ID:         "vm-1",
+							PowerState: string(types.VirtualMachinePowerStatePoweredOn),
+						},
+					},
+				}
+			},
+			collect: func(c *Collector) error { return c.collectVMs(make(map[string]int64)) },
+			wantLog: "collect VM performance metrics",
 		},
 	}
 
-	require.NoError(t, collr.collectHosts(make(map[string]int64)))
-	require.NoError(t, collr.collectHosts(make(map[string]int64)))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			collr := New()
+			collr.Logger = logger.NewWithWriter(&buf)
+			tc.setup(collr)
 
-	assert.Equal(t, 1, strings.Count(buf.String(), "collect host performance metrics"))
+			require.NoError(t, tc.collect(collr))
+			require.NoError(t, tc.collect(collr))
+
+			assert.Equal(t, 1, strings.Count(buf.String(), tc.wantLog))
+		})
+	}
 }
 
 func TestWriteHostPropertyMetrics_RuntimeStatus(t *testing.T) {
@@ -766,71 +920,6 @@ func TestWriteHostPropertyMetrics_RuntimeStatus(t *testing.T) {
 	assert.EqualValues(t, 0, mx["host-1_connection_state.connected"])
 	assert.EqualValues(t, 1, mx["host-1_maintenance_status.inMaintenance"])
 	assert.EqualValues(t, 0, mx["host-1_maintenance_status.normal"])
-}
-
-func TestCollector_Collect_NonPoweredVMPropertyOnly(t *testing.T) {
-	collr := New()
-	collr.resources = &rs.Resources{
-		VMs: rs.VMs{
-			"vm-1": &rs.VM{
-				ID:                    "vm-1",
-				PowerState:            string(types.VirtualMachinePowerStateSuspended),
-				OverallStatus:         "yellow",
-				SnapshotCount:         2,
-				SnapshotMaxChainDepth: 1,
-			},
-		},
-	}
-	mx := make(map[string]int64)
-
-	require.NoError(t, collr.collectVMs(mx))
-
-	assert.EqualValues(t, 1, mx["vm-1_overall.status.yellow"])
-	assert.EqualValues(t, 1, mx["vm-1_power_state.suspended"])
-	assert.EqualValues(t, 0, mx["vm-1_power_state.poweredOn"])
-	assert.EqualValues(t, 2, mx["vm-1_snapshot_count"])
-	assert.EqualValues(t, 1, mx["vm-1_snapshot_max_chain_depth"])
-	assert.NotContains(t, mx, "vm-1_cpu.usage.average")
-}
-
-func TestCollector_Collect_VMNoPerfData(t *testing.T) {
-	collr, _, teardown := prepareVSphereSim(t)
-	defer teardown()
-
-	require.NoError(t, collr.Init(context.Background()))
-	collr.scraper = mockScraperNoVMPerf{mockScraper{collr.scraper}}
-
-	mx := collectMapForTest(t, collr)
-	require.NotNil(t, mx)
-
-	for _, host := range collr.resources.Hosts {
-		assert.Contains(t, mx, host.ID+"_cpu.usage.average")
-	}
-	for _, vm := range collr.resources.VMs {
-		assert.Contains(t, mx, vm.ID+"_overall.status.green")
-		assert.Contains(t, mx, vm.ID+"_power_state.poweredOn")
-		assert.NotContains(t, mx, vm.ID+"_cpu.usage.average")
-	}
-}
-
-func TestCollector_Collect_VMNoPerfDataWarningIsRateLimited(t *testing.T) {
-	var buf bytes.Buffer
-	collr := New()
-	collr.Logger = logger.NewWithWriter(&buf)
-	collr.scraper = mockScraperNoVMPerf{}
-	collr.resources = &rs.Resources{
-		VMs: rs.VMs{
-			"vm-1": &rs.VM{
-				ID:         "vm-1",
-				PowerState: string(types.VirtualMachinePowerStatePoweredOn),
-			},
-		},
-	}
-
-	require.NoError(t, collr.collectVMs(make(map[string]int64)))
-	require.NoError(t, collr.collectVMs(make(map[string]int64)))
-
-	assert.Equal(t, 1, strings.Count(buf.String(), "collect VM performance metrics"))
 }
 
 func TestWriteVMPropertyMetrics_StatusConfigAndStorage(t *testing.T) {
@@ -944,7 +1033,18 @@ func TestUpdateResourcePoolFromProperties_ZeroValueOptionalProperties(t *testing
 	assert.EqualValues(t, -1, rp.MemLimit)
 }
 
-func collectMapForTest(t *testing.T, collr *Collector) map[string]int64 {
+func collectScalarSeriesForTest(t *testing.T, collr *Collector) map[string]metrix.SampleValue {
+	t.Helper()
+
+	mx, err := collecttest.CollectScalarSeries(collr, metrix.ReadRaw())
+	require.NoError(t, err)
+	if len(mx) == 0 {
+		return nil
+	}
+	return mx
+}
+
+func collectV1MapForTest(t *testing.T, collr *Collector) map[string]int64 {
 	t.Helper()
 
 	cycle := mustCycleController(t, collr.MetricStore())
@@ -1045,7 +1145,7 @@ func TestCollector_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
 
 	numOfRuns := 5
 	for range numOfRuns {
-		collectMapForTest(t, collr)
+		collectScalarSeriesForTest(t, collr)
 	}
 
 	host := collr.resources.Hosts.Get(okHostId)
@@ -1068,7 +1168,7 @@ func TestCollector_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
 	}
 
 	for i := numOfRuns; i < failedUpdatesLimit; i++ {
-		collectMapForTest(t, collr)
+		collectScalarSeriesForTest(t, collr)
 	}
 
 	assert.Len(t, collr.discoveredHosts, 1)
@@ -1095,7 +1195,7 @@ func TestCollector_Collect_Run(t *testing.T) {
 
 	runs := 20
 	for i := range runs {
-		assert.True(t, len(collectMapForTest(t, collr)) > 0)
+		assert.True(t, len(collectScalarSeriesForTest(t, collr)) > 0)
 		if i < 6 {
 			time.Sleep(time.Second)
 		}
@@ -1222,7 +1322,7 @@ func TestCollector_Collect_DatastoreNoPerfData(t *testing.T) {
 
 	collr.scraper = mockScraperNoDSPerf{collr.scraper}
 
-	mx := collectMapForTest(t, collr)
+	mx := collectV1MapForTest(t, collr)
 	require.NotNil(t, mx)
 
 	count := model.Count()
@@ -1265,7 +1365,7 @@ func TestCollector_Collect_DatastoreNoPerfData(t *testing.T) {
 	// Now switch to a scraper that returns perf data — perf charts should appear.
 	collr.scraper = mockScraper{collr.scraper.(mockScraperNoDSPerf).scraper}
 
-	mx = collectMapForTest(t, collr)
+	mx = collectV1MapForTest(t, collr)
 	require.NotNil(t, mx)
 
 	// Perf metrics should now be present.
@@ -1312,7 +1412,7 @@ func TestCollector_Collect_ClusterNoPerfData(t *testing.T) {
 
 	collr.scraper = mockScraperNoClusterPerf{collr.scraper}
 
-	mx := collectMapForTest(t, collr)
+	mx := collectV1MapForTest(t, collr)
 	require.NotNil(t, mx)
 
 	count := model.Count()
@@ -1349,7 +1449,7 @@ func TestCollector_Collect_ClusterNoPerfData(t *testing.T) {
 	// Now switch to a scraper that returns perf data — perf charts should appear.
 	collr.scraper = mockScraper{collr.scraper.(mockScraperNoClusterPerf).scraper}
 
-	mx = collectMapForTest(t, collr)
+	mx = collectV1MapForTest(t, collr)
 	require.NotNil(t, mx)
 
 	// Perf metrics should now be present.
@@ -1379,7 +1479,7 @@ func TestCollector_Collect_ClusterEvictionCleansUpMaps(t *testing.T) {
 	collr.scraper = mockScraper{collr.scraper}
 
 	// First collect — creates all charts including cluster perf charts.
-	mx := collectMapForTest(t, collr)
+	mx := collectV1MapForTest(t, collr)
 	require.NotNil(t, mx)
 
 	assert.NotEmpty(t, collr.discoveredClusters)
@@ -1395,7 +1495,7 @@ func TestCollector_Collect_ClusterEvictionCleansUpMaps(t *testing.T) {
 	}
 
 	// Next collect increments counter past the limit, triggering eviction in updateCharts.
-	collectMapForTest(t, collr)
+	collectScalarSeriesForTest(t, collr)
 
 	assert.Empty(t, collr.discoveredClusters)
 	assert.Empty(t, collr.clusterPerfReceived)
@@ -1418,7 +1518,7 @@ func TestCollector_Collect_ResourcePoolEvictionCleansUpMaps(t *testing.T) {
 	collr.scraper = mockScraper{collr.scraper}
 
 	// First collect — creates resource pool charts.
-	mx := collectMapForTest(t, collr)
+	mx := collectScalarSeriesForTest(t, collr)
 	require.NotNil(t, mx)
 
 	assert.NotEmpty(t, collr.discoveredResourcePools)
@@ -1430,7 +1530,7 @@ func TestCollector_Collect_ResourcePoolEvictionCleansUpMaps(t *testing.T) {
 	}
 
 	// Next collect increments counter past the limit, triggering eviction.
-	collectMapForTest(t, collr)
+	collectScalarSeriesForTest(t, collr)
 
 	assert.Empty(t, collr.discoveredResourcePools)
 
@@ -1451,7 +1551,7 @@ func TestCollector_Collect_DatastoreEvictionCleansUpMaps(t *testing.T) {
 	collr.scraper = mockScraper{collr.scraper}
 
 	// First collect — creates all charts including datastore perf charts.
-	mx := collectMapForTest(t, collr)
+	mx := collectScalarSeriesForTest(t, collr)
 	require.NotNil(t, mx)
 
 	assert.NotEmpty(t, collr.discoveredDatastores)
@@ -1467,7 +1567,7 @@ func TestCollector_Collect_DatastoreEvictionCleansUpMaps(t *testing.T) {
 	}
 
 	// Next collect increments counter past the limit, triggering eviction in updateCharts.
-	collectMapForTest(t, collr)
+	collectScalarSeriesForTest(t, collr)
 
 	assert.Empty(t, collr.discoveredDatastores)
 	assert.Empty(t, collr.datastorePerfReceived)

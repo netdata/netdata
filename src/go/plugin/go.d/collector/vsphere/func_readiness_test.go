@@ -22,99 +22,137 @@ func TestVSphereMethods(t *testing.T) {
 		byID[method.ID] = method
 	}
 
-	readiness := byID["readiness"]
-	require.Equal(t, "vSphere Readiness", readiness.Name)
-	require.Equal(t, 30, readiness.UpdateEvery)
-	require.True(t, readiness.RequireCloud)
-	require.False(t, readiness.AgentWide)
-
-	topology := byID["topology:vsphere"]
-	require.Equal(t, "vSphere Topology", topology.Name)
-	require.Equal(t, 30, topology.UpdateEvery)
-	require.True(t, topology.RequireCloud)
-	require.False(t, topology.AgentWide)
-	require.Contains(t, topology.Aliases, "topology:vsphere")
-	require.Equal(t, "topology", topology.ResponseType)
-	require.NotNil(t, topology.Presentation())
-}
-
-func TestFuncReadiness_HandleWithoutDiscovery(t *testing.T) {
-	collr := New()
-	handler := &funcReadiness{collector: collr}
-
-	resp := handler.Handle(context.Background(), "readiness", nil)
-
-	require.Equal(t, 200, resp.Status)
-	require.NotEmpty(t, resp.Columns)
-	rows := readinessRowsFromResponse(t, resp)
-	require.Equal(t, "not_ready", rows["target_url"][2])
-	require.Equal(t, "not_ready", rows["inventory_cache"][2])
-	require.Equal(t, "disabled", rows["vsan"][2])
-}
-
-func TestFuncReadiness_HandlePartialInitState(t *testing.T) {
-	collr := New()
-	collr.URL = "https://vcenter.local"
-	collr.Username = "user"
-	collr.Password = "[REDACTED_SECRET]"
-
-	handler := &funcReadiness{collector: collr}
-	resp := handler.Handle(context.Background(), "readiness", nil)
-
-	require.Equal(t, 200, resp.Status)
-	rows := readinessRowsFromResponse(t, resp)
-	require.Equal(t, "ok", rows["target_url"][2])
-	require.Equal(t, "ok", rows["credentials"][2])
-	require.Equal(t, "not_ready", rows["client"][2])
-	require.Equal(t, "not_ready", rows["inventory_cache"][2])
-}
-
-func TestFuncReadiness_HandleWithVSANCachedData(t *testing.T) {
-	collr := newVSANTestCollector(true)
-	collr.URL = "https://vcenter.local"
-	collr.Username = "user"
-	collr.Password = "[REDACTED_SECRET]"
-	for _, cluster := range collr.resources.Clusters {
-		cluster.MetricList = performance.MetricList{{CounterId: 1}}
-	}
-	for _, host := range collr.resources.Hosts {
-		host.MetricList = performance.MetricList{{CounterId: 1}}
-	}
-	for _, vm := range collr.resources.VMs {
-		vm.MetricList = performance.MetricList{{CounterId: 1}}
+	tests := map[string]struct {
+		wantName     string
+		responseType string
+		alias        string
+		presentation bool
+	}{
+		"readiness": {
+			wantName: "vSphere Readiness",
+		},
+		"topology:vsphere": {
+			wantName:     "vSphere Topology",
+			responseType: "topology",
+			alias:        "topology:vsphere",
+			presentation: true,
+		},
 	}
 
-	handler := &funcReadiness{collector: collr}
-	resp := handler.Handle(context.Background(), "readiness", nil)
-
-	require.Equal(t, 200, resp.Status)
-	rows := readinessRowsFromResponse(t, resp)
-	require.Equal(t, "ok", rows["target_url"][2])
-	require.Equal(t, "ok", rows["credentials"][2])
-	require.Equal(t, "ok", rows["inventory_cache"][2])
-	require.Equal(t, "ok", rows["vsan"][2])
-	require.Contains(t, rows["vsan"][3], "vSAN data cached")
+	for id, tc := range tests {
+		t.Run(id, func(t *testing.T) {
+			method := byID[id]
+			require.Equal(t, tc.wantName, method.Name)
+			require.Equal(t, 30, method.UpdateEvery)
+			require.True(t, method.RequireCloud)
+			require.False(t, method.AgentWide)
+			if tc.alias != "" {
+				require.Contains(t, method.Aliases, tc.alias)
+			}
+			if tc.responseType != "" {
+				require.Equal(t, tc.responseType, method.ResponseType)
+			}
+			if tc.presentation {
+				require.NotNil(t, method.Presentation())
+			}
+		})
+	}
 }
 
-func TestFuncReadiness_HandleWithEmptyVSANCachedData(t *testing.T) {
-	collr := newVSANTestCollector(true)
-	collr.vsanMetrics = &scrapepkg.VSANMetrics{}
+func TestFuncReadiness_Handle(t *testing.T) {
+	tests := map[string]struct {
+		method    string
+		collector func() *Collector
+		want      int
+		check     func(*testing.T, map[string][]any)
+	}{
+		"without discovery": {
+			method:    "readiness",
+			collector: New,
+			want:      200,
+			check: func(t *testing.T, rows map[string][]any) {
+				require.Equal(t, "not_ready", rows["target_url"][2])
+				require.Equal(t, "not_ready", rows["inventory_cache"][2])
+				require.Equal(t, "disabled", rows["vsan"][2])
+			},
+		},
+		"partial init state": {
+			method: "readiness",
+			collector: func() *Collector {
+				collr := New()
+				collr.URL = "https://vcenter.local"
+				collr.Username = "user"
+				collr.Password = "[REDACTED_SECRET]"
+				return collr
+			},
+			want: 200,
+			check: func(t *testing.T, rows map[string][]any) {
+				require.Equal(t, "ok", rows["target_url"][2])
+				require.Equal(t, "ok", rows["credentials"][2])
+				require.Equal(t, "not_ready", rows["client"][2])
+				require.Equal(t, "not_ready", rows["inventory_cache"][2])
+			},
+		},
+		"with vSAN cached data": {
+			method: "readiness",
+			collector: func() *Collector {
+				collr := newVSANTestCollector(true)
+				collr.URL = "https://vcenter.local"
+				collr.Username = "user"
+				collr.Password = "[REDACTED_SECRET]"
+				for _, cluster := range collr.resources.Clusters {
+					cluster.MetricList = performance.MetricList{{CounterId: 1}}
+				}
+				for _, host := range collr.resources.Hosts {
+					host.MetricList = performance.MetricList{{CounterId: 1}}
+				}
+				for _, vm := range collr.resources.VMs {
+					vm.MetricList = performance.MetricList{{CounterId: 1}}
+				}
+				return collr
+			},
+			want: 200,
+			check: func(t *testing.T, rows map[string][]any) {
+				require.Equal(t, "ok", rows["target_url"][2])
+				require.Equal(t, "ok", rows["credentials"][2])
+				require.Equal(t, "ok", rows["inventory_cache"][2])
+				require.Equal(t, "ok", rows["vsan"][2])
+				require.Contains(t, rows["vsan"][3], "vSAN data cached")
+			},
+		},
+		"with empty vSAN cached data": {
+			method: "readiness",
+			collector: func() *Collector {
+				collr := newVSANTestCollector(true)
+				collr.vsanMetrics = &scrapepkg.VSANMetrics{}
+				return collr
+			},
+			want: 200,
+			check: func(t *testing.T, rows map[string][]any) {
+				require.Equal(t, "warning", rows["vsan"][2])
+				require.Contains(t, rows["vsan"][3], "last vSAN scrape returned no data")
+			},
+		},
+		"unknown method": {
+			method:    "unknown",
+			collector: New,
+			want:      404,
+		},
+	}
 
-	handler := &funcReadiness{collector: collr}
-	resp := handler.Handle(context.Background(), "readiness", nil)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			handler := &funcReadiness{collector: tc.collector()}
 
-	require.Equal(t, 200, resp.Status)
-	rows := readinessRowsFromResponse(t, resp)
-	require.Equal(t, "warning", rows["vsan"][2])
-	require.Contains(t, rows["vsan"][3], "last vSAN scrape returned no data")
-}
+			resp := handler.Handle(context.Background(), tc.method, nil)
 
-func TestFuncReadiness_UnknownMethod(t *testing.T) {
-	handler := &funcReadiness{collector: New()}
-
-	resp := handler.Handle(context.Background(), "unknown", nil)
-
-	require.Equal(t, 404, resp.Status)
+			require.Equal(t, tc.want, resp.Status)
+			if tc.check != nil {
+				require.NotEmpty(t, resp.Columns)
+				tc.check(t, readinessRowsFromResponse(t, resp))
+			}
+		})
+	}
 }
 
 func readinessRowsFromResponse(t *testing.T, resp *funcapi.FunctionResponse) map[string][]any {

@@ -33,7 +33,7 @@ func TestCollector_DatastoreClustersDefaultOff(t *testing.T) {
 	collr.scraper = mockScraper{collr.scraper}
 	setOnlyTestStoragePods(collr, []*rs.StoragePod{testStoragePod("group-p1", "DC0_POD0", 1000, 400, true)})
 
-	require.NotEmpty(t, collectMapForTest(t, collr))
+	require.NotEmpty(t, collectScalarSeriesForTest(t, collr))
 
 	require.Zero(t, countMetricSeries(collr.MetricStore().Read(metrix.ReadRaw()), datastoreClusterSpaceUsageCapacityMetric))
 }
@@ -49,7 +49,7 @@ func TestCollector_DatastoreClustersOptInEmitsCharts(t *testing.T) {
 	pod.Labels = map[string]string{"vsphere_tag_environment": "prod"}
 	setOnlyTestStoragePods(collr, []*rs.StoragePod{pod})
 
-	require.NotEmpty(t, collectMapForTest(t, collr))
+	require.NotEmpty(t, collectScalarSeriesForTest(t, collr))
 
 	labels := datastoreClusterLabelsMap(pod)
 	labels["vsphere_tag_environment"] = "prod"
@@ -110,7 +110,7 @@ func TestCollector_DatastoreClustersSelector(t *testing.T) {
 				testStoragePod("group-p2", "DC0_POD1", 2000, 500, false),
 			}))
 
-			require.NotEmpty(t, collectMapForTest(t, collr))
+			require.NotEmpty(t, collectScalarSeriesForTest(t, collr))
 
 			require.Equal(t, tc.want, countMetricSeries(collr.MetricStore().Read(metrix.ReadRaw()), datastoreClusterSpaceUsageCapacityMetric))
 		})

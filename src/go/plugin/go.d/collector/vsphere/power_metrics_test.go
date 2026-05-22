@@ -28,7 +28,7 @@ func TestCollector_PowerMetricsEmitCharts(t *testing.T) {
 		vmSeries:    testVMPowerSeries(),
 	}
 
-	require.NotEmpty(t, collectMapForTest(t, collr))
+	require.NotEmpty(t, collectScalarSeriesForTest(t, collr))
 
 	reader := collr.MetricStore().Read(metrix.ReadRaw())
 	hostLabels := hostPowerLabelsMap(collr, host)

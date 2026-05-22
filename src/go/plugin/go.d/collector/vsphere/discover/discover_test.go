@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmware/govmomi/performance"
 	"github.com/vmware/govmomi/simulator"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
@@ -54,64 +55,62 @@ func TestDiscoverer_networkPathSetIncludesOverallStatus(t *testing.T) {
 	assert.Contains(t, Discoverer{}.networkPathSet(), "overallStatus")
 }
 
-func TestDiscoverer_DiscoverNetworkTopologyFailSoft(t *testing.T) {
-	d, _, teardown := prepareDiscovererSim(t)
-	defer teardown()
-	d.CollectNetworkTopology = true
-	d.Client = networksErrorClient{Client: d.Client}
+func TestDiscoverer_DiscoverFailSoftOptionalSurfaces(t *testing.T) {
+	tests := map[string]struct {
+		setup func(*Discoverer)
+		check func(*testing.T, *rs.Resources)
+	}{
+		"network topology": {
+			setup: func(d *Discoverer) {
+				d.CollectNetworkTopology = true
+				d.Client = networksErrorClient{Client: d.Client}
+			},
+			check: func(t *testing.T, res *rs.Resources) {
+				require.Empty(t, res.Networks)
+				assert.NotEmpty(t, res.Datastores)
+			},
+		},
+		"datastore clusters": {
+			setup: func(d *Discoverer) {
+				d.CollectDatastoreClusters = true
+				d.Client = storagePodsErrorClient{Client: d.Client}
+			},
+			check: func(t *testing.T, res *rs.Resources) {
+				require.Empty(t, res.StoragePods)
+				assert.NotEmpty(t, res.Datastores)
+			},
+		},
+		"custom attributes": {
+			setup: func(d *Discoverer) {
+				d.Client = customFieldsErrorClient{Client: d.Client}
+				d.CustomAttributeMatcher = matcher.TRUE()
+			},
+		},
+		"tags": {
+			setup: func(d *Discoverer) {
+				d.Client = tagsByRefErrorClient{Client: d.Client}
+				d.TagCategoryMatcher = matcher.TRUE()
+			},
+		},
+	}
 
-	res, err := d.Discover()
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			d, _, teardown := prepareDiscovererSim(t)
+			defer teardown()
+			tc.setup(d)
 
-	require.NoError(t, err)
-	require.NotNil(t, res)
-	require.Empty(t, res.Networks)
-	assert.True(t, len(res.Hosts) > 0)
-	assert.True(t, len(res.VMs) > 0)
-	assert.True(t, len(res.Datastores) > 0)
-}
+			res, err := d.Discover()
 
-func TestDiscoverer_DiscoverDatastoreClustersFailSoft(t *testing.T) {
-	d, _, teardown := prepareDiscovererSim(t)
-	defer teardown()
-	d.CollectDatastoreClusters = true
-	d.Client = storagePodsErrorClient{Client: d.Client}
-
-	res, err := d.Discover()
-
-	require.NoError(t, err)
-	require.NotNil(t, res)
-	require.Empty(t, res.StoragePods)
-	assert.True(t, len(res.Hosts) > 0)
-	assert.True(t, len(res.VMs) > 0)
-	assert.True(t, len(res.Datastores) > 0)
-}
-
-func TestDiscoverer_DiscoverCustomAttributeErrorFailSoft(t *testing.T) {
-	d, _, teardown := prepareDiscovererSim(t)
-	defer teardown()
-	d.Client = customFieldsErrorClient{Client: d.Client}
-	d.CustomAttributeMatcher = matcher.TRUE()
-
-	res, err := d.Discover()
-
-	require.NoError(t, err)
-	require.NotNil(t, res)
-	assert.True(t, len(res.Hosts) > 0)
-	assert.True(t, len(res.VMs) > 0)
-}
-
-func TestDiscoverer_DiscoverTagErrorFailSoft(t *testing.T) {
-	d, _, teardown := prepareDiscovererSim(t)
-	defer teardown()
-	d.Client = tagsByRefErrorClient{Client: d.Client}
-	d.TagCategoryMatcher = matcher.TRUE()
-
-	res, err := d.Discover()
-
-	require.NoError(t, err)
-	require.NotNil(t, res)
-	assert.True(t, len(res.Hosts) > 0)
-	assert.True(t, len(res.VMs) > 0)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			assert.NotEmpty(t, res.Hosts)
+			assert.NotEmpty(t, res.VMs)
+			if tc.check != nil {
+				tc.check(t, res)
+			}
+		})
+	}
 }
 
 func TestDiscoverer_discover(t *testing.T) {
@@ -149,11 +148,21 @@ func TestDiscoverer_build(t *testing.T) {
 }
 
 func TestResourceBuildersSkipMissingParent(t *testing.T) {
-	assert.Nil(t, newFolder(mo.Folder{}))
-	assert.Nil(t, newCluster(mo.ComputeResource{}))
-	assert.Nil(t, newHost(mo.HostSystem{}))
-	assert.Nil(t, newDatastore(mo.Datastore{}))
-	assert.Nil(t, newStoragePod(mo.StoragePod{}))
+	tests := map[string]struct {
+		build func() any
+	}{
+		"folder":      {build: func() any { return newFolder(mo.Folder{}) }},
+		"cluster":     {build: func() any { return newCluster(mo.ComputeResource{}) }},
+		"host":        {build: func() any { return newHost(mo.HostSystem{}) }},
+		"datastore":   {build: func() any { return newDatastore(mo.Datastore{}) }},
+		"storage pod": {build: func() any { return newStoragePod(mo.StoragePod{}) }},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Nil(t, tc.build())
+		})
+	}
 }
 
 func TestDiscoverer_buildHostsKeepsNonPoweredHosts(t *testing.T) {
@@ -456,39 +465,47 @@ func TestDiscoverer_collectMetricLists(t *testing.T) {
 	assert.True(t, isMetricListsCollected(res))
 }
 
-func TestSimpleHostMetricListIncludesPowerMetrics(t *testing.T) {
-	counters := map[string]*types.PerfCounterInfo{
-		"cpu.usage.average":                  {Key: 1},
-		"power.power.average":                {Key: 2},
-		"power.powerCap.average":             {Key: 3},
-		"power.energy.summation":             {Key: 4},
-		"power.capacity.usage.average":       {Key: 5},
-		"power.capacity.usagePct.average":    {Key: 6},
-		"power.capacity.usageIdle.average":   {Key: 7},
-		"power.capacity.usageSystem.average": {Key: 8},
-		"power.capacity.usageVm.average":     {Key: 9},
+func TestSimpleMetricListIncludesPowerMetrics(t *testing.T) {
+	tests := map[string]struct {
+		counters map[string]*types.PerfCounterInfo
+		build    func(map[string]*types.PerfCounterInfo) performance.MetricList
+		wantLen  int
+	}{
+		"host": {
+			counters: map[string]*types.PerfCounterInfo{
+				"cpu.usage.average":                  {Key: 1},
+				"power.power.average":                {Key: 2},
+				"power.powerCap.average":             {Key: 3},
+				"power.energy.summation":             {Key: 4},
+				"power.capacity.usage.average":       {Key: 5},
+				"power.capacity.usagePct.average":    {Key: 6},
+				"power.capacity.usageIdle.average":   {Key: 7},
+				"power.capacity.usageSystem.average": {Key: 8},
+				"power.capacity.usageVm.average":     {Key: 9},
+			},
+			build:   simpleHostMetricList,
+			wantLen: 9,
+		},
+		"VM": {
+			counters: map[string]*types.PerfCounterInfo{
+				"cpu.usage.average":      {Key: 1},
+				"power.power.average":    {Key: 2},
+				"power.energy.summation": {Key: 3},
+			},
+			build:   simpleVMMetricList,
+			wantLen: 3,
+		},
 	}
 
-	ml := simpleHostMetricList(counters)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ml := tc.build(tc.counters)
 
-	require.Len(t, ml, 9)
-	for _, metric := range ml {
-		assert.Empty(t, metric.Instance)
-	}
-}
-
-func TestSimpleVMMetricListIncludesPowerMetrics(t *testing.T) {
-	counters := map[string]*types.PerfCounterInfo{
-		"cpu.usage.average":      {Key: 1},
-		"power.power.average":    {Key: 2},
-		"power.energy.summation": {Key: 3},
-	}
-
-	ml := simpleVMMetricList(counters)
-
-	require.Len(t, ml, 3)
-	for _, metric := range ml {
-		assert.Empty(t, metric.Instance)
+			require.Len(t, ml, tc.wantLen)
+			for _, metric := range ml {
+				assert.Empty(t, metric.Instance)
+			}
+		})
 	}
 }
 
@@ -496,10 +513,16 @@ func TestExpectedMetricCounterNamesSkipsOptionalCounters(t *testing.T) {
 	names := expectedMetricCounterNames()
 
 	assert.Contains(t, names, "cpu.usage.average")
-	assert.NotContains(t, names, "power.power.average")
-	assert.NotContains(t, names, "power.energy.summation")
-	assert.NotContains(t, names, "clusterServices.clusterDrsScore.latest")
-	assert.NotContains(t, names, "clusterServices.vmDrsScore.latest")
+	for name, counter := range map[string]string{
+		"host power":        "power.power.average",
+		"host energy":       "power.energy.summation",
+		"cluster DRS score": "clusterServices.clusterDrsScore.latest",
+		"VM DRS score":      "clusterServices.vmDrsScore.latest",
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.NotContains(t, names, counter)
+		})
+	}
 }
 
 func prepareDiscovererSim(t *testing.T) (d *Discoverer, model *simulator.Model, teardown func()) {

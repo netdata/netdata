@@ -69,21 +69,47 @@ func TestDiscovererPathSetsAddCustomValueOnlyWhenCustomAttributesEnabled(t *test
 	require.NoError(t, err)
 
 	require.NotContains(t, Discoverer{}.hostPathSet(), "customValue")
-	require.Contains(t, Discoverer{CustomAttributeMatcher: m}.hostPathSet(), "customValue")
-	require.Contains(t, Discoverer{CustomAttributeMatcher: m}.vmPathSet(), "customValue")
-	require.Contains(t, Discoverer{CustomAttributeMatcher: m}.datastorePathSet(), "customValue")
-	require.Contains(t, Discoverer{CustomAttributeMatcher: m}.clusterPathSet(), "customValue")
-	require.Contains(t, Discoverer{CustomAttributeMatcher: m}.resourcePoolPathSet(), "customValue")
-	require.Contains(t, Discoverer{CustomAttributeMatcher: m}.storagePodPathSet(), "customValue")
+	for name, pathSet := range map[string][]string{
+		"hosts":              Discoverer{CustomAttributeMatcher: m}.hostPathSet(),
+		"VMs":                Discoverer{CustomAttributeMatcher: m}.vmPathSet(),
+		"datastores":         Discoverer{CustomAttributeMatcher: m}.datastorePathSet(),
+		"clusters":           Discoverer{CustomAttributeMatcher: m}.clusterPathSet(),
+		"resource pools":     Discoverer{CustomAttributeMatcher: m}.resourcePoolPathSet(),
+		"datastore clusters": Discoverer{CustomAttributeMatcher: m}.storagePodPathSet(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Contains(t, pathSet, "customValue")
+		})
+	}
 }
 
 func TestDiscovererPathSetsAddVSANFieldsOnlyWhenEnabled(t *testing.T) {
-	require.NotContains(t, Discoverer{}.clusterPathSet(), "configurationEx.vsanConfigInfo")
-	require.NotContains(t, Discoverer{}.hostPathSet(), "config.vsanHostConfig.clusterInfo.nodeUuid")
-	require.NotContains(t, Discoverer{}.vmPathSet(), "config.instanceUuid")
+	tests := map[string]struct {
+		disabled []string
+		enabled  []string
+		field    string
+	}{
+		"clusters": {
+			disabled: Discoverer{}.clusterPathSet(),
+			enabled:  Discoverer{CollectVSAN: true}.clusterPathSet(),
+			field:    "configurationEx.vsanConfigInfo",
+		},
+		"hosts": {
+			disabled: Discoverer{}.hostPathSet(),
+			enabled:  Discoverer{CollectVSAN: true}.hostPathSet(),
+			field:    "config.vsanHostConfig.clusterInfo.nodeUuid",
+		},
+		"VMs": {
+			disabled: Discoverer{}.vmPathSet(),
+			enabled:  Discoverer{CollectVSAN: true}.vmPathSet(),
+			field:    "config.instanceUuid",
+		},
+	}
 
-	d := Discoverer{CollectVSAN: true}
-	require.Contains(t, d.clusterPathSet(), "configurationEx.vsanConfigInfo")
-	require.Contains(t, d.hostPathSet(), "config.vsanHostConfig.clusterInfo.nodeUuid")
-	require.Contains(t, d.vmPathSet(), "config.instanceUuid")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NotContains(t, tc.disabled, tc.field)
+			require.Contains(t, tc.enabled, tc.field)
+		})
+	}
 }

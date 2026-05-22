@@ -46,20 +46,30 @@ func TestScraper_calcMaxQuery(t *testing.T) {
 	}
 }
 
-func TestScraper_ScrapeVMs(t *testing.T) {
-	s, res, teardown := prepareScraper(t)
-	defer teardown()
+func TestScraper_ScrapeInventoryPerf(t *testing.T) {
+	tests := map[string]struct {
+		scrape func(*Scraper, *rs.Resources) []performance.EntityMetric
+		want   func(*rs.Resources) int
+	}{
+		"VMs": {
+			scrape: func(s *Scraper, res *rs.Resources) []performance.EntityMetric { return s.ScrapeVMs(res.VMs) },
+			want:   func(res *rs.Resources) int { return len(res.VMs) },
+		},
+		"hosts": {
+			scrape: func(s *Scraper, res *rs.Resources) []performance.EntityMetric { return s.ScrapeHosts(res.Hosts) },
+			want:   func(res *rs.Resources) int { return len(res.Hosts) },
+		},
+	}
 
-	metrics := s.ScrapeVMs(res.VMs)
-	assert.Len(t, metrics, len(res.VMs))
-}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			s, res, teardown := prepareScraper(t)
+			defer teardown()
 
-func TestScraper_ScrapeHosts(t *testing.T) {
-	s, res, teardown := prepareScraper(t)
-	defer teardown()
-
-	metrics := s.ScrapeHosts(res.Hosts)
-	assert.Len(t, metrics, len(res.Hosts))
+			metrics := tc.scrape(s, res)
+			assert.Len(t, metrics, tc.want(res))
+		})
+	}
 }
 
 func TestScraper_ScrapeMetricsErrorIsRateLimited(t *testing.T) {
@@ -103,48 +113,59 @@ func TestScraper_ScrapeVSANRecordsEmptyHealthAsUnknown(t *testing.T) {
 	assert.Empty(t, got.Health["domain-c1"])
 }
 
-func Test_newHostsPerfQuerySpecsSkipsNonPoweredHosts(t *testing.T) {
-	hosts := rs.Hosts{
-		"host-1": &rs.Host{
-			ID:         "host-1",
-			PowerState: string(types.HostSystemPowerStatePoweredOn),
-			MetricList: performance.MetricList{{CounterId: 1}},
-			Ref:        types.ManagedObjectReference{Type: "HostSystem", Value: "host-1"},
+func Test_newPerfQuerySpecsSkipsNonPoweredResources(t *testing.T) {
+	tests := map[string]struct {
+		query func() []types.PerfQuerySpec
+		want  string
+	}{
+		"hosts": {
+			query: func() []types.PerfQuerySpec {
+				return newHostsPerfQuerySpecs(rs.Hosts{
+					"host-1": &rs.Host{
+						ID:         "host-1",
+						PowerState: string(types.HostSystemPowerStatePoweredOn),
+						MetricList: performance.MetricList{{CounterId: 1}},
+						Ref:        types.ManagedObjectReference{Type: "HostSystem", Value: "host-1"},
+					},
+					"host-2": &rs.Host{
+						ID:         "host-2",
+						PowerState: string(types.HostSystemPowerStatePoweredOff),
+						MetricList: performance.MetricList{{CounterId: 1}},
+						Ref:        types.ManagedObjectReference{Type: "HostSystem", Value: "host-2"},
+					},
+				})
+			},
+			want: "host-1",
 		},
-		"host-2": &rs.Host{
-			ID:         "host-2",
-			PowerState: string(types.HostSystemPowerStatePoweredOff),
-			MetricList: performance.MetricList{{CounterId: 1}},
-			Ref:        types.ManagedObjectReference{Type: "HostSystem", Value: "host-2"},
+		"VMs": {
+			query: func() []types.PerfQuerySpec {
+				return newVMsPerfQuerySpecs(rs.VMs{
+					"vm-1": &rs.VM{
+						ID:         "vm-1",
+						PowerState: string(types.VirtualMachinePowerStatePoweredOn),
+						MetricList: performance.MetricList{{CounterId: 1}},
+						Ref:        types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-1"},
+					},
+					"vm-2": &rs.VM{
+						ID:         "vm-2",
+						PowerState: string(types.VirtualMachinePowerStateSuspended),
+						MetricList: performance.MetricList{{CounterId: 1}},
+						Ref:        types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-2"},
+					},
+				})
+			},
+			want: "vm-1",
 		},
 	}
 
-	pqs := newHostsPerfQuerySpecs(hosts)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			pqs := tc.query()
 
-	require.Len(t, pqs, 1)
-	assert.Equal(t, "host-1", pqs[0].Entity.Value)
-}
-
-func Test_newVMsPerfQuerySpecsSkipsNonPoweredVMs(t *testing.T) {
-	vms := rs.VMs{
-		"vm-1": &rs.VM{
-			ID:         "vm-1",
-			PowerState: string(types.VirtualMachinePowerStatePoweredOn),
-			MetricList: performance.MetricList{{CounterId: 1}},
-			Ref:        types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-1"},
-		},
-		"vm-2": &rs.VM{
-			ID:         "vm-2",
-			PowerState: string(types.VirtualMachinePowerStateSuspended),
-			MetricList: performance.MetricList{{CounterId: 1}},
-			Ref:        types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-2"},
-		},
+			require.Len(t, pqs, 1)
+			assert.Equal(t, tc.want, pqs[0].Entity.Value)
+		})
 	}
-
-	pqs := newVMsPerfQuerySpecs(vms)
-
-	require.Len(t, pqs, 1)
-	assert.Equal(t, "vm-1", pqs[0].Entity.Value)
 }
 
 func prepareScraper(t *testing.T) (s *Scraper, res *rs.Resources, teardown func()) {

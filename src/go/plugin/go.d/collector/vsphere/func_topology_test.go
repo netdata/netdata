@@ -12,28 +12,54 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFuncTopology_HandleWithoutDiscovery(t *testing.T) {
-	handler := &funcTopology{collector: New(), agentID: "vsphere_vcenter1"}
+func TestFuncTopology_Handle(t *testing.T) {
+	tests := map[string]struct {
+		method    string
+		collector func() *Collector
+		want      int
+		check     func(*testing.T, any)
+	}{
+		"without discovery": {
+			method:    "topology:vsphere",
+			collector: New,
+			want:      503,
+		},
+		"with empty inventory cache": {
+			method: "topology:vsphere",
+			collector: func() *Collector {
+				collr := New()
+				collr.resources = &rs.Resources{}
+				return collr
+			},
+			want: 200,
+			check: func(t *testing.T, raw any) {
+				data, ok := raw.(topology.Data)
+				require.True(t, ok)
+				require.Empty(t, data.Actors)
+				require.Empty(t, data.Links)
+				require.EqualValues(t, 0, data.Stats["hosts"])
+				require.EqualValues(t, 0, data.Stats["vms"])
+			},
+		},
+		"unknown method": {
+			method:    "unknown",
+			collector: New,
+			want:      404,
+		},
+	}
 
-	resp := handler.Handle(context.Background(), "topology:vsphere", nil)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			handler := &funcTopology{collector: tc.collector(), agentID: "vsphere_vcenter1"}
 
-	require.Equal(t, 503, resp.Status)
-}
+			resp := handler.Handle(context.Background(), tc.method, nil)
 
-func TestFuncTopology_HandleWithEmptyInventoryCache(t *testing.T) {
-	collr := New()
-	collr.resources = &rs.Resources{}
-	handler := &funcTopology{collector: collr, agentID: "vsphere_vcenter1"}
-
-	resp := handler.Handle(context.Background(), "topology:vsphere", nil)
-
-	require.Equal(t, 200, resp.Status)
-	data, ok := resp.Data.(topology.Data)
-	require.True(t, ok)
-	require.Empty(t, data.Actors)
-	require.Empty(t, data.Links)
-	require.EqualValues(t, 0, data.Stats["hosts"])
-	require.EqualValues(t, 0, data.Stats["vms"])
+			require.Equal(t, tc.want, resp.Status)
+			if tc.check != nil {
+				tc.check(t, resp.Data)
+			}
+		})
+	}
 }
 
 func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
@@ -184,14 +210,6 @@ func TestFuncTopology_DoesNotLinkToFilteredActors(t *testing.T) {
 	require.Contains(t, keys, "vsphere_datacenter:datacenter-1->vsphere_vm:vm-1:contains")
 	require.NotContains(t, keys, "vsphere_cluster:domain-c-filtered->vsphere_host:host-1:contains")
 	require.NotContains(t, keys, "vsphere_host:host-filtered->vsphere_vm:vm-1:runs")
-}
-
-func TestFuncTopology_UnknownMethod(t *testing.T) {
-	handler := &funcTopology{collector: New()}
-
-	resp := handler.Handle(context.Background(), "unknown", nil)
-
-	require.Equal(t, 404, resp.Status)
 }
 
 func topologyActorsByID(actors []topology.Actor) map[string]topology.Actor {

@@ -533,21 +533,23 @@ func TestClusterIncludes_Parse(t *testing.T) {
 }
 
 func TestInventoryIncludes_ParseEmptyReturnsNil(t *testing.T) {
-	hostMatcher, err := HostIncludes{}.Parse()
-	assert.NoError(t, err)
-	assert.Nil(t, hostMatcher)
+	tests := map[string]struct {
+		parse func() (any, error)
+	}{
+		"host":      {parse: func() (any, error) { return HostIncludes{}.Parse() }},
+		"VM":        {parse: func() (any, error) { return VMIncludes{}.Parse() }},
+		"datastore": {parse: func() (any, error) { return DatastoreIncludes{}.Parse() }},
+		"cluster":   {parse: func() (any, error) { return ClusterIncludes{}.Parse() }},
+	}
 
-	vmMatcher, err := VMIncludes{}.Parse()
-	assert.NoError(t, err)
-	assert.Nil(t, vmMatcher)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			m, err := tc.parse()
 
-	datastoreMatcher, err := DatastoreIncludes{}.Parse()
-	assert.NoError(t, err)
-	assert.Nil(t, datastoreMatcher)
-
-	clusterMatcher, err := ClusterIncludes{}.Parse()
-	assert.NoError(t, err)
-	assert.Nil(t, clusterMatcher)
+			assert.NoError(t, err)
+			assert.Nil(t, m)
+		})
+	}
 }
 
 func TestDatastoreClusterIncludes_Parse(t *testing.T) {

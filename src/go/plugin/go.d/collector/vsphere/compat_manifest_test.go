@@ -69,7 +69,7 @@ func TestCollector_V1CompatibilityManifest(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 	collr.scraper = mockScraper{collr.scraper}
 
-	mx := collectMapForTest(t, collr)
+	mx := collectV1MapForTest(t, collr)
 	require.NotEmpty(t, mx)
 
 	actual := buildV1CompatManifest(collr.Charts(), mx)
@@ -93,7 +93,7 @@ func TestCollector_V2CompatibilitySurface(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 	collr.scraper = mockScraper{collr.scraper}
 
-	require.NotEmpty(t, collectMapForTest(t, collr))
+	require.NotEmpty(t, collectScalarSeriesForTest(t, collr))
 
 	plan := buildV2PlanForTest(t, collr)
 	createdCharts, createdDims := v2CreatedChartsAndDims(plan)
