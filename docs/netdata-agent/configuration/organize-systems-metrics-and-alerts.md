@@ -85,31 +85,7 @@ To create a virtual node for your Windows server:
         url: http://203.0.113.10:9182/metrics
     ```
 
-### vSphere example
-
-To create a virtual node for your ESXi host or vCenter-managed system:
-
-1. Define the virtual node in `/etc/netdata/vnodes/vnodes.conf`:
-
-    ```yaml
-    - hostname: esxi_host1
-      guid: <value>
-    ```
-
-   :::tip
-   Generate a valid GUID using `uuidgen` on Linux or `[guid]::NewGuid()` in Windows PowerShell.
-   :::
-
-2. Add the vnode configuration to your data collection job in `go.d/vsphere.conf`:
-
-    ```yaml
-    jobs:
-      - name: esxi_host1
-        vnode: esxi_host1
-        url: https://203.0.113.1
-        username: admin@vsphere.local
-        password: somepassword
-    ```
+For vSphere collector configuration with virtual nodes, see the [VMware vCenter Server integration examples](/src/go/plugin/go.d/collector/vsphere/README.md#examples).
 
 ## Host labels
 

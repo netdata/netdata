@@ -316,11 +316,12 @@ modules:
                 Add the `vnode` option to an existing job to associate it with a [Virtual Node](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md#virtual-nodes).
 
                 Requires first defining the vnode in `/etc/netdata/vnodes/vnodes.conf`.
-
-                See the **Basic** example above for the full job configuration fields.
               config: |
                 jobs:
                   - name     : vcenter1
+                    url      : https://203.0.113.1
+                    username : admin@vsphere.local
+                    password : somepassword
                     vnode    : vcenter_host_node
     troubleshooting:
       problems:
