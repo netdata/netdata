@@ -271,7 +271,7 @@ The following template triggers when the anomaly rate on `system.cpu` exceeds th
 
 ### Pairing with actual values
 
-An anomaly-rate alert tells you *something is unusual*, but not *what the actual numbers are*. To get the real values in the same notification, create a companion alert on the raw metric:
+An anomaly-rate alert tells you *something is unusual*, but not *what the actual numbers are*. To get the real values alongside the anomaly alert, create a companion alert on the raw metric:
 
 ```text
  alarm: cpu_usage_5min
@@ -284,7 +284,7 @@ lookup: average -5m of user system
   info: average user+system CPU utilization over the last 5 minutes
 ```
 
-When the anomaly alert fires, the companion alert provides the concrete values — for example, "CPU anomaly rate 35%" together with "CPU utilization 92%".
+When the anomaly alert fires, the companion alert can provide the concrete values in a separate alert — for example, "CPU anomaly rate 35%" alongside "CPU utilization 92%".
 
 :::tip
 

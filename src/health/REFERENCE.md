@@ -541,7 +541,7 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 | `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                         |
 | `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                          |
 | `OPTIONS`          | Processing modifiers        | See options table below                                                    |
-| `of DIMENSIONS`    | Which dimensions to include | Space-separated list, supports patterns                                    |
+| `of DIMENSIONS`    | Which dimensions to include | Comma-, space-, or pipe-separated list, supports patterns                  |
 
 **Processing Options:**
 
@@ -1314,7 +1314,7 @@ template: ml_5min_cpu_chart
    units: %
    every: 30s
     warn: $this > (($status >= $WARNING)  ? (5) : (20))
-    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+    crit: $this >= (($status == $CRITICAL) ? (20) : (100))
     info: rolling 5min anomaly rate for system.cpu chart
 ```
 
@@ -1344,7 +1344,7 @@ template: ml_5min_node
    units: %
    every: 30s
     warn: $this > (($status >= $WARNING)  ? (5) : (20))
-    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+    crit: $this >= (($status == $CRITICAL) ? (20) : (100))
     info: rolling 5min anomaly rate for all ML enabled dims
 ```
 
