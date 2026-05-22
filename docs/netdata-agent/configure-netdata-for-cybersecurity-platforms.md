@@ -146,6 +146,39 @@ For detailed operational steps, see:
 - [Edit Configuration Files](/docs/netdata-agent/configuration/README.md#edit-configuration-files)
 - [Securing Netdata Agents](/docs/netdata-agent/securing-netdata-agents.md)
 
+## Required endpoints and ports
+
+For firewall and proxy allowlisting, your Netdata Agents need the following network access:
+
+| Direction | Port        | Protocol  | Purpose                                            |
+|-----------|-------------|-----------|----------------------------------------------------|
+| Inbound   | 19999/TCP   | TCP       | Local dashboard access and streaming from Child Agents |
+| Outbound  | 443/TCP     | WSS/HTTPS | Agent-Cloud Link (ACLK) and node claiming          |
+
+:::note
+
+You can disable inbound access on port `19999` by setting `mode = none` in `netdata.conf` when using Cloud-only access. See [Configure Cloud-only access](#configure-cloud-only-access) for details.
+
+:::
+
+### Outbound domain allowlist
+
+Allow the following Netdata Cloud domains through your firewall or proxy:
+
+| Domain                | Purpose                  |
+|-----------------------|--------------------------|
+| `app.netdata.cloud`   | Netdata Cloud application |
+| `api.netdata.cloud`   | Netdata Cloud API        |
+| `mqtt.netdata.cloud`  | Agent-Cloud Link MQTT    |
+
+:::important
+
+Prefer **domain-based allowlisting** over IP-based rules. IP addresses can change without notice and vary based on your geographic location due to CDN-edge servers.
+
+:::
+
+For broader firewall design principles and recommended network architecture, see [Network rules your cybersecurity platform should enforce](#network-rules-your-cybersecurity-platform-should-enforce) below.
+
 ## Network rules your cybersecurity platform should enforce
 
 No matter which product you use, your platform design should follow these rules:
