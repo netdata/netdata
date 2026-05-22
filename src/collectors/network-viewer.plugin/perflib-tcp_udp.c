@@ -264,7 +264,7 @@ static void proto_emit_udp_row(BUFFER *wb, const UDP_FAMILY *udp)
 
 void function_network_protocols(
     const char *transaction, char *function __maybe_unused,
-    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled,
     BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
     const char *source __maybe_unused, void *data __maybe_unused)
 {
@@ -277,10 +277,40 @@ void function_network_protocols(
         initialized = true;
     }
 
+    if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
+        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
+                                               "Request cancelled.");
+        return;
+    }
+
     bool have_tcp_ipv4 = tcp_collect_family(&tcp_ipv4);
+    if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
+        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
+                                               "Request cancelled.");
+        return;
+    }
+
     bool have_tcp_ipv6 = tcp_collect_family(&tcp_ipv6);
+    if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
+        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
+                                               "Request cancelled.");
+        return;
+    }
+
     bool have_udp_ipv4 = udp_collect_family(&udp_ipv4);
+    if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
+        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
+                                               "Request cancelled.");
+        return;
+    }
+
     bool have_udp_ipv6 = udp_collect_family(&udp_ipv6);
+
+    if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
+        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST,
+                                               "Request cancelled.");
+        return;
+    }
 
     if(unlikely(!have_tcp_ipv4 && !have_tcp_ipv6 && !have_udp_ipv4 && !have_udp_ipv6)) {
         pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
