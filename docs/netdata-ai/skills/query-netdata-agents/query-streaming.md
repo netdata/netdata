@@ -105,4 +105,3 @@ for the envelope definition and the canonical
   -- canonical Function reference + envelope.
 - [query-nodes.md](./query-nodes.md) -- node identity, parent /
   child labels.
-- `<repo>/src/streaming/` -- agent-side streaming implementation.

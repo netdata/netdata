@@ -190,7 +190,7 @@ Cross-references:
 - **VLAN fallback (D1)** could over-attribute if a device uses `fdbID != VLAN_ID` mapping but doesn't expose `dot1qVlanCurrentTable`. LibreNMS accepts this trade-off; the fallback is a documented best-effort.
 - **Warn-on-drop (E4)** could be noisy. Implementation MUST be rate-limited to one log line per poll cycle with a count, not one per dropped row. This is in the acceptance criteria.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Gate state at implementation start: decisions locked; implementation authorized after validation.
 

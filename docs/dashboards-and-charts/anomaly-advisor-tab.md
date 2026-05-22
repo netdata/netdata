@@ -10,11 +10,11 @@ For configuration details, see the [ML documentation](/src/ml/README.md).
 
 The Anomaly Advisor leverages Netdata’s machine learning to evaluate anomaly rates across your nodes. It provides three key visualizations:
 
-| Chart Name                     | Purpose                                                           | Why It Matters                                                 |
-|--------------------------------|-------------------------------------------------------------------|----------------------------------------------------------------|
-| **Anomaly Rate**               | Shows the percentage of anomalous metrics over time per node.     | Helps you quickly spot nodes behaving abnormally.              |
-| **Count of Anomalous Metrics** | Displays raw counts of anomalous metrics per node.                | Useful when nodes have different numbers of collected metrics. |
-| **Anomaly Events Detected**    | Indicates when the anomaly rate has triggered a node-level event. | Focuses your attention on meaningful spikes, not just noise.   |
+| Chart Name                    | Purpose                                                            | Why It Matters                                        |
+|-------------------------------|--------------------------------------------------------------------|-------------------------------------------------------|
+| **Anomaly Rate**              | Shows the percentage of anomalous metrics over time per node.      | Helps you quickly spot nodes behaving abnormally.     |
+| **Count of Anomalous Metrics**| Displays raw counts of anomalous metrics per node.                 | Useful when nodes have different numbers of metrics.  |
+| **Anomaly Events Detected**   | Indicates when the anomaly rate has triggered a node-level event.  | Focuses your attention on meaningful spikes, not noise. |
 
 :::note
 
@@ -38,10 +38,10 @@ Use the [node filter](/docs/dashboards-and-charts/node-filter.md) to focus on sp
 
 ## Usage Tips
 
-| Tip                                           | Why It Matters                                                   |
-|-----------------------------------------------|------------------------------------------------------------------|
-| Filter to specific nodes before highlighting. | Reduces noise by limiting averaging across unrelated nodes.      |
-| Highlight close to the anomaly spike.         | Improves ranking accuracy by focusing on the relevant timeframe. |
+| Tip                                            | Why It Matters                                                   |
+|------------------------------------------------|------------------------------------------------------------------|
+| Filter to specific nodes before highlighting.  | Reduces noise by limiting averaging across unrelated nodes.      |
+| Highlight close to the anomaly spike.          | Improves ranking accuracy by focusing on the relevant timeframe. |
 
 ## Anomaly Advisor Diagram
 

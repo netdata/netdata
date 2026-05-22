@@ -68,11 +68,11 @@ SOW-0007 (`integrations-lifecycle`) as their own acceptance gates.
 
 ### Acceptance Criteria
 
-- A `verify/` runner under each verified skill -- e.g.
-  `<repo>/docs/netdata-ai/skills/query-netdata-cloud/verify/run.sh`
+- A verification runner under `.agents/skill-verification/<skill>/`, e.g.
+  `<repo>/.agents/skill-verification/query-netdata-cloud/run.sh`
   -- that:
-  1. Reads `<skill>/verify/questions.md` (the seed list shipped
-     by the upstream SOW).
+  1. Reads `.agents/skill-verification/<skill>/questions.md` (the seed list
+     shipped by the upstream SOW).
   2. For each question, spawns a Sonnet-class assistant with a
      minimal system prompt that points at the skill (SKILL.md +
      `how-tos/INDEX.md` + canonical reference docs).
@@ -80,9 +80,9 @@ SOW-0007 (`integrations-lifecycle`) as their own acceptance gates.
      it made, and the final answer.
   4. Records results under
      `<repo>/.local/audits/<skill>/verify/<timestamp>/`.
-  5. Grades each answer against `verify/grader.md`.
+  5. Grades each answer against `.agents/skill-verification/<skill>/grader.md`.
   6. Reports pass / fail / unanswered counts.
-- `verify/grader.md` per skill: rubric covering (a) correctness,
+- `.agents/skill-verification/<skill>/grader.md` per skill: rubric covering (a) correctness,
   (b) evidence shown (file:line refs, response keys), (c) no
   exposed tokens / bearers / claim ids in the transcript or
   output, (d) how-to authored when missing.
@@ -129,8 +129,8 @@ Status: blocked-on-prereq
 
 Depends on SOW-0010 closing (it provides the SKILL.md, the
 per-domain guides, the `how-tos/INDEX.md`, the
-`verify/questions.md` seed list, and the token-safe wrappers
-that the harness must invoke).
+`.agents/skill-verification/<skill>/questions.md` seed list, and the
+token-safe wrappers that the harness must invoke).
 
 Sensitive data handling plan:
 
@@ -152,8 +152,11 @@ Holding-pattern decisions to record now:
   is a runner flag with a default; not a per-question
   hardcode.
 - The how-to generation prompt is a separate template under
-  `verify/howto-template.md`. Stage 2 implementation defines
-  it.
+  `.agents/skill-verification/<skill>/howto-template.md`. Stage 2
+  implementation defines it.
+- Verification seed questions are harness inputs, not public/operator skill
+  content. They live under `.agents/skill-verification/<skill>/questions.md`,
+  not under `docs/netdata-ai/skills/`.
 
 ## Implications And Decisions
 
@@ -165,7 +168,7 @@ SOW-0010 closes and stage 2 begins.
 1. **Wait for SOW-0010 to close.**
 2. Stage 2a: read SOW-0010 final deliverables (SKILL.md
    structure, how-tos shape, wrappers).
-3. Stage 2b: implement `verify/run.sh` for the cloud skill;
+3. Stage 2b: implement `.agents/skill-verification/query-netdata-cloud/run.sh`;
    prove end-to-end on the seed questions.
 4. Stage 2c: parameterize `run.sh` so it can target any of the
    SOW-0010+ skills.
