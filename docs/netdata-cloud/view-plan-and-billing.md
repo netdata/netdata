@@ -150,3 +150,10 @@ Subtracting credit from your balance, if necessary.
 Applying tax to the final amount, if positive. Negative results adjust your customer credit balance.
 
 </details>
+
+<details>
+<summary>Can I Use the Community Plan for My Business?</summary>
+
+Yes. The Community plan can be used for commercial and business purposes. It is free and includes up to 5 active connected nodes with core monitoring capabilities. The Homelab plan, which is a separate plan intended for home users and students, is the only plan restricted to non-commercial use. For businesses needing more than 5 nodes or advanced features like RBAC, SSO, and centralized configuration, the Business plan is recommended.
+
+</details>
