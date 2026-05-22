@@ -80,7 +80,12 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
         goto fail;
     }
 
+    // Drop any leftover semaphore from a previous (possibly crashed) run so
+    // sem_open honours the initial value instead of reusing stale state.
+    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
     ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
+    if (ctx->sem == SEM_FAILED)
+        goto fail;
 
     memset(ctx->entries, 0, length);
     return ctx;
