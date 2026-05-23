@@ -63,42 +63,16 @@ The default `update_every` is 20 seconds, and it doesn't make sense to decrease 
 
 It is likely that 20 seconds is not enough for big installations and the value should be tuned.
 
-To get a better view we recommend running the collector in debug mode and seeing how much time it will take to collect metrics.
+To size a job, run the collector in debug mode and compare the discovery and collection timing lines. Discovery runs in a separate goroutine, while collection timing must stay comfortably below `update_every`.
 
-<details>
-<summary>Example (all not related debug lines were removed)</summary>
+Useful log lines include:
 
-```
-[ilyam@pc]$ ./go.d.plugin -d -m vsphere
-[ DEBUG ] vsphere[vsphere] discover.go:94 discovering : starting resource discovering process
-[ DEBUG ] vsphere[vsphere] discover.go:102 discovering : found 3 dcs, process took 49.329656ms
-[ DEBUG ] vsphere[vsphere] discover.go:109 discovering : found 12 folders, process took 49.538688ms
-[ DEBUG ] vsphere[vsphere] discover.go:116 discovering : found 3 clusters, process took 47.722692ms
-[ DEBUG ] vsphere[vsphere] discover.go:123 discovering : found 2 hosts, process took 52.966995ms
-[ DEBUG ] vsphere[vsphere] discover.go:130 discovering : found 2 vms, process took 49.832979ms
-[ INFO  ] vsphere[vsphere] discover.go:140 discovering : found 3 dcs, 12 folders, 3 clusters (2 dummy), 2 hosts, 3 vms, process took 249.655993ms
-[ DEBUG ] vsphere[vsphere] build.go:12 discovering : building : starting building resources process
-[ INFO  ] vsphere[vsphere] build.go:23 discovering : building : built 3/3 dcs, 12/12 folders, 3/3 clusters, 2/2 hosts, 3/3 vms, process took 63.3µs
-[ DEBUG ] vsphere[vsphere] hierarchy.go:10 discovering : hierarchy : start setting resources hierarchy process
-[ INFO  ] vsphere[vsphere] hierarchy.go:18 discovering : hierarchy : set 3/3 clusters, 2/2 hosts, 3/3 vms, process took 6.522µs
-[ DEBUG ] vsphere[vsphere] filter.go:24 discovering : filtering : starting filtering resources process
-[ DEBUG ] vsphere[vsphere] filter.go:45 discovering : filtering : removed 0 unmatched hosts
-[ DEBUG ] vsphere[vsphere] filter.go:56 discovering : filtering : removed 0 unmatched vms
-[ INFO  ] vsphere[vsphere] filter.go:29 discovering : filtering : filtered 0/2 hosts, 0/3 vms, process took 42.973µs
-[ DEBUG ] vsphere[vsphere] metric_lists.go:14 discovering : metric lists : starting resources metric lists collection process
-[ INFO  ] vsphere[vsphere] metric_lists.go:30 discovering : metric lists : collected metric lists for 2/2 hosts, 3/3 vms, process took 275.60764ms
-[ INFO  ] vsphere[vsphere] discover.go:74 discovering : discovered 2/2 hosts, 3/3 vms, the whole process took 525.614041ms
-[ INFO  ] vsphere[vsphere] discover.go:11 starting discovery process, will do discovery every 5m0s
-[ DEBUG ] vsphere[vsphere] collect.go:11 starting collection process
-[ DEBUG ] vsphere[vsphere] scrape.go:48 scraping : scraped metrics for 2/2 hosts, process took 96.257374ms
-[ DEBUG ] vsphere[vsphere] scrape.go:60 scraping : scraped metrics for 3/3 vms, process took 57.879697ms
-[ DEBUG ] vsphere[vsphere] collect.go:23 metrics collected, process took 154.77997ms
-```
+- `discovering : discovered ... the whole process took ...`
+- `scraping : scraped metrics for ... hosts, process took ...`
+- `scraping : scraped metrics for ... vms, process took ...`
+- `metrics collected, process took ...`
 
-</details>
-
-There you can see that discovering took `525.614041ms`, and collecting metrics took `154.77997ms`. Discovering is a separate thread, it doesn't affect collecting.
-`update_every` and `timeout` parameters should be adjusted based on these numbers.
+Adjust `update_every` and `timeout` based on those timings and on the number of enabled optional surfaces.
 
 
 ## Setup
@@ -120,7 +94,21 @@ UI configuration requires paid Netdata Cloud plan.
 
 ### Prerequisites
 
-No action required.
+#### vCenter read-only access
+
+Configure a vCenter account that can read inventory objects, properties, and performance counters for the datacenters, clusters, ESXi hosts, VMs, datastores, and resource pools selected by the include filters.
+
+
+#### Optional vSphere metadata permissions
+
+`tag_categories` requires access to the vSphere Automation/CIS tagging APIs for the selected categories. `custom_attributes` requires access to custom field definitions and values for the selected inventory objects.
+
+
+#### Optional datastore cluster, vSAN, and network data
+
+`collect_datastore_clusters` requires read access to StoragePod objects. `collect_vsan` requires vSAN Management API access and the vSAN Performance Service on the target clusters. `collect_network_topology` requires read access to Network and Distributed Virtual Port Group inventory objects.
+
+
 
 ### Configuration
 
@@ -893,12 +881,19 @@ No additional configuration is required.
 
 #### Returns
 
-Cached vSphere inventory topology. Actors represent discovered inventory objects and links represent parent-child, host-runs-VM, or host/VM-connects-network relationships.
+Cached vSphere inventory topology payload. Actors represent discovered inventory objects and links represent parent-child, host-runs-VM, or host/VM-connects-network relationships.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
+| schema_version | string |  |  | Topology payload schema version. |
+| source | string |  |  | Topology source identifier. |
+| layer | string |  |  | Topology layer identifier. |
+| agent_id | string |  |  | Netdata Agent identifier for the node serving the function. |
+| collected_at | datetime |  |  | Time when the cached topology response was built. |
+| view | string |  |  | Topology view identifier. |
 | actors | array |  |  | vSphere inventory actors, including datacenters, clusters, ESXi hosts, VMs, datastores, optional networks, datastore clusters, and resource pools. |
 | links | array |  |  | Topology links between vSphere inventory actors. |
+| stats | object |  |  | Counts of discovered inventory objects, actors, and links included in the response. |
 
 
 
@@ -968,5 +963,20 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep vsphere
 ```
+
+### Missing performance samples
+
+If the logs show `vsphere:host-no-perf-samples` or `vsphere:vm-no-perf-samples`, verify that the configured account can read vCenter performance counters for the selected hosts and VMs, and that the entities are powered on when performance metrics are expected.
+
+
+### Periodic discovery errors
+
+If the logs show `vsphere:periodic-discovery-error`, check vCenter reachability, account permissions for the enabled optional surfaces, and whether the configured `timeout` is large enough for the inventory size.
+
+
+### vCenter reboot recovery
+
+The collector cannot always recover an existing session after a vCenter reboot. Restart `go.d.plugin` if collection does not resume after vCenter becomes available again.
+
 
 
