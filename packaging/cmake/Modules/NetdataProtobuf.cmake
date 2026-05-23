@@ -91,7 +91,17 @@ macro(netdata_detect_protobuf)
         if(OS_WINDOWS)
                 set(PROTOBUF_PROTOC_EXECUTABLE "$ENV{PROTOBUF_PROTOC_EXECUTABLE}")
                 if(NOT PROTOBUF_PROTOC_EXECUTABLE)
-                        set(PROTOBUF_PROTOC_EXECUTABLE "/bin/protoc")
+                        # Under MSYSTEM=UCRT64 the UCRT64 cmake is a native Windows
+                        # binary; ninja cannot resolve POSIX-shaped paths like
+                        # /bin/protoc. Let find_program walk PATH (which begins with
+                        # /ucrt64/bin under UCRT64) and return a native Windows path.
+                        find_program(PROTOBUF_PROTOC_EXECUTABLE NAMES protoc.exe protoc)
+                        if(NOT PROTOBUF_PROTOC_EXECUTABLE)
+                                message(FATAL_ERROR
+                                        "Could not find protoc on PATH. "
+                                        "Install mingw-w64-ucrt-x86_64-protobuf or "
+                                        "set PROTOBUF_PROTOC_EXECUTABLE explicitly.")
+                        endif()
                 endif()
                 set(PROTOBUF_CFLAGS_OTHER "")
                 set(PROTOBUF_INCLUDE_DIRS "")
