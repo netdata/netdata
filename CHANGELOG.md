@@ -206,6 +206,14 @@
 - Fix(packaging): correct rust macro name in spec _have_rust gate ([#22515](https://github.com/netdata/netdata/issues/22515))
 - Translate Path (Windows) ([#22194](https://github.com/netdata/netdata/issues/22194))
 - Modify NetdataYAML.cmake to fix compilation error ([#21295](https://github.com/netdata/netdata/issues/21295))
+- Docs: task class: improve_docs — add the 'is our localhost - not changing ([#22526](https://github.com/netdata/netdata/issues/22526))
+- Docs: add anomaly-bit health alert guide and reference entry ([#22307](https://github.com/netdata/netdata/issues/22307))
+- Docs: task class: improve_docs add a troubleshooting entry to the prometheus ([#22525](https://github.com/netdata/netdata/issues/22525))
+- Check for missing program name when accepting a streaming connection ([#22520](https://github.com/netdata/netdata/issues/22520))
+- Regenerate integrations docs ([#22529](https://github.com/netdata/netdata/issues/22529))
+- Add topology v1 payload contract and producers ([#22496](https://github.com/netdata/netdata/issues/22496))
+- Fix static journal facet filters ([#22456](https://github.com/netdata/netdata/issues/22456))
+- Update remove-node.md ([#22531](https://github.com/netdata/netdata/issues/22531))
 
 ## [2.10.0] - 2026-04-09
 
