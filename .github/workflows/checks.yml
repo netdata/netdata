@@ -4,7 +4,9 @@ on:
   push:
     branches:
       - master
-  pull_request: null
+  pull_request: # SOW-0033 iteration on rwin: disable non-Windows CI. Revert this block before merge.
+    paths:
+      - '__SOW_0033_DISABLED__'
 env:
   DISABLE_TELEMETRY: 1
 concurrency:

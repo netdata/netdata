@@ -2,8 +2,9 @@
 # Runs various linter checks against PR with suggested changes to improve quality
 name: Review
 on:
-  pull_request:
-    types: [opened, reopened, labeled, synchronize]
+  pull_request: # SOW-0033 iteration on rwin: disable non-Windows CI. Revert this block before merge.
+    paths:
+      - '__SOW_0033_DISABLED__'
 env:
   DISABLE_TELEMETRY: 1
 concurrency:

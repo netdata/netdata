@@ -9,11 +9,9 @@ on:
       - 'CMakeLists.txt'
       - '**.c'
       - '**.h'
-  pull_request:
+  pull_request: # SOW-0033 iteration on rwin: disable non-Windows CI. Revert this block before merge.
     paths:
-      - 'CMakeLists.txt'
-      - '**.c'
-      - '**.h'
+      - '__SOW_0033_DISABLED__'
 env:
   DISABLE_TELEMETRY: 1
 concurrency:

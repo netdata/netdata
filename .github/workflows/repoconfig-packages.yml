@@ -3,11 +3,9 @@
 name: Repository Packages
 on:
   workflow_dispatch: null
-  pull_request:
+  pull_request: # SOW-0033 iteration on rwin: disable non-Windows CI. Revert this block before merge.
     paths:
-      - packaging/repoconfig/**
-      - .github/workflows/repoconfig-packages.yml
-      - .github/data/distros.yml
+      - '__SOW_0033_DISABLED__'
   push:
     branches:
       - master

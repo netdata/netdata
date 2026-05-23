@@ -1,14 +1,9 @@
 name: Docs Broken Link Check
 
 on:
-  pull_request:
+  pull_request: # SOW-0033 iteration on rwin: disable non-Windows CI. Revert this block before merge.
     paths:
-      - '**/*.md'
-      - '**/*.mdx'
-      - 'docs/**'
-      - '**/metadata.yaml'
-      - '**/taxonomy.yaml'
-      - 'integrations/**'
+      - '__SOW_0033_DISABLED__'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

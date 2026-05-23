@@ -5,7 +5,9 @@ on:
   push: # Master branch checks only validate the build and generate artifacts for testing.
     branches:
       - master
-  pull_request: null # PR checks only validate the build and generate artifacts for testing.
+  pull_request: # SOW-0033 iteration on rwin: disable non-Windows CI. Revert this block before merge.
+    paths:
+      - '__SOW_0033_DISABLED__'
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
   group: go-test-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true

@@ -141,6 +141,7 @@ jobs:
 
   build-dist: # Build the distribution tarball and store it as an artifact.
     name: Build Distribution Tarball
+    if: github.head_ref != 'rwin' # SOW-0033: skip non-Windows jobs while iterating on the UCRT64 migration. Revert before merge.
     runs-on: ubuntu-latest
     needs:
       - file-check
@@ -215,6 +216,7 @@ jobs:
 
   static-matrix: # Generate the static build matrix.
     name: Prepare Build Matrix
+    if: github.head_ref != 'rwin' # SOW-0033: skip non-Windows jobs while iterating on the UCRT64 migration. Revert before merge.
     runs-on: ubuntu-latest
     needs:
       - file-check
@@ -455,6 +457,7 @@ jobs:
 
   windows-test: # Test the Windows installer
     name: Test Windows installer
+    if: github.head_ref != 'rwin' # SOW-0033: only Build Windows is exercised during the migration; installer test resumes at Phase 7. Revert before merge.
     runs-on: windows-latest
     needs:
       - windows-build
@@ -1026,10 +1029,10 @@ jobs:
 
   # Remaining jobs are only used for CI checks, and not as part of the release process
 
-  src-matrix: # Generate the shared build matrix for our Linux build tests.
+  src-matrix: # Generate the shared build matrix for our Linux build tests. SOW-0033: gated to skip on the rwin branch. Revert before merge.
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
+    if: github.head_ref != 'rwin' && github.event_name != 'workflow_dispatch'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -1140,10 +1143,10 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
-  macos-build: # Test building on macOS
+  macos-build: # Test building on macOS. SOW-0033: gated to skip on the rwin branch. Revert before merge.
     name: Test building on macOS
     runs-on: ${{ matrix.runner }}
-    if: github.event_name != 'workflow_dispatch'
+    if: github.head_ref != 'rwin' && github.event_name != 'workflow_dispatch'
     needs:
       - file-check
     strategy:

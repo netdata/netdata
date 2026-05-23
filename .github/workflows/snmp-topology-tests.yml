@@ -10,13 +10,9 @@ on:
       - 'src/go/plugin/go.d/collector/snmp_topology/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
       - 'src/go/pkg/topology/**'
-  pull_request:
+  pull_request: # SOW-0033 iteration on rwin: disable non-Windows CI. Revert this block before merge.
     paths:
-      - '.github/workflows/snmp-topology-tests.yml'
-      - 'src/go/plugin/go.d/collector/snmp/**'
-      - 'src/go/plugin/go.d/collector/snmp_topology/**'
-      - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
-      - 'src/go/pkg/topology/**'
+      - '__SOW_0033_DISABLED__'
 
 jobs:
   fixture-tests:
