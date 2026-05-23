@@ -118,6 +118,17 @@ bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_por
         return false;
     }
 
+#if defined(OS_WINDOWS)
+    // Winsock has no per-call MSG_DONTWAIT (Cygwin used to emulate it via
+    // its event-based fhandler_socket layer). Under UCRT64 we need the
+    // socket itself in non-blocking mode for the nd_sock_*_nowait helpers
+    // to return immediately instead of blocking. This change is
+    // Windows-only -- on POSIX the existing MSG_DONTWAIT flag does the
+    // right thing per-call and the socket stays blocking, matching the
+    // current behaviour.
+    (void)sock_setnonblock(s->fd, true);
+#endif
+
     if(ssl && s->ctx) {
         if (!nd_sock_open_ssl(s)) {
             close(s->fd);

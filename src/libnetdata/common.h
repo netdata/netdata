@@ -461,6 +461,16 @@ typedef uint32_t uid_t;
 #include <process.h>
 #include <tlhelp32.h>
 #include <winevt.h>
+
+// Winsock has no per-call MSG_DONTWAIT flag (POSIX recv/send/recvmsg/sendmsg
+// flag for "non-blocking just this once"). Cygwin's fhandler_socket layer
+// emulated it via internal events; under UCRT64 there is no emulation, so
+// existing call sites must rely on the socket being in non-blocking mode
+// (set via sock_setnonblock(fd, true) at creation). Defining the flag to 0
+// here lets those call sites compile unchanged.
+#ifndef MSG_DONTWAIT
+#define MSG_DONTWAIT 0
+#endif
 #include <evntprov.h>
 #include <wbemidl.h>
 #include <sddl.h>

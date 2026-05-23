@@ -225,6 +225,14 @@ int sock_setcork(int fd __maybe_unused, bool cork __maybe_unused) {
 
 // Returns -1 for errors, 0 if O_NONBLOCK is unset, 1 if O_NONBLOCK is set
 int sock_setnonblock(int fd, bool nonblock) {
+#if defined(OS_WINDOWS)
+    // Winsock sockets are toggled non-blocking via ioctlsocket(FIONBIO).
+    // fcntl(F_SETFL, O_NONBLOCK) does not work for SOCKETs on Windows.
+    u_long mode = nonblock ? 1UL : 0UL;
+    if (ioctlsocket((SOCKET)fd, FIONBIO, &mode) == 0)
+        return nonblock ? 1 : 0;
+    return -1;
+#else
     int rc = -1;
     int flags = fcntl(fd, F_GETFL);
 
@@ -246,6 +254,7 @@ int sock_setnonblock(int fd, bool nonblock) {
     }
 
     return rc;
+#endif
 }
 
 // Returns -1 for errors, 0 if SO_REUSEADDR is unset, 1 if SO_REUSEADDR is set
