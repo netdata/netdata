@@ -22,10 +22,10 @@ static void update_cygpath_env(void) {
     if(done) return;
     done = true;
 
-    char win_path[MAX_PATH];
-
-    // Convert Cygwin root path to Windows path
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path));
+    // Resolve the MSYS2 install root in Windows form. Used to be a Cygwin
+    // runtime call against "/"; under UCRT64 we look it up through our
+    // own POSIX->Windows translator, which has a fixed MSYS install root.
+    CLEAN_CHAR_P *win_path = os_translate_msys_to_windows_path("/");
 
     nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
 
@@ -60,10 +60,11 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
 static BUFFER *argv_to_windows(const char **argv) {
     BUFFER *wb = buffer_create(0, NULL);
 
-    // argv[0] is the path
-    size_t b_size = strlen(argv[0]) * 2 + FILENAME_MAX;
-    CLEAN_CHAR_P *b = mallocz(b_size);
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, b_size);
+    // argv[0] is the executable path; translate it to Windows form so
+    // CreateProcess can find the binary. The translator gives us an
+    // absolute Windows path when argv[0] is a root-relative POSIX
+    // path (e.g. "/opt/netdata/usr/libexec/...").
+    CLEAN_CHAR_P *b = os_translate_msys_to_windows_path(argv[0]);
 
     for(size_t i = 0; argv[i] ;i++) {
         const char *s = (i == 0) ? b : argv[i];
@@ -269,9 +270,13 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     close(pipe_stdout[PIPE_WRITE]); pipe_stdout[PIPE_WRITE] = -1;
     close(pipe_stderr[PIPE_WRITE]); pipe_stderr[PIPE_WRITE] = -1;
 
-    // Store process information in instance
+    // Store process information in instance.
+    // child_pid used to be the Cygwin-translated POSIX pid; under UCRT64
+    // there is no Cygwin pid namespace, so leave it as -1 and let
+    // spawn_server_instance_pid() fall back to the raw Windows PID
+    // (dwProcessId).
     instance->dwProcessId = pi.dwProcessId;
-    instance->child_pid = cygwin_winpid_to_pid((pid_t)pi.dwProcessId);
+    instance->child_pid = -1;
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors

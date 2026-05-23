@@ -59,6 +59,9 @@ void os_get_system_HZ(void);
 #if defined(OS_WINDOWS)
 char *os_translate_path(char *dst, const char *src, size_t dst_size);
 char *os_translate_msys_to_windows_path(const char *src);
+// Wide-string variant for the Win32 *W APIs (CreateFileW, GetDiskFreeSpaceExW, ...).
+// Caller frees with freez(); returns NULL on conversion failure.
+wchar_t *os_translate_msys_to_windows_pathW(const char *src);
 // Returns newly allocated POSIX-style storage; caller must free.
 char *os_translate_windows_to_msys_path(const char *src);
 #else

@@ -460,7 +460,6 @@ typedef uint32_t uid_t;
 #include <fcntl.h>
 #include <process.h>
 #include <tlhelp32.h>
-#include <sys/cygwin.h>
 #include <winevt.h>
 #include <evntprov.h>
 #include <wbemidl.h>

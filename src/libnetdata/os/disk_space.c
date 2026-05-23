@@ -52,15 +52,9 @@ OS_SYSTEM_DISK_SPACE os_disk_space(const char *path) {
 OS_SYSTEM_DISK_SPACE os_disk_space(const char *path_utf8) {
     OS_SYSTEM_DISK_SPACE space = OS_SYSTEM_DISK_SPACE_EMPTY;
 
-    ssize_t wpath_size = cygwin_conv_path(CCP_POSIX_TO_WIN_W, path_utf8, NULL, 0);
-    if(wpath_size < 0)
+    wchar_t *wpath = os_translate_msys_to_windows_pathW(path_utf8);
+    if(!wpath)
         return space;
-
-    wchar_t *wpath = mallocz(wpath_size);
-    if(cygwin_conv_path(CCP_POSIX_TO_WIN_W, path_utf8, wpath, wpath_size) != 0) {
-        freez(wpath);
-        return space;
-    }
 
     // Use the wide-character version of GetDiskFreeSpaceEx.
     ULARGE_INTEGER freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes;
