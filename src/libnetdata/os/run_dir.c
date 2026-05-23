@@ -26,7 +26,7 @@ static inline bool netdata_dir_in_parent(const char *parent, char *out_path, siz
         return false;
 
     snprintfz(out_path, out_path_len, "%s/netdata", parent);
-    if (mkdir(out_path, 0755) == -1 && errno != EEXIST)
+    if (nd_mkdir(out_path, 0755) == -1 && errno != EEXIST)
         return false;
 
     return is_dir_accessible(out_path, rw);
@@ -82,7 +82,7 @@ static char *detect_run_dir(bool rw) {
 //                            if (!rw)
 //                                goto success;
 //
-//                            if (mkdir(path, 0755) == 0 || errno == EEXIST)
+//                            if (nd_mkdir(path, 0755) == 0 || errno == EEXIST)
 //                                goto success;
 //                        }
 //                    }
@@ -95,12 +95,12 @@ static char *detect_run_dir(bool rw) {
     // Fallback to /tmp/netdata - force creation if needed
     if (!is_dir_accessible("/tmp", rw)) {
         // Try to create /tmp with standard permissions (including sticky bit)
-        if (rw && mkdir("/tmp", 01777) == -1 && errno != EEXIST)
+        if (rw && nd_mkdir("/tmp", 01777) == -1 && errno != EEXIST)
             return NULL;
     }
 
     snprintfz(path, sizeof(path), "/tmp/netdata");
-    if (rw && mkdir(path, 0755) == -1 && errno != EEXIST)
+    if (rw && nd_mkdir(path, 0755) == -1 && errno != EEXIST)
         return NULL;
 
 success:

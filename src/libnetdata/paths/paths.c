@@ -166,7 +166,7 @@ bool filename_is_dir(const char *filename, bool create_it) {
         break;
     }
 
-    if(!is_dir && create_it && max_links == 100 && mkdir(filename, 0750) == 0)
+    if(!is_dir && create_it && max_links == 100 && nd_mkdir(filename, 0750) == 0)
         is_dir = true;
 
     return is_dir;

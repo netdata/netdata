@@ -64,6 +64,11 @@ char *os_translate_msys_to_windows_path(const char *src);
 wchar_t *os_translate_msys_to_windows_pathW(const char *src);
 // Returns newly allocated POSIX-style storage; caller must free.
 char *os_translate_windows_to_msys_path(const char *src);
+
+// Portable mkdir() with a POSIX mode argument. UCRT's mkdir takes only
+// the path -- Windows uses ACLs rather than POSIX permission bits, and
+// `mode` is intentionally dropped on this platform.
+#define nd_mkdir(path, mode) mkdir(path)
 #else
 // No translation needed on non-Windows; copy src into dst for consistent semantics.
 static inline char *os_translate_path(char *dst, const char *src, size_t dst_size) {
@@ -79,6 +84,7 @@ static inline char *os_translate_path(char *dst, const char *src, size_t dst_siz
 static inline char *os_translate_windows_to_msys_path(const char *src) {
     return strdupz(src ? src : "");
 }
+#define nd_mkdir(path, mode) mkdir((path), (mode))
 #endif
 
 #endif //NETDATA_OS_H

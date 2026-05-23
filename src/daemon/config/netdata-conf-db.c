@@ -266,7 +266,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
         else
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
-        int ret = mkdir(dbenginepath, 0775);
+        int ret = nd_mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
             nd_log(NDLS_DAEMON, NDLP_CRIT, "DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
             continue;

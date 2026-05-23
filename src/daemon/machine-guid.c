@@ -211,7 +211,7 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
 
     // Avoid a check-then-create race; mkdir() + EEXIST is sufficient.
     errno_clear();
-    if (mkdir(pathname, 0775) != 0) {
+    if (nd_mkdir(pathname, 0775) != 0) {
         if (errno != EEXIST) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot create directory '%s'", pathname);
             // Even if directory creation fails, continue with in-memory GUID.
