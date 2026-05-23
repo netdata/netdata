@@ -53,5 +53,6 @@ pacman -S --noconfirm --needed \
     ucrt64/mingw-w64-ucrt-x86_64-zlib \
     ucrt64/mingw-w64-ucrt-x86_64-cmake \
     ucrt64/mingw-w64-ucrt-x86_64-ninja \
-    ucrt64/mingw-w64-ucrt-x86_64-libyaml
+    ucrt64/mingw-w64-ucrt-x86_64-libyaml \
+    ucrt64/mingw-w64-ucrt-x86_64-libbacktrace
 ${GITHUB_ACTIONS+echo "::endgroup::"}
