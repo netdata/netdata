@@ -400,7 +400,7 @@ static void aral_delete_leftover_files(const char *name, const char *path, const
 
     struct dirent *de = NULL;
     while((de = readdir(dir))) {
-        if(de->d_type == DT_DIR)
+        if(os_dirent_type(path, de) == DT_DIR)
             continue;
 
         if(strncmp(de->d_name, required_prefix, len) != 0)

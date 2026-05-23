@@ -238,7 +238,8 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     else {
         struct dirent *de = NULL;
         while((de = readdir(dir))) {
-            if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
+            unsigned char dtype = os_dirent_type(udir, de);
+            if(dtype == DT_DIR || dtype == DT_LNK) {
                 if( !de->d_name[0] ||
                     (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
                     (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
@@ -253,7 +254,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                 }
             }
 
-            if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
+            if(dtype == DT_UNKNOWN || dtype == DT_REG || dtype == DT_LNK) {
                 size_t len = strlen(de->d_name);
                 if(path_entry_is_file(udir, de->d_name) &&
                     len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
@@ -265,7 +266,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                 }
             }
 
-            netdata_log_debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
+            netdata_log_debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s' of type %d", udir, de->d_name, (int)dtype);
         }
 
         closedir(dir);
@@ -281,7 +282,8 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
         if (strcmp(udir, sdir)) {
             struct dirent *de = NULL;
             while((de = readdir(dir))) {
-                if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
+                unsigned char dtype = os_dirent_type(sdir, de);
+                if(dtype == DT_DIR || dtype == DT_LNK) {
                     if( !de->d_name[0] ||
                         (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
                         (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
@@ -301,7 +303,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     }
                 }
 
-                if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
+                if(dtype == DT_UNKNOWN || dtype == DT_REG || dtype == DT_LNK) {
                     size_t len = strlen(de->d_name);
                     if(path_entry_is_file(sdir, de->d_name) && !path_entry_is_file(udir, de->d_name) &&
                         len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
@@ -314,7 +316,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
 
                 }
 
-                netdata_log_debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
+                netdata_log_debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)dtype);
             }
         }
         closedir(dir);

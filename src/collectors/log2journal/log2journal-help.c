@@ -18,7 +18,7 @@ static void config_dir_print_available(void) {
     size_t current_columns = 7; // Start with 7 spaces for the first line
 
     while ((entry = readdir(dir))) {
-        if (entry->d_type == DT_REG) { // Check if it's a regular file
+        if (os_dirent_type(path, entry) == DT_REG) { // Check if it's a regular file
             const char *file_name = entry->d_name;
             size_t len = strlen(file_name);
             if (len >= 5 && strcmp(file_name + len - 5, ".yaml") == 0) {

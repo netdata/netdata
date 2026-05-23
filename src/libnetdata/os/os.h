@@ -43,6 +43,7 @@
 #include "machine_id.h"
 #include "process_memory.h"
 #include "dir_size.h"
+#include "os_dirent.h"
 
 // this includes windows.h to the whole of netdata
 // so various conflicts arise

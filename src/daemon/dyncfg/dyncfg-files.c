@@ -224,7 +224,8 @@ void dyncfg_load_all(void) {
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strendswith(entry->d_name, ".dyncfg"))
+        unsigned char dtype = os_dirent_type(dyncfg_globals.dir, entry);
+        if ((dtype == DT_REG || dtype == DT_LNK) && strendswith(entry->d_name, ".dyncfg"))
             dyncfg_file_load(entry->d_name);
     }
 
