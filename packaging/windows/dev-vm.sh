@@ -65,8 +65,11 @@ case "${1:-help}" in
     msys)
         shift
         [ "${1:-}" = "--" ] && shift
-        # Force MSYSTEM=UCRT64 so this matches what build.ps1 sets up.
-        ssh "$VM_HOST" "C:\\msys64\\usr\\bin\\bash.exe -lc \"MSYSTEM=UCRT64 $*\""
+        # Use msys2_shell.cmd -ucrt64 so MSYSTEM is set in the parent env
+        # before /etc/profile is sourced. Setting MSYSTEM inside the bash
+        # -c string is too late: the login shell already configured PATH
+        # for the default MSYS subsystem.
+        ssh "$VM_HOST" "C:\\msys64\\msys2_shell.cmd -ucrt64 -here -no-start -defterm -c \"$*\""
         ;;
     -h|--help|help)
         usage

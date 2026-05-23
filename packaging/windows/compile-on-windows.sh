@@ -71,6 +71,10 @@ ${GITHUB_ACTIONS+echo "::group::Configuring"}
 # Use the UCRT64 cmake (resolved via PATH under MSYSTEM=UCRT64); the MSYS
 # cmake at /usr/bin/cmake reports CMAKE_SYSTEM_NAME=MSYS and is not what
 # we want.
+#
+# rustc / cargo are also resolved via PATH under MSYSTEM=UCRT64 (no
+# explicit -DRust_COMPILER needed). Corrosion's FindRust.cmake then
+# discovers cargo next to rustc in /ucrt64/bin/.
 # shellcheck disable=SC2086
 CFLAGS="${BUILD_CFLAGS}" cmake \
     -S "${REPO_ROOT}" \

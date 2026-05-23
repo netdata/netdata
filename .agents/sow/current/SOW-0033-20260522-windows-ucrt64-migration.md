@@ -4,11 +4,13 @@
 
 Status: in-progress
 
-Sub-state: Pre-impl gate filled; investigation evidence inherited from
-SOW-0032. Phase plan drafted; awaiting user confirmation on phase
-sequencing before implementation begins. The `rwin` worktree is dedicated
-to this migration. SOW-0032 (Rust-on-Windows smoke) is paused and will
-resume to validate this SOW's outcome at close.
+Sub-state: Phase 2 (shell switch to MSYSTEM=UCRT64) and two follow-ups
+are committed (`da82bd03b5`, `bffb496eec`, `d46fba1d96`). CI iteration on
+the `rwin` branch is gated to run only Build Windows (commit
+`bfe4b28455`; to be reverted before merge). Next step is Phase 3 — the
+cygwin path-translation replacement. SOW-0032 remains paused; Phase 7
+of this SOW removes the Windows override and resumes SOW-0032 for
+final validation.
 
 ## Requirements
 
@@ -117,10 +119,11 @@ Unknowns:
   data (verified by inspecting the Windows agent in a live test).
 - The resulting MSI installer is smaller than the current MSI (target:
   meaningful drop, exact figure measured during validation).
-- `packaging/windows/compile-on-windows.sh` no longer passes
-  `-DENABLE_RUST_DEMO=Off`. The Windows build picks up the default
-  `ENABLE_RUST_DEMO=On` from CMake and exercises the toolchain via the
-  rust-demo smoke crate added in SOW-0032.
+- `packaging/windows/compile-on-windows.sh` flips to passing
+  `-DENABLE_RUST_DEMO=On` (the global default is `Off` since
+  `bffb496eec`). The Windows build exercises the Rust toolchain via
+  the `rust-demo` smoke crate added in SOW-0032 and emits the
+  `RUST FFI smoke:` log line at startup.
 - `packaging/cmake/Modules/NetdataPlatform.cmake` no longer treats
   `CMAKE_SYSTEM_NAME == "MSYS"` as a Windows variant (or, if kept for
   backwards-compat with developer setups, is clearly documented as
@@ -191,7 +194,15 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: needs-user-decision
+Status: historical snapshot
+
+Note: this section captures the gate state at SOW creation
+(2026-05-22). The decisions referenced in "Open decisions" have since
+been made; current SOW lifecycle state (in-progress, phases completed,
+follow-up commits) lives in the "Execution Log" section below. Treat
+this gate as a historical baseline, not as live status.
+
+Original gate status at creation: needs-user-decision
 
 Problem / root-cause model:
 
@@ -366,15 +377,21 @@ Open decisions:
    Recommended: set MSYSTEM=UCRT64 unconditionally in build.ps1; keep
    the developer CLion-MSYS .bat for hand-holding; mark
    NetdataPlatform.cmake's MSYS branch deprecated but functional.
+   **Resolved (Execution Log 2026-05-22)**: user chose a hard cut —
+   MSYSTEM=UCRT64 unconditional; MSYS/MINGW64 paths removed;
+   NetdataPlatform.cmake refuses anything but UCRT64.
 2. Phase 4 may discover blocking issues (e.g., an entire subsystem
    that relies on `<sys/un.h>` AF_UNIX semantics). The plan is to
    surface these as sub-decisions when they appear, not pre-plan
    for unknown unknowns.
+   **Open**: this decision is forward-looking; will fire when Phase 4
+   reaches socket/AF_UNIX code.
 3. Phase 6 needs a choice on how minimal the installer should be:
    strictly the DLLs `dumpbin` finds, or also keep a small set of
    common UCRT64 tools (e.g., `bash.exe`) for users who today rely
    on the MSYS shell shipped inside the installer. Recommended:
    strictly DLLs; add helper tools only if user reports show demand.
+   **Open**: defers to Phase 6 execution.
 
 ## Implications And Decisions
 
@@ -627,6 +644,15 @@ Pending.
 ## Followup
 
 - Resume SOW-0032 at Phase 7 of this SOW.
+- Revert `bfe4b28455` (the temporary CI-disable for non-Windows jobs)
+  and any working-tree-only edits to the gated workflows before this
+  SOW closes. Both mechanisms are documented:
+  - `build.yml` jobs gated with `if: github.head_ref != 'rwin'`.
+  - 11 other PR-triggering workflows neutralised by
+    `paths: ['__SOW_0033_DISABLED__']`.
+  Search for `SOW_0033_DISABLED` and `SOW-0033:` to enumerate every
+  gate; or `git revert bfe4b28455` covers the bulk if no further
+  workflow edits land on top.
 
 ## Regression Log
 

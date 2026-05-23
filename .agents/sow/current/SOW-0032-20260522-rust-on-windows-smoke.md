@@ -77,9 +77,10 @@ Unknowns:
 
 - A new crate `src/crates/rust-demo` builds with `cargo build` in the
   standard host environment.
-- `cmake --build` succeeds on Linux with `ENABLE_RUST_DEMO=ON` (default).
-- `cmake --build` succeeds on Linux with `ENABLE_RUST_DEMO=OFF` (no Rust
-  used at all — proves the option is non-mandatory).
+- `cmake --build` succeeds on Linux with `-DENABLE_RUST_DEMO=On` (opt-in).
+- `cmake --build` succeeds on Linux with the option absent (no Rust used
+  at all — proves the option is non-mandatory and the default-off path
+  works).
 - The Windows MSYS2/UCRT64 build, when triggered via the draft PR, exercises
   Corrosion and links the static library into `netdata.exe`.
 - Starting `netdata` (Linux build, locally) emits a log line containing the
@@ -116,8 +117,11 @@ Risks:
 - Cargo network access during configure/build on Windows CI: this is the
   whole point of the smoke test. If the CI machine cannot reach crates.io
   the build will fail and we will know.
-- Adds a new always-on CMake option. Set the default to ON and gate Rust
-  presence behind it so projects can opt out if needed.
+- Adds a new CMake option. The original plan defaulted it `On`; later
+  revised to `Off` (commit `bffb496eec`) after CI surfaced that
+  source-tarball builds without a Rust toolchain were silently forced
+  to install one. The Windows path opts in explicitly via
+  `compile-on-windows.sh`.
 
 ## Pre-Implementation Gate
 
@@ -144,9 +148,14 @@ Affected contracts and surfaces:
 - New crate `src/crates/rust-demo` (Cargo.toml, src/lib.rs, header).
 - Patch in `src/daemon/main.c` adding `#include` and a single call near
   `NETDATA STARTUP`.
-- Windows build script (`packaging/windows/compile-on-windows.sh`) — needs
-  no change because the default is ON and there is no override; on Linux
-  CI the option also defaults ON.
+- Windows build script (`packaging/windows/compile-on-windows.sh`)
+  currently passes `-DENABLE_RUST_DEMO=Off` (added during the SOW-0033
+  pivot, commit `0b02218107`, after CMake's option default was flipped
+  to `Off` in `bffb496eec`). Removing that override at the close of
+  SOW-0033 (Phase 7) is what re-enables the smoke crate on Windows
+  and validates this SOW's acceptance criteria. Linux / macOS keep
+  the smoke crate Off by default; opt in per build with
+  `-DENABLE_RUST_DEMO=On`.
 
 Existing patterns to reuse:
 
@@ -167,7 +176,8 @@ Sensitive data handling plan:
 
 Implementation plan:
 
-1. Add CMake option `ENABLE_RUST_DEMO` (default ON), extend the Corrosion
+1. Add CMake option `ENABLE_RUST_DEMO` (originally default `On`; later
+   flipped to `Off` in commit `bffb496eec`). Extend the Corrosion
    `if(...)` guard, `corrosion_import_crate(MANIFEST_PATH
    src/crates/rust-demo/Cargo.toml CRATES rust_demo)` and
    `target_link_libraries(netdata PRIVATE rust_demo)` guarded by the option.
@@ -188,11 +198,11 @@ Implementation plan:
 
 Validation plan:
 
-- Local Linux: `cmake -B build -DENABLE_RUST_DEMO=ON && cmake --build build`
+- Local Linux: `cmake -B build -DENABLE_RUST_DEMO=On && cmake --build build`
   with the smoke crate compiled and linked.
-- Local Linux: `cmake -B build -DENABLE_RUST_DEMO=OFF && cmake --build
-  build` to confirm option is honoured and Corrosion is not pulled in (if
-  no other Rust plugin is enabled).
+- Local Linux: `cmake -B build && cmake --build build` (no override; option
+  defaults to `Off`) to confirm the option is honoured and Corrosion is not
+  pulled in unless another Rust plugin is also enabled.
 - Open a draft PR; rely on the existing Windows packaging workflow
   (`packaging.yml` / `build.yml`) for the actual Windows CI signal —
   this SOW is intentionally scoped so the user can verify on a draft PR.

@@ -15,5 +15,7 @@ set "batch_dir=%~dp0"
 set "batch_dir=%batch_dir:\=/%"
 set MSYSTEM=UCRT64
 set GOROOT=C:\msys64\ucrt64
-set "PATH=%PATH%;C:\msys64\ucrt64\bin;C:\msys64\usr\bin;C:\msys64\bin"
+:: UCRT64 bins MUST come first so an unrelated toolchain already on PATH
+:: cannot win symbol resolution (e.g. a system MinGW64 install).
+set "PATH=C:\msys64\ucrt64\bin;C:\msys64\usr\bin;C:\msys64\bin;%PATH%"
 set PROTOBUF_PROTOC_EXECUTABLE=C:/msys64/ucrt64/bin/protoc.exe
