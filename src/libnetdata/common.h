@@ -476,6 +476,14 @@ typedef uint32_t uid_t;
 #ifndef MSG_DONTWAIT
 #define MSG_DONTWAIT 0
 #endif
+
+// UCRT64's <sys/types.h> declares `useconds_t` but not POSIX's
+// `suseconds_t`. struct timeval::tv_usec is plain `long` on this
+// platform (mingw-w64's <sys/time.h>), so map the type accordingly --
+// keeping all the (suseconds_t) casts in collectors and clocks code
+// compiling unchanged.
+typedef long suseconds_t;
+
 #include <evntprov.h>
 #include <wbemidl.h>
 #include <sddl.h>
