@@ -4,7 +4,6 @@
 
 RRDHOST *localhost;
 struct config netdata_config;
-char *netdata_configured_primary_plugins_dir = NULL;
 
 struct k8s_test_data {
     char *data;
