@@ -107,8 +107,36 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
 #endif
 #endif
     else if(strcmp(output, "syslog") == 0) {
+#if defined(OS_WINDOWS)
+        // Windows has no syslog daemon and no <syslog.h>. The Windows-native
+        // log channels are 'wel' (Windows Event Log) and 'etw' (Event Tracing
+        // for Windows), both provided by nd_log-to-windows-events.c. Warn
+        // loudly and fall back to a sensible Windows default rather than
+        // silently honouring an impossible request; killing the agent is the
+        // wrong call when running as a Windows service because stderr is
+        // detached and the user would see a silent service-start failure.
+        const char *fallback_name;
+#  if defined(HAVE_WEL)
+        ls->method = NDLM_WEL;
+        fallback_name = WEL_NAME;
+#  elif defined(HAVE_ETW)
+        ls->method = NDLM_ETW;
+        fallback_name = ETW_NAME;
+#  else
+        ls->method = NDLM_STDERR;
+        ls->fd = STDERR_FILENO;
+        fallback_name = "stderr";
+#  endif
+        ls->filename = NULL;
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Log output 'syslog' is not supported on Windows for source '%s'. "
+               "Falling back to '%s'. Update netdata.conf to use 'wel', 'etw', "
+               "'stderr', 'stdout', or a file path explicitly.",
+               nd_log_id2source(source), fallback_name);
+#else
         ls->method = NDLM_SYSLOG;
         ls->filename = NULL;
+#endif
     }
     else if(strcmp(output, "/dev/null") == 0) {
         ls->method = NDLM_DEVNULL;
