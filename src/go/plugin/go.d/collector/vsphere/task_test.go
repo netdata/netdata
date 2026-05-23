@@ -16,10 +16,15 @@ func Test_task(t *testing.T) {
 		atomic.AddInt64(&i, 1)
 	}
 
-	task := newTask(job, time.Millisecond*200)
-	defer task.stop()
-	time.Sleep(time.Second)
-	assert.True(t, atomic.LoadInt64(&i) > 0)
+	task := newTask(job, time.Millisecond)
+	defer func() {
+		task.stop()
+		task.wait()
+	}()
+
+	assert.Eventually(t, func() bool {
+		return atomic.LoadInt64(&i) > 0
+	}, time.Second, time.Millisecond)
 }
 
 func Test_task_state(t *testing.T) {
@@ -46,7 +51,7 @@ func Test_task_state(t *testing.T) {
 			assert.Equal(t, tc.wantBefore, tc.state(task))
 
 			task.stop()
-			time.Sleep(time.Millisecond * 500)
+			task.wait()
 			assert.Equal(t, tc.wantAfter, tc.state(task))
 		})
 	}
