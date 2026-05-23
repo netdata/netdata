@@ -484,6 +484,18 @@ typedef uint32_t uid_t;
 // compiling unchanged.
 typedef long suseconds_t;
 
+// UCRT64 has Microsoft's gmtime_s / localtime_s (errno_t return,
+// reversed argument order) but no POSIX gmtime_r / localtime_r.
+// Provide thin inline adapters so call sites compile unchanged. Both
+// shims populate *result and return it on success, NULL on failure --
+// matching the POSIX contract exactly.
+static inline struct tm *gmtime_r(const time_t *timep, struct tm *result) {
+    return (gmtime_s(result, timep) == 0) ? result : NULL;
+}
+static inline struct tm *localtime_r(const time_t *timep, struct tm *result) {
+    return (localtime_s(result, timep) == 0) ? result : NULL;
+}
+
 #include <evntprov.h>
 #include <wbemidl.h>
 #include <sddl.h>
