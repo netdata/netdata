@@ -2318,6 +2318,29 @@ GitHub review feedback fixes as of 2026-05-22:
   - `go vet ./collector/vsphere/...` passed from `src/go/plugin/go.d`.
   - `git diff --check` passed from `src/go/plugin/go.d`.
 
+Taxonomy merge-gate fix as of 2026-05-23:
+
+- The PR review statement that vSphere taxonomy was out of scope was rejected
+  after running the local CI-equivalent taxonomy checker. The checker reports
+  missing collector taxonomy as fatal when collector metrics change.
+- Added `src/go/plugin/go.d/collector/vsphere/taxonomy.yaml` with one vSphere
+  placement under `containers-vms`, using the existing `cgroup` taxonomy icon.
+- The initial taxonomy owned all 115 vSphere metric contexts and grouped them by
+  resource family so the fatal taxonomy gate could pass.
+- After user review, the taxonomy was reshaped to mirror the existing
+  cloud-frontend vSphere dashboard TOC from
+  `${NETDATA_REPOS_DIR}/cloud-frontend/src/domains/charts/toc/taxonomy/containersAndVms.js`:
+  overview heads grid, Inventory, Clusters, Hosts, Virtual Machines, Resource
+  Pools, Datastores, and Datastore Clusters with the same child group ordering.
+- The overview heads grid references four contexts as display widgets; all 115
+  current contexts remain owned exactly once by structural taxonomy groups.
+- Validation:
+  - `../../../../.venv/bin/python ../../../../integrations/check_collector_taxonomy.py --pr-diff upstream/master...HEAD` passed from `src/go/plugin/go.d`.
+  - `../../../../.venv/bin/python ../../../../integrations/gen_taxonomy.py --check-only` passed from `src/go/plugin/go.d`.
+  - Metadata-to-taxonomy coverage check reported `metadata=115 taxonomy=115 missing=0 extra=0 duplicates=0`.
+  - Post-refinement ownership check reported `metadata=115 owned=115 referenced=4 missing=0 extra=0 duplicates=0`.
+  - `collector/vsphere/taxonomy.yaml` parsed successfully with `ruamel.yaml`.
+
 NIDL/config/metadata verification as of 2026-05-09:
 
 - `docs/NIDL-Framework.md:116` through `docs/NIDL-Framework.md:170` require one instance type per context, related dimensions with one unit, hierarchy separation by contexts, and meaningful labels. The generated template has 161 contexts, no detected context/unit mismatch, and contexts are separated by vSphere resource type or child-resource type.
