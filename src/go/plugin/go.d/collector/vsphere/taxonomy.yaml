@@ -1,0 +1,430 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: vsphere
+placements:
+  - id: vsphere
+    section_id: containers-vms
+    title: VMware vCenter Server
+    icon: cgroup
+    properties: { important: false, grouping: true }
+    items:
+      - type: grid
+        id: vsphere-heads
+        title: vsphere-heads
+        items:
+          - type: context
+            title: Top Hosts by CPU Usage
+            contexts: [vsphere.host_cpu_utilization]
+            chart_library: bars
+            group_by: [label]
+            group_by_label: [host]
+            dimensions_sort: valueDesc
+            colors: ["#994499", "#22AA99"]
+            layout: { left: 0, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Top Hosts by Memory Usage
+            contexts: [vsphere.host_mem_utilization]
+            chart_library: bars
+            group_by: [label]
+            group_by_label: [host]
+            dimensions_sort: valueDesc
+            colors: ["#DC3912", "#FE3912"]
+            layout: { left: 3, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Top VMs by CPU Usage
+            contexts: [vsphere.vm_cpu_utilization]
+            chart_library: bars
+            group_by: [label]
+            group_by_label: [vm]
+            dimensions_sort: valueDesc
+            colors: ["#994499", "#22AA99"]
+            layout: { left: 6, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Top VMs by Memory Usage
+            contexts: [vsphere.vm_mem_utilization]
+            chart_library: bars
+            group_by: [label]
+            group_by_label: [vm]
+            dimensions_sort: valueDesc
+            colors: ["#990099", "#0099C6"]
+            layout: { left: 9, top: 0, width: 3, height: 4 }
+      - type: group
+        id: inventory
+        title: Inventory
+        properties: { grouping: false }
+        families: false
+        items:
+          - vsphere.inventory_objects
+      - type: group
+        id: clusters
+        title: Clusters
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: cluster-resources
+            title: Resources
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.cluster_cpu_capacity
+              - vsphere.cluster_mem_capacity
+              - vsphere.cluster_cpu_topology
+          - type: group
+            id: cluster-utilization
+            title: Utilization
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.cluster_cpu_utilization
+              - vsphere.cluster_cpu_usage
+              - vsphere.cluster_mem_utilization
+              - vsphere.cluster_mem_usage
+              - vsphere.cluster_usage_cpu
+              - vsphere.cluster_usage_mem
+          - type: group
+            id: cluster-drs
+            title: Distributed Resource Scheduler
+            short_name: DRS
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.cluster_drs_config
+              - vsphere.cluster_drs_mode
+              - vsphere.cluster_drs_vmotion_rate
+              - vsphere.cluster_drs_score
+              - vsphere.cluster_drs_balance
+              - vsphere.cluster_services_fairness
+              - vsphere.cluster_services_effective_cpu
+              - vsphere.cluster_services_effective_mem
+              - vsphere.cluster_vmotions
+          - type: group
+            id: cluster-ha
+            title: High Availability
+            short_name: HA
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.cluster_ha_config
+              - vsphere.cluster_ha_host_monitoring
+              - vsphere.cluster_ha_vm_monitoring
+              - vsphere.cluster_ha_vm_component_protection
+              - vsphere.cluster_services_failover
+          - type: group
+            id: cluster-vsan
+            title: vSAN
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vsan_cluster_space_usage
+              - vsphere.vsan_cluster_space_utilization
+              - vsphere.vsan_cluster_operations
+              - vsphere.vsan_cluster_throughput
+              - vsphere.vsan_cluster_latency
+              - vsphere.vsan_cluster_congestions
+              - vsphere.vsan_cluster_health_status
+          - type: group
+            id: cluster-vm-ops
+            title: Virtual Machine Operations
+            short_name: VM Ops
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.cluster_vm_migrations
+              - vsphere.cluster_vm_lifecycle
+              - vsphere.cluster_vm_management
+              - vsphere.cluster_vm_guest_ops
+              - vsphere.cluster_vm_cold_migrations
+          - type: group
+            id: cluster-inventory
+            title: Inventory
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.cluster_hosts
+              - vsphere.cluster_vm_count
+          - type: group
+            id: cluster-status
+            title: Status
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.cluster_overall_status
+      - type: group
+        id: hosts
+        title: Hosts
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: host-cpu
+            title: CPU
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.host_cpu_utilization
+          - type: group
+            id: host-memory
+            title: Memory
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.host_mem_utilization
+              - vsphere.host_mem_usage
+              - vsphere.host_mem_swap_io
+          - type: group
+            id: host-disk
+            title: Disk
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.host_disk_io
+              - vsphere.host_disk_max_latency
+          - type: group
+            id: host-network
+            title: Network
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.host_net_traffic
+              - vsphere.host_net_packets
+              - vsphere.host_net_drops
+              - vsphere.host_net_errors
+          - type: group
+            id: host-power
+            title: Power
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.host_power_usage
+              - vsphere.host_power_capacity_usage
+              - vsphere.host_power_capacity_utilization
+              - vsphere.host_energy_usage
+          - type: group
+            id: host-vsan
+            title: vSAN
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vsan_host_operations
+              - vsphere.vsan_host_throughput
+              - vsphere.vsan_host_latency
+              - vsphere.vsan_host_congestions
+              - vsphere.vsan_host_cache_hit_rate
+          - type: group
+            id: host-status
+            title: Status
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.host_overall_status
+              - vsphere.host_power_state
+              - vsphere.host_connection_state
+              - vsphere.host_maintenance_status
+          - type: group
+            id: host-uptime
+            title: Uptime
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.host_system_uptime
+      - type: group
+        id: virtual-machines
+        title: Virtual Machines
+        short_name: VMs
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: vm-cpu
+            title: CPU
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_cpu_utilization
+          - type: group
+            id: vm-memory
+            title: Memory
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_mem_utilization
+              - vsphere.vm_mem_usage
+              - vsphere.vm_mem_swap_usage
+              - vsphere.vm_mem_swap_io
+          - type: group
+            id: vm-disk
+            title: Disk
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_disk_io
+              - vsphere.vm_disk_max_latency
+          - type: group
+            id: vm-storage
+            title: Storage
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_storage_usage
+          - type: group
+            id: vm-network
+            title: Network
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_net_traffic
+              - vsphere.vm_net_packets
+              - vsphere.vm_net_drops
+          - type: group
+            id: vm-power
+            title: Power
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_power_usage
+              - vsphere.vm_energy_usage
+          - type: group
+            id: vm-vsan
+            title: vSAN
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vsan_vm_operations
+              - vsphere.vsan_vm_throughput
+              - vsphere.vsan_vm_latency
+          - type: group
+            id: vm-snapshots
+            title: Snapshots
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_snapshot_count
+              - vsphere.vm_snapshot_max_age
+              - vsphere.vm_snapshot_max_chain_depth
+          - type: group
+            id: vm-configuration
+            title: Configuration
+            short_name: Config
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_config_cpu
+              - vsphere.vm_config_memory
+              - vsphere.vm_config_devices
+          - type: group
+            id: vm-status
+            title: Status
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_overall_status
+              - vsphere.vm_power_state
+              - vsphere.vm_connection_state
+              - vsphere.vm_consolidation_needed
+          - type: group
+            id: vm-tools
+            title: VMware Tools
+            short_name: Tools
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_tools_running_status
+              - vsphere.vm_tools_version_status
+          - type: group
+            id: vm-uptime
+            title: Uptime
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.vm_system_uptime
+      - type: group
+        id: resource-pools
+        title: Resource Pools
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: resource-pool-cpu
+            title: CPU
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.resource_pool_cpu_usage
+              - vsphere.resource_pool_cpu_entitlement
+              - vsphere.resource_pool_cpu_allocation
+              - vsphere.resource_pool_cpu_config
+          - type: group
+            id: resource-pool-memory
+            title: Memory
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.resource_pool_mem_usage
+              - vsphere.resource_pool_mem_entitlement
+              - vsphere.resource_pool_mem_allocation
+              - vsphere.resource_pool_mem_breakdown
+              - vsphere.resource_pool_mem_config
+          - type: group
+            id: resource-pool-status
+            title: Status
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.resource_pool_overall_status
+      - type: group
+        id: datastores
+        title: Datastores
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: datastore-disk-io
+            title: Disk I/O
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.datastore_disk_io
+              - vsphere.datastore_disk_iops
+              - vsphere.datastore_disk_latency
+          - type: group
+            id: datastore-space
+            title: Space
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.datastore_space_utilization
+              - vsphere.datastore_space_usage
+          - type: group
+            id: datastore-status
+            title: Status
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.datastore_overall_status
+              - vsphere.datastore_accessibility_status
+              - vsphere.datastore_maintenance_status
+              - vsphere.datastore_multiple_host_access
+      - type: group
+        id: datastore-clusters
+        title: Datastore Clusters
+        short_name: DS Clusters
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: datastore-cluster-space
+            title: Space
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.datastore_cluster_space_utilization
+              - vsphere.datastore_cluster_space_usage
+          - type: group
+            id: datastore-cluster-storage-drs
+            title: Storage DRS
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.datastore_cluster_storage_drs_status
+          - type: group
+            id: datastore-cluster-status
+            title: Status
+            properties: { grouping: false }
+            families: false
+            items:
+              - vsphere.datastore_cluster_overall_status
