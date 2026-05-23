@@ -721,6 +721,29 @@ static int read_single_base64_or_hex_number_file(const char *filename, unsigned 
     }
 }
 
+#if defined(OS_WINDOWS)
+// UCRT's <string.h> does not ship strsep() (it is BSD-derived, not standard
+// C). Provide a portable equivalent. Semantics match the BSD man page:
+// extract the next token delimited by any character in `delim`, replace
+// that delimiter with a NUL, advance `*stringp` past it (or set it to NULL
+// if no delimiter was found), and return the original `*stringp`.
+ALWAYS_INLINE
+static char *strsep(char **stringp, const char *delim) {
+    char *start = *stringp;
+    if (!start)
+        return NULL;
+
+    char *end = strpbrk(start, delim);
+    if (end) {
+        *end = '\0';
+        *stringp = end + 1;
+    } else {
+        *stringp = NULL;
+    }
+    return start;
+}
+#endif
+
 ALWAYS_INLINE
 static char *strsep_skip_consecutive_separators(char **ptr, char *s) {
     char *p = (char *)"";
