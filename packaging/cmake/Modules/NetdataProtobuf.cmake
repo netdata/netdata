@@ -93,21 +93,23 @@ macro(netdata_detect_protobuf)
                 if(NOT PROTOBUF_PROTOC_EXECUTABLE)
                         # Under MSYSTEM=UCRT64 the UCRT64 cmake is a native Windows
                         # binary; ninja cannot resolve POSIX-shaped paths like
-                        # /bin/protoc. Hint find_program at $MINGW_PREFIX/bin
-                        # (which MSYS2's /etc/profile sets to /ucrt64) so we get
-                        # a Windows-canonical path even when bash->cmake PATH
-                        # propagation is inconsistent.
-                        find_program(PROTOBUF_PROTOC_EXECUTABLE
-                                NAMES protoc.exe protoc
-                                HINTS "$ENV{MINGW_PREFIX}/bin")
-                        if(NOT PROTOBUF_PROTOC_EXECUTABLE)
+                        # /bin/protoc. The MSYS2 ucrt64 protobuf package installs
+                        # protoc.exe at $MINGW_PREFIX/bin/protoc.exe. Use a direct
+                        # set + EXISTS check instead of find_program(): the MSYS2
+                        # ucrt64 cmake toolchain configures CMAKE_FIND_ROOT_PATH_*
+                        # in ways that mask /ucrt64/bin from find_program even when
+                        # passed as HINTS.
+                        set(_nd_protoc "$ENV{MINGW_PREFIX}/bin/protoc.exe")
+                        if(EXISTS "${_nd_protoc}")
+                                set(PROTOBUF_PROTOC_EXECUTABLE "${_nd_protoc}")
+                        else()
                                 message(FATAL_ERROR
-                                        "Could not find protoc. "
+                                        "Could not find protoc at '${_nd_protoc}'. "
                                         "Install mingw-w64-ucrt-x86_64-protobuf, or "
                                         "set PROTOBUF_PROTOC_EXECUTABLE explicitly. "
-                                        "Searched HINTS: '$ENV{MINGW_PREFIX}/bin' "
                                         "(MINGW_PREFIX from env: '$ENV{MINGW_PREFIX}').")
                         endif()
+                        unset(_nd_protoc)
                 endif()
                 set(PROTOBUF_CFLAGS_OTHER "")
                 set(PROTOBUF_INCLUDE_DIRS "")
