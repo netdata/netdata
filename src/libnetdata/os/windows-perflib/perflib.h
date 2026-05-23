@@ -7,10 +7,11 @@
 
 #if defined(OS_WINDOWS)
 
-typedef uint32_t DWORD;
-typedef long long  LONGLONG;
-typedef unsigned long long ULONGLONG;
-typedef int BOOL;
+// DWORD, LONGLONG, ULONGLONG, BOOL come from <windows.h>, which is
+// included via libnetdata/common.h above. Don't re-typedef them here:
+// under UCRT64 LLP64, <windows.h>'s `DWORD` is `unsigned long` (4 bytes,
+// distinct type from uint32_t) and the local redefinition is a hard
+// conflict for the compiler.
 
 struct _PERF_DATA_BLOCK;
 typedef struct _PERF_DATA_BLOCK PERF_DATA_BLOCK;
