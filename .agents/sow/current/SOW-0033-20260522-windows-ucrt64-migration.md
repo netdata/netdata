@@ -445,6 +445,91 @@ CI run.
   - Build failure here is informative, not regressive: this is the
     signal we are migrating to surface.
 
+### 2026-05-23
+
+- Considered restructuring Phases 3-4 to introduce an `nd-os` Rust
+  crate exposing C FFI as the OS-portable substrate (with `rustix`
+  and `windows-sys` as backends), then having the C code call into
+  it instead of being migrated to Win32 directly.
+- Audited the OS-touching surface of `src/` to size the option:
+  - Bucket A (already covered by libuv / `std`-portable): the
+    threading, event-loop, fs, and process-spawn surfaces are
+    largely abstracted via libuv already (70 `uv_fs_*`, 33 `uv_loop`,
+    30 `uv_timer`, 25 `uv_sem`, 18 `uv_pipe`, 7 `uv_process`, etc.).
+  - Bucket B (POSIX-portable, works on UCRT64 directly): ~700 call
+    sites in env/time/fs/network that need no Windows-specific
+    changes.
+  - Bucket C (POSIX vs Winsock2 mismatch, real work): ~200 sites,
+    dominated by ~130 socket-shaped calls and ~35 `mmap`/`madvise`
+    sites. This is the actual Windows-pain area.
+  - Bucket D (Cygwin-only APIs that must be replaced):
+    **13 `cygwin_conv_path()` calls in 5 files**, plus the one
+    `<sys/cygwin.h>` include in `common.h`. Bounded and small.
+  - Bucket E (Linux-only, already gated): inotify, epoll, netlink.
+  - Bucket F (Windows-native code already in tree): 21 files include
+    `<windows.h>`. Already substantial OS_WINDOWS branching.
+  - Real `fork()` call sites: only 6, and none execute on Windows
+    (already gated or selector-routed via `spawn_server_*`).
+- Sized three `nd-os` tiers:
+  - Tier 1 (shim cygwin_conv_path + errno): ~100 LOC Rust, ~3-5
+    days.
+  - Tier 2 (real OS layer for sockets + mmap + pwd/grp): ~1500 LOC
+    Rust, ~4-6 weeks, separate SOW.
+  - Tier 3 (replace libuv): 3-6 months, not worth doing — libuv
+    already works.
+- Decision: do NOT introduce `nd-os`. Reasons:
+  - Bucket A shows the codebase already has a working OS portability
+    layer (libuv). `nd-os` would not fill a missing layer; it would
+    replace one that works.
+  - Bucket D is tiny enough (13 sites in 5 files) that a direct C
+    Win32 replacement is cheaper than designing, exposing, and
+    permanently maintaining a Rust crate + C FFI for those sites.
+  - Bucket C is the real cost driver. The reshape work (`int`
+    sockfd → `SOCKET`, `errno` → `WSAGetLastError`) has roughly the
+    same call-site editing volume regardless of whether the
+    abstraction lives in C with `#ifdef` or in Rust behind FFI. The
+    Rust route adds a permanent build-time dependency for marginal
+    benefit at the call sites.
+  - Locking the C build into "cannot build without Rust" is a real
+    downside (it removes `ENABLE_RUST_DEMO=Off` as an escape
+    hatch — packagers / embedded builds lose the option).
+  - The smoke crate (SOW-0032) remains the validator for Rust
+    toolchain availability on Windows; in-process Rust FFI stays
+    available for future Rust code that genuinely needs it, but is
+    not the migration's chosen vehicle.
+- Phase 3 stays scoped as: small Win32-native C helper in
+  `src/libnetdata/os/` using `MultiByteToWideChar` +
+  `GetFullPathNameW` / `_wfullpath`. No new crate.
+
+- First Windows CI run on draft PR #22535 surfaced two distinct
+  failure modes:
+  1. **Windows build**: `NetdataPlatform.cmake` rejected
+     `CMAKE_SYSTEM_NAME=MSYS`. Root cause: `compile-on-windows.sh`
+     hard-coded `/usr/bin/cmake`, which is the MSYS-runtime cmake
+     and always self-reports as `MSYS` regardless of `$MSYSTEM`.
+     Setting `MSYSTEM=UCRT64` changed the PATH for `gcc`/`pkg-config`
+     but the absolute path bypassed it for `cmake` itself.
+  2. **Linux source-tarball builds across ~all distros**, plus the
+     `LibreSSL` and `Clang` Checks jobs: `rustc not found in PATH`.
+     Root cause: the default `ENABLE_RUST_DEMO=On` in CMake now
+     forces Corrosion to require `rustc` in every build environment,
+     including ones that previously did not need a Rust toolchain.
+- Phase 2 follow-up:
+  - `packaging/windows/compile-on-windows.sh`: `/usr/bin/cmake` →
+    `cmake` so PATH resolves it to `/ucrt64/bin/cmake.exe` under
+    `MSYSTEM=UCRT64`.
+  - `packaging/windows/msys2-dependencies.sh`: add
+    `mingw-w64-ucrt-x86_64-cmake` and `mingw-w64-ucrt-x86_64-ninja`
+    so the UCRT64 cmake/ninja are actually present.
+  - `CMakeLists.txt`: flip `ENABLE_RUST_DEMO` default to `Off`. The
+    smoke crate stays in tree; opt in per build. `compile-on-windows.sh`
+    still passes `-DENABLE_RUST_DEMO=Off` explicitly during the
+    migration (will flip to `=On` at Phase 7 to validate Rust on
+    Windows end-to-end).
+  - Linux/macOS CI keeps Rust unconditionally available via OTEL /
+    NetFlow plugins when those are opted in; the smoke crate's
+    incremental value is the Windows path only.
+
 ## Validation
 
 Acceptance criteria evidence:

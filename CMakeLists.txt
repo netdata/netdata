@@ -243,14 +243,13 @@ cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's jour
 
 # Build a tiny Rust staticlib and link it into the main `netdata` binary so
 # that hosts actually exercise the Rust toolchain. The crate is self-contained
-# and has no runtime dependencies; turn it off with -DENABLE_RUST_DEMO=OFF when
-# bisecting.
+# and has no runtime dependencies.
 #
-# The Windows build (packaging/windows/compile-on-windows.sh) currently passes
-# -DENABLE_RUST_DEMO=Off while the UCRT64 migration is in flight. Once that
-# migration lands, the override should be removed and this default will exercise
-# Rust on Windows.
-option(ENABLE_RUST_DEMO "Build the rust-demo smoke crate and link it into netdata" True)
+# Default is OFF so source-tarball builds and CI environments that do not
+# pre-install a Rust toolchain are not silently forced to. Opt in with
+# -DENABLE_RUST_DEMO=On per build. The Windows build flips this to On at the
+# end of SOW-0033 (Phase 7) to validate Rust-on-Windows end-to-end.
+option(ENABLE_RUST_DEMO "Build the rust-demo smoke crate and link it into netdata" False)
 
 # Setup Rust/Corrosion for plugins that need it
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW OR ENABLE_RUST_DEMO)

@@ -50,5 +50,7 @@ pacman -S --noconfirm --needed \
     ucrt64/mingw-w64-ucrt-x86_64-openssl \
     ucrt64/mingw-w64-ucrt-x86_64-pcre2 \
     ucrt64/mingw-w64-ucrt-x86_64-protobuf \
-    ucrt64/mingw-w64-ucrt-x86_64-zlib
+    ucrt64/mingw-w64-ucrt-x86_64-zlib \
+    ucrt64/mingw-w64-ucrt-x86_64-cmake \
+    ucrt64/mingw-w64-ucrt-x86_64-ninja
 ${GITHUB_ACTIONS+echo "::endgroup::"}

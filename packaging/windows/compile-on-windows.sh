@@ -68,8 +68,11 @@ else
 fi
 
 ${GITHUB_ACTIONS+echo "::group::Configuring"}
+# Use the UCRT64 cmake (resolved via PATH under MSYSTEM=UCRT64); the MSYS
+# cmake at /usr/bin/cmake reports CMAKE_SYSTEM_NAME=MSYS and is not what
+# we want.
 # shellcheck disable=SC2086
-CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
+CFLAGS="${BUILD_CFLAGS}" cmake \
     -S "${REPO_ROOT}" \
     -B "${build}" \
     -G "${generator}" \
