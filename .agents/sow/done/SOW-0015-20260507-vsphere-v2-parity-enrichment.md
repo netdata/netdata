@@ -2,12 +2,12 @@
 
 ## Status
 
-Status: in-progress
+Status: completed
 
 Sub-state: Implementation is complete for the approved PR scope. The SOW has
-been collapsed to the final shipped state by user decision. Final lifecycle
-close still requires marking this SOW completed and moving it to
-`.agents/sow/done/` with the closing commit.
+been collapsed to the final shipped state by user decision. Final validation
+passed on 2026-05-23, and this SOW is being moved to `.agents/sow/done/` with
+the closeout commit.
 
 ## Requirements
 
@@ -497,9 +497,8 @@ Artifact maintenance gate:
   surface.
 - End-user/operator skills: no public operator skill changed because this PR
   changes collector behavior/docs, not AI skill workflows.
-- SOW lifecycle: SOW remains in `.agents/sow/current/` while final review fixes
-  are active. Successful close requires `Status: completed` and moving this file
-  to `.agents/sow/done/` with the closing commit.
+- SOW lifecycle: this closeout marks SOW-0015 `completed` and moves it to
+  `.agents/sow/done/` with the closing commit.
 
 Specs update:
 
