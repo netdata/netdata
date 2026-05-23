@@ -12,7 +12,13 @@ include_guard()
 macro(_nd_windows_config)
   set(OS_WINDOWS True)
 
-  if(NOT "${CMAKE_INSTALL_PREFIX}" STREQUAL "/opt/netdata")
+  # On Linux and the MSYS-runtime cmake, the prefix stays verbatim as
+  # /opt/netdata. The UCRT64 cmake is a native Windows binary and
+  # canonicalises /opt/netdata to its MSYS2-mounted form (typically
+  # C:/msys64/opt/netdata). Both refer to the same on-disk location, so
+  # accept either: the exact string, or anything ending in /opt/netdata.
+  if(NOT "${CMAKE_INSTALL_PREFIX}" STREQUAL "/opt/netdata" AND
+     NOT "${CMAKE_INSTALL_PREFIX}" MATCHES "/opt/netdata$")
     message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
   endif()
 

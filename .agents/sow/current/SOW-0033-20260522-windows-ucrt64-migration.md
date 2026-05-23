@@ -530,6 +530,35 @@ CI run.
     NetFlow plugins when those are opted in; the smoke crate's
     incremental value is the Windows path only.
 
+- Second Windows CI run (after the Phase 2 follow-up commit
+  `bffb496eec`) confirmed that the UCRT64 cmake change worked:
+  `CMAKE_SYSTEM_NAME=Windows` now, `_nd_windows_config()` is reached.
+  All Linux source-tarball builds, LibreSSL, and Clang Checks now
+  pass — the `ENABLE_RUST_DEMO=Off` default fix worked.
+- One step deeper, a new Windows-only failure surfaced at
+  `NetdataPlatform.cmake:16`:
+  ```
+  CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to
+  C:/msys64/opt/netdata
+  ```
+  Root cause: the UCRT64 cmake is a native Windows binary; when it
+  sees `/opt/netdata` on the command line it canonicalises to the
+  MSYS2-mounted form `C:/msys64/opt/netdata`. The old `STREQUAL`
+  check was written for the MSYS-cmake which keeps the path verbatim.
+  Both forms refer to the same physical install location.
+- Fix in this commit: relax the check to accept either the exact
+  `/opt/netdata` (Linux + MSYS-cmake) or anything matching
+  `/opt/netdata$` (UCRT64-cmake canonical form).
+- Other CI failures observed in run #2 are pre-existing CI flakes
+  unrelated to this PR:
+  - `Packages (i386 debian:bullseye)`, `Go build tests (linux/386)`:
+    submodule clone auth failures (`could not read Username`).
+  - `Packages (amazonlinux:2023, debian:trixie)`: curl exit 28
+    (timeout).
+  - `Build Docker Images (amd64)`: `buildx failed`.
+  - `Codacy Static Code Analysis`: external service.
+  None of these are caused by SOW-0033 changes.
+
 ## Validation
 
 Acceptance criteria evidence:
