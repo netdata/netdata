@@ -169,7 +169,7 @@ void ml_host_stop(RRDHOST *rh) {
     rrdset_foreach_read(rsp, host->rh) {
         RRDSET *rs = static_cast<RRDSET *>(rsp);
 
-        ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
+        ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rs->ml_chart, __ATOMIC_ACQUIRE);
         if (!chart)
             continue;
 
@@ -308,7 +308,14 @@ void ml_chart_new(RRDSET *rs)
     chart->rs = rs;
     chart->mls = ml_machine_learning_stats_t();
 
-    rs->ml_chart = (rrd_ml_chart_t *) chart;
+    // Publish with release semantics so readers that load rs->ml_chart with
+    // acquire semantics observe the chart's `rs` and `mls` fields as fully
+    // initialized. Without this, the C++ compiler may reorder the plain
+    // `chart->rs = rs` store after the publish store of rs->ml_chart, and a
+    // concurrent reader would see chart != NULL with chart->rs still NULL
+    // (from value-init in `new ml_chart_t()`), producing the SIGSEGV /
+    // MAPERR / 0x80 fault inside ml_chart_is_available_for_ml.
+    __atomic_store_n(&rs->ml_chart, (rrd_ml_chart_t *)chart, __ATOMIC_RELEASE);
 }
 
 void ml_chart_delete(RRDSET *rs)
@@ -317,15 +324,18 @@ void ml_chart_delete(RRDSET *rs)
     if (!host)
         return;
 
-    ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
+    ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rs->ml_chart, __ATOMIC_ACQUIRE);
 
+    // Unpublish BEFORE freeing so a concurrent reader that loads rs->ml_chart
+    // observes either the live chart (with chart->rs set) or NULL -- never
+    // the freed chart memory.
+    __atomic_store_n(&rs->ml_chart, (rrd_ml_chart_t *)NULL, __ATOMIC_RELEASE);
     delete chart;
-    rs->ml_chart = NULL;
 }
 
 ALWAYS_INLINE_ONLY bool ml_chart_update_begin(RRDSET *rs)
 {
-    ml_chart_t *chart = (ml_chart_t *)rs->ml_chart;
+    ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rs->ml_chart, __ATOMIC_ACQUIRE);
     if (!chart)
         return false;
 
@@ -335,14 +345,14 @@ ALWAYS_INLINE_ONLY bool ml_chart_update_begin(RRDSET *rs)
 
 void ml_chart_update_end(RRDSET *rs)
 {
-    ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
+    ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rs->ml_chart, __ATOMIC_ACQUIRE);
     if (!chart)
         return;
 }
 
 void ml_dimension_new(RRDDIM *rd)
 {
-    ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
+    ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rd->rrdset->ml_chart, __ATOMIC_ACQUIRE);
     if (!chart)
         return;
 
@@ -425,7 +435,9 @@ ALWAYS_INLINE_ONLY void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomal
     if (!host->ml_running)
         return;
 
-    ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
+    ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rd->rrdset->ml_chart, __ATOMIC_ACQUIRE);
+    if (!chart)
+        return;
 
     ml_chart_update_dimension(chart, dim, is_anomalous);
 }
@@ -442,7 +454,9 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
     if (!host->ml_running)
         return false;
 
-    ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
+    ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rd->rrdset->ml_chart, __ATOMIC_ACQUIRE);
+    if (!chart)
+        return false;
 
     bool is_anomalous = ml_dimension_predict(dim, value, exists);
     ml_chart_update_dimension(chart, dim, is_anomalous);

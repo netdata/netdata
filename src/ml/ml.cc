@@ -1080,7 +1080,7 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         rrdset_foreach_read(rsp, host->rh) {
             RRDSET *rs = static_cast<RRDSET *>(rsp);
 
-            ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
+            ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rs->ml_chart, __ATOMIC_ACQUIRE);
             if (!chart)
                 continue;
 
