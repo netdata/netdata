@@ -4,8 +4,25 @@
 // storage adapter for selectors and combining results with the operator
 // and aggregation layers.
 
+//! PromQL expression evaluator.
+//!
+//! The evaluator walks a [`Plan`](crate::plan::Plan) IR tree against an
+//! [`EvalContext`], dispatching each node type to a dedicated submodule:
+//!
+//! - [`select`] — vector and matrix selector evaluation
+//! - [`binop`] — binary operators (arithmetic, comparison, set)
+//! - [`unary`] — unary negation
+//! - [`aggregation`] — aggregation operators (sum, avg, topk, etc.)
+//! - [`functions`] — built-in functions (rate, histogram_quantile, etc.)
+//! - [`labelops`] — label_replace / label_join
+//! - [`absent`] — absent / absent_over_time
+//! - [`subquery`] — subquery evaluation
+//! - [`fused`] — fused aggregation + rollup streaming path
+//!
+//! Results are column-oriented [`Series`] values grouped in an [`EvalResult`].
+
 #![allow(dead_code)] // EvalError::Other and a couple of builder helpers
-                    // are reserved for chunks 4/5.
+// are reserved for chunks 4/5.
 
 mod absent;
 mod aggregation;
@@ -25,4 +42,4 @@ pub use context::EvalContext;
 pub use dispatch::eval;
 pub use grid::Grid;
 #[allow(unused_imports)]
-pub use types::{labels_signature, EvalError, EvalResult, Sample, Series};
+pub use types::{EvalError, EvalResult, Sample, Series, labels_signature};

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Label manipulation functions. SOW-0027 Group F.
+// Label manipulation functions.
 //
 // `label_replace(v, dst, replacement, src, regex)` matches the regex
 // against the value of `src` on each input series; on match, the
@@ -16,7 +16,7 @@
 use crate::plan::LabelOpKind;
 use crate::storage::compile_regex;
 
-use super::types::{labels_signature, EvalError, EvalResult, Series};
+use super::types::{EvalError, EvalResult, Series, labels_signature};
 
 pub fn apply_label_op(op: &LabelOpKind, inner: EvalResult) -> Result<EvalResult, EvalError> {
     let series = match inner {
@@ -26,7 +26,7 @@ pub fn apply_label_op(op: &LabelOpKind, inner: EvalResult) -> Result<EvalResult,
                 context: "label op",
                 expected: crate::plan::ValueType::InstantVector,
                 got: other.value_type(),
-            })
+            });
         }
     };
     let out = match op {
@@ -78,10 +78,7 @@ fn apply_replace(
             None => s.labels,
             Some(v) if v.is_empty() => {
                 // Empty replacement removes the destination label.
-                s.labels
-                    .into_iter()
-                    .filter(|(n, _)| n != dst)
-                    .collect()
+                s.labels.into_iter().filter(|(n, _)| n != dst).collect()
             }
             Some(v) => set_label(s.labels, dst, &v),
         };
@@ -106,10 +103,7 @@ fn apply_join(series: Vec<Series>, dst: &str, sep: &str, srcs: &[String]) -> Vec
         }
         let joined = parts.join(sep);
         let new_labels = if joined.is_empty() {
-            s.labels
-                .into_iter()
-                .filter(|(n, _)| n != dst)
-                .collect()
+            s.labels.into_iter().filter(|(n, _)| n != dst).collect()
         } else {
             set_label(s.labels, dst, &joined)
         };
@@ -121,10 +115,7 @@ fn apply_join(series: Vec<Series>, dst: &str, sep: &str, srcs: &[String]) -> Vec
 
 /// Insert or replace a label, keeping the sorted-by-name invariant.
 fn set_label(labels: Vec<(String, String)>, name: &str, value: &str) -> Vec<(String, String)> {
-    let mut out: Vec<(String, String)> = labels
-        .into_iter()
-        .filter(|(n, _)| n != name)
-        .collect();
+    let mut out: Vec<(String, String)> = labels.into_iter().filter(|(n, _)| n != name).collect();
     let pos = out
         .binary_search_by(|(n, _)| n.as_str().cmp(name))
         .unwrap_or_else(|p| p);
@@ -141,8 +132,9 @@ fn expand_replacement(re: &regex::Regex, input: &str, template: &str) -> String 
         None => return template.to_string(),
     };
     let mut out = String::with_capacity(template.len());
-    re_replace_walk(template, |key, sink| {
-        match key {
+    re_replace_walk(
+        template,
+        |key, sink| match key {
             CapRef::Index(n) => {
                 if let Some(m) = caps.get(n) {
                     sink.push_str(m.as_str());
@@ -153,8 +145,9 @@ fn expand_replacement(re: &regex::Regex, input: &str, template: &str) -> String 
                     sink.push_str(m.as_str());
                 }
             }
-        }
-    }, &mut out);
+        },
+        &mut out,
+    );
     out
 }
 
@@ -166,7 +159,11 @@ enum CapRef<'a> {
 
 /// Walk `template`, copying plain chars verbatim and invoking `on_ref`
 /// for each `$N` / `${name}` reference. `$$` is an escaped dollar.
-fn re_replace_walk(template: &str, mut on_ref: impl FnMut(CapRef<'_>, &mut String), out: &mut String) {
+fn re_replace_walk(
+    template: &str,
+    mut on_ref: impl FnMut(CapRef<'_>, &mut String),
+    out: &mut String,
+) {
     let bytes = template.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
@@ -223,14 +220,7 @@ mod tests {
     #[test]
     fn replace_writes_capture_into_dst() {
         let s = ser(&[("__name__", "x"), ("src", "abc123")]);
-        let out = apply_replace(
-            vec![s],
-            "dst",
-            "$1",
-            "src",
-            "abc(\\d+)",
-        )
-        .unwrap();
+        let out = apply_replace(vec![s], "dst", "$1", "src", "abc(\\d+)").unwrap();
         assert_eq!(out.len(), 1);
         let v = out[0]
             .labels
@@ -244,14 +234,7 @@ mod tests {
     #[test]
     fn replace_leaves_series_when_no_match() {
         let s = ser(&[("__name__", "x"), ("src", "no-digits")]);
-        let out = apply_replace(
-            vec![s.clone()],
-            "dst",
-            "$1",
-            "src",
-            "abc(\\d+)",
-        )
-        .unwrap();
+        let out = apply_replace(vec![s.clone()], "dst", "$1", "src", "abc(\\d+)").unwrap();
         assert_eq!(out[0].labels.len(), s.labels.len());
         assert!(out[0].labels.iter().all(|(n, _)| n != "dst"));
     }
@@ -259,7 +242,12 @@ mod tests {
     #[test]
     fn join_concatenates_with_separator() {
         let s = ser(&[("a", "x"), ("b", "y"), ("c", "z")]);
-        let out = apply_join(vec![s], "joined", "-", &["a".to_string(), "b".to_string(), "c".to_string()]);
+        let out = apply_join(
+            vec![s],
+            "joined",
+            "-",
+            &["a".to_string(), "b".to_string(), "c".to_string()],
+        );
         let v = out[0]
             .labels
             .iter()
@@ -272,7 +260,12 @@ mod tests {
     #[test]
     fn join_missing_label_becomes_empty_part() {
         let s = ser(&[("a", "x"), ("c", "z")]);
-        let out = apply_join(vec![s], "joined", "-", &["a".to_string(), "b".to_string(), "c".to_string()]);
+        let out = apply_join(
+            vec![s],
+            "joined",
+            "-",
+            &["a".to_string(), "b".to_string(), "c".to_string()],
+        );
         let v = out[0]
             .labels
             .iter()

@@ -11,6 +11,10 @@
 
 /**
  * Opaque handle for a query response.
+ *
+ * Created by [`nd_promql_query_instant`] or [`nd_promql_query_range`].
+ * Callers read the body and HTTP status through the accessor functions,
+ * then release the handle with [`nd_promql_response_free`].
  */
 typedef struct NdPromqlResponse NdPromqlResponse;
 

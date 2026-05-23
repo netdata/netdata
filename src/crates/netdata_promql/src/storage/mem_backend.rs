@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// In-memory storage backend. SOW-0030.
+// In-memory storage backend.
 //
-// Used by the compliance-corpus runner and by future unit tests that
-// need synthetic series. Not wired into the daemon; lives in the crate
-// so the evaluator can be exercised without the C shim.
+// Used by the compliance-corpus runner and by unit tests that need
+// synthetic series. Not wired into the daemon; lives in the crate so
+// the evaluator can be exercised without the C shim.
 
 use std::sync::RwLock;
 
@@ -18,7 +18,7 @@ use crate::eval::labels_signature;
 /// Samples are stored as parallel `(timestamps_ms, values)` columns,
 /// matching the shape `drain_samples` produces and `eval` consumes.
 /// Values may be NaN to represent "missing"; promqltest's `_` token
-/// loads as NaN. SOW-0040.
+/// loads as NaN.
 #[derive(Clone, Debug)]
 pub struct MemSeries {
     /// Labels in sorted-by-name order. The first entry is normally
@@ -172,8 +172,12 @@ impl BackendQuery for MemQuery {
     ) {
         out_ts.clear();
         out_vals.clear();
-        let Some(&idx) = self.indices.get(i) else { return };
-        let Some(s) = self.series.get(idx) else { return };
+        let Some(&idx) = self.indices.get(i) else {
+            return;
+        };
+        let Some(s) = self.series.get(idx) else {
+            return;
+        };
         // Mirror the FFI backend's second-resolution boundaries.
         let lo_ms = after_s.saturating_mul(1000);
         let hi_ms = before_s.saturating_mul(1000);
@@ -226,10 +230,7 @@ mod tests {
         let q = b
             .resolve(
                 None,
-                &[
-                    Matcher::eq("__name__", "m"),
-                    Matcher::eq("job", "api"),
-                ],
+                &[Matcher::eq("__name__", "m"), Matcher::eq("job", "api")],
                 0,
                 10,
                 100,
@@ -239,10 +240,7 @@ mod tests {
             .unwrap();
         assert_eq!(q.len(), 1);
         let meta = q.series_meta(0).unwrap();
-        assert!(meta
-            .labels
-            .iter()
-            .any(|(n, v)| n == "job" && v == "api"));
+        assert!(meta.labels.iter().any(|(n, v)| n == "job" && v == "api"));
     }
 
     #[test]

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// `absent` and `absent_over_time`. SOW-0027 Group G, rewritten for
-// SOW-0031.
+// `absent` and `absent_over_time`.
 //
 // Both functions return a 1-valued series at every grid point where the
 // inner expression yielded no data, with labels carried from the
@@ -50,7 +49,7 @@ pub fn eval_absent(
         }
         EvalResult::RangeVector(series) => {
             // For absent_over_time: the inner range vector spans the
-            // matrix window for each grid point. SOW-0031 selectors
+            // matrix window for each grid point. Grid-aware selectors
             // emit samples across the whole [grid.start - range, grid.end]
             // window without per-grid-point segmentation, so to decide
             // presence at grid point `t` we'd need range_ms here. The
@@ -111,12 +110,8 @@ mod tests {
             ("__name__".to_string(), "metric".to_string()),
             ("job".to_string(), "api".to_string()),
         ];
-        let result = eval_absent(
-            &ctx(1000),
-            &labels,
-            EvalResult::InstantVector(Vec::new()),
-        )
-        .unwrap();
+        let result =
+            eval_absent(&ctx(1000), &labels, EvalResult::InstantVector(Vec::new())).unwrap();
         match result {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
@@ -140,12 +135,7 @@ mod tests {
 
     #[test]
     fn empty_range_emits_one_series() {
-        let result = eval_absent(
-            &ctx(2000),
-            &[],
-            EvalResult::RangeVector(Vec::new()),
-        )
-        .unwrap();
+        let result = eval_absent(&ctx(2000), &[], EvalResult::RangeVector(Vec::new())).unwrap();
         match result {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Slow-query log. SOW-0028.
+// Slow-query log.
 //
 // One JSONL line per PromQL query the FFI sees. Configured entirely
 // through environment variables; unset `NETDATA_PROMQL_LOG` disables
@@ -358,7 +358,10 @@ mod tests {
         let i = line.find(key).expect("query key present");
         let after = &line[i + key.len()..];
         let end = after.find('"').expect("query value closed");
-        assert_eq!(end, 100, "expected exactly 100 chars of query value, got {end}");
+        assert_eq!(
+            end, 100,
+            "expected exactly 100 chars of query value, got {end}"
+        );
     }
 
     #[test]

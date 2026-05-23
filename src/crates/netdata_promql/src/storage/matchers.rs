@@ -167,14 +167,26 @@ impl MatchersFfi {
 
         for m in matchers {
             let (name, op, value) = match m {
-                Matcher::Eq { name, value } => (name.as_str(), raw::nd_pds_match_op::ND_PDS_EQ, value.as_str()),
-                Matcher::Ne { name, value } => (name.as_str(), raw::nd_pds_match_op::ND_PDS_NE, value.as_str()),
-                Matcher::Re { name, pattern, .. } => {
-                    (name.as_str(), raw::nd_pds_match_op::ND_PDS_RE, pattern.as_str())
-                }
-                Matcher::Nre { name, pattern, .. } => {
-                    (name.as_str(), raw::nd_pds_match_op::ND_PDS_NRE, pattern.as_str())
-                }
+                Matcher::Eq { name, value } => (
+                    name.as_str(),
+                    raw::nd_pds_match_op::ND_PDS_EQ,
+                    value.as_str(),
+                ),
+                Matcher::Ne { name, value } => (
+                    name.as_str(),
+                    raw::nd_pds_match_op::ND_PDS_NE,
+                    value.as_str(),
+                ),
+                Matcher::Re { name, pattern, .. } => (
+                    name.as_str(),
+                    raw::nd_pds_match_op::ND_PDS_RE,
+                    pattern.as_str(),
+                ),
+                Matcher::Nre { name, pattern, .. } => (
+                    name.as_str(),
+                    raw::nd_pds_match_op::ND_PDS_NRE,
+                    pattern.as_str(),
+                ),
             };
 
             let name_c = CString::new(name).map_err(|_| MatcherError::NulInLabel)?;

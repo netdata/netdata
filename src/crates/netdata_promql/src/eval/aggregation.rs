@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Aggregations: sum, avg, min, max, count, topk, bottomk, quantile,
-// count_values, with optional by/without grouping. SOW-0031 made them
-// grid-aware (iterate positions). SOW-0032 made them column-oriented:
-// input series carry `values: Vec<f64>` indexed by grid position, and
-// output series share the same `Arc<Vec<i64>>` timestamps as the input.
+// count_values, stddev, stdvar, group, limitk, limit_ratio, with
+// optional by/without grouping.
+//
+// All aggregations are grid-aware and column-oriented: input series
+// carry `values: Vec<f64>` indexed by grid position, and output series
+// share the same `Arc<Vec<i64>>` timestamps as the input.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::plan::{AggrKind, Grouping, ValueType};
 
-use super::types::{labels_signature, EvalError, EvalResult, Series};
+use super::types::{EvalError, EvalResult, Series, labels_signature};
 
 /// Apply an aggregation operator to an instant vector.
 ///
@@ -33,7 +35,7 @@ pub fn apply_aggregate(
                 context: "aggregation operand",
                 expected: ValueType::InstantVector,
                 got: other.value_type(),
-            })
+            });
         }
     };
 
@@ -124,9 +126,8 @@ fn apply_collapsing(
 
 /// topk(k, expr) / bottomk(k, expr): at each grid position, bucket by
 /// grouping, sort by value, keep top or bottom k. Output preserves
-/// **all** original input labels including `__name__` (SOW-0035 --
-/// distinct from the general aggregation convention which strips
-/// `__name__`). A series that ranked at some positions but not others
+/// **all** original input labels including `__name__` (distinct from the
+/// general aggregation convention which strips `__name__`). A series that ranked at some positions but not others
 /// gets NaN at the missing positions; the per-position drop-NaN rule
 /// does not collapse the series across positions.
 fn apply_topk_bottomk(
@@ -161,8 +162,10 @@ fn apply_topk_bottomk(
     // accum: input-series signature -> (labels, values), one f64 per
     // grid position. Output series get NaN at positions where the
     // input series did not rank in the top/bottom-k for its bucket.
-    // SOW-0035: use the input series' own signature/labels so that
-    // `__name__` is preserved on the output (Prometheus semantics).
+    // Output series get NaN at positions where the input series did not
+    // rank in the top/bottom-k for its bucket. Use the input series'
+    // own signature/labels so that `__name__` is preserved on the output
+    // (Prometheus semantics).
     let mut accum: BTreeMap<u64, (Vec<(String, String)>, Vec<f64>)> = BTreeMap::new();
 
     for i in 0..n {
@@ -308,9 +311,7 @@ fn apply_count_values(
             output_labels.push((label.to_string(), value_str));
             output_labels.sort_by(|a, b| a.0.cmp(&b.0));
             let sig = labels_signature(&output_labels);
-            let entry = per_bucket
-                .entry(sig)
-                .or_insert_with(|| (output_labels, 0));
+            let entry = per_bucket.entry(sig).or_insert_with(|| (output_labels, 0));
             entry.1 += 1;
         }
         // Track which buckets contributed this position so we can pad
@@ -355,16 +356,13 @@ fn apply_count_values(
     Ok(EvalResult::InstantVector(out))
 }
 
-/// `group(v)` (SOW-0034). Per bucket per grid position, emit 1.0 if
+/// `group(v)`. Per bucket per grid position, emit 1.0 if
 /// any input series had a non-NaN value at that position; NaN
 /// otherwise. Output labels follow the grouping projection (same as
 /// sum/avg). Used in production as a join-key fabricator: takes a
 /// labeled input and emits a singleton-per-group series of 1s that
 /// can be joined against other vectors via vector matching.
-fn apply_group(
-    grouping: Option<&Grouping>,
-    series: Vec<Series>,
-) -> Result<EvalResult, EvalError> {
+fn apply_group(grouping: Option<&Grouping>, series: Vec<Series>) -> Result<EvalResult, EvalError> {
     if series.is_empty() {
         return Ok(EvalResult::InstantVector(Vec::new()));
     }
@@ -410,7 +408,7 @@ fn apply_group(
     Ok(EvalResult::InstantVector(out))
 }
 
-/// `limitk(k, v)` (SOW-0034). Per bucket per grid position, pick the
+/// `limitk(k, v)`. Per bucket per grid position, pick the
 /// first `k` input series in signature order (stable, deterministic,
 /// independent of value). Output series carry the original input
 /// labels minus `__name__` -- same convention as `topk`/`bottomk`.
@@ -481,7 +479,7 @@ fn apply_limitk(
     Ok(EvalResult::InstantVector(out))
 }
 
-/// `limit_ratio(ratio, v)` (SOW-0034). Per bucket, select a
+/// `limit_ratio(ratio, v)`. Per bucket, select a
 /// deterministic-random subset of input series whose
 /// `hash01(signature)` falls below `ratio` (positive) or above
 /// `1 + ratio` (negative). `ratio` outside `[-1, 1]` clamps to all-
@@ -570,7 +568,11 @@ fn format_value_for_label(v: f64) -> String {
         return "NaN".to_string();
     }
     if v.is_infinite() {
-        return if v > 0.0 { "+Inf".to_string() } else { "-Inf".to_string() };
+        return if v > 0.0 {
+            "+Inf".to_string()
+        } else {
+            "-Inf".to_string()
+        };
     }
     format!("{v}")
 }
@@ -662,20 +664,12 @@ impl Bucket {
                 // `stdvar_over_time` rollup.
                 let mean = self.sum / n;
                 let var = self.sum_sq / n - mean * mean;
-                if var < 0.0 {
-                    0.0
-                } else {
-                    var
-                }
+                if var < 0.0 { 0.0 } else { var }
             }
             AggrKind::Stddev => {
                 let mean = self.sum / n;
                 let var = self.sum_sq / n - mean * mean;
-                if var < 0.0 {
-                    0.0
-                } else {
-                    var.sqrt()
-                }
+                if var < 0.0 { 0.0 } else { var.sqrt() }
             }
             AggrKind::TopK
             | AggrKind::BottomK
@@ -684,7 +678,10 @@ impl Bucket {
             | AggrKind::LimitK
             | AggrKind::LimitRatio
             | AggrKind::Group => {
-                unreachable!("parametrized/non-collapsing aggregator in Bucket::finalize_value: {:?}", op)
+                unreachable!(
+                    "parametrized/non-collapsing aggregator in Bucket::finalize_value: {:?}",
+                    op
+                )
             }
         }
     }
@@ -693,11 +690,14 @@ impl Bucket {
 /// Project a series's labels onto (or away from) the grouping
 /// clause's label list. Drops `__name__` *unless the user explicitly
 /// names it* in `by (__name__, ...)`; for `without (...)`, drops
-/// `__name__` only when it appears in the `without` list. SOW-0037
-/// brought this in line with Prometheus -- aggregation output
-/// normally has no metric name, but `by (__name__, ...)` is a
+/// `__name__` only when it appears in the `without` list. This matches
+/// Prometheus semantics — aggregation output normally has no metric
+/// name, but `by (__name__, ...)` is a valid opt-in.
 /// deliberate request to keep it.
-fn project_labels(labels: &[(String, String)], grouping: Option<&Grouping>) -> Vec<(String, String)> {
+fn project_labels(
+    labels: &[(String, String)],
+    grouping: Option<&Grouping>,
+) -> Vec<(String, String)> {
     let kept: Vec<(String, String)> = match grouping {
         None => Vec::new(),
         Some(Grouping::By(names)) => {
@@ -824,8 +824,11 @@ mod tests {
         let avg = apply_aggregate(AggrKind::Avg, None, None, None, input.clone()).unwrap();
         let min = apply_aggregate(AggrKind::Min, None, None, None, input.clone()).unwrap();
         let max = apply_aggregate(AggrKind::Max, None, None, None, input).unwrap();
-        if let (EvalResult::InstantVector(a), EvalResult::InstantVector(b), EvalResult::InstantVector(c)) =
-            (avg, min, max)
+        if let (
+            EvalResult::InstantVector(a),
+            EvalResult::InstantVector(b),
+            EvalResult::InstantVector(c),
+        ) = (avg, min, max)
         {
             assert!((a[0].values[0] - 3.0).abs() < 1e-9);
             assert!((b[0].values[0] - 1.0).abs() < 1e-9);
@@ -850,9 +853,9 @@ mod tests {
 
     #[test]
     fn topk_returns_top_k_preserving_name() {
-        // SOW-0035: topk/bottomk preserve `__name__` (and every other
-        // input label) on output, unlike sum/avg which collapse to
-        // the grouping projection.
+        // topk/bottomk preserve `__name__` (and every other input label)
+        // on output, unlike sum/avg which collapse to the grouping
+        // projection.
         let input = EvalResult::InstantVector(vec![
             s("foo", "a", 1.0),
             s("foo", "b", 4.0),
@@ -880,7 +883,8 @@ mod tests {
             s("foo", "c", 3.0),
             s("foo", "d", 2.0),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::BottomK, None, Some(2.0), None, input).unwrap());
+        let v =
+            unwrap_vec(apply_aggregate(AggrKind::BottomK, None, Some(2.0), None, input).unwrap());
         assert_eq!(v.len(), 2);
         assert_eq!(values_sorted(&v), vec![1.0, 2.0]);
     }
@@ -888,11 +892,17 @@ mod tests {
     #[test]
     fn topk_zero_returns_empty() {
         let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0)]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(0.0), None, input.clone()).unwrap());
+        let v = unwrap_vec(
+            apply_aggregate(AggrKind::TopK, None, Some(0.0), None, input.clone()).unwrap(),
+        );
         assert!(v.is_empty());
-        let v = unwrap_vec(apply_aggregate(AggrKind::TopK, None, Some(-1.0), None, input.clone()).unwrap());
+        let v = unwrap_vec(
+            apply_aggregate(AggrKind::TopK, None, Some(-1.0), None, input.clone()).unwrap(),
+        );
         assert!(v.is_empty());
-        let v = unwrap_vec(apply_aggregate(AggrKind::BottomK, None, Some(f64::NAN), None, input).unwrap());
+        let v = unwrap_vec(
+            apply_aggregate(AggrKind::BottomK, None, Some(f64::NAN), None, input).unwrap(),
+        );
         assert!(v.is_empty());
     }
 
@@ -939,7 +949,8 @@ mod tests {
             s("foo", "d", 4.0),
             s("foo", "e", 5.0),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.5), None, input).unwrap());
+        let v =
+            unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.5), None, input).unwrap());
         assert_eq!(v.len(), 1);
         assert!((v[0].values[0] - 3.0).abs() < 1e-9);
     }
@@ -951,9 +962,12 @@ mod tests {
             s("foo", "b", 7.0),
             s("foo", "c", 3.0),
         ]);
-        let v0 = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.0), None, input.clone()).unwrap());
+        let v0 = unwrap_vec(
+            apply_aggregate(AggrKind::Quantile, None, Some(0.0), None, input.clone()).unwrap(),
+        );
         assert_eq!(v0[0].values[0], 1.0);
-        let v1 = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(1.0), None, input).unwrap());
+        let v1 =
+            unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(1.0), None, input).unwrap());
         assert_eq!(v1[0].values[0], 7.0);
     }
 
@@ -966,16 +980,24 @@ mod tests {
             s("foo", "d", 4.0),
             s("foo", "e", 5.0),
         ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.95), None, input).unwrap());
-        assert!((v[0].values[0] - 4.8).abs() < 1e-9, "got {}", v[0].values[0]);
+        let v =
+            unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.95), None, input).unwrap());
+        assert!(
+            (v[0].values[0] - 4.8).abs() < 1e-9,
+            "got {}",
+            v[0].values[0]
+        );
     }
 
     #[test]
     fn quantile_out_of_range_clamps_to_infinity() {
         let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0), s("foo", "b", 2.0)]);
-        let v_neg = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(-0.5), None, input.clone()).unwrap());
+        let v_neg = unwrap_vec(
+            apply_aggregate(AggrKind::Quantile, None, Some(-0.5), None, input.clone()).unwrap(),
+        );
         assert_eq!(v_neg[0].values[0], f64::NEG_INFINITY);
-        let v_high = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(2.0), None, input).unwrap());
+        let v_high =
+            unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(2.0), None, input).unwrap());
         assert_eq!(v_high[0].values[0], f64::INFINITY);
     }
 
@@ -1004,11 +1026,10 @@ mod tests {
 
     #[test]
     fn quantile_empty_bucket_drops() {
-        let input = EvalResult::InstantVector(vec![
-            s("foo", "a", f64::NAN),
-            s("foo", "b", f64::NAN),
-        ]);
-        let v = unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.5), None, input).unwrap());
+        let input =
+            EvalResult::InstantVector(vec![s("foo", "a", f64::NAN), s("foo", "b", f64::NAN)]);
+        let v =
+            unwrap_vec(apply_aggregate(AggrKind::Quantile, None, Some(0.5), None, input).unwrap());
         assert!(v.is_empty());
     }
 
@@ -1031,14 +1052,7 @@ mod tests {
             s("foo", "c", 1.0),
         ]);
         let v = unwrap_vec(
-            apply_aggregate(
-                AggrKind::CountValues,
-                None,
-                None,
-                Some("v"),
-                input,
-            )
-            .unwrap(),
+            apply_aggregate(AggrKind::CountValues, None, None, Some("v"), input).unwrap(),
         );
         assert_eq!(v.len(), 2);
         let pairs: Vec<(String, f64)> = v
@@ -1068,14 +1082,7 @@ mod tests {
             s("foo", "c", 5.0),
         ]);
         let v = unwrap_vec(
-            apply_aggregate(
-                AggrKind::CountValues,
-                None,
-                None,
-                Some("v"),
-                input,
-            )
-            .unwrap(),
+            apply_aggregate(AggrKind::CountValues, None, None, Some("v"), input).unwrap(),
         );
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].values[0], 3.0);
@@ -1110,14 +1117,7 @@ mod tests {
             s("foo", "c", 1.0),
         ]);
         let v = unwrap_vec(
-            apply_aggregate(
-                AggrKind::CountValues,
-                None,
-                None,
-                Some("v"),
-                input,
-            )
-            .unwrap(),
+            apply_aggregate(AggrKind::CountValues, None, None, Some("v"), input).unwrap(),
         );
         assert_eq!(v.len(), 2);
         let nan_count = v
@@ -1129,7 +1129,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // SOW-0034: stddev / stdvar / limitk / limit_ratio / group
+    // stddev / stdvar / limitk / limit_ratio / group
     // -----------------------------------------------------------------
 
     #[test]
@@ -1145,7 +1145,11 @@ mod tests {
         ]);
         let v = unwrap_vec(apply_aggregate(AggrKind::Stddev, None, None, None, input).unwrap());
         assert_eq!(v.len(), 1);
-        assert!((v[0].values[0] - (2.0_f64).sqrt()).abs() < 1e-9, "got {}", v[0].values[0]);
+        assert!(
+            (v[0].values[0] - (2.0_f64).sqrt()).abs() < 1e-9,
+            "got {}",
+            v[0].values[0]
+        );
         assert!(v[0].labels.is_empty());
     }
 
@@ -1163,7 +1167,11 @@ mod tests {
         let expected = (16.0 / 3.0) / 1.0 - 9.0; // sum_sq/n - mean^2 = 35/3 - 9 = 8/3
         // sum_sq = 1 + 9 + 25 = 35; mean = 9/3 = 3; var = 35/3 - 9 = 8/3 ≈ 2.6667.
         let _ = expected;
-        assert!((v[0].values[0] - 8.0 / 3.0).abs() < 1e-9, "got {}", v[0].values[0]);
+        assert!(
+            (v[0].values[0] - 8.0 / 3.0).abs() < 1e-9,
+            "got {}",
+            v[0].values[0]
+        );
     }
 
     #[test]
@@ -1232,10 +1240,8 @@ mod tests {
 
     #[test]
     fn group_drops_all_nan_bucket() {
-        let input = EvalResult::InstantVector(vec![
-            s("foo", "a", f64::NAN),
-            s("foo", "b", f64::NAN),
-        ]);
+        let input =
+            EvalResult::InstantVector(vec![s("foo", "a", f64::NAN), s("foo", "b", f64::NAN)]);
         let v = unwrap_vec(apply_aggregate(AggrKind::Group, None, None, None, input).unwrap());
         assert!(v.is_empty());
     }
@@ -1249,9 +1255,8 @@ mod tests {
             s("foo", "c", 3.0),
             s("foo", "d", 4.0),
         ]);
-        let v = unwrap_vec(
-            apply_aggregate(AggrKind::LimitK, None, Some(2.0), None, input).unwrap(),
-        );
+        let v =
+            unwrap_vec(apply_aggregate(AggrKind::LimitK, None, Some(2.0), None, input).unwrap());
         assert_eq!(v.len(), 2);
         // __name__ stripped on output (per topk/bottomk convention).
         for s in &v {
@@ -1267,9 +1272,8 @@ mod tests {
         );
         assert!(v.is_empty());
         // Negative k -> empty too.
-        let v = unwrap_vec(
-            apply_aggregate(AggrKind::LimitK, None, Some(-3.0), None, input).unwrap(),
-        );
+        let v =
+            unwrap_vec(apply_aggregate(AggrKind::LimitK, None, Some(-3.0), None, input).unwrap());
         assert!(v.is_empty());
     }
 
@@ -1311,10 +1315,7 @@ mod tests {
 
     #[test]
     fn limit_ratio_zero_returns_empty() {
-        let input = EvalResult::InstantVector(vec![
-            s("foo", "a", 1.0),
-            s("foo", "b", 2.0),
-        ]);
+        let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0), s("foo", "b", 2.0)]);
         let v = unwrap_vec(
             apply_aggregate(AggrKind::LimitRatio, None, Some(0.0), None, input.clone()).unwrap(),
         );
@@ -1327,7 +1328,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // SOW-0037: explicit `by (__name__, ...)` keeps __name__
+    // explicit `by (__name__, ...)` keeps __name__
     // -----------------------------------------------------------------
 
     #[test]
@@ -1335,10 +1336,7 @@ mod tests {
         // Two series with the same __name__ but different dimensions.
         // `sum by (__name__)` should collapse them into one bucket
         // keyed by __name__, preserving "foo" on the output.
-        let input = EvalResult::InstantVector(vec![
-            s("foo", "a", 1.0),
-            s("foo", "b", 2.0),
-        ]);
+        let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0), s("foo", "b", 2.0)]);
         let v = unwrap_vec(
             apply_aggregate(
                 AggrKind::Sum,
@@ -1376,14 +1374,16 @@ mod tests {
             .unwrap(),
         );
         assert_eq!(v.len(), 1);
-        assert!(v[0]
-            .labels
-            .iter()
-            .any(|(n, v)| n == "__name__" && v == "foo"));
-        assert!(v[0]
-            .labels
-            .iter()
-            .any(|(n, v)| n == "dimension" && v == "a"));
+        assert!(
+            v[0].labels
+                .iter()
+                .any(|(n, v)| n == "__name__" && v == "foo")
+        );
+        assert!(
+            v[0].labels
+                .iter()
+                .any(|(n, v)| n == "dimension" && v == "a")
+        );
     }
 
     #[test]
@@ -1391,10 +1391,7 @@ mod tests {
         // `sum without (dimension)` drops `dimension` and keeps
         // everything else -- including `__name__` (since the user
         // didn't list it in `without`).
-        let input = EvalResult::InstantVector(vec![
-            s("foo", "a", 1.0),
-            s("foo", "b", 2.0),
-        ]);
+        let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0), s("foo", "b", 2.0)]);
         let v = unwrap_vec(
             apply_aggregate(
                 AggrKind::Sum,
@@ -1407,20 +1404,18 @@ mod tests {
         );
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].values[0], 3.0);
-        assert!(v[0]
-            .labels
-            .iter()
-            .any(|(n, v)| n == "__name__" && v == "foo"));
+        assert!(
+            v[0].labels
+                .iter()
+                .any(|(n, v)| n == "__name__" && v == "foo")
+        );
     }
 
     #[test]
     fn sum_without_explicit_name_drops_name() {
         // `sum without (__name__)` drops `__name__` and keeps
         // everything else.
-        let input = EvalResult::InstantVector(vec![
-            s("foo", "a", 1.0),
-            s("foo", "a", 4.0),
-        ]);
+        let input = EvalResult::InstantVector(vec![s("foo", "a", 1.0), s("foo", "a", 4.0)]);
         let v = unwrap_vec(
             apply_aggregate(
                 AggrKind::Sum,
@@ -1434,10 +1429,11 @@ mod tests {
         assert_eq!(v.len(), 1);
         assert!((v[0].values[0] - 5.0).abs() < 1e-9);
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
-        assert!(v[0]
-            .labels
-            .iter()
-            .any(|(n, v)| n == "dimension" && v == "a"));
+        assert!(
+            v[0].labels
+                .iter()
+                .any(|(n, v)| n == "dimension" && v == "a")
+        );
     }
 
     #[test]
@@ -1453,10 +1449,13 @@ mod tests {
             s("foo", "d", 4.0),
             s("foo", "e", 5.0),
         ]);
-        let n_input = if let EvalResult::InstantVector(v) = &input { v.len() } else { 0 };
+        let n_input = if let EvalResult::InstantVector(v) = &input {
+            v.len()
+        } else {
+            0
+        };
         let pos = unwrap_vec(
-            apply_aggregate(AggrKind::LimitRatio, None, Some(0.4), None, input.clone())
-                .unwrap(),
+            apply_aggregate(AggrKind::LimitRatio, None, Some(0.4), None, input.clone()).unwrap(),
         );
         let neg = unwrap_vec(
             apply_aggregate(AggrKind::LimitRatio, None, Some(-0.6), None, input).unwrap(),

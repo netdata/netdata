@@ -2,29 +2,27 @@
 //
 // Evaluator result types.
 //
-// A `Series` is one labeled time series in column-oriented form
-// (SOW-0032): the timestamps live in a shared `Arc<Vec<i64>>` so that
-// every grid-aligned series in a result reuses the same column, and
-// the values live in a tight `Vec<f64>` that auto-vectorises in inner
-// loops. The `samples()` iterator adapter zips them back into the
-// pre-SOW-0032 `(ts, value)` shape for read sites that prefer it.
+// A `Series` is one labeled time series in column-oriented form:
+// timestamps live in a shared `Arc<Vec<i64>>` so every grid-aligned
+// series in a result reuses the same column, and values live in a
+// tight `Vec<f64>` that auto-vectorises in inner loops. The
+// `samples()` iterator adapter zips them back into `(ts, value)`
+// pairs for read sites that prefer it.
 //
-// An `EvalResult` is what a single `eval()` call produces against the
-// Plan IR -- a scalar, an instant vector (each series with one value
-// per grid point), or a range vector (each series with raw storage
-// samples at their own timestamps). Series are emitted in stable
-// signature order so downstream consumers can compare deterministically.
+// An `EvalResult` is what a single `eval()` call produces — a scalar,
+// an instant vector (each series with one value per grid point), or a
+// range vector (each series with raw storage samples at their own
+// timestamps). Series are emitted in stable signature order so
+// downstream consumers can compare deterministically.
 
 use std::sync::Arc;
 
 use crate::plan::ValueType;
 use crate::storage::ResolveError;
 
-/// `(ts, value)` pair. Internal to the eval crate post-SOW-0032; the
-/// crate's column-oriented `Series` materialises Samples on demand for
-/// the small number of read sites that genuinely want the pair shape
-/// (output serialization, test conversions, legacy single-window
-/// rollup paths).
+/// `(ts, value)` pair. The crate's column-oriented [`Series`] materialises
+/// these on demand for the small number of read sites that genuinely want
+/// the pair shape (output serialization, test conversions).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Sample {
     pub timestamp_ms: i64,
@@ -54,11 +52,7 @@ impl Series {
     /// plus a fresh values vector. Computes the signature from the
     /// labels. The two vectors must already have matching length;
     /// this is debug-asserted.
-    pub fn new(
-        labels: Vec<(String, String)>,
-        timestamps: Arc<Vec<i64>>,
-        values: Vec<f64>,
-    ) -> Self {
+    pub fn new(labels: Vec<(String, String)>, timestamps: Arc<Vec<i64>>, values: Vec<f64>) -> Self {
         debug_assert_eq!(
             timestamps.len(),
             values.len(),

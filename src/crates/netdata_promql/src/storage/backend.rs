@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Storage backend abstraction. SOW-0030.
+// Storage backend abstraction.
 //
 // The PromQL evaluator's leaf selectors reach into "storage" through this
 // trait. Two implementations live in this crate:
@@ -21,7 +21,7 @@ use super::matchers::Matcher;
 use super::query::ResolveError;
 
 /// Metadata for one resolved series. The lifetime is owned because
-/// `BackendQuery` is trait-object-shaped and cannot borrow from itself
+/// [`BackendQuery`] is trait-object-shaped and cannot borrow from itself
 /// across method boundaries without GATs. The allocation is bounded:
 /// once per series per `eval` call (selectors only).
 pub struct SeriesMeta {
@@ -33,12 +33,12 @@ pub struct SeriesMeta {
 /// must be thread-safe; the daemon shares one backend across all
 /// concurrent HTTP request handlers.
 ///
-/// `points_wanted` and `tier_hint` (SOW-0041) thread tier-selection
-/// inputs to the storage layer. `points_wanted` is the target sample
-/// count across `[after_s, before_s]` — the natural PromQL analogue is
+/// `points_wanted` and `tier_hint` thread tier-selection inputs to the
+/// storage layer. `points_wanted` is the target sample count across
+/// `[after_s, before_s]` — the natural PromQL analogue is
 /// `(end_ms - start_ms) / step_ms`; instant queries pass 1. `tier_hint`
 /// is `-1` for auto-select (recommended) or `0..N-1` for explicit
-/// override. The `MemBackend` test impl ignores both.
+/// override. The [`MemBackend`](super::MemBackend) test impl ignores both.
 pub trait Backend: Send + Sync {
     fn resolve<'a>(
         &'a self,
@@ -53,10 +53,9 @@ pub trait Backend: Send + Sync {
 }
 
 /// One resolved query's series set. The trait-object boundary is the
-/// `Box<dyn BackendQuery>` in `resolve`'s return; sample drains happen
-/// through concrete-typed inner loops behind a single virtual call per
-/// series (SOW-0040, replacing the prior per-sample `Box<dyn Iterator>`
-/// dispatch).
+/// `Box<dyn BackendQuery>` in [`Backend::resolve`]'s return; sample
+/// drains happen through concrete-typed inner loops behind a single
+/// virtual call per series.
 pub trait BackendQuery {
     fn len(&self) -> usize;
     fn was_truncated(&self) -> bool;

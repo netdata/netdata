@@ -145,7 +145,9 @@ mod tests {
             unit: "",
         }];
         let s = serialize_metadata_map(&entries, &[]);
-        assert!(s.contains(r#""system_cpu":[{"type":"gauge","help":"Total CPU utilization","unit":""}]"#));
+        assert!(s.contains(
+            r#""system_cpu":[{"type":"gauge","help":"Total CPU utilization","unit":""}]"#
+        ));
     }
 
     #[test]

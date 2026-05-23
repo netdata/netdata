@@ -11,18 +11,18 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use promql_parser::label::{MatchOp as ParserMatchOp, Matcher as ParserMatcher, METRIC_NAME};
+use promql_parser::label::{METRIC_NAME, MatchOp as ParserMatchOp, Matcher as ParserMatcher};
 use promql_parser::parser::token;
 use promql_parser::parser::{
     AggregateExpr, BinaryExpr, Call, Expr, LabelModifier, MatrixSelector, Offset, ParenExpr,
     SubqueryExpr, UnaryExpr, VectorSelector,
 };
 
-use crate::storage::{compile_regex, Matcher};
+use crate::storage::{Matcher, compile_regex};
 
 use super::ir::{
-    AggrKind, AtMod, BinopKind, Cardinality, FuncKind, FusedSource, Grouping, MatchKeys,
-    MatchSpec, Plan, ValueType,
+    AggrKind, AtMod, BinopKind, Cardinality, FuncKind, FusedSource, Grouping, MatchKeys, MatchSpec,
+    Plan, ValueType,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -162,9 +162,7 @@ fn lower_binary(b: &BinaryExpr) -> Result<Plan, LowerError> {
             });
         }
     }
-    if op.is_set_op()
-        && (lhs.value_type() != InstantVector || rhs.value_type() != InstantVector)
-    {
+    if op.is_set_op() && (lhs.value_type() != InstantVector || rhs.value_type() != InstantVector) {
         return Err(LowerError::Type {
             context: "set operator",
             expected: InstantVector,
@@ -237,8 +235,7 @@ fn lower_binary(b: &BinaryExpr) -> Result<Plan, LowerError> {
             cardinality,
             include,
         })
-    } else if matches!(lhs.value_type(), InstantVector)
-        || matches!(rhs.value_type(), InstantVector)
+    } else if matches!(lhs.value_type(), InstantVector) || matches!(rhs.value_type(), InstantVector)
     {
         // Vector binops always carry a matching spec, defaulted.
         Some(MatchSpec::default())
@@ -288,8 +285,7 @@ fn lower_aggregate(a: &AggregateExpr) -> Result<Plan, LowerError> {
             other => {
                 return Err(LowerError::Aggregation(format!(
                     "{:?} requires a string parameter (the bucket label name); got {:?}",
-                    op,
-                    other
+                    op, other
                 )));
             }
         },
@@ -343,10 +339,9 @@ fn lower_aggregate(a: &AggregateExpr) -> Result<Plan, LowerError> {
         LabelModifier::Exclude(ls) => Grouping::Without(ls.labels.clone()),
     });
 
-    // SOW-0033: try to fuse `aggr(rollup(matrix|subquery))` into a
-    // single streaming plan node. The unfused Plan::Aggregate is
-    // returned when fusion doesn't apply (parametrized aggregator,
-    // non-rollup inner, predict_linear/holt_winters/etc.).
+    // Try to fuse `aggr(rollup(matrix|subquery))` into a single streaming
+    // plan node. The unfused Plan::Aggregate is returned when fusion
+    // doesn't apply (parametrized aggregator, non-rollup inner, etc.).
     if lowered_param.is_none() && lowered_param_string.is_none() {
         if let Some(fused) = try_fuse_aggr_rollup(op, &grouping, &expr) {
             return Ok(fused);
@@ -363,26 +358,20 @@ fn lower_aggregate(a: &AggregateExpr) -> Result<Plan, LowerError> {
 }
 
 /// Detect `aggr(rollup(matrix|subquery))` and rewrite to
-/// `Plan::FusedAggrRollup` when both the aggregator and the rollup are
-/// on the supported list. Returns `None` (keeping the unfused
-/// `Plan::Aggregate`) for any other shape. SOW-0033.
-fn try_fuse_aggr_rollup(
-    aggr: AggrKind,
-    grouping: &Option<Grouping>,
-    expr: &Plan,
-) -> Option<Plan> {
+/// [`Plan::FusedAggrRollup`] when both the aggregator and the rollup
+/// are on the supported list. Returns `None` (keeping the unfused
+/// [`Plan::Aggregate`]) for any other shape.
+fn try_fuse_aggr_rollup(aggr: AggrKind, grouping: &Option<Grouping>, expr: &Plan) -> Option<Plan> {
     // Aggregator must be one of sum/avg/min/max/count.
     match aggr {
-        AggrKind::Sum
-        | AggrKind::Avg
-        | AggrKind::Min
-        | AggrKind::Max
-        | AggrKind::Count => {}
+        AggrKind::Sum | AggrKind::Avg | AggrKind::Min | AggrKind::Max | AggrKind::Count => {}
         _ => return None,
     }
     // Inner must be a Call into a fusable rollup, with a single
     // argument that is itself a matrix selector or subquery.
-    let Plan::Call { func, args } = expr else { return None };
+    let Plan::Call { func, args } = expr else {
+        return None;
+    };
     if args.len() != 1 {
         return None;
     }
@@ -440,7 +429,7 @@ fn try_fuse_aggr_rollup(
 
 /// Default step when the parser leaves `step` as `None`. Prometheus uses
 /// the global evaluation interval; we adopt 1 second (the minimum
-/// sensible value) and document it in the contract spec. SOW-0026.
+/// sensible value).
 const DEFAULT_SUBQUERY_STEP_MS: i64 = 1000;
 
 fn lower_subquery(sq: &SubqueryExpr) -> Result<Plan, LowerError> {
@@ -498,18 +487,18 @@ fn lower_subquery(sq: &SubqueryExpr) -> Result<Plan, LowerError> {
 }
 
 fn lower_call(c: &Call) -> Result<Plan, LowerError> {
-    // SOW-0027 Group F: label_replace / label_join take string-literal
-    // arguments that don't lower to Plan nodes. Intercept here and
-    // produce a Plan::LabelOp with the strings pre-extracted.
+    // label_replace / label_join take string-literal arguments that
+    // don't lower to Plan nodes. Intercept here and produce a
+    // Plan::LabelOp with the strings pre-extracted.
     if c.func.name == "label_replace" {
         return lower_label_replace(c);
     }
     if c.func.name == "label_join" {
         return lower_label_join(c);
     }
-    // SOW-0027 Group G: absent / absent_over_time need the static
-    // matcher labels extracted at lowering so the evaluator can
-    // synthesise them when the inner returns empty.
+    // absent / absent_over_time need the static matcher labels
+    // extracted at lowering so the evaluator can synthesise them
+    // when the inner returns empty.
     if c.func.name == "absent" || c.func.name == "absent_over_time" {
         return lower_absent(c);
     }
@@ -557,7 +546,9 @@ fn lower_label_replace(c: &Call) -> Result<Plan, LowerError> {
         .ok_or_else(|| LowerError::Call("label_replace dst must be a string literal".into()))?
         .to_string();
     let replacement = as_string_literal(&c.args.args[2])
-        .ok_or_else(|| LowerError::Call("label_replace replacement must be a string literal".into()))?
+        .ok_or_else(|| {
+            LowerError::Call("label_replace replacement must be a string literal".into())
+        })?
         .to_string();
     let src = as_string_literal(&c.args.args[3])
         .ok_or_else(|| LowerError::Call("label_replace src must be a string literal".into()))?
@@ -567,9 +558,8 @@ fn lower_label_replace(c: &Call) -> Result<Plan, LowerError> {
         .to_string();
     // Validate the regex now so failures surface at parse time, not at
     // every step of a range query.
-    compile_regex(&regex).map_err(|e| {
-        LowerError::InvalidMatcher(format!("label_replace regex {regex}: {e}"))
-    })?;
+    compile_regex(&regex)
+        .map_err(|e| LowerError::InvalidMatcher(format!("label_replace regex {regex}: {e}")))?;
     Ok(Plan::LabelOp {
         op: crate::plan::LabelOpKind::Replace {
             dst,
@@ -668,11 +658,7 @@ fn lower_label_join(c: &Call) -> Result<Plan, LowerError> {
         srcs.push(s.to_string());
     }
     Ok(Plan::LabelOp {
-        op: crate::plan::LabelOpKind::Join {
-            dst,
-            sep,
-            srcs,
-        },
+        op: crate::plan::LabelOpKind::Join { dst, sep, srcs },
         expr: Arc::new(inner),
     })
 }
@@ -700,21 +686,17 @@ fn lower_one_matcher(m: &ParserMatcher) -> Result<Matcher, LowerError> {
             // the lowering layer share compiled patterns.
             let pattern = r.as_str().to_string();
             // Validate against our regex engine by compiling once.
-            compile_regex(&pattern).map_err(|e| {
-                LowerError::InvalidMatcher(format!("regex {pattern}: {e}"))
-            })?;
-            Matcher::re(m.name.clone(), pattern).map_err(|e| {
-                LowerError::InvalidMatcher(format!("re matcher build: {e}"))
-            })?
+            compile_regex(&pattern)
+                .map_err(|e| LowerError::InvalidMatcher(format!("regex {pattern}: {e}")))?;
+            Matcher::re(m.name.clone(), pattern)
+                .map_err(|e| LowerError::InvalidMatcher(format!("re matcher build: {e}")))?
         }
         ParserMatchOp::NotRe(r) => {
             let pattern = r.as_str().to_string();
-            compile_regex(&pattern).map_err(|e| {
-                LowerError::InvalidMatcher(format!("regex {pattern}: {e}"))
-            })?;
-            Matcher::nre(m.name.clone(), pattern).map_err(|e| {
-                LowerError::InvalidMatcher(format!("nre matcher build: {e}"))
-            })?
+            compile_regex(&pattern)
+                .map_err(|e| LowerError::InvalidMatcher(format!("regex {pattern}: {e}")))?;
+            Matcher::nre(m.name.clone(), pattern)
+                .map_err(|e| LowerError::InvalidMatcher(format!("nre matcher build: {e}")))?
         }
     })
 }
@@ -758,7 +740,7 @@ fn binop_from_token(t: token::TokenId) -> Result<BinopKind, LowerError> {
         other => {
             return Err(LowerError::Unsupported(format!(
                 "binary operator token {other} is unrecognized"
-            )))
+            )));
         }
     })
 }
@@ -783,7 +765,7 @@ fn aggr_from_token(t: token::TokenId) -> Result<AggrKind, LowerError> {
         other => {
             return Err(LowerError::Unsupported(format!(
                 "aggregation operator token {other} is unrecognized"
-            )))
+            )));
         }
     })
 }
@@ -797,7 +779,9 @@ mod tests {
     }
 
     fn lower_err(q: &str) -> LowerError {
-        lower_query(q).err().unwrap_or_else(|| panic!("expected error for {q}"))
+        lower_query(q)
+            .err()
+            .unwrap_or_else(|| panic!("expected error for {q}"))
     }
 
     #[test]
@@ -811,7 +795,11 @@ mod tests {
     fn vector_selector_with_name_and_matcher() {
         let p = lower_ok("http_requests_total{method=\"GET\"}");
         match p {
-            Plan::VectorSelect { matchers, offset_ms, .. } => {
+            Plan::VectorSelect {
+                matchers,
+                offset_ms,
+                ..
+            } => {
                 assert_eq!(offset_ms, 0);
                 assert_eq!(matchers.len(), 2);
                 assert_eq!(matchers[0].name(), "__name__");
@@ -845,7 +833,9 @@ mod tests {
     fn binop_lowers_comparison() {
         let p = lower_ok("foo > 5");
         match p {
-            Plan::Binop { op, return_bool, .. } => {
+            Plan::Binop {
+                op, return_bool, ..
+            } => {
                 assert_eq!(op, BinopKind::Gt);
                 assert!(!return_bool);
             }
@@ -885,7 +875,6 @@ mod tests {
 
     #[test]
     fn subquery_lowers_to_range_vector() {
-        // SOW-0026: subqueries are supported and produce a range vector.
         let p = lower_ok("foo[5m:1m]");
         match p {
             Plan::Subquery {
@@ -930,7 +919,11 @@ mod tests {
             LowerError::Parse(msg) => {
                 assert!(msg.contains("vector"), "msg = {msg}");
             }
-            LowerError::Type { context, expected, got } => {
+            LowerError::Type {
+                context,
+                expected,
+                got,
+            } => {
                 assert_eq!(context, "subquery inner expression");
                 assert_eq!(expected, ValueType::InstantVector);
                 assert_eq!(got, ValueType::RangeVector);
@@ -1008,7 +1001,12 @@ mod tests {
                 assert_eq!(func, FuncKind::MaxOverTime);
                 assert_eq!(args.len(), 1);
                 match &args[0] {
-                    Plan::Subquery { range_ms, step_ms, expr, .. } => {
+                    Plan::Subquery {
+                        range_ms,
+                        step_ms,
+                        expr,
+                        ..
+                    } => {
                         assert_eq!(*range_ms, 5 * 60 * 1000);
                         assert_eq!(*step_ms, 60 * 1000);
                         assert!(matches!(**expr, Plan::Aggregate { .. }));
@@ -1031,7 +1029,6 @@ mod tests {
 
     #[test]
     fn at_modifier_lowers_to_atts() {
-        // SOW-0025: `@` modifier preserved through lowering.
         let p = lower_ok("foo @ 1234.5");
         match p {
             Plan::VectorSelect { at, .. } => {
@@ -1071,16 +1068,9 @@ mod tests {
 
     #[test]
     fn set_operator_lowers_to_binop() {
-        // SOW-0022 (Phase 3d): set operators are supported. The
-        // lowering preserves the operator kind and attaches a default
-        // matching spec.
         let plan = lower_query("foo and bar").unwrap();
         match plan {
-            Plan::Binop {
-                op,
-                matching,
-                ..
-            } => {
+            Plan::Binop { op, matching, .. } => {
                 assert_eq!(op, BinopKind::LAnd);
                 let m = matching.expect("set op carries a matching spec");
                 assert_eq!(m.cardinality, Cardinality::OneToOne);
@@ -1108,11 +1098,13 @@ mod tests {
         }
     }
 
-    // SOW-0027 tests --------------------------------------------------------
+    // Function lowering tests ------------------------------------------------
 
     #[test]
     fn group_a_math_functions_lower() {
-        for name in ["abs", "ceil", "floor", "sgn", "ln", "log2", "log10", "exp", "sqrt"] {
+        for name in [
+            "abs", "ceil", "floor", "sgn", "ln", "log2", "log10", "exp", "sqrt",
+        ] {
             let p = lower_ok(&format!("{name}(foo)"));
             match p {
                 Plan::Call { func, args } => {
@@ -1211,7 +1203,12 @@ mod tests {
         let p = lower_ok(r#"label_replace(foo, "dst", "$1", "src", "abc(\\d+)")"#);
         match p {
             Plan::LabelOp { op, .. } => match op {
-                crate::plan::LabelOpKind::Replace { dst, replacement, src, regex } => {
+                crate::plan::LabelOpKind::Replace {
+                    dst,
+                    replacement,
+                    src,
+                    regex,
+                } => {
                     assert_eq!(dst, "dst");
                     assert_eq!(replacement, "$1");
                     assert_eq!(src, "src");
@@ -1271,7 +1268,11 @@ mod tests {
         let p = lower_ok(r#"absent(rate(metric[5m]))"#);
         match p {
             Plan::Absent { labels, .. } => {
-                assert!(labels.is_empty(), "expected empty labels for complex inner; got {:?}", labels);
+                assert!(
+                    labels.is_empty(),
+                    "expected empty labels for complex inner; got {:?}",
+                    labels
+                );
             }
             other => panic!("unexpected: {other:?}"),
         }
@@ -1285,7 +1286,10 @@ mod tests {
         // our in-lowering check is defense in depth.
         match lower_err("absent_over_time(foo)") {
             LowerError::Parse(msg) => {
-                assert!(msg.contains("matrix") || msg.contains("range"), "msg = {msg}");
+                assert!(
+                    msg.contains("matrix") || msg.contains("range"),
+                    "msg = {msg}"
+                );
             }
             LowerError::Type { expected, got, .. } => {
                 assert_eq!(expected, ValueType::RangeVector);

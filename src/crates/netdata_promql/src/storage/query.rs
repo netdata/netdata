@@ -6,7 +6,7 @@
 // rejected by RE/NRE matchers are tracked in a Rust-side filter index --
 // the shim's series array is read-only from our perspective. Borrowing
 // rules: a `NdQuery` reference can hand out `SeriesView` borrows and
-// drain per-series samples into caller-provided column buffers (SOW-0040).
+// drain per-series samples into caller-provided column buffers.
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -203,11 +203,7 @@ impl NdQuery {
             Some(f) => f.get(i).copied(),
             None => {
                 let total = unsafe { raw::nd_pds_series_count(self.handle.as_ptr()) };
-                if i < total {
-                    Some(i)
-                } else {
-                    None
-                }
+                if i < total { Some(i) } else { None }
             }
         }
     }
@@ -243,9 +239,7 @@ impl NdQuery {
     /// Drain samples for the i-th series (after RE/NRE filter) into the
     /// caller's column buffers. The buffers are cleared first; on
     /// return they hold parallel `(timestamp_ms, value)` columns in
-    /// ascending timestamp order. SOW-0040 replaces the prior
-    /// iterator-returning shape so the per-sample fetch does not pay a
-    /// per-call indirect-dispatch cost.
+    /// ascending timestamp order.
     pub fn drain_samples(
         &self,
         i: usize,

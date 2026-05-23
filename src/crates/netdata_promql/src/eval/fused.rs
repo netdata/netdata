@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Operator fusion for the `aggr(rollup(selector))` shape. SOW-0033.
+// Operator fusion for the `aggr(rollup(selector))` shape.
 //
 // The canonical Grafana panel query -- `sum by (X) (rate(metric[5m]))`
 // or similar -- composes three operators that, in the unfused path,
@@ -21,8 +21,8 @@
 //
 // The trait `IncrementalAggr` encapsulates the per-bucket accumulator
 // behaviour (sum, avg via sum+count, etc.). The enum `RollupKind`
-// dispatches into the existing `compute_*` helpers in functions.rs --
-// SOW-0032's column-shaped slice signature lets us call them directly.
+// dispatches into the existing `compute_*` helpers in functions.rs.
+// The column-shaped slice signature lets us call them directly.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -31,7 +31,7 @@ use crate::plan::{AggrKind, FuncKind, Grouping};
 use crate::storage::Matcher;
 
 use super::context::EvalContext;
-use super::types::{labels_signature, EvalError, EvalResult, Series};
+use super::types::{EvalError, EvalResult, Series, labels_signature};
 
 // ---------------------------------------------------------------------------
 // IncrementalAggr trait + impls
@@ -68,11 +68,7 @@ impl IncrementalAggr for SumAggr {
         acc.count += 1;
     }
     fn finalize(acc: &Self::Acc) -> f64 {
-        if acc.count == 0 {
-            f64::NAN
-        } else {
-            acc.sum
-        }
+        if acc.count == 0 { f64::NAN } else { acc.sum }
     }
 }
 
@@ -123,11 +119,7 @@ impl IncrementalAggr for MinAggr {
         }
     }
     fn finalize(acc: &Self::Acc) -> f64 {
-        if acc.seen {
-            acc.value
-        } else {
-            f64::NAN
-        }
+        if acc.seen { acc.value } else { f64::NAN }
     }
 }
 
@@ -144,11 +136,7 @@ impl IncrementalAggr for MaxAggr {
         }
     }
     fn finalize(acc: &Self::Acc) -> f64 {
-        if acc.seen {
-            acc.value
-        } else {
-            f64::NAN
-        }
+        if acc.seen { acc.value } else { f64::NAN }
     }
 }
 
@@ -249,60 +237,42 @@ impl RollupKind {
             ),
             RollupKind::Delta => super::functions::compute_delta(values),
             RollupKind::IRate => super::functions::compute_irate(timestamps, values),
-            RollupKind::AvgOverTime => {
-                super::functions::compute_over_time::<super::functions::AvgReducer>(
-                    timestamps, values,
-                )
-                .map(|(v, _)| v)
-            }
-            RollupKind::SumOverTime => {
-                super::functions::compute_over_time::<super::functions::SumReducer>(
-                    timestamps, values,
-                )
-                .map(|(v, _)| v)
-            }
-            RollupKind::MinOverTime => {
-                super::functions::compute_over_time::<super::functions::MinReducer>(
-                    timestamps, values,
-                )
-                .map(|(v, _)| v)
-            }
-            RollupKind::MaxOverTime => {
-                super::functions::compute_over_time::<super::functions::MaxReducer>(
-                    timestamps, values,
-                )
-                .map(|(v, _)| v)
-            }
-            RollupKind::CountOverTime => {
-                super::functions::compute_over_time::<super::functions::CountReducer>(
-                    timestamps, values,
-                )
-                .map(|(v, _)| v)
-            }
-            RollupKind::LastOverTime => {
-                super::functions::compute_over_time::<super::functions::LastReducer>(
-                    timestamps, values,
-                )
-                .map(|(v, _)| v)
-            }
-            RollupKind::PresentOverTime => {
-                super::functions::compute_over_time::<super::functions::PresentReducer>(
-                    timestamps, values,
-                )
-                .map(|(v, _)| v)
-            }
-            RollupKind::StddevOverTime => {
-                super::functions::compute_over_time::<super::functions::StddevReducer>(
-                    timestamps, values,
-                )
-                .map(|(v, _)| v)
-            }
-            RollupKind::StdvarOverTime => {
-                super::functions::compute_over_time::<super::functions::StdvarReducer>(
-                    timestamps, values,
-                )
-                .map(|(v, _)| v)
-            }
+            RollupKind::AvgOverTime => super::functions::compute_over_time::<
+                super::functions::AvgReducer,
+            >(timestamps, values)
+            .map(|(v, _)| v),
+            RollupKind::SumOverTime => super::functions::compute_over_time::<
+                super::functions::SumReducer,
+            >(timestamps, values)
+            .map(|(v, _)| v),
+            RollupKind::MinOverTime => super::functions::compute_over_time::<
+                super::functions::MinReducer,
+            >(timestamps, values)
+            .map(|(v, _)| v),
+            RollupKind::MaxOverTime => super::functions::compute_over_time::<
+                super::functions::MaxReducer,
+            >(timestamps, values)
+            .map(|(v, _)| v),
+            RollupKind::CountOverTime => super::functions::compute_over_time::<
+                super::functions::CountReducer,
+            >(timestamps, values)
+            .map(|(v, _)| v),
+            RollupKind::LastOverTime => super::functions::compute_over_time::<
+                super::functions::LastReducer,
+            >(timestamps, values)
+            .map(|(v, _)| v),
+            RollupKind::PresentOverTime => super::functions::compute_over_time::<
+                super::functions::PresentReducer,
+            >(timestamps, values)
+            .map(|(v, _)| v),
+            RollupKind::StddevOverTime => super::functions::compute_over_time::<
+                super::functions::StddevReducer,
+            >(timestamps, values)
+            .map(|(v, _)| v),
+            RollupKind::StdvarOverTime => super::functions::compute_over_time::<
+                super::functions::StdvarReducer,
+            >(timestamps, values)
+            .map(|(v, _)| v),
         }
     }
 }
@@ -471,7 +441,7 @@ fn run_fused<A: IncrementalAggr>(
             .collect(),
     };
 
-    // Reusable drain buffers (SOW-0040). The fused driver keeps the
+    // Reusable drain buffers. The fused driver keeps the
     // filtered columns per-series because the inner two-pointer walk
     // consumes them in one pass and they are dropped at the end of
     // each iteration; sharing the raw drain buffer across series
@@ -481,7 +451,9 @@ fn run_fused<A: IncrementalAggr>(
     let mut raw_vals: Vec<f64> = Vec::new();
 
     for i in 0..q.len() {
-        let Some(meta) = q.series_meta(i) else { continue };
+        let Some(meta) = q.series_meta(i) else {
+            continue;
+        };
         q.drain_samples(i, after_s, before_s, 0, &mut raw_ts, &mut raw_vals);
 
         // NaN-filter into column form for the two-pointer walk.
@@ -664,7 +636,11 @@ mod tests {
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
-                assert!((v[0].values[0] - 40.0).abs() < 1e-9, "got {}", v[0].values[0]);
+                assert!(
+                    (v[0].values[0] - 40.0).abs() < 1e-9,
+                    "got {}",
+                    v[0].values[0]
+                );
             }
             _ => panic!("expected instant vector"),
         }
@@ -691,7 +667,11 @@ mod tests {
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
-                assert!((v[0].values[0] - 20.0).abs() < 1e-9, "got {}", v[0].values[0]);
+                assert!(
+                    (v[0].values[0] - 20.0).abs() < 1e-9,
+                    "got {}",
+                    v[0].values[0]
+                );
             }
             _ => panic!(),
         }
@@ -757,8 +737,8 @@ mod tests {
 
     /// Equivalence test: the fused path must produce bit-identical
     /// output to the unfused `Plan::Aggregate{expr: Plan::Call{...}}`
-    /// path for the same query against the same data. SOW-0033's
-    /// primary correctness invariant.
+    /// path for the same query against the same data. The primary
+    /// correctness invariant for fusion.
     #[test]
     fn fused_matches_unfused_for_sum_rate() {
         use crate::eval::eval;
@@ -820,10 +800,7 @@ mod tests {
                                 uv,
                                 fv
                             ),
-                            _ => panic!(
-                                "NaN-mismatch: unfused {} vs fused {}",
-                                uv, fv
-                            ),
+                            _ => panic!("NaN-mismatch: unfused {} vs fused {}", uv, fv),
                         }
                     }
                 }

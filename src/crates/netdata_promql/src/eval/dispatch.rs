@@ -7,7 +7,7 @@ use crate::plan::{FuncKind, Plan};
 use super::context::EvalContext;
 use super::select::{eval_matrix_select, eval_vector_select};
 use super::subquery::eval_subquery;
-use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
+use super::types::{EvalError, EvalResult, Sample, Series, labels_signature};
 
 /// Evaluate one plan node at `ctx.at_ms()`.
 pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
@@ -91,9 +91,7 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
             match func {
                 FuncKind::Time => {
                     if !args.is_empty() {
-                        return Err(EvalError::Other(
-                            "time() expects no arguments".to_string(),
-                        ));
+                        return Err(EvalError::Other("time() expects no arguments".to_string()));
                     }
                     return Ok(EvalResult::Scalar(ctx.at_ms() as f64 / 1000.0));
                 }
@@ -110,7 +108,7 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
                                 context: "vector",
                                 expected: crate::plan::ValueType::Scalar,
                                 got: other.value_type(),
-                            })
+                            });
                         }
                     };
                     let series = Series::scalar(Vec::new(), ctx.at_ms(), v);
@@ -118,8 +116,8 @@ pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
                 }
                 _ => {}
             }
-            // SOW-0031: rollup functions need the range window so they
-            // can two-pointer-window per grid point. The window comes
+            // Rollup functions need the range window so they can
+            // two-pointer-window per grid point. The window comes
             // from the first argument when it is a matrix selector or
             // a subquery; otherwise None.
             let range_ms: Option<i64> = args.first().and_then(|a| match a {

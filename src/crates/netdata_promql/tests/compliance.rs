@@ -28,9 +28,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use netdata_promql::testing::{
-    eval_instant_against, Backend, MemBackend, MemSeries, TestResult,
-};
+use netdata_promql::testing::{Backend, MemBackend, MemSeries, TestResult, eval_instant_against};
 
 // --------------------------------------------------------------------- types
 
@@ -47,16 +45,22 @@ struct SeriesSpec {
 
 #[derive(Debug, Clone)]
 struct ExpectedSeries {
-    metric: Option<String>,    // None if the labelset has no __name__
+    metric: Option<String>, // None if the labelset has no __name__
     labels: Vec<(String, String)>,
-    values: Vec<f64>,           // length 1 for instant, N for range
+    values: Vec<f64>, // length 1 for instant, N for range
 }
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // Range fields read by future SOW that adds range eval.
 enum EvalKind {
-    Instant { at_ms: i64 },
-    Range { start_ms: i64, end_ms: i64, step_ms: i64 },
+    Instant {
+        at_ms: i64,
+    },
+    Range {
+        start_ms: i64,
+        end_ms: i64,
+        step_ms: i64,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -614,7 +618,10 @@ fn execute_file(path: &Path, expected_fails: &HashSet<String>) -> FileReport {
     for cmd in commands {
         match cmd {
             Command::Clear => backend.clear(),
-            Command::Load { interval_ms, series } => {
+            Command::Load {
+                interval_ms,
+                series,
+            } => {
                 for sp in series {
                     let mut labels = sp.labels.clone();
                     labels.push(("__name__".to_string(), sp.metric.clone()));
@@ -636,7 +643,8 @@ fn execute_file(path: &Path, expected_fails: &HashSet<String>) -> FileReport {
                         report.skip += 1;
                         continue;
                     }
-                    let backend_clone = Arc::clone(&backend) as Arc<dyn netdata_promql::testing::Backend>;
+                    let backend_clone =
+                        Arc::clone(&backend) as Arc<dyn netdata_promql::testing::Backend>;
                     match eval_instant_against(backend_clone, &ec.query, at_ms) {
                         Ok(actual) => {
                             if ec.expect_fail {
@@ -855,8 +863,7 @@ fn load_expected_fails(path: &Path) -> HashSet<String> {
 #[test]
 fn run_compliance_corpus() {
     let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/compliance-data");
-    let expected_fails =
-        load_expected_fails(&data_dir.join("EXPECTED_FAILS.md"));
+    let expected_fails = load_expected_fails(&data_dir.join("EXPECTED_FAILS.md"));
 
     let mut files: Vec<PathBuf> = fs::read_dir(&data_dir)
         .expect("compliance-data dir present")
@@ -882,18 +889,12 @@ fn run_compliance_corpus() {
     let mut all_failures: Vec<String> = Vec::new();
 
     println!("\n=== promqltest compliance run ===");
-    println!(
-        "{:<32} {:>6} {:>6} {:>6}",
-        "file", "pass", "fail", "skip"
-    );
+    println!("{:<32} {:>6} {:>6} {:>6}", "file", "pass", "fail", "skip");
     println!("{}", "-".repeat(56));
 
     for f in &files {
         let r = execute_file(f, &expected_fails);
-        println!(
-            "{:<32} {:>6} {:>6} {:>6}",
-            r.file, r.pass, r.fail, r.skip
-        );
+        println!("{:<32} {:>6} {:>6} {:>6}", r.file, r.pass, r.fail, r.skip);
         total_pass += r.pass;
         total_fail += r.fail;
         total_skip += r.skip;

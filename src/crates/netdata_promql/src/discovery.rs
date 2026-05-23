@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Discovery endpoints (Phase 2 of SOW-0018).
+// Prometheus label/series/metadata discovery endpoints.
 //
-// Three FFI functions, one per endpoint that needs to project resolved
-// series into Prometheus discovery shapes:
+// Three FFI functions, one per endpoint that projects resolved series
+// into Prometheus discovery shapes:
 //
 //   * `nd_promql_labels`        -> /api/v1/labels
 //   * `nd_promql_label_values`  -> /api/v1/label/<name>/values
@@ -12,22 +12,22 @@
 // Each accepts an array of `match[]` selectors. The implementation parses
 // each selector through `plan::lower_query`, extracts the matchers from
 // the resulting Plan::VectorSelect node, and resolves them through the
-// shim via `storage::NdQuery`. Results from multiple selectors are unioned
-// by signature.
+// storage shim via `storage::NdQuery`. Results from multiple selectors are
+// unioned by signature.
 //
 // `/api/v1/metadata` and `/api/v1/status/buildinfo` do not need Rust:
 // metadata enumeration is pure-C (see `nd_pds_metadata_*`), and buildinfo
 // is a static JSON response.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::{c_char, CStr};
+use std::ffi::{CStr, c_char};
 
-use crate::output::{
-    serialize_metadata_map, serialize_series_list, serialize_string_list, MetadataEntry,
-};
-use crate::plan::{lower_query, LowerError, Plan};
-use crate::storage::{Matcher, NdQuery, ResolveError};
 use crate::NdPromqlResponse;
+use crate::output::{
+    MetadataEntry, serialize_metadata_map, serialize_series_list, serialize_string_list,
+};
+use crate::plan::{LowerError, Plan, lower_query};
+use crate::storage::{Matcher, NdQuery, ResolveError};
 
 /// `match[]` strings often arrive with no `__name__` predicate -- Grafana's
 /// universal sentinel is `{__name__!=""}`. The shim enumerates every
@@ -36,10 +36,10 @@ use crate::NdPromqlResponse;
 const TRUNCATION_WARNING: &str =
     "result truncated at max_series=10000; tighten match[] or raise the cap";
 
-/// `host_machine_guid` follows the shim contract:
+/// Resolve the host scope from a C string pointer:
 ///   - `None` -> localhost only
 ///   - `Some("*")` -> all known hosts
-///   - `Some(name)` -> the host with that machine_guid or hostname (Phase 2 chunk 2)
+///   - `Some(name)` -> the host with that machine_guid or hostname
 fn host_from_ptr(p: *const c_char) -> Option<String> {
     if p.is_null() {
         return None;
@@ -228,7 +228,7 @@ pub unsafe extern "C" fn nd_promql_label_values(
         _ => {
             return Box::into_raw(Box::new(NdPromqlResponse::bad_data(
                 "label name is required",
-            )))
+            )));
         }
     };
 
@@ -297,7 +297,15 @@ pub unsafe extern "C" fn nd_promql_series(
         let mut seen: BTreeSet<u64> = BTreeSet::new();
         let mut truncated = false;
         for matchers in &selectors {
-            let q = match NdQuery::resolve(host.as_deref(), matchers, after_s, before_s, max_series(limit), 0, -1) {
+            let q = match NdQuery::resolve(
+                host.as_deref(),
+                matchers,
+                after_s,
+                before_s,
+                max_series(limit),
+                0,
+                -1,
+            ) {
                 Ok(q) => q,
                 Err(ResolveError::Empty) => continue,
                 Err(_) => continue,
@@ -389,17 +397,23 @@ pub unsafe extern "C" fn nd_promql_metadata(
         let ty = if e.type_.is_null() {
             String::new()
         } else {
-            unsafe { CStr::from_ptr(e.type_) }.to_string_lossy().into_owned()
+            unsafe { CStr::from_ptr(e.type_) }
+                .to_string_lossy()
+                .into_owned()
         };
         let help = if e.help.is_null() {
             String::new()
         } else {
-            unsafe { CStr::from_ptr(e.help) }.to_string_lossy().into_owned()
+            unsafe { CStr::from_ptr(e.help) }
+                .to_string_lossy()
+                .into_owned()
         };
         let unit = if e.unit.is_null() {
             String::new()
         } else {
-            unsafe { CStr::from_ptr(e.unit) }.to_string_lossy().into_owned()
+            unsafe { CStr::from_ptr(e.unit) }
+                .to_string_lossy()
+                .into_owned()
         };
         owned.push((name, ty, help, unit));
     }
@@ -465,9 +479,7 @@ fn metric_names_fast_path(
         if p.is_null() {
             continue;
         }
-        let s = unsafe { CStr::from_ptr(p) }
-            .to_string_lossy()
-            .into_owned();
+        let s = unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned();
         items.push(s);
     }
     unsafe { raw::nd_pds_metric_names_free(m) };
@@ -537,7 +549,8 @@ mod tests {
 
     #[test]
     fn missing_label_name_yields_bad_data() {
-        let r = unsafe { nd_promql_label_values(ptr::null(), ptr::null(), ptr::null(), 0, 0, 0, 0) };
+        let r =
+            unsafe { nd_promql_label_values(ptr::null(), ptr::null(), ptr::null(), 0, 0, 0, 0) };
         let status = unsafe { crate::nd_promql_response_http_status(r) };
         assert_eq!(status, 400);
         unsafe { crate::nd_promql_response_free(r) };

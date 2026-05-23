@@ -2,18 +2,50 @@
 
 //! Netdata PromQL evaluator.
 //!
-//! Six entry points form the C ABI: two query functions and four accessors
-//! around an opaque response handle. Phase 1 (SOW-0017) replaces the
-//! Phase 0 placeholder bodies with a real pipeline: parse via
-//! `promql-parser`, lower into a typed Plan IR, evaluate against the C
-//! storage shim through the `storage` module, and serialize to the
-//! Prometheus HTTP API response shape.
+//! This crate implements a full PromQL query engine for the Netdata Agent.
+//! It parses PromQL expressions via `promql-parser`, lowers them into a typed
+//! Plan IR, evaluates against the Netdata storage engine, and serializes
+//! results in the Prometheus HTTP API JSON format.
 //!
-//! Chunk 3 covers number literals, vector and matrix selectors, scalar
-//! arithmetic, comparisons (with and without `bool`), the five basic
-//! aggregations (sum/avg/min/max/count) with `by`/`without`, unary minus,
-//! and `offset`. Counter functions (`rate`/`irate`/`increase`/`delta`) and
-//! `histogram_quantile` arrive in chunk 4.
+//! # Architecture
+//!
+//! The pipeline has four stages:
+//!
+//! 1. **Parse** — a PromQL string is parsed into an AST via `promql-parser`.
+//! 2. **Lower** — the AST is lowered into a typed [`plan::Plan`] IR that
+//!    resolves operators, compiles regex matchers, and catches type errors.
+//! 3. **Evaluate** — the Plan is walked against an [`eval::EvalContext`],
+//!    which carries a time grid, storage backend, and query parameters.
+//!    Selectors fetch data through the [`storage::Backend`] trait; operators
+//!    and aggregations combine results in a single whole-range pass.
+//! 4. **Serialize** — results are written as Prometheus-compatible JSON.
+//!
+//! # C ABI entry points
+//!
+//! The crate is compiled as a static library linked into the Netdata daemon.
+//! The C ABI exposes two query functions and four response accessors:
+//!
+//! - [`nd_promql_query_instant`] and [`nd_promql_query_range`] accept a
+//!   PromQL string and time parameters, returning an opaque response handle.
+//! - [`nd_promql_response_body`], [`nd_promql_response_body_len`],
+//!   [`nd_promql_response_http_status`] read fields from the handle.
+//! - [`nd_promql_response_free`] releases the handle.
+//!
+//! # Supported PromQL features
+//!
+//! Number literals, vector and matrix selectors, scalar arithmetic,
+//! comparisons (with and without `bool`), all standard aggregations
+//! (`sum`/`avg`/`min`/`max`/`count`/`topk`/`bottomk`/`quantile`/`stddev`/
+//! `stdvar`/`count_values`/`group`/`limitk`/`limit_ratio`) with `by`/
+//! `without`, binary operators with `on`/`ignoring`/`group_left`/
+//! `group_right`, set operators (`and`/`or`/`unless`), unary minus, `offset`,
+//! `@` modifier, subqueries, counter functions (`rate`/`irate`/`increase`/
+//! `delta`), `histogram_quantile`, and all standard `_over_time` functions.
+//!
+//! # Testing
+//!
+//! The [`testing`] module exposes an in-memory backend and evaluation helpers
+//! for integration tests and the PromQL compliance corpus runner.
 
 mod discovery;
 mod eval;
@@ -22,21 +54,21 @@ mod plan;
 mod slow_log;
 mod storage;
 
-// Public testing surface for the compliance corpus runner and future
-// out-of-crate consumers. SOW-0030.
+// Public testing surface for the compliance corpus runner and
+// out-of-crate consumers.
 pub mod testing;
 
-use std::ffi::{c_char, c_int, CStr, CString};
+use std::ffi::{CStr, CString, c_char, c_int};
 use std::ptr;
 use std::time::Instant;
 
-use eval::{eval, EvalContext, EvalError, EvalResult, Grid, Sample, Series};
+use eval::{EvalContext, EvalError, EvalResult, Grid, Sample, Series, eval};
 use output::{serialize_error, serialize_scalar_at, serialize_success};
-use plan::{lower_query, LowerError, ValueType};
+use plan::{LowerError, ValueType, lower_query};
 
 /// Prometheus' default cap on the number of points per timeseries in a
 /// range query. Guards against pathological step values. Subquery
-/// lowering reuses this cap (SOW-0026).
+/// lowering reuses this cap.
 pub(crate) const MAX_POINTS_PER_TIMESERIES: usize = 11_000;
 
 /// Default lookback window for instant vector selectors.
@@ -46,6 +78,10 @@ const DEFAULT_LOOKBACK_MS: i64 = 5 * 60 * 1000;
 const DEFAULT_MAX_SERIES: usize = 10_000;
 
 /// Opaque handle for a query response.
+///
+/// Created by [`nd_promql_query_instant`] or [`nd_promql_query_range`].
+/// Callers read the body and HTTP status through the accessor functions,
+/// then release the handle with [`nd_promql_response_free`].
 pub struct NdPromqlResponse {
     body: CString,
     http_status: c_int,
@@ -273,11 +309,13 @@ fn run_instant_inner(
     tier_hint: i32,
 ) -> Result<(NdPromqlResponse, usize), QueryError> {
     let plan = lower_query(query)?;
-    // SOW-0041: operators that need exact distribution shape
-    // (min/max/quantile/stddev/stdvar over_time, topk, bottomk) force
-    // tier 0; bucket aggregates at higher tiers don't preserve enough
-    // information to compute them correctly.
-    let effective_tier_hint = if plan.requires_tier_zero() { 0 } else { tier_hint };
+    // Operators that need exact distribution shape force tier 0 because
+    // higher-tier bucket aggregates don't preserve enough information.
+    let effective_tier_hint = if plan.requires_tier_zero() {
+        0
+    } else {
+        tier_hint
+    };
     // For instant queries, the outer "range" is a single point.
     let ctx = EvalContext {
         grid: std::sync::Arc::new(Grid::instant(at_ms)),
@@ -348,26 +386,23 @@ fn run_range_inner(
         return Err(QueryError::UnsupportedTopLevel(tt));
     }
 
-    // SOW-0041: operators that need exact distribution shape force
-    // tier 0. See `Plan::requires_tier_zero` for the list and
-    // rationale.
-    let effective_tier_hint = if plan.requires_tier_zero() { 0 } else { tier_hint };
+    // Operators that need exact distribution shape force tier 0.
+    // See [`Plan::requires_tier_zero`] for the full list.
+    let effective_tier_hint = if plan.requires_tier_zero() {
+        0
+    } else {
+        tier_hint
+    };
 
-    // SOW-0031: every operator is grid-aware. Build one Grid::range,
-    // call eval once, serialize. The per-step fallback that older
-    // SOW-0031 checkpoints carried for rollup/subquery/absent plans
-    // is gone -- those operators evaluate against the grid natively
-    // now.
+    // Every operator is grid-aware. Build one Grid::range, call eval
+    // once, serialize. Selectors and per-position operators emit grid-
+    // aligned series; the serializer reads them as a matrix.
     run_range_single_pass(plan, start_ms, end_ms, step_ms, host, effective_tier_hint)
 }
 
-/// SOW-0031 single-pass range query path. Builds a Grid::range once,
-/// calls `eval` once. Selectors and per-position operators emit grid-
-/// aligned series; the serializer reads them as a matrix.
-///
-/// Only invoked for plans that do not contain matrix selectors or
-/// subqueries (i.e. no rollups). Rollup grid-awareness is tracked as
-/// a follow-up SOW.
+/// Single-pass range query path. Builds a [`Grid::range`] once, calls
+/// [`eval`] once. Selectors and per-position operators emit grid-aligned
+/// series; the serializer reads them as a matrix.
 fn run_range_single_pass(
     plan: plan::Plan,
     start_ms: i64,
@@ -413,9 +448,8 @@ fn run_range_single_pass(
     ))
 }
 
-/// Emit one slow-query log record. The result is borrowed so the
-/// caller can return it after logging. Status / error-type / count
-/// are extracted from whichever arm the result took. SOW-0028.
+/// Emit one slow-query log record. Status, error type, and count are
+/// extracted from whichever arm the result took.
 #[allow(clippy::too_many_arguments)]
 fn log_query(
     kind: slow_log::Kind,
@@ -432,9 +466,11 @@ fn log_query(
     let (status, error_type, error_message): (i32, Option<&str>, Option<String>) = match result {
         Ok(resp) => (resp.http_status, None, None),
         Err(QueryError::Lower(e)) => (400, Some("bad_data"), Some(format!("{e}"))),
-        Err(QueryError::Eval(EvalError::NotYetImplemented(msg))) => {
-            (422, Some("execution"), Some(format!("not yet implemented: {msg}")))
-        }
+        Err(QueryError::Eval(EvalError::NotYetImplemented(msg))) => (
+            422,
+            Some("execution"),
+            Some(format!("not yet implemented: {msg}")),
+        ),
         Err(QueryError::Eval(e)) => (422, Some("execution"), Some(format!("{e}"))),
         Err(QueryError::UnsupportedTopLevel(t)) => (
             400,
@@ -510,5 +546,4 @@ mod tests {
         assert_eq!(unsafe { nd_promql_response_http_status(r) }, 400);
         unsafe { nd_promql_response_free(r) };
     }
-
 }

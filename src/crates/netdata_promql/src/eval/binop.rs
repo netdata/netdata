@@ -3,8 +3,7 @@
 // Binary operators: arithmetic, comparison, and set operators across
 // scalar/vector combinations, with full PromQL vector matching.
 //
-// Vector matching (Phase 3d, SOW-0022) follows the Prometheus model:
-// each lhs/rhs pair gets paired by a *matching key* projected from
+// Vector matching follows the Prometheus model: each lhs/rhs pair gets paired by a *matching key* projected from
 // their labels per the `MatchSpec`. The default key is "all labels
 // except __name__". `on(labels)` restricts to the listed labels;
 // `ignoring(labels)` drops those (and __name__). Cardinality selects
@@ -16,7 +15,7 @@ use std::collections::HashMap;
 
 use crate::plan::{BinopKind, Cardinality, MatchKeys, MatchSpec, ValueType};
 
-use super::types::{labels_signature, EvalError, EvalResult, Series};
+use super::types::{EvalError, EvalResult, Series, labels_signature};
 
 /// Apply a binary operator. `return_bool` toggles the Prometheus `bool`
 /// modifier on comparison operators. `matching` is `Some` for any binop
@@ -183,7 +182,14 @@ fn vec_vec(
         }
         Cardinality::OneToMany => {
             // lhs is the "one" side: index by key, then pair each rhs.
-            vec_vec_many_to_one(op, return_bool, spec, rhs, lhs, /*one_on_right=*/ false)
+            vec_vec_many_to_one(
+                op,
+                return_bool,
+                spec,
+                rhs,
+                lhs,
+                /*one_on_right=*/ false,
+            )
         }
     }
 }
@@ -293,12 +299,7 @@ fn vec_vec_many_to_one(
 /// the resulting `Vec<f64>` (grid-aligned, NaN where comparison-as-
 /// filter rejects) or `None` if every position fell out under
 /// comparison-as-filter semantics. Arithmetic always returns `Some`.
-fn pair_values(
-    op: BinopKind,
-    return_bool: bool,
-    lhs: &[f64],
-    rhs: &[f64],
-) -> Option<Vec<f64>> {
+fn pair_values(op: BinopKind, return_bool: bool, lhs: &[f64], rhs: &[f64]) -> Option<Vec<f64>> {
     let n = lhs.len().min(rhs.len());
     let mut values = Vec::with_capacity(n);
     let mut kept_any = false;
@@ -317,11 +318,7 @@ fn pair_values(
             kept_any = true;
         }
     }
-    if kept_any {
-        Some(values)
-    } else {
-        None
-    }
+    if kept_any { Some(values) } else { None }
 }
 
 /// Build a single output series from a matched lhs/rhs pair. Returns
@@ -416,11 +413,7 @@ fn apply_op_or_bool(op: BinopKind, a: f64, b: f64, return_bool: bool) -> f64 {
     if op.is_comparison() {
         let r = cmp(op, a, b);
         if return_bool {
-            if r {
-                1.0
-            } else {
-                0.0
-            }
+            if r { 1.0 } else { 0.0 }
         } else if r {
             a
         } else {
@@ -502,7 +495,14 @@ mod tests {
     fn vector_times_scalar() {
         let v = EvalResult::InstantVector(vec![instant("foo", 4.0)]);
         let spec = MatchSpec::default();
-        let r = apply_binop(BinopKind::Mul, false, Some(&spec), v, EvalResult::Scalar(2.0)).unwrap();
+        let r = apply_binop(
+            BinopKind::Mul,
+            false,
+            Some(&spec),
+            v,
+            EvalResult::Scalar(2.0),
+        )
+        .unwrap();
         match r {
             EvalResult::InstantVector(vs) => {
                 assert_eq!(vs.len(), 1);
@@ -516,11 +516,25 @@ mod tests {
     fn vector_gt_scalar_filters() {
         let v = EvalResult::InstantVector(vec![instant("foo", 4.0), instant("bar", 1.0)]);
         let spec = MatchSpec::default();
-        let r = apply_binop(BinopKind::Gt, false, Some(&spec), v, EvalResult::Scalar(2.0)).unwrap();
+        let r = apply_binop(
+            BinopKind::Gt,
+            false,
+            Some(&spec),
+            v,
+            EvalResult::Scalar(2.0),
+        )
+        .unwrap();
         match r {
             EvalResult::InstantVector(vs) => {
                 assert_eq!(vs.len(), 1);
-                assert_eq!(vs[0].labels.iter().find(|(n, _)| n == "__name__").map(|(_, v)| v.as_str()), Some("foo"));
+                assert_eq!(
+                    vs[0]
+                        .labels
+                        .iter()
+                        .find(|(n, _)| n == "__name__")
+                        .map(|(_, v)| v.as_str()),
+                    Some("foo")
+                );
             }
             _ => panic!(),
         }
@@ -636,8 +650,14 @@ mod tests {
         // series per region. group_left(meta) copies the `meta` label
         // from rhs to each lhs result.
         let lhs = EvalResult::InstantVector(vec![
-            s_with(vec![("__name__", "req"), ("host", "h1"), ("region", "us")], 10.0),
-            s_with(vec![("__name__", "req"), ("host", "h2"), ("region", "us")], 20.0),
+            s_with(
+                vec![("__name__", "req"), ("host", "h1"), ("region", "us")],
+                10.0,
+            ),
+            s_with(
+                vec![("__name__", "req"), ("host", "h2"), ("region", "us")],
+                20.0,
+            ),
         ]);
         let rhs = EvalResult::InstantVector(vec![s_with(
             vec![("__name__", "info"), ("region", "us"), ("meta", "x")],
@@ -676,8 +696,14 @@ mod tests {
             2.0,
         )]);
         let rhs = EvalResult::InstantVector(vec![
-            s_with(vec![("__name__", "req"), ("host", "h1"), ("region", "us")], 10.0),
-            s_with(vec![("__name__", "req"), ("host", "h2"), ("region", "us")], 20.0),
+            s_with(
+                vec![("__name__", "req"), ("host", "h1"), ("region", "us")],
+                10.0,
+            ),
+            s_with(
+                vec![("__name__", "req"), ("host", "h2"), ("region", "us")],
+                20.0,
+            ),
         ]);
         let spec = MatchSpec {
             keys: MatchKeys::On(vec!["region".to_string()]),
@@ -699,10 +725,7 @@ mod tests {
 
     #[test]
     fn comparison_as_filter_keeps_lhs_labels() {
-        let lhs = EvalResult::InstantVector(vec![s_with(
-            vec![("__name__", "a"), ("x", "1")],
-            5.0,
-        )]);
+        let lhs = EvalResult::InstantVector(vec![s_with(vec![("__name__", "a"), ("x", "1")], 5.0)]);
         let rhs = EvalResult::InstantVector(vec![s_with(vec![("x", "1")], 3.0)]);
         let r = apply_binop(BinopKind::Gt, false, Some(&default_spec()), lhs, rhs).unwrap();
         match r {
@@ -755,10 +778,7 @@ mod tests {
         match r {
             EvalResult::InstantVector(vs) => {
                 assert_eq!(vs.len(), 1);
-                assert_eq!(
-                    vs[0].labels.iter().find(|(n, _)| n == "x").unwrap().1,
-                    "2"
-                );
+                assert_eq!(vs[0].labels.iter().find(|(n, _)| n == "x").unwrap().1, "2");
             }
             _ => panic!(),
         }

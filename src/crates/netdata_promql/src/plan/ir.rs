@@ -4,10 +4,6 @@
 // from the `promql_parser` AST. The IR mirrors the AST nodes the evaluator
 // supports, with type errors caught at lowering time rather than at
 // execution.
-//
-// Phase 1 chunk 3 (SOW-0017) covers ~15 AST node kinds. Subqueries, vector
-// matching with group_left/group_right, and function calls beyond what's
-// needed for rate()/histogram_quantile() are deferred.
 
 use std::sync::Arc;
 
@@ -25,10 +21,11 @@ pub enum ValueType {
 
 /// Aggregation operators supported in the evaluator.
 ///
-/// Sum/Avg/Min/Max/Count: Phase 1 (SOW-0017), no parameter.
-/// TopK/BottomK/Quantile: Phase 3c (SOW-0021), each takes a single
-/// scalar parameter (k or phi). `count_values` is parametrized but
-/// takes a string; deferred.
+/// Non-parametrized aggregators (`Sum`/`Avg`/`Min`/`Max`/`Count`/`Stddev`/
+/// `Stdvar`/`Group`) take one instant-vector argument. Parametrized
+/// aggregators (`TopK`/`BottomK`/`Quantile`/`LimitK`/`LimitRatio`) take a
+/// scalar parameter. `CountValues` takes a string parameter (the output
+/// label name).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AggrKind {
     Sum,
@@ -40,20 +37,20 @@ pub enum AggrKind {
     BottomK,
     Quantile,
     CountValues,
-    // SOW-0034: missing-aggregators batch.
-    /// `stddev(v)` -- population standard deviation per group.
+    // Missing-aggregators batch.
+    /// `stddev(v)` — population standard deviation per group.
     /// Distinct from `stddev_over_time`, which is a rollup.
     Stddev,
-    /// `stdvar(v)` -- population variance per group.
+    /// `stdvar(v)` — population variance per group.
     Stdvar,
-    /// `limitk(k, v)` -- first k series per group in signature
+    /// `limitk(k, v)` — first k series per group in signature
     /// order (Prometheus 2.40+).
     LimitK,
-    /// `limit_ratio(ratio, v)` -- deterministic-random selection
+    /// `limit_ratio(ratio, v)` — deterministic-random selection
     /// of approximately `ratio` of input series per group
     /// (Prometheus 2.40+).
     LimitRatio,
-    /// `group(v)` -- emits 1 per output bucket whenever any
+    /// `group(v)` — emits 1 per output bucket whenever any
     /// input series had a non-NaN value. Used as a join-key
     /// fabricator.
     Group,
@@ -99,10 +96,9 @@ pub enum BinopKind {
     Le,
     Gt,
     Ge,
-    // Set operators (Phase 3d / SOW-0022). These take vector/vector
-    // operands and a matching spec; they do not accept the `bool`
-    // modifier or the `group_left`/`group_right` cardinality
-    // modifiers.
+    // Set operators. These take vector/vector operands and a matching
+    // spec; they do not accept the `bool` modifier or the
+    // `group_left`/`group_right` cardinality modifiers.
     LAnd,
     LOr,
     LUnless,
@@ -112,7 +108,12 @@ impl BinopKind {
     pub fn is_comparison(self) -> bool {
         matches!(
             self,
-            BinopKind::Eq | BinopKind::Ne | BinopKind::Lt | BinopKind::Le | BinopKind::Gt | BinopKind::Ge
+            BinopKind::Eq
+                | BinopKind::Ne
+                | BinopKind::Lt
+                | BinopKind::Le
+                | BinopKind::Gt
+                | BinopKind::Ge
         )
     }
 
@@ -123,7 +124,7 @@ impl BinopKind {
 
 /// The `@` modifier on a vector or matrix selector. When present, the
 /// selector evaluates at the resolved timestamp instead of the
-/// EvalContext's `at_ms`. Phase 3g (SOW-0025).
+/// EvalContext's grid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AtMod {
     /// Fixed Unix timestamp in milliseconds.
@@ -197,8 +198,10 @@ impl Default for MatchSpec {
     }
 }
 
-/// Function calls supported in Phase 1. Empty in chunk 3; populated in
-/// chunk 4 (rate, irate, increase, delta, histogram_quantile).
+/// PromQL functions supported by the evaluator.
+///
+/// Each variant maps to a function callable in PromQL expressions.
+/// [`FuncKind::from_name`] resolves a function name string to its variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FuncKind {
     Rate,
@@ -219,7 +222,7 @@ pub enum FuncKind {
     QuantileOverTime,
     PredictLinear,
     HoltWinters,
-    // SOW-0027 Group A: per-sample math transforms on instant vectors.
+    // Per-sample math transforms on instant vectors.
     Abs,
     Ceil,
     Floor,
@@ -229,20 +232,20 @@ pub enum FuncKind {
     Log10,
     Exp,
     Sqrt,
-    // SOW-0027 Group B: bounded transforms / rounding.
+    // Bounded transforms / rounding.
     Clamp,
     ClampMin,
     ClampMax,
     Round,
-    // SOW-0027 Group C: vector restructuring.
+    // Vector restructuring.
     Vector,
     Scalar,
     Sort,
     SortDesc,
-    // SOW-0027 Group D: timestamp / time.
+    // Timestamp / time.
     Time,
     Timestamp,
-    // SOW-0027 Group E: range-vector reductions.
+    // Range-vector reductions.
     Deriv,
     IDelta,
     Changes,
@@ -270,7 +273,6 @@ impl FuncKind {
             "quantile_over_time" => FuncKind::QuantileOverTime,
             "predict_linear" => FuncKind::PredictLinear,
             "holt_winters" => FuncKind::HoltWinters,
-            // SOW-0027.
             "abs" => FuncKind::Abs,
             "ceil" => FuncKind::Ceil,
             "floor" => FuncKind::Floor,
@@ -310,10 +312,10 @@ impl FuncKind {
     }
 }
 
-/// Label-mutation kind. SOW-0027 Group F. Carried by `Plan::LabelOp`
-/// rather than being a regular `FuncKind` because the operator takes
-/// string-literal arguments (not lowerable Plans), and the lowering
-/// layer pre-extracts them.
+/// Label-mutation kind. Carried by [`Plan::LabelOp`] rather than being
+/// a regular [`FuncKind`] because these operators take string-literal
+/// arguments (not lowerable Plans), and the lowering layer pre-extracts
+/// them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LabelOpKind {
     /// `label_replace(v, dst, repl, src, regex)`. The regex is
@@ -334,10 +336,11 @@ pub enum LabelOpKind {
     },
 }
 
-/// The Plan IR.
+/// The Plan IR — a typed, executable representation of a PromQL query.
 ///
-/// Cheap to clone (`Arc` for the heavy heap-allocated children), so the
-/// parse cache can hand out copies safely.
+/// Cheap to clone (`Arc` for heap-allocated children), so the parse cache
+/// can hand out copies safely. Each variant carries a known [`ValueType`]
+/// resolved at lowering time.
 #[derive(Debug, Clone)]
 pub enum Plan {
     /// A scalar number literal.
@@ -351,8 +354,7 @@ pub enum Plan {
         /// forwards.
         offset_ms: i64,
         /// `@` modifier. When `Some`, the selector evaluates at the
-        /// resolved timestamp instead of the EvalContext's `at_ms`.
-        /// Added in SOW-0025.
+        /// resolved timestamp instead of the EvalContext's grid.
         at: Option<AtMod>,
     },
 
@@ -371,9 +373,8 @@ pub enum Plan {
 
     /// Binary operation. The Plan IR distinguishes type combinations at
     /// lowering time: scalar/scalar, scalar/vector, vector/scalar,
-    /// vector/vector. The single variant carries the kind, the bool
-    /// modifier for comparisons, and the vector-matching spec (Phase 3d
-    /// / SOW-0022).
+    /// vector/vector. Carries the kind, the `bool` modifier for
+    /// comparisons, and the vector-matching spec.
     Binop {
         op: BinopKind,
         /// True for `comparison bool` operators which return 0/1 rather
@@ -403,16 +404,12 @@ pub enum Plan {
     },
 
     /// Function call: rate(), histogram_quantile(), etc.
-    Call {
-        func: FuncKind,
-        args: Vec<Plan>,
-    },
+    Call { func: FuncKind, args: Vec<Plan> },
 
     /// Subquery `<expr>[range_ms:step_ms] [@<ts>] [offset <d>]`. The
     /// inner expression must lower to `InstantVector`; evaluating the
     /// subquery yields a `RangeVector` by re-evaluating the inner at
     /// every grid point in `[t - range_ms, t]` at `step_ms` stride.
-    /// SOW-0026.
     Subquery {
         expr: Arc<Plan>,
         range_ms: i64,
@@ -424,19 +421,15 @@ pub enum Plan {
         at: Option<AtMod>,
     },
 
-    /// `label_replace` / `label_join` (SOW-0027 Group F). Carries the
-    /// pre-extracted string args alongside the input expression.
-    LabelOp {
-        op: LabelOpKind,
-        expr: Arc<Plan>,
-    },
+    /// `label_replace` / `label_join`. Carries the pre-extracted string
+    /// args alongside the input expression.
+    LabelOp { op: LabelOpKind, expr: Arc<Plan> },
 
-    /// `absent(v)` / `absent_over_time(v[w])` (SOW-0027 Group G). When
-    /// the inner returns empty, emits a single series with `labels`
-    /// taken from the inner's static `=` matchers (when the inner is
-    /// a vector/matrix selector) or an empty label set (when the
-    /// inner is a more complex expression). The evaluator decides
-    /// instant-vs-range based on `expr.value_type()`.
+    /// `absent(v)` / `absent_over_time(v[w])`. When the inner returns
+    /// empty, emits a single series with `labels` taken from the inner's
+    /// static `=` matchers (when the inner is a vector/matrix selector)
+    /// or an empty label set (when the inner is a more complex expression).
+    /// The evaluator decides instant-vs-range based on `expr.value_type()`.
     Absent {
         labels: Vec<(String, String)>,
         expr: Arc<Plan>,
@@ -445,7 +438,7 @@ pub enum Plan {
     /// `aggr(rollup(matrix-selector | subquery))` fused into a single
     /// streaming pass. Emitted by the lowering layer when the inner
     /// expression matches the pattern and both the aggregator and the
-    /// rollup are on the supported list (see `eval::fused`). SOW-0033.
+    /// rollup are on the supported list (see `eval::fused`).
     ///
     /// The unfused `Plan::Aggregate{expr: Plan::Call{...}}` shape is
     /// still emitted for combinations outside the supported list
@@ -503,14 +496,13 @@ impl Plan {
     /// True when the plan contains any operator that needs exact
     /// distribution shape from the storage layer and therefore cannot
     /// run against the bucket-aggregated samples that higher tiers
-    /// store. SOW-0041.
+    /// store.
     ///
     /// Operators that force tier 0:
     /// - `min_over_time`, `max_over_time` — need per-sample extremes
     /// - `quantile_over_time` — needs the full distribution
     /// - `stddev_over_time`, `stdvar_over_time` — need raw samples for
-    ///   variance (variance of bucket averages is a different
-    ///   statistic, not the user-intended one)
+    ///   variance (variance of bucket averages is a different statistic)
     /// - `topk`, `bottomk` — select among series by exact value
     ///
     /// Plans without any of these operators can run on auto-selected
@@ -521,8 +513,7 @@ impl Plan {
             Plan::UnaryMinus(inner) => inner.requires_tier_zero(),
             Plan::Binop { lhs, rhs, .. } => lhs.requires_tier_zero() || rhs.requires_tier_zero(),
             Plan::Aggregate { op, expr, .. } => {
-                matches!(op, AggrKind::TopK | AggrKind::BottomK)
-                    || expr.requires_tier_zero()
+                matches!(op, AggrKind::TopK | AggrKind::BottomK) || expr.requires_tier_zero()
             }
             Plan::Call { func, args } => {
                 func.requires_tier_zero() || args.iter().any(|a| a.requires_tier_zero())
@@ -530,7 +521,12 @@ impl Plan {
             Plan::Subquery { expr, .. } => expr.requires_tier_zero(),
             Plan::LabelOp { expr, .. } => expr.requires_tier_zero(),
             Plan::Absent { expr, .. } => expr.requires_tier_zero(),
-            Plan::FusedAggrRollup { aggr, rollup, source, .. } => {
+            Plan::FusedAggrRollup {
+                aggr,
+                rollup,
+                source,
+                ..
+            } => {
                 matches!(aggr, AggrKind::TopK | AggrKind::BottomK)
                     || rollup.requires_tier_zero()
                     || match source {

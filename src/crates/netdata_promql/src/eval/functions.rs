@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Counter-family functions (rate, irate, increase, delta) and
-// `histogram_quantile`.
+// Built-in PromQL functions: counter-family (rate, irate, increase,
+// delta), histogram_quantile, _over_time family, per-sample math
+// transforms, bounded transforms, vector restructuring, and more.
 //
-// Counter semantics per SOW-0017 Implications #2: rate/irate/increase
-// work directly on the deltas Netdata's storage already produced. We do
-// not reconstruct a cumulative counter value, and we do not infer resets
-// from sample-to-sample decreases -- if the storage flagged a reset, the
-// delta at that bucket already reflects it.
+// Counter semantics: rate/irate/increase work directly on the deltas
+// Netdata's storage already produced. We do not reconstruct a cumulative
+// counter value, and we do not infer resets from sample-to-sample
+// decreases -- if the storage flagged a reset, the delta at that bucket
+// already reflects it.
 
 use std::collections::BTreeMap;
 
 use crate::plan::FuncKind;
 
 use super::context::EvalContext;
-use super::types::{labels_signature, EvalError, EvalResult, Sample, Series};
+use super::types::{EvalError, EvalResult, Sample, Series, labels_signature};
 
 pub fn apply_call(
     ctx: &EvalContext,
@@ -41,7 +42,7 @@ pub fn apply_call(
         FuncKind::QuantileOverTime => apply_quantile_over_time(ctx, args, range_ms),
         FuncKind::PredictLinear => apply_predict_linear(ctx, args, range_ms),
         FuncKind::HoltWinters => apply_holt_winters(ctx, args, range_ms),
-        // SOW-0027 Group A: per-sample math transforms.
+        // Per-sample math transforms.
         FuncKind::Abs => apply_per_sample(args, "abs", f64::abs),
         FuncKind::Ceil => apply_per_sample(args, "ceil", f64::ceil),
         FuncKind::Floor => apply_per_sample(args, "floor", f64::floor),
@@ -51,26 +52,25 @@ pub fn apply_call(
         FuncKind::Log10 => apply_per_sample(args, "log10", f64::log10),
         FuncKind::Exp => apply_per_sample(args, "exp", f64::exp),
         FuncKind::Sqrt => apply_per_sample(args, "sqrt", f64::sqrt),
-        // SOW-0027 Group B: bounded transforms / rounding.
+        // Bounded transforms / rounding.
         FuncKind::Clamp => apply_clamp(args),
         FuncKind::ClampMin => apply_clamp_min(args),
         FuncKind::ClampMax => apply_clamp_max(args),
         FuncKind::Round => apply_round(args),
-        // SOW-0027 Group C: vector restructuring.
+        // Vector restructuring.
         FuncKind::Vector => apply_vector(args),
         FuncKind::Scalar => apply_scalar(args),
         FuncKind::Sort => apply_sort(args, false),
         FuncKind::SortDesc => apply_sort(args, true),
-        // SOW-0027 Group D: time / timestamp. `time()` is plumbed through
-        // dispatch because the evaluator needs the eval-context's at_ms;
-        // we encode that requirement here by having dispatch.rs reject
-        // `Time` from this path and produce the scalar directly. See
-        // `eval/dispatch.rs` for the special-case.
+        // Time / timestamp. `time()` is plumbed through dispatch because the
+        // evaluator needs the eval-context's at_ms; we encode that
+        // requirement here by having dispatch.rs reject `Time` from this
+        // path and produce the scalar directly.
         FuncKind::Time => Err(EvalError::Other(
             "time() is evaluated by the dispatcher".to_string(),
         )),
         FuncKind::Timestamp => apply_timestamp(args),
-        // SOW-0027 Group E: range-vector reductions.
+        // Range-vector reductions.
         FuncKind::Deriv => apply_deriv(ctx, args, range_ms),
         FuncKind::IDelta => apply_idelta(ctx, args, range_ms),
         FuncKind::Changes => apply_changes(ctx, args, range_ms),
@@ -83,7 +83,7 @@ pub fn apply_call(
 /// is the half-open `(t - range_ms, t]`. Returns one `f64` per grid
 /// timestamp; positions where `compute` returns `None` get NaN. Used
 /// by every range-vector rollup to produce grid-aligned output in a
-/// single pass over the underlying sample sequence. SOW-0031 + SOW-0032.
+/// single pass over the underlying sample sequence.
 fn rollup_two_pointer<F>(
     timestamps: &[i64],
     values: &[f64],
@@ -114,7 +114,7 @@ where
 }
 
 /// Windowed aggregator selector. The variants correspond to the seven
-/// `*_over_time` functions in Phase 3b (SOW-0020).
+/// `*_over_time` functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OverTimeOp {
     Avg,
@@ -190,9 +190,13 @@ fn apply_over_time_typed<R: OverTimeReducer>(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |ts, vals| {
-            compute_over_time::<R>(ts, vals).map(|(v, _)| v)
-        });
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            |ts, vals| compute_over_time::<R>(ts, vals).map(|(v, _)| v),
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -225,13 +229,13 @@ fn apply_over_time_legacy<R: OverTimeReducer>(range: Vec<Series>) -> Result<Eval
 }
 
 // ---------------------------------------------------------------------------
-// OverTimeReducer trait + per-op accumulators. SOW-0039.
+// OverTimeReducer trait + per-op accumulators.
 //
 // Each `*_over_time` operator is a separate impl with its own Acc shape,
 // so the per-sample fold touches only the state that operator actually
-// reads. Compared to the pre-SOW-0039 unified loop, this drops dead
-// accumulator updates (e.g. `avg_over_time` no longer maintains
-// min/max/sum_sq) and gives LLVM enough static information per impl to
+// reads. This drops dead accumulator updates (e.g. `avg_over_time`
+// no longer maintains min/max/sum_sq) and gives LLVM enough static
+// information per impl to
 // inline `step` into the calling loop and, where the reducer permits,
 // auto-vectorize the value-side reduction.
 //
@@ -601,11 +605,14 @@ pub(crate) enum WindowOp {
     Increase,
 }
 
-fn expect_one_range_vector(args: Vec<EvalResult>, func: &'static str) -> Result<Vec<Series>, EvalError> {
+fn expect_one_range_vector(
+    args: Vec<EvalResult>,
+    func: &'static str,
+) -> Result<Vec<Series>, EvalError> {
     let mut it = args.into_iter();
-    let first = it.next().ok_or_else(|| {
-        EvalError::Other(format!("{func} requires a range-vector argument"))
-    })?;
+    let first = it
+        .next()
+        .ok_or_else(|| EvalError::Other(format!("{func} requires a range-vector argument")))?;
     if it.next().is_some() {
         return Err(EvalError::Other(format!(
             "{func} expects exactly one argument"
@@ -639,9 +646,13 @@ fn apply_window_op(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |ts, vals| {
-            compute_window_op(ts, vals, op)
-        });
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            |ts, vals| compute_window_op(ts, vals, op),
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -655,7 +666,9 @@ fn apply_window_op(
 fn apply_window_op_legacy(range: Vec<Series>, op: WindowOp) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_window_op(&s.timestamps, &s.values, op) else { continue };
+        let Some(value) = compute_window_op(&s.timestamps, &s.values, op) else {
+            continue;
+        };
         let (labels, _) = strip_name(&s.labels);
         let ts = s.timestamps.last().copied().unwrap_or(0);
         out.push(Series::scalar(labels, ts, value));
@@ -700,9 +713,13 @@ fn apply_irate(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |ts, vals| {
-            compute_irate(ts, vals)
-        });
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            |ts, vals| compute_irate(ts, vals),
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -731,7 +748,9 @@ pub(crate) fn compute_irate(timestamps: &[i64], values: &[f64]) -> Option<f64> {
 fn apply_irate_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_irate(&s.timestamps, &s.values) else { continue };
+        let Some(value) = compute_irate(&s.timestamps, &s.values) else {
+            continue;
+        };
         let ts = s.timestamps.last().copied().unwrap_or(0);
         let (labels, _) = strip_name(&s.labels);
         out.push(Series::scalar(labels, ts, value));
@@ -758,9 +777,13 @@ fn apply_delta(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |_ts, vals| {
-            compute_delta(vals)
-        });
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            |_ts, vals| compute_delta(vals),
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -786,7 +809,9 @@ pub(crate) fn compute_delta(values: &[f64]) -> Option<f64> {
 fn apply_delta_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_delta(&s.values) else { continue };
+        let Some(value) = compute_delta(&s.values) else {
+            continue;
+        };
         let ts = s.timestamps.last().copied().unwrap_or(0);
         let (labels, _) = strip_name(&s.labels);
         out.push(Series::scalar(labels, ts, value));
@@ -809,12 +834,12 @@ fn apply_histogram_quantile(args: Vec<EvalResult>) -> Result<EvalResult, EvalErr
                 context: "histogram_quantile phi",
                 expected: crate::plan::ValueType::Scalar,
                 got: other.value_type(),
-            })
+            });
         }
         None => {
             return Err(EvalError::Other(
                 "histogram_quantile requires (phi, vector)".to_string(),
-            ))
+            ));
         }
     };
     let vector = match it.next() {
@@ -824,12 +849,12 @@ fn apply_histogram_quantile(args: Vec<EvalResult>) -> Result<EvalResult, EvalErr
                 context: "histogram_quantile vector",
                 expected: crate::plan::ValueType::InstantVector,
                 got: other.value_type(),
-            })
+            });
         }
         None => {
             return Err(EvalError::Other(
                 "histogram_quantile requires (phi, vector)".to_string(),
-            ))
+            ));
         }
     };
     if it.next().is_some() {
@@ -847,7 +872,9 @@ fn apply_histogram_quantile(args: Vec<EvalResult>) -> Result<EvalResult, EvalErr
     let mut groups: BTreeMap<u64, (Vec<(String, String)>, Vec<HBucket>, i64)> = BTreeMap::new();
     let mut saw_le = false;
     for s in vector.into_iter() {
-        let Some(le_str) = lookup_label(&s.labels, "le") else { continue };
+        let Some(le_str) = lookup_label(&s.labels, "le") else {
+            continue;
+        };
         saw_le = true;
         let le = parse_le(le_str);
         let Some(le) = le else { continue };
@@ -865,7 +892,9 @@ fn apply_histogram_quantile(args: Vec<EvalResult>) -> Result<EvalResult, EvalErr
             .cloned()
             .collect();
         let key = labels_signature(&key_labels);
-        let entry = groups.entry(key).or_insert_with(|| (key_labels, Vec::new(), ts));
+        let entry = groups
+            .entry(key)
+            .or_insert_with(|| (key_labels, Vec::new(), ts));
         entry.1.push(HBucket { le, count: value });
         entry.2 = entry.2.max(ts);
     }
@@ -879,7 +908,9 @@ fn apply_histogram_quantile(args: Vec<EvalResult>) -> Result<EvalResult, EvalErr
     let mut out = Vec::with_capacity(groups.len());
     for (_, (labels, mut buckets, ts)) in groups.into_iter() {
         buckets.sort_by(|a, b| a.le.partial_cmp(&b.le).unwrap_or(std::cmp::Ordering::Equal));
-        let Some(value) = interpolate_quantile(&buckets, phi) else { continue };
+        let Some(value) = interpolate_quantile(&buckets, phi) else {
+            continue;
+        };
         out.push(Series::scalar(labels, ts, value));
     }
     out.sort_by_key(|s| s.signature);
@@ -955,13 +986,13 @@ fn interpolate_quantile(buckets: &[HBucket], phi: f64) -> Option<f64> {
 }
 
 // ---------------------------------------------------------------------------
-// Two-arg over_time variants and predictive functions (SOW-0023)
+// Two-arg over_time variants and predictive functions
 // ---------------------------------------------------------------------------
 
 /// quantile_over_time(phi, range_vector): per series, sort non-NaN
 /// samples ascending and apply the same linear-interpolation formula
-/// used by the `quantile` aggregator (SOW-0021). Phi outside [0, 1]
-/// clamps to +-Inf per Prometheus. Empty window drops the series.
+/// used by the `quantile` aggregator. Phi outside [0, 1] clamps to
+/// +-Inf per Prometheus. Empty window drops the series.
 fn apply_quantile_over_time(
     ctx: &EvalContext,
     args: Vec<EvalResult>,
@@ -975,9 +1006,13 @@ fn apply_quantile_over_time(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |_ts, vals| {
-            compute_quantile_over_window(vals, phi)
-        });
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            |_ts, vals| compute_quantile_over_window(vals, phi),
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -997,13 +1032,12 @@ fn compute_quantile_over_window(values: &[f64], phi: f64) -> Option<f64> {
     Some(crate::eval::aggregation::compute_quantile(&sorted, phi))
 }
 
-fn apply_quantile_over_time_legacy(
-    phi: f64,
-    range: Vec<Series>,
-) -> Result<EvalResult, EvalError> {
+fn apply_quantile_over_time_legacy(phi: f64, range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_quantile_over_window(&s.values, phi) else { continue };
+        let Some(value) = compute_quantile_over_window(&s.values, phi) else {
+            continue;
+        };
         let ts = s
             .values
             .iter()
@@ -1037,9 +1071,13 @@ fn apply_predict_linear(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |ts, vals| {
-            compute_predict_linear(ts, vals, t_secs)
-        });
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            |ts, vals| compute_predict_linear(ts, vals, t_secs),
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -1051,11 +1089,13 @@ fn apply_predict_linear(
 }
 
 fn compute_predict_linear(timestamps: &[i64], values: &[f64], t_secs: f64) -> Option<f64> {
-    let last_ts_ms = values
-        .iter()
-        .enumerate()
-        .rev()
-        .find_map(|(i, v)| if v.is_nan() { None } else { Some(timestamps[i]) })?;
+    let last_ts_ms = values.iter().enumerate().rev().find_map(|(i, v)| {
+        if v.is_nan() {
+            None
+        } else {
+            Some(timestamps[i])
+        }
+    })?;
     let now_s = (last_ts_ms as f64) / 1000.0;
     let mut n = 0.0;
     let mut sum_x = 0.0;
@@ -1094,19 +1134,24 @@ fn compute_predict_linear(timestamps: &[i64], values: &[f64], t_secs: f64) -> Op
     Some(intercept + slope * t_secs)
 }
 
-fn apply_predict_linear_legacy(
-    range: Vec<Series>,
-    t_secs: f64,
-) -> Result<EvalResult, EvalError> {
+fn apply_predict_linear_legacy(range: Vec<Series>, t_secs: f64) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_predict_linear(&s.timestamps, &s.values, t_secs) else { continue };
+        let Some(value) = compute_predict_linear(&s.timestamps, &s.values, t_secs) else {
+            continue;
+        };
         let last_ts_ms = s
             .values
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
+            .find_map(|(i, v)| {
+                if v.is_nan() {
+                    None
+                } else {
+                    Some(s.timestamps[i])
+                }
+            })
             .unwrap_or(0);
         let (labels, _) = strip_name(&s.labels);
         out.push(Series::scalar(labels, last_ts_ms, value));
@@ -1141,9 +1186,13 @@ fn apply_holt_winters(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, |_ts, vals| {
-            compute_holt_winters(vals, sf, tf)
-        });
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            |_ts, vals| compute_holt_winters(vals, sf, tf),
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -1180,13 +1229,21 @@ fn apply_holt_winters_legacy(
 ) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_holt_winters(&s.values, sf, tf) else { continue };
+        let Some(value) = compute_holt_winters(&s.values, sf, tf) else {
+            continue;
+        };
         let last_ts = s
             .values
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
+            .find_map(|(i, v)| {
+                if v.is_nan() {
+                    None
+                } else {
+                    Some(s.timestamps[i])
+                }
+            })
             .unwrap_or(0);
         let (labels, _) = strip_name(&s.labels);
         out.push(Series::scalar(labels, last_ts, value));
@@ -1315,9 +1372,7 @@ fn expect_range_then_two_scalars(
             });
         }
         None => {
-            return Err(EvalError::Other(format!(
-                "{func} requires three arguments"
-            )));
+            return Err(EvalError::Other(format!("{func} requires three arguments")));
         }
     };
     let tf = match it.next() {
@@ -1330,9 +1385,7 @@ fn expect_range_then_two_scalars(
             });
         }
         None => {
-            return Err(EvalError::Other(format!(
-                "{func} requires three arguments"
-            )));
+            return Err(EvalError::Other(format!("{func} requires three arguments")));
         }
     };
     if it.next().is_some() {
@@ -1354,7 +1407,7 @@ fn strip_name(labels: &[(String, String)]) -> (Vec<(String, String)>, u64) {
 }
 
 // ---------------------------------------------------------------------------
-// SOW-0027: function omnibus (Tier 1 + Tier 2).
+// Per-sample transforms, bounded transforms, vector restructuring, etc.
 // ---------------------------------------------------------------------------
 
 /// Group A helper: apply a pure `f64 -> f64` transform to every sample of
@@ -1405,22 +1458,14 @@ fn apply_clamp(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
 fn apply_clamp_min(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
     let (series, lo) = expect_vec_then_scalar(args, "clamp_min")?;
     Ok(EvalResult::InstantVector(map_samples(series, |v| {
-        if v.is_nan() {
-            f64::NAN
-        } else {
-            v.max(lo)
-        }
+        if v.is_nan() { f64::NAN } else { v.max(lo) }
     })))
 }
 
 fn apply_clamp_max(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
     let (series, hi) = expect_vec_then_scalar(args, "clamp_max")?;
     Ok(EvalResult::InstantVector(map_samples(series, |v| {
-        if v.is_nan() {
-            f64::NAN
-        } else {
-            v.min(hi)
-        }
+        if v.is_nan() { f64::NAN } else { v.min(hi) }
     })))
 }
 
@@ -1428,9 +1473,9 @@ fn apply_clamp_max(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
 /// nearest multiple of `n`. Prometheus uses round-half-up; we mirror.
 fn apply_round(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
     let mut it = args.into_iter();
-    let first = it.next().ok_or_else(|| {
-        EvalError::Other("round requires an instant-vector argument".to_string())
-    })?;
+    let first = it
+        .next()
+        .ok_or_else(|| EvalError::Other("round requires an instant-vector argument".to_string()))?;
     let to_nearest = match it.next() {
         None => 1.0,
         Some(EvalResult::Scalar(v)) => v,
@@ -1439,11 +1484,13 @@ fn apply_round(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
                 context: "round to_nearest",
                 expected: crate::plan::ValueType::Scalar,
                 got: other.value_type(),
-            })
+            });
         }
     };
     if it.next().is_some() {
-        return Err(EvalError::Other("round expects at most 2 arguments".to_string()));
+        return Err(EvalError::Other(
+            "round expects at most 2 arguments".to_string(),
+        ));
     }
     let series = match first {
         EvalResult::InstantVector(s) => s,
@@ -1452,7 +1499,7 @@ fn apply_round(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
                 context: "round",
                 expected: crate::plan::ValueType::InstantVector,
                 got: other.value_type(),
-            })
+            });
         }
     };
     let scale = if to_nearest == 0.0 { 1.0 } else { to_nearest };
@@ -1468,11 +1515,13 @@ fn apply_round(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
 
 fn apply_vector(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
     let mut it = args.into_iter();
-    let first = it.next().ok_or_else(|| {
-        EvalError::Other("vector requires a scalar argument".to_string())
-    })?;
+    let first = it
+        .next()
+        .ok_or_else(|| EvalError::Other("vector requires a scalar argument".to_string()))?;
     if it.next().is_some() {
-        return Err(EvalError::Other("vector expects exactly 1 argument".to_string()));
+        return Err(EvalError::Other(
+            "vector expects exactly 1 argument".to_string(),
+        ));
     }
     let v = match first {
         EvalResult::Scalar(v) => v,
@@ -1481,7 +1530,7 @@ fn apply_vector(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
                 context: "vector",
                 expected: crate::plan::ValueType::Scalar,
                 got: other.value_type(),
-            })
+            });
         }
     };
     // `vector(s)` returns one labelless series whose single sample has the
@@ -1509,10 +1558,8 @@ fn apply_scalar(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
 }
 
 fn apply_sort(args: Vec<EvalResult>, descending: bool) -> Result<EvalResult, EvalError> {
-    let mut series = expect_one_instant_vector(
-        args,
-        if descending { "sort_desc" } else { "sort" },
-    )?;
+    let mut series =
+        expect_one_instant_vector(args, if descending { "sort_desc" } else { "sort" })?;
     series.sort_by(|a, b| {
         let av = a.values.first().copied().unwrap_or(f64::NAN);
         let bv = b.values.first().copied().unwrap_or(f64::NAN);
@@ -1523,11 +1570,7 @@ fn apply_sort(args: Vec<EvalResult>, descending: bool) -> Result<EvalResult, Eva
             (false, true) => std::cmp::Ordering::Less,
             (false, false) => {
                 let ord = av.partial_cmp(&bv).unwrap_or(std::cmp::Ordering::Equal);
-                if descending {
-                    ord.reverse()
-                } else {
-                    ord
-                }
+                if descending { ord.reverse() } else { ord }
             }
         }
     });
@@ -1542,11 +1585,7 @@ fn apply_timestamp(args: Vec<EvalResult>) -> Result<EvalResult, EvalError> {
             let (labels, _) = strip_name(&s.labels);
             // Per-position: emit value = sample's own timestamp in
             // seconds. Output keeps the grid-aligned timestamps Arc.
-            let values: Vec<f64> = s
-                .timestamps
-                .iter()
-                .map(|&t| t as f64 / 1000.0)
-                .collect();
+            let values: Vec<f64> = s.timestamps.iter().map(|&t| t as f64 / 1000.0).collect();
             Series::new(labels, s.timestamps, values)
         })
         .collect();
@@ -1566,7 +1605,13 @@ fn apply_deriv(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, compute_deriv);
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            compute_deriv,
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -1611,13 +1656,21 @@ fn compute_deriv(timestamps: &[i64], values: &[f64]) -> Option<f64> {
 fn apply_deriv_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_deriv(&s.timestamps, &s.values) else { continue };
+        let Some(value) = compute_deriv(&s.timestamps, &s.values) else {
+            continue;
+        };
         let last_ts = s
             .values
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
+            .find_map(|(i, v)| {
+                if v.is_nan() {
+                    None
+                } else {
+                    Some(s.timestamps[i])
+                }
+            })
             .unwrap_or(0);
         let (labels, _) = strip_name(&s.labels);
         out.push(Series::scalar(labels, last_ts, value));
@@ -1639,7 +1692,13 @@ fn apply_idelta(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, compute_idelta);
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            compute_idelta,
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -1663,13 +1722,21 @@ fn compute_idelta(_timestamps: &[i64], values: &[f64]) -> Option<f64> {
 fn apply_idelta_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_idelta(&s.timestamps, &s.values) else { continue };
+        let Some(value) = compute_idelta(&s.timestamps, &s.values) else {
+            continue;
+        };
         let last_ts = s
             .values
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
+            .find_map(|(i, v)| {
+                if v.is_nan() {
+                    None
+                } else {
+                    Some(s.timestamps[i])
+                }
+            })
             .unwrap_or(0);
         let (labels, _) = strip_name(&s.labels);
         out.push(Series::scalar(labels, last_ts, value));
@@ -1691,7 +1758,13 @@ fn apply_changes(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, compute_changes);
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            compute_changes,
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -1719,13 +1792,21 @@ fn compute_changes(_timestamps: &[i64], values: &[f64]) -> Option<f64> {
 fn apply_changes_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_changes(&s.timestamps, &s.values) else { continue };
+        let Some(value) = compute_changes(&s.timestamps, &s.values) else {
+            continue;
+        };
         let last_ts = s
             .values
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
+            .find_map(|(i, v)| {
+                if v.is_nan() {
+                    None
+                } else {
+                    Some(s.timestamps[i])
+                }
+            })
             .unwrap_or(0);
         let (labels, _) = strip_name(&s.labels);
         out.push(Series::scalar(labels, last_ts, value));
@@ -1747,7 +1828,13 @@ fn apply_resets(
     let grid_ts = std::sync::Arc::clone(&grid.timestamps);
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let values = rollup_two_pointer(&s.timestamps, &s.values, &grid.timestamps, window_ms, compute_resets);
+        let values = rollup_two_pointer(
+            &s.timestamps,
+            &s.values,
+            &grid.timestamps,
+            window_ms,
+            compute_resets,
+        );
         if values.iter().all(|v| v.is_nan()) {
             continue;
         }
@@ -1775,13 +1862,21 @@ fn compute_resets(_timestamps: &[i64], values: &[f64]) -> Option<f64> {
 fn apply_resets_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
     let mut out = Vec::with_capacity(range.len());
     for s in range.into_iter() {
-        let Some(value) = compute_resets(&s.timestamps, &s.values) else { continue };
+        let Some(value) = compute_resets(&s.timestamps, &s.values) else {
+            continue;
+        };
         let last_ts = s
             .values
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(i, v)| if v.is_nan() { None } else { Some(s.timestamps[i]) })
+            .find_map(|(i, v)| {
+                if v.is_nan() {
+                    None
+                } else {
+                    Some(s.timestamps[i])
+                }
+            })
             .unwrap_or(0);
         let (labels, _) = strip_name(&s.labels);
         out.push(Series::scalar(labels, last_ts, value));
@@ -1791,7 +1886,7 @@ fn apply_resets_legacy(range: Vec<Series>) -> Result<EvalResult, EvalError> {
 }
 
 // ---------------------------------------------------------------------------
-// Shared argument-extraction helpers for SOW-0027.
+// Shared argument-extraction helpers.
 // ---------------------------------------------------------------------------
 
 fn expect_one_instant_vector(
@@ -1840,7 +1935,7 @@ fn expect_vec_then_scalar(
                 context: func,
                 expected: crate::plan::ValueType::InstantVector,
                 got: other.value_type(),
-            })
+            });
         }
     };
     let scalar = match second {
@@ -1850,7 +1945,7 @@ fn expect_vec_then_scalar(
                 context: func,
                 expected: crate::plan::ValueType::Scalar,
                 got: other.value_type(),
-            })
+            });
         }
     };
     Ok((series, scalar))
@@ -1882,7 +1977,7 @@ fn expect_vec_then_two_scalars(
                 context: func,
                 expected: crate::plan::ValueType::InstantVector,
                 got: other.value_type(),
-            })
+            });
         }
     };
     let a = match second {
@@ -1892,7 +1987,7 @@ fn expect_vec_then_two_scalars(
                 context: func,
                 expected: crate::plan::ValueType::Scalar,
                 got: other.value_type(),
-            })
+            });
         }
     };
     let b = match third {
@@ -1902,7 +1997,7 @@ fn expect_vec_then_two_scalars(
                 context: func,
                 expected: crate::plan::ValueType::Scalar,
                 got: other.value_type(),
-            })
+            });
         }
     };
     Ok((series, a, b))
@@ -1951,7 +2046,13 @@ mod tests {
             samples.push((i * 10_000, 10.0));
         }
         let s = series(vec![("__name__", "foo")], samples);
-        let r = apply_window_op(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None, WindowOp::Rate).unwrap();
+        let r = apply_window_op(
+            &EvalContext::default(),
+            vec![EvalResult::RangeVector(vec![s])],
+            None,
+            WindowOp::Rate,
+        )
+        .unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
@@ -1971,8 +2072,13 @@ mod tests {
             vec![("__name__", "foo")],
             vec![(0, 10.0), (1000, 5.0), (2000, 20.0)],
         );
-        let r =
-            apply_window_op(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None, WindowOp::Increase).unwrap();
+        let r = apply_window_op(
+            &EvalContext::default(),
+            vec![EvalResult::RangeVector(vec![s])],
+            None,
+            WindowOp::Increase,
+        )
+        .unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 assert!((v[0].values[0] - 35.0).abs() < 1e-9);
@@ -1987,7 +2093,12 @@ mod tests {
             vec![("__name__", "foo")],
             vec![(0, 1.0), (5_000, 2.0), (10_000, 3.0)],
         );
-        let r = apply_irate(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None).unwrap();
+        let r = apply_irate(
+            &EvalContext::default(),
+            vec![EvalResult::RangeVector(vec![s])],
+            None,
+        )
+        .unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 // Last delta = 3.0 over 5s gap = 0.6/s.
@@ -2003,7 +2114,12 @@ mod tests {
             vec![("__name__", "g")],
             vec![(0, 100.0), (10_000, 105.0), (20_000, 90.0)],
         );
-        let r = apply_delta(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None).unwrap();
+        let r = apply_delta(
+            &EvalContext::default(),
+            vec![EvalResult::RangeVector(vec![s])],
+            None,
+        )
+        .unwrap();
         match r {
             EvalResult::InstantVector(v) => {
                 assert!((v[0].values[0] - (-10.0)).abs() < 1e-9);
@@ -2033,7 +2149,11 @@ mod tests {
         match r {
             EvalResult::InstantVector(v) => {
                 assert_eq!(v.len(), 1);
-                assert!((v[0].values[0] - 2.5).abs() < 1e-9, "got {}", v[0].values[0]);
+                assert!(
+                    (v[0].values[0] - 2.5).abs() < 1e-9,
+                    "got {}",
+                    v[0].values[0]
+                );
             }
             _ => panic!(),
         }
@@ -2062,11 +2182,9 @@ mod tests {
                 ));
             }
         }
-        let r = apply_histogram_quantile(vec![
-            EvalResult::Scalar(0.99),
-            EvalResult::InstantVector(v),
-        ])
-        .unwrap();
+        let r =
+            apply_histogram_quantile(vec![EvalResult::Scalar(0.99), EvalResult::InstantVector(v)])
+                .unwrap();
         match r {
             EvalResult::InstantVector(out) => {
                 assert_eq!(out.len(), 2);
@@ -2085,7 +2203,13 @@ mod tests {
     #[test]
     fn rate_on_empty_drops_series() {
         let s = series(vec![("__name__", "foo")], vec![]);
-        let r = apply_window_op(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None, WindowOp::Rate).unwrap();
+        let r = apply_window_op(
+            &EvalContext::default(),
+            vec![EvalResult::RangeVector(vec![s])],
+            None,
+            WindowOp::Rate,
+        )
+        .unwrap();
         match r {
             EvalResult::InstantVector(v) => assert_eq!(v.len(), 0),
             _ => panic!(),
@@ -2093,12 +2217,18 @@ mod tests {
     }
 
     // -------------------------------------------------------------------
-    // *_over_time family (SOW-0020 chunk 1)
+    // *_over_time family
     // -------------------------------------------------------------------
 
     fn run_over_time(op: OverTimeOp, samples: Vec<(i64, f64)>) -> Vec<Series> {
         let s = series(vec![("__name__", "foo"), ("dim", "x")], samples);
-        let r = apply_over_time(&EvalContext::default(), vec![EvalResult::RangeVector(vec![s])], None, op).unwrap();
+        let r = apply_over_time(
+            &EvalContext::default(),
+            vec![EvalResult::RangeVector(vec![s])],
+            None,
+            op,
+        )
+        .unwrap();
         match r {
             EvalResult::InstantVector(v) => v,
             _ => panic!("expected instant vector"),
@@ -2170,7 +2300,9 @@ mod tests {
         assert_eq!(v[0].values[0], 3.0);
         // __name__ PRESERVED for last_over_time (Prometheus convention).
         assert!(
-            v[0].labels.iter().any(|(n, v)| n == "__name__" && v == "foo"),
+            v[0].labels
+                .iter()
+                .any(|(n, v)| n == "__name__" && v == "foo"),
             "labels = {:?}",
             v[0].labels
         );
@@ -2258,7 +2390,12 @@ mod tests {
     #[test]
     fn over_time_requires_range_vector() {
         // Scalar input -> Type error.
-        let r = apply_over_time(&EvalContext::default(), vec![EvalResult::Scalar(1.0)], None, OverTimeOp::Avg);
+        let r = apply_over_time(
+            &EvalContext::default(),
+            vec![EvalResult::Scalar(1.0)],
+            None,
+            OverTimeOp::Avg,
+        );
         assert!(matches!(r, Err(EvalError::Type { .. })));
         // Instant vector input -> Type error.
         let s = series(vec![("__name__", "foo")], vec![(0, 1.0)]);
@@ -2272,7 +2409,7 @@ mod tests {
     }
 
     // -------------------------------------------------------------------
-    // SOW-0023: stddev/stdvar/quantile_over_time, predict_linear,
+    // stddev/stdvar/quantile_over_time, predict_linear,
     //          holt_winters
     // -------------------------------------------------------------------
 
@@ -2284,7 +2421,11 @@ mod tests {
             vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)],
         );
         assert_eq!(v.len(), 1);
-        assert!((v[0].values[0] - 2.0).abs() < 1e-9, "got {}", v[0].values[0]);
+        assert!(
+            (v[0].values[0] - 2.0).abs() < 1e-9,
+            "got {}",
+            v[0].values[0]
+        );
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
     }
 
@@ -2306,10 +2447,7 @@ mod tests {
 
     #[test]
     fn stddev_over_time_skips_nan() {
-        let v = run_over_time(
-            OverTimeOp::Stddev,
-            vec![(0, 1.0), (1, f64::NAN), (2, 5.0)],
-        );
+        let v = run_over_time(OverTimeOp::Stddev, vec![(0, 1.0), (1, f64::NAN), (2, 5.0)]);
         // mean = 3, var = (1+25)/2 - 9 = 4 -> stddev 2.
         assert!((v[0].values[0] - 2.0).abs() < 1e-9);
     }
@@ -2330,10 +2468,7 @@ mod tests {
 
     #[test]
     fn quantile_over_time_median() {
-        let v = run_quantile_over_time(
-            0.5,
-            vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)],
-        );
+        let v = run_quantile_over_time(0.5, vec![(0, 1.0), (1, 2.0), (2, 3.0), (3, 4.0), (4, 5.0)]);
         assert!((v[0].values[0] - 3.0).abs() < 1e-9);
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
     }
@@ -2377,12 +2512,13 @@ mod tests {
         // predict y at x = 3+10 = 13s -> 27 (since y = 2x + 1 anchored
         // at the reference: from last sample's perspective the line is
         // y_last + 2 * delta_seconds = 7 + 20 = 27).
-        let v = run_predict_linear(
-            vec![(0, 1.0), (1000, 3.0), (2000, 5.0), (3000, 7.0)],
-            10.0,
-        );
+        let v = run_predict_linear(vec![(0, 1.0), (1000, 3.0), (2000, 5.0), (3000, 7.0)], 10.0);
         assert_eq!(v.len(), 1);
-        assert!((v[0].values[0] - 27.0).abs() < 1e-9, "got {}", v[0].values[0]);
+        assert!(
+            (v[0].values[0] - 27.0).abs() < 1e-9,
+            "got {}",
+            v[0].values[0]
+        );
         assert!(v[0].labels.iter().all(|(n, _)| n != "__name__"));
     }
 
@@ -2391,15 +2527,16 @@ mod tests {
         // With t=0 the prediction = the linear-fit value at the last
         // sample's reference time, which for a perfect line equals the
         // last sample's value.
-        let v = run_predict_linear(
-            vec![(0, 1.0), (1000, 3.0), (2000, 5.0)],
-            0.0,
-        );
+        let v = run_predict_linear(vec![(0, 1.0), (1000, 3.0), (2000, 5.0)], 0.0);
         // The intercept at x=0 (the reference time = last sample's
         // time) is the predicted value. For y=2x+1 centered at the
         // last sample (x=2): y = 5 at x=2 -> in centered coordinates
         // intercept = 5.
-        assert!((v[0].values[0] - 5.0).abs() < 1e-9, "got {}", v[0].values[0]);
+        assert!(
+            (v[0].values[0] - 5.0).abs() < 1e-9,
+            "got {}",
+            v[0].values[0]
+        );
     }
 
     #[test]
@@ -2490,7 +2627,7 @@ mod tests {
         assert!(matches!(r, Err(EvalError::Type { .. })));
     }
 
-    // SOW-0027 unit tests --------------------------------------------------
+    // Function unit tests --------------------------------------------------
 
     #[test]
     fn abs_strips_negatives() {
@@ -2503,9 +2640,10 @@ mod tests {
                 assert_eq!(s.len(), 2);
                 assert!(s.iter().all(|x| x.values[0] >= 0.0));
                 // __name__ stripped.
-                assert!(s
-                    .iter()
-                    .all(|x| x.labels.iter().all(|(n, _)| n != "__name__")));
+                assert!(
+                    s.iter()
+                        .all(|x| x.labels.iter().all(|(n, _)| n != "__name__"))
+                );
             }
             other => panic!("unexpected: {other:?}"),
         }
@@ -2565,10 +2703,7 @@ mod tests {
 
     #[test]
     fn scalar_returns_value_for_singleton() {
-        let v = EvalResult::InstantVector(vec![series(
-            vec![("a", "1")],
-            vec![(0, 42.5)],
-        )]);
+        let v = EvalResult::InstantVector(vec![series(vec![("a", "1")], vec![(0, 42.5)])]);
         match apply_scalar(vec![v]).unwrap() {
             EvalResult::Scalar(v) => assert_eq!(v, 42.5),
             other => panic!("unexpected: {other:?}"),
@@ -2612,10 +2747,7 @@ mod tests {
     fn deriv_returns_slope_per_second() {
         // Linear increase of 1.0 per second over 5 seconds: slope = 1.
         let samples: Vec<(i64, f64)> = (0..5).map(|i| (i * 1000, i as f64)).collect();
-        let v = EvalResult::RangeVector(vec![series(
-            vec![("__name__", "x")],
-            samples,
-        )]);
+        let v = EvalResult::RangeVector(vec![series(vec![("__name__", "x")], samples)]);
         match apply_deriv(&EvalContext::default(), vec![v], None).unwrap() {
             EvalResult::InstantVector(s) => {
                 assert!((s[0].values[0] - 1.0).abs() < 1e-9);

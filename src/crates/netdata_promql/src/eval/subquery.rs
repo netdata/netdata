@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Subquery evaluation. SOW-0026, rewritten for SOW-0031.
+// Subquery evaluation.
 //
 // A subquery `<expr>[range_ms:step_ms]` evaluates `expr` once over a
 // nested grid spanning `[outer.start - range_ms, outer.end]` at
@@ -8,11 +8,10 @@
 // `RangeVector` samples that downstream rollups consume via two-pointer
 // windowing.
 //
-// Pre-SOW-0031 this looped per outer grid point, calling `eval` for
-// each inner step. The new shape does one inner evaluation over the
-// union of all per-outer-point inner windows, which lets the inner
-// selectors hit storage once and lets downstream rollups window the
-// resulting samples without re-evaluating the inner expression.
+// The inner evaluation covers the union of all per-outer-point inner
+// windows, which lets inner selectors hit storage once and lets
+// downstream rollups window the resulting samples without re-evaluating
+// the inner expression.
 
 use crate::plan::{AtMod, Plan, ValueType};
 
@@ -73,7 +72,7 @@ pub fn eval_subquery(
         host_machine_guid: ctx.host_machine_guid.clone(),
         max_series: ctx.max_series,
         // `@ start()` / `@ end()` inside the subquery resolve against
-        // the *outer* range, not the subquery's window. SOW-0026.
+        // the *outer* range, not the subquery's window.
         outer_start_ms: ctx.outer_start_ms,
         outer_end_ms: ctx.outer_end_ms,
         backend: std::sync::Arc::clone(&ctx.backend),
@@ -114,9 +113,15 @@ mod tests {
             ..EvalContext::default()
         };
         let inner = Plan::Number(1.0);
-        let err = eval_subquery(&ctx, &inner, 1000, 500, 0, None).err().unwrap();
+        let err = eval_subquery(&ctx, &inner, 1000, 500, 0, None)
+            .err()
+            .unwrap();
         match err {
-            EvalError::Type { context, expected, got } => {
+            EvalError::Type {
+                context,
+                expected,
+                got,
+            } => {
                 assert_eq!(context, "subquery inner expression");
                 assert_eq!(expected, ValueType::InstantVector);
                 assert_eq!(got, ValueType::Scalar);

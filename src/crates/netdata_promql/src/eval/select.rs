@@ -2,14 +2,14 @@
 //
 // Evaluation of vector and matrix selectors against the storage adapter.
 //
-// SOW-0031: selectors are grid-aware. One storage fetch per series per
-// query covers the full evaluation window; the per-grid-point latest-in-
-// lookback pick is a single sweep over the fetched samples (two-pointer
-// for vector selectors, no per-step storage I/O).
+// Selectors are grid-aware. One storage fetch per series per query covers
+// the full evaluation window; the per-grid-point latest-in-lookback pick
+// is a single sweep over the fetched samples (two-pointer for vector
+// selectors, no per-step storage I/O).
 //
-// SOW-0032: output is column-oriented. Vector selectors clone the grid's
-// shared `Arc<Vec<i64>>` for every emitted series; matrix selectors
-// build a fresh `Arc<Vec<i64>>` from each series' storage timestamps.
+// Output is column-oriented. Vector selectors clone the grid's shared
+// `Arc<Vec<i64>>` for every emitted series; matrix selectors build a
+// fresh `Arc<Vec<i64>>` from each series' storage timestamps.
 
 use std::sync::Arc;
 
@@ -85,22 +85,23 @@ pub fn eval_vector_select(
 
     let lookback_ms = ctx.lookback_ms;
     let mut out: Vec<Series> = Vec::with_capacity(q.len());
-    // Shared timestamps Arc for every output series. SOW-0032: this is
-    // the entire point of the column-oriented shape -- 100 series at
-    // 241 grid points share one 192-byte allocation instead of 100
-    // copies of the same column.
+    // Shared timestamps Arc for every output series. This is the key
+    // benefit of column-oriented output — 100 series at 241 grid points
+    // share one 192-byte allocation instead of 100 copies.
     let grid_timestamps = Arc::clone(&grid.timestamps);
 
-    // Per-query drain buffers reused across the per-series loop
-    // (SOW-0040). `drain_samples` clears them on each call and the
-    // selector filters NaN inline.
+    // Per-query drain buffers reused across the per-series loop.
+    // `drain_samples` clears them on each call and the selector filters
+    // NaN inline.
     let mut raw_ts: Vec<i64> = Vec::new();
     let mut raw_vals: Vec<f64> = Vec::new();
     let mut timestamps_buf: Vec<i64> = Vec::new();
     let mut values_buf: Vec<f64> = Vec::new();
 
     for i in 0..q.len() {
-        let Some(meta) = q.series_meta(i) else { continue };
+        let Some(meta) = q.series_meta(i) else {
+            continue;
+        };
         q.drain_samples(i, after_s, before_s, 0, &mut raw_ts, &mut raw_vals);
 
         // Filter NaN once into per-series column buffers. The two-pointer
@@ -143,7 +144,11 @@ pub fn eval_vector_select(
             continue;
         }
 
-        out.push(Series::new(meta.labels, Arc::clone(&grid_timestamps), out_values));
+        out.push(Series::new(
+            meta.labels,
+            Arc::clone(&grid_timestamps),
+            out_values,
+        ));
     }
 
     out.sort_by_key(|s| s.signature);
@@ -265,7 +270,9 @@ pub fn eval_matrix_select(
     let mut raw_ts: Vec<i64> = Vec::new();
     let mut raw_vals: Vec<f64> = Vec::new();
     for i in 0..q.len() {
-        let Some(meta) = q.series_meta(i) else { continue };
+        let Some(meta) = q.series_meta(i) else {
+            continue;
+        };
         q.drain_samples(i, after_s, before_s, 0, &mut raw_ts, &mut raw_vals);
 
         // The matrix selector keeps the per-series timestamps as its

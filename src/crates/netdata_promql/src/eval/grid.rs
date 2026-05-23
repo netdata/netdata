@@ -1,20 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Whole-range evaluation grid. SOW-0031.
+// Whole-range evaluation grid.
 //
-// The pre-SOW-0031 evaluator carried a single `at_ms` on the EvalContext
-// and `run_range` looped over `(end_ms - start_ms) / step_ms + 1`
-// timestamps, calling `eval(ctx, plan)` once per point. For a typical
-// 1h @ 15s range query that is 241 walks of the plan tree, 241 storage
-// fetches per leaf, 241 Gorilla decompressions of largely overlapping
-// sample windows.
-//
-// `Grid` precomputes the list of evaluation timestamps once and is
-// carried by reference on the EvalContext. Each operator evaluates over
-// the entire grid in a single pass: selectors emit one Sample per
-// series per grid point, rollups two-pointer-sweep over bulk-fetched
-// raw samples, and all per-position operators (binops, aggregations,
-// transforms, label ops) work element-wise across the grid.
+// The evaluator precomputes the list of evaluation timestamps once and
+// carries it on the EvalContext. Each operator evaluates over the entire
+// grid in a single pass: selectors emit one sample per series per grid
+// point, rollups two-pointer-sweep over bulk-fetched raw samples, and
+// all per-position operators (binops, aggregations, transforms, label
+// ops) work element-wise across the grid.
 //
 // An instant query builds a single-point grid; the same code path serves
 // both shapes.
@@ -96,8 +89,7 @@ impl Grid {
 
     /// Convenience: the single grid timestamp when `is_instant()`.
     /// Returns the first timestamp for any other grid (callers usually
-    /// want `start_ms` in that case; provided here to ease migration
-    /// from the pre-SOW-0031 `ctx.at_ms` shape).
+    /// want `start_ms` in that case).
     #[inline]
     pub fn first_ms(&self) -> i64 {
         self.timestamps[0]

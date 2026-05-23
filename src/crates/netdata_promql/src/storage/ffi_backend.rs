@@ -22,7 +22,13 @@ impl Backend for FfiBackend {
         tier_hint: i32,
     ) -> Result<Box<dyn BackendQuery + 'a>, ResolveError> {
         let q = NdQuery::resolve(
-            host, matchers, after_s, before_s, max_series, points_wanted, tier_hint,
+            host,
+            matchers,
+            after_s,
+            before_s,
+            max_series,
+            points_wanted,
+            tier_hint,
         )?;
         Ok(Box::new(FfiQuery(q)))
     }
@@ -60,6 +66,7 @@ impl BackendQuery for FfiQuery {
         out_ts: &mut Vec<i64>,
         out_vals: &mut Vec<f64>,
     ) {
-        self.0.drain_samples(i, after_s, before_s, step_ms, out_ts, out_vals);
+        self.0
+            .drain_samples(i, after_s, before_s, step_ms, out_ts, out_vals);
     }
 }

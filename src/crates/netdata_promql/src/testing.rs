@@ -1,36 +1,52 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Public testing surface. Re-exports the in-memory backend and a
-// minimal `eval_instant_against` entry point so integration tests
-// (and future external consumers) can drive the evaluator without
-// the C shim. SOW-0030.
+// convenience `eval_instant_against` entry point so integration tests
+// and external consumers can drive the evaluator without the C shim.
+
+//! Testing utilities for the PromQL evaluator.
+//!
+//! This module re-exports the in-memory [`MemBackend`] and provides
+//! [`eval_instant_against`], a convenience function that parses a PromQL
+//! string, builds an evaluation context around a caller-supplied backend,
+//! and returns a [`TestResult`]. This is the primary entry point for the
+//! PromQL compliance corpus runner and for unit tests that need known-good
+//! inputs.
 
 pub use crate::storage::{Backend, MemBackend, MemSeries};
 
 use std::sync::Arc;
 
-use crate::eval::{eval, EvalContext, EvalError, EvalResult, Grid};
+use crate::eval::{EvalContext, EvalError, EvalResult, Grid, eval};
 use crate::plan::lower_query;
 
-/// One series in an instant-vector result. Owned strings for ease of
-/// consumption from integration tests.
+/// One series in an instant-vector result. Owns its label pairs and
+/// scalar value for ergonomic consumption in test assertions.
 #[derive(Debug)]
 pub struct TestSeries {
     pub labels: Vec<(String, String)>,
     pub value: f64,
 }
 
-/// What an instant evaluation can produce. The test runner only ever
-/// needs scalars or instant vectors; range vectors at the top level
-/// are an error in instant queries.
+/// Result of an instant evaluation. Scalars and instant vectors are the
+/// only valid top-level results for instant queries.
 #[derive(Debug)]
 pub enum TestResult {
     Scalar(f64),
     InstantVector(Vec<TestSeries>),
 }
 
-/// Lower + evaluate a PromQL string at one timestamp against a
-/// custom backend. Used by the compliance corpus runner.
+/// Parse and evaluate a PromQL string at a single timestamp against a
+/// custom [`Backend`].
+///
+/// This is the main entry point for the compliance corpus runner. It
+/// performs lowering, builds a default [`EvalContext`](crate::eval::EvalContext)
+/// around the supplied backend, runs evaluation, and converts the result
+/// into the convenient [`TestResult`] enum.
+///
+/// # Errors
+///
+/// Returns a string describing the error if lowering or evaluation fails.
 pub fn eval_instant_against(
     backend: Arc<dyn Backend>,
     query: &str,

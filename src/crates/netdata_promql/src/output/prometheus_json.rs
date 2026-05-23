@@ -96,7 +96,7 @@ fn write_range_series(out: &mut String, series: &[Series]) {
         out.push_str(r#","values":["#);
         // Filter NaN samples from matrix output to match Prometheus
         // ("no observation at this point" = absent from values array).
-        // Grid-aligned series (SOW-0031) carry NaN at missing-data grid
+        // Grid-aligned series carry NaN at missing-data grid
         // positions; emitting them as numeric NaN would render incorrectly
         // in Grafana / break downstream consumers.
         let mut first = true;
@@ -180,7 +180,7 @@ pub(crate) fn write_escaped(out: &mut String, s: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::eval::{labels_signature, Sample, Series};
+    use crate::eval::{Sample, Series, labels_signature};
 
     fn series(labels: Vec<(&str, &str)>, pairs: Vec<(i64, f64)>) -> Series {
         let owned: Vec<(String, String)> = labels
