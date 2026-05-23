@@ -35,6 +35,22 @@ static const int IOCTL_RETRY_DELAY_MS = 10;
 static const int THREAD_JOIN_FALLBACK_WAIT_MS = 2000;
 #define INVALID_TEMP ((collected_number)(-1))
 
+static bool netdata_expand_driver_path(char *expanded_path, size_t expanded_path_size)
+{
+    DWORD ret = ExpandEnvironmentStringsA(drv_path, expanded_path, (DWORD)expanded_path_size);
+    if (ret == 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot expand environment strings. Error= %lu \n", GetLastError());
+        return false;
+    }
+
+    if (ret > expanded_path_size) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Expanded driver path exceeds buffer size (%lu bytes needed)\n", ret);
+        return false;
+    }
+
+    return true;
+}
+
 static void netdata_stop_driver()
 {
     SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
@@ -79,8 +95,7 @@ int netdata_install_driver()
     }
 
     char expanded_path[MAX_PATH];
-    if (ExpandEnvironmentStringsA(drv_path, expanded_path, sizeof(expanded_path)) == 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot expand environment strings. Error= %lu \n", GetLastError());
+    if (!netdata_expand_driver_path(expanded_path, sizeof(expanded_path))) {
         CloseServiceHandle(scm);
         return -1;
     }
@@ -390,9 +405,7 @@ static void netdata_detect_cpu()
 static int initialize()
 {
     char expanded_path[MAX_PATH];
-    if (ExpandEnvironmentStringsA(drv_path, expanded_path, sizeof(expanded_path)) == 0) {
-        nd_log(
-            NDLS_COLLECTORS, NDLP_ERR, "Cannot expand driver path environment strings. Error= %lu \n", GetLastError());
+    if (!netdata_expand_driver_path(expanded_path, sizeof(expanded_path))) {
         return -1;
     }
 

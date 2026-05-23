@@ -102,13 +102,12 @@ APPS_MATCH pid_match_create(const char *comm) {
     };
 
     // copy comm to make changes to it
-    size_t len = strlen(comm);
-    char buf[len + 1];
-    memcpy(buf, comm, sizeof(buf));
+    char *buf = strdupz(comm);
 
     trim_all(buf);
+    size_t len = strlen(buf);
 
-    if(buf[len - 1] == '*') {
+    if(len && buf[len - 1] == '*') {
         buf[--len] = '\0';
         m.starts_with = true;
     }
@@ -124,6 +123,7 @@ APPS_MATCH pid_match_create(const char *comm) {
     if(strchr(nid, '*'))
         m.pattern = simple_pattern_create(comm, SIMPLE_PATTERN_NO_SEPARATORS, SIMPLE_PATTERN_EXACT, false);
 
+    freez(buf);
     return m;
 }
 
@@ -131,4 +131,3 @@ void pid_match_cleanup(APPS_MATCH *m) {
     string_freez(m->compare);
     simple_pattern_free(m->pattern);
 }
-

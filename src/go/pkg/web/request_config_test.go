@@ -413,10 +413,10 @@ func parseBasicAuth(auth string) (username, password string, ok bool) {
 	}
 
 	decodedStr := string(decoded)
-	idx := strings.IndexByte(decodedStr, ':')
-	if idx < 0 {
+	before, after, ok0 := strings.Cut(decodedStr, ":")
+	if !ok0 {
 		return "", "", false
 	}
 
-	return decodedStr[:idx], decodedStr[idx+1:], true
+	return before, after, true
 }

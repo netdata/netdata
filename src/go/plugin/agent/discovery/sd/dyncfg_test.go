@@ -186,7 +186,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 	// Filter and normalize dyncfg output (same approach as jobmgr sim_test.go)
 	var lines []string
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		// Skip template CONFIG lines (registered on startup)
 		if strings.HasPrefix(line, "CONFIG") && strings.Contains(line, " template ") {
 			continue
@@ -414,7 +414,7 @@ func TestServiceDiscovery_DyncfgGet(t *testing.T) {
 	}{
 		"get existing job": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", 0, 0, defaultTestServices())
+				cfg := newTestNetListenersConfig("serialized-name", 0, 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -436,6 +436,7 @@ func TestServiceDiscovery_DyncfgGet(t *testing.T) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
 						// JSON key order may vary, so check for presence of expected fields
 						assert.Contains(t, got, `"name":"test-job"`)
+						assert.NotContains(t, got, `"name":"serialized-name"`)
 						assert.Contains(t, got, `"discoverer":{`)
 						assert.Contains(t, got, `"net_listeners":{}`)
 					},
@@ -852,7 +853,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 	}{
 		"userconfig for template": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig("serialized-name", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -863,7 +864,8 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 					},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 200 application/yaml")
-						assert.Contains(t, got, "name: test-job")
+						assert.Contains(t, got, "name: test")
+						assert.NotContains(t, got, "name: serialized-name")
 						assert.Contains(t, got, "discoverer:")
 						assert.Contains(t, got, "net_listeners:")
 						assert.Contains(t, got, "interval: 5")
@@ -874,7 +876,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 		},
 		"userconfig for existing job": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig("serialized-name", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -893,6 +895,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-add 202 application/json")
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-userconfig 200 application/yaml")
 						assert.Contains(t, got, "name: test-job")
+						assert.NotContains(t, got, "name: serialized-name")
 						assert.Contains(t, got, "discoverer:")
 						assert.Contains(t, got, "net_listeners:")
 						assert.Contains(t, got, "interval: 5")
@@ -913,7 +916,6 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 					},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 200 application/yaml")
-						assert.Contains(t, got, "name: docker-test")
 						assert.Contains(t, got, "discoverer:")
 						assert.Contains(t, got, "docker:")
 						assert.Contains(t, got, "address: unix:///var/run/docker.sock")
@@ -937,7 +939,6 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 					},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 200 application/yaml")
-						assert.Contains(t, got, "name: k8s-test")
 						assert.Contains(t, got, "discoverer:")
 						assert.Contains(t, got, "k8s:")
 						assert.Contains(t, got, "role: pod")
@@ -963,7 +964,6 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 					},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 200 application/yaml")
-						assert.Contains(t, got, "name: snmp-test")
 						assert.Contains(t, got, "discoverer:")
 						assert.Contains(t, got, "snmp:")
 						assert.Contains(t, got, "rescan_interval: 1h")
@@ -1133,7 +1133,6 @@ CONFIG test:sd:docker:docker-test create accepted job /collectors/test/ServiceDi
 					},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
-						assert.Contains(t, got, `"name":"docker-test"`)
 						assert.Contains(t, got, `"discoverer":{`)
 						assert.Contains(t, got, `"docker":{`)
 						assert.Contains(t, got, `"address":"unix:///var/run/docker.sock"`)
@@ -1240,7 +1239,6 @@ CONFIG test:sd:k8s:k8s-test create accepted job /collectors/test/ServiceDiscover
 					},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
-						assert.Contains(t, got, `"name":"k8s-test"`)
 						assert.Contains(t, got, `"discoverer":{`)
 						assert.Contains(t, got, `"k8s":[`)
 						assert.Contains(t, got, `"role":"pod"`)
@@ -1362,7 +1360,6 @@ CONFIG test:sd:snmp:snmp-test create accepted job /collectors/test/ServiceDiscov
 					},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
-						assert.Contains(t, got, `"name":"snmp-test"`)
 						assert.Contains(t, got, `"discoverer":{`)
 						assert.Contains(t, got, `"snmp":{`)
 						assert.Contains(t, got, `"rescan_interval":"1h"`)

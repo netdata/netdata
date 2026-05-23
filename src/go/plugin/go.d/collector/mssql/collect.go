@@ -16,6 +16,11 @@ import (
 // noLatencySentinel is the value SQL Server returns when no latency data is available
 const noLatencySentinel = 999999
 
+const (
+	maxKBToBytes        = int64(1<<63-1) / 1024
+	maxKBToCentiPercent = int64(1<<63-1) / 10000
+)
+
 func (c *Collector) collect() (map[string]int64, error) {
 	if c.db == nil {
 		db, err := c.openConnection()
@@ -358,6 +363,9 @@ func (c *Collector) collectDatabaseMetrics(mx map[string]int64) error {
 	if err := c.collectLogGrowths(mx); err != nil {
 		return err
 	}
+	if err := c.collectDatabaseLogCounters(mx); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -405,6 +413,110 @@ func (c *Collector) collectDatabaseCounters(mx map[string]int64) error {
 	}
 
 	return rows.Err()
+}
+
+type databaseLogCounters struct {
+	sizeKB          int64
+	usedKB          int64
+	truncations     int64
+	shrinks         int64
+	hasSize         bool
+	hasUsed         bool
+	hasTruncations  bool
+	hasShrinks      bool
+	hasKnownCounter bool
+}
+
+func (c *Collector) collectDatabaseLogCounters(mx map[string]int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	rows, err := c.db.QueryContext(ctx, queryDatabaseLogCounters)
+	if err != nil {
+		return fmt.Errorf("database log counters query failed: %v", err)
+	}
+	defer rows.Close()
+
+	counters := make(map[string]*databaseLogCounters)
+
+	for rows.Next() {
+		var dbName, counterName string
+		var value int64
+		if err := rows.Scan(&dbName, &counterName, &value); err != nil {
+			continue
+		}
+		if value < 0 {
+			continue
+		}
+
+		dbName = strings.TrimSpace(dbName)
+		counterName = strings.TrimSpace(counterName)
+		if dbName == "" {
+			continue
+		}
+
+		if !c.seenDatabasesWithLog[dbName] {
+			c.seenDatabasesWithLog[dbName] = true
+			c.addDatabaseLogCharts(dbName)
+		}
+
+		if counters[dbName] == nil {
+			counters[dbName] = &databaseLogCounters{}
+		}
+
+		switch counterName {
+		case "Log File(s) Size (KB)":
+			counters[dbName].sizeKB = value
+			counters[dbName].hasSize = true
+			counters[dbName].hasKnownCounter = true
+		case "Log File(s) Used Size (KB)":
+			counters[dbName].usedKB = value
+			counters[dbName].hasUsed = true
+			counters[dbName].hasKnownCounter = true
+		case "Log Truncations":
+			counters[dbName].truncations = value
+			counters[dbName].hasTruncations = true
+			counters[dbName].hasKnownCounter = true
+		case "Log Shrinks":
+			counters[dbName].shrinks = value
+			counters[dbName].hasShrinks = true
+			counters[dbName].hasKnownCounter = true
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for dbName, values := range counters {
+		if values == nil || !values.hasKnownCounter {
+			continue
+		}
+
+		dbID := cleanDatabaseName(dbName)
+
+		if values.hasSize && values.hasUsed && values.sizeKB > 0 &&
+			values.sizeKB <= maxKBToBytes && values.usedKB <= maxKBToBytes {
+			usedBytes := values.usedKB * 1024
+			freeKB := max(values.sizeKB-values.usedKB, 0)
+
+			mx[fmt.Sprintf("database_%s_log_size_used", dbID)] = usedBytes
+			mx[fmt.Sprintf("database_%s_log_size_free", dbID)] = freeKB * 1024
+
+			if values.usedKB <= maxKBToCentiPercent {
+				mx[fmt.Sprintf("database_%s_log_percent_used", dbID)] = values.usedKB * 10000 / values.sizeKB
+			}
+		}
+
+		if values.hasTruncations {
+			mx[fmt.Sprintf("database_%s_log_truncations", dbID)] = values.truncations
+		}
+		if values.hasShrinks {
+			mx[fmt.Sprintf("database_%s_log_shrinks", dbID)] = values.shrinks
+		}
+	}
+
+	return nil
 }
 
 func (c *Collector) collectLockStatsByResourceType(mx map[string]int64) error {

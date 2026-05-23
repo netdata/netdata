@@ -39,4 +39,5 @@ type Service interface {
 	RegisterComponent(cfg ComponentConfig) error
 	UnregisterComponent(name string)
 	RegisterProducer(name string, tickFn func() error) error
+	UnregisterProducer(name string)
 }

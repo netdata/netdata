@@ -1,0 +1,789 @@
+version: v1
+context_namespace: powerstore
+groups:
+  - family: Cluster Capacity
+    metrics:
+      - cluster_space_physical_total
+      - cluster_space_physical_used
+      - cluster_space_logical_provisioned
+      - cluster_space_logical_used
+      - cluster_space_data_physical_used
+      - cluster_space_shared_logical_used
+      - cluster_space_efficiency_ratio
+      - cluster_space_data_reduction
+      - cluster_space_snapshot_savings
+      - cluster_space_thin_savings
+    charts:
+      - id: cluster_space_usage
+        title: Cluster Space Usage
+        context: cluster_space_usage
+        units: bytes
+        algorithm: absolute
+        dimensions:
+          - selector: cluster_space_physical_used
+            name: used
+          - selector: cluster_space_physical_total
+            name: total
+      - id: cluster_space_logical
+        title: Cluster Logical Space
+        context: cluster_space_logical
+        units: bytes
+        algorithm: absolute
+        dimensions:
+          - selector: cluster_space_logical_provisioned
+            name: provisioned
+          - selector: cluster_space_logical_used
+            name: used
+          - selector: cluster_space_data_physical_used
+            name: data_physical
+          - selector: cluster_space_shared_logical_used
+            name: shared
+      - id: cluster_space_efficiency
+        title: Cluster Space Efficiency Ratios
+        context: cluster_space_efficiency
+        units: ratio
+        algorithm: absolute
+        dimensions:
+          - selector: cluster_space_efficiency_ratio
+            name: efficiency
+            options:
+              float: true
+          - selector: cluster_space_data_reduction
+            name: data_reduction
+            options:
+              float: true
+          - selector: cluster_space_snapshot_savings
+            name: snapshot_savings
+            options:
+              float: true
+          - selector: cluster_space_thin_savings
+            name: thin_savings
+            options:
+              float: true
+
+  - family: Hardware Health
+    metrics:
+      - hardware_fan_ok
+      - hardware_fan_degraded
+      - hardware_fan_failed
+      - hardware_fan_unknown
+      - hardware_psu_ok
+      - hardware_psu_degraded
+      - hardware_psu_failed
+      - hardware_psu_unknown
+      - hardware_drive_ok
+      - hardware_drive_degraded
+      - hardware_drive_failed
+      - hardware_drive_unknown
+      - hardware_battery_ok
+      - hardware_battery_degraded
+      - hardware_battery_failed
+      - hardware_battery_unknown
+      - hardware_node_ok
+      - hardware_node_degraded
+      - hardware_node_failed
+      - hardware_node_unknown
+    charts:
+      - id: hardware_health_fan
+        title: Fan Health Status
+        context: hardware_health_fan
+        units: fans
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hardware_fan_ok
+            name: ok
+          - selector: hardware_fan_degraded
+            name: degraded
+          - selector: hardware_fan_failed
+            name: failed
+          - selector: hardware_fan_unknown
+            name: unknown
+      - id: hardware_health_psu
+        title: Power Supply Health Status
+        context: hardware_health_psu
+        units: PSUs
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hardware_psu_ok
+            name: ok
+          - selector: hardware_psu_degraded
+            name: degraded
+          - selector: hardware_psu_failed
+            name: failed
+          - selector: hardware_psu_unknown
+            name: unknown
+      - id: hardware_health_drive
+        title: Drive Health Status
+        context: hardware_health_drive
+        units: drives
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hardware_drive_ok
+            name: ok
+          - selector: hardware_drive_degraded
+            name: degraded
+          - selector: hardware_drive_failed
+            name: failed
+          - selector: hardware_drive_unknown
+            name: unknown
+      - id: hardware_health_battery
+        title: Battery Health Status
+        context: hardware_health_battery
+        units: batteries
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hardware_battery_ok
+            name: ok
+          - selector: hardware_battery_degraded
+            name: degraded
+          - selector: hardware_battery_failed
+            name: failed
+          - selector: hardware_battery_unknown
+            name: unknown
+      - id: hardware_health_node
+        title: Node Health Status
+        context: hardware_health_node
+        units: nodes
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hardware_node_ok
+            name: ok
+          - selector: hardware_node_degraded
+            name: degraded
+          - selector: hardware_node_failed
+            name: failed
+          - selector: hardware_node_unknown
+            name: unknown
+
+  - family: Alerts
+    metrics:
+      - alerts_critical
+      - alerts_major
+      - alerts_minor
+      - alerts_info
+    charts:
+      - id: alerts_active
+        title: Active Alerts by Severity
+        context: alerts_active
+        units: alerts
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: alerts_critical
+            name: critical
+          - selector: alerts_major
+            name: major
+          - selector: alerts_minor
+            name: minor
+          - selector: alerts_info
+            name: info
+
+  - family: NAS
+    metrics:
+      - nas_started
+      - nas_stopped
+      - nas_degraded
+      - nas_unknown
+    charts:
+      - id: nas_server_status
+        title: NAS Server Status
+        context: nas_server_status
+        units: servers
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: nas_started
+            name: started
+          - selector: nas_stopped
+            name: stopped
+          - selector: nas_degraded
+            name: degraded
+          - selector: nas_unknown
+            name: unknown
+
+  - family: Replication
+    metrics:
+      - copy_data_remaining
+      - copy_data_transferred
+      - copy_transfer_rate
+    charts:
+      - id: copy_data
+        title: Replication Data
+        context: copy_data
+        units: bytes
+        algorithm: absolute
+        dimensions:
+          - selector: copy_data_remaining
+            name: remaining
+          - selector: copy_data_transferred
+            name: transferred
+      - id: copy_transfer_rate
+        title: Replication Transfer Rate
+        context: copy_transfer_rate
+        units: bytes/s
+        algorithm: absolute
+        dimensions:
+          - selector: copy_transfer_rate
+            name: rate
+            options:
+              float: true
+
+  - family: Appliance
+    metrics:
+      - appliance_perf_read_iops
+      - appliance_perf_write_iops
+      - appliance_perf_read_bandwidth
+      - appliance_perf_write_bandwidth
+      - appliance_perf_avg_read_latency
+      - appliance_perf_avg_write_latency
+      - appliance_perf_avg_latency
+      - appliance_cpu_utilization
+      - appliance_space_physical_used
+      - appliance_space_physical_total
+      - appliance_space_logical_provisioned
+      - appliance_space_logical_used
+      - appliance_space_data_physical_used
+      - appliance_space_shared_logical_used
+      - appliance_space_efficiency_ratio
+      - appliance_space_data_reduction
+      - appliance_space_snapshot_savings
+      - appliance_space_thin_savings
+    charts:
+      - id: appliance_iops
+        title: Appliance IOPS
+        context: appliance_iops
+        units: ops/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [appliance]
+        dimensions:
+          - selector: appliance_perf_read_iops
+            name: read
+            options:
+              float: true
+          - selector: appliance_perf_write_iops
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: appliance_bandwidth
+        title: Appliance Bandwidth
+        context: appliance_bandwidth
+        units: bytes/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [appliance]
+        dimensions:
+          - selector: appliance_perf_read_bandwidth
+            name: read
+            options:
+              float: true
+          - selector: appliance_perf_write_bandwidth
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: appliance_latency
+        title: Appliance Latency
+        context: appliance_latency
+        units: microseconds
+        algorithm: absolute
+        instances:
+          by_labels: [appliance]
+        dimensions:
+          - selector: appliance_perf_avg_read_latency
+            name: read
+            options:
+              float: true
+          - selector: appliance_perf_avg_write_latency
+            name: write
+            options:
+              float: true
+          - selector: appliance_perf_avg_latency
+            name: avg
+            options:
+              float: true
+      - id: appliance_cpu
+        title: Appliance IO Workload CPU Utilization
+        context: appliance_cpu
+        units: percentage
+        algorithm: absolute
+        instances:
+          by_labels: [appliance]
+        dimensions:
+          - selector: appliance_cpu_utilization
+            name: utilization
+            options:
+              float: true
+      - id: appliance_space
+        title: Appliance Space Usage
+        context: appliance_space
+        units: bytes
+        algorithm: absolute
+        instances:
+          by_labels: [appliance]
+        dimensions:
+          - selector: appliance_space_physical_used
+            name: used
+          - selector: appliance_space_physical_total
+            name: total
+      - id: appliance_space_logical
+        title: Appliance Logical Space
+        context: appliance_space_logical
+        units: bytes
+        algorithm: absolute
+        instances:
+          by_labels: [appliance]
+        dimensions:
+          - selector: appliance_space_logical_provisioned
+            name: provisioned
+          - selector: appliance_space_logical_used
+            name: used
+          - selector: appliance_space_data_physical_used
+            name: data_physical
+          - selector: appliance_space_shared_logical_used
+            name: shared
+      - id: appliance_space_efficiency
+        title: Appliance Space Efficiency Ratios
+        context: appliance_space_efficiency
+        units: ratio
+        algorithm: absolute
+        instances:
+          by_labels: [appliance]
+        dimensions:
+          - selector: appliance_space_efficiency_ratio
+            name: efficiency
+            options:
+              float: true
+          - selector: appliance_space_data_reduction
+            name: data_reduction
+            options:
+              float: true
+          - selector: appliance_space_snapshot_savings
+            name: snapshot_savings
+            options:
+              float: true
+          - selector: appliance_space_thin_savings
+            name: thin_savings
+            options:
+              float: true
+
+  - family: Volume
+    metrics:
+      - volume_perf_read_iops
+      - volume_perf_write_iops
+      - volume_perf_read_bandwidth
+      - volume_perf_write_bandwidth
+      - volume_perf_avg_read_latency
+      - volume_perf_avg_write_latency
+      - volume_perf_avg_latency
+      - volume_space_logical_provisioned
+      - volume_space_logical_used
+      - volume_space_thin_savings
+    charts:
+      - id: volume_iops
+        title: Volume IOPS
+        context: volume_iops
+        units: ops/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_perf_read_iops
+            name: read
+            options:
+              float: true
+          - selector: volume_perf_write_iops
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: volume_bandwidth
+        title: Volume Bandwidth
+        context: volume_bandwidth
+        units: bytes/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_perf_read_bandwidth
+            name: read
+            options:
+              float: true
+          - selector: volume_perf_write_bandwidth
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: volume_latency
+        title: Volume Latency
+        context: volume_latency
+        units: microseconds
+        algorithm: absolute
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_perf_avg_read_latency
+            name: read
+            options:
+              float: true
+          - selector: volume_perf_avg_write_latency
+            name: write
+            options:
+              float: true
+          - selector: volume_perf_avg_latency
+            name: avg
+            options:
+              float: true
+      - id: volume_space
+        title: Volume Space Usage
+        context: volume_space
+        units: bytes
+        algorithm: absolute
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_space_logical_provisioned
+            name: provisioned
+          - selector: volume_space_logical_used
+            name: used
+      - id: volume_space_savings
+        title: Volume Thin Savings
+        context: volume_space_savings
+        units: ratio
+        algorithm: absolute
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_space_thin_savings
+            name: thin_savings
+            options:
+              float: true
+
+  - family: Node
+    metrics:
+      - node_perf_read_iops
+      - node_perf_write_iops
+      - node_perf_read_bandwidth
+      - node_perf_write_bandwidth
+      - node_perf_avg_read_latency
+      - node_perf_avg_write_latency
+      - node_perf_avg_latency
+      - node_current_logins
+    charts:
+      - id: node_iops
+        title: Node IOPS
+        context: node_iops
+        units: ops/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [node]
+        dimensions:
+          - selector: node_perf_read_iops
+            name: read
+            options:
+              float: true
+          - selector: node_perf_write_iops
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: node_bandwidth
+        title: Node Bandwidth
+        context: node_bandwidth
+        units: bytes/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [node]
+        dimensions:
+          - selector: node_perf_read_bandwidth
+            name: read
+            options:
+              float: true
+          - selector: node_perf_write_bandwidth
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: node_latency
+        title: Node Latency
+        context: node_latency
+        units: microseconds
+        algorithm: absolute
+        instances:
+          by_labels: [node]
+        dimensions:
+          - selector: node_perf_avg_read_latency
+            name: read
+            options:
+              float: true
+          - selector: node_perf_avg_write_latency
+            name: write
+            options:
+              float: true
+          - selector: node_perf_avg_latency
+            name: avg
+            options:
+              float: true
+      - id: node_logins
+        title: Node Current Logins
+        context: node_logins
+        units: logins
+        algorithm: absolute
+        instances:
+          by_labels: [node]
+        dimensions:
+          - selector: node_current_logins
+            name: logins
+
+  - family: FC Port
+    metrics:
+      - fc_port_perf_read_iops
+      - fc_port_perf_write_iops
+      - fc_port_perf_read_bandwidth
+      - fc_port_perf_write_bandwidth
+      - fc_port_perf_avg_read_latency
+      - fc_port_perf_avg_write_latency
+      - fc_port_perf_avg_latency
+      - fc_port_link_up
+    charts:
+      - id: fc_port_iops
+        title: FC Port IOPS
+        context: fc_port_iops
+        units: ops/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [fc_port]
+        dimensions:
+          - selector: fc_port_perf_read_iops
+            name: read
+            options:
+              float: true
+          - selector: fc_port_perf_write_iops
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: fc_port_bandwidth
+        title: FC Port Bandwidth
+        context: fc_port_bandwidth
+        units: bytes/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [fc_port]
+        dimensions:
+          - selector: fc_port_perf_read_bandwidth
+            name: read
+            options:
+              float: true
+          - selector: fc_port_perf_write_bandwidth
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: fc_port_latency
+        title: FC Port Latency
+        context: fc_port_latency
+        units: microseconds
+        algorithm: absolute
+        instances:
+          by_labels: [fc_port]
+        dimensions:
+          - selector: fc_port_perf_avg_read_latency
+            name: read
+            options:
+              float: true
+          - selector: fc_port_perf_avg_write_latency
+            name: write
+            options:
+              float: true
+          - selector: fc_port_perf_avg_latency
+            name: avg
+            options:
+              float: true
+      - id: fc_port_link_status
+        title: FC Port Link Status
+        context: fc_port_link_status
+        units: status
+        algorithm: absolute
+        instances:
+          by_labels: [fc_port]
+        dimensions:
+          - selector: fc_port_link_up
+            name: up
+
+  - family: Ethernet Port
+    metrics:
+      - eth_port_bytes_rx_ps
+      - eth_port_bytes_tx_ps
+      - eth_port_pkt_rx_ps
+      - eth_port_pkt_tx_ps
+      - eth_port_pkt_rx_crc_error_ps
+      - eth_port_pkt_rx_no_buffer_error_ps
+      - eth_port_pkt_tx_error_ps
+      - eth_port_link_up
+    charts:
+      - id: eth_port_bytes
+        title: Ethernet Port Bytes Rate
+        context: eth_port_bytes
+        units: bytes/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [eth_port]
+        dimensions:
+          - selector: eth_port_bytes_rx_ps
+            name: received
+            options:
+              float: true
+          - selector: eth_port_bytes_tx_ps
+            name: sent
+            options:
+              multiplier: -1
+              float: true
+      - id: eth_port_packets
+        title: Ethernet Port Packets Rate
+        context: eth_port_packets
+        units: packets/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [eth_port]
+        dimensions:
+          - selector: eth_port_pkt_rx_ps
+            name: received
+            options:
+              float: true
+          - selector: eth_port_pkt_tx_ps
+            name: sent
+            options:
+              multiplier: -1
+              float: true
+      - id: eth_port_errors
+        title: Ethernet Port Errors Rate
+        context: eth_port_errors
+        units: errors/s
+        type: stacked
+        algorithm: absolute
+        instances:
+          by_labels: [eth_port]
+        dimensions:
+          - selector: eth_port_pkt_rx_crc_error_ps
+            name: rx_crc
+            options:
+              float: true
+          - selector: eth_port_pkt_rx_no_buffer_error_ps
+            name: rx_no_buffer
+            options:
+              float: true
+          - selector: eth_port_pkt_tx_error_ps
+            name: tx_error
+            options:
+              float: true
+      - id: eth_port_link_status
+        title: Ethernet Port Link Status
+        context: eth_port_link_status
+        units: status
+        algorithm: absolute
+        instances:
+          by_labels: [eth_port]
+        dimensions:
+          - selector: eth_port_link_up
+            name: up
+
+  - family: File System
+    metrics:
+      - file_system_perf_read_iops
+      - file_system_perf_write_iops
+      - file_system_perf_read_bandwidth
+      - file_system_perf_write_bandwidth
+      - file_system_perf_avg_read_latency
+      - file_system_perf_avg_write_latency
+      - file_system_perf_avg_latency
+    charts:
+      - id: filesystem_iops
+        title: File System IOPS
+        context: filesystem_iops
+        units: ops/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [filesystem]
+        dimensions:
+          - selector: file_system_perf_read_iops
+            name: read
+            options:
+              float: true
+          - selector: file_system_perf_write_iops
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: filesystem_bandwidth
+        title: File System Bandwidth
+        context: filesystem_bandwidth
+        units: bytes/s
+        type: area
+        algorithm: absolute
+        instances:
+          by_labels: [filesystem]
+        dimensions:
+          - selector: file_system_perf_read_bandwidth
+            name: read
+            options:
+              float: true
+          - selector: file_system_perf_write_bandwidth
+            name: write
+            options:
+              multiplier: -1
+              float: true
+      - id: filesystem_latency
+        title: File System Latency
+        context: filesystem_latency
+        units: microseconds
+        algorithm: absolute
+        instances:
+          by_labels: [filesystem]
+        dimensions:
+          - selector: file_system_perf_avg_read_latency
+            name: read
+            options:
+              float: true
+          - selector: file_system_perf_avg_write_latency
+            name: write
+            options:
+              float: true
+          - selector: file_system_perf_avg_latency
+            name: avg
+            options:
+              float: true
+
+  - family: Drive
+    metrics:
+      - drive_endurance_remaining
+    charts:
+      - id: drive_endurance
+        title: Drive Endurance Remaining
+        context: drive_endurance
+        units: percentage
+        algorithm: absolute
+        instances:
+          by_labels: [drive]
+        dimensions:
+          - selector: drive_endurance_remaining
+            name: remaining
+            options:
+              float: true

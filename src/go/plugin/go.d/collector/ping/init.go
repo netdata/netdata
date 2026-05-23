@@ -5,6 +5,8 @@ package ping
 import (
 	"errors"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 )
 
 func (c *Collector) validateConfig() error {
@@ -30,7 +32,7 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initProber() (Prober, error) {
+func (c *Collector) initPinger() (pinger.Client, error) {
 	mul := 0.9
 	if c.UpdateEvery > 1 {
 		mul = 0.95
@@ -39,8 +41,15 @@ func (c *Collector) initProber() (Prober, error) {
 	if timeout.Milliseconds() == 0 {
 		return nil, errors.New("zero ping timeout")
 	}
-	conf := c.Config.ProberConfig
-	conf.Timeout = timeout
-
-	return c.newProber(conf, c.Logger), nil
+	return c.newPinger(pinger.Config{
+		Probe: pinger.ProbeConfig{
+			Network:    c.Network,
+			Interface:  c.Interface,
+			Privileged: c.Privileged,
+			Packets:    c.Packets,
+			Interval:   c.Interval,
+			Timeout:    timeout,
+		},
+		Analysis: c.AnalysisConfig,
+	}, c.Logger)
 }

@@ -172,6 +172,8 @@ struct rrdset {
         struct {
 #ifdef REPLICATION_TRACKING
             REPLAY_WHO who;
+#else
+            uint8_t unused;
 #endif
         } rcv;
     } stream;

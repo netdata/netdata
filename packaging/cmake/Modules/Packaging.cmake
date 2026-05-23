@@ -98,7 +98,7 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
 		"netdata-plugin-cups, netdata-plugin-freeipmi, netdata-plugin-ibm")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
 		"netdata-plugin-systemd-journal, netdata-plugin-systemd-units, \
-netdata-plugin-network-viewer")
+netdata-plugin-network-viewer, netdata-plugin-scripts")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
 
@@ -476,6 +476,25 @@ set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_DEBUGINFO_PACKAGE Off)
 
 #
+# netflow.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-NETFLOW_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-NETFLOW_DESCRIPTION
+		"The NetFlow/IPFIX/sFlow flow analysis plugin for the Netdata Agent
+ This plugin ingests, stores, and serves NetFlow/IPFIX/sFlow flow data for
+ traffic analysis functions.")
+
+set(CPACK_DEBIAN_PLUGIN-NETFLOW_PACKAGE_NAME "netdata-plugin-netflow")
+set(CPACK_DEBIAN_PLUGIN-NETFLOW_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-NETFLOW_PACKAGE_PREDEPENDS "netdata-user")
+
+set(CPACK_DEBIAN_PLUGIN-NETFLOW_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-netflow/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-NETFLOW_DEBUGINFO_PACKAGE Off)
+
+#
 # nfacct.plugin
 #
 
@@ -671,6 +690,9 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
 endif()
 if(ENABLE_PLUGIN_NFACCT)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-nfacct")
+endif()
+if(ENABLE_PLUGIN_NETFLOW)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-netflow")
 endif()
 if(ENABLE_PLUGIN_PERF)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-perf")

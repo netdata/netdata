@@ -10,6 +10,7 @@
 typedef enum __attribute__ ((__packed__)) {
     DICT_FLAG_NONE                  = 0,
     DICT_FLAG_DESTROYED             = (1 << 0), // this dictionary has been destroyed
+    DICT_FLAG_QUEUED_FOR_DESTRUCTION = (1 << 1), // this dictionary is queued for delayed destruction
 } DICT_FLAGS;
 
 #define dict_flag_check(dict, flag) (__atomic_load_n(&((dict)->flags), __ATOMIC_RELAXED) & (flag))

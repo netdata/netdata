@@ -111,8 +111,8 @@ func (c *Collector) collectCacheCode() {
 	}
 	cntr.Inc()
 
-	tags := strings.Split(c.line.cacheCode, "_")
-	for _, tag := range tags {
+	tags := strings.SplitSeq(c.line.cacheCode, "_")
+	for tag := range tags {
 		c.collectCacheCodeTag(tag)
 	}
 }

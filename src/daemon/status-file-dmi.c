@@ -124,14 +124,15 @@ static void linux_get_dmi_field(const char *field, const char *alt, char *dst, s
     if (!filename[0])
         return;
 
-    char buf[MAX(256, dst_size)];
-    if (read_txt_file(filename, buf, sizeof(buf)) != 0)
+    size_t buf_size = MAX(256, dst_size);
+    CLEAN_CHAR_P *buf = mallocz(buf_size);
+    if (read_txt_file(filename, buf, buf_size) != 0)
         return;
 
     if (!buf[0])
         return;
 
-    dmi_clean_field(buf, sizeof(buf));
+    dmi_clean_field(buf, buf_size);
 
     if (!buf[0])
         return;

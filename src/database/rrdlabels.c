@@ -798,8 +798,7 @@ static SIMPLE_PATTERN_RESULT simple_pattern_match_name_and_value_callback(const 
     t->searches++;
     if(simple_pattern_matches(t->pattern, name)) return -1;
 
-    size_t len = RRDLABELS_MAX_NAME_LENGTH + RRDLABELS_MAX_VALUE_LENGTH + 2; // +1 for =, +1 for \0
-    char tmp[len], *dst = &tmp[0];
+    char tmp[RRDLABELS_MAX_NAME_LENGTH + RRDLABELS_MAX_VALUE_LENGTH + 2], *dst = &tmp[0];
     const char *v = value;
 
     // copy the name
@@ -904,8 +903,8 @@ static int label_to_buffer_callback(const RRDLABEL *lb, void *value __maybe_unus
     size_t n_size = (t->name_sanitizer ) ? ( RRDLABELS_MAX_NAME_LENGTH  * 2 ) : 1;
     size_t v_size = (t->value_sanitizer) ? ( RRDLABELS_MAX_VALUE_LENGTH * 2 ) : 1;
 
-    char n[n_size];
-    char v[v_size];
+    char n[RRDLABELS_MAX_NAME_LENGTH * 2];
+    char v[RRDLABELS_MAX_VALUE_LENGTH * 2];
 
     const char *name = string2str(lb->index.key);
 

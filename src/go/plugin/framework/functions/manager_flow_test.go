@@ -114,14 +114,22 @@ func TestManager_FlowScenarios(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer)
 	}{
-		"queued cancel emits 499 and skips execution": {
+		"queued cancel is ignored; function still executes": {
 			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				// New semantics: a CANCEL for a queued function is a no-op at
+				// the framework level. The function stays in the scheduler,
+				// runs to completion when its turn comes, and any terminal
+				// response goes through normally. No 499 is emitted by the
+				// framework (netdata already considers the transaction done
+				// via its own per-transaction timer, so an extra 499 would
+				// just be noise).
 				var (
 					mu       sync.Mutex
 					executed []string
 				)
 				started := make(chan struct{}, 1)
 				release := make(chan struct{})
+				tx2Done := make(chan struct{})
 
 				mgr.Register("fn", func(fn Function) {
 					mu.Lock()
@@ -130,6 +138,14 @@ func TestManager_FlowScenarios(t *testing.T) {
 					if fn.UID == "tx1" {
 						started <- struct{}{}
 						<-release
+						// Emit terminal response so the per-key lane advances
+						// to tx2; otherwise the lane stays "owned" by tx1 and
+						// tx2 never gets picked up.
+						mgr.respUID(fn.UID, 200, "ok")
+					}
+					if fn.UID == "tx2" {
+						mgr.respUID(fn.UID, 200, "ok")
+						close(tx2Done)
 					}
 				})
 
@@ -140,17 +156,67 @@ func TestManager_FlowScenarios(t *testing.T) {
 				<-started
 				in.ch <- functionLine("tx2", "fn")
 				in.ch <- "FUNCTION_CANCEL tx2"
+
+				// tx2 must NOT receive a 499 from the framework. We can't
+				// assert "no 499 ever" without waiting forever, but we can at
+				// least verify it isn't there immediately after CANCEL.
+				time.Sleep(50 * time.Millisecond)
+				assert.NotContains(t, out.String(), "FUNCTION_RESULT_BEGIN tx2 499")
+
 				close(release)
+				select {
+				case <-tx2Done:
+				case <-time.After(time.Second):
+					t.Fatal("tx2 did not execute after release")
+				}
+
 				close(in.ch)
 				waitForDone(t, done)
 
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx2 499", time.Second)
+				// Both tx1 and tx2 should have executed (in order).
 				mu.Lock()
 				defer mu.Unlock()
-				assert.Equal(t, []string{"tx1"}, executed)
+				assert.Equal(t, []string{"tx1", "tx2"}, executed)
+				// tx2's normal 200 response went through (no tombstone).
+				assert.Contains(t, out.String(), "FUNCTION_RESULT_BEGIN tx2 200")
 			},
 		},
-		"running cancel fallback emits 499 once": {
+		"running cancel fallback tombstones silently (no emit)": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				// New semantics: the cancel fallback timer no longer emits a
+				// 499 to netdata. By the time CANCEL arrives, netdata has
+				// already 504'd and removed the inflight transaction, so any
+				// response would just produce a "transaction not found" log.
+				// We only do the bookkeeping (tombstone + lane advance).
+				mgr.cancelFallbackDelay = 50 * time.Millisecond
+				started := make(chan struct{}, 1)
+				release := make(chan struct{})
+
+				mgr.Register("fn", func(fn Function) {
+					if fn.UID == "tx1" {
+						started <- struct{}{}
+						<-release
+					}
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				<-started
+				in.ch <- "FUNCTION_CANCEL tx1"
+				// Wait long enough for the fallback timer to fire.
+				time.Sleep(150 * time.Millisecond)
+
+				close(release)
+				close(in.ch)
+				waitForDone(t, done)
+
+				// No 499 should be emitted, ever.
+				assert.Equal(t, 0, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
+			},
+		},
+		"repeated cancel for same uid is idempotent and silent": {
 			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
 				mgr.cancelFallbackDelay = 50 * time.Millisecond
 				started := make(chan struct{}, 1)
@@ -169,42 +235,14 @@ func TestManager_FlowScenarios(t *testing.T) {
 				in.ch <- functionLine("tx1", "fn")
 				<-started
 				in.ch <- "FUNCTION_CANCEL tx1"
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+				in.ch <- "FUNCTION_CANCEL tx1"
+				time.Sleep(150 * time.Millisecond)
 
 				close(release)
 				close(in.ch)
 				waitForDone(t, done)
 
-				assert.Equal(t, 1, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
-			},
-		},
-		"repeated cancel for same uid still emits one terminal response": {
-			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
-				mgr.cancelFallbackDelay = 50 * time.Millisecond
-				started := make(chan struct{}, 1)
-				release := make(chan struct{})
-
-				mgr.Register("fn", func(fn Function) {
-					if fn.UID == "tx1" {
-						started <- struct{}{}
-						<-release
-					}
-				})
-
-				cancel, done := startFlowManager(t, mgr)
-				defer cancel()
-
-				in.ch <- functionLine("tx1", "fn")
-				<-started
-				in.ch <- "FUNCTION_CANCEL tx1"
-				in.ch <- "FUNCTION_CANCEL tx1"
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
-
-				close(release)
-				close(in.ch)
-				waitForDone(t, done)
-
-				assert.Equal(t, 1, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 0, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
 			},
 		},
 		"running cancel drops late terminal response": {
@@ -227,14 +265,17 @@ func TestManager_FlowScenarios(t *testing.T) {
 				in.ch <- functionLine("tx1", "fn")
 				<-started
 				in.ch <- "FUNCTION_CANCEL tx1"
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+				// Let the fallback timer fire (tombstones the UID).
+				time.Sleep(150 * time.Millisecond)
 
 				close(release)
 				close(in.ch)
 				waitForDone(t, done)
 
 				got := out.String()
-				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				// No 499 emitted by the fallback path.
+				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				// Late 200 from the handler is dropped by the tombstone.
 				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
 			},
 		},
@@ -340,35 +381,6 @@ func TestManager_FlowScenarios(t *testing.T) {
 				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
 				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 409"))
 				assert.EqualValues(t, 1, calls.Load())
-			},
-		},
-		"queue full is rejected with 503": {
-			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
-				mgr.queueSize = 1
-				mgr.workerCount = 1
-				started := make(chan struct{}, 1)
-				release := make(chan struct{})
-
-				mgr.Register("fn", func(fn Function) {
-					if fn.UID == "tx1" {
-						started <- struct{}{}
-						<-release
-					}
-					mgr.respUID(fn.UID, 200, "ok")
-				})
-
-				cancel, done := startFlowManager(t, mgr)
-				defer cancel()
-
-				in.ch <- functionLine("tx1", "fn")
-				<-started
-				in.ch <- functionLine("tx2", "fn")
-				in.ch <- functionLine("tx3", "fn")
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx3 503", time.Second)
-
-				close(release)
-				close(in.ch)
-				waitForDone(t, done)
 			},
 		},
 		"panic in handler emits 500": {

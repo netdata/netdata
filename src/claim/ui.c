@@ -49,7 +49,6 @@ LRESULT CALLBACK WndProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM l
         }
         default: {
             return DefWindowProc(hNetdatawnd, message, wParam, lParam);
-            break;
         }
     }
 

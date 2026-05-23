@@ -14,14 +14,14 @@ function(netdata_bundle_sentry)
         # ignore debhelper
         set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
-        set(SENTRY_VERSION 0.6.6)
+        set(SENTRY_VERSION 0.13.5)
         set(SENTRY_BACKEND "breakpad")
         set(SENTRY_BUILD_SHARED_LIBS OFF)
 
         FetchContent_Declare(
                 sentry
                 GIT_REPOSITORY https://github.com/getsentry/sentry-native.git
-                GIT_TAG c97bcc63fa89ae557cef9c9b6e3acb11a72ff97d # v0.6.6
+                GIT_TAG 6ebd29bd9742fd2f93b6770b5023e31a8efbc10e # v0.13.5
                 CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
         )
         FetchContent_MakeAvailable(sentry)

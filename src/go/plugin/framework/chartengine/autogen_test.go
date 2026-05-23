@@ -140,6 +140,7 @@ func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 		labels     map[string]string
 		wantID     string
 		wantDim    string
+		wantUnits  string
 	}{
 		"summary quantile excludes quantile label and keeps absolute algorithm": {
 			metricName: "svc.request_duration_seconds",
@@ -148,8 +149,9 @@ func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 				"method":   "GET",
 				"quantile": "0.99",
 			},
-			wantID:  "svc.request_duration_seconds-instance=db1-method=GET",
-			wantDim: "quantile_0.99",
+			wantID:    "svc.request_duration_seconds-instance=db1-method=GET",
+			wantDim:   "quantile_0.99",
+			wantUnits: "seconds",
 		},
 	}
 
@@ -166,6 +168,7 @@ func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 
 			assert.Equal(t, tc.wantID, route.chartID)
 			assert.Equal(t, tc.wantDim, route.dimensionName)
+			assert.Equal(t, tc.wantUnits, route.units)
 			assert.Equal(t, metrix.SummaryQuantileLabel, route.dimensionKeyLabel)
 			assert.Equal(t, program.AlgorithmAbsolute, route.algorithm)
 			assert.False(t, route.staticDimension)

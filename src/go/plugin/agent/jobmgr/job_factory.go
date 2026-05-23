@@ -3,6 +3,7 @@
 package jobmgr
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,45 +11,75 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
+
+func jobLogSource(cfg confgroup.Config) string {
+	sourceType := cfg.SourceType()
+	provider := cfg.Provider()
+	if sourceType != "" && sourceType == provider {
+		return sourceType
+	}
+	return fmt.Sprintf("%s/%s", sourceType, provider)
+}
 
 // jobFactory builds runtime jobs from configs without mutating manager-owned runtime maps.
 type jobFactory struct {
 	logger *logger.Logger
 
-	pluginName string
-	modules    collectorapi.Registry
-	vnodes     *vnodeStore
-	out        io.Writer
+	pluginName  string
+	modules     collectorapi.Registry
+	vnodeLookup func(string) (*vnodes.VirtualNode, bool)
+	out         io.Writer
+
+	validationOnly bool
 
 	auditMode     bool
 	auditAnalyzer metricsaudit.Analyzer
 	auditDataDir  string
 
 	runtimeService runtimecomp.Service
+	vnodeRegistry  *vnoderegistry.Registry
+
+	secretResolver *secretresolver.Resolver
+	secretStoreSvc secretstore.Service
+	ctx            context.Context
 }
 
 func newJobFactory(m *Manager) *jobFactory {
 	return &jobFactory{
 		logger: m.Logger,
 
-		pluginName: m.pluginName,
-		modules:    m.modules,
-		vnodes:     m.vnodes,
-		out:        m.out,
+		pluginName:  m.pluginName,
+		modules:     m.modules,
+		vnodeLookup: m.vnodesCtl.Lookup,
+		out:         m.out,
 
 		auditMode:     m.auditMode,
 		auditAnalyzer: m.auditAnalyzer,
 		auditDataDir:  m.auditDataDir,
 
 		runtimeService: m.runtimeService,
+		vnodeRegistry:  m.vnodeRegistry,
+		secretResolver: m.secretResolver,
+		secretStoreSvc: m.secretsCtl.Service(),
+		ctx:            m.baseContext(),
 	}
+}
+
+func (f *jobFactory) validate(cfg confgroup.Config) error {
+	clone := *f
+	clone.validationOnly = true
+	_, err := clone.create(cfg)
+	return err
 }
 
 func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
@@ -64,7 +95,10 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 
 	var vnode *vnodes.VirtualNode
 	if cfg.Vnode() != "" {
-		n, ok := f.vnodes.Lookup(cfg.Vnode())
+		if f.vnodeLookup == nil {
+			return nil, fmt.Errorf("vnode '%s' is not found", cfg.Vnode())
+		}
+		n, ok := f.vnodeLookup(cfg.Vnode())
 		if !ok || n == nil {
 			return nil, fmt.Errorf("vnode '%s' is not found", cfg.Vnode())
 		}
@@ -79,12 +113,22 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 	return f.createV1(cfg, creator, functionOnly, vnode)
 }
 
+func (f *jobFactory) logApplyConfigError(cfg confgroup.Config, err error) {
+	if f.validationOnly {
+		return
+	}
+	f.logger.Errorf("failed to apply config for %s[%s] job: %v", cfg.Module(), cfg.Name(), err)
+}
+
 func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator, functionOnly bool, vnode *vnodes.VirtualNode) (runtimeJob, error) {
 	mod := creator.CreateV2()
 	if mod == nil {
 		return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
 	}
-	if err := applyConfig(cfg, mod); err != nil {
+	storeSnapshot := f.secretStoreSvc.Capture()
+	resolveCtx := collectorSecretResolveContext(f.ctx, f.logger, cfg)
+	if err := applyConfig(resolveCtx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
+		f.logApplyConfigError(cfg, err)
 		return nil, err
 	}
 
@@ -93,6 +137,7 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 		Name:            cfg.Name(),
 		ModuleName:      cfg.Module(),
 		FullName:        cfg.FullName(),
+		Source:          jobLogSource(cfg),
 		UpdateEvery:     cfg.UpdateEvery(),
 		AutoDetectEvery: cfg.AutoDetectionRetry(),
 		IsStock:         cfg.SourceType() == "stock",
@@ -101,6 +146,7 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 		Module:          mod,
 		FunctionOnly:    functionOnly,
 		RuntimeService:  f.runtimeService,
+		VnodeRegistry:   f.vnodeRegistry,
 	}
 	if vnode != nil {
 		jobCfg.Vnode = *vnode.Copy()
@@ -119,7 +165,10 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 	}
 
 	mod := creator.Create()
-	if err := applyConfig(cfg, mod); err != nil {
+	storeSnapshot := f.secretStoreSvc.Capture()
+	resolveCtx := collectorSecretResolveContext(f.ctx, f.logger, cfg)
+	if err := applyConfig(resolveCtx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
+		f.logApplyConfigError(cfg, err)
 		return nil, err
 	}
 
@@ -137,6 +186,7 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 		Name:            cfg.Name(),
 		ModuleName:      cfg.Module(),
 		FullName:        cfg.FullName(),
+		Source:          jobLogSource(cfg),
 		UpdateEvery:     cfg.UpdateEvery(),
 		AutoDetectEvery: cfg.AutoDetectionRetry(),
 		Priority:        cfg.Priority(),
@@ -156,6 +206,9 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 }
 
 func (f *jobFactory) createV1CaptureDir(cfg confgroup.Config) (string, error) {
+	if f.validationOnly {
+		return "", nil
+	}
 	if f.auditDataDir == "" {
 		return "", nil
 	}

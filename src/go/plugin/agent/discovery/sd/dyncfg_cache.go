@@ -5,6 +5,7 @@ package sd
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
@@ -89,6 +90,7 @@ func (c sdConfig) ToPipelineConfig(configDefaults confgroup.Registry) (pipeline.
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return pipeline.Config{}, fmt.Errorf("unmarshal pipeline config: %w", err)
 	}
+	cfg.Name = c.Name()
 
 	cfg.ConfigDefaults = configDefaults
 
@@ -117,7 +119,8 @@ func (c sdConfig) DataJSON() []byte {
 }
 
 // newSDConfigFromYAML creates an sdConfig from YAML bytes.
-// Used when loading file configs. Cleans the name for dyncfg compatibility.
+// Used when loading file configs. The stored name prefers raw config content,
+// falling back to the file basename, and is cleaned for dyncfg compatibility.
 func newSDConfigFromYAML(data []byte, source, sourceType, pipelineKey string) (sdConfig, error) {
 	// First unmarshal to pipeline.Config to get discoverer type and apply YAML processing
 	var cfg pipeline.Config
@@ -136,8 +139,11 @@ func newSDConfigFromYAML(data []byte, source, sourceType, pipelineKey string) (s
 		return nil, fmt.Errorf("unmarshal to map: %w", err)
 	}
 
-	// Clean the name for dyncfg compatibility
-	if name := m.Name(); name != "" {
+	name := strings.TrimSpace(cfg.Name)
+	if name == "" {
+		name = configNameFromSource(source)
+	}
+	if name != "" {
 		m["name"] = naming.Sanitize(name)
 	}
 
@@ -181,4 +187,12 @@ func sourceTypeFromPath(path string) string {
 		return confgroup.TypeStock
 	}
 	return confgroup.TypeUser
+}
+
+func configNameFromSource(source string) string {
+	base := filepath.Base(strings.TrimSpace(source))
+	if before, ok := strings.CutSuffix(base, ".conf"); ok {
+		base = before
+	}
+	return base
 }

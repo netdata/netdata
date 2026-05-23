@@ -17,10 +17,17 @@ differences from the defaults:
   the first newline after a block will be _removed_, as will any leading
   whitespace on the same line as a block.
 
-Each markdown template corresponds to the key of the same name in the
+Most markdown templates correspond to the key of the same name in the
 integrations objects in that file. Those templates get passed the
 integration data using the name `entry`, plus the composed related
 resource data using the name `rel_res`.
+
+The `setup` section is a special case and is selected by integration
+type in `gen_integrations.py`:
+
+- `setup-generic.md` for the generic integration path
+- `setup-logs.md` for logs integrations
+- `setup-secretstore.md` for secretstore integrations
 
 The `integrations.js` template is used to compose the final file. It gets
 passed the JSON-formatted category and integration data using the names

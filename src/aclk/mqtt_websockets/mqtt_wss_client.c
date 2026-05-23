@@ -245,12 +245,35 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
         netdata_ssl_log_verify_error(ctx);
     }
 
-    if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT &&
-        client->ssl_flags & MQTT_WSS_SSL_ALLOW_SELF_SIGNED)
-    {
-        preverify_ok = 1;
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Self Signed Certificate Accepted as the connection was "
-                               "requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+    if (!preverify_ok && (client->ssl_flags & MQTT_WSS_SSL_ALLOW_SELF_SIGNED)) {
+        // MQTT_WSS_SSL_ALLOW_SELF_SIGNED means "this connection accepts a
+        // certificate that wouldn't pass full validation". Cover the errors
+        // that on-prem deployments routinely hit:
+        //  - leaf is self-signed (no CA at all)
+        //  - cert subject does not match the configured hostname/IP
+        //    (DNS aliases, IP-only access, certs without proper SAN)
+        switch (err) {
+            case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
+                preverify_ok = 1;
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Self Signed Certificate Accepted as the connection was "
+                       "requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+                break;
+            case X509_V_ERR_HOSTNAME_MISMATCH:
+                preverify_ok = 1;
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Certificate hostname mismatch accepted as the connection "
+                       "was requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+                break;
+            case X509_V_ERR_IP_ADDRESS_MISMATCH:
+                preverify_ok = 1;
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Certificate IP address mismatch accepted as the connection "
+                       "was requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+                break;
+            default:
+                break;
+        }
     }
 
     return preverify_ok;
@@ -412,6 +435,21 @@ int mqtt_wss_connect(
     if (!SSL_set_tlsext_host_name(client->ssl, client->target_host)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting TLS SNI host");
         return -7;
+    }
+
+    if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
+        // target_host may be either a DNS hostname or an IP literal.
+        // X509_VERIFY_PARAM_set1_ip_asc() parses the string as an IP and
+        // matches against the cert's iPAddress SAN; it returns 0 if the
+        // string is not a valid IP. X509_VERIFY_PARAM_set1_host() matches
+        // against the dNSName SAN. Try the IP path first; if the input is
+        // not an IP literal, fall back to hostname matching.
+        X509_VERIFY_PARAM *param = SSL_get0_param(client->ssl);
+        if (!X509_VERIFY_PARAM_set1_ip_asc(param, client->target_host) &&
+            !X509_VERIFY_PARAM_set1_host(param, client->target_host, 0)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting TLS hostname verification host");
+            return -7;
+        }
     }
 
     result = SSL_connect(client->ssl);
@@ -792,32 +830,66 @@ int mqtt_wss_publish5(mqtt_wss_client client,
                       uint8_t publish_flags,
                       uint16_t *packet_id)
 {
-    if (client->mqtt_disconnecting) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "mqtt_wss is disconnecting can't publish");
+    // topic_free is not yet supported: the rollback path inside mqtt_ng_publish
+    // can free topic asymmetrically across failure modes (see contract notes in
+    // mqtt_ng.h and the long comment below). Enforce NULL until that is fixed
+    // so callers don't silently leak a borrowed/allocated topic on failure.
+    internal_fatal(topic_free != NULL, "mqtt_wss_publish5: topic_free must be NULL until rollback ownership is made symmetric");
+
+    const char *fail_reason = NULL;
+    if (client->mqtt_disconnecting)
+        fail_reason = "mqtt_wss is disconnecting can't publish";
+    else if (!client->mqtt_connected)
+        fail_reason = "MQTT is offline. Can't send message.";
+
+    if (fail_reason) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "%s", fail_reason);
+        if (packet_id)
+            *packet_id = 0;
         if (msg_free)
             msg_free(msg);
         return 1;
     }
 
-    if (!client->mqtt_connected) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MQTT is offline. Can't send message.");
-        if (msg_free)
-            msg_free(msg);
-        return 1;
-    }
-    uint8_t mqtt_flags = 0;
-
-    mqtt_flags = (publish_flags & MQTT_WSS_PUB_QOSMASK) << 1;
+    uint8_t mqtt_flags = (publish_flags & MQTT_WSS_PUB_QOSMASK) << 1;
     if (publish_flags & MQTT_WSS_PUB_RETAIN)
         mqtt_flags |= MQTT_PUBLISH_RETAIN;
 
+    // Failure-path ownership contract with mqtt_ng_publish:
+    //  - On MQTT_NG_MSGGEN_OK, msg is attached to a buffer fragment and the
+    //    transaction buffer will call msg_free after the message is ack'd.
+    //  - On any non-OK return, msg is never attached, so ownership stays with
+    //    us and we must call msg_free here.
+    //
+    //    Single-free invariant: msg is attached to a fragment only at the
+    //    final frag_set_external_data() inside mqtt_ng_generate_publish(),
+    //    after which the function commits unconditionally -- there is no
+    //    `goto fail_rollback` between attachment and commit. Every reachable
+    //    fail_rollback site therefore runs with msg unattached, so the
+    //    rollback walks no msg-bearing fragment and msg_free() is only ever
+    //    called by us. If a future change inserts a failure exit after
+    //    attaching msg but before commit, the rollback would also invoke
+    //    msg_free and this branch would double-free; preserve the invariant
+    //    or move responsibility entirely into mqtt_ng_publish().
+    //
+    //  - topic_free is intentionally NOT handled here. mqtt_ng_publish may
+    //    attach topic to a fragment via optimized_add() before failing, in
+    //    which case the rollback already invokes topic_free; if it fails
+    //    earlier, topic_free is never invoked at all. The current callers all
+    //    pass topic_free=NULL, so this asymmetry is harmless today.
     int rc = mqtt_ng_publish(client->mqtt, topic, topic_free, msg, msg_free, msg_len, mqtt_flags, packet_id);
-    if (rc == MQTT_NG_MSGGEN_MSG_TOO_BIG)
-        return MQTT_WSS_ERR_MSG_TOO_BIG;
+    if (rc != MQTT_NG_MSGGEN_OK) {
+        if (packet_id)
+            *packet_id = 0;
+        if (msg_free)
+            msg_free(msg);
+        if (rc == MQTT_NG_MSGGEN_MSG_TOO_BIG)
+            return MQTT_WSS_ERR_MSG_TOO_BIG;
+        return rc;
+    }
 
     mqtt_wss_wakeup(client);
-
-    return rc;
+    return MQTT_WSS_OK;
 }
 
 int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level)

@@ -9,6 +9,7 @@ type writeView struct {
 type snapshotMeter struct {
 	backend meterBackend
 	prefix  string
+	scope   HostScope
 	sets    []LabelSet
 }
 
@@ -20,6 +21,7 @@ type snapshotVecMeter struct {
 type statefulMeter struct {
 	backend meterBackend
 	prefix  string
+	scope   HostScope
 	sets    []LabelSet
 }
 
@@ -43,13 +45,22 @@ func (m *snapshotMeter) WithLabels(labels ...Label) SnapshotMeter {
 	return m.WithLabelSet(set)
 }
 
+func (m *snapshotMeter) WithHostScope(scope HostScope) SnapshotMeter {
+	return &snapshotMeter{
+		backend: m.backend,
+		prefix:  m.prefix,
+		scope:   mustNormalizeHostScope(scope),
+		sets:    appendLabelSets(m.sets, nil),
+	}
+}
+
 func (m *snapshotMeter) WithLabelSet(labels ...LabelSet) SnapshotMeter {
 	for _, ls := range labels {
 		if ls.set == nil || ls.set.owner != m.backend {
 			panic(errForeignLabelSet)
 		}
 	}
-	return &snapshotMeter{backend: m.backend, prefix: m.prefix, sets: appendLabelSets(m.sets, labels)}
+	return &snapshotMeter{backend: m.backend, prefix: m.prefix, scope: m.scope, sets: appendLabelSets(m.sets, labels)}
 }
 
 func (m *snapshotMeter) Vec(labelKeys ...string) SnapshotVecMeter {
@@ -68,13 +79,22 @@ func (m *statefulMeter) WithLabels(labels ...Label) StatefulMeter {
 	return m.WithLabelSet(set)
 }
 
+func (m *statefulMeter) WithHostScope(scope HostScope) StatefulMeter {
+	return &statefulMeter{
+		backend: m.backend,
+		prefix:  m.prefix,
+		scope:   mustNormalizeHostScope(scope),
+		sets:    appendLabelSets(m.sets, nil),
+	}
+}
+
 func (m *statefulMeter) WithLabelSet(labels ...LabelSet) StatefulMeter {
 	for _, ls := range labels {
 		if ls.set == nil || ls.set.owner != m.backend {
 			panic(errForeignLabelSet)
 		}
 	}
-	return &statefulMeter{backend: m.backend, prefix: m.prefix, sets: appendLabelSets(m.sets, labels)}
+	return &statefulMeter{backend: m.backend, prefix: m.prefix, scope: m.scope, sets: appendLabelSets(m.sets, labels)}
 }
 
 func (m *statefulMeter) Vec(labelKeys ...string) StatefulVecMeter {
@@ -90,6 +110,13 @@ func (m *statefulMeter) LabelSet(labels ...Label) LabelSet {
 
 func (m *snapshotVecMeter) Gauge(name string, opts ...InstrumentOption) SnapshotGaugeVec {
 	return m.meter.GaugeVec(name, m.labelKeys, opts...)
+}
+
+func (m *snapshotVecMeter) WithHostScope(scope HostScope) SnapshotVecMeter {
+	return &snapshotVecMeter{
+		meter:     m.meter.WithHostScope(scope).(*snapshotMeter),
+		labelKeys: append([]string(nil), m.labelKeys...),
+	}
 }
 
 func (m *snapshotVecMeter) Counter(name string, opts ...InstrumentOption) SnapshotCounterVec {
@@ -118,6 +145,13 @@ func (m *snapshotVecMeter) MeasureSetCounter(name string, opts ...InstrumentOpti
 
 func (m *statefulVecMeter) Gauge(name string, opts ...InstrumentOption) StatefulGaugeVec {
 	return m.meter.GaugeVec(name, m.labelKeys, opts...)
+}
+
+func (m *statefulVecMeter) WithHostScope(scope HostScope) StatefulVecMeter {
+	return &statefulVecMeter{
+		meter:     m.meter.WithHostScope(scope).(*statefulMeter),
+		labelKeys: append([]string(nil), m.labelKeys...),
+	}
 }
 
 func (m *statefulVecMeter) Counter(name string, opts ...InstrumentOption) StatefulCounterVec {

@@ -57,18 +57,24 @@ func BuildMSSQLAzureADDSN(baseDSN string, cfg cloudauth.Config) (string, error) 
 
 	switch aadCfg.NormalizedMode() {
 	case cloudauth.AzureADAuthModeServicePrincipal:
+		sp := aadCfg.ModeServicePrincipal
+		if sp == nil {
+			return "", fmt.Errorf("unsupported cloud_auth.azure_ad.mode %q", aadCfg.Mode)
+		}
 		q.Set("fedauth", mssqlFedAuthServicePrincipal)
-		clientID := strings.TrimSpace(aadCfg.ClientID)
-		clientSecret := strings.TrimSpace(aadCfg.ClientSecret)
+		clientID := strings.TrimSpace(sp.ClientID)
+		clientSecret := strings.TrimSpace(sp.ClientSecret)
 		userID := clientID
-		if tenantID := strings.TrimSpace(aadCfg.TenantID); tenantID != "" {
+		if tenantID := strings.TrimSpace(sp.TenantID); tenantID != "" {
 			userID = userID + "@" + tenantID
 		}
 		u.User = url.UserPassword(userID, clientSecret)
 	case cloudauth.AzureADAuthModeManagedIdentity:
+		mi := aadCfg.ModeManagedIdentity
 		q.Set("fedauth", mssqlFedAuthManagedIdentity)
 		u.User = nil
-		if id := strings.TrimSpace(aadCfg.ManagedIdentityClientID); id != "" {
+		if mi != nil && strings.TrimSpace(mi.ClientID) != "" {
+			id := strings.TrimSpace(mi.ClientID)
 			q.Set("user id", id)
 		}
 	case cloudauth.AzureADAuthModeDefault:

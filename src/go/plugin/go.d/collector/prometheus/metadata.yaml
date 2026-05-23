@@ -278,7 +278,10 @@ modules:
                     url: http://192.0.2.1:9090/metrics
     troubleshooting:
       problems:
-        list: [ ]
+        list:
+          - name: "Disappearing or sparse metrics not clearing alerts"
+            description: |
+              When a metric disappears from the Prometheus endpoint response (for example, a gauge that is only exposed when its value is greater than 0), Netdata does not require any special value to stop tracking it. The Prometheus collector automatically detects metrics that are no longer present in the scrape response. After 10 consecutive collection cycles where the metric is absent, the associated chart is automatically removed and any alerts on that chart will clear. You do not need to send a special value (such as 0, NaN, or StaleNaN) — simply omitting the metric from the response is sufficient. Note that during the 10-cycle grace period, the last known value remains and alerts may not clear immediately.
     alerts: [ ]
     metrics:
       folding:
@@ -3247,33 +3250,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [mtail](https://github.com/google/mtail) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
-      id: collector-go.d.plugin-prometheus-nagios
-      community: true
-      monitored_instance:
-        name: Nagios
-        link: https://github.com/wbollock/nagios_exporter
-        icon_filename: nagios.png
-        categories:
-          - data-collection.applications
-      keywords: [ ]
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Keep tabs on Nagios network monitoring metrics for efficient
-          IT infrastructure management and performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Nagios exporter](https://github.com/wbollock/nagios_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [Nagios exporter](https://github.com/wbollock/nagios_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta

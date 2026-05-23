@@ -241,10 +241,11 @@ impl ChartConfigManager {
     pub fn load_user_configs<P: AsRef<std::path::Path>>(&mut self, config_dir: P) -> Result<()> {
         let config_path = config_dir.as_ref();
         if !config_path.exists() {
-            return Err(anyhow::anyhow!(
-                "Configuration directory does not exist: {}",
+            tracing::info!(
+                "user configuration directory does not exist: {} - using stock configs",
                 config_path.display()
-            ));
+            );
+            return Ok(());
         }
         if !config_path.is_dir() {
             return Err(anyhow::anyhow!(

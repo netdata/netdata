@@ -44,4 +44,7 @@ mod error;
 mod log;
 
 pub use error::{Result, WriterError};
-pub use log::{Config, Log, RetentionPolicy, RotationPolicy};
+pub use log::{
+    Config, EntryTimestamps, Log, LogLifecycleEvent, LogLifecycleObserver, RetentionPolicy,
+    RotationPolicy,
+};

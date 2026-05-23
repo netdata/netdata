@@ -112,6 +112,95 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, 0, charts[0].Lifecycle.Dimensions.ExpireAfterCycles)
 			},
 		},
+		"defaults chart priority when omitted": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Service",
+						Metrics: []string{"svc_requests_total"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Requests",
+								Context: "requests",
+								Units:   "requests/s",
+								Dimensions: []charttpl.Dimension{
+									{Selector: "svc_requests_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.Equal(t, Priority, charts[0].Meta.Priority)
+			},
+		},
+		"preserves explicit chart priority": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Service",
+						Metrics: []string{"svc_requests_total"},
+						Charts: []charttpl.Chart{
+							{
+								Title:    "Requests",
+								Context:  "requests",
+								Units:    "requests/s",
+								Priority: Priority + 321,
+								Dimensions: []charttpl.Dimension{
+									{Selector: "svc_requests_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.Equal(t, Priority+321, charts[0].Meta.Priority)
+			},
+		},
+		"does not apply chart_defaults inheritance during compile": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Service",
+						Metrics: []string{"svc_requests_total"},
+						ChartDefaults: &charttpl.ChartDefaults{
+							LabelPromoted: []string{"cluster"},
+							Instances: &charttpl.Instances{
+								ByLabels: []string{"instance"},
+							},
+						},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Requests",
+								Context: "requests",
+								Units:   "requests/s",
+								Dimensions: []charttpl.Dimension{
+									{Selector: "svc_requests_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.Empty(t, charts[0].Labels.PromoteKeys)
+				assert.Empty(t, charts[0].Identity.InstanceByLabels)
+			},
+		},
 		"keeps default chart expiry when lifecycle is present without expire_after_cycles": {
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,

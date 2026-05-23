@@ -12,7 +12,6 @@ type managerRuntimeMetrics struct {
 	schedulerPending          metrix.StatefulGauge
 
 	functionCallsTotal  metrix.StatefulCounter
-	queueFullTotal      metrix.StatefulCounter
 	cancelFallbackTotal metrix.StatefulCounter
 	lateTerminalDropped metrix.StatefulCounter
 	duplicateUIDIgnored metrix.StatefulCounter
@@ -48,12 +47,6 @@ func newManagerRuntimeMetrics(store metrix.RuntimeStore) *managerRuntimeMetrics 
 			metrix.WithDescription("Total number of parsed function call requests"),
 			metrix.WithChartFamily("Framework/Functions/Calls"),
 			metrix.WithUnit("calls"),
-		),
-		queueFullTotal: metrix.SeededCounter(meter,
-			"queue_full_total",
-			metrix.WithDescription("Total number of function requests rejected due to queue full"),
-			metrix.WithChartFamily("Framework/Functions/Failures"),
-			metrix.WithUnit("requests"),
 		),
 		cancelFallbackTotal: metrix.SeededCounter(meter,
 			"cancel_fallback_total",
@@ -100,13 +93,6 @@ func (m *Manager) observeSchedulerPending() {
 		return
 	}
 	m.runtimeMetrics.schedulerPending.Set(float64(m.scheduler.pendingCount()))
-}
-
-func (m *Manager) observeQueueFull() {
-	if m == nil || m.runtimeMetrics == nil {
-		return
-	}
-	m.runtimeMetrics.queueFullTotal.Add(1)
 }
 
 func (m *Manager) observeFunctionCall() {

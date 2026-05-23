@@ -237,8 +237,7 @@ void SIGNAL_CODE_2str_h(SIGNAL_CODE code, char *buf, size_t size) {
 SIGNAL_CODE SIGNAL_CODE_2id_h(const char *str) {
     if(!str || !*str) return 0;
 
-    char buf[strlen(str) + 1];
-    memcpy(buf, str, strlen(str) + 1);
+    CLEAN_CHAR_P *buf = strdupz(str);
 
     char *si_code_str = strchr(buf, '/');
     if(si_code_str) {

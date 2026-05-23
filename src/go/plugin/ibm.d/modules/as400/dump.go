@@ -1,5 +1,4 @@
 //go:build cgo
-// +build cgo
 
 package as400
 
@@ -8,6 +7,7 @@ package as400
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -113,9 +113,7 @@ func (d *dumpContext) recordMetrics(metrics map[string]int64) {
 	d.metricSeq++
 	filename := fmt.Sprintf("metrics-%04d.json", d.metricSeq)
 	copyMetrics := make(map[string]int64, len(metrics))
-	for k, v := range metrics {
-		copyMetrics[k] = v
-	}
+	maps.Copy(copyMetrics, metrics)
 	payload := struct {
 		GeneratedAt time.Time        `json:"generated_at"`
 		Metrics     map[string]int64 `json:"metrics"`

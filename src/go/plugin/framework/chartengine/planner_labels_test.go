@@ -18,7 +18,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 		"auto intersection keeps only common labels and excludes dimension key": {
 			observed: []map[string]string{
 				{
-					"_collect_job":   "mysql-local",
+					collectJobLabel:  "mysql-local",
 					"env":            "prod",
 					"instance":       "db1",
 					"mode":           "read",
@@ -26,7 +26,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 					"selector_fixed": "x",
 				},
 				{
-					"_collect_job":   "mysql-local",
+					collectJobLabel:  "mysql-local",
 					"env":            "prod",
 					"instance":       "db1",
 					"mode":           "write",
@@ -34,7 +34,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 					"selector_fixed": "x",
 				},
 				{
-					"_collect_job":   "mysql-local",
+					collectJobLabel:  "mysql-local",
 					"env":            "prod",
 					"instance":       "db1",
 					"mode":           "read",
@@ -78,7 +78,40 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 			assert.NotContains(t, got, "mode")
 			assert.NotContains(t, got, "selector_fixed")
-			assert.NotContains(t, got, "_collect_job")
+			assert.NotContains(t, got, collectJobLabel)
+		})
+	}
+}
+
+func TestCompileInstanceLabelPlanExcludeWinsRegardlessOfTokenOrder(t *testing.T) {
+	tests := map[string]struct {
+		selectors []program.InstanceLabelSelector
+	}{
+		"exclude after explicit": {
+			selectors: []program.InstanceLabelSelector{
+				{Key: "host"},
+				{Exclude: true, Key: "host"},
+				{IncludeAll: true},
+			},
+		},
+		"exclude before explicit": {
+			selectors: []program.InstanceLabelSelector{
+				{Exclude: true, Key: "host"},
+				{Key: "host"},
+				{IncludeAll: true},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			plan := compileInstanceLabelPlan(program.ChartIdentity{
+				InstanceByLabels: tc.selectors,
+			})
+			assert.True(t, plan.includeAll)
+			assert.Empty(t, plan.explicitKeys)
+			assert.Empty(t, plan.explicitSet)
+			assert.Contains(t, plan.excludeSet, "host")
 		})
 	}
 }

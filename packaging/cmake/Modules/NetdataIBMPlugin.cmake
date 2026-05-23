@@ -27,7 +27,7 @@ macro(add_ibm_plugin_target)
     URL_HASH SHA256=${IBM_MQ_HASH}
   )
 
-  if(DEFINED FETCHCONTENT_SOURCE_DIR_IBM_MQ)
+  if(FETCHCONTENT_SOURCE_DIR_IBM_MQ)
     message(STATUS "Copying IBM MQ client library sources from ${FETCHCONTENT_SOURCE_DIR_IBM_MQ} to ${IBM_MQ_BUILD_DIR}")
     file(REMOVE_RECURSE "${IBM_MQ_BUILD_DIR}")
     execute_process(

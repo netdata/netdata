@@ -12,7 +12,7 @@ use journal_index::{
     LogQueryParamsBuilder, Microseconds,
 };
 use journal_registry::File;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -57,6 +57,7 @@ pub struct LogQuery<'a> {
     builder: LogQueryParamsBuilder,
     cancellation: Option<CancellationToken>,
     progress: Option<Arc<AtomicUsize>>,
+    output_fields: Option<HashSet<String>>,
 }
 
 impl<'a> LogQuery<'a> {
@@ -82,6 +83,7 @@ impl<'a> LogQuery<'a> {
             ),
             cancellation: None,
             progress: None,
+            output_fields: None,
         }
     }
 
@@ -158,6 +160,19 @@ impl<'a> LogQuery<'a> {
         self
     }
 
+    /// Limit returned field-value pairs to the requested field names.
+    ///
+    /// Field names may be specified using either their OTEL names or the raw
+    /// systemd names present on disk.
+    pub fn with_output_fields<I, S>(mut self, fields: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.output_fields = Some(fields.into_iter().map(Into::into).collect());
+        self
+    }
+
     /// Execute the query and return log entries.
     ///
     /// This consumes the builder and returns a vector of log entries sorted by timestamp
@@ -168,6 +183,7 @@ impl<'a> LogQuery<'a> {
     /// Returns an error if anchor or direction were not set, or if time boundaries are invalid.
     pub fn execute(self) -> Result<Vec<LogEntryData>> {
         let params = self.builder.build()?;
+        let output_fields = self.output_fields;
         let (log_entry_ids, _state) = retrieve_log_entries(
             self.file_indexes.to_vec(),
             params,
@@ -176,7 +192,7 @@ impl<'a> LogQuery<'a> {
             self.progress.as_ref(),
         );
 
-        extract_entry_data(&log_entry_ids)
+        extract_entry_data(&log_entry_ids, output_fields.as_ref())
     }
 
     /// Execute the query with pagination support.
@@ -201,6 +217,7 @@ impl<'a> LogQuery<'a> {
         state: Option<&PaginationState>,
     ) -> Result<(Vec<LogEntryData>, PaginationState)> {
         let params = self.builder.build()?;
+        let output_fields = self.output_fields;
         let (log_entry_ids, new_state) = retrieve_log_entries(
             self.file_indexes.to_vec(),
             params,
@@ -209,7 +226,7 @@ impl<'a> LogQuery<'a> {
             self.progress.as_ref(),
         );
 
-        let data = extract_entry_data(&log_entry_ids)?;
+        let data = extract_entry_data(&log_entry_ids, output_fields.as_ref())?;
         Ok((data, new_state))
     }
 }
@@ -457,8 +474,9 @@ fn merge_log_entries(
         return a.into_iter().take(limit).collect();
     }
 
-    // Allocate result vector with appropriate capacity
-    let mut result = Vec::with_capacity(limit);
+    // Allocate result vector with appropriate capacity — cap at actual data size
+    // to avoid capacity overflow when limit is usize::MAX (no limit set).
+    let mut result = Vec::with_capacity(a.len().saturating_add(b.len()).min(limit));
     let mut i = 0;
     let mut j = 0;
 
@@ -484,6 +502,16 @@ fn merge_log_entries(
     }
 
     result
+}
+
+fn is_projected(
+    raw_field_name: &str,
+    output_field_name: &str,
+    output_fields: Option<&HashSet<String>>,
+) -> bool {
+    output_fields.map_or(true, |projected| {
+        projected.contains(raw_field_name) || projected.contains(output_field_name)
+    })
 }
 
 /// Raw field data extracted from a journal entry.
@@ -515,7 +543,10 @@ pub struct LogEntryData {
 /// # Returns
 ///
 /// A vector of `LogEntryData` in the same order as the input entries
-fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
+fn extract_entry_data(
+    log_entries: &[LogEntryId],
+    output_fields: Option<&HashSet<String>>,
+) -> Result<Vec<LogEntryData>> {
     // Group entries by file to minimize file open/close operations
     let mut entries_by_file: HashMap<&File, Vec<(usize, &LogEntryId)>> = HashMap::new();
     for (idx, entry) in log_entries.iter().enumerate() {
@@ -580,14 +611,24 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
                 let payload_str = String::from_utf8_lossy(payload_bytes);
 
                 if let Some(mut pair) = FieldValuePair::parse(&payload_str) {
+                    let raw_field_name = pair.field();
+                    let otel_field_name = reverse_map.get(raw_field_name).map(String::as_str);
+                    let output_field_name = otel_field_name.unwrap_or(raw_field_name);
+                    let projected = is_projected(raw_field_name, output_field_name, output_fields);
+
                     // Reverse-map systemd field name back to OTEL name if needed
-                    if let Some(otel_name) = reverse_map.get(pair.field()) {
+                    if let Some(otel_name) = otel_field_name {
                         pair = FieldValuePair::new_unchecked(
                             FieldName::new_unchecked(otel_name),
                             pair.value().to_string(),
                         );
                     }
-                    fields.push(pair);
+
+                    // Accept projection filters expressed with either OTEL field names (preferred)
+                    // or the raw systemd names present on disk.
+                    if projected {
+                        fields.push(pair);
+                    }
                 }
             }
 
@@ -604,4 +645,51 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
 
     // Filter out None entries (remapping entries are skipped and left as None)
     Ok(result.into_iter().flatten().collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn projected_fields(fields: &[&str]) -> HashSet<String> {
+        fields.iter().map(|field| (*field).to_string()).collect()
+    }
+
+    #[test]
+    fn projection_accepts_raw_systemd_field_name() {
+        let projected = projected_fields(&["_SYSTEMD_UNIT"]);
+
+        assert!(is_projected(
+            "_SYSTEMD_UNIT",
+            "systemd.unit",
+            Some(&projected)
+        ));
+    }
+
+    #[test]
+    fn projection_accepts_remapped_otel_field_name() {
+        let projected = projected_fields(&["service.name"]);
+
+        assert!(is_projected(
+            "ND_SD_DFB2E175D0B14B66",
+            "service.name",
+            Some(&projected)
+        ));
+    }
+
+    #[test]
+    fn projection_rejects_unmatched_field_names() {
+        let projected = projected_fields(&["service.name"]);
+
+        assert!(!is_projected(
+            "_SYSTEMD_UNIT",
+            "systemd.unit",
+            Some(&projected)
+        ));
+    }
+
+    #[test]
+    fn projection_accepts_all_fields_without_projection_filter() {
+        assert!(is_projected("_SYSTEMD_UNIT", "systemd.unit", None));
+    }
 }

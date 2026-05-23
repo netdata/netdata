@@ -1,0 +1,42 @@
+{
+  "port": [
+    {
+      "durable-id": "hostport_A0",
+      "port": "A0",
+      "health": "OK",
+      "health-numeric": 0,
+      "status": "Up",
+      "status-numeric": 0,
+      "actual-speed": "12Gbps",
+      "target-id": "0"
+    },
+    {
+      "durable-id": "hostport_A1",
+      "port": "A1",
+      "health": "OK",
+      "health-numeric": 0,
+      "status": "Up",
+      "status-numeric": 0,
+      "actual-speed": "12Gbps",
+      "target-id": "1"
+    },
+    {
+      "durable-id": "hostport_B0",
+      "port": "B0",
+      "health": "N/A",
+      "health-numeric": 4,
+      "status": "Not Installed",
+      "status-numeric": 2,
+      "actual-speed": "",
+      "target-id": "2"
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

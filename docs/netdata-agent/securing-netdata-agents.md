@@ -4,6 +4,8 @@ By default, your Netdata Agent exposes its local dashboard on port `19999`. If y
 
 You can protect your Agents by implementing any of these security measures:
 
+If you need to align Netdata with enterprise cybersecurity platforms such as Sophos, secure-access gateways, or corporate reverse proxies, see [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md).
+
 ## Security Approaches
 
 ### Recommended Methods
@@ -45,7 +47,14 @@ Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netda
     mode = none
 ```
 
-Restart your Agent to apply changes. After restart, the local dashboard (http://NODE:19999) will no longer be accessible, but all metrics remain available through Netdata Cloud.
+Restart your Agent to apply changes. After restart, the Agent's web server (default port `19999`) will no longer accept inbound connections.
+
+:::warning
+
+This disables inbound connections, including streams from Child Agents.
+**Do not use this setting on Parent Agents.**
+
+:::
 
 :::tip
 

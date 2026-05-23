@@ -4,6 +4,7 @@ package ddsnmpcollector
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -364,7 +365,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			collectedMetrics: func() []ddsnmp.Metric {
 				// Simulate 1000 interfaces
 				metrics := make([]ddsnmp.Metric, 0, 1000)
-				for i := 0; i < 1000; i++ {
+				for i := range 1000 {
 					metrics = append(metrics, ddsnmp.Metric{
 						Name:    "ifHCInOctets",
 						Value:   int64(i * 100),
@@ -443,13 +444,13 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 							{
 								OID:  "1.3.6.1.2.1.2.2.1.8",
 								Name: "ifOperStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
 									"3": "testing",
 									"4": "unknown",
 									"5": "dormant",
-								},
+								}),
 							},
 						},
 					},
@@ -562,10 +563,10 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 							{
 								OID:  "1.3.6.1.2.1.2.2.1.8",
 								Name: "ifOperStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
-								},
+								}),
 							},
 						},
 					},
@@ -746,6 +747,40 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			},
 		},
 
+		"composite with selected multivalue dimensions": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "bgpPeerAvailability",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
+							{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerAdminStatus",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:       "bgpPeerState",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					MultiValue: map[string]int64{"idle": 0, "connect": 0, "active": 0, "opensent": 0, "openconfirm": 0, "established": 1},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerAvailability",
+					MultiValue: map[string]int64{"admin_enabled": 1, "established": 1},
+				},
+			},
+		},
+
 		"composite with scalar sources (CPU)": {
 			profileDef: &ddprofiledefinition.ProfileDefinition{
 				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
@@ -783,7 +818,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
 					{
 						Name:    "ifTrafficPerInterface",
-						GroupBy: []string{"interface", "ifType"},
+						GroupBy: ddprofiledefinition.StringArray{"interface", "ifType"},
 						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
 							{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
@@ -818,7 +853,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
 					{
 						Name:    "ifErrorsPerInterface",
-						GroupBy: []string{"interface"},
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
 						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 							{Metric: "ifInErrors", Table: "ifTable"},
 						},
@@ -906,7 +941,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
 					{
 						Name:    "invalidGroupedVM",
-						GroupBy: []string{"interface"},
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
 						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 							{Metric: "ifInOctets", Table: "ifTable", As: "in"},
 							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in2"},
@@ -1026,7 +1061,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					{
 						Name:    "ifTrafficPerRowHint",
 						PerRow:  true,
-						GroupBy: []string{"interface"}, // used as row-key hint
+						GroupBy: ddprofiledefinition.StringArray{"interface"}, // used as row-key hint
 						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
 							{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
@@ -1058,6 +1093,364 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					Table:      "ifXTable",
 					Tags:       map[string]string{"interface": "ethB", "ifType": "ethernetCsmacd", "ifIndex": "12"},
 					MultiValue: map[string]int64{"in": 1, "out": 2},
+				},
+			},
+		},
+
+		"per_row with missing key hint falls back to stable visible tags": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:    "ifTrafficPerRowHintFallback",
+						PerRow:  true,
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
+							{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{Name: "ifHCInOctets", Value: 5, IsTable: true, Table: "ifXTable",
+					Tags: map[string]string{"ifType": "ethernetCsmacd", "ifIndex": "11"}},
+				{Name: "ifHCOutOctets", Value: 7, IsTable: true, Table: "ifXTable",
+					Tags: map[string]string{"ifType": "ethernetCsmacd", "ifIndex": "11"}},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:       "ifTrafficPerRowHintFallback",
+					IsTable:    true,
+					Table:      "ifXTable",
+					Tags:       map[string]string{"ifType": "ethernetCsmacd", "ifIndex": "11"},
+					MultiValue: map[string]int64{"in": 5, "out": 7},
+				},
+			},
+		},
+
+		"per_row composite with selected multivalue dimensions": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:    "bgpPeerAvailability",
+						PerRow:  true,
+						GroupBy: ddprofiledefinition.StringArray{"neighbor"},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
+							{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-peer availability",
+							Family:      "Network/Routing/BGP/Peer/Availability",
+							Unit:        "{status}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerAdminStatus",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "192.0.2.1", "remote_as": "64512"},
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:       "bgpPeerState",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "192.0.2.1", "remote_as": "64512"},
+					MultiValue: map[string]int64{"idle": 1, "connect": 0, "active": 0, "opensent": 0, "openconfirm": 0, "established": 0},
+				},
+				{
+					Name:       "bgpPeerAdminStatus",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "2001:db8::1", "remote_as": "64513"},
+					MultiValue: map[string]int64{"stop": 1, "start": 0},
+				},
+				{
+					Name:       "bgpPeerState",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "2001:db8::1", "remote_as": "64513"},
+					MultiValue: map[string]int64{"idle": 1, "connect": 0, "active": 0, "opensent": 0, "openconfirm": 0, "established": 0},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "bgpPeerAvailability",
+					IsTable:     true,
+					Table:       "bgpPeerTable",
+					Tags:        map[string]string{"neighbor": "192.0.2.1", "remote_as": "64512"},
+					MultiValue:  map[string]int64{"admin_enabled": 1, "established": 0},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+				{
+					Name:        "bgpPeerAvailability",
+					IsTable:     true,
+					Table:       "bgpPeerTable",
+					Tags:        map[string]string{"neighbor": "2001:db8::1", "remote_as": "64513"},
+					MultiValue:  map[string]int64{"admin_enabled": 0, "established": 0},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+			},
+		},
+
+		"per_row composite can group by hidden tags and emit normalized tags": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:    "bgpPeerAvailability",
+						PerRow:  true,
+						GroupBy: ddprofiledefinition.StringArray{"_routing_instance", "_neighbor", "_address_family", "_subsequent_address_family"},
+						EmitTags: []ddprofiledefinition.VirtualMetricEmitTagConfig{
+							{Tag: "routing_instance", From: "_routing_instance"},
+							{Tag: "neighbor", From: "_neighbor"},
+							{Tag: "address_family", From: "_address_family"},
+							{Tag: "subsequent_address_family", From: "_subsequent_address_family"},
+							{Tag: "remote_as", From: "_remote_as"},
+						},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerAdminStatus", Table: "hwBgpPeerTable", As: "admin_enabled", Dim: "start"},
+							{Metric: "bgpPeerState", Table: "hwBgpPeerTable", As: "established", Dim: "established"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-peer availability",
+							Family:      "Network/Routing/BGP/Peer/Availability",
+							Unit:        "{status}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:    "bgpPeerAdminStatus",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv4",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:    "bgpPeerState",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv4",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"idle": 0, "established": 1},
+				},
+				{
+					Name:    "bgpPeerAdminStatus",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv6",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:    "bgpPeerState",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv6",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"idle": 1, "established": 0},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:    "bgpPeerAvailability",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"routing_instance":          "blue",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"admin_enabled": 1, "established": 1},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+				{
+					Name:    "bgpPeerAvailability",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"routing_instance":          "blue",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"admin_enabled": 1, "established": 0},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+			},
+		},
+
+		"per_row composite can group by metric static tags": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:    "bgpPeerUpdates",
+						PerRow:  true,
+						GroupBy: ddprofiledefinition.StringArray{"routing_instance", "neighbor", "address_family", "subsequent_address_family"},
+						EmitTags: []ddprofiledefinition.VirtualMetricEmitTagConfig{
+							{Tag: "routing_instance", From: "routing_instance"},
+							{Tag: "neighbor", From: "neighbor"},
+							{Tag: "address_family", From: "address_family"},
+							{Tag: "subsequent_address_family", From: "subsequent_address_family"},
+							{Tag: "remote_as", From: "remote_as"},
+						},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerInUpdates", Table: "tBgpPeerNgOperTable", As: "received"},
+							{Metric: "bgpPeerOutUpdates", Table: "tBgpPeerNgOperTable", As: "sent"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-peer update traffic",
+							Family:      "Network/Routing/BGP/Peer/Message/Update",
+							Unit:        "{message}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerInUpdates",
+					Value:      11,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+					},
+				},
+				{
+					Name:       "bgpPeerOutUpdates",
+					Value:      12,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+					},
+				},
+				{
+					Name:       "bgpPeerInUpdates",
+					Value:      21,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+					},
+				},
+				{
+					Name:       "bgpPeerOutUpdates",
+					Value:      22,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+					},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:    "bgpPeerUpdates",
+					IsTable: true,
+					Table:   "tBgpPeerNgOperTable",
+					Tags: map[string]string{
+						"routing_instance":          "Base",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"received": 11, "sent": 12},
+					Description: "Per-peer update traffic",
+					Family:      "Network/Routing/BGP/Peer/Message/Update",
+					Unit:        "{message}",
+					MetricType:  ddprofiledefinition.ProfileMetricTypeRate,
+				},
+				{
+					Name:    "bgpPeerUpdates",
+					IsTable: true,
+					Table:   "tBgpPeerNgOperTable",
+					Tags: map[string]string{
+						"routing_instance":          "Base",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"received": 21, "sent": 22},
+					Description: "Per-peer update traffic",
+					Family:      "Network/Routing/BGP/Peer/Message/Update",
+					Unit:        "{message}",
+					MetricType:  ddprofiledefinition.ProfileMetricTypeRate,
 				},
 			},
 		},
@@ -1400,7 +1793,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					{
 						Name:    "ifTraffic",
 						PerRow:  true,
-						GroupBy: []string{"interface"},
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
 						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
 							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 								{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
@@ -1462,7 +1855,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					{
 						Name:    "ifTraffic",
 						PerRow:  true,
-						GroupBy: []string{"interface"},
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
 						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
 							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 								{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
@@ -1526,7 +1919,15 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 }
 
 func Test_vmBuildGroupKey(t *testing.T) {
-	const sep = '\x1F'
+	encodeParts := func(parts ...string) string {
+		var b strings.Builder
+		for _, part := range parts {
+			b.WriteString(strconv.Itoa(len(part)))
+			b.WriteByte(':')
+			b.WriteString(part)
+		}
+		return b.String()
+	}
 
 	tests := map[string]struct {
 		agg     vmetricsAggregator
@@ -1545,7 +1946,7 @@ func Test_vmBuildGroupKey(t *testing.T) {
 			agg:     vmetricsAggregator{grouped: true, perRow: true},
 			tags:    map[string]string{"iface": "eth0", "_if_type": "loopback", "zone": "a"},
 			wantOK:  true,
-			wantKey: "iface=eth0" + string(sep) + "zone=a",
+			wantKey: encodeParts("iface", "eth0", "zone", "a"),
 		},
 
 		"per_row + no groupBy: all tags underscore -> no key": {
@@ -1559,14 +1960,14 @@ func Test_vmBuildGroupKey(t *testing.T) {
 			agg:     vmetricsAggregator{grouped: true, perRow: true, groupBy: []string{"_if_type", "iface"}},
 			tags:    map[string]string{"iface": "eth0", "_if_type": "ethernetCsmacd"},
 			wantOK:  true,
-			wantKey: "ethernetCsmacd" + string(sep) + "eth0",
+			wantKey: encodeParts("ethernetCsmacd", "eth0"),
 		},
 
-		"per_row + groupBy: missing required tag -> no key": {
+		"per_row + groupBy: missing hint falls back to stable visible-tag key": {
 			agg:     vmetricsAggregator{grouped: true, perRow: true, groupBy: []string{"iface", "zone"}},
 			tags:    map[string]string{"iface": "eth0"},
-			wantOK:  false,
-			wantKey: "",
+			wantOK:  true,
+			wantKey: encodeParts("iface", "eth0"),
 		},
 
 		"non per_row + groupBy(1): returns that label value": {
@@ -1580,7 +1981,7 @@ func Test_vmBuildGroupKey(t *testing.T) {
 			agg:     vmetricsAggregator{grouped: true, perRow: false, groupBy: []string{"_if_type", "zone"}},
 			tags:    map[string]string{"_if_type": "ethernetCsmacd", "zone": "edge"},
 			wantOK:  true,
-			wantKey: "ethernetCsmacd" + string(sep) + "edge",
+			wantKey: encodeParts("ethernetCsmacd", "edge"),
 		},
 
 		"non per_row + groupBy: missing one value -> no key": {
@@ -1598,6 +1999,27 @@ func Test_vmBuildGroupKey(t *testing.T) {
 			assert.Equal(t, tc.wantKey, key, "key mismatch")
 		})
 	}
+
+	t.Run("per_row fallback encodes key-value pairs without raw-delimiter collisions", func(t *testing.T) {
+		keyA, okA := vmBuildGroupKey(map[string]string{"a=b": "c"}, &vmetricsAggregator{grouped: true, perRow: true})
+		keyB, okB := vmBuildGroupKey(map[string]string{"a": "b=c"}, &vmetricsAggregator{grouped: true, perRow: true})
+
+		assert.True(t, okA)
+		assert.True(t, okB)
+		assert.NotEqual(t, keyA, keyB)
+	})
+
+	t.Run("multi-label group_by encodes values without separator collisions", func(t *testing.T) {
+		sep := string(rune(0x1F))
+		agg := vmetricsAggregator{grouped: true, groupBy: []string{"iface", "zone"}}
+
+		keyA, okA := vmBuildGroupKey(map[string]string{"iface": "a" + sep + "b", "zone": "c"}, &agg)
+		keyB, okB := vmBuildGroupKey(map[string]string{"iface": "a", "zone": "b" + sep + "c"}, &vmetricsAggregator{grouped: true, groupBy: []string{"iface", "zone"}})
+
+		assert.True(t, okA)
+		assert.True(t, okB)
+		assert.NotEqual(t, keyA, keyB)
+	})
 }
 
 var (
@@ -1607,7 +2029,7 @@ var (
 
 func makeTags(n int) map[string]string {
 	t := make(map[string]string, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		t["label"+strconv.Itoa(i)] = "v" + strconv.Itoa(i)
 	}
 	return t

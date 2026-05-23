@@ -5,6 +5,7 @@ extends:
   - _system-base.yaml
   - _cisco-base.yaml
   - _cisco-catalyst.yaml
+  - _cisco-bgp4-mib.yaml
 
 selector:
   - sysobjectid:

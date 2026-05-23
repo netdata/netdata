@@ -45,7 +45,7 @@ func BenchmarkBuildPlanBySeriesCardinality(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := engine.BuildPlan(reader); err != nil {
+				if _, err := buildPlan(engine, reader); err != nil {
 					b.Fatalf("build plan: %v", err)
 				}
 			}
@@ -67,7 +67,7 @@ func benchmarkCollectorReader(b *testing.B, seriesCount int) metrix.Reader {
 	g := meter.Gauge("bench_metric")
 
 	cc.BeginCycle()
-	for i := 0; i < seriesCount; i++ {
+	for i := range seriesCount {
 		g.Observe(metrix.SampleValue(i), meter.LabelSet(
 			metrix.Label{Key: "id", Value: strconv.Itoa(i)},
 		))

@@ -218,7 +218,7 @@ func (m *mockFactory) create(cfg pipeline.Config) (sdPipeline, error) {
 	lock.Lock()
 	defer lock.Unlock()
 
-	if cfg.Name == "invalid" {
+	if cfg.Name == "invalid" || len(cfg.Services) == 0 {
 		return nil, errors.New("mock sdPipelineFactory.create() error")
 	}
 

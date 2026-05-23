@@ -18,10 +18,11 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataLogicalDevicesOld, _      = os.ReadFile("testdata/getconfig-ld-old.txt")
-	dataPhysicalDevicesOld, _     = os.ReadFile("testdata/getconfig-pd-old.txt")
-	dataLogicalDevicesCurrent, _  = os.ReadFile("testdata/getconfig-ld-current.txt")
-	dataPhysicalDevicesCurrent, _ = os.ReadFile("testdata/getconfig-pd-current.txt")
+	dataLogicalDevicesOld, _            = os.ReadFile("testdata/getconfig-ld-old.txt")
+	dataPhysicalDevicesOld, _           = os.ReadFile("testdata/getconfig-pd-old.txt")
+	dataLogicalDevicesCurrent, _        = os.ReadFile("testdata/getconfig-ld-current.txt")
+	dataPhysicalDevicesCurrent, _       = os.ReadFile("testdata/getconfig-pd-current.txt")
+	dataPhysicalDevicesWithEnclosure, _ = os.ReadFile("testdata/getconfig-pd-with-enclosure.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -29,10 +30,11 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataConfigJSON": dataConfigJSON,
 		"dataConfigYAML": dataConfigYAML,
 
-		"dataLogicalDevicesOld":      dataLogicalDevicesOld,
-		"dataPhysicalDevicesOld":     dataPhysicalDevicesOld,
-		"dataLogicalDevicesCurrent":  dataLogicalDevicesCurrent,
-		"dataPhysicalDevicesCurrent": dataPhysicalDevicesCurrent,
+		"dataLogicalDevicesOld":            dataLogicalDevicesOld,
+		"dataPhysicalDevicesOld":           dataPhysicalDevicesOld,
+		"dataLogicalDevicesCurrent":        dataLogicalDevicesCurrent,
+		"dataPhysicalDevicesCurrent":       dataPhysicalDevicesCurrent,
+		"dataPhysicalDevicesWithEnclosure": dataPhysicalDevicesWithEnclosure,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -119,6 +121,10 @@ func TestCollector_Check(t *testing.T) {
 			wantFail:    false,
 			prepareMock: prepareMockOkCurrent,
 		},
+		"success case with enclosure data": {
+			wantFail:    false,
+			prepareMock: prepareMockOkWithEnclosure,
+		},
 		"err on exec": {
 			wantFail:    true,
 			prepareMock: prepareMockErr,
@@ -200,6 +206,50 @@ func TestCollector_Collect(t *testing.T) {
 				"pd_5_smart_warnings":        0,
 			},
 		},
+		"success case with enclosure data": {
+			prepareMock: prepareMockOkWithEnclosure,
+			wantCharts:  len(ldChartsTmpl)*1 + (len(pdChartsTmpl)-1)*12,
+			wantMetrics: map[string]int64{
+				"ld_0_health_state_critical":  0,
+				"ld_0_health_state_ok":        1,
+				"pd_0_health_state_critical":  0,
+				"pd_0_health_state_ok":        1,
+				"pd_0_smart_warnings":         0,
+				"pd_1_health_state_critical":  0,
+				"pd_1_health_state_ok":        1,
+				"pd_1_smart_warnings":         0,
+				"pd_10_health_state_critical": 0,
+				"pd_10_health_state_ok":       1,
+				"pd_10_smart_warnings":        0,
+				"pd_11_health_state_critical": 0,
+				"pd_11_health_state_ok":       1,
+				"pd_11_smart_warnings":        0,
+				"pd_2_health_state_critical":  0,
+				"pd_2_health_state_ok":        1,
+				"pd_2_smart_warnings":         0,
+				"pd_3_health_state_critical":  0,
+				"pd_3_health_state_ok":        1,
+				"pd_3_smart_warnings":         0,
+				"pd_4_health_state_critical":  0,
+				"pd_4_health_state_ok":        1,
+				"pd_4_smart_warnings":         0,
+				"pd_5_health_state_critical":  0,
+				"pd_5_health_state_ok":        1,
+				"pd_5_smart_warnings":         0,
+				"pd_6_health_state_critical":  0,
+				"pd_6_health_state_ok":        1,
+				"pd_6_smart_warnings":         0,
+				"pd_7_health_state_critical":  0,
+				"pd_7_health_state_ok":        1,
+				"pd_7_smart_warnings":         0,
+				"pd_8_health_state_critical":  0,
+				"pd_8_health_state_ok":        1,
+				"pd_8_smart_warnings":         0,
+				"pd_9_health_state_critical":  0,
+				"pd_9_health_state_ok":        1,
+				"pd_9_smart_warnings":         0,
+			},
+		},
 		"err on exec": {
 			prepareMock: prepareMockErr,
 		},
@@ -236,6 +286,13 @@ func prepareMockOkCurrent() *mockArcconfExec {
 	return &mockArcconfExec{
 		ldData: dataLogicalDevicesCurrent,
 		pdData: dataPhysicalDevicesCurrent,
+	}
+}
+
+func prepareMockOkWithEnclosure() *mockArcconfExec {
+	return &mockArcconfExec{
+		ldData: dataLogicalDevicesCurrent,
+		pdData: dataPhysicalDevicesWithEnclosure,
 	}
 }
 

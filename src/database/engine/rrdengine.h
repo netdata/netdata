@@ -58,6 +58,23 @@ struct rrdeng_cmd;
 
 #define MAX_EXTENT_UNCOMPRESSED_SIZE (MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE))
 
+static inline size_t rrdeng_min_extent_disk_size(void) {
+    return sizeof(struct rrdeng_df_extent_header) +
+           sizeof(struct rrdeng_extent_page_descr) +
+           sizeof(struct rrdeng_df_extent_trailer);
+}
+
+static inline size_t rrdeng_max_extent_disk_size(void) {
+    return sizeof(struct rrdeng_df_extent_header) +
+           sizeof(struct rrdeng_extent_page_descr) * MAX_PAGES_PER_EXTENT +
+           MAX_EXTENT_UNCOMPRESSED_SIZE +
+           sizeof(struct rrdeng_df_extent_trailer);
+}
+
+static inline bool rrdeng_valid_extent_disk_size(size_t size) {
+    return size >= rrdeng_min_extent_disk_size() && size <= rrdeng_max_extent_disk_size();
+}
+
 
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"

@@ -57,7 +57,7 @@ Admission checks:
 - manager stopping -> reject `503`
 - unknown/nil handler -> reject `501`
 - duplicate active/tombstoned UID -> ignore duplicate input (debug/warn log, no terminal output)
-- queue full -> reject `503`
+- queue full -> blocks on `scheduler.enqueue` until space frees (back-pressures stdin reader -> netdata via OS pipe). The only errors returned from this path are manager-stopping (`503`) on shutdown and invalid-request (`500`) for malformed input.
 
 ### Keyed scheduler + worker pool
 
@@ -123,7 +123,6 @@ Pathology-focused metrics currently exposed:
     - `netdata.go.plugin.framework.functions.manager.invocations_awaiting_result`
     - `netdata.go.plugin.framework.functions.manager.scheduler_pending`
 - counters:
-    - `netdata.go.plugin.framework.functions.manager.queue_full_total`
     - `netdata.go.plugin.framework.functions.manager.cancel_fallback_total`
     - `netdata.go.plugin.framework.functions.manager.late_terminal_dropped_total`
     - `netdata.go.plugin.framework.functions.manager.duplicate_uid_ignored_total`
@@ -188,8 +187,7 @@ flowchart TD
     C1 -->|stopping| R503["respf 503"]
     C1 -->|unregistered/nil handler| R501["respf 501"]
     C1 -->|duplicate/tombstoned UID| DUP["ignore duplicate + log"]
-    C1 -->|queue full| R503
-    C1 -->|accepted| Q["scheduler.enqueue by route key + state=queued"]
+    C1 -->|accepted| Q["scheduler.enqueue by route key + state=queued (blocks if queue full)"]
     Q --> S["keyScheduler"]
     S -->|same key busy| SQ["lane queue (serialized)"]
     S -->|key free| W["Worker"]

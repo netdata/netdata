@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package bio.net;
+option go_package = "github.com/bio-routing/bio-rd/net/api";
+
+message Prefix {
+    IP address = 1;
+    uint32 length = 2;
+}
+
+message IP {
+    uint64 higher = 1;
+    uint64 lower = 2;
+    enum Version {
+        VERSION_UNSPECIFIED = 0;
+        IPv4 = 1;
+        IPv6 = 2;
+    }
+    Version version = 3;
+}

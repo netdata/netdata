@@ -16,6 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
@@ -59,6 +60,7 @@ type JobConfig struct {
 	Name            string
 	ModuleName      string
 	FullName        string
+	Source          string
 	Module          collectorapi.CollectorV1
 	Labels          map[string]string
 	Out             io.Writer
@@ -106,10 +108,7 @@ func NewJob(cfg JobConfig) *Job {
 		auditAnalyzer:        cfg.AuditAnalyzer,
 	}
 
-	log := logger.New().With(
-		slog.String("collector", j.ModuleName()),
-		slog.String("job", j.Name()),
-	)
+	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
 
 	j.Logger = log
 	if j.module != nil {
@@ -577,21 +576,19 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 }
 
 func (j *Job) sendVnodeHostInfo() {
-	if j.vnode.Labels == nil {
-		j.vnode.Labels = make(map[string]string)
-	}
-	if _, ok := j.vnode.Labels["_hostname"]; !ok {
-		j.vnode.Labels["_hostname"] = j.vnode.Hostname
-	}
-	for k, v := range j.vnode.Labels {
-		j.vnode.Labels[k] = lblValueReplacer.Replace(v)
-	}
-
-	j.api.HOSTINFO(netdataapi.HostInfo{
+	info, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{
 		GUID:     j.vnode.GUID,
 		Hostname: j.vnode.Hostname,
 		Labels:   j.vnode.Labels,
 	})
+	if err != nil {
+		j.Warningf("prepare vnode host info failed: %v", err)
+		return
+	}
+
+	j.vnode.Hostname = info.Hostname
+	j.vnode.Labels = info.Labels
+	j.api.HOSTINFO(info)
 }
 
 func (j *Job) createChart(chart *collectorapi.Chart) {
@@ -762,7 +759,7 @@ func getChartType(chart *collectorapi.Chart, j *Job) string {
 	}
 	if chart.OverModule != "" {
 		cachedType := chart.CachedType()
-		if v := strings.TrimPrefix(cachedType, j.ModuleName()); v != cachedType {
+		if v, ok := strings.CutPrefix(cachedType, j.ModuleName()); ok {
 			chart.SetCachedType(chart.OverModule + v)
 		}
 	}

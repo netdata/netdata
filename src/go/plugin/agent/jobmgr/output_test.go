@@ -21,7 +21,7 @@ func TestNew_UsesConfiguredOutForDyncfgResponder(t *testing.T) {
 		Out:        &buf,
 	})
 
-	mgr.dyncfgApi.ConfigCreate(netdataapi.ConfigOpts{
+	mgr.dyncfgResponder.ConfigCreate(netdataapi.ConfigOpts{
 		ID:                "test:collector:module",
 		Status:            dyncfg.StatusAccepted.String(),
 		ConfigType:        dyncfg.ConfigTypeTemplate.String(),

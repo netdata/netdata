@@ -67,10 +67,8 @@ func (c *Collector) scrapeHealth(status *vcsaHealthStatus) {
 		func() { scrape(c.client.Swap, &status.Swap) },
 		func() { scrape(c.client.SoftwarePackages, &status.SoftwarePackages) },
 	} {
-		fn := fn
 
-		wg.Add(1)
-		go func() { defer wg.Done(); fn() }()
+		wg.Go(func() { fn() })
 	}
 
 	wg.Wait()

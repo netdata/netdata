@@ -5,6 +5,7 @@ package sd
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -415,8 +416,6 @@ func (m *PipelineManager) processGracePeriodRemovals(ctx context.Context) {
 
 func copySourcesMap(src map[string]struct{}) map[string]struct{} {
 	dst := make(map[string]struct{}, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
+	maps.Copy(dst, src)
 	return dst
 }

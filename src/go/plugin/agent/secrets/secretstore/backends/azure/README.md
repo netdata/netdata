@@ -1,0 +1,1 @@
+integrations/azure-kv.md

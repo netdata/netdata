@@ -30,6 +30,16 @@ Each Netdata chart contains metrics called `dimensions`. All dimensions in a cha
 - Share the same units of measurement
 - Belong to the same contextual category (e.g., disk bandwidth contains `read` and `write` dimensions)
 
+#### Negative Values in Exported Metrics
+
+Some Netdata dimensions use a `-1` multiplier by design so that read and write appear as opposing values on the dashboard. This multiplier is applied in the RRD layer during collection and is reflected in all Prometheus data sources (`as-collected`, `average`, and `sum`), causing those dimensions to export as negative values. You can identify affected charts from the dashboard — they display read and write as stacked opposing areas.
+
+:::note
+
+To get absolute values in PromQL, use `abs()`. For example: `abs(netdata_cgroup_io_KiB_persec_average{dimension="write"})`.
+
+:::
+
 ### Netdata Data Source
 
 Netdata sends metrics to Prometheus from 3 data sources:

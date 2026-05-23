@@ -18,7 +18,8 @@
     "auth_proto": "ok",
     "auth_key": "ok",
     "priv_proto": "ok",
-    "priv_key": "ok"
+    "priv_key": "ok",
+    "context_name": "ok"
   },
   "options": {
     "port": 123,
@@ -31,6 +32,7 @@
   "manual_profiles": [
     "ok"
   ],
+  "ping_only": true,
   "ping": {
     "enabled": true,
     "network": "ip",

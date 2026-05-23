@@ -44,7 +44,6 @@ func TestOverrides_OnUnknownOID(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			defer withOverrides(t, tc.overrides)()
 
@@ -65,7 +64,6 @@ func TestOrgToVendorMapping(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			rawOrg := lookupEnterpriseNumber(tc.oid)
 			if rawOrg == "" {
@@ -104,7 +102,6 @@ func TestLookupEnterpriseNumber(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			got := lookupEnterpriseNumber(tc.oid)
 			if tc.wantNonEmpty {
@@ -141,7 +138,6 @@ func TestPduToString(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			got, err := PduToString(tc.pdu)
 			if tc.wantErr {

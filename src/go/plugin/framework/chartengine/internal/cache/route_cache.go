@@ -73,6 +73,9 @@ func (c *RouteCache[T]) MarkSeenIfPresent(identity metrix.SeriesIdentity, buildS
 }
 
 func (c *RouteCache[T]) Store(identity metrix.SeriesIdentity, revision uint64, buildSeq uint64, values []T) {
+	if !c.beginBuild(buildSeq) {
+		return
+	}
 	bucket := c.buckets[identity.Hash64]
 	for i := range bucket {
 		if bucket[i].identity.ID != identity.ID {
@@ -80,7 +83,10 @@ func (c *RouteCache[T]) Store(identity metrix.SeriesIdentity, revision uint64, b
 		}
 		bucket[i].revision = revision
 		bucket[i].values = cloneSlice(values)
-		c.markSeen(&bucket[i], buildSeq)
+		if bucket[i].lastSeenBuild != buildSeq {
+			bucket[i].lastSeenBuild = buildSeq
+			c.seenCount++
+		}
 		c.buckets[identity.Hash64] = bucket
 		return
 	}
@@ -93,10 +99,6 @@ func (c *RouteCache[T]) Store(identity metrix.SeriesIdentity, revision uint64, b
 	}
 	c.buckets[identity.Hash64] = append(bucket, entry)
 	c.entryCount++
-	if c.seenBuild != buildSeq {
-		c.seenBuild = buildSeq
-		c.seenCount = 0
-	}
 	c.seenCount++
 }
 
@@ -107,6 +109,9 @@ func (c *RouteCache[T]) RetainSeen(buildSeq uint64) RetainSeenStats {
 		EntriesAfter:  c.entryCount,
 	}
 	if c.entryCount == 0 {
+		return stats
+	}
+	if buildSeq < c.seenBuild {
 		return stats
 	}
 	if c.seenBuild != buildSeq {
@@ -143,15 +148,25 @@ func (c *RouteCache[T]) RetainSeen(buildSeq uint64) RetainSeenStats {
 }
 
 func (c *RouteCache[T]) markSeen(entry *routeCacheEntry[T], buildSeq uint64) {
-	if c.seenBuild != buildSeq {
-		c.seenBuild = buildSeq
-		c.seenCount = 0
+	if !c.beginBuild(buildSeq) {
+		return
 	}
 	if entry.lastSeenBuild == buildSeq {
 		return
 	}
 	entry.lastSeenBuild = buildSeq
 	c.seenCount++
+}
+
+func (c *RouteCache[T]) beginBuild(buildSeq uint64) bool {
+	if buildSeq < c.seenBuild {
+		return false
+	}
+	if c.seenBuild != buildSeq {
+		c.seenBuild = buildSeq
+		c.seenCount = 0
+	}
+	return true
 }
 
 func cloneSlice[T any](in []T) []T {

@@ -117,8 +117,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 
 				job.runOnce(2)
 				result := out.String()
-				assert.Contains(t, result, "CHART")
-				assert.Contains(t, result, "BEGIN")
+				requireInOrder(t, result, "HOST ''", "CHART", "BEGIN")
 			},
 		},
 		"runtime job observes all visible runtime series (not only latest seq)": {
@@ -211,8 +210,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 				reg.remove("component")
 				job.runOnce(2)
 				result := out.String()
-				assert.Contains(t, result, "CHART 'netdata.go.d.internal.component.component_load'")
-				assert.Contains(t, result, "'obsolete'")
+				requireInOrder(t, result, "HOST ''", "CHART 'netdata.go.d.internal.component.component_load'", "'obsolete'")
 			},
 		},
 	}

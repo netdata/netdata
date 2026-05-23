@@ -1,0 +1,33 @@
+{
+  "sas-host-phy-statistics": [
+    {
+      "port": "A0",
+      "phy": "0",
+      "disparity-errors": 5,
+      "lost-dwords": 2,
+      "invalid-dwords": 1
+    },
+    {
+      "port": "A0",
+      "phy": "1",
+      "disparity-errors": 3,
+      "lost-dwords": 0,
+      "invalid-dwords": 0
+    },
+    {
+      "port": "A1",
+      "phy": "0",
+      "disparity-errors": 0,
+      "lost-dwords": 1,
+      "invalid-dwords": 0
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

@@ -122,6 +122,7 @@ struct web_client *web_client_get_from_cache(void) {
     web_client_reset_permissions(w);
     web_client_clear_mcp_preview_key(w);
     memset(w->transaction, 0, sizeof(w->transaction));
+    memset(w->mcp_session_id, 0, sizeof(w->mcp_session_id));
     memset(&w->auth, 0, sizeof(w->auth));
 
     return w;

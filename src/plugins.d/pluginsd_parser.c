@@ -125,6 +125,7 @@ static void pluginsd_host_define_cleanup(PARSER *parser) {
     parser->user.host_define.hostname = NULL;
     parser->user.host_define.rrdlabels = NULL;
     parser->user.host_define.parsing_host = false;
+    parser->user.host_define.node_stale_after_seconds = 0;
 }
 
 static inline bool pluginsd_validate_machine_guid(const char *guid, nd_uuid_t *uuid, char *output) {
@@ -153,6 +154,7 @@ static inline PARSER_RC pluginsd_host_define(char **words, size_t num_words, PAR
     parser->user.host_define.hostname = string_strdupz(hostname);
     parser->user.host_define.rrdlabels = rrdlabels_create();
     parser->user.host_define.parsing_host = true;
+    parser->user.host_define.node_stale_after_seconds = 0;
 
     return PARSER_RC_OK;
 }
@@ -260,7 +262,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (aclk_host_config)
         aclk_queue_node_info(host, true);
     else

@@ -178,7 +178,8 @@ static int test_yaml_parse_arrays(void) {
     }
     
     if (!json_object_is_type(json, json_type_array)) {
-        fprintf(stderr, "FAILED: test_yaml_parse_arrays: expected array but got type %d\n", json_object_get_type(json));
+        fprintf(stderr, "FAILED: test_yaml_parse_arrays: expected array but got type %u\n",
+                (unsigned int)json_object_get_type(json));
         failed++;
         goto cleanup;
     }

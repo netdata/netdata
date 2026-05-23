@@ -1052,7 +1052,7 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
 
 static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
 {
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (!aclk_host_config)
         return;
 
@@ -1171,7 +1171,7 @@ char *aclk_state(void)
 
 static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 {
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (!aclk_host_config)
         return;
 

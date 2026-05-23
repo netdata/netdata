@@ -113,9 +113,11 @@ static void claim_add_user_info_command(BUFFER *wb) {
     const char *os_message;
 
 #if defined(OS_WINDOWS)
-    char win_path[MAX_PATH];
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A, filename, win_path, sizeof(win_path));
-    os_filename = win_path;
+    char win_path[FILENAME_MAX];
+    if(cygwin_conv_path(CCP_POSIX_TO_WIN_A, filename, win_path, sizeof(win_path)) == 0)
+        os_filename = win_path;
+    else
+        os_filename = os_translate_path(win_path, filename, sizeof(win_path));
     os_prefix = "more";
     os_message = "We need to verify this Windows server is yours. So, open a Command Prompt on this server to run the command. It will give you a UUID. Copy and paste this UUID to this box:";
 #else

@@ -20,10 +20,31 @@ SOURCE_DIR="$(dirname "$(dirname "${SCRIPT_SOURCE}")")"
 
 . /etc/os-release
 
-CMAKE_ARGS="-S ${SOURCE_DIR} -B ${BUILD_DIR}"
+# Keep one argument per line so POSIX sh preserves embedded spaces
+# without relying on arrays or eval.
+CMAKE_ARGS="-S
+${SOURCE_DIR}
+-B
+${BUILD_DIR}
+-G
+Ninja"
 
 add_cmake_option() {
-    CMAKE_ARGS="${CMAKE_ARGS} -D${1}=${2}"
+    CMAKE_ARGS="${CMAKE_ARGS}
+-D${1}=${2}"
+}
+
+run_cmake() {
+    (
+        set --
+        while IFS= read -r arg; do
+            [ -n "${arg}" ] || continue
+            set -- "$@" "${arg}"
+        done <<EOF
+${CMAKE_ARGS}
+EOF
+        cmake "$@"
+    )
 }
 
 add_cmake_option CMAKE_BUILD_TYPE RelWithDebInfo
@@ -42,6 +63,7 @@ add_cmake_option ENABLE_PLUGIN_PYTHON On
 add_cmake_option ENABLE_PLUGIN_CHARTS On
 add_cmake_option ENABLE_PLUGIN_LOCAL_LISTENERS On
 add_cmake_option ENABLE_PLUGIN_NFACCT On
+add_cmake_option ENABLE_PLUGIN_NETFLOW On
 add_cmake_option ENABLE_PLUGIN_OTEL On
 add_cmake_option ENABLE_PLUGIN_PERF On
 add_cmake_option ENABLE_PLUGIN_SLABINFO On
@@ -59,6 +81,13 @@ add_cmake_option ENABLE_LIBBACKTRACE On
 add_cmake_option BUILD_FOR_PACKAGING On
 
 [ -d "${SOURCE_DIR}/tmp/ibm_mq" ] && add_cmake_option FETCHCONTENT_SOURCE_DIR_IBM_MQ "${SOURCE_DIR}/tmp/ibm_mq"
+if [ -n "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
+    if [ ! -d "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
+        echo "Missing topology IP intelligence stock directory: ${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
+        exit 1
+    fi
+    add_cmake_option NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
+fi
 
 case "${PKG_TYPE}" in
     DEB)
@@ -112,8 +141,7 @@ else
     add_cmake_option ENABLE_SENTRY Off
 fi
 
-# shellcheck disable=SC2086
-cmake ${CMAKE_ARGS} -G Ninja
+run_cmake
 cmake --build "${BUILD_DIR}" --parallel "$(nproc)" -- -k 1
 
 if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then

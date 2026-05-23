@@ -269,13 +269,15 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         time_t db_update_every_s;
     } tier_retention[nd_profile.storage_tiers];
 
+    RRDDIM *rd = rrdmetric_rrddim_get_and_lock(rm);
+
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = qn->rrdhost->db[tier].eng;
         tier_retention[tier].eng = eng;
         tier_retention[tier].db_update_every_s = (time_t) (qn->rrdhost->db[tier].tier_grouping * ri->update_every_s);
 
-        if(rm->rrddim && rm->rrddim->tiers[tier].smh)
-            tier_retention[tier].smh = eng->api.metric_dup(rm->rrddim->tiers[tier].smh);
+        if(rd && rd->tiers[tier].smh)
+            tier_retention[tier].smh = eng->api.metric_dup(rd->tiers[tier].smh);
         else
             tier_retention[tier].smh = eng->api.metric_get_by_id(qn->rrdhost->db[tier].si, rm->uuid);
 
@@ -306,6 +308,8 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             tier_retention[tier].db_update_every_s = 0;
         }
     }
+
+    rrdmetric_rrddim_unlock(rd);
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         if(!qt->db.tiers[tier].update_every || (tier_retention[tier].db_update_every_s && tier_retention[tier].db_update_every_s < qt->db.tiers[tier].update_every))
@@ -481,8 +485,11 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             // we don't have a dimensions pattern
             // so this is a selected dimension
             // if it is not hidden
+            RRDDIM *rd = rrdmetric_rrddim_get_and_lock(rm);
+            bool hidden = rrd_flag_check(rm, RRD_FLAG_HIDDEN) || (rd && rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN));
+            rrdmetric_rrddim_unlock(rd);
 
-            if(rrd_flag_check(rm, RRD_FLAG_HIDDEN) || (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) {
+            if(hidden) {
                 // this is a hidden dimension
                 // we don't need to query it
                 status |= QUERY_STATUS_DIMENSION_HIDDEN;

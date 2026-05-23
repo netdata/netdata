@@ -855,7 +855,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			var mx map[string]int64
 
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				mx = collr.Collect(context.Background())
 			}
 
@@ -875,7 +875,7 @@ func TestCollector_connectionReuse(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 
 	var collected map[string]int64
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		collected = collr.Collect(context.Background())
 	}
 

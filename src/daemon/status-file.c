@@ -93,16 +93,10 @@ static void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
+// Each section is a separate function to stay within GCC's -fvar-tracking-assignments size limit.
+// IMPORTANT: ALL functions here are called from signal handlers — no locks, no allocations.
 
-static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
-
-    dsf_acquire(*ds);
-
-    buffer_json_member_add_string(wb, "@timestamp", ds->timestamp_ut_rfc3339);
-    buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
-
+static void dsf_json_agent(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "agent");
     {
         buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid.uuid);
@@ -121,7 +115,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         if(ds->v >= 24)
             buffer_json_member_add_uint64(wb, "crashes", ds->crashes);
-            
+
         // Only include PID if we're at version 27 or later
         if(ds->v >= 27)
             buffer_json_member_add_uint64(wb, "pid", (uint64_t)ds->pid);
@@ -159,7 +153,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_metrics(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     // Add metrics stats as a top-level node
     buffer_json_member_add_object(wb, "metrics");
     {
@@ -194,7 +190,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_host(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "host");
     {
         buffer_json_member_add_uuid_compact(wb, "id", ds->machine_id.uuid);
@@ -209,7 +207,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string_or_empty(wb, "cloud_instance", ds->cloud_instance_type);
             buffer_json_member_add_string_or_empty(wb, "cloud_region", ds->cloud_instance_region);
         }
-        
+
         buffer_json_member_add_uint64(wb, "system_cpus", ds->system_cpus);
 
         buffer_json_member_add_object(wb, "boot");
@@ -241,7 +239,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
                 buffer_json_member_add_boolean(wb, "read_only", ds->var_cache.is_read_only);
             }
             buffer_json_object_close(wb);
-            
+
             buffer_json_member_add_object(wb, "netdata");
             buffer_json_member_add_uint64(wb, "dbengine", ds->disk_footprint.dbengine);
             buffer_json_member_add_uint64(wb, "sqlite", ds->disk_footprint.sqlite);
@@ -252,7 +250,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
-    
+}
+
+static void dsf_json_os(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "os");
     {
         buffer_json_member_add_string(wb, "type", DAEMON_OS_TYPE_2str(ds->os_type));
@@ -263,7 +263,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "platform", ds->os_id_like);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_hw(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "hw");
     {
         buffer_json_member_add_object(wb, "sys");
@@ -314,7 +316,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_product(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "product");
     {
         buffer_json_member_add_string(wb, "vendor", ds->product.vendor);
@@ -322,7 +326,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string(wb, "type", ds->product.type);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_fatal(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "fatal");
     {
         buffer_json_member_add_uint64(wb, "line", ds->fatal.line);
@@ -358,6 +364,24 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_uint64(wb, "worker_job_id", ds->fatal.worker_job_id);
     }
     buffer_json_object_close(wb);
+}
+
+static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
+    dsf_acquire(*ds);
+
+    buffer_json_member_add_string(wb, "@timestamp", ds->timestamp_ut_rfc3339);
+    buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
+
+    dsf_json_agent(wb, ds);
+    dsf_json_metrics(wb, ds);
+    dsf_json_host(wb, ds);
+    dsf_json_os(wb, ds);
+    dsf_json_hw(wb, ds);
+    dsf_json_product(wb, ds);
+    dsf_json_fatal(wb, ds);
 
     dsf_release(*ds);
 }
@@ -1010,47 +1034,6 @@ struct log_priority PRI_FATAL           = { NDLP_ERR, NDLP_ERR };
 struct log_priority PRI_DEADLY_SIGNAL   = { NDLP_CRIT, NDLP_CRIT };
 struct log_priority PRI_KILLED_HARD     = { NDLP_ERR, NDLP_WARNING };
 
-static bool is_ci(void) {
-    // List of known CI environment variables.
-    const char *ci_vars[] = {
-        "CI",                       // Generic CI flag
-        "CONTINUOUS_INTEGRATION",   // Alternate generic flag
-        "BUILD_NUMBER",             // Jenkins, TeamCity
-        "RUN_ID",                   // AWS CodeBuild, some others
-        "TRAVIS",                   // Travis CI
-        "GITHUB_ACTIONS",           // GitHub Actions
-        "GITHUB_TOKEN",             // GitHub Actions
-        "GITLAB_CI",                // GitLab CI
-        "CIRCLECI",                 // CircleCI
-        "APPVEYOR",                 // AppVeyor
-        "BITBUCKET_BUILD_NUMBER",   // Bitbucket Pipelines
-        "SYSTEM_TEAMFOUNDATIONCOLLECTIONURI", // Azure DevOps
-        "TF_BUILD",                 // Azure DevOps (alternate)
-        "BAMBOO_BUILDKEY",          // Bamboo CI
-        "GO_PIPELINE_NAME",         // GoCD
-        "HUDSON_URL",               // Hudson CI
-        "TEAMCITY_VERSION",         // TeamCity
-        "CI_NAME",                  // Some environments (e.g., CodeShip)
-        "CI_WORKER",                // AppVeyor (alternate)
-        "CI_SERVER",                // Generic
-        "HEROKU_TEST_RUN_ID",       // Heroku CI
-        "BUILDKITE",                // Buildkite
-        "DRONE",                    // Drone CI
-        "SEMAPHORE",                // Semaphore CI
-        "NETLIFY",                  // Netlify CI
-        "NOW_BUILDER",              // Vercel (formerly Zeit Now)
-        NULL
-    };
-
-    // Iterate over the CI environment variable names.
-    for (const char **env = ci_vars; *env; env++) {
-        if(getenv(*env))
-            return true;
-    }
-
-    return false;
-}
-
 enum crash_report_t {
     DSF_REPORT_DISABLED = 0,
     DSF_REPORT_ALL,
@@ -1329,7 +1312,7 @@ void daemon_status_file_check_crash(void) {
         (!no_previous_status || daemon_status_file_saved) &&
 
         // we have more than 2 restarts, or this is not a CI run
-        (last_session_status.restarts > 1 || !is_ci()) &&
+        (last_session_status.restarts > 1 || !nd_is_running_under_ci()) &&
 
         // we have not reported this
         !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)

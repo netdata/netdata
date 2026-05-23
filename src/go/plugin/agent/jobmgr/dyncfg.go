@@ -11,13 +11,13 @@ import (
 func (m *Manager) dyncfgConfig(fn dyncfg.Function) {
 	if err := fn.ValidateArgs(2); err != nil {
 		m.Warningf("dyncfg: %v", err)
-		m.dyncfgApi.SendCodef(fn, 400, "%v", err)
+		m.dyncfgResponder.SendCodef(fn, 400, "%v", err)
 		return
 	}
 
 	select {
 	case <-m.ctx.Done():
-		m.dyncfgApi.SendCodef(fn, 503, "Job manager is shutting down.")
+		m.dyncfgResponder.SendCodef(fn, 503, "Job manager is shutting down.")
 		return
 	default:
 	}
@@ -26,27 +26,27 @@ func (m *Manager) dyncfgConfig(fn dyncfg.Function) {
 }
 
 func (m *Manager) dyncfgQueuedExec(fn dyncfg.Function) {
-	id := fn.ID()
-
 	switch {
-	case strings.HasPrefix(id, m.dyncfgCollectorPrefixValue()):
+	case strings.HasPrefix(fn.ID(), m.dyncfgSecretStorePrefixValue()):
+		m.dyncfgSecretStoreExec(fn)
+	case strings.HasPrefix(fn.ID(), m.dyncfgCollectorPrefixValue()):
 		m.dyncfgCollectorExec(fn)
-	case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
+	case strings.HasPrefix(fn.ID(), m.dyncfgVnodePrefixValue()):
 		m.dyncfgVnodeExec(fn)
 	default:
-		m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Fn().Name, id)
+		m.dyncfgResponder.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Fn().Name, fn.ID())
 	}
 }
 
 func (m *Manager) dyncfgSeqExec(fn dyncfg.Function) {
-	id := fn.ID()
-
 	switch {
-	case strings.HasPrefix(id, m.dyncfgCollectorPrefixValue()):
+	case strings.HasPrefix(fn.ID(), m.dyncfgSecretStorePrefixValue()):
+		m.dyncfgSecretStoreSeqExec(fn)
+	case strings.HasPrefix(fn.ID(), m.dyncfgCollectorPrefixValue()):
 		m.dyncfgCollectorSeqExec(fn)
-	case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
+	case strings.HasPrefix(fn.ID(), m.dyncfgVnodePrefixValue()):
 		m.dyncfgVnodeSeqExec(fn)
 	default:
-		m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Fn().Name, id)
+		m.dyncfgResponder.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Fn().Name, fn.ID())
 	}
 }

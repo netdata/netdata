@@ -4,6 +4,7 @@ package runtimechartemit
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -104,10 +105,15 @@ func (r *componentRegistry) snapshot() []componentSpec {
 
 func cloneEmitEnv(env chartemit.EmitEnv) chartemit.EmitEnv {
 	out := env
-	if env.JobLabels != nil {
-		out.JobLabels = make(map[string]string, len(env.JobLabels))
-		for k, v := range env.JobLabels {
-			out.JobLabels[k] = v
+	out.JobLabels = maps.Clone(env.JobLabels)
+	if env.HostScope != nil {
+		out.HostScope = &chartemit.HostScope{
+			GUID: env.HostScope.GUID,
+		}
+		if env.HostScope.Define != nil {
+			define := *env.HostScope.Define
+			define.Labels = maps.Clone(env.HostScope.Define.Labels)
+			out.HostScope.Define = &define
 		}
 	}
 	return out
@@ -143,7 +149,7 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 		Plugin:      firstNotEmpty(strings.TrimSpace(cfg.Plugin), pluginName),
 		Module:      firstNotEmpty(strings.TrimSpace(cfg.Module), "internal"),
 		JobName:     firstNotEmpty(strings.TrimSpace(cfg.JobName), name),
-		JobLabels:   cloneStringMap(cfg.JobLabels),
+		JobLabels:   maps.Clone(cfg.JobLabels),
 	}
 
 	return componentSpec{
@@ -154,17 +160,6 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 		Autogen:      cfg.Autogen,
 		EmitEnv:      env,
 	}, nil
-}
-
-func cloneStringMap(in map[string]string) map[string]string {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
 }
 
 func firstNotEmpty(items ...string) string {

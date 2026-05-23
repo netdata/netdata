@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package bio.ris;
+
+import "net/api/net.proto";
+import "route/api/route.proto";
+option go_package = "github.com/bio-routing/bio-rd/cmd/ris/api";
+
+service RoutingInformationService {
+    rpc LPM(LPMRequest) returns (LPMResponse) {};
+    rpc Get(GetRequest) returns (GetResponse) {};
+    rpc GetRouters(GetRoutersRequest) returns (GetRoutersResponse) {};
+    rpc GetLonger(GetLongerRequest) returns (GetLongerResponse) {};
+    rpc ObserveRIB(ObserveRIBRequest) returns (stream RIBUpdate);
+    rpc DumpRIB(DumpRIBRequest) returns (stream DumpRIBReply);
+}
+
+message LPMRequest {
+    string router = 1;
+    uint64 vrf_id = 2;
+    string vrf = 4;
+    bio.net.Prefix pfx = 3;
+}
+
+message LPMResponse {
+    repeated bio.route.Route routes = 1;
+}
+
+message GetRequest {
+    string router = 1;
+    uint64 vrf_id = 2;
+    string vrf = 4;
+    bio.net.Prefix pfx = 3;
+}
+
+message GetResponse {
+    repeated bio.route.Route routes = 1;
+}
+
+message GetLongerRequest {
+    string router = 1;
+    uint64 vrf_id = 2;
+    string vrf = 4;
+    bio.net.Prefix pfx = 3;
+}
+
+message GetLongerResponse {
+    repeated bio.route.Route routes = 1;
+}
+
+message ObserveRIBRequest {
+    string router = 1;
+    uint64 vrf_id = 2;
+    string vrf = 4;
+    enum AFISAFI {
+        IPv4Unicast = 0;
+        IPv6Unicast = 1;
+    }
+    AFISAFI afisafi = 3;
+    bool allow_unready_rib = 5;
+}
+
+message RIBFilter {
+    uint32 originating_asn = 1;
+    uint32 min_length = 2;
+    uint32 max_length = 3;
+}
+
+message RIBUpdate {
+    bool advertisement = 1;
+    bool is_initial_dump = 3;
+    bool end_of_rib = 4;
+    bio.route.Route route = 2;
+}
+
+
+message DumpRIBRequest {
+    string router = 1;
+    uint64 vrf_id = 2;
+    string vrf = 4;
+    enum AFISAFI {
+        IPv4Unicast = 0;
+        IPv6Unicast = 1;
+    }
+    AFISAFI afisafi = 3;
+    RIBFilter filter = 5;
+}
+
+message DumpRIBReply {
+    bio.route.Route route = 1;
+}
+
+message GetRoutersRequest {
+
+}
+
+message Router {
+    string sys_name = 1;
+    repeated uint64 vrf_ids = 2;
+    string address = 3;
+}
+
+message GetRoutersResponse {
+    repeated Router routers = 1;
+}

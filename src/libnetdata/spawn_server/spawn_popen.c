@@ -84,7 +84,7 @@ POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...) {
     va_end(args_copy);
 
     // Allocate memory for argv array (+2 for cmd and NULL terminator)
-    const char *argv[argc + 2];
+    const char **argv = callocz(argc + 2, sizeof(*argv));
 
     // Populate the argv array
     argv[0] = cmd;
@@ -97,7 +97,10 @@ POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...) {
     // End processing variadic arguments
     va_end(args);
 
-    return spawn_popen_run_argv(argv);
+    POPEN_INSTANCE *pi = spawn_popen_run_argv(argv);
+    freez(argv);
+
+    return pi;
 }
 
 POPEN_INSTANCE *spawn_popen_run(const char *cmd) {

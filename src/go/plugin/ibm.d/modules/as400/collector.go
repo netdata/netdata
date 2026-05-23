@@ -1,5 +1,4 @@
 //go:build cgo
-// +build cgo
 
 package as400
 
@@ -1069,10 +1068,7 @@ func (c *Collector) slowPathIntervalSeconds() int {
 	}
 	interval := int(c.slow.config.interval / time.Second)
 	if interval < 1 {
-		interval = c.fastPathIntervalSeconds()
-		if interval < 1 {
-			interval = 1
-		}
+		interval = max(c.fastPathIntervalSeconds(), 1)
 	}
 	return interval
 }

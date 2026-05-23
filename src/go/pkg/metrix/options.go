@@ -26,14 +26,16 @@ type instrumentConfig struct {
 	measureSetFields    []MeasureFieldSpec
 	measureSetSemantics *MeasureSetSemantics
 
-	descriptionSet bool
-	description    string
-	chartFamilySet bool
-	chartFamily    string
-	unitSet        bool
-	unit           string
-	floatSet       bool
-	float          bool
+	descriptionSet   bool
+	description      string
+	chartFamilySet   bool
+	chartFamily      string
+	chartPrioritySet bool
+	chartPriority    int
+	unitSet          bool
+	unit             string
+	floatSet         bool
+	float            bool
 }
 
 func WithFreshness(policy FreshnessPolicy) InstrumentOption {
@@ -110,6 +112,16 @@ func WithChartFamily(chartFamily string) InstrumentOption {
 	return optionFunc(func(cfg *instrumentConfig) {
 		cfg.chartFamilySet = true
 		cfg.chartFamily = chartFamily
+	})
+}
+
+// WithChartPriority sets optional metric-family chart priority metadata.
+// It is currently consumed only by chartengine autogen.
+// TODO: Revisit whether chart-template charts should also honor metrix priority hints.
+func WithChartPriority(chartPriority int) InstrumentOption {
+	return optionFunc(func(cfg *instrumentConfig) {
+		cfg.chartPrioritySet = true
+		cfg.chartPriority = chartPriority
 	})
 }
 

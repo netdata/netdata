@@ -36,6 +36,85 @@ void rrdhost_set_health_evloop_iteration(RRDHOST *host) {
                      health_evloop_current_iteration(), __ATOMIC_RELAXED);
 }
 
+static inline void health_alert_status_counts_add(struct health_alert_status_counts *c, RRDCALC_STATUS status) {
+    switch(status) {
+        case RRDCALC_STATUS_CLEAR:
+            c->clear++;
+            break;
+
+        case RRDCALC_STATUS_WARNING:
+            c->warning++;
+            break;
+
+        case RRDCALC_STATUS_CRITICAL:
+            c->critical++;
+            break;
+
+        case RRDCALC_STATUS_UNDEFINED:
+            c->undefined++;
+            break;
+
+        case RRDCALC_STATUS_UNINITIALIZED:
+            c->uninitialized++;
+            break;
+
+        default:
+            break;
+    }
+}
+
+static inline void health_alert_status_counts_sub(struct health_alert_status_counts *c, RRDCALC_STATUS status) {
+    switch(status) {
+        case RRDCALC_STATUS_CLEAR:
+            if(c->clear) c->clear--;
+            break;
+
+        case RRDCALC_STATUS_WARNING:
+            if(c->warning) c->warning--;
+            break;
+
+        case RRDCALC_STATUS_CRITICAL:
+            if(c->critical) c->critical--;
+            break;
+
+        case RRDCALC_STATUS_UNDEFINED:
+            if(c->undefined) c->undefined--;
+            break;
+
+        case RRDCALC_STATUS_UNINITIALIZED:
+            if(c->uninitialized) c->uninitialized--;
+            break;
+
+        default:
+            break;
+    }
+}
+
+static inline uint64_t health_alert_status_snapshot_begin_update(RRDHOST *host) {
+    // Make generation odd (writer in progress) so readers can safely retry/fallback.
+    uint64_t generation = __atomic_add_fetch(&host->health.alert_status_snapshot.generation, 1, __ATOMIC_ACQ_REL);
+    if(!(generation & 1))
+        generation = __atomic_add_fetch(&host->health.alert_status_snapshot.generation, 1, __ATOMIC_ACQ_REL);
+
+    __atomic_store_n(&host->health.alert_status_snapshot.valid, 0, __ATOMIC_RELEASE);
+    return generation;
+}
+
+static inline void health_alert_status_snapshot_finish_update(
+    RRDHOST *host,
+    const struct health_alert_status_counts *counts,
+    uint64_t odd_generation) {
+
+    __atomic_store_n(&host->health.alert_status_snapshot.counts.clear, counts->clear, __ATOMIC_RELAXED);
+    __atomic_store_n(&host->health.alert_status_snapshot.counts.warning, counts->warning, __ATOMIC_RELAXED);
+    __atomic_store_n(&host->health.alert_status_snapshot.counts.critical, counts->critical, __ATOMIC_RELAXED);
+    __atomic_store_n(&host->health.alert_status_snapshot.counts.undefined, counts->undefined, __ATOMIC_RELAXED);
+    __atomic_store_n(&host->health.alert_status_snapshot.counts.uninitialized, counts->uninitialized, __ATOMIC_RELAXED);
+
+    __atomic_store_n(&host->health.alert_status_snapshot.valid, 1, __ATOMIC_RELEASE);
+    __atomic_store_n(&host->health.alert_status_snapshot.generation, odd_generation + 1, __ATOMIC_RELEASE);
+}
+
 // ----------------------------------------------------------------------------
 // health main thread and friends
 
@@ -165,8 +244,8 @@ static void health_initialize_rrdhost(RRDHOST *host) {
     host->health_log.next_log_id = get_uint32_id();
     host->health_log.next_alarm_id = 0;
 
-    sql_health_alarm_log_load(host);
     rw_spinlock_init(&host->health_log.spinlock);
+    sql_health_alarm_log_load(host);
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
 
 
@@ -238,8 +317,16 @@ static void do_eval_expression(
 }
 
 // returns the number of runnable alerts
-static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run) {
+//
+// The caller owns `owa` and provides it so a single arena can be reused
+// across all hosts of one iteration (and, in the multi-threaded variant,
+// across all hosts a single worker processes). The arena is reset between
+// alerts inside this function, so peak memory stays bounded by one alert's
+// scratch no matter how many hosts flow through it.
+static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run, ONEWAYALLOC *owa) {
     size_t runnable = 0;
+    struct health_alert_status_counts status_counts = { 0 };
+    bool snapshot_complete = true;
 
     if(unlikely(!rrdhost_should_run_health(host)))
         return;
@@ -283,16 +370,34 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
     worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
     {
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (aclk_host_config && aclk_host_config->send_snapshot == 2)
             return;
     }
 
+    // Reuse the caller-provided arena across every alert's DB lookup. Each
+    // alert's scratch (RRDR + query state) is released via onewayalloc_reset
+    // at the top of the next iteration — trims the page list back to a
+    // single head page. Net effect: one mmap/munmap for the whole health
+    // iteration, regardless of host count or alert count.
+
     // the first loop is to lookup values from the db
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
+        // Reclaim the previous alert's query scratch before starting the
+        // next one. The arena is reused across every alert of every host in
+        // this iteration, so this reset trims trailing pages left by the
+        // previous alert (same host or prior host). No-op only on the very
+        // first alert after the arena was created.
+        onewayalloc_reset(owa);
+
+        if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
+            snapshot_complete = false;
             break;
+        }
+
+        if(likely(rc->rrdset))
+            health_alert_status_counts_add(&status_counts, rc->status);
 
         rrdcalc_update_info_using_rrdset_labels(rc);
 
@@ -325,6 +430,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 if (ae) {
                     health_log_alert(host, ae);
                     health_alarm_log_add_entry(host, ae, false);
+                    health_alert_status_counts_sub(&status_counts, rc->status);
                     rc->old_status = rc->status;
                     rc->status = RRDCALC_STATUS_REMOVED;
                     rc->last_status_change = now_tmp;
@@ -377,7 +483,8 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     break;
             }
 
-            int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
+            int ret = rrdset2value_api_v1_with_owa(owa,
+                                          rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
                                           rc->config.after, rc->config.before, rc->config.time_group, group_options,
                                           0, rc->config.options | RRDR_OPTION_SELECTED_TIER,
                                           &rc->db_after,&rc->db_before,
@@ -424,8 +531,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
     if (unlikely(runnable && service_running(SERVICE_HEALTH))) {
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
+            if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
+                snapshot_complete = false;
                 break;
+            }
 
             if (unlikely(!(rc->run_flags & RRDCALC_FLAG_RUNNABLE)))
                 continue;
@@ -534,6 +643,9 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                        rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), ae_new_value_string(ae),
                        rrdcalc_status2string(ae->new_status));
 
+                health_alert_status_counts_sub(&status_counts, rc->status);
+                health_alert_status_counts_add(&status_counts, status);
+
                 rc->last_status_change_value = rc->value;
                 rc->last_status_change = now;
                 rc->old_status = rc->status;
@@ -617,6 +729,11 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         foreach_rrdcalc_in_rrdhost_done(rc);
     }
 
+    if(likely(snapshot_complete)) {
+        uint64_t snapshot_generation = health_alert_status_snapshot_begin_update(host);
+        health_alert_status_snapshot_finish_update(host, &status_counts, snapshot_generation);
+    }
+
     if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
         alerts_raised_summary_free(hrm);
         return;
@@ -634,7 +751,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         commit_alert_transitions(host);
 
     if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (aclk_host_config && aclk_host_config->send_snapshot == 1) {
             aclk_host_config->send_snapshot = 2;
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -684,14 +801,20 @@ static void health_event_loop(void) {
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
         uint64_t loop = __atomic_add_fetch(&health_evloop_iteration, 1, __ATOMIC_RELAXED);
 
+        // Single onewayalloc arena reused across every host in this iteration —
+        // one mmap/munmap pair for the whole cycle instead of per host.
+        ONEWAYALLOC *iter_owa = onewayalloc_create(0);
+
         RRDHOST *host;
         dfe_start_reentrant(rrdhost_root_index, host) {
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
 
-            health_event_loop_for_host(host, apply_hibernation_delay, now, &next_run);
+            health_event_loop_for_host(host, apply_hibernation_delay, now, &next_run, iter_owa);
         }
         dfe_done(host);
+
+        onewayalloc_destroy(iter_owa);
 
         if(unlikely(!service_running(SERVICE_HEALTH)))
             break;

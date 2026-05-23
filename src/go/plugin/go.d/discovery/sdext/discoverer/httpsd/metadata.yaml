@@ -1,0 +1,265 @@
+# yamllint disable rule:line-length
+---
+id: 'service-discovery-http'
+meta:
+  kind: 'http'
+  name: 'HTTP endpoint'
+  tagline: 'Items returned by an HTTP/HTTPS endpoint (JSON or YAML).'
+  link: 'https://datatracker.ietf.org/doc/html/rfc9110'
+  icon_filename: 'http.svg'
+keywords:
+  - 'service discovery'
+  - 'sd'
+  - 'http'
+  - 'rest'
+  - 'discovery'
+  - 'cmdb'
+overview:
+  description: |
+    Netdata can pull a list of monitorable targets from any HTTP endpoint you control — a CMDB API, an internal asset registry, a static file served by nginx, or a Prometheus-style file_sd export. The discoverer fetches the endpoint, decodes JSON or YAML, and feeds each item into the `services:` rule engine. This is the "bring your own source-of-truth" discoverer.
+
+    This page covers HTTP-specific setup. For the broader Service Discovery model and the shared template-helper reference, see [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md).
+  how_it_works: |
+    Each discovery cycle, the discoverer:
+
+    1. **Fetches** the configured `url` over HTTP/HTTPS, honouring all standard go.d collector HTTP options (auth, headers, TLS, proxy, timeout).
+    2. **Decodes** the response as either JSON or YAML according to `format` (auto / json / yaml). With `format: auto`, the decoder uses `Content-Type` if it is unambiguous, otherwise tries JSON first then YAML.
+    3. **Accepts two shapes** at the top level: a bare array (`[ item, item, … ]`) **or** an envelope (`{ "items": [ … ] }`). Anything else is rejected.
+    4. **Builds one target per array element**, exposing `.Item` (the decoded element — could be a string, a map, a number, …), `.TUID`, and `.Hash`.
+    5. **Runs the `services:` rules** against each target. The default stock rule passes the item through unchanged via the `toYaml` helper, so an endpoint that already serves go.d job configurations works with zero rule authoring.
+    6. **Reconciles** disappeared items — when a target is no longer in the response, the corresponding job stops on the next reconcile.
+  limitations: |
+    - Only **one URL per pipeline**. To pull from multiple sources, configure multiple HTTP discovery pipelines (each as its own UI entry, or split the file into one job per source).
+    - **Response size** is capped at 10 MiB.
+    - **One-shot mode** (`interval: 0`) fetches a single time when the pipeline starts. It does **not** refetch on SD reload — recreate the pipeline to refresh.
+    - **`bearer_token_file`** under `/var/run/secrets/` is treated as optional when Netdata is **not** running in Kubernetes (so the same config can be used in a Helm deployment without erroring out on dev hosts).
+    - The discoverer does not introspect the items it received — anything beyond what the upstream endpoint provides must be inferred via service rules.
+setup:
+  prerequisites:
+    list:
+      - title: 'Endpoint that returns JSON or YAML'
+        description: |
+          Stand up an HTTP endpoint that returns either a top-level array (`[ "https://a/health", "https://b/health" ]`) or an envelope (`{ "items": [...] }`). Items can be primitives (strings, numbers), maps, or any nestable value the rule engine knows how to consume.
+      - title: 'Choose a pass-through vs. curated approach'
+        description: |
+          - **Pass-through**: have your endpoint emit ready-made go.d job configurations and use the stock rule, which renders each item directly via `toYaml`. Zero rule authoring on the Netdata side.
+          - **Curated**: have your endpoint emit raw data (URLs, hostnames, tags) and write `services:` rules that map the data to the right collector module. More work, more flexibility.
+  configuration:
+    file:
+      name: 'go.d/sd/http.conf'
+    options:
+      description: |
+        The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn fetched items into collector jobs — see [Service Rules](#service-rules)).
+
+        After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
+      folding:
+        title: 'Discoverer options'
+        enabled: false
+      list:
+        - name: 'url'
+          description: 'HTTP/HTTPS endpoint that returns the items.'
+          default_value: ''
+          required: true
+          detailed_description: |
+            Must be a fully-qualified `http://` or `https://` URL. The endpoint is expected to return either a bare array or an `{"items": [...]}` envelope (see [Service Rules](#service-rules) for the input model).
+        - name: 'interval'
+          description: 'How often to refetch the endpoint.'
+          default_value: '1m'
+          required: false
+          detailed_description: |
+            Set to `0` for one-shot mode — the endpoint is fetched once when the pipeline starts and never again. SD reload does not retrigger; recreate the pipeline to refresh.
+        - name: 'format'
+          description: 'Response format. One of `auto`, `json`, `yaml`.'
+          default_value: 'auto'
+          required: false
+          detailed_description: |
+            With `auto`, the decoder uses `Content-Type` when it is unambiguous (`application/json`, `application/yaml`, `*+json`, `*+yaml`), otherwise tries JSON first then YAML.
+        - name: 'timeout'
+          description: 'Per-request HTTP timeout.'
+          default_value: '2s'
+          required: false
+        - name: 'headers / username / password / bearer_token_file / proxy_url / tls_skip_verify / etc.'
+          description: 'All standard go.d HTTP options are accepted (basic auth, bearer tokens, custom headers, HTTP proxy, TLS options).'
+          default_value: ''
+          required: false
+          detailed_description: |
+            See any go.d HTTP-based collector (`httpcheck`, `prometheus`, `nginx`, …) for the full set. Notable: when `bearer_token_file` points under `/var/run/secrets/` and Netdata is **not** running inside Kubernetes, missing token files are silently ignored.
+    examples:
+      folding:
+        title: 'Configuration examples'
+        enabled: true
+      list:
+        - name: 'Pass-through go.d jobs (stock rule)'
+          description: |
+            The endpoint serves go.d job configurations directly. Each item must include a `module` field. The stock rule pipes the item through `toYaml` unchanged.
+          config: |
+            disabled: no
+            discoverer:
+              http:
+                url: https://cmdb.example.com/netdata/jobs.yaml
+                interval: 5m
+                format: auto
+            services:
+              - id: passthrough
+                match: '{{ true }}'
+                config_template: |
+                  {{ .Item | toYaml }}
+        - name: 'Array of bare URLs → httpcheck'
+          description: |
+            The endpoint returns `[ "https://a/health", "https://b/health" ]`. Map each URL to an `httpcheck` job.
+          config: |
+            disabled: no
+            discoverer:
+              http:
+                url: https://cmdb.example.com/netdata/health-urls.json
+                interval: 1m
+            services:
+              - id: httpcheck
+                match: '{{ kindIs "string" .Item }}'
+                config_template: |
+                  name: {{ .TUID }}
+                  url: {{ .Item }}
+        - name: 'Array of objects with custom shape'
+          description: |
+            The endpoint returns `[ { "name": "api", "url": "https://api.example.com/health" }, … ]`.
+          config: |
+            disabled: no
+            discoverer:
+              http:
+                url: https://cmdb.example.com/netdata/services.json
+            services:
+              - id: httpcheck
+                match: '{{ and (kindIs "map" .Item) (hasKey .Item "url") }}'
+                config_template: |
+                  name: {{ .Item.name }}
+                  url: {{ .Item.url }}
+        - name: 'Bearer-token authentication'
+          description: 'Authenticate against the source-of-truth endpoint using a bearer token from a file.'
+          config: |
+            disabled: no
+            discoverer:
+              http:
+                url: https://cmdb.example.com/api/v1/netdata/jobs
+                bearer_token_file: /etc/netdata/secrets/cmdb-token
+                headers:
+                  Accept: application/yaml
+            services:
+              - id: passthrough
+                match: '{{ true }}'
+                config_template: |
+                  {{ .Item | toYaml }}
+services:
+  description: |
+    A `services:` rule turns each fetched item into one or more collector jobs. The HTTP discoverer is unique among SD discoverers in that the target's data shape is **defined by the upstream endpoint**, not by this discoverer — `.Item` is whatever JSON/YAML element the endpoint returned.
+
+    The shared rule model — function reference (`match`, sprig including `kindIs`/`hasKey`/`toYaml`), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are HTTP-specific.
+  evaluation:
+    description: |
+      Quick reference — see [Rule evaluation semantics](/src/collectors/SERVICE-DISCOVERY.md#rule-evaluation-semantics) on the hub page for the full model.
+    list:
+      - name: 'Type-check `.Item` first'
+        description: |
+          Because `.Item` is whatever the endpoint serves, write defensive rules that check the type before reading sub-fields. `kindIs "string" .Item`, `kindIs "map" .Item`, and `hasKey .Item "<key>"` are the workhorses. A rule that does `{{ .Item.url }}` on a non-map item will fail at template-render time (`missingkey=error`) and the rule will be skipped.
+      - name: 'Pass-through requires `module:` in the upstream payload'
+        description: |
+          The pass-through rule (`{{ .Item | toYaml }}`) forwards the item unchanged to the collector subsystem. The collector subsystem requires every job to have `name:` and `module:`. If your endpoint omits `module:`, the resulting job has no module and the agent rejects it. Either include `module:` upstream or wrap with a curated rule that adds it.
+      - name: 'Module inference from rule id'
+        description: |
+          When you write a curated rule and the rendered job omits `module:`, the rule `id` is used as the module name. So `id: httpcheck` is enough to produce httpcheck jobs without writing `module: httpcheck` in every template.
+  template_variables:
+    description: 'Available inside both `match` expressions and `config_template` bodies for HTTP targets.'
+    list:
+      - name: '.Item'
+        type: 'any'
+        description: 'The decoded array element. Type depends on the upstream endpoint — could be a string, a number, a bool, a map, or a nested structure. Always type-check before reading sub-fields.'
+      - name: '.TUID'
+        type: 'string'
+        description: |
+          Stable per-target ID (`http_<endpoint-label>_<hash>`). Useful as a job `name:` when the upstream payload does not provide one.
+      - name: '.Hash'
+        type: 'uint64'
+        description: 'Hash of the item content. Used internally for change detection.'
+  examples:
+    description: 'Each example shows one or more entries from the `services:` array. Order matters — see [How rules are evaluated](#how-rules-are-evaluated).'
+    list:
+      - name: 'Pass-through (default stock rule)'
+        description: |
+          The endpoint already returns valid go.d job configurations. Forward each item unchanged via `toYaml`. Each item **must** include a `module` field (and `name`).
+        config: |
+          - id: passthrough
+            match: '{{ true }}'
+            config_template: |
+              {{ .Item | toYaml }}
+      - name: 'Array of strings → httpcheck (curated)'
+        description: |
+          Endpoint serves `[ "https://a/health", "https://b/health" ]`. Use `kindIs "string"` to gate the rule, then map each string to an `httpcheck` job. `id: httpcheck` makes the module infer automatically.
+        config: |
+          - id: httpcheck
+            match: '{{ kindIs "string" .Item }}'
+            config_template: |
+              name: {{ .TUID }}
+              url: {{ .Item }}
+      - name: 'Array of objects → httpcheck (curated)'
+        description: |
+          Endpoint serves `[ { "name": "api", "url": "https://api/health" }, … ]`. Type-check that the item is a map and has a `url` key, then map fields into the rendered job.
+        config: |
+          - id: httpcheck
+            match: '{{ and (kindIs "map" .Item) (hasKey .Item "url") }}'
+            config_template: |
+              name: {{ .Item.name }}
+              url: {{ .Item.url }}
+      - name: 'Multiple modules from one endpoint'
+        description: |
+          Your endpoint mixes shapes — some items target `httpcheck`, some target `prometheus`. Use `hasKey` to discriminate, with each rule producing its own module's jobs.
+        config: |
+          - id: prometheus
+            match: '{{ and (kindIs "map" .Item) (hasKey .Item "metrics_url") }}'
+            config_template: |
+              name: {{ .Item.name }}
+              url: {{ .Item.metrics_url }}
+
+          - id: httpcheck
+            match: '{{ and (kindIs "map" .Item) (hasKey .Item "health_url") }}'
+            config_template: |
+              name: {{ .Item.name }}
+              url: {{ .Item.health_url }}
+verify:
+  description: 'After enabling the discoverer, confirm the endpoint is reachable and items are being parsed.'
+  checks:
+    list:
+      - name: 'Confirm the endpoint is being fetched'
+        description: |
+          Watch the agent log for `discoverer=http` messages. With systemd:
+
+          ```bash
+          journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep "discoverer=http"
+          ```
+
+          A successful fetch logs the number of items decoded. Failures (DNS, TLS, auth, parse) appear at warn level.
+      - name: 'Reproduce the fetch with curl'
+        description: |
+          When the discoverer log shows a parse error, hit the endpoint with `curl` to inspect what it returned:
+
+          ```bash
+          curl -sS -H "Accept: application/yaml" https://cmdb.example.com/netdata/jobs.yaml | head -40
+          ```
+
+          The response **must** be a top-level array or `{"items": [...]}` envelope.
+      - name: 'Confirm jobs are being created'
+        description: |
+          In the Netdata UI go to `Collectors -> go.d -> <module>`. Pass-through jobs use the `name` your endpoint provided; curated rules use whatever you set in the `config_template`.
+troubleshooting:
+  problems:
+    list:
+      - name: 'parse response as json: ...; parse response as yaml: ...'
+        description: |
+          The response is neither valid JSON nor valid YAML. Common causes: the endpoint returned an HTML error page (check status code and `Content-Type`), the JSON has trailing garbage, or YAML indentation is wrong. Reproduce with `curl -i` to see the headers + body.
+      - name: 'Items decoded but no jobs created'
+        description: |
+          Your `services:` rules are not matching, or they match but the rendered template is empty. With pass-through (`{{ .Item | toYaml }}`), make sure each upstream item includes `module:` and `name:`. With curated rules, double-check the type checks (`kindIs`, `hasKey`).
+      - name: 'TLS/certificate errors against an internal endpoint'
+        description: |
+          Use `tls_skip_verify: yes` to bypass for testing, then mount the issuing CA and set `tls_ca: /path/to/ca.crt` for production.
+      - name: 'Bearer token file not found'
+        description: |
+          When Netdata runs **outside** Kubernetes and the configured `bearer_token_file` points under `/var/run/secrets/`, missing tokens are silently ignored — this is intentional so the same config works in dev and in Helm. If you are inside k8s, the file must exist.

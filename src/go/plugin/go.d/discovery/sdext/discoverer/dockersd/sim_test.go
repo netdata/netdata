@@ -45,15 +45,11 @@ func (sim *discoverySim) run(t *testing.T) {
 	in := make(chan []model.TargetGroup)
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		d.Discover(ctx, in)
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -64,7 +60,7 @@ func (sim *discoverySim) run(t *testing.T) {
 				}
 			}
 		}
-	}()
+	})
 
 	done := make(chan struct{})
 	go func() {

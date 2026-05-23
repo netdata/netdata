@@ -53,8 +53,11 @@ type SeriesMeta struct {
 type MetricMeta struct {
 	Description string
 	ChartFamily string
-	Unit        string
-	Float       bool
+	// ChartPriority is currently consumed only by chartengine autogen.
+	// TODO: Revisit whether chart-template charts should also honor metrix priority hints.
+	ChartPriority int
+	Unit          string
+	Float         bool
 }
 
 // MetricKind identifies the logical metric family type.

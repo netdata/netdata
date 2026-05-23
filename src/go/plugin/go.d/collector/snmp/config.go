@@ -4,7 +4,7 @@ package snmp
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 )
 
 type (
@@ -22,12 +22,13 @@ type (
 
 		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
 
-		Ping PingConfig `yaml:"ping,omitempty" json:"ping"`
+		PingOnly bool       `yaml:"ping_only,omitempty" json:"ping_only"`
+		Ping     PingConfig `yaml:"ping,omitempty" json:"ping"`
 	}
 
 	PingConfig struct {
-		Enabled           bool `yaml:"enabled" json:"enabled"`
-		ping.ProberConfig `yaml:",inline" json:",inline"`
+		Enabled            bool `yaml:"enabled" json:"enabled"`
+		pinger.ProbeConfig `yaml:",inline" json:",inline"`
 	}
 
 	UserConfig struct {
@@ -37,10 +38,11 @@ type (
 		AuthKey       string `yaml:"auth_key,omitempty" json:"auth_key"`
 		PrivProto     string `yaml:"priv_proto,omitempty" json:"priv_proto"`
 		PrivKey       string `yaml:"priv_key,omitempty" json:"priv_key"`
+		ContextName   string `yaml:"context_name,omitempty" json:"context_name"`
 	}
 	OptionsConfig struct {
 		Port           int    `yaml:"port,omitempty" json:"port"`
-		Retries        int    `yaml:"retries,omitempty" json:"retries"`
+		Retries        int    `yaml:"retries" json:"retries"`
 		Timeout        int    `yaml:"timeout,omitempty" json:"timeout"`
 		Version        string `yaml:"version,omitempty" json:"version"`
 		MaxOIDs        int    `yaml:"max_request_size,omitempty" json:"max_request_size"`

@@ -39,7 +39,7 @@ static struct proc_module {
      .func = do_GetPowerSupply,
      .rd = NULL,
      .thread = NULL,
-     .cleanup = NULL},
+     .cleanup = do_GetPowerSupply_cleanup},
     {.name = "GetSensors",
      .dim = "GetSensors",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -109,6 +109,14 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = NULL},
+    {.name = "PerflibSMB",
+     .dim = "PerflibSMB",
+     .enabled = CONFIG_BOOLEAN_NO,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibSMB,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_PerflibSMB_cleanup},
     {.name = "PerflibObjects",
      .dim = "PerflibObjects",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -326,11 +334,13 @@ void win_plugin_main(void *ptr)
     // Join threads
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
-        if (pm->cleanup)
-            pm->cleanup();
 
         if (pm->thread) {
             nd_thread_join(pm->thread);
+            pm->thread = NULL;
         }
+
+        if (pm->cleanup)
+            pm->cleanup();
     }
 }

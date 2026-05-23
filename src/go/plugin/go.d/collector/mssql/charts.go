@@ -48,6 +48,9 @@ const (
 	prioDatabaseLogFlushes
 	prioDatabaseLogFlushed
 	prioDatabaseLogGrowths
+	prioDatabaseLogFileSize
+	prioDatabaseLogPercentUsed
+	prioDatabaseLogTruncationsShrinks
 	prioDatabaseIOStall
 	prioDatabaseDeadlocks
 	prioDatabaseLockWaits
@@ -541,6 +544,44 @@ var (
 			{ID: "database_%s_log_growths", Name: "growths", Algo: collectorapi.Incremental},
 		},
 	}
+	databaseLogFileSizeChartTmpl = collectorapi.Chart{
+		ID:       "database_%s_log_file_size",
+		Title:    "Transaction log file size",
+		Units:    "bytes",
+		Fam:      "db log",
+		Ctx:      "mssql.database_log_file_size",
+		Type:     collectorapi.Stacked,
+		Priority: prioDatabaseLogFileSize,
+		Dims: collectorapi.Dims{
+			{ID: "database_%s_log_size_used", Name: "used"},
+			{ID: "database_%s_log_size_free", Name: "free"},
+		},
+	}
+	databaseLogPercentUsedChartTmpl = collectorapi.Chart{
+		ID:       "database_%s_log_percent_used",
+		Title:    "Transaction log space utilization",
+		Units:    "percentage",
+		Fam:      "db log",
+		Ctx:      "mssql.database_log_percent_used",
+		Type:     collectorapi.Line,
+		Priority: prioDatabaseLogPercentUsed,
+		Dims: collectorapi.Dims{
+			{ID: "database_%s_log_percent_used", Name: "used", Div: 100},
+		},
+	}
+	databaseLogTruncationsShrinksChartTmpl = collectorapi.Chart{
+		ID:       "database_%s_log_truncations_shrinks",
+		Title:    "Transaction log truncations and shrinks",
+		Units:    "events/s",
+		Fam:      "db log",
+		Ctx:      "mssql.database_log_truncations_shrinks",
+		Type:     collectorapi.Line,
+		Priority: prioDatabaseLogTruncationsShrinks,
+		Dims: collectorapi.Dims{
+			{ID: "database_%s_log_truncations", Name: "truncations", Algo: collectorapi.Incremental},
+			{ID: "database_%s_log_shrinks", Name: "shrinks", Algo: collectorapi.Incremental},
+		},
+	}
 	databaseIOStallChartTmpl = collectorapi.Chart{
 		ID:       "database_%s_io_stall",
 		Title:    "Database I/O stall time",
@@ -770,6 +811,30 @@ func (c *Collector) addDatabaseCharts(dbName string) {
 		databaseBackupRestoreThroughputChartTmpl.Copy(),
 		databaseStateChartTmpl.Copy(),
 		databaseReadOnlyChartTmpl.Copy(),
+	}
+
+	dbID := cleanDatabaseName(dbName)
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, dbID)
+		chart.Labels = []collectorapi.Label{
+			{Key: "database", Value: dbName},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, dbID)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) addDatabaseLogCharts(dbName string) {
+	charts := &collectorapi.Charts{
+		databaseLogFileSizeChartTmpl.Copy(),
+		databaseLogPercentUsedChartTmpl.Copy(),
+		databaseLogTruncationsShrinksChartTmpl.Copy(),
 	}
 
 	dbID := cleanDatabaseName(dbName)

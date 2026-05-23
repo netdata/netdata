@@ -14,6 +14,10 @@ type engineState struct {
 	matchIndex   matchIndex
 	routeCache   *routeCache
 	materialized materializedState
+	engineEpoch  uint64
+	commitSeq    uint64
+	nextAttempt  uint64
+	outstanding  uint64
 	hints        plannerSizingHints
 	buildSeq     buildSeqState
 	// plannerBuildSeq is runtime-mode build-cycle sequence used only by

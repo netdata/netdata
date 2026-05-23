@@ -42,6 +42,10 @@ func (t *task) stop() {
 	t.once.Do(func() { close(t.done) })
 }
 
+func (t *task) wait() {
+	<-t.running
+}
+
 func (t *task) isStopped() bool {
 	select {
 	case <-t.done:

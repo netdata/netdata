@@ -23,6 +23,9 @@
 
 #define UID_UNSET (uid_t)(UINT32_MAX)
 
+// max cmdline bytes read from /proc/<pid>/cmdline — reader-side guard must match
+#define LOCAL_SOCKETS_CMDLINE_MAX 8192
+
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for keeping the namespaces
 // key and value is the namespace inode
@@ -193,6 +196,7 @@ typedef enum __attribute__((packed)) {
 struct pid_socket {
     uint64_t inode;
     pid_t pid;
+    pid_t ppid;
     uid_t uid;
     uint64_t net_ns_inode;
     char *cmdline;
@@ -236,6 +240,7 @@ typedef struct local_socket {
     struct socket_endpoint local;
     struct socket_endpoint remote;
     pid_t pid;
+    pid_t ppid;
 
     SOCKET_DIRECTION direction;
 
@@ -484,7 +489,7 @@ static inline void local_listeners_print_socket(LS_STATE *ls __maybe_unused, con
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
     }
 
-    printf("%s, direction=%s%s%s%s%s pid=%d, state=0x%0x, ns=%"PRIu64", local=%s[:%u], remote=%s[:%u], uid=%u, inode=%"PRIu64", comm=%s\n",
+    printf("%s, direction=%s%s%s%s%s pid=%d, ppid=%d, state=0x%0x, ns=%"PRIu64", local=%s[:%u], remote=%s[:%u], uid=%u, inode=%"PRIu64", comm=%s\n",
         local_sockets_protocol_name(n),
            (n->direction & SOCKET_DIRECTION_LISTEN) ? "LISTEN," : "",
            (n->direction & SOCKET_DIRECTION_INBOUND) ? "INBOUND," : "",
@@ -492,6 +497,7 @@ static inline void local_listeners_print_socket(LS_STATE *ls __maybe_unused, con
            (n->direction & (SOCKET_DIRECTION_LOCAL_INBOUND|SOCKET_DIRECTION_LOCAL_OUTBOUND)) ? "LOCAL," : "",
            (n->direction == 0) ? "NONE," : "",
            n->pid,
+           n->ppid,
            (unsigned int)n->state,
            n->net_ns_inode,
            local_address, n->local.port,
@@ -580,7 +586,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
     struct dirent *proc_entry;
     char filename[FILENAME_MAX + 1];
     char comm[TASK_COMM_LEN];
-    char cmdline[8192];
+    char cmdline[LOCAL_SOCKETS_CMDLINE_MAX];
     const char *cmdline_trimmed;
     uint64_t net_ns_inode;
 
@@ -619,6 +625,10 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
             closedir(fd_dir);
             continue;
         }
+        pid_t ppid = 0;
+        bool ppid_checked = false;
+        bool status_checked = false;
+        bool status_failed = false;
         net_ns_inode = 0;
         uid_t uid = UID_UNSET;
 
@@ -637,19 +647,38 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
             SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl = simple_hashtable_get_slot_PID_SOCKET(&ls->pid_sockets_hashtable, inode_hash, &inode, true);
             struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl);
             if(!ps || (ps->pid == 1 && pid != 1)) {
-                if(uid == UID_UNSET && ls->config.uid) {
+                if(!status_checked && !status_failed &&
+                   ((uid == UID_UNSET && ls->config.uid) || (!ppid_checked && ls->config.pid))) {
                     char status_buf[512];
+
                     snprintfz(filename, sizeof(filename), "%s/%s/status", proc_filename, proc_entry->d_name);
-                    if (read_txt_file(filename, status_buf, sizeof(status_buf)))
+                    if (read_txt_file(filename, status_buf, sizeof(status_buf))) {
+                        status_failed = true;
                         local_sockets_log(ls, "cannot open file: %s\n", filename);
+                    }
                     else {
-                        char *u = strstr(status_buf, "Uid:");
-                        if(u) {
-                            u += 4;
-                            while(isspace(*u)) u++;                     // skip spaces
-                            while(*u >= '0' && *u <= '9') u++;          // skip the first number (real uid)
-                            while(isspace(*u)) u++;                     // skip spaces again
-                            uid = strtol(u, NULL, 10);   // parse the 2nd number (effective uid)
+                        status_checked = true;
+                        if(ls->config.pid)
+                            ppid_checked = true;
+
+                        if(ls->config.uid) {
+                            char *u = strstr(status_buf, "Uid:");
+                            if(u) {
+                                u += 4;
+                                while(isspace((unsigned char)*u)) u++;     // skip spaces
+                                while(*u >= '0' && *u <= '9') u++;          // skip the first number (real uid)
+                                while(isspace((unsigned char)*u)) u++;     // skip spaces again
+                                uid = strtol(u, NULL, 10);   // parse the 2nd number (effective uid)
+                            }
+                        }
+
+                        if(ls->config.pid) {
+                            char *p = strstr(status_buf, "PPid:");
+                            if(p) {
+                                p += 5;
+                                while(isspace((unsigned char)*p)) p++;     // skip spaces
+                                ppid = (pid_t)strtol(p, NULL, 10);          // parse parent pid
+                            }
                         }
                     }
                 }
@@ -686,6 +715,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
 
                 ps->inode = inode;
                 ps->pid = pid;
+                ps->ppid = ppid;
                 ps->uid = uid;
                 ps->net_ns_inode = net_ns_inode;
                 strncpyz(ps->comm, comm, sizeof(ps->comm) - 1);
@@ -755,6 +785,7 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
     if(ps) {
         n->net_ns_inode = ps->net_ns_inode;
         n->pid = ps->pid;
+        n->ppid = ps->ppid;
 
         if(ps->uid != UID_UNSET && n->uid == UID_UNSET)
             n->uid = ps->uid;
@@ -1551,8 +1582,14 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         if(read(spawn_server_instance_read_fd(si), &len, sizeof(len)) != sizeof(len))
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
+        if(len > LOCAL_SOCKETS_CMDLINE_MAX) {
+            // broken pipe protocol: writer caps at LOCAL_SOCKETS_CMDLINE_MAX bytes
+            local_sockets_log(ls, "cmdline length %zu from child exceeds limit (%d), aborting namespace socket collection", len, LOCAL_SOCKETS_CMDLINE_MAX);
+            break;
+        }
+
         if(len) {
-            char cmdline[len + 1];
+            CLEAN_CHAR_P *cmdline = mallocz(len + 1);
             if(read(spawn_server_instance_read_fd(si), cmdline, len) != (ssize_t)len)
                 local_sockets_log(ls, "failed to read cmdline from pipe");
             else {
@@ -1635,10 +1672,8 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
     if(threads > 100) threads = 100;
 
     size_t last_thread = 0;
-    ND_THREAD *workers[threads];
-    struct local_sockets_namespace_worker workers_data[threads];
-    memset(workers, 0, sizeof(workers));
-    memset(workers_data, 0, sizeof(workers_data));
+    ND_THREAD **workers = callocz(threads, sizeof(*workers));
+    struct local_sockets_namespace_worker *workers_data = callocz(threads, sizeof(*workers_data));
 
     spinlock_lock(&ls->spinlock);
 
@@ -1683,6 +1718,9 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
         if(workers[i])
             nd_thread_join(workers[i]);
     }
+
+    freez(workers_data);
+    freez(workers);
 }
 
 #endif // LOCAL_SOCKETS_USE_SETNS

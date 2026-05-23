@@ -36,12 +36,19 @@ type EngineAutogen struct {
 
 // Group is a recursive chart-group container.
 type Group struct {
-	Family           string   `yaml:"family" json:"family"`
-	ContextNamespace string   `yaml:"context_namespace,omitempty" json:"context_namespace,omitempty"`
-	Metrics          []string `yaml:"metrics,omitempty" json:"metrics,omitempty"`
+	Family           string         `yaml:"family" json:"family"`
+	ContextNamespace string         `yaml:"context_namespace,omitempty" json:"context_namespace,omitempty"`
+	Metrics          []string       `yaml:"metrics,omitempty" json:"metrics,omitempty"`
+	ChartDefaults    *ChartDefaults `yaml:"chart_defaults,omitempty" json:"chart_defaults,omitempty"`
 
 	Groups []Group `yaml:"groups,omitempty" json:"groups,omitempty"`
 	Charts []Chart `yaml:"charts,omitempty" json:"charts,omitempty"`
+}
+
+// ChartDefaults defines inheritable chart fields on a group.
+type ChartDefaults struct {
+	LabelPromoted []string   `yaml:"label_promotion,omitempty" json:"label_promotion,omitempty"`
+	Instances     *Instances `yaml:"instances,omitempty" json:"instances,omitempty"`
 }
 
 // Chart describes one chart template in compact DSL form.

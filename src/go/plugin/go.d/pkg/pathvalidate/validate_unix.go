@@ -56,24 +56,29 @@ func ValidateBinaryPath(path string) (string, error) {
 		return "", fmt.Errorf("binary at %s must be executable", absPath)
 	}
 
-	// Step 7: Check parent directory
-	dir := filepath.Dir(absPath)
-	dirInfo, err := os.Stat(dir)
-	if err != nil {
-		return "", fmt.Errorf("directory stat error for %s: %w", dir, err)
-	}
+	// Step 7: Check all ancestor directories up to and including root
+	for dir := filepath.Dir(absPath); ; dir = filepath.Dir(dir) {
+		dirInfo, err := os.Stat(dir)
+		if err != nil {
+			return "", fmt.Errorf("directory stat error for %s: %w", dir, err)
+		}
 
-	dirStat, ok := dirInfo.Sys().(*syscall.Stat_t)
-	if !ok {
-		return "", fmt.Errorf("unable to get directory stat information for %s", dir)
-	}
-	if dirStat.Uid != 0 {
-		return "", fmt.Errorf("directory %s must be owned by root (current uid: %d)", dir, dirStat.Uid)
-	}
+		dirStat, ok := dirInfo.Sys().(*syscall.Stat_t)
+		if !ok {
+			return "", fmt.Errorf("unable to get directory stat information for %s", dir)
+		}
+		if dirStat.Uid != 0 {
+			return "", fmt.Errorf("directory %s must be owned by root (current uid: %d)", dir, dirStat.Uid)
+		}
 
-	if perm := dirInfo.Mode().Perm(); perm&0022 != 0 {
-		return "", fmt.Errorf("directory %s must not be writable by group/others (current permissions: %s / %04o)",
-			dir, dirInfo.Mode().String(), perm)
+		if perm := dirInfo.Mode().Perm(); perm&0022 != 0 {
+			return "", fmt.Errorf("directory %s must not be writable by group/others (current permissions: %s / %04o)",
+				dir, dirInfo.Mode().String(), perm)
+		}
+
+		if dir == filepath.Dir(dir) {
+			break
+		}
 	}
 
 	return absPath, nil

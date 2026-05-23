@@ -4,7 +4,9 @@ package ddsnmpcollector
 
 import (
 	"regexp"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
@@ -30,6 +32,24 @@ func setupMockHandler(t *testing.T) (*gomock.Controller, *snmpmock.MockHandler) 
 	mockHandler := snmpmock.NewMockHandler(ctrl)
 	mockHandler.EXPECT().MaxOids().Return(10).AnyTimes()
 	return ctrl, mockHandler
+}
+
+func matchedProfileByFile(t *testing.T, sysObjectID, profileFile string) *ddsnmp.Profile {
+	t.Helper()
+
+	matched := ddsnmp.FindProfiles(sysObjectID, "", nil)
+	for _, prof := range matched {
+		if strings.HasSuffix(prof.SourceFile, profileFile) {
+			return prof
+		}
+	}
+
+	require.FailNowf(t, "missing profile", "expected %s for %s", profileFile, sysObjectID)
+	return nil
+}
+
+func oidWithIndex(baseOID, index string) string {
+	return strings.Trim(baseOID, ".") + "." + strings.Trim(index, ".")
 }
 
 func createTestProfile(sourceFile string, metrics []ddprofiledefinition.MetricsConfig) *ddsnmp.Profile {
@@ -60,6 +80,21 @@ func expectSNMPGetError(mockHandler *snmpmock.MockHandler, oids []string, err er
 	mockHandler.EXPECT().Get(gomock.InAnyOrder(oids)).Return(nil, err)
 }
 
+func expectSystemMetadataGets(mockHandler *snmpmock.MockHandler, sysObjectID, sysName string) {
+	mockHandler.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+		createStringPDU("1.0.8802.1.1.2.1.3.1.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.2.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.3.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.4.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.5.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.6.0", sysName),
+		createStringPDU("1.3.6.1.2.1.1.1.0", "SNMP device"),
+		createPDU("1.3.6.1.2.1.1.2.0", gosnmp.ObjectIdentifier, sysObjectID),
+		createStringPDU("1.3.6.1.2.1.1.5.0", sysName),
+		createStringPDU("1.3.6.1.2.1.1.6.0", "lab"),
+	}}, nil).AnyTimes()
+}
+
 func expectSNMPWalk(mockHandler *snmpmock.MockHandler, version gosnmp.SnmpVersion, oid string, pdus []gosnmp.SnmpPDU) {
 	mockHandler.EXPECT().Version().Return(version)
 	if version == gosnmp.Version1 {
@@ -78,7 +113,7 @@ func expectSNMPWalkError(mockHandler *snmpmock.MockHandler, version gosnmp.SnmpV
 	}
 }
 
-func createPDU(name string, pduType gosnmp.Asn1BER, value interface{}) gosnmp.SnmpPDU {
+func createPDU(name string, pduType gosnmp.Asn1BER, value any) gosnmp.SnmpPDU {
 	return gosnmp.SnmpPDU{
 		Name:  name,
 		Type:  pduType,
@@ -108,6 +143,19 @@ func createGauge32PDU(name string, value uint) gosnmp.SnmpPDU {
 
 func createTimeTicksPDU(name string, value uint32) gosnmp.SnmpPDU {
 	return createPDU(name, gosnmp.TimeTicks, value)
+}
+
+func createDateAndTimePDU(name string, value time.Time) gosnmp.SnmpPDU {
+	return createPDU(name, gosnmp.OctetString, []byte{
+		byte(value.Year() >> 8),
+		byte(value.Year()),
+		byte(value.Month()),
+		byte(value.Day()),
+		byte(value.Hour()),
+		byte(value.Minute()),
+		byte(value.Second()),
+		0,
+	})
 }
 
 func createNoSuchObjectPDU(name string) gosnmp.SnmpPDU {

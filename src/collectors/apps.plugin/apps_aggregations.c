@@ -180,8 +180,54 @@ static void assign_a_target_to_all_processes(void) {
     }
 }
 
+#if (PROCESSES_HAVE_SERVICE == 1)
+static STRING *other_service_name = NULL;
+
+static void assign_service_to_all_processes(void) {
+    if(!other_service_name)
+        other_service_name = string_strdupz("not-services");
+
+    // Clear walk-up assigned service_names from previous iteration.
+    // Direct matches (got_service) are kept — they persist per process lifetime.
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
+        if(!p->got_service && p->service_name) {
+            string_freez(p->service_name);
+            p->service_name = NULL;
+        }
+    }
+
+    // Phase 1: direct match — GetServiceNames() already tagged service root PIDs
+    // with p->service_name during data collection.
+
+    // Phase 2: untagged processes walk up to find a service-tagged ancestor
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
+        if(!p->service_name) {
+            if(!p->is_manager) {
+                for(struct pid_stat *pp = p->parent; pp ; pp = pp->parent) {
+                    if(pp->is_manager) break;
+
+                    if(pp->service_name) {
+                        p->service_name = string_dup(pp->service_name);
+                        break;
+                    }
+                }
+            }
+
+            // Phase 3: fallback — no service ancestor found
+            if(!p->service_name)
+                p->service_name = string_dup(other_service_name);
+        }
+    }
+}
+#endif
+
 void aggregate_processes_to_targets(void) {
     assign_a_target_to_all_processes();
+
+#if (PROCESSES_HAVE_SERVICE == 1)
+    if(enable_services_charts)
+        assign_service_to_all_processes();
+#endif
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
 #if (PROCESSES_HAVE_UID == 1)
@@ -192,6 +238,10 @@ void aggregate_processes_to_targets(void) {
 #endif
 #if (PROCESSES_HAVE_SID == 1)
     zero_all_targets(sids_root_target);
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    if(enable_services_charts)
+        zero_all_targets(services_root_target);
 #endif
 
     // this has to be done, before the cleanup
@@ -266,6 +316,21 @@ void aggregate_processes_to_targets(void) {
             w = p->sid_target = get_sid_target(p->sid_name);
 
         aggregate_pid_on_target(w, p, o);
+#endif
+
+        // --------------------------------------------------------------------
+        // service target
+
+#if (PROCESSES_HAVE_SERVICE == 1)
+        if(enable_services_charts) {
+            o = p->service_target;
+            if(likely(p->service_target && p->service_target->service_name == p->service_name))
+                w = p->service_target;
+            else
+                w = p->service_target = get_service_target(p->service_name);
+
+            aggregate_pid_on_target(w, p, o);
+        }
 #endif
 
         // --------------------------------------------------------------------

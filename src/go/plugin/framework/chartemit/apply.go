@@ -51,9 +51,50 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if err := validateTypeIDBudget(env.TypeID, normalized); err != nil {
 		return err
 	}
+	if !hasEmissions(normalized) {
+		return nil
+	}
+	if err := emitHostSelection(api, env); err != nil {
+		return err
+	}
 	emitCreatePhase(api, env, normalized)
 	emitUpdatePhase(api, env, normalized.updateCharts)
 	emitRemovePhase(api, env, normalized)
+	return nil
+}
+
+func hasEmissions(actions normalizedActions) bool {
+	return len(actions.createCharts) > 0 ||
+		len(actions.createDimsByID) > 0 ||
+		len(actions.updateCharts) > 0 ||
+		len(actions.removeDimensions) > 0 ||
+		len(actions.removeCharts) > 0
+}
+
+func emitHostSelection(api *netdataapi.API, env EmitEnv) error {
+	if env.HostScope == nil {
+		api.HOST("")
+		return nil
+	}
+
+	guid := strings.TrimSpace(env.HostScope.GUID)
+	if guid == "" {
+		return fmt.Errorf("chartemit: emit env host scope guid is required")
+	}
+	if sanitizeWireID(guid) != guid {
+		return fmt.Errorf("chartemit: emit env host scope guid contains unsupported characters")
+	}
+	if env.HostScope.Define != nil {
+		define, err := PrepareHostInfo(*env.HostScope.Define)
+		if err != nil {
+			return err
+		}
+		if define.GUID != guid {
+			return fmt.Errorf("chartemit: host define guid %q does not match host scope guid %q", env.HostScope.Define.GUID, env.HostScope.GUID)
+		}
+		api.HOSTINFO(define)
+	}
+	api.HOST(guid)
 	return nil
 }
 

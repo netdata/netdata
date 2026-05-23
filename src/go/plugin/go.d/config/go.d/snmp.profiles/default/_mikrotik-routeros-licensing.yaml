@@ -1,0 +1,22 @@
+licensing:
+  - id: routeros_upgrade
+    MIB: MIKROTIK-MIB
+    identity:
+      id:
+        value: routeros_upgrade
+      name:
+        value: RouterOS upgrade entitlement
+      component:
+        value: routeros
+    descriptors:
+      type:
+        value: upgrade_entitlement
+      impact:
+        value: RouterOS software upgrade entitlement for this device
+    signals:
+      expiry:
+        timestamp:
+          OID: 1.3.6.1.4.1.14988.1.1.4.2.0
+          name: mtxrLicUpgrUntil
+          format: snmp_dateandtime
+          sentinel: [timer_pre_1971]

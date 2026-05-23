@@ -2,7 +2,10 @@
 
 package program
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // SelectorMatcher is the runtime predicate compiled from selector expressions.
 //
@@ -56,16 +59,17 @@ type Dimension struct {
 }
 
 func validateDimension(dimension Dimension) error {
+	var errs []error
 	if dimension.Selector.Expression == "" {
-		return fmt.Errorf("selector expression is required")
+		errs = append(errs, fmt.Errorf("selector expression is required"))
 	}
 	if dimension.Selector.Matcher == nil {
-		return fmt.Errorf("selector matcher is required")
+		errs = append(errs, fmt.Errorf("selector matcher is required"))
 	}
 	if dimension.NameTemplate.Raw == "" && dimension.NameFromLabel == "" && !dimension.InferNameFromSeriesMeta {
-		return fmt.Errorf("dimension name is required (name template or name_from_label)")
+		errs = append(errs, fmt.Errorf("dimension name is required (name template or name_from_label)"))
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (d Dimension) clone() Dimension {

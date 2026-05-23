@@ -6,173 +6,132 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	trueHostDC  = hostDCMatcher{matcher.TRUE()}
-	falseHostDC = hostDCMatcher{matcher.FALSE()}
-	trueVMDC    = vmDCMatcher{matcher.TRUE()}
-	falseVMDC   = vmDCMatcher{matcher.FALSE()}
-	trueDSDC    = dsDCMatcher{matcher.TRUE()}
-	falseDSDC   = dsDCMatcher{matcher.FALSE()}
-	trueClDC    = clusterDCMatcher{matcher.TRUE()}
-	falseClDC   = clusterDCMatcher{matcher.FALSE()}
-)
-
-func TestOrHostMatcher_Match(t *testing.T) {
-	tests := map[string]struct {
-		expected bool
-		lhs      HostMatcher
-		rhs      HostMatcher
-	}{
-		"true, true":   {expected: true, lhs: trueHostDC, rhs: trueHostDC},
-		"true, false":  {expected: true, lhs: trueHostDC, rhs: falseHostDC},
-		"false, true":  {expected: true, lhs: falseHostDC, rhs: trueHostDC},
-		"false, false": {expected: false, lhs: falseHostDC, rhs: falseHostDC},
-	}
-
-	var host resources.Host
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			m := newOrHostMatcher(test.lhs, test.rhs)
-			assert.Equal(t, test.expected, m.Match(&host))
-		})
-	}
-}
-
-func TestAndHostMatcher_Match(t *testing.T) {
-	tests := map[string]struct {
-		expected bool
-		lhs      HostMatcher
-		rhs      HostMatcher
-	}{
-		"true, true":   {expected: true, lhs: trueHostDC, rhs: trueHostDC},
-		"true, false":  {expected: false, lhs: trueHostDC, rhs: falseHostDC},
-		"false, true":  {expected: false, lhs: falseHostDC, rhs: trueHostDC},
-		"false, false": {expected: false, lhs: falseHostDC, rhs: falseHostDC},
-	}
-
-	var host resources.Host
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			m := newAndHostMatcher(test.lhs, test.rhs)
-			assert.Equal(t, test.expected, m.Match(&host))
-		})
-	}
-}
-
-func TestOrVMMatcher_Match(t *testing.T) {
-	tests := map[string]struct {
-		expected bool
-		lhs      VMMatcher
-		rhs      VMMatcher
-	}{
-		"true, true":   {expected: true, lhs: trueVMDC, rhs: trueVMDC},
-		"true, false":  {expected: true, lhs: trueVMDC, rhs: falseVMDC},
-		"false, true":  {expected: true, lhs: falseVMDC, rhs: trueVMDC},
-		"false, false": {expected: false, lhs: falseVMDC, rhs: falseVMDC},
-	}
-
-	var vm resources.VM
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			m := newOrVMMatcher(test.lhs, test.rhs)
-			assert.Equal(t, test.expected, m.Match(&vm))
-		})
-	}
-}
-
-func TestAndVMMatcher_Match(t *testing.T) {
-	tests := map[string]struct {
-		expected bool
-		lhs      VMMatcher
-		rhs      VMMatcher
-	}{
-		"true, true":   {expected: true, lhs: trueVMDC, rhs: trueVMDC},
-		"true, false":  {expected: false, lhs: trueVMDC, rhs: falseVMDC},
-		"false, true":  {expected: false, lhs: falseVMDC, rhs: trueVMDC},
-		"false, false": {expected: false, lhs: falseVMDC, rhs: falseVMDC},
-	}
-
-	var vm resources.VM
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			m := newAndVMMatcher(test.lhs, test.rhs)
-			assert.Equal(t, test.expected, m.Match(&vm))
-		})
-	}
-}
-
 func TestHostIncludes_Parse(t *testing.T) {
 	tests := map[string]struct {
-		valid    bool
-		expected HostMatcher
+		valid bool
+		cases map[string]struct {
+			host *resources.Host
+			want bool
+		}
 	}{
 		"":        {valid: false},
 		"*/C1/H1": {valid: false},
-		"/":       {valid: true, expected: falseHostDC},
-		"/*":      {valid: true, expected: trueHostDC},
-		"/!*":     {valid: true, expected: falseHostDC},
-		"/!*/":    {valid: true, expected: falseHostDC},
+		"/": {
+			valid: true,
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"does not match": {host: testHost("DC1", "Cluster1", "Host1"), want: false},
+			},
+		},
+		"/*": {
+			valid: true,
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"matches": {host: testHost("DC1", "Cluster1", "Host1"), want: true},
+			},
+		},
+		"/!*": {
+			valid: true,
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"does not match": {host: testHost("DC1", "Cluster1", "Host1"), want: false},
+			},
+		},
+		"/!*/": {
+			valid: true,
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"does not match": {host: testHost("DC1", "Cluster1", "Host1"), want: false},
+			},
+		},
 		"/!*/ ": {
 			valid: true,
-			expected: andHostMatcher{
-				lhs: falseHostDC,
-				rhs: hostClusterMatcher{matcher.FALSE()},
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"does not match": {host: testHost("DC1", "Cluster1", "Host1"), want: false},
 			},
 		},
 		"/DC1* DC2* !*/Cluster*": {
 			valid: true,
-			expected: andHostMatcher{
-				lhs: hostDCMatcher{mustSP("DC1* DC2* !*")},
-				rhs: hostClusterMatcher{mustSP("Cluster*")},
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"matches first datacenter":    {host: testHost("DC1A", "Cluster1", "Host1"), want: true},
+				"matches second datacenter":   {host: testHost("DC2A", "Cluster1", "Host1"), want: true},
+				"rejects other datacenter":    {host: testHost("DC3A", "Cluster1", "Host1"), want: false},
+				"rejects different cluster":   {host: testHost("DC1A", "Other", "Host1"), want: false},
+				"matches any host below path": {host: testHost("DC1A", "Cluster1", "Other"), want: true},
+			},
+		},
+		"/DC1*/Cluster*": {
+			valid: true,
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"matches datacenter and cluster":    {host: testHost("DC1A", "Cluster1", "Host1"), want: true},
+				"rejects different datacenter":      {host: testHost("DC2A", "Cluster1", "Host1"), want: false},
+				"rejects different cluster":         {host: testHost("DC1A", "Other", "Host1"), want: false},
+				"matches any host below two levels": {host: testHost("DC1A", "Cluster1", "Other"), want: true},
 			},
 		},
 		"/*/*/HOST1*": {
 			valid: true,
-			expected: andHostMatcher{
-				lhs: andHostMatcher{
-					lhs: trueHostDC,
-					rhs: hostClusterMatcher{matcher.TRUE()},
-				},
-				rhs: hostHostMatcher{mustSP("HOST1*")},
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"matches host":           {host: testHost("DC1", "Cluster1", "HOST10"), want: true},
+				"rejects different host": {host: testHost("DC1", "Cluster1", "OTHER"), want: false},
 			},
 		},
 		"/*/*/HOST1*/*/*": {
 			valid: true,
-			expected: andHostMatcher{
-				lhs: andHostMatcher{
-					lhs: trueHostDC,
-					rhs: hostClusterMatcher{matcher.TRUE()},
-				},
-				rhs: hostHostMatcher{mustSP("HOST1*")},
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"ignores extra segments": {host: testHost("DC1", "Cluster1", "HOST10"), want: true},
 			},
 		},
 		"[/DC1*,/DC2*]": {
 			valid: true,
-			expected: orHostMatcher{
-				lhs: hostDCMatcher{mustSP("DC1*")},
-				rhs: hostDCMatcher{mustSP("DC2*")},
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"matches first include":  {host: testHost("DC1A", "Cluster1", "Host1"), want: true},
+				"matches second include": {host: testHost("DC2A", "Cluster1", "Host1"), want: true},
+				"rejects other":          {host: testHost("DC3A", "Cluster1", "Host1"), want: false},
 			},
 		},
 		"[/DC1*,/DC2*,/DC3*/Cluster1*/H*]": {
 			valid: true,
-			expected: orHostMatcher{
-				lhs: orHostMatcher{
-					lhs: hostDCMatcher{mustSP("DC1*")},
-					rhs: hostDCMatcher{mustSP("DC2*")},
-				},
-				rhs: andHostMatcher{
-					lhs: andHostMatcher{
-						lhs: hostDCMatcher{mustSP("DC3*")},
-						rhs: hostClusterMatcher{mustSP("Cluster1*")},
-					},
-					rhs: hostHostMatcher{mustSP("H*")},
-				},
+			cases: map[string]struct {
+				host *resources.Host
+				want bool
+			}{
+				"matches first include":     {host: testHost("DC1A", "Other", "Other"), want: true},
+				"matches second include":    {host: testHost("DC2A", "Other", "Other"), want: true},
+				"matches third include":     {host: testHost("DC3A", "Cluster10", "Host1"), want: true},
+				"rejects third bad host":    {host: testHost("DC3A", "Cluster10", "Other"), want: false},
+				"rejects third bad cluster": {host: testHost("DC3A", "Other", "Host1"), want: false},
 			},
 		},
 	}
@@ -185,7 +144,12 @@ func TestHostIncludes_Parse(t *testing.T) {
 			if !test.valid {
 				assert.Error(t, err)
 			} else {
-				assert.Equal(t, test.expected, m)
+				assert.NoError(t, err)
+				for caseName, tc := range test.cases {
+					t.Run(caseName, func(t *testing.T) {
+						assert.Equal(t, tc.want, m.Match(tc.host))
+					})
+				}
 			}
 		})
 	}
@@ -193,76 +157,118 @@ func TestHostIncludes_Parse(t *testing.T) {
 
 func TestVMIncludes_Parse(t *testing.T) {
 	tests := map[string]struct {
-		valid    bool
-		includes []string
-		expected VMMatcher
+		valid bool
+		cases map[string]struct {
+			vm   *resources.VM
+			want bool
+		}
 	}{
 		"":           {valid: false},
 		"*/C1/H1/V1": {valid: false},
-		"/*":         {valid: true, expected: trueVMDC},
-		"/!*":        {valid: true, expected: falseVMDC},
-		"/!*/":       {valid: true, expected: falseVMDC},
+		"/*": {
+			valid: true,
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"matches": {vm: testVM("DC1", "Cluster1", "Host1", "VM1"), want: true},
+			},
+		},
+		"/!*": {
+			valid: true,
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"does not match": {vm: testVM("DC1", "Cluster1", "Host1", "VM1"), want: false},
+			},
+		},
+		"/!*/": {
+			valid: true,
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"does not match": {vm: testVM("DC1", "Cluster1", "Host1", "VM1"), want: false},
+			},
+		},
 		"/!*/ ": {
 			valid: true,
-			expected: andVMMatcher{
-				lhs: falseVMDC,
-				rhs: vmClusterMatcher{matcher.FALSE()},
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"does not match": {vm: testVM("DC1", "Cluster1", "Host1", "VM1"), want: false},
 			},
 		},
 		"/DC1* DC2* !*/Cluster*": {
 			valid: true,
-			expected: andVMMatcher{
-				lhs: vmDCMatcher{mustSP("DC1* DC2* !*")},
-				rhs: vmClusterMatcher{mustSP("Cluster*")},
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"matches first datacenter":  {vm: testVM("DC1A", "Cluster1", "Host1", "VM1"), want: true},
+				"matches second datacenter": {vm: testVM("DC2A", "Cluster1", "Host1", "VM1"), want: true},
+				"rejects other datacenter":  {vm: testVM("DC3A", "Cluster1", "Host1", "VM1"), want: false},
+				"rejects different cluster": {vm: testVM("DC1A", "Other", "Host1", "VM1"), want: false},
+				"matches any VM below path": {vm: testVM("DC1A", "Cluster1", "Other", "Other"), want: true},
+			},
+		},
+		"/DC1*/Cluster*": {
+			valid: true,
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"matches datacenter and cluster":  {vm: testVM("DC1A", "Cluster1", "Host1", "VM1"), want: true},
+				"rejects different datacenter":    {vm: testVM("DC2A", "Cluster1", "Host1", "VM1"), want: false},
+				"rejects different cluster":       {vm: testVM("DC1A", "Other", "Host1", "VM1"), want: false},
+				"matches any VM below two levels": {vm: testVM("DC1A", "Cluster1", "Other", "Other"), want: true},
 			},
 		},
 		"/*/*/HOST1": {
 			valid: true,
-			expected: andVMMatcher{
-				lhs: andVMMatcher{
-					lhs: trueVMDC,
-					rhs: vmClusterMatcher{matcher.TRUE()},
-				},
-				rhs: vmHostMatcher{mustSP("HOST1")},
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"matches host":           {vm: testVM("DC1", "Cluster1", "HOST1", "VM1"), want: true},
+				"rejects different host": {vm: testVM("DC1", "Cluster1", "HOST2", "VM1"), want: false},
+				"matches any VM on host": {vm: testVM("DC1", "Cluster1", "HOST1", "Other"), want: true},
 			},
 		},
 		"/*/*/HOST1*/*/*": {
 			valid: true,
-			expected: andVMMatcher{
-				lhs: andVMMatcher{
-					lhs: andVMMatcher{
-						lhs: trueVMDC,
-						rhs: vmClusterMatcher{matcher.TRUE()},
-					},
-					rhs: vmHostMatcher{mustSP("HOST1*")},
-				},
-				rhs: vmVMMatcher{matcher.TRUE()},
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"matches host and wildcard VM": {vm: testVM("DC1", "Cluster1", "HOST10", "VM1"), want: true},
+				"rejects different host":       {vm: testVM("DC1", "Cluster1", "Other", "VM1"), want: false},
 			},
 		},
 		"[/DC1*,/DC2*]": {
 			valid: true,
-			expected: orVMMatcher{
-				lhs: vmDCMatcher{mustSP("DC1*")},
-				rhs: vmDCMatcher{mustSP("DC2*")},
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"matches first include":  {vm: testVM("DC1A", "Cluster1", "Host1", "VM1"), want: true},
+				"matches second include": {vm: testVM("DC2A", "Cluster1", "Host1", "VM1"), want: true},
+				"rejects other":          {vm: testVM("DC3A", "Cluster1", "Host1", "VM1"), want: false},
 			},
 		},
 		"[/DC1*,/DC2*,/DC3*/Cluster1*/H*/VM*]": {
 			valid: true,
-			expected: orVMMatcher{
-				lhs: orVMMatcher{
-					lhs: vmDCMatcher{mustSP("DC1*")},
-					rhs: vmDCMatcher{mustSP("DC2*")},
-				},
-				rhs: andVMMatcher{
-					lhs: andVMMatcher{
-						lhs: andVMMatcher{
-							lhs: vmDCMatcher{mustSP("DC3*")},
-							rhs: vmClusterMatcher{mustSP("Cluster1*")},
-						},
-						rhs: vmHostMatcher{mustSP("H*")},
-					},
-					rhs: vmVMMatcher{mustSP("VM*")},
-				},
+			cases: map[string]struct {
+				vm   *resources.VM
+				want bool
+			}{
+				"matches first include":  {vm: testVM("DC1A", "Other", "Other", "Other"), want: true},
+				"matches second include": {vm: testVM("DC2A", "Other", "Other", "Other"), want: true},
+				"matches third include":  {vm: testVM("DC3A", "Cluster10", "Host1", "VM1"), want: true},
+				"rejects third bad VM":   {vm: testVM("DC3A", "Cluster10", "Host1", "Other"), want: false},
+				"rejects third bad host": {vm: testVM("DC3A", "Cluster10", "Other", "VM1"), want: false},
 			},
 		},
 	}
@@ -275,104 +281,114 @@ func TestVMIncludes_Parse(t *testing.T) {
 			if !test.valid {
 				assert.Error(t, err)
 			} else {
-				assert.Equal(t, test.expected, m)
+				assert.NoError(t, err)
+				for caseName, tc := range test.cases {
+					t.Run(caseName, func(t *testing.T) {
+						assert.Equal(t, tc.want, m.Match(tc.vm))
+					})
+				}
 			}
-		})
-	}
-}
-
-func TestOrDSMatcher_Match(t *testing.T) {
-	tests := map[string]struct {
-		expected bool
-		lhs      DatastoreMatcher
-		rhs      DatastoreMatcher
-	}{
-		"true, true":   {expected: true, lhs: trueDSDC, rhs: trueDSDC},
-		"true, false":  {expected: true, lhs: trueDSDC, rhs: falseDSDC},
-		"false, true":  {expected: true, lhs: falseDSDC, rhs: trueDSDC},
-		"false, false": {expected: false, lhs: falseDSDC, rhs: falseDSDC},
-	}
-
-	var ds resources.Datastore
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			m := orDSMatcher{lhs: test.lhs, rhs: test.rhs}
-			assert.Equal(t, test.expected, m.Match(&ds))
-		})
-	}
-}
-
-func TestAndDSMatcher_Match(t *testing.T) {
-	tests := map[string]struct {
-		expected bool
-		lhs      DatastoreMatcher
-		rhs      DatastoreMatcher
-	}{
-		"true, true":   {expected: true, lhs: trueDSDC, rhs: trueDSDC},
-		"true, false":  {expected: false, lhs: trueDSDC, rhs: falseDSDC},
-		"false, true":  {expected: false, lhs: falseDSDC, rhs: trueDSDC},
-		"false, false": {expected: false, lhs: falseDSDC, rhs: falseDSDC},
-	}
-
-	var ds resources.Datastore
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			m := andDSMatcher{lhs: test.lhs, rhs: test.rhs}
-			assert.Equal(t, test.expected, m.Match(&ds))
 		})
 	}
 }
 
 func TestDatastoreIncludes_Parse(t *testing.T) {
 	tests := map[string]struct {
-		valid    bool
-		expected DatastoreMatcher
+		valid bool
+		cases map[string]struct {
+			ds   *resources.Datastore
+			want bool
+		}
 	}{
 		"":      {valid: false},
 		"*/DS1": {valid: false},
-		"/":     {valid: true, expected: falseDSDC},
-		"/*":    {valid: true, expected: trueDSDC},
-		"/!*":   {valid: true, expected: falseDSDC},
-		"/!*/":  {valid: true, expected: falseDSDC},
+		"/": {
+			valid: true,
+			cases: map[string]struct {
+				ds   *resources.Datastore
+				want bool
+			}{
+				"does not match": {ds: testDatastore("DC1", "DS1"), want: false},
+			},
+		},
+		"/*": {
+			valid: true,
+			cases: map[string]struct {
+				ds   *resources.Datastore
+				want bool
+			}{
+				"matches": {ds: testDatastore("DC1", "DS1"), want: true},
+			},
+		},
+		"/!*": {
+			valid: true,
+			cases: map[string]struct {
+				ds   *resources.Datastore
+				want bool
+			}{
+				"does not match": {ds: testDatastore("DC1", "DS1"), want: false},
+			},
+		},
+		"/!*/": {
+			valid: true,
+			cases: map[string]struct {
+				ds   *resources.Datastore
+				want bool
+			}{
+				"does not match": {ds: testDatastore("DC1", "DS1"), want: false},
+			},
+		},
 		"/!*/ ": {
 			valid: true,
-			expected: andDSMatcher{
-				lhs: falseDSDC,
-				rhs: dsDSMatcher{matcher.FALSE()},
+			cases: map[string]struct {
+				ds   *resources.Datastore
+				want bool
+			}{
+				"does not match": {ds: testDatastore("DC1", "DS1"), want: false},
 			},
 		},
 		"/DC1*/DS*": {
 			valid: true,
-			expected: andDSMatcher{
-				lhs: dsDCMatcher{mustSP("DC1*")},
-				rhs: dsDSMatcher{mustSP("DS*")},
+			cases: map[string]struct {
+				ds   *resources.Datastore
+				want bool
+			}{
+				"matches datacenter and datastore": {ds: testDatastore("DC1A", "DS1"), want: true},
+				"rejects different datacenter":     {ds: testDatastore("DC2A", "DS1"), want: false},
+				"rejects different datastore":      {ds: testDatastore("DC1A", "Other"), want: false},
 			},
 		},
 		"/*/*/extra": {
 			valid: true,
-			expected: andDSMatcher{
-				lhs: trueDSDC,
-				rhs: dsDSMatcher{matcher.TRUE()},
+			cases: map[string]struct {
+				ds   *resources.Datastore
+				want bool
+			}{
+				"ignores extra segments": {ds: testDatastore("DC1", "DS1"), want: true},
 			},
 		},
 		"[/DC1*,/DC2*]": {
 			valid: true,
-			expected: orDSMatcher{
-				lhs: dsDCMatcher{mustSP("DC1*")},
-				rhs: dsDCMatcher{mustSP("DC2*")},
+			cases: map[string]struct {
+				ds   *resources.Datastore
+				want bool
+			}{
+				"matches first include":  {ds: testDatastore("DC1A", "DS1"), want: true},
+				"matches second include": {ds: testDatastore("DC2A", "DS1"), want: true},
+				"rejects other":          {ds: testDatastore("DC3A", "DS1"), want: false},
 			},
 		},
 		"[/DC1*,/DC2*,/DC3*/DS*]": {
 			valid: true,
-			expected: orDSMatcher{
-				lhs: orDSMatcher{
-					lhs: dsDCMatcher{mustSP("DC1*")},
-					rhs: dsDCMatcher{mustSP("DC2*")},
-				},
-				rhs: andDSMatcher{
-					lhs: dsDCMatcher{mustSP("DC3*")},
-					rhs: dsDSMatcher{mustSP("DS*")},
-				},
+			cases: map[string]struct {
+				ds   *resources.Datastore
+				want bool
+			}{
+				"matches first include":        {ds: testDatastore("DC1A", "Other"), want: true},
+				"matches second include":       {ds: testDatastore("DC2A", "Other"), want: true},
+				"matches third include":        {ds: testDatastore("DC3A", "DS1"), want: true},
+				"rejects third bad datastore":  {ds: testDatastore("DC3A", "Other"), want: false},
+				"rejects third bad datacenter": {ds: testDatastore("Other", "DS1"), want: false},
 			},
 		},
 	}
@@ -385,104 +401,114 @@ func TestDatastoreIncludes_Parse(t *testing.T) {
 			if !test.valid {
 				assert.Error(t, err)
 			} else {
-				assert.Equal(t, test.expected, m)
+				assert.NoError(t, err)
+				for caseName, tc := range test.cases {
+					t.Run(caseName, func(t *testing.T) {
+						assert.Equal(t, tc.want, m.Match(tc.ds))
+					})
+				}
 			}
-		})
-	}
-}
-
-func TestOrClusterMatcher_Match(t *testing.T) {
-	tests := map[string]struct {
-		expected bool
-		lhs      ClusterMatcher
-		rhs      ClusterMatcher
-	}{
-		"true, true":   {expected: true, lhs: trueClDC, rhs: trueClDC},
-		"true, false":  {expected: true, lhs: trueClDC, rhs: falseClDC},
-		"false, true":  {expected: true, lhs: falseClDC, rhs: trueClDC},
-		"false, false": {expected: false, lhs: falseClDC, rhs: falseClDC},
-	}
-
-	var cl resources.Cluster
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			m := orClusterMatcher{lhs: test.lhs, rhs: test.rhs}
-			assert.Equal(t, test.expected, m.Match(&cl))
-		})
-	}
-}
-
-func TestAndClusterMatcher_Match(t *testing.T) {
-	tests := map[string]struct {
-		expected bool
-		lhs      ClusterMatcher
-		rhs      ClusterMatcher
-	}{
-		"true, true":   {expected: true, lhs: trueClDC, rhs: trueClDC},
-		"true, false":  {expected: false, lhs: trueClDC, rhs: falseClDC},
-		"false, true":  {expected: false, lhs: falseClDC, rhs: trueClDC},
-		"false, false": {expected: false, lhs: falseClDC, rhs: falseClDC},
-	}
-
-	var cl resources.Cluster
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			m := andClusterMatcher{lhs: test.lhs, rhs: test.rhs}
-			assert.Equal(t, test.expected, m.Match(&cl))
 		})
 	}
 }
 
 func TestClusterIncludes_Parse(t *testing.T) {
 	tests := map[string]struct {
-		valid    bool
-		expected ClusterMatcher
+		valid bool
+		cases map[string]struct {
+			cluster *resources.Cluster
+			want    bool
+		}
 	}{
 		"":     {valid: false},
 		"*/C1": {valid: false},
-		"/":    {valid: true, expected: falseClDC},
-		"/*":   {valid: true, expected: trueClDC},
-		"/!*":  {valid: true, expected: falseClDC},
-		"/!*/": {valid: true, expected: falseClDC},
+		"/": {
+			valid: true,
+			cases: map[string]struct {
+				cluster *resources.Cluster
+				want    bool
+			}{
+				"does not match": {cluster: testCluster("DC1", "Cluster1"), want: false},
+			},
+		},
+		"/*": {
+			valid: true,
+			cases: map[string]struct {
+				cluster *resources.Cluster
+				want    bool
+			}{
+				"matches": {cluster: testCluster("DC1", "Cluster1"), want: true},
+			},
+		},
+		"/!*": {
+			valid: true,
+			cases: map[string]struct {
+				cluster *resources.Cluster
+				want    bool
+			}{
+				"does not match": {cluster: testCluster("DC1", "Cluster1"), want: false},
+			},
+		},
+		"/!*/": {
+			valid: true,
+			cases: map[string]struct {
+				cluster *resources.Cluster
+				want    bool
+			}{
+				"does not match": {cluster: testCluster("DC1", "Cluster1"), want: false},
+			},
+		},
 		"/!*/ ": {
 			valid: true,
-			expected: andClusterMatcher{
-				lhs: falseClDC,
-				rhs: clusterNameMatcher{matcher.FALSE()},
+			cases: map[string]struct {
+				cluster *resources.Cluster
+				want    bool
+			}{
+				"does not match": {cluster: testCluster("DC1", "Cluster1"), want: false},
 			},
 		},
 		"/DC1*/Cluster*": {
 			valid: true,
-			expected: andClusterMatcher{
-				lhs: clusterDCMatcher{mustSP("DC1*")},
-				rhs: clusterNameMatcher{mustSP("Cluster*")},
+			cases: map[string]struct {
+				cluster *resources.Cluster
+				want    bool
+			}{
+				"matches datacenter and cluster": {cluster: testCluster("DC1A", "Cluster1"), want: true},
+				"rejects different datacenter":   {cluster: testCluster("DC2A", "Cluster1"), want: false},
+				"rejects different cluster":      {cluster: testCluster("DC1A", "Other"), want: false},
 			},
 		},
 		"/*/*/extra": {
 			valid: true,
-			expected: andClusterMatcher{
-				lhs: trueClDC,
-				rhs: clusterNameMatcher{matcher.TRUE()},
+			cases: map[string]struct {
+				cluster *resources.Cluster
+				want    bool
+			}{
+				"ignores extra segments": {cluster: testCluster("DC1", "Cluster1"), want: true},
 			},
 		},
 		"[/DC1*,/DC2*]": {
 			valid: true,
-			expected: orClusterMatcher{
-				lhs: clusterDCMatcher{mustSP("DC1*")},
-				rhs: clusterDCMatcher{mustSP("DC2*")},
+			cases: map[string]struct {
+				cluster *resources.Cluster
+				want    bool
+			}{
+				"matches first include":  {cluster: testCluster("DC1A", "Cluster1"), want: true},
+				"matches second include": {cluster: testCluster("DC2A", "Cluster1"), want: true},
+				"rejects other":          {cluster: testCluster("DC3A", "Cluster1"), want: false},
 			},
 		},
 		"[/DC1*,/DC2*,/DC3*/Cluster*]": {
 			valid: true,
-			expected: orClusterMatcher{
-				lhs: orClusterMatcher{
-					lhs: clusterDCMatcher{mustSP("DC1*")},
-					rhs: clusterDCMatcher{mustSP("DC2*")},
-				},
-				rhs: andClusterMatcher{
-					lhs: clusterDCMatcher{mustSP("DC3*")},
-					rhs: clusterNameMatcher{mustSP("Cluster*")},
-				},
+			cases: map[string]struct {
+				cluster *resources.Cluster
+				want    bool
+			}{
+				"matches first include":        {cluster: testCluster("DC1A", "Other"), want: true},
+				"matches second include":       {cluster: testCluster("DC2A", "Other"), want: true},
+				"matches third include":        {cluster: testCluster("DC3A", "Cluster1"), want: true},
+				"rejects third bad cluster":    {cluster: testCluster("DC3A", "Other"), want: false},
+				"rejects third bad datacenter": {cluster: testCluster("Other", "Cluster1"), want: false},
 			},
 		},
 	}
@@ -495,17 +521,207 @@ func TestClusterIncludes_Parse(t *testing.T) {
 			if !test.valid {
 				assert.Error(t, err)
 			} else {
-				assert.Equal(t, test.expected, m)
+				assert.NoError(t, err)
+				for caseName, tc := range test.cases {
+					t.Run(caseName, func(t *testing.T) {
+						assert.Equal(t, tc.want, m.Match(tc.cluster))
+					})
+				}
 			}
 		})
+	}
+}
+
+func TestInventoryIncludes_ParseEmptyReturnsNil(t *testing.T) {
+	tests := map[string]struct {
+		parse func() (any, error)
+	}{
+		"host":      {parse: func() (any, error) { return HostIncludes{}.Parse() }},
+		"VM":        {parse: func() (any, error) { return VMIncludes{}.Parse() }},
+		"datastore": {parse: func() (any, error) { return DatastoreIncludes{}.Parse() }},
+		"cluster":   {parse: func() (any, error) { return ClusterIncludes{}.Parse() }},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			m, err := tc.parse()
+
+			assert.NoError(t, err)
+			assert.Nil(t, m)
+		})
+	}
+}
+
+func TestDatastoreClusterIncludes_Parse(t *testing.T) {
+	pod := &resources.StoragePod{
+		ID:   "group-p1",
+		Name: "Pod1",
+		Hier: resources.StoragePodHierarchy{DC: resources.HierarchyValue{Name: "DC1"}},
+	}
+	tests := map[string]struct {
+		includes DatastoreClusterIncludes
+		want     bool
+		wantErr  bool
+	}{
+		"invalid pattern": {includes: DatastoreClusterIncludes{"["}, wantErr: true},
+		"path match":      {includes: DatastoreClusterIncludes{"/DC1/Pod1"}, want: true},
+		"name match":      {includes: DatastoreClusterIncludes{"Pod1"}, want: true},
+		"id match":        {includes: DatastoreClusterIncludes{"group-p1"}, want: true},
+		"no match":        {includes: DatastoreClusterIncludes{"Pod2"}, want: false},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			m, err := tc.includes.Parse()
+
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, m.Match(pod))
+		})
+	}
+}
+
+func TestVSANClusterIncludes_Parse(t *testing.T) {
+	cluster := &resources.Cluster{
+		ID:       "domain-c1",
+		Name:     "Cluster1",
+		Hier:     resources.ClusterHierarchy{DC: resources.HierarchyValue{Name: "DC1"}},
+		VSANUUID: "cluster-uuid",
+	}
+	tests := map[string]struct {
+		includes VSANClusterIncludes
+		want     bool
+		wantErr  bool
+	}{
+		"invalid pattern": {includes: VSANClusterIncludes{"["}, wantErr: true},
+		"path match":      {includes: VSANClusterIncludes{"/DC1/Cluster1"}, want: true},
+		"name match":      {includes: VSANClusterIncludes{"Cluster1"}, want: true},
+		"id match":        {includes: VSANClusterIncludes{"domain-c1"}, want: true},
+		"uuid match":      {includes: VSANClusterIncludes{"vsan_uuid:cluster-uuid"}, want: true},
+		"no match":        {includes: VSANClusterIncludes{"Cluster2"}, want: false},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			m, err := tc.includes.Parse()
+
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, m.Match(cluster))
+		})
+	}
+}
+
+func TestVSANHostIncludes_Parse(t *testing.T) {
+	host := &resources.Host{
+		ID:           "host-1",
+		Name:         "Host1",
+		Hier:         resources.HostHierarchy{DC: resources.HierarchyValue{Name: "DC1"}, Cluster: resources.HierarchyValue{Name: "Cluster1"}},
+		VSANNodeUUID: "host-uuid",
+	}
+	tests := map[string]struct {
+		includes VSANHostIncludes
+		want     bool
+		wantErr  bool
+	}{
+		"invalid pattern": {includes: VSANHostIncludes{"["}, wantErr: true},
+		"path match":      {includes: VSANHostIncludes{"/DC1/Cluster1/Host1"}, want: true},
+		"name match":      {includes: VSANHostIncludes{"Host1"}, want: true},
+		"id match":        {includes: VSANHostIncludes{"host-1"}, want: true},
+		"uuid match":      {includes: VSANHostIncludes{"vsan_node_uuid:host-uuid"}, want: true},
+		"no match":        {includes: VSANHostIncludes{"Host2"}, want: false},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			m, err := tc.includes.Parse()
+
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, m.Match(host))
+		})
+	}
+}
+
+func TestVSANVMIncludes_Parse(t *testing.T) {
+	vm := &resources.VM{
+		ID:           "vm-1",
+		Name:         "VM1",
+		Hier:         resources.VMHierarchy{DC: resources.HierarchyValue{Name: "DC1"}, Cluster: resources.HierarchyValue{Name: "Cluster1"}, Host: resources.HierarchyValue{Name: "Host1"}},
+		InstanceUUID: "vm-uuid",
+	}
+	tests := map[string]struct {
+		includes VSANVMIncludes
+		want     bool
+		wantErr  bool
+	}{
+		"invalid pattern": {includes: VSANVMIncludes{"["}, wantErr: true},
+		"path match":      {includes: VSANVMIncludes{"/DC1/Cluster1/Host1/VM1"}, want: true},
+		"name match":      {includes: VSANVMIncludes{"VM1"}, want: true},
+		"id match":        {includes: VSANVMIncludes{"vm-1"}, want: true},
+		"uuid match":      {includes: VSANVMIncludes{"instance_uuid:vm-uuid"}, want: true},
+		"no match":        {includes: VSANVMIncludes{"VM2"}, want: false},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			m, err := tc.includes.Parse()
+
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, m.Match(vm))
+		})
+	}
+}
+
+func testHost(dc, cluster, name string) *resources.Host {
+	return &resources.Host{
+		Name: name,
+		Hier: resources.HostHierarchy{
+			DC:      resources.HierarchyValue{Name: dc},
+			Cluster: resources.HierarchyValue{Name: cluster},
+		},
+	}
+}
+
+func testVM(dc, cluster, host, name string) *resources.VM {
+	return &resources.VM{
+		Name: name,
+		Hier: resources.VMHierarchy{
+			DC:      resources.HierarchyValue{Name: dc},
+			Cluster: resources.HierarchyValue{Name: cluster},
+			Host:    resources.HierarchyValue{Name: host},
+		},
+	}
+}
+
+func testDatastore(dc, name string) *resources.Datastore {
+	return &resources.Datastore{
+		Name: name,
+		Hier: resources.DatastoreHierarchy{DC: resources.HierarchyValue{Name: dc}},
+	}
+}
+
+func testCluster(dc, name string) *resources.Cluster {
+	return &resources.Cluster{
+		Name: name,
+		Hier: resources.ClusterHierarchy{DC: resources.HierarchyValue{Name: dc}},
 	}
 }
 
 func prepareIncludes(include string) []string {
 	trimmed := strings.Trim(include, "[]")
 	return strings.Split(trimmed, ",")
-}
-
-func mustSP(expr string) matcher.Matcher {
-	return matcher.Must(matcher.NewSimplePatternsMatcher(expr))
 }

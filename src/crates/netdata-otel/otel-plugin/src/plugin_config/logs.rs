@@ -63,7 +63,6 @@ pub struct LogsConfig {
         default_value = "100MB",
         value_parser = parse_bytesize
     )]
-    #[serde(with = "bytesize_serde")]
     pub size_of_journal_file: ByteSize,
 
     /// Maximum number of entries in journal files
@@ -87,7 +86,6 @@ pub struct LogsConfig {
         default_value = "1GB",
         value_parser = parse_bytesize
     )]
-    #[serde(with = "bytesize_serde")]
     pub size_of_journal_files: ByteSize,
 
     /// Maximum age for journal entries (accepts human-readable durations like "7 days", "1 week", "168h")

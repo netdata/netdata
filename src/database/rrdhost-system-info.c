@@ -194,6 +194,9 @@ struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labe
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface, "_net_default_iface");
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface_ip, "_net_default_iface_ip");
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface_detection, "_net_default_iface_detection");
+    rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_name, "_hw_product_name");
+    rrdlabels_get_value_strdup_or_null(labels, &info->hw_sys_vendor, "_hw_sys_vendor");
+    rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_type, "_hw_product_type");
     return info;
 }
 
@@ -266,15 +269,45 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
 
     if (system_info->network_default_iface_detection)
         rrdlabels_add(labels, "_net_default_iface_detection", system_info->network_default_iface_detection, RRDLABEL_SRC_AUTO);
+
+    if (system_info->hw_product_name)
+        rrdlabels_add(labels, "_hw_product_name", system_info->hw_product_name, RRDLABEL_SRC_AUTO);
+
+    if (system_info->hw_sys_vendor)
+        rrdlabels_add(labels, "_hw_sys_vendor", system_info->hw_sys_vendor, RRDLABEL_SRC_AUTO);
+
+    if (system_info->hw_product_type)
+        rrdlabels_add(labels, "_hw_product_type", system_info->hw_product_type, RRDLABEL_SRC_AUTO);
 }
 
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
-#if !defined(OS_WINDOWS)
     if (unlikely(!system_info)) {
         netdata_log_error("SYSTEM INFO: System info structure is NULL.");
         return 1;
     }
 
+    // Populate hardware product fields from the daemon status file when it is available/initialized.
+    {
+        const char *product_name = daemon_status_file_get_product_name();
+        if (product_name && *product_name) {
+            freez(system_info->hw_product_name);
+            system_info->hw_product_name = strdupz(product_name);
+        }
+
+        const char *sys_vendor = daemon_status_file_get_sys_vendor();
+        if (sys_vendor && *sys_vendor) {
+            freez(system_info->hw_sys_vendor);
+            system_info->hw_sys_vendor = strdupz(sys_vendor);
+        }
+
+        const char *product_type = daemon_status_file_get_product_type();
+        if (product_type && *product_type) {
+            freez(system_info->hw_product_type);
+            system_info->hw_product_type = strdupz(product_type);
+        }
+    }
+
+#if !defined(OS_WINDOWS)
     CLEAN_BUFFER *script = buffer_create(0, NULL);
     buffer_sprintf(script, "%s/system-info.sh", netdata_configured_primary_plugins_dir);
 
@@ -405,6 +438,9 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->network_default_iface);
         freez(system_info->network_default_iface_ip);
         freez(system_info->network_default_iface_detection);
+        freez(system_info->hw_product_name);
+        freez(system_info->hw_sys_vendor);
+        freez(system_info->hw_product_type);
         freez(system_info);
     }
 }
@@ -587,6 +623,37 @@ void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, s
     node_info->data.container_type = system_info->container ? system_info->container : "unknown";
     node_info->data.ml_info.ml_capable = system_info->ml_capable;
     node_info->data.ml_info.ml_enabled = system_info->ml_enabled;
+}
+
+// emit system info as named key-value pairs into an open JSON object
+void rrdhost_system_info_to_json_object_fields(BUFFER *wb, struct rrdhost_system_info *si) {
+    buffer_json_member_add_string(wb, "os_name",                si && si->host_os_name ? si->host_os_name : "");
+    buffer_json_member_add_string(wb, "os_id",                  si && si->host_os_id ? si->host_os_id : "");
+    buffer_json_member_add_string(wb, "os_id_like",             si && si->host_os_id_like ? si->host_os_id_like : "");
+    buffer_json_member_add_string(wb, "os_version",             si && si->host_os_version ? si->host_os_version : "");
+    buffer_json_member_add_string(wb, "os_version_id",          si && si->host_os_version_id ? si->host_os_version_id : "");
+    buffer_json_member_add_string(wb, "os_detection",           si && si->host_os_detection ? si->host_os_detection : "");
+    buffer_json_member_add_uint64(wb, "cpu_cores",              si && si->host_cores ? str2uint64_t(si->host_cores, NULL) : 0);
+    buffer_json_member_add_uint64(wb, "disk_space",             si && si->host_disk_space ? str2uint64_t(si->host_disk_space, NULL) : 0);
+    buffer_json_member_add_uint64(wb, "cpu_freq",               si && si->host_cpu_freq ? str2uint64_t(si->host_cpu_freq, NULL) : 0);
+    buffer_json_member_add_uint64(wb, "ram_total",              si && si->host_ram_total ? str2uint64_t(si->host_ram_total, NULL) : 0);
+    buffer_json_member_add_string(wb, "container_os_name",      si && si->container_os_name ? si->container_os_name : "");
+    buffer_json_member_add_string(wb, "container_os_id",        si && si->container_os_id ? si->container_os_id : "");
+    buffer_json_member_add_string(wb, "container_os_id_like",   si && si->container_os_id_like ? si->container_os_id_like : "");
+    buffer_json_member_add_string(wb, "container_os_version",   si && si->container_os_version ? si->container_os_version : "");
+    buffer_json_member_add_string(wb, "container_os_version_id",si && si->container_os_version_id ? si->container_os_version_id : "");
+    buffer_json_member_add_string(wb, "container_os_detection", si && si->container_os_detection ? si->container_os_detection : "");
+    buffer_json_member_add_string(wb, "is_k8s_node",            si && si->is_k8s_node ? si->is_k8s_node : "");
+    buffer_json_member_add_string(wb, "kernel_name",            si && si->kernel_name ? si->kernel_name : "");
+    buffer_json_member_add_string(wb, "kernel_version",         si && si->kernel_version ? si->kernel_version : "");
+    buffer_json_member_add_string(wb, "architecture",           si && si->architecture ? si->architecture : "");
+    buffer_json_member_add_string(wb, "virtualization",         si && si->virtualization ? si->virtualization : "");
+    buffer_json_member_add_string(wb, "virt_detection",         si && si->virt_detection ? si->virt_detection : "");
+    buffer_json_member_add_string(wb, "container_type",         si && si->container ? si->container : "");
+    buffer_json_member_add_string(wb, "container_detection",    si && si->container_detection ? si->container_detection : "");
+    buffer_json_member_add_string(wb, "cloud_provider_type",    si && si->cloud_provider_type ? si->cloud_provider_type : "");
+    buffer_json_member_add_string(wb, "cloud_instance_type",    si && si->cloud_instance_type ? si->cloud_instance_type : "");
+    buffer_json_member_add_string(wb, "cloud_instance_region",  si && si->cloud_instance_region ? si->cloud_instance_region : "");
 }
 
 void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_system_info *system_info) {

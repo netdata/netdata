@@ -74,7 +74,7 @@ void health_load_config_defaults(void) {
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     health_globals.config.default_exec =
-        string_strdupz(inicfg_get(&netdata_config, CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
+        string_strdupz(inicfg_get_filename(&netdata_config, CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
 
     health_globals.config.enabled_alerts =
         simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_HEALTH, "enabled alarms", "*"),
@@ -136,13 +136,13 @@ void health_load_config_defaults(void) {
 inline const char *health_user_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_user_config_dir);
-    return inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "health config", buffer);
+    return inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "health config", buffer);
 }
 
 inline const char *health_stock_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "stock health config", buffer);
+    return inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "stock health config", buffer);
 }
 
 void health_plugin_init(void) {

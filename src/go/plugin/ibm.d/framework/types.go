@@ -7,10 +7,10 @@ import (
 
 // Logger interface for logging functionality
 type Logger interface {
-	Debugf(format string, args ...interface{})
-	Warningf(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
-	Infof(format string, args ...interface{})
+	Debugf(format string, args ...any)
+	Warningf(format string, args ...any)
+	Errorf(format string, args ...any)
+	Infof(format string, args ...any)
 }
 
 // Context represents a metric collection context with compile-time type safety

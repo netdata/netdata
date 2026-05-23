@@ -1,0 +1,286 @@
+# yamllint disable rule:line-length
+---
+id: 'service-discovery-k8s'
+meta:
+  kind: 'k8s'
+  name: 'Kubernetes'
+  tagline: 'Pods and services in a Kubernetes cluster.'
+  link: 'https://kubernetes.io/'
+  icon_filename: 'kubernetes.svg'
+keywords:
+  - 'service discovery'
+  - 'sd'
+  - 'k8s'
+  - 'kubernetes'
+  - 'pods'
+  - 'services'
+  - 'discovery'
+overview:
+  description: |
+    Netdata can automatically discover monitorable workloads inside a Kubernetes cluster — pods (with their containers and ports) or Services. The discoverer watches the Kubernetes API in real time, exposes per-pod-container or per-service-port targets to the rule engine, and lets you generate collector jobs from labels, annotations, container images, and ports.
+
+    This page covers Kubernetes-specific setup. For the broader Service Discovery model and the shared template-helper reference, see [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md).
+  how_it_works: |
+    Each Kubernetes discovery pipeline runs as either a **pod** discoverer or a **service** discoverer (selected by the `role` option). It then:
+
+    1. **Connects** to the Kubernetes API using the in-cluster service-account credentials (no `api_server` config — the discoverer uses the standard k8s client config-loader chain).
+    2. **Watches** Pods (or Services) in the configured `namespaces[]`, optionally narrowed by label/field selectors.
+    3. **Builds targets**:
+       - `role: pod` → one target per `(pod, container, container-port)` triple. Container env, image, labels, annotations, and node name are all exposed.
+       - `role: service` → one target per `(service, service-port)` pair, with the cluster-internal DNS name (`name.ns.svc:port`) as `.Address`.
+    4. **Runs the `services:` rules** against each target, producing collector jobs.
+    5. **Reconciles** in real time — pod/service add/update/delete events update the target set without polling.
+  limitations: |
+    - **Stock conf ships in the Helm chart, not this repo**: a stock `/etc/netdata/go.d/sd/k8s.conf` is not packaged with the agent. On Kubernetes deployments you should install Netdata via the [Helm chart](https://github.com/netdata/helmchart) — the chart renders both the discoverer config and a curated rule set tailored to your cluster's Netdata setup.
+    - **Outside Kubernetes**: this discoverer requires kube-API access (in-cluster service-account or kubeconfig). Running it on a workstation requires a kubeconfig and is not a typical use case.
+    - **Two roles per pipeline, never both**: `role` is a single-valued option. If you want both pod and service discovery, configure two pipelines.
+    - **`local_mode` for pods is opt-in**: by default the pod discoverer watches **all** pods in the configured namespaces. Set `pod.local_mode: true` to restrict to pods on the **same node** as the Netdata Agent (intended for the parent-on-every-node Helm topology). When `local_mode` is enabled, the env var `MY_NODE_NAME` must be set on the Netdata pod (the Helm chart sets this via the downward API).
+    - **TLS to the API server is mTLS via the in-cluster CA bundle** — there is no per-pipeline TLS configuration to override.
+setup:
+  prerequisites:
+    list:
+      - title: 'Run on Kubernetes via the Netdata Helm chart'
+        description: |
+          The supported way to run the k8s discoverer is via the [Netdata Helm chart](https://github.com/netdata/helmchart). The chart provisions the right RBAC (`get/list/watch` on `pods`, `services`, `configmaps`, `secrets`), wires `MY_NODE_NAME` for `local_mode`, and ships a stock `services:` rule set tuned to its parent/child topology.
+      - title: 'RBAC permissions'
+        description: |
+          The discoverer needs the following verbs from its service account:
+
+          - `pods`: `get`, `list`, `watch` (cluster-wide or per-namespace, matching `namespaces[]`)
+          - `services`: `get`, `list`, `watch` (only when `role: service`)
+          - `configmaps`, `secrets`: `get`, `list`, `watch` (only when `role: pod` — used to enrich pod targets with referenced env values)
+
+          The Helm chart's default RBAC role covers all of these.
+      - title: 'For `pod.local_mode: true`, set MY_NODE_NAME'
+        description: |
+          When `local_mode` is enabled, the Netdata Agent reads its node name from `MY_NODE_NAME`. The Helm chart sets this via the downward API:
+
+          ```yaml
+          env:
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ```
+  configuration:
+    file:
+      name: 'go.d/sd/k8s.conf'
+    options:
+      description: |
+        The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn discovered pods/services into collector jobs — see [Service Rules](#service-rules)).
+
+        After editing the file, restart the Netdata Agent to load the updated discovery pipeline. The default and recommended deployment path on Kubernetes is the [Netdata Helm chart](https://github.com/netdata/helmchart) — the chart renders this file and the rules for you.
+      folding:
+        title: 'Discoverer options'
+        enabled: false
+      list:
+        - name: 'role'
+          description: 'What to discover. One of `pod` or `service`.'
+          default_value: ''
+          required: true
+          detailed_description: |
+            - `pod` — produces one target per `(pod, container, port)` triple. Use this for the bulk of in-cluster monitoring (databases, exporters, applications).
+            - `service` — produces one target per `(service, port)` pair. Use this for cluster-internal endpoints monitored at the service-name DNS level.
+
+            To watch both, configure two pipelines.
+        - name: 'namespaces'
+          description: 'Namespaces to watch. Empty means all namespaces.'
+          default_value: '[] (all namespaces)'
+          required: false
+        - name: 'selector.label'
+          description: 'Label selector applied at watch time (server-side filtering).'
+          default_value: ''
+          required: false
+          detailed_description: |
+            Standard Kubernetes label-selector syntax: `app=foo`, `environment in (prod, staging)`, etc. Reduces watch traffic when only a subset of pods/services is interesting.
+        - name: 'selector.field'
+          description: 'Field selector applied at watch time.'
+          default_value: ''
+          required: false
+          detailed_description: |
+            Useful field selectors: `status.phase=Running`, `spec.nodeName=node-1`. When `pod.local_mode: true`, the discoverer automatically appends `spec.nodeName=$MY_NODE_NAME`.
+        - name: 'pod.local_mode'
+          description: 'Restrict pod discovery to pods on the same node as the Netdata Agent.'
+          default_value: 'false'
+          required: false
+          detailed_description: |
+            Only applies when `role: pod`. Requires `MY_NODE_NAME` to be set on the Netdata container. Used by the Helm chart's parent-on-every-node topology to keep watch traffic local.
+    examples:
+      folding:
+        title: 'Configuration examples'
+        enabled: true
+      list:
+        - name: 'Pod discovery, local mode (Helm-style)'
+          description: 'The configuration the Helm chart renders by default for the parent-on-every-node topology.'
+          config: |
+            disabled: no
+            discoverer:
+              k8s:
+                role: pod
+                pod:
+                  local_mode: true
+            services: [ ]
+        - name: 'Service discovery in a specific namespace'
+          description: 'Watch only Services in the `monitoring` namespace, scoped by a label selector.'
+          config: |
+            disabled: no
+            discoverer:
+              k8s:
+                role: service
+                namespaces:
+                  - monitoring
+                selector:
+                  label: app.kubernetes.io/component=metrics-endpoint
+            services: [ ]
+services:
+  description: |
+    A `services:` rule turns each discovered pod-container target (`role: pod`) or service-port target (`role: service`) into one or more collector jobs. The two target shapes have different fields — annotations and labels are common to both, but pod targets additionally expose container-level info (image, env, controller).
+
+    The shared rule model — function reference (`match`, `glob`, `hasKey`, `index`, sprig), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are k8s-specific.
+  evaluation:
+    description: |
+      Quick reference — see [Rule evaluation semantics](/src/collectors/SERVICE-DISCOVERY.md#rule-evaluation-semantics) on the hub page for the full model.
+    list:
+      - name: 'Different target shape per role'
+        description: |
+          `role: pod` and `role: service` produce different target structs. Rules in a pipeline must assume one shape — design your pipeline to match the discoverer's `role`. To handle both, run two pipelines.
+      - name: 'Annotation-driven matching is idiomatic'
+        description: |
+          Standard Kubernetes practice is to opt pods/services into monitoring via annotations (e.g. `prometheus.io/scrape: "true"`, `netdata.cloud/scrape: "true"`). Use `hasKey .Annotations "key"` and `index .Annotations "key"` to read them.
+      - name: 'Container ports vs. service ports'
+        description: |
+          Pod targets expose `.Port` / `.PortName` / `.PortProtocol` from the container's `ports[]`. Service targets expose them from the service's `ports[]`. Container ports may not be advertised through a Service — when you want both granularities, run two pipelines.
+      - name: 'Module inference from rule id'
+        description: |
+          For Kubernetes, set `id: <module-name>` so the rendered job inherits the module name automatically — same as the other discoverers.
+  template_variables:
+    description: 'Two distinct target shapes — `PodTarget` for `role: pod` and `ServiceTarget` for `role: service`.'
+    list:
+      - name: '.Address'
+        type: 'string'
+        description: 'For pods: `<pod-IP>:<port>` (or just `<pod-IP>` when no container port is exposed). For services: `<svc-name>.<namespace>.svc:<port>`.'
+      - name: '.Namespace'
+        type: 'string'
+        description: 'Pod/Service namespace.'
+      - name: '.Name'
+        type: 'string'
+        description: 'Pod or Service name.'
+      - name: '.Annotations'
+        type: 'map'
+        description: 'Pod/Service annotations. Read with `index .Annotations "key"`.'
+      - name: '.Labels'
+        type: 'map'
+        description: 'Pod/Service labels. Read with `index .Labels "key"`.'
+      - name: '.Port'
+        type: 'string'
+        description: 'Container port (pod target) or service port (service target).'
+      - name: '.PortName'
+        type: 'string'
+        description: 'Port name as declared in the spec (`http`, `metrics`, …).'
+      - name: '.PortProtocol'
+        type: 'string'
+        description: 'Port protocol (`TCP`, `UDP`).'
+      - name: '.PodIP'
+        type: 'string'
+        description: '**Pod targets only.** IP address of the pod.'
+      - name: '.NodeName'
+        type: 'string'
+        description: '**Pod targets only.** Name of the node hosting the pod.'
+      - name: '.ContName'
+        type: 'string'
+        description: '**Pod targets only.** Container name (within the pod).'
+      - name: '.Image'
+        type: 'string'
+        description: '**Pod targets only.** Container image.'
+      - name: '.Env'
+        type: 'map'
+        description: '**Pod targets only.** Container environment, with values from referenced ConfigMaps and Secrets resolved.'
+      - name: '.ControllerName'
+        type: 'string'
+        description: '**Pod targets only.** Owning controller name (e.g. ReplicaSet name).'
+      - name: '.ControllerKind'
+        type: 'string'
+        description: '**Pod targets only.** Owning controller kind (`ReplicaSet`, `StatefulSet`, `DaemonSet`, `Job`, …).'
+      - name: '.ClusterIP'
+        type: 'string'
+        description: '**Service targets only.** Cluster IP.'
+      - name: '.ExternalName'
+        type: 'string'
+        description: '**Service targets only.** External name (for `type: ExternalName` services).'
+      - name: '.Type'
+        type: 'string'
+        description: '**Service targets only.** Service type (`ClusterIP`, `NodePort`, `LoadBalancer`, `ExternalName`).'
+  examples:
+    description: 'Each example shows one entry from the `services:` array. Order matters — see [How rules are evaluated](#how-rules-are-evaluated).'
+    list:
+      - name: 'Pod with prometheus.io/scrape annotation'
+        description: |
+          The de-facto standard "scrape me" annotation. Match pods that opt in, route to the `prometheus` module.
+        config: |
+          - id: prometheus
+            match: '{{ and (hasKey .Annotations "prometheus.io/scrape") (eq (index .Annotations "prometheus.io/scrape") "true") }}'
+            config_template: |
+              name: {{ .Namespace }}_{{ .Name }}_{{ .ContName }}
+              url: http://{{ .Address }}{{ index .Annotations "prometheus.io/path" | default "/metrics" }}
+      - name: 'Service-role: monitor each metrics-endpoint Service'
+        description: |
+          Run with `role: service`. Match Services that carry a `metrics-endpoint` component label.
+        config: |
+          - id: prometheus
+            match: '{{ and (hasKey .Labels "app.kubernetes.io/component") (eq (index .Labels "app.kubernetes.io/component") "metrics-endpoint") }}'
+            config_template: |
+              name: {{ .Namespace }}_{{ .Name }}
+              url: http://{{ .Address }}/metrics
+      - name: 'Image-driven: nginx pods'
+        description: |
+          Match nginx-image pods on a known port. Use `match "sp"` for the four-form image family.
+        config: |
+          - id: nginx
+            match: '{{ and (eq .Port "80") (match "sp" .Image "nginx nginx:* */nginx */nginx:*") }}'
+            config_template: |
+              name: {{ .Namespace }}_{{ .Name }}
+              url: http://{{ .Address }}/stub_status
+verify:
+  description: 'After enabling the discoverer, confirm it is watching the API and producing targets.'
+  checks:
+    list:
+      - name: 'Confirm the discoverer registered'
+        description: |
+          Watch the Netdata Agent log inside the pod for `discoverer=kubernetes` messages:
+
+          ```bash
+          kubectl logs -n netdata <netdata-pod> | grep "discoverer=kubernetes"
+          ```
+
+          On startup you should see "instance is started", role information, and which namespaces are being watched. RBAC failures appear as `forbidden` errors from the watch.
+      - name: 'Confirm the API is reachable'
+        description: |
+          From the pod:
+
+          ```bash
+          kubectl exec -n netdata <netdata-pod> -- curl -sSk \
+            -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+            https://kubernetes.default.svc/api/v1/namespaces
+          ```
+
+          A 401 / 403 indicates the service account lacks the right RBAC. The Helm chart provisions the correct role.
+      - name: 'Confirm jobs are being created'
+        description: |
+          In the Netdata UI go to `Collectors -> go.d -> <module>`. Job names follow your `config_template` — the examples above use `<namespace>_<name>` patterns.
+troubleshooting:
+  problems:
+    list:
+      - name: 'Permission denied (RBAC)'
+        description: |
+          The service account needs `get`, `list`, `watch` on `pods` (or `services`), and on `configmaps` + `secrets` for pod-role env enrichment. The Helm chart provisions this; out-of-Helm deployments must bind the equivalent role.
+      - name: '`local_mode` enabled but env "MY_NODE_NAME" not set'
+        description: |
+          When `pod.local_mode: true` is set but `MY_NODE_NAME` is missing, the discoverer fails at startup with `local_mode is enabled, but env 'MY_NODE_NAME' not set`. Set the env via the downward API on the Netdata pod (the Helm chart does this).
+      - name: 'No targets discovered'
+        description: |
+          - Confirm pods/services exist in the configured `namespaces[]`.
+          - If `selector.label` or `selector.field` is set, verify the targets actually carry the matching labels/fields.
+          - With `local_mode`, only pods on the same node as the Netdata pod are visible.
+      - name: 'Generated jobs fail to start'
+        description: |
+          The Address resolves to the pod's CNI IP — the Netdata Agent must be able to reach pod IPs. Most CNIs allow this from a pod running in the same cluster, but flat-network requirements differ. For service-role targets, the cluster-internal DNS name (`<svc>.<ns>.svc`) is used and should always resolve from inside the cluster.

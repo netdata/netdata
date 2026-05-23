@@ -21,7 +21,7 @@ type Config struct {
 	Name     string `yaml:"name" json:"name"`
 
 	// Canonical format: discoverer: { <type>: <config> }
-	Discoverer DiscovererPayload `yaml:"discoverer,omitempty" json:"discoverer,omitempty"`
+	Discoverer DiscovererPayload `yaml:"discoverer,omitempty" json:"discoverer"`
 
 	// New single-step format for service rules:
 	Services []ServiceRuleConfig `yaml:"services,omitempty" json:"services,omitempty"`
@@ -320,7 +320,7 @@ func NewDiscovererPayload(typ string, cfg any) (DiscovererPayload, error) {
 func (c Config) MarshalYAML() (any, error) {
 	type output struct {
 		Disabled   bool                `yaml:"disabled,omitempty"`
-		Name       string              `yaml:"name"`
+		Name       string              `yaml:"name,omitempty"`
 		Discoverer DiscovererPayload   `yaml:"discoverer,omitempty"`
 		Services   []ServiceRuleConfig `yaml:"services,omitempty"`
 	}

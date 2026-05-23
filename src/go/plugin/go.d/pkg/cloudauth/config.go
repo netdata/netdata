@@ -31,7 +31,10 @@ func (c Config) Validate() error {
 	case ProviderNone:
 		return nil
 	case ProviderAzureAD:
-		return c.azureADConfig().Validate()
+		if c.AzureAD == nil {
+			return errors.New("cloud_auth.azure_ad is required")
+		}
+		return c.AzureAD.Validate()
 	default:
 		return fmt.Errorf("cloud_auth.provider %q is invalid: expected one of %q, %q",
 			c.Provider, ProviderNone, ProviderAzureAD)

@@ -21,6 +21,10 @@ type Callbacks[C Config] interface {
 	// Includes all validation (including heavy checks like module instantiation).
 	ParseAndValidate(fn Function, name string) (C, error)
 
+	// ValidateJobName enforces the domain's job-name policy. Called before
+	// ParseAndValidate so cheap name-format rejections happen without parsing payload.
+	ValidateJobName(name string) error
+
 	// Start creates a work unit and starts it. Owns the full start lifecycle
 	// including pre-start cleanup and post-fail retry scheduling.
 	// Return CodedError to override EnableFailCode.
@@ -48,6 +52,12 @@ type Callbacks[C Config] interface {
 type CodedError interface {
 	error
 	Code() int
+}
+
+// CommandMessageSource optionally provides a success/warning message
+// for the command that just completed.
+type CommandMessageSource interface {
+	TakeCommandMessage() string
 }
 
 // HandlerOpts configures the handler with component-specific settings.
@@ -80,6 +90,14 @@ type Handler[C Config] struct {
 	removeStockOnEnableFail bool
 	jobCommands             []Command
 	waitGate                *waitGate[C]
+}
+
+func takeCommandMessage[C Config](cb Callbacks[C]) string {
+	msgSrc, ok := any(cb).(CommandMessageSource)
+	if !ok {
+		return ""
+	}
+	return msgSrc.TakeCommandMessage()
 }
 
 // WaitTimeoutEvent describes a wait gate timeout transition.
@@ -423,7 +441,7 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 		return
 	}
 
-	if err := ValidateJobName(name); err != nil {
+	if err := h.cb.ValidateJobName(name); err != nil {
 		h.api.SendCodef(fn, 400, "invalid job name '%s': %v.", name, err)
 		return
 	}
@@ -506,7 +524,7 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 	}
 
 	entry.Status = StatusRunning
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobStatus(entry.Cfg, StatusRunning)
 	h.cb.OnStatusChange(entry, oldStatus, fn)
 }
@@ -537,7 +555,7 @@ func (h *Handler[C]) CmdDisable(fn Function) {
 	h.cb.Stop(entry.Cfg)
 
 	entry.Status = StatusDisabled
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobStatus(entry.Cfg, StatusDisabled)
 	h.cb.OnStatusChange(entry, oldStatus, fn)
 }
@@ -565,7 +583,7 @@ func (h *Handler[C]) CmdRemove(fn Function) {
 	h.exposed.Remove(entry.Cfg)
 	h.cb.Stop(entry.Cfg)
 
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobRemove(entry.Cfg)
 }
 
@@ -632,7 +650,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 		if isConversion {
 			h.NotifyJobCreate(newCfg, StatusDisabled)
 		}
-		h.api.SendCodef(fn, 200, "")
+		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 		h.NotifyJobStatus(newCfg, StatusDisabled)
 		h.cb.OnStatusChange(newEntry, oldStatus, fn)
 		return
@@ -672,7 +690,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	if isConversion {
 		h.NotifyJobCreate(newCfg, StatusRunning)
 	}
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobStatus(newCfg, StatusRunning)
 	h.cb.OnStatusChange(newEntry, oldStatus, fn)
 }

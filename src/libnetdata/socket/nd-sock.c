@@ -76,8 +76,7 @@ bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_por
 
     // Extract hostname for SNI before establishing connection
     if(ssl) {
-        char buffer[strlen(definition) + 1];
-        strcpy(buffer, definition);
+        CLEAN_CHAR_P *buffer = strdupz(definition);
         
         char *host = buffer;
         

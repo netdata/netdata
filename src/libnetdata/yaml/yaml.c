@@ -148,7 +148,7 @@ static bool parse_number_with_underscores(const char *str, size_t len, long long
     return false;
 }
 
-static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags) {
+static struct json_object *yaml_scalar_to_json(yaml_node_t *node, YAML2JSON_FLAGS flags) {
     const char *value = (const char *)node->data.scalar.value;
     size_t length = node->data.scalar.length;
 
@@ -271,7 +271,7 @@ static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_nod
 
     switch (node->type) {
         case YAML_SCALAR_NODE:
-            return yaml_scalar_to_json(node, error, flags);
+            return yaml_scalar_to_json(node, flags);
 
         case YAML_SEQUENCE_NODE:
             return yaml_sequence_to_json(document, node, error, flags, depth + 1);
@@ -280,19 +280,9 @@ static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_nod
             return yaml_mapping_to_json(document, node, error, flags, depth + 1);
 
         default:
-            buffer_sprintf(error, "Unsupported YAML node type: %d", node->type);
+            buffer_sprintf(error, "Unsupported YAML node type: %u", (unsigned int)node->type);
             return NULL;
     }
-}
-
-static struct json_object *yaml_document_to_json(yaml_document_t *document, BUFFER *error) {
-    yaml_node_t *root = yaml_document_get_root_node(document);
-    if (!root) {
-        // Empty document - this is valid YAML but we return NULL
-        return NULL;
-    }
-
-    return yaml_node_to_json(document, root, error, YAML2JSON_DEFAULT, 0);
 }
 
 static struct json_object *yaml_document_to_json_with_flags(yaml_document_t *document, BUFFER *error, YAML2JSON_FLAGS flags) {
@@ -579,7 +569,7 @@ static int yaml_add_json_to_document(yaml_document_t *document, struct json_obje
             return yaml_add_object_to_document(document, json, error, depth + 1);
 
         default:
-            buffer_sprintf(error, "Unknown JSON type: %d", type);
+            buffer_sprintf(error, "Unknown JSON type: %u", (unsigned int)type);
             return 0;
     }
 }

@@ -1,5 +1,4 @@
 //go:build cgo
-// +build cgo
 
 package jmx
 
@@ -38,7 +37,7 @@ func (f *fakeBridge) Send(ctx context.Context, cmd jmxbridge.Command) (*jmxbridg
 	}
 	resp := f.responses[target]
 	if resp == nil {
-		return &jmxbridge.Response{Status: "OK", Data: map[string]interface{}{}}, nil
+		return &jmxbridge.Response{Status: "OK", Data: map[string]any{}}, nil
 	}
 	return resp, nil
 }
@@ -52,31 +51,31 @@ func TestClientFetchJVM(t *testing.T) {
 		responses: map[string]*jmxbridge.Response{
 			"JVM": {
 				Status: "OK",
-				Data: map[string]interface{}{
-					"heap": map[string]interface{}{
+				Data: map[string]any{
+					"heap": map[string]any{
 						"used":      512.0,
 						"committed": 1024.0,
 						"max":       2048.0,
 					},
-					"nonheap": map[string]interface{}{
+					"nonheap": map[string]any{
 						"used":      128.0,
 						"committed": 256.0,
 					},
-					"gc": map[string]interface{}{
+					"gc": map[string]any{
 						"count": 12.0,
 						"time":  345.0,
 					},
-					"threads": map[string]interface{}{
+					"threads": map[string]any{
 						"count":        44.0,
 						"daemon":       30.0,
 						"peak":         60.0,
 						"totalStarted": 100.0,
 					},
-					"classes": map[string]interface{}{
+					"classes": map[string]any{
 						"loaded":   5000.0,
 						"unloaded": 200.0,
 					},
-					"cpu": map[string]interface{}{
+					"cpu": map[string]any{
 						"processCpuUsage": 0.42,
 					},
 					"uptime": 900.0,
@@ -118,15 +117,15 @@ func TestClientFetchThreadPools(t *testing.T) {
 		responses: map[string]*jmxbridge.Response{
 			"THREADPOOLS": {
 				Status: "OK",
-				Data: map[string]interface{}{
-					"threadPools": []interface{}{
-						map[string]interface{}{
+				Data: map[string]any{
+					"threadPools": []any{
+						map[string]any{
 							"name":            "Default",
 							"poolSize":        50.0,
 							"activeCount":     5.0,
 							"maximumPoolSize": 75.0,
 						},
-						map[string]interface{}{
+						map[string]any{
 							"name":            "WebContainer",
 							"poolSize":        80.0,
 							"activeCount":     12.0,
@@ -168,9 +167,9 @@ func TestClientFetchJDBCPools(t *testing.T) {
 		responses: map[string]*jmxbridge.Response{
 			"JDBC": {
 				Status: "OK",
-				Data: map[string]interface{}{
-					"jdbcPools": []interface{}{
-						map[string]interface{}{
+				Data: map[string]any{
+					"jdbcPools": []any{
+						map[string]any{
 							"name":                    "DefaultDS",
 							"poolSize":                40.0,
 							"numConnectionsUsed":      5.0,
@@ -218,9 +217,9 @@ func TestClientFetchJMSDestinations(t *testing.T) {
 		responses: map[string]*jmxbridge.Response{
 			"JMS": {
 				Status: "OK",
-				Data: map[string]interface{}{
-					"jmsDestinations": []interface{}{
-						map[string]interface{}{
+				Data: map[string]any{
+					"jmsDestinations": []any{
+						map[string]any{
 							"name":                 "Queue1",
 							"type":                 "queue",
 							"messagesCurrentCount": 12.0,
@@ -265,9 +264,9 @@ func TestClientFetchApplications(t *testing.T) {
 		responses: map[string]*jmxbridge.Response{
 			"APPLICATIONS": {
 				Status: "OK",
-				Data: map[string]interface{}{
-					"applications": []interface{}{
-						map[string]interface{}{
+				Data: map[string]any{
+					"applications": []any{
+						map[string]any{
 							"name":                   "sample-app",
 							"module":                 "moduleA",
 							"requestCount":           120.0,

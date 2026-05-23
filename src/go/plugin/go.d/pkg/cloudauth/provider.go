@@ -35,7 +35,7 @@ func (p Provider) MarshalYAML() (any, error) {
 	return p.marshalValue(), nil
 }
 
-func (p *Provider) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (p *Provider) UnmarshalYAML(unmarshal func(any) error) error {
 	var raw string
 	if err := unmarshal(&raw); err != nil {
 		return err

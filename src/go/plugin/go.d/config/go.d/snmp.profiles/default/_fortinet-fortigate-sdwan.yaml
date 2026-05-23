@@ -1,0 +1,124 @@
+# SD-WAN health-check and link monitor for Fortinet FortiGate devices
+# fgVWLHealthCheckLinkTable: per SD-WAN link state, latency, jitter, packet loss
+# fgLinkMonitorTable: per gateway-probe state, latency, jitter, packet loss
+
+metrics:
+  ### SD-WAN health-check table
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.9.2
+      name: fgVWLHealthCheckLinkTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12356.101.4.9.2.1.4
+        name: fgVWLHealthCheckLinkState
+        chart_meta:
+          description: SD-WAN health-check link state
+          family: 'Network/SD-WAN/Link/Status'
+          unit: "{status}"
+        mapping:
+          0: alive
+          1: dead
+      - OID: 1.3.6.1.4.1.12356.101.4.9.2.1.5
+        name: fgVWLHealthCheckLinkLatency
+        chart_meta:
+          description: Average latency of SD-WAN health-check link within last 30 probes
+          family: 'Network/SD-WAN/Link/Latency'
+          unit: "ms"
+        extract_value: '(\d+)'
+      - OID: 1.3.6.1.4.1.12356.101.4.9.2.1.6
+        name: fgVWLHealthCheckLinkJitter
+        chart_meta:
+          description: Average jitter of SD-WAN health-check link within last 30 probes
+          family: 'Network/SD-WAN/Link/Jitter'
+          unit: "ms"
+        extract_value: '(\d+)'
+      - OID: 1.3.6.1.4.1.12356.101.4.9.2.1.7
+        name: fgVWLHealthCheckLinkPacketSend
+        chart_meta:
+          description: Packets sent per second by SD-WAN health-check on this link
+          family: 'Network/SD-WAN/Link/Packets/Sent'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.12356.101.4.9.2.1.8
+        name: fgVWLHealthCheckLinkPacketRecv
+        chart_meta:
+          description: Packets received per second by SD-WAN health-check on this link
+          family: 'Network/SD-WAN/Link/Packets/Received'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.12356.101.4.9.2.1.9
+        name: fgVWLHealthCheckLinkPacketLoss
+        chart_meta:
+          description: Packet loss percentage of SD-WAN health-check link within last 30 probes
+          family: 'Network/SD-WAN/Link/PacketLoss'
+          unit: "%"
+        extract_value: '(\d+)'
+    metric_tags:
+      - tag: sdwan_healthcheck
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.9.2.1.2
+          name: fgVWLHealthCheckLinkName
+      - tag: _sdwan_interface
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.9.2.1.14
+          name: fgVWLHealthCheckLinkIfName
+      - tag: _sdwan_vdom
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.9.2.1.10
+          name: fgVWLHealthCheckLinkVdom
+
+  ### Link monitor table (gateway health probes)
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.8.2
+      name: fgLinkMonitorTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12356.101.4.8.2.1.3
+        name: fgLinkMonitorState
+        chart_meta:
+          description: Link monitor gateway probe state
+          family: 'Network/LinkMonitor/Status'
+          unit: "{status}"
+        mapping:
+          0: alive
+          1: dead
+      - OID: 1.3.6.1.4.1.12356.101.4.8.2.1.4
+        name: fgLinkMonitorLatency
+        chart_meta:
+          description: Average latency of link monitor probe
+          family: 'Network/LinkMonitor/Latency'
+          unit: "ms"
+        extract_value: '(\d+)'
+      - OID: 1.3.6.1.4.1.12356.101.4.8.2.1.5
+        name: fgLinkMonitorJitter
+        chart_meta:
+          description: Average jitter of link monitor probe
+          family: 'Network/LinkMonitor/Jitter'
+          unit: "ms"
+        extract_value: '(\d+)'
+      - OID: 1.3.6.1.4.1.12356.101.4.8.2.1.6
+        name: fgLinkMonitorPacketSend
+        chart_meta:
+          description: Packets sent by link monitor probe
+          family: 'Network/LinkMonitor/Packets/Sent'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.12356.101.4.8.2.1.7
+        name: fgLinkMonitorPacketRecv
+        chart_meta:
+          description: Packets received by link monitor probe
+          family: 'Network/LinkMonitor/Packets/Received'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.12356.101.4.8.2.1.8
+        name: fgLinkMonitorPacketLoss
+        chart_meta:
+          description: Packet loss percentage of link monitor probe
+          family: 'Network/LinkMonitor/PacketLoss'
+          unit: "%"
+        extract_value: '(\d+)'
+    metric_tags:
+      - tag: link_monitor
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.8.2.1.2
+          name: fgLinkMonitorName
+      - tag: _link_monitor_vdom
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.8.2.1.9
+          name: fgLinkMonitorVdom

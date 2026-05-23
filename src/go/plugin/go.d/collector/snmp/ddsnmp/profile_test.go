@@ -174,6 +174,213 @@ func Test_FindProfiles(t *testing.T) {
 	}
 }
 
+func TestDefaultCatalogResolveProject_LoadedProfilesSeparateConsumers(t *testing.T) {
+	tests := map[string]struct {
+		sysObjectID       string
+		consumer          ProfileConsumer
+		consumers         []ProfileConsumer
+		wantMetrics       []string
+		wantTopologyKinds []ddprofiledefinition.TopologyKind
+		wantLicensingIDs  []string
+		wantBGPIDs        []string
+		wantNoMetrics     bool
+		wantNoTopology    bool
+		wantNoLicensing   bool
+		wantNoBGP         bool
+	}{
+		"metrics_projection": {
+			sysObjectID:     "1.3.6.1.4.1.9.1.1",
+			consumer:        ConsumerMetrics,
+			wantMetrics:     []string{"systemUptime", "tcpCurrEstab", "cpmCPUTotal5minRev"},
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+			wantNoBGP:       true,
+		},
+		"topology_projection": {
+			sysObjectID: "1.3.6.1.4.1.9.1.1",
+			consumer:    ConsumerTopology,
+			wantTopologyKinds: []ddprofiledefinition.TopologyKind{
+				ddprofiledefinition.KindLldpRem,
+				ddprofiledefinition.KindCdpCache,
+				ddprofiledefinition.KindFdbEntry,
+				ddprofiledefinition.KindQbridgeFdbEntry,
+				ddprofiledefinition.KindStpPort,
+				ddprofiledefinition.KindVtpVlan,
+			},
+			wantNoMetrics:   true,
+			wantNoLicensing: true,
+			wantNoBGP:       true,
+		},
+		"licensing_projection": {
+			sysObjectID: "1.3.6.1.4.1.9.1.1",
+			consumer:    ConsumerLicensing,
+			wantLicensingIDs: []string{
+				"cisco_traditional_licenses",
+				"smart_registration",
+				"smart_authorization",
+				"smart_id_certificate",
+				"smart_evaluation_period",
+				"smart_entitlements",
+			},
+			wantNoMetrics:  true,
+			wantNoTopology: true,
+			wantNoBGP:      true,
+		},
+		"bgp_projection": {
+			sysObjectID:     "1.3.6.1.4.1.9.1.923",
+			consumer:        ConsumerBGP,
+			wantBGPIDs:      []string{"cisco-bgp-peer", "cisco-bgp-peer-family"},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_nokia": {
+			sysObjectID: "1.3.6.1.4.1.6527.1.3.17",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"nokia-timos-bgp-peer",
+				"nokia-timos-bgp-peer-family-ipv4-unicast",
+				"nokia-timos-bgp-peer-family-ipv4-vpn",
+				"nokia-timos-bgp-peer-family-ipv6-unicast",
+				"nokia-timos-bgp-peer-family-ipv6-vpn",
+				"nokia-timos-bgp-peer-family-l2vpn-vpls",
+				"nokia-timos-bgp-peer-family-l2vpn-evpn",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_huawei": {
+			sysObjectID: "1.3.6.1.4.1.2011.2.224.279",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"huawei-bgp-device-counts",
+				"huawei-bgp-peer-family",
+				"huawei-bgp-peer-family-routes",
+				"huawei-bgp-peer-family-messages",
+				"huawei-bgp-peer-statistics",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_arista": {
+			sysObjectID: "1.3.6.1.4.1.30065.1.3011.7010.427.48",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"arista-bgp-peer",
+				"arista-bgp-peer-family",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_dell_os10": {
+			sysObjectID: "1.3.6.1.4.1.674.11000.5000.100.2.1.1",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"dell-os10-bgp-peer",
+				"dell-os10-bgp-peer-family",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"bgp_projection_alcatel": {
+			sysObjectID: "1.3.6.1.4.1.6486.801.1.1.2.1.1",
+			consumer:    ConsumerBGP,
+			wantBGPIDs: []string{
+				"alcatel-bgp4-peer",
+				"alcatel-bgp4-peer-family",
+				"alcatel-bgp6-peer",
+				"alcatel-bgp6-peer-family",
+			},
+			wantNoMetrics:   true,
+			wantNoTopology:  true,
+			wantNoLicensing: true,
+		},
+		"metrics_and_licensing_projection": {
+			sysObjectID: "1.3.6.1.4.1.9.1.1",
+			consumer:    ConsumerMetrics,
+			consumers:   []ProfileConsumer{ConsumerLicensing},
+			wantMetrics: []string{"systemUptime", "tcpCurrEstab", "cpmCPUTotal5minRev"},
+			wantLicensingIDs: []string{
+				"cisco_traditional_licenses",
+				"smart_registration",
+				"smart_authorization",
+				"smart_id_certificate",
+				"smart_evaluation_period",
+				"smart_entitlements",
+			},
+			wantNoTopology: true,
+			wantNoBGP:      true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profiles := DefaultCatalog().Resolve(ResolveRequest{
+				SysObjectID:  tc.sysObjectID,
+				ManualPolicy: ManualProfileFallback,
+			}).Project(tc.consumer, tc.consumers...).Profiles()
+			require.NotEmpty(t, profiles)
+
+			metricNames := make(map[string]bool)
+			topologyKinds := make(map[ddprofiledefinition.TopologyKind]bool)
+			licensingIDs := make(map[string]bool)
+			bgpIDs := make(map[string]bool)
+
+			for _, prof := range profiles {
+				require.NotNil(t, prof.Definition)
+				if tc.wantNoMetrics {
+					assert.Empty(t, prof.Definition.Metrics, prof.SourceFile)
+					assert.Empty(t, prof.Definition.VirtualMetrics, prof.SourceFile)
+				}
+				if tc.wantNoTopology {
+					assert.Empty(t, prof.Definition.Topology, prof.SourceFile)
+				}
+				if tc.wantNoLicensing {
+					assert.Empty(t, prof.Definition.Licensing, prof.SourceFile)
+				}
+				if tc.wantNoBGP {
+					assert.Empty(t, prof.Definition.BGP, prof.SourceFile)
+				}
+
+				for _, metric := range prof.Definition.Metrics {
+					if metric.Symbol.Name != "" {
+						metricNames[metric.Symbol.Name] = true
+					}
+					for _, sym := range metric.Symbols {
+						metricNames[sym.Name] = true
+					}
+				}
+				for _, topo := range prof.Definition.Topology {
+					topologyKinds[topo.Kind] = true
+				}
+				for _, row := range prof.Definition.Licensing {
+					licensingIDs[row.ID] = true
+				}
+				for _, row := range prof.Definition.BGP {
+					bgpIDs[row.ID] = true
+				}
+			}
+
+			for _, metricName := range tc.wantMetrics {
+				assert.True(t, metricNames[metricName], "missing metric %q", metricName)
+			}
+			for _, kind := range tc.wantTopologyKinds {
+				assert.True(t, topologyKinds[kind], "missing topology kind %q", kind)
+			}
+			for _, id := range tc.wantLicensingIDs {
+				assert.True(t, licensingIDs[id], "missing licensing row %q", id)
+			}
+			for _, id := range tc.wantBGPIDs {
+				assert.True(t, bgpIDs[id], "missing BGP row %q", id)
+			}
+		})
+	}
+}
+
 func Test_Profile_merge(t *testing.T) {
 	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216", "", nil) // cisco-nexus
 
@@ -190,6 +397,117 @@ func Test_Profile_merge(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestProfileMerge_ColumnSymbolsWithSameNameFromBaseArePreserved(t *testing.T) {
+	child := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{},
+	}
+	base := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metrics: []ddprofiledefinition.MetricsConfig{
+				{
+					Table: ddprofiledefinition.SymbolConfig{OID: "1.2.3", Name: "tableA"},
+					Symbols: []ddprofiledefinition.SymbolConfig{
+						{OID: "1.2.3.1", Name: "duplicated.column"},
+						{OID: "1.2.3.2", Name: "duplicated.column"},
+					},
+				},
+				{
+					Table: ddprofiledefinition.SymbolConfig{OID: "1.2.4", Name: "tableB"},
+					Symbols: []ddprofiledefinition.SymbolConfig{
+						{OID: "1.2.4.1", Name: "duplicated.column"},
+					},
+				},
+			},
+		},
+	}
+
+	child.mergeMetrics(base)
+
+	require.Len(t, child.Definition.Metrics, 2)
+	require.Len(t, child.Definition.Metrics[0].Symbols, 2)
+	assert.Equal(t, "1.2.3.1", child.Definition.Metrics[0].Symbols[0].OID)
+	assert.Equal(t, "1.2.3.2", child.Definition.Metrics[0].Symbols[1].OID)
+	require.Len(t, child.Definition.Metrics[1].Symbols, 1)
+	assert.Equal(t, "1.2.4.1", child.Definition.Metrics[1].Symbols[0].OID)
+}
+
+func TestProfileMerge_DifferentTablesDoNotOverrideColumnsByName(t *testing.T) {
+	child := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metrics: []ddprofiledefinition.MetricsConfig{
+				{
+					Table: ddprofiledefinition.SymbolConfig{OID: "9.9.9", Name: "childTable"},
+					Symbols: []ddprofiledefinition.SymbolConfig{
+						{OID: "9.9.9.1", Name: "memory.used"},
+					},
+				},
+			},
+		},
+	}
+	base := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metrics: []ddprofiledefinition.MetricsConfig{
+				{
+					Table: ddprofiledefinition.SymbolConfig{OID: "1.2.3", Name: "baseTable"},
+					Symbols: []ddprofiledefinition.SymbolConfig{
+						{OID: "1.2.3.1", Name: "memory.used"},
+						{OID: "1.2.3.2", Name: "memory.free"},
+					},
+				},
+			},
+		},
+	}
+
+	child.mergeMetrics(base)
+
+	require.Len(t, child.Definition.Metrics, 2)
+	assert.Equal(t, "childTable", child.Definition.Metrics[0].Table.Name)
+	require.Len(t, child.Definition.Metrics[0].Symbols, 1)
+	assert.Equal(t, "memory.used", child.Definition.Metrics[0].Symbols[0].Name)
+	assert.Equal(t, "baseTable", child.Definition.Metrics[1].Table.Name)
+	require.Len(t, child.Definition.Metrics[1].Symbols, 2)
+	assert.Equal(t, "memory.used", child.Definition.Metrics[1].Symbols[0].Name)
+	assert.Equal(t, "memory.free", child.Definition.Metrics[1].Symbols[1].Name)
+}
+
+func TestProfileMerge_BaseScalarDuplicateAddedOnce(t *testing.T) {
+	child := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{},
+	}
+	base := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metrics: []ddprofiledefinition.MetricsConfig{
+				{
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  "1.2.3.0",
+						Name: "license.expiry",
+					},
+				},
+				{
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  "1.2.3.0",
+						Name: "license.expiry",
+					},
+				},
+				{
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  "1.2.4.0",
+						Name: "license.state",
+					},
+				},
+			},
+		},
+	}
+
+	child.mergeMetrics(base)
+
+	require.Len(t, child.Definition.Metrics, 2)
+	assert.Equal(t, "license.expiry", child.Definition.Metrics[0].Symbol.Name)
+	assert.Equal(t, "1.2.3.0", child.Definition.Metrics[0].Symbol.OID)
+	assert.Equal(t, "license.state", child.Definition.Metrics[1].Symbol.Name)
+	assert.Equal(t, "1.2.4.0", child.Definition.Metrics[1].Symbol.OID)
 }
 
 func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
@@ -1018,7 +1336,7 @@ func TestSortProfilesBySpecificity_Stable(t *testing.T) {
 	profiles := make([]*Profile, numProfiles)
 	matchedOIDs := make(map[*Profile]string)
 
-	for i := 0; i < numProfiles; i++ {
+	for i := range numProfiles {
 		profiles[i] = &Profile{
 			SourceFile: fmt.Sprintf("profile-%03d.yaml", i),
 		}
@@ -1028,7 +1346,7 @@ func TestSortProfilesBySpecificity_Stable(t *testing.T) {
 	sortProfilesBySpecificity(profiles, matchedOIDs)
 
 	// Verify order is preserved (lexicographic due to same OID)
-	for i := 0; i < numProfiles; i++ {
+	for i := range numProfiles {
 		expected := fmt.Sprintf("profile-%03d.yaml", i)
 		assert.Equal(t, expected, profiles[i].SourceFile)
 	}
@@ -1334,8 +1652,8 @@ func TestProfile_MultipleExtends(t *testing.T) {
 
 	// Main profile extending both
 	main := filepath.Join(tmp, "device.yaml")
-	writeYAML(t, main, map[string]any{
-		"extends": []string{"_base1.yaml", "_base2.yaml"},
+	writeYAML(t, main, ddprofiledefinition.ProfileDefinition{
+		Extends: []string{"_base1.yaml", "_base2.yaml"},
 	})
 
 	paths := multipath.New(tmp)
@@ -1354,6 +1672,116 @@ func TestProfile_MultipleExtends(t *testing.T) {
 	// Check all files
 	allFiles := prof.getAllExtendedFiles()
 	assert.Len(t, allFiles, 2)
+}
+
+func TestProfile_MultipleExtends_LaterOverrideEarlier(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeBase := func(path, suffix string) {
+		writeYAML(t, path, ddprofiledefinition.ProfileDefinition{
+			Metadata: ddprofiledefinition.MetadataConfig{
+				"device": {
+					Fields: map[string]ddprofiledefinition.MetadataField{
+						"model": {Value: suffix},
+					},
+				},
+			},
+			StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
+				{Tag: "source", Value: suffix},
+			},
+			Metrics: []ddprofiledefinition.MetricsConfig{
+				{
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  "1.3.6.1.2.1.1.5.0",
+						Name: "sysName",
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: suffix,
+						},
+					},
+				},
+			},
+			VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+				{
+					Name: "ifTraffic",
+					Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+						{Metric: "sysName", Table: ""},
+					},
+					ChartMeta: ddprofiledefinition.ChartMeta{
+						Description: suffix,
+					},
+				},
+			},
+		})
+	}
+
+	base1 := filepath.Join(tmp, "_base1.yaml")
+	base2 := filepath.Join(tmp, "_base2.yaml")
+	writeBase(base1, "base1")
+	writeBase(base2, "base2")
+
+	main := filepath.Join(tmp, "device.yaml")
+	writeYAML(t, main, map[string]any{
+		"extends": []string{"_base1.yaml", "_base2.yaml"},
+	})
+
+	prof, err := loadProfile(main, multipath.New(tmp))
+	require.NoError(t, err)
+
+	require.Len(t, prof.Definition.Metrics, 1)
+	assert.Equal(t, "base2", prof.Definition.Metrics[0].Symbol.ChartMeta.Description)
+
+	require.Len(t, prof.Definition.VirtualMetrics, 1)
+	assert.Equal(t, "base2", prof.Definition.VirtualMetrics[0].ChartMeta.Description)
+
+	assert.Equal(t, "base2", prof.Definition.Metadata["device"].Fields["model"].Value)
+
+	require.Len(t, prof.Definition.StaticTags, 2)
+	assert.Equal(t, "base1", prof.Definition.StaticTags[0].Value)
+	assert.Equal(t, "base2", prof.Definition.StaticTags[1].Value)
+
+	mergedStaticTags := make(map[string]string, len(prof.Definition.StaticTags))
+	for _, tag := range prof.Definition.StaticTags {
+		if tag.Tag != "" && tag.Value != "" {
+			mergedStaticTags[tag.Tag] = tag.Value
+		}
+	}
+	assert.Equal(t, "base2", mergedStaticTags["source"])
+}
+
+func TestProfile_MultipleExtends_PreservesScalarSameNameFallbackOIDs(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeYAML(t, filepath.Join(tmp, "_base1.yaml"), ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{
+			{
+				Symbol: ddprofiledefinition.SymbolConfig{
+					OID:  "1.3.6.1.2.1.25.1.1.0",
+					Name: "systemUptime",
+				},
+			},
+		},
+	})
+	writeYAML(t, filepath.Join(tmp, "_base2.yaml"), ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{
+			{
+				Symbol: ddprofiledefinition.SymbolConfig{
+					OID:  "1.3.6.1.2.1.1.3.0",
+					Name: "systemUptime",
+				},
+			},
+		},
+	})
+	writeYAML(t, filepath.Join(tmp, "device.yaml"), map[string]any{
+		"extends": []string{"_base1.yaml", "_base2.yaml"},
+	})
+
+	prof, err := loadProfile(filepath.Join(tmp, "device.yaml"), multipath.New(tmp))
+	require.NoError(t, err)
+	require.Len(t, prof.Definition.Metrics, 2)
+	assert.Equal(t, "systemUptime", prof.Definition.Metrics[0].Symbol.Name)
+	assert.Equal(t, "1.3.6.1.2.1.1.3.0", prof.Definition.Metrics[0].Symbol.OID)
+	assert.Equal(t, "systemUptime", prof.Definition.Metrics[1].Symbol.Name)
+	assert.Equal(t, "1.3.6.1.2.1.25.1.1.0", prof.Definition.Metrics[1].Symbol.OID)
 }
 
 func TestProfile_ComplexHierarchy(t *testing.T) {

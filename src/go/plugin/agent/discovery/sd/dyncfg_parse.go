@@ -12,10 +12,9 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// parseDyncfgPayload parses a dyncfg JSON payload into a pipeline.Config.
-// Since pipeline.Config now has proper JSON tags matching the schema,
-// we can unmarshal directly without type-specific parsing.
-func parseDyncfgPayload(payload []byte, discovererType string, configDefaults confgroup.Registry, reg Registry, validate bool) (pipeline.Config, error) {
+// parseDyncfgPayload parses a dyncfg JSON payload into a runtime pipeline.Config.
+// The dyncfg job name is authoritative and overrides any serialized payload name.
+func parseDyncfgPayload(payload []byte, discovererType, name string, configDefaults confgroup.Registry, reg Registry, validate bool) (pipeline.Config, error) {
 	if reg == nil {
 		return pipeline.Config{}, fmt.Errorf("discoverer registry is not configured")
 	}
@@ -25,6 +24,7 @@ func parseDyncfgPayload(payload []byte, discovererType string, configDefaults co
 		return pipeline.Config{}, fmt.Errorf("unmarshal %s config: %w", discovererType, err)
 	}
 
+	cfg.Name = name
 	cfg.ConfigDefaults = configDefaults
 
 	// Validate that the config has the expected discoverer type
@@ -75,20 +75,14 @@ func configToJSON(data []byte) ([]byte, error) {
 }
 
 // userConfigFromPayload converts a JSON payload to YAML format for user editing.
-// It unmarshals JSON into pipeline.Config, then marshals to YAML.
-// If jobName is provided (non-empty), it overrides the name from payload.
-// This ensures consistent field ordering and validates the structure.
+// The returned YAML always uses jobName (or "test") as the top-level pipeline name.
 func userConfigFromPayload(payload []byte, discovererType, jobName string) ([]byte, error) {
 	var cfg pipeline.Config
 	if err := json.Unmarshal(payload, &cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal json: %w", err)
 	}
 
-	// Use jobName if provided, otherwise keep name from payload
-	if jobName != "" {
-		cfg.Name = jobName
-	}
-	// If still no name, use default
+	cfg.Name = jobName
 	if cfg.Name == "" {
 		cfg.Name = "test"
 	}

@@ -3,7 +3,7 @@
 #include "api_v2_calls.h"
 
 int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format, size_t api_version) {
-    if (!netdata_ready)
+    if (!netdata_ready_load())
         return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     time_t baseline_after = 0, baseline_before = 0, after = 0, before = 0;

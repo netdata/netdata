@@ -273,8 +273,7 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
     if(!function || !*function)
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "command received is empty");
 
-    char buf[strlen(function) + 1];
-    memcpy(buf, function, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(function);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);

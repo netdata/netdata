@@ -53,7 +53,7 @@ static inline bool logftm_parse_value(LOGFMT_STATE *lfs) {
 
     char quote = '\0';
     const char *s = logfmt_current_pos(lfs);
-    if(*s == '\"' || *s == '\'') {
+    if(*s == '"' || *s == '\'') {
         quote = *s;
         logfmt_consume_char(lfs);
     }
@@ -70,27 +70,31 @@ static inline bool logftm_parse_value(LOGFMT_STATE *lfs) {
         if (*s == '\\') {
             s++;
 
-            switch (*s) {
-                case 'n':
-                    copy_newline(lfs, &d, &remaining);
-                    s++;
-                    continue;
+            if(!*s)
+                c = '\\';
+            else {
+                switch (*s) {
+                    case 'n':
+                        copy_newline(lfs, &d, &remaining);
+                        s++;
+                        continue;
 
-                case 't':
-                    copy_tab(lfs, &d, &remaining);
-                    s++;
-                    continue;
+                    case 't':
+                        copy_tab(lfs, &d, &remaining);
+                        s++;
+                        continue;
 
-                case 'f':
-                case 'b':
-                case 'r':
-                    c = ' ';
-                    s++;
-                    break;
+                    case 'f':
+                    case 'b':
+                    case 'r':
+                        c = ' ';
+                        s++;
+                        break;
 
-                default:
-                    c = *s++;
-                    break;
+                    default:
+                        c = *s++;
+                        break;
+                }
             }
         }
         else
@@ -140,10 +144,16 @@ static inline bool logfmt_parse_key(LOGFMT_STATE *lfs) {
     while(*s && *s != '=') {
         char c;
 
-        if (*s == '\\')
+        if (*s == '\\') {
             s++;
 
-        c = journal_key_characters_map[(unsigned char)*s++];
+            if(!*s)
+                c = journal_key_characters_map[(unsigned char)'\\'];
+            else
+                c = journal_key_characters_map[(unsigned char)*s++];
+        }
+        else
+            c = journal_key_characters_map[(unsigned char)*s++];
 
         if(c == '_' && last_c == '_')
             continue;

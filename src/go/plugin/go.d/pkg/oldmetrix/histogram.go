@@ -4,6 +4,7 @@ package oldmetrix
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -93,7 +94,7 @@ func NewHistogram(buckets []float64) Histogram {
 	if len(buckets) == 0 {
 		buckets = DefBuckets
 	} else {
-		sort.Slice(buckets, func(i, j int) bool { return buckets[i] < buckets[j] })
+		slices.Sort(buckets)
 	}
 
 	return &histogram{
@@ -108,7 +109,7 @@ func NewHistogramWithRangeBuckets(buckets []float64) Histogram {
 	if len(buckets) == 0 {
 		buckets = DefBuckets
 	} else {
-		sort.Slice(buckets, func(i, j int) bool { return buckets[i] < buckets[j] })
+		slices.Sort(buckets)
 	}
 
 	return &histogram{

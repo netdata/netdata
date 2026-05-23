@@ -1,0 +1,209 @@
+{
+  "status": 200,
+  "type": "topology",
+  "has_history": false,
+  "update_every": 60,
+  "data": {
+    "schema_version": "netdata.topology.v1",
+    "producer": {
+      "source": "vsphere",
+      "instance": "sample-vcenter",
+      "node_id": "vcenter-node",
+      "machine_guid": "vcenter-machine",
+      "agent_version": "test",
+      "plugin": "go.d.plugin",
+      "capabilities": ["topology-v1"]
+    },
+    "collected_at": "2026-05-09T00:00:00Z",
+    "view": {
+      "id": "vsphere-inventory",
+      "scope": "vsphere_object",
+      "mode": "detailed",
+      "group_by": ["vsphere_object"]
+    },
+    "dictionaries": {
+      "strings": [
+        "vsphere_datacenter",
+        "vsphere_cluster",
+        "vsphere_host",
+        "vsphere_vm",
+        "vsphere_datastore",
+        "dc-1",
+        "domain-c1",
+        "host-101",
+        "vm-501",
+        "datastore-301",
+        "vsphere_ownership",
+        "vsphere_dependency",
+        "vsphere_relationship",
+        "vsphere_object_detail",
+        "contains",
+        "runs_on",
+        "uses",
+        "powered_on",
+        "/dc-1/cluster-a/host-a/vm-a"
+      ]
+    },
+    "types": {
+      "actor_types": {
+        "vsphere_datacenter": {
+          "layer": "virtualization",
+          "identity": ["vsphere_moid"],
+          "merge_identity": ["vsphere_moid"],
+          "aggregation_scopes": ["vsphere_object"]
+        },
+        "vsphere_cluster": {
+          "layer": "virtualization",
+          "identity": ["vsphere_moid"],
+          "merge_identity": ["vsphere_moid"],
+          "parent_identity": ["parent_moid"],
+          "aggregation_scopes": ["vsphere_object"]
+        },
+        "vsphere_host": {
+          "layer": "virtualization",
+          "identity": ["vsphere_moid"],
+          "merge_identity": ["vsphere_moid"],
+          "parent_identity": ["parent_moid"],
+          "aggregation_scopes": ["vsphere_object"]
+        },
+        "vsphere_vm": {
+          "layer": "virtualization",
+          "identity": ["vsphere_moid"],
+          "merge_identity": ["vsphere_moid"],
+          "parent_identity": ["parent_moid"],
+          "aggregation_scopes": ["vsphere_object"]
+        },
+        "vsphere_datastore": {
+          "layer": "storage",
+          "identity": ["vsphere_moid"],
+          "merge_identity": ["vsphere_moid"],
+          "aggregation_scopes": ["vsphere_object"]
+        }
+      },
+      "link_types": {
+        "vsphere_ownership": {
+          "orientation": "hierarchical",
+          "direction_role": "ownership",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "append"
+          },
+          "evidence_types": ["vsphere_relationship"]
+        },
+        "vsphere_dependency": {
+          "orientation": "directed",
+          "direction_role": "dependency",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "append"
+          },
+          "evidence_types": ["vsphere_relationship"]
+        }
+      },
+      "evidence_types": {
+        "vsphere_relationship": {
+          "link_type": "vsphere_ownership",
+          "role": "relationship_evidence",
+          "match_columns": ["source_moid", "target_moid", "relationship"],
+          "columns": [
+            {"id": "link", "type": "link_ref", "role": "reference"},
+            {"id": "source_moid", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "target_moid", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "relationship", "type": "string_ref", "dictionary": "strings", "role": "group_key"}
+          ]
+        }
+      },
+      "table_types": {
+        "vsphere_object_detail": {
+          "role": "actor_detail",
+          "owner": "actor",
+          "aggregation": "last",
+          "columns": [
+            {"id": "actor", "type": "actor_ref", "role": "reference"},
+            {"id": "power_state", "type": "string_ref", "dictionary": "strings"},
+            {"id": "inventory_path", "type": "string_ref", "dictionary": "strings"}
+          ]
+        }
+      },
+      "aggregation_scopes": {
+        "vsphere_object": {"columns": ["vsphere_moid"], "evidence_policy": "preserve"}
+      }
+    },
+    "actors": {
+      "rows": 5,
+      "columns": [
+        {"id": "type", "type": "string_ref", "dictionary": "strings"},
+        {"id": "vsphere_moid", "type": "string_ref", "dictionary": "strings", "role": "identity"},
+        {"id": "parent_moid", "type": "string_ref", "dictionary": "strings", "nullable": true, "role": "parent_identity"}
+      ],
+      "values": [
+        {"codec": "values", "values": [0, 1, 2, 3, 4]},
+        {"codec": "values", "values": [5, 6, 7, 8, 9]},
+        {"codec": "values", "values": [null, 5, 6, 7, null]}
+      ]
+    },
+    "links": {
+      "rows": 4,
+      "columns": [
+        {"id": "src_actor", "type": "actor_ref", "role": "reference"},
+        {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
+        {"id": "type", "type": "string_ref", "dictionary": "strings"},
+        {"id": "relationship", "type": "string_ref", "dictionary": "strings"},
+        {"id": "evidence_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+      ],
+      "values": [
+        {"codec": "values", "values": [0, 1, 2, 3]},
+        {"codec": "values", "values": [1, 2, 3, 4]},
+        {"codec": "values", "values": [10, 10, 10, 11]},
+        {"codec": "values", "values": [14, 14, 15, 16]},
+        {"codec": "const", "value": 1}
+      ]
+    },
+    "evidence": {
+      "vsphere_relationship": {
+        "type": "vsphere_relationship",
+        "table": {
+          "rows": 4,
+          "columns": [
+            {"id": "link", "type": "link_ref", "role": "reference"},
+            {"id": "source_moid", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "target_moid", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "relationship", "type": "string_ref", "dictionary": "strings", "role": "group_key"}
+          ],
+          "values": [
+            {"codec": "values", "values": [0, 1, 2, 3]},
+            {"codec": "values", "values": [5, 6, 7, 8]},
+            {"codec": "values", "values": [6, 7, 8, 9]},
+            {"codec": "values", "values": [14, 14, 15, 16]}
+          ]
+        }
+      }
+    },
+    "tables": {
+      "actor": {
+        "vsphere_object_detail": {
+          "type": "vsphere_object_detail",
+          "table": {
+            "rows": 1,
+            "columns": [
+              {"id": "actor", "type": "actor_ref", "role": "reference"},
+              {"id": "power_state", "type": "string_ref", "dictionary": "strings"},
+              {"id": "inventory_path", "type": "string_ref", "dictionary": "strings"}
+            ],
+            "values": [
+              {"codec": "const", "value": 3},
+              {"codec": "const", "value": 17},
+              {"codec": "const", "value": 18}
+            ]
+          }
+        }
+      }
+    },
+    "stats": {
+      "actors": 5,
+      "links": 4,
+      "evidence_rows": 4,
+      "actor_detail_rows": 1
+    }
+  }
+}

@@ -20,7 +20,7 @@ type RuntimeStore interface {
 // Collector code does not call these methods directly.
 type CycleController interface {
 	BeginCycle()
-	CommitCycleSuccess()
+	CommitCycleSuccess() error
 	AbortCycle()
 }
 
@@ -45,6 +45,10 @@ type Reader interface {
 	// Example: histogram families resolve via *_bucket/*_count/*_sum names.
 	MetricMeta(name string) (MetricMeta, bool)
 	CollectMeta() CollectMeta
+	// HostScopes returns all host scopes present in the snapshot, including the
+	// default scope when it has series. The result is not filtered by the
+	// reader's active scope.
+	HostScopes() []HostScope
 	// Family returns a scalar-only view. For non-scalar families use Histogram/Summary/StateSet,
 	// or use Read(ReadFlatten()) at reader acquisition time.
 	Family(name string) (FamilyView, bool)
@@ -86,6 +90,7 @@ type RuntimeWriter interface {
 
 // SnapshotMeter declares snapshot-mode instruments under a metric-name prefix.
 type SnapshotMeter interface {
+	WithHostScope(scope HostScope) SnapshotMeter
 	WithLabels(labels ...Label) SnapshotMeter
 	WithLabelSet(labels ...LabelSet) SnapshotMeter
 	// Vec binds a reusable vec label-key schema for multiple vector instruments.
@@ -102,6 +107,7 @@ type SnapshotMeter interface {
 
 // SnapshotVecMeter declares snapshot vec instruments sharing one label-key schema.
 type SnapshotVecMeter interface {
+	WithHostScope(scope HostScope) SnapshotVecMeter
 	Gauge(name string, opts ...InstrumentOption) SnapshotGaugeVec
 	Counter(name string, opts ...InstrumentOption) SnapshotCounterVec
 	Histogram(name string, opts ...InstrumentOption) SnapshotHistogramVec
@@ -113,6 +119,7 @@ type SnapshotVecMeter interface {
 
 // StatefulMeter declares stateful-mode instruments under a metric-name prefix.
 type StatefulMeter interface {
+	WithHostScope(scope HostScope) StatefulMeter
 	WithLabels(labels ...Label) StatefulMeter
 	WithLabelSet(labels ...LabelSet) StatefulMeter
 	// Vec binds a reusable vec label-key schema for multiple vector instruments.
@@ -129,6 +136,7 @@ type StatefulMeter interface {
 
 // StatefulVecMeter declares stateful vec instruments sharing one label-key schema.
 type StatefulVecMeter interface {
+	WithHostScope(scope HostScope) StatefulVecMeter
 	Gauge(name string, opts ...InstrumentOption) StatefulGaugeVec
 	Counter(name string, opts ...InstrumentOption) StatefulCounterVec
 	Histogram(name string, opts ...InstrumentOption) StatefulHistogramVec
@@ -148,6 +156,7 @@ type SnapshotGauge interface {
 // - GetWithLabelValues returns (metric, error)
 // - WithLabelValues panics on invalid label values
 type SnapshotGaugeVec interface {
+	WithHostScope(scope HostScope) SnapshotGaugeVec
 	GetWithLabelValues(labelValues ...string) (SnapshotGauge, error)
 	WithLabelValues(labelValues ...string) SnapshotGauge
 }
@@ -161,6 +170,7 @@ type StatefulGauge interface {
 
 // StatefulGaugeVec provides labeled series handles for stateful gauges.
 type StatefulGaugeVec interface {
+	WithHostScope(scope HostScope) StatefulGaugeVec
 	GetWithLabelValues(labelValues ...string) (StatefulGauge, error)
 	WithLabelValues(labelValues ...string) StatefulGauge
 }
@@ -171,6 +181,7 @@ type SnapshotCounter interface {
 
 // SnapshotCounterVec provides labeled series handles for snapshot counters.
 type SnapshotCounterVec interface {
+	WithHostScope(scope HostScope) SnapshotCounterVec
 	GetWithLabelValues(labelValues ...string) (SnapshotCounter, error)
 	WithLabelValues(labelValues ...string) SnapshotCounter
 }
@@ -181,6 +192,7 @@ type StatefulCounter interface {
 
 // StatefulCounterVec provides labeled series handles for stateful counters.
 type StatefulCounterVec interface {
+	WithHostScope(scope HostScope) StatefulCounterVec
 	GetWithLabelValues(labelValues ...string) (StatefulCounter, error)
 	WithLabelValues(labelValues ...string) StatefulCounter
 }
@@ -191,6 +203,7 @@ type SnapshotHistogram interface {
 
 // SnapshotHistogramVec provides labeled series handles for snapshot histograms.
 type SnapshotHistogramVec interface {
+	WithHostScope(scope HostScope) SnapshotHistogramVec
 	GetWithLabelValues(labelValues ...string) (SnapshotHistogram, error)
 	WithLabelValues(labelValues ...string) SnapshotHistogram
 }
@@ -201,6 +214,7 @@ type StatefulHistogram interface {
 
 // StatefulHistogramVec provides labeled series handles for stateful histograms.
 type StatefulHistogramVec interface {
+	WithHostScope(scope HostScope) StatefulHistogramVec
 	GetWithLabelValues(labelValues ...string) (StatefulHistogram, error)
 	WithLabelValues(labelValues ...string) StatefulHistogram
 }
@@ -211,6 +225,7 @@ type SnapshotSummary interface {
 
 // SnapshotSummaryVec provides labeled series handles for snapshot summaries.
 type SnapshotSummaryVec interface {
+	WithHostScope(scope HostScope) SnapshotSummaryVec
 	GetWithLabelValues(labelValues ...string) (SnapshotSummary, error)
 	WithLabelValues(labelValues ...string) SnapshotSummary
 }
@@ -221,6 +236,7 @@ type StatefulSummary interface {
 
 // StatefulSummaryVec provides labeled series handles for stateful summaries.
 type StatefulSummaryVec interface {
+	WithHostScope(scope HostScope) StatefulSummaryVec
 	GetWithLabelValues(labelValues ...string) (StatefulSummary, error)
 	WithLabelValues(labelValues ...string) StatefulSummary
 }
@@ -236,6 +252,7 @@ type SnapshotMeasureSetGauge interface {
 }
 
 type SnapshotMeasureSetGaugeVec interface {
+	WithHostScope(scope HostScope) SnapshotMeasureSetGaugeVec
 	GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetGauge, error)
 	WithLabelValues(labelValues ...string) SnapshotMeasureSetGauge
 }
@@ -246,6 +263,7 @@ type SnapshotMeasureSetCounter interface {
 }
 
 type SnapshotMeasureSetCounterVec interface {
+	WithHostScope(scope HostScope) SnapshotMeasureSetCounterVec
 	GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetCounter, error)
 	WithLabelValues(labelValues ...string) SnapshotMeasureSetCounter
 }
@@ -260,6 +278,7 @@ type StatefulMeasureSetGauge interface {
 }
 
 type StatefulMeasureSetGaugeVec interface {
+	WithHostScope(scope HostScope) StatefulMeasureSetGaugeVec
 	GetWithLabelValues(labelValues ...string) (StatefulMeasureSetGauge, error)
 	WithLabelValues(labelValues ...string) StatefulMeasureSetGauge
 }
@@ -271,18 +290,21 @@ type StatefulMeasureSetCounter interface {
 }
 
 type StatefulMeasureSetCounterVec interface {
+	WithHostScope(scope HostScope) StatefulMeasureSetCounterVec
 	GetWithLabelValues(labelValues ...string) (StatefulMeasureSetCounter, error)
 	WithLabelValues(labelValues ...string) StatefulMeasureSetCounter
 }
 
 // SnapshotStateSetVec provides labeled series handles for snapshot statesets.
 type SnapshotStateSetVec interface {
+	WithHostScope(scope HostScope) SnapshotStateSetVec
 	GetWithLabelValues(labelValues ...string) (StateSetInstrument, error)
 	WithLabelValues(labelValues ...string) StateSetInstrument
 }
 
 // StatefulStateSetVec provides labeled series handles for stateful statesets.
 type StatefulStateSetVec interface {
+	WithHostScope(scope HostScope) StatefulStateSetVec
 	GetWithLabelValues(labelValues ...string) (StateSetInstrument, error)
 	WithLabelValues(labelValues ...string) StateSetInstrument
 }

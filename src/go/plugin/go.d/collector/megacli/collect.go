@@ -33,18 +33,18 @@ func writeInt(mx map[string]int64, key, value string) {
 }
 
 func getColonSepValue(line string) string {
-	i := strings.IndexByte(line, ':')
-	if i == -1 {
+	_, after, ok := strings.Cut(line, ":")
+	if !ok {
 		return ""
 	}
-	return strings.TrimSpace(line[i+1:])
+	return strings.TrimSpace(after)
 }
 
 func getColonSepNumValue(line string) string {
 	v := getColonSepValue(line)
-	i := strings.IndexByte(v, ' ')
-	if i == -1 {
+	before, _, ok := strings.Cut(v, " ")
+	if !ok {
 		return v
 	}
-	return v[:i]
+	return before
 }

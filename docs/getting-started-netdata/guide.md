@@ -69,7 +69,7 @@ Once logged into Netdata Cloud, you'll see connection instructions. There are th
 <details>
 <summary><strong>Method 1: Through the Cloud Interface</strong></summary><br/>
 
-1. Navigate to **Space Settings** (cogwheel icon)
+1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list
 2. Select **Nodes** tab
 3. Click the **"+"** button to add a new node
 4. Copy and run the generated connection command
@@ -285,7 +285,7 @@ Transform troubleshooting from complex queries to natural conversation. Ask ques
 <details>
 <summary><strong>Model Context Protocol (MCP) Integration</strong></summary><br/>
 
-MCP is available via Netdata Cloud for infrastructure-wide access (Business/Homelab plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
+MCP is available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
 
 **Why this matters:** Use your existing AI tools or our standalone web chat with choice of AI providers. Query live metrics, logs, processes, network connections, and system state securely.
 

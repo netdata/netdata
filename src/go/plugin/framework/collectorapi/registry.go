@@ -6,12 +6,13 @@ import (
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
 
 const (
 	UpdateEvery        = 1
 	AutoDetectionRetry = 0
-	Priority           = 70000
+	Priority           = chartengine.Priority
 )
 
 // Defaults is a set of module default parameters.

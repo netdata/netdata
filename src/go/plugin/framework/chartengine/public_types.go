@@ -15,6 +15,12 @@ type (
 )
 
 const (
+	// Priority is the default chart priority used by chartengine when templates
+	// and autogen routes do not specify one explicitly.
+	Priority = 70000
+)
+
+const (
 	AlgorithmAbsolute    = program.AlgorithmAbsolute
 	AlgorithmIncremental = program.AlgorithmIncremental
 )

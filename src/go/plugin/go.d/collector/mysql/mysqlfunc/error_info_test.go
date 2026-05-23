@@ -42,7 +42,7 @@ func TestFuncErrorInfo_Handle_CleanupConcurrent(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		for i := 0; i < iterations; i++ {
+		for range iterations {
 			resp := handler.Handle(context.Background(), errorInfoMethodID, nil)
 			require.NotNil(t, resp)
 		}
@@ -50,7 +50,7 @@ func TestFuncErrorInfo_Handle_CleanupConcurrent(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		for i := 0; i < iterations; i++ {
+		for range iterations {
 			deps.cleanup()
 		}
 	}()

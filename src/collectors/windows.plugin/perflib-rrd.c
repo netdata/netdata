@@ -174,19 +174,19 @@ collected_number perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_D
 
         case PERF_COUNTER_MULTI_TIMER:
             // 100 * ((N1 - N0) / ((D1 - D0) / TB)) / B1
-            if (!VALID_DELTA(cd))
+            if (!VALID_DELTA(cd) || !cd->current.Frequency || !cd->current.MultiCounterData)
                 return 0;
             numerator = cd->current.Data - cd->previous.Data;
             denominator = cd->current.Time - cd->previous.Time;
-            denominator /= cd->current.Frequency;
-            doubleValue = 100.0 * ((double)numerator / (double)denominator) / cd->current.MultiCounterData;
+            doubleValue = 100.0 * ((double)numerator / ((double)denominator / (double)cd->current.Frequency)) /
+                          (double)cd->current.MultiCounterData;
             // printf("Display value is (multi-timer): %f%%\n", doubleValue);
             value = (collected_number)(doubleValue * COLLECTED_NUMBER_PRECISION);
             break;
 
         case PERF_100NSEC_MULTI_TIMER:
             // 100 * ((N1 - N0) / (D1 - D0)) / B1
-            if (!VALID_DELTA(cd))
+            if (!VALID_DELTA(cd) || !cd->current.MultiCounterData)
                 return 0;
             numerator = cd->current.Data - cd->previous.Data;
             denominator = cd->current.Time - cd->previous.Time;
@@ -198,7 +198,7 @@ collected_number perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_D
         case PERF_COUNTER_MULTI_TIMER_INV:
         case PERF_100NSEC_MULTI_TIMER_INV:
             // 100 * (B1 - ((N1 - N0) / (D1 - D0)))
-            if (!VALID_DELTA(cd))
+            if (!VALID_DELTA(cd) || !cd->current.MultiCounterData)
                 return 0;
             numerator = cd->current.Data - cd->previous.Data;
             denominator = cd->current.Time - cd->previous.Time;

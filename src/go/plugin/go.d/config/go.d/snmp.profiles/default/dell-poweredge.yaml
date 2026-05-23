@@ -878,11 +878,22 @@ metrics:
           5: critical
           6: nonRecoverable
           7: absent
-    # TODO: bitmask support (https://github.com/DanielleHuisman/observium-community-edition/blob/9f799d444ac7aee4fff8a87b2daa8a719e24d474/mibs/dell/MIB-Dell-10892#L7869)
-    #      - OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.6
-    #        name: processorDeviceStatusReading
-    #        description: Reading value of the processor device status probe
-    #        unit: "TBD"
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.6
+        name: processorDeviceStatusReading
+        chart_meta:
+          family: 'Hardware/Processor/Device/Status/Reading'
+          description: Reading value of the processor device status probe
+          unit: "{reading}"
+        mapping:
+          mode: bitmask
+          items:
+            1: internalError
+            2: thermalTrip
+            32: configurationError
+            128: processorPresent
+            256: processorDisabled
+            512: terminatorPresent
+            1024: processorThrottled
     metric_tags:
       - tag: chassis_index
         symbol:
@@ -971,11 +982,23 @@ metrics:
           5: critical
           6: nonRecoverable
           7: absent
-    # TODO: bitmask support (https://github.com/DanielleHuisman/observium-community-edition/blob/9f799d444ac7aee4fff8a87b2daa8a719e24d474/mibs/dell/MIB-Dell-10892#L8324)
-    #      - OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.20
-    #        name: memoryDeviceFailureModes
-    #        description: Failure modes of the memory device
-    #        unit: "TBD"
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.20
+        name: memoryDeviceFailureModes
+        chart_meta:
+          family: 'Hardware/Memory/FailureModes'
+          description: Failure modes of the memory device
+          unit: "{failure_mode}"
+        mapping:
+          mode: bitmask
+          items:
+            # 0 means the device reports no active failure bits.
+            0: noFaults
+            1: eccSingleBitCorrectionWarningRate
+            2: eccSingleBitCorrectionFailureRate
+            4: eccMultiBitFault
+            8: eccSingleBitCorrectionLoggingDisabled
+            16: deviceDisabledBySpareActivation
+            32: correctableMemoryComponentFault
     metric_tags:
       - tag: chassis_index
         symbol:

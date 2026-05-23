@@ -3,6 +3,8 @@
 #ifndef NETDATA_EBPF_SYNC_H
 #define NETDATA_EBPF_SYNC_H 1
 
+#include "libbpf_api/ebpf.h"
+
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SYNC "sync"
 #define NETDATA_EBPF_SYNC_MODULE_DESC                                                                                  \
@@ -23,6 +25,11 @@
 #define NETDATA_SYSCALLS_SYNC_FILE_RANGE "sync_file_range"
 
 #define NETDATA_EBPF_SYNC_SLEEP_MS 800000ULL
+
+#define NETDATA_EBPF_FILE_SYNC_CHART_ORDER 21300
+#define NETDATA_EBPF_MSYNC_CHART_ORDER 21301
+#define NETDATA_EBPF_SYNC_CHART_ORDER 21302
+#define NETDATA_EBPF_FILE_SEGMENT_CHART_ORDER 21303
 
 // configuration file
 #define NETDATA_SYNC_CONFIG_FILE "sync.conf"

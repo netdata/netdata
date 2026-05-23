@@ -16,7 +16,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.2.9.2.1.0
       name: cpvIKETotalFailuresInit
       chart_meta:
-        description: Total IKE negotiation failures as initiator
+        description: IKE negotiation failures as initiator per second
         family: 'Network/VPN/IPSec/IKE/Failure/Initiator'
         unit: "{failure}/s"
   - MIB: CHECKPOINT-MIB
@@ -24,7 +24,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.2.9.2.3.0
       name: cpvIKETotalFailuresResp
       chart_meta:
-        description: Total IKE negotiation failures as responder
+        description: IKE negotiation failures as responder per second
         family: 'Network/VPN/IPSec/IKE/Failure/Responder'
         unit: "{failure}/s"
 
@@ -52,7 +52,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.2.5.3.1.0
       name: cpvSaDecrErr
       chart_meta:
-        description: Total SA decryption errors
+        description: SA decryption errors per second
         family: 'Network/VPN/IPSec/SA/Error/Decrypt'
         unit: "{error}/s"
   - MIB: CHECKPOINT-MIB
@@ -60,7 +60,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.2.5.3.2.0
       name: cpvSaAuthErr
       chart_meta:
-        description: Total SA authentication errors
+        description: SA authentication errors per second
         family: 'Network/VPN/IPSec/SA/Error/Auth'
         unit: "{error}/s"
   - MIB: CHECKPOINT-MIB
@@ -68,7 +68,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.2.5.3.3.0
       name: cpvSaReplayErr
       chart_meta:
-        description: Total SA replay errors
+        description: SA replay errors per second
         family: 'Network/VPN/IPSec/SA/Error/Replay'
         unit: "{error}/s"
 
@@ -78,7 +78,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.2.5.4.5.0
       name: cpvIpsecEspEncPkts
       chart_meta:
-        description: Total ESP encrypted packets
+        description: ESP encrypted packets per second
         family: 'Network/VPN/IPSec/Traffic/Packet/Out'
         unit: "{packet}/s"
   - MIB: CHECKPOINT-MIB
@@ -86,7 +86,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.2.5.4.6.0
       name: cpvIpsecEspDecPkts
       chart_meta:
-        description: Total ESP decrypted packets
+        description: ESP decrypted packets per second
         family: 'Network/VPN/IPSec/Traffic/Packet/In'
         unit: "{packet}/s"
   - MIB: CHECKPOINT-MIB
@@ -94,7 +94,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.2.5.4.19.0
       name: cpvIpsecEspEncBytes
       chart_meta:
-        description: Total ESP encrypted bytes
+        description: ESP encrypted bytes per second
         family: 'Network/VPN/IPSec/Traffic/Throughput/Out'
         unit: "By/s"
   - MIB: CHECKPOINT-MIB
@@ -102,7 +102,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.2.5.4.20.0
       name: cpvIpsecEspDecBytes
       chart_meta:
-        description: Total ESP decrypted bytes
+        description: ESP decrypted bytes per second
         family: 'Network/VPN/IPSec/Traffic/Throughput/In'
         unit: "By/s"
 
@@ -227,3 +227,106 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.2620.500.9003.1.11
           name: permanentTunnelType
+
+  # Extended IKE scalars — complement the 3 IKE metrics above
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.9.1.2.0
+      name: cpvIKECurrInitSAs
+      chart_meta:
+        description: Current IKE Security Associations initiated by this gateway
+        family: 'Network/VPN/IPSec/IKE/SA/Active/Initiator'
+        unit: "{sa}"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.9.1.3.0
+      name: cpvIKECurrRespSAs
+      chart_meta:
+        description: Current IKE Security Associations responded to by this gateway
+        family: 'Network/VPN/IPSec/IKE/SA/Active/Responder'
+        unit: "{sa}"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.9.1.4.0
+      name: cpvIKETotalSAs
+      chart_meta:
+        description: IKE Security Associations created per second
+        family: 'Network/VPN/IPSec/IKE/SA/Total'
+        unit: "{sa}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.9.1.7.0
+      name: cpvIKETotalSAsAttempts
+      chart_meta:
+        description: IKE SA negotiation attempts per second
+        family: 'Network/VPN/IPSec/IKE/SA/Attempts'
+        unit: "{attempt}/s"
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.9.1.10.0
+      name: cpvIKEMaxConncurSAs
+      chart_meta:
+        description: Peak concurrent IKE Security Associations
+        family: 'Network/VPN/IPSec/IKE/SA/Peak'
+        unit: "{sa}"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.9.2.2.0
+      name: cpvIKENoResp
+      chart_meta:
+        description: IKE failures per second due to no response from peer
+        family: 'Network/VPN/IPSec/IKE/Failure/NoResponse'
+        unit: "{failure}/s"
+
+  # Extended IPSec SA error scalars — complement decrypt/auth/replay
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.3.4.0
+      name: cpvSaPolicyErr
+      chart_meta:
+        description: IPSec SA policy errors per second
+        family: 'Network/VPN/IPSec/SA/Error/Policy'
+        unit: "{error}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.3.5.0
+      name: cpvSaOtherErrIn
+      chart_meta:
+        description: IPSec SA other inbound errors per second
+        family: 'Network/VPN/IPSec/SA/Error/Other/In'
+        unit: "{error}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.3.6.0
+      name: cpvSaOtherErrOut
+      chart_meta:
+        description: IPSec SA other outbound errors per second
+        family: 'Network/VPN/IPSec/SA/Error/Other/Out'
+        unit: "{error}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.3.7.0
+      name: cpvSaUnknownSpiErr
+      chart_meta:
+        description: IPSec SA unknown SPI errors per second
+        family: 'Network/VPN/IPSec/SA/Error/UnknownSPI'
+        unit: "{error}/s"
+
+  # NAT-Traversal (UDP-encapsulated ESP) packet counters
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.4.1.0
+      name: cpvIpsecUdpEspEncPkts
+      chart_meta:
+        description: NAT-T UDP-encapsulated ESP encrypted packets per second
+        family: 'Network/VPN/IPSec/Traffic/Packet/NatT/Out'
+        unit: "{packet}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.4.2.0
+      name: cpvIpsecUdpEspDecPkts
+      chart_meta:
+        description: NAT-T UDP-encapsulated ESP decrypted packets per second
+        family: 'Network/VPN/IPSec/Traffic/Packet/NatT/In'
+        unit: "{packet}/s"

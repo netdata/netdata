@@ -51,12 +51,10 @@ func Run(a *agent.Agent) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		runDone := make(chan struct{})
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer close(runDone)
 			a.RunContext(ctx)
-		}()
+		})
 
 		select {
 		case sig := <-ch:
