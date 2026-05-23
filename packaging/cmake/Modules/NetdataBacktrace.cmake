@@ -15,26 +15,13 @@ function(netdata_bundle_libbacktrace)
         set(libbacktrace_INSTALL_DIR "${CMAKE_BINARY_DIR}/libbacktrace-install")
         set(libbacktrace_LIBRARY "${libbacktrace_INSTALL_DIR}/lib/libbacktrace.a")
 
-        # libbacktrace's configure script is a POSIX shell script. On Linux
-        # and macOS it runs directly because the OS associates the shebang
-        # with /bin/sh. On Windows under MSYSTEM=UCRT64 the cmake/ninja stack
-        # is native Windows and dispatches commands via cmd.exe, which has
-        # no concept of shebangs and refuses to execute the file. Invoke the
-        # script through bash explicitly on Windows; bash.exe is on PATH via
-        # /usr/bin under MSYS2.
-        if(OS_WINDOWS)
-                set(_nd_libbacktrace_configure bash "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
-        else()
-                set(_nd_libbacktrace_configure "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
-        endif()
-
         # Clone and build libbacktrace
         ExternalProject_Add(
                 libbacktrace
                 GIT_REPOSITORY https://github.com/ianlancetaylor/libbacktrace.git
                 SOURCE_DIR "${libbacktrace_SOURCE_DIR}"
                 BINARY_DIR "${libbacktrace_BINARY_DIR}"
-                CONFIGURE_COMMAND ${_nd_libbacktrace_configure}
+                CONFIGURE_COMMAND "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static
                 BUILD_COMMAND make install
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS "${libbacktrace_LIBRARY}"
