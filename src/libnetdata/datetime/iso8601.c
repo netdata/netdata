@@ -49,7 +49,7 @@ size_t iso8601_datetime_ut(char *buffer, size_t len, usec_t now_ut, ISO8601_OPTI
     }
     else {
         // Calculate the timezone offset in hours and minutes from UTC.
-        long offset = tmbuf.tm_gmtoff;
+        long offset = nd_tm_gmtoff(&tmbuf);
         int hours = (int) (offset / 3600); // Convert offset seconds to hours.
         int minutes = (int) ((offset % 3600) / 60); // Convert remainder to minutes (keep the sign for minutes).
 
