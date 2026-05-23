@@ -171,7 +171,12 @@ typedef uint32_t uid_t;
 #define	LOG_LOCAL7	(23<<3)	/* reserved for local use */
 #endif
 
-#ifdef HAVE_SYS_MMAN_H
+#if defined(OS_WINDOWS)
+// UCRT64 ships no <sys/mman.h>; provide a POSIX-shaped shim built on
+// top of CreateFileMappingW/MapViewOfFile and VirtualAlloc. See
+// memory/mman-win32.h for the supported subset and the rationale.
+#include "memory/mman-win32.h"
+#elif defined(HAVE_SYS_MMAN_H)
 #include <sys/mman.h>
 #endif
 

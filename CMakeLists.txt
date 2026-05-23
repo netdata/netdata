@@ -1263,6 +1263,8 @@ if(OS_WINDOWS)
     set(LIBNETDATA_WIN_FILES
             src/libnetdata/os/windows-api/windows_api.c
             src/libnetdata/os/windows-api/windows_api.h
+            src/libnetdata/memory/mman-win32.c
+            src/libnetdata/memory/mman-win32.h
     )
 
     list(APPEND LIBNETDATA_FILES ${LIBNETDATA_WIN_FILES})
