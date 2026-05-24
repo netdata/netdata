@@ -470,7 +470,11 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUG
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
+if((ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS) AND NOT OS_WINDOWS)
+    # ndsudo is a setuid privilege-drop helper that plugins use to drop
+    # to the netdata user before running. POSIX-only (setuid/setgid/setegid);
+    # Windows has no equivalent and netdata.exe runs under a configured
+    # service account instead.
     set(NEED_NDSUDO TRUE)
 else()
     set(NEED_NDSUDO FALSE)
