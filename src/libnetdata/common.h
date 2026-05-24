@@ -609,6 +609,21 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 #define poll(fds, nfds, timeout) WSAPoll((fds), (nfds), (timeout))
 #endif
 
+// strcasestr() is a GNU/BSD extension, not POSIX, and UCRT64 omits it.
+// Provide a portable inline implementation. Behaviour matches glibc:
+// returns a pointer into haystack at the first case-insensitive match
+// of needle, NULL if not found, haystack itself if needle is empty.
+static inline char *strcasestr(const char *haystack, const char *needle) {
+    if (!*needle)
+        return (char *)haystack;
+    size_t nlen = strlen(needle);
+    for (; *haystack; haystack++) {
+        if (strncasecmp(haystack, needle, nlen) == 0)
+            return (char *)haystack;
+    }
+    return NULL;
+}
+
 // UCRT64 has no readlink() (POSIX) and no S_IFLNK in <sys/stat.h>:
 // Windows reparse points are reachable through GetFinalPathNameByHandle,
 // not through readlink semantics. Two Windows-built call sites
