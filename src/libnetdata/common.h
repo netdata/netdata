@@ -992,6 +992,13 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
     setsockopt((s), (level), (optname), (const char *)(const void *)(optval), (optlen))
 #endif
 
+// wcscasecmp() is the POSIX wide-string case-insensitive compare.
+// UCRT exposes Microsoft's _wcsicmp() with the same signature and
+// semantics. Alias so windows-events.plugin compiles unchanged.
+#ifndef wcscasecmp
+#define wcscasecmp _wcsicmp
+#endif
+
 // strcasestr() is a GNU/BSD extension, not POSIX, and UCRT64 omits it.
 // Provide a portable inline implementation. Behaviour matches glibc:
 // returns a pointer into haystack at the first case-insensitive match
