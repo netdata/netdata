@@ -539,6 +539,14 @@ static inline struct tm *localtime_r(const time_t *timep, struct tm *result) {
     return (localtime_s(result, timep) == 0) ? result : NULL;
 }
 
+// strerror_r() has the same shape: UCRT exposes strerror_s() with
+// reversed argument order (buf first, errnum last). nd_log-internals.c
+// auto-detects via _Generic on the return type; the XSI POSIX form
+// returns int, which matches strerror_s and what we forward here.
+static inline int strerror_r(int errnum, char *buf, size_t buflen) {
+    return (int)strerror_s(buf, buflen, errnum);
+}
+
 // UCRT64 has no <sys/resource.h>: no struct rlimit, no getrlimit /
 // setrlimit, no RLIMIT_NOFILE / RLIMIT_CORE / RLIM_INFINITY. Provide a
 // minimal POSIX-shaped shim covering the two resources netdata actually
