@@ -1089,7 +1089,7 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 // sites pass typed buffers (int *, struct timeval *, struct linger *,
 // ...) -- compilation succeeds on Linux/macOS/FreeBSD via the
 // implicit void * conversion and fails on Windows with
-// -Wincompatible-pointer-types.
+// -Wincompatible-pointer-types (and in C++ rejected outright).
 //
 // Wrap with self-referencing macros that cast the option-value
 // argument to `char *`. C99 6.10.3 guarantees no infinite expansion:
@@ -1104,6 +1104,21 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 #ifndef setsockopt
 #define setsockopt(s, level, optname, optval, optlen) \
     setsockopt((s), (level), (optname), (const char *)(const void *)(optval), (optlen))
+#endif
+
+// Winsock recv()/send() use `char *` / `const char *` for the buffer
+// argument; POSIX uses `void *` / `const void *`. nd-sock.h's static
+// inlines pass `void *` directly -- builds fine in C (implicit
+// conversion) but fails in C++ (e.g. ml/ad_charts.cc which includes
+// nd-sock.h transitively). Same macro pattern as get/setsockopt:
+// cast the buffer arg to char * / const char * for Winsock.
+#ifndef recv
+#define recv(s, buf, len, flags) \
+    recv((s), (char *)(void *)(buf), (len), (flags))
+#endif
+#ifndef send
+#define send(s, buf, len, flags) \
+    send((s), (const char *)(const void *)(buf), (len), (flags))
 #endif
 
 // wcscasecmp() is the POSIX wide-string case-insensitive compare.
