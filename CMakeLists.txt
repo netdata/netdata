@@ -4369,6 +4369,21 @@ if(ENABLE_PLUGIN_GO)
 
     install(DIRECTORY
             COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
+
+    file(GLOB GO_SNMP_TRAP_PROFILE_FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/*.yaml)
+    install(FILES ${GO_SNMP_TRAP_PROFILE_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
+    install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles)
     install(DIRECTORY
             COMPONENT plugin-go
