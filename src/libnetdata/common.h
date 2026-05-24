@@ -522,6 +522,112 @@ static inline int getpwnam_r(const char *name, struct passwd *pwd, char *buf, si
 // and socket/listen-sockets.c get the declaration for free.
 #include <iphlpapi.h>
 
+// UCRT has the C-standard signal() / SIG_DFL / SIG_IGN / SIGINT etc.
+// but none of POSIX's sigaction / siginfo_t / sigset_t / sigsetjmp
+// API. signal-handler.c and protected-access.{h,c} use those types
+// freely. Master compiled this code under MSYS-gcc only because the
+// Cygwin runtime emulates POSIX signals.
+//
+// Provide the type and function surface as no-op stubs so the files
+// compile. Signal handling on Windows degrades to "C-standard
+// signal()" behaviour: SIGINT/SIGTERM still work for clean shutdown
+// via the default handler, but no chained handlers, no
+// SIGBUS/SIGSEGV mmap-fault recovery, no signal masking. This
+// matches master's effective behaviour (the POSIX-shaped calls there
+// were translated by Cygwin into best-effort SEH).
+//
+// Proper Windows signal handling -- SEH-based mmap fault recovery,
+// CTRL+C handler via SetConsoleCtrlHandler, structured exception
+// translation -- is a separate workstream.
+typedef unsigned long sigset_t;
+
+typedef struct {
+    int   si_signo;
+    int   si_errno;
+    int   si_code;
+    void *si_addr;
+} siginfo_t;
+
+struct sigaction {
+    union {
+        void (*sa_handler)(int);
+        void (*sa_sigaction)(int, siginfo_t *, void *);
+    };
+    sigset_t sa_mask;
+    int      sa_flags;
+};
+
+#ifndef SA_SIGINFO
+#define SA_SIGINFO    0x0004
+#endif
+#ifndef SA_NODEFER
+#define SA_NODEFER    0x0040
+#endif
+#ifndef SA_RESETHAND
+#define SA_RESETHAND  0x0080
+#endif
+#ifndef SA_RESTART
+#define SA_RESTART    0x0010
+#endif
+#ifndef SIG_BLOCK
+#define SIG_BLOCK     0
+#endif
+#ifndef SIG_UNBLOCK
+#define SIG_UNBLOCK   1
+#endif
+#ifndef SIG_SETMASK
+#define SIG_SETMASK   2
+#endif
+#ifndef SI_USER
+#define SI_USER       0
+#endif
+#ifndef SEGV_MAPERR
+#define SEGV_MAPERR   1
+#endif
+#ifndef SEGV_ACCERR
+#define SEGV_ACCERR   2
+#endif
+#ifndef BUS_ADRALN
+#define BUS_ADRALN    1
+#endif
+#ifndef BUS_ADRERR
+#define BUS_ADRERR    2
+#endif
+#ifndef BUS_OBJERR
+#define BUS_OBJERR    3
+#endif
+
+static inline int sigemptyset(sigset_t *set)            { if (set) *set = 0; return 0; }
+static inline int sigfillset(sigset_t *set)             { if (set) *set = (sigset_t)-1; return 0; }
+static inline int sigaddset(sigset_t *set, int signo)   { (void)signo; if (set) *set |= 1u; return 0; }
+static inline int sigdelset(sigset_t *set, int signo)   { (void)signo; (void)set; return 0; }
+static inline int sigismember(const sigset_t *set, int signo) { (void)set; (void)signo; return 0; }
+static inline int sigprocmask(int how, const sigset_t *set, sigset_t *oset) {
+    (void)how; (void)set; (void)oset; return 0;
+}
+static inline int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact) {
+    (void)signum; (void)act;
+    if (oldact) {
+        oldact->sa_handler = (void (*)(int))0;
+        oldact->sa_mask = 0;
+        oldact->sa_flags = 0;
+    }
+    return 0;
+}
+
+// sigsetjmp / siglongjmp degrade to plain setjmp / longjmp. The
+// "savemask" argument is irrelevant -- signal masks aren't a thing
+// here -- so we discard it. This is what mingw-w64's _setjmp/_longjmp
+// already are under the hood.
+#include <setjmp.h>
+typedef jmp_buf sigjmp_buf;
+#ifndef sigsetjmp
+#define sigsetjmp(env, savemask) setjmp(env)
+#endif
+#ifndef siglongjmp
+#define siglongjmp(env, val) longjmp((env), (val))
+#endif
+
 // ffs() (find-first-set, 1-based, returns 0 if no bits set) is a POSIX
 // function from <strings.h>. UCRT64 doesn't have it. gcc has
 // __builtin_ffs always available, and rrdenginelib.h calls ffs() in
