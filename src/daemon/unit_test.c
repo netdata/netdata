@@ -2,6 +2,10 @@
 
 #include "common.h"
 
+#if defined(OS_LINUX)
+#include "collectors/proc.plugin/plugin_proc.h"
+#endif
+
 static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
     bool ok = sanitize_command_argument_string(dst, src, dst_size);
 
@@ -1464,6 +1468,11 @@ int run_all_mockup_tests(void)
 
     if(check_rrdcalc_comparisons())
         return 1;
+
+#if defined(OS_LINUX)
+    if(proc_interrupts_unittest())
+        return 1;
+#endif
 
     if(!test_variable_renames())
         return 1;
