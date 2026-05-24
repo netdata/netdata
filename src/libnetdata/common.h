@@ -780,22 +780,18 @@ static inline int setgroups(int n, const gid_t *list) {
 static inline pid_t fork(void)   { errno = ENOSYS; return -1; }
 static inline pid_t setsid(void) { errno = ENOSYS; return -1; }
 
-// sched_getparam / sched_setscheduler are POSIX scheduling primitives.
-// Windows uses SetPriorityClass / SetThreadPriority instead. daemon.c
-// calls sched_getparam to inspect the current priority before applying
-// SCHED_BATCH / SCHED_IDLE -- not applicable on Windows.
-struct sched_param { int sched_priority; };
+// winpthreads (already pulled in via <pthread.h>) provides struct
+// sched_param, SCHED_OTHER/SCHED_FIFO/SCHED_RR, and sched_setscheduler.
+// It does NOT provide sched_getparam (the read-side counterpart that
+// daemon.c uses to inspect the current priority before applying
+// SCHED_BATCH/SCHED_IDLE) or the SCHED_BATCH/SCHED_IDLE constants.
+// Provide just those gaps.
+#include <sched.h>
 static inline int sched_getparam(pid_t pid, struct sched_param *p) {
     (void)pid;
     if (p) p->sched_priority = 0;
     return 0;
 }
-static inline int sched_setscheduler(pid_t pid, int policy, const struct sched_param *p) {
-    (void)pid; (void)policy; (void)p; return 0;
-}
-#ifndef SCHED_OTHER
-#define SCHED_OTHER 0
-#endif
 #ifndef SCHED_BATCH
 #define SCHED_BATCH 3
 #endif
