@@ -664,7 +664,14 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # -funwind-tables = generate unwind tables for all functions
     # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
     add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
-    add_link_options(-rdynamic)
+    # -rdynamic exports all dynamic symbols so backtrace can resolve them
+    # at runtime. ELF/Mach-O linkers support it; the mingw-w64 binutils
+    # ld variant on Windows doesn't (PE/COFF exports work through
+    # __declspec(dllexport) or .def files instead). Skip on Windows
+    # so NetdataClaim / windows-events.plugin / etc. can link.
+    if(NOT OS_WINDOWS)
+        add_link_options(-rdynamic)
+    endif()
     message(STATUS "Added compiler and linker flags for better stack trace support")
 endif()
 
