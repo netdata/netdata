@@ -1,0 +1,22 @@
+# Empty [workspace] makes this Cargo.toml a workspace root in its own right,
+# so the parent workspace at src/crates/Cargo.toml does not try to claim it.
+# Same trick used by rust-demo (and jf via the parent's `exclude`).
+[workspace]
+
+[package]
+name = "wevt-builder"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+publish = false
+description = "Build-time orchestrator that runs the Microsoft mc.exe / rc.exe / link.exe toolchain to compile Netdata's Windows Event Log resource bundle. Replaces the previous wevt_netdata_compile.sh / .bat / find-sdk-path.sh chain, which depended on the MSYS shell's POSIX path translation and on the MSYS cmake routing COMMAND through /bin/sh -- neither works under MSYSTEM=UCRT64."
+
+[[bin]]
+name = "wevt-builder"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

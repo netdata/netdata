@@ -251,8 +251,12 @@ cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's jour
 # end of SOW-0033 (Phase 7) to validate Rust-on-Windows end-to-end.
 option(ENABLE_RUST_DEMO "Build the rust-demo smoke crate and link it into netdata" False)
 
-# Setup Rust/Corrosion for plugins that need it
-if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW OR ENABLE_RUST_DEMO)
+# Setup Rust/Corrosion for plugins (and the Windows wevt-builder build tool) that need it.
+# The Windows build always pulls in wevt-builder because the wevt resource pipeline is the
+# Rust toolchain's first production-path job under MSYSTEM=UCRT64 (replaces the old
+# wevt_netdata_compile.sh/.bat chain that depended on the MSYS POSIX cmake routing
+# COMMAND through /bin/sh).
+if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW OR ENABLE_RUST_DEMO OR OS_WINDOWS)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
@@ -275,6 +279,17 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
     if(ENABLE_RUST_DEMO)
         corrosion_import_crate(MANIFEST_PATH src/crates/rust-demo/Cargo.toml
                                CRATES rust_demo)
+    endif()
+
+    if(OS_WINDOWS)
+        # wevt-builder is a build-time orchestrator for mc.exe / rc.exe /
+        # link.exe (the Windows Event Log resource pipeline). It replaces
+        # the old wevt_netdata_compile.{sh,bat} + find-sdk-path.sh chain
+        # that worked only when cmake routed COMMAND through /bin/sh -- a
+        # property of the MSYS-runtime cmake at /usr/bin/cmake, not the
+        # UCRT64 cmake at /ucrt64/bin/cmake.exe that we now use.
+        corrosion_import_crate(MANIFEST_PATH src/crates/wevt-builder/Cargo.toml
+                               CRATES wevt-builder)
     endif()
 
     # Import crates from the main cargo workspace
@@ -2444,8 +2459,6 @@ if(OS_WINDOWS)
                 set(WEVT_GEN_SRC_C_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_mc_generate.c")
                 set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
 
-                set(WEVT_BUILD_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_compile.sh")
-
                 set(WEVT_MC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.mc")
                 set(WEVT_MAN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.xml")
                 set(WEVT_RC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.rc")
@@ -2460,15 +2473,20 @@ if(OS_WINDOWS)
                 # and the headers required for compiling libnetdata/logs
 
                 if(HAVE_ETW)
-                        # ETW method also supports WEL
-                        # but it requires Microsoft tools mc, rc, and link
+                        # ETW method also supports WEL.
+                        # Resource compilation requires the Microsoft mc/rc/link
+                        # toolchain, orchestrated by the wevt-builder Rust crate
+                        # (src/crates/wevt-builder). The previous bash+cmd.exe
+                        # wrapper worked only under MSYS-runtime cmake routing
+                        # COMMAND through /bin/sh -- a property the UCRT64 cmake
+                        # we now use does not share.
                         add_custom_command(
                                 OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_H_FILE}" "${WEVT_DLL_FILE}"
                                 COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
-                                COMMAND "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
-                                DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
+                                COMMAND $<TARGET_FILE:wevt-builder> "${CMAKE_BINARY_DIR}"
+                                DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}" wevt-builder
                                 COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                         )
                 else()
