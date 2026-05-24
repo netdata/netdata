@@ -609,6 +609,28 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 #define poll(fds, nfds, timeout) WSAPoll((fds), (nfds), (timeout))
 #endif
 
+// Winsock declares getsockopt() and setsockopt() with `char *` as the
+// option-value argument, while POSIX uses `void *`. Existing call
+// sites pass typed buffers (int *, struct timeval *, struct linger *,
+// ...) -- compilation succeeds on Linux/macOS/FreeBSD via the
+// implicit void * conversion and fails on Windows with
+// -Wincompatible-pointer-types.
+//
+// Wrap with self-referencing macros that cast the option-value
+// argument to `char *`. C99 6.10.3 guarantees no infinite expansion:
+// the inner getsockopt/setsockopt resolve to the Winsock functions.
+// The double cast (`void *` then `char *`) is intentional -- it strips
+// `const` qualifiers callers might pass into setsockopt without
+// triggering -Wcast-qual.
+#ifndef getsockopt
+#define getsockopt(s, level, optname, optval, optlen) \
+    getsockopt((s), (level), (optname), (char *)(void *)(optval), (optlen))
+#endif
+#ifndef setsockopt
+#define setsockopt(s, level, optname, optval, optlen) \
+    setsockopt((s), (level), (optname), (const char *)(const void *)(optval), (optlen))
+#endif
+
 // strcasestr() is a GNU/BSD extension, not POSIX, and UCRT64 omits it.
 // Provide a portable inline implementation. Behaviour matches glibc:
 // returns a pointer into haystack at the first case-insensitive match
