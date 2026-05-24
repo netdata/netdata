@@ -99,11 +99,21 @@ static bool websocket_thread_init_poll(WEBSOCKET_THREAD *wth) {
             goto cleanup;
         }
 
-        // Set pipe to non-blocking
+#if !defined(OS_WINDOWS)
+        // Set pipe to non-blocking. fcntl(F_SETFL, O_NONBLOCK) on a
+        // POSIX pipe fd flips the read-side to "return EAGAIN when
+        // empty" so the poll-driven reader can drain everything
+        // without a final blocking read. UCRT64 has no fcntl(), and
+        // anonymous pipes from _pipe() aren't trivially switchable
+        // to non-blocking (SetNamedPipeHandleState applies to named
+        // pipes; CRT-fd pipes have no documented per-fd toggle).
+        // The websocket command pipe is for short, well-bounded
+        // signal bytes -- a blocking short-read is fine in practice.
         if(fcntl(wth->cmd.pipe[PIPE_READ], F_SETFL, O_NONBLOCK) == -1) {
             netdata_log_error("WEBSOCKET[%zu]: Failed to set command pipe to non-blocking: %s", wth->id, strerror(errno));
             goto cleanup;
         }
+#endif
 
         // Add command pipe to poll
         bool added = nd_poll_add(wth->ndpl, wth->cmd.pipe[PIPE_READ], ND_POLL_READ, &wth->cmd);
