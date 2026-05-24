@@ -1159,6 +1159,19 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
     setsockopt((s), (level), (optname), (const char *)(const void *)(optval), (optlen))
 #endif
 
+// shutdown() takes SHUT_RD/SHUT_WR/SHUT_RDWR on POSIX; Winsock uses
+// SD_RECEIVE/SD_SEND/SD_BOTH (same numeric values). Alias the POSIX
+// names so call sites compile unchanged.
+#ifndef SHUT_RD
+#define SHUT_RD   SD_RECEIVE
+#endif
+#ifndef SHUT_WR
+#define SHUT_WR   SD_SEND
+#endif
+#ifndef SHUT_RDWR
+#define SHUT_RDWR SD_BOTH
+#endif
+
 // Winsock recv()/send() use `char *` / `const char *` for the buffer
 // argument; POSIX uses `void *` / `const void *`. nd-sock.h's static
 // inlines pass `void *` directly -- builds fine in C (implicit
