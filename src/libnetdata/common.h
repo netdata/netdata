@@ -599,6 +599,31 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 #define _SC_OPEN_MAX            6
 #endif
 
+// UCRT64 has no readlink() (POSIX) and no S_IFLNK in <sys/stat.h>:
+// Windows reparse points are reachable through GetFinalPathNameByHandle,
+// not through readlink semantics. Two Windows-built call sites
+// dereference these (paths/paths.c symlink-chain resolver, procfile
+// filename-for-error-message getter); both already handle "no symlink
+// here" gracefully -- paths.c gates the readlink call on the
+// S_IFLNK == st_mode & S_IFMT check (false on Windows since stat never
+// returns this bit), procfile.c falls through to "unknown filename for
+// fd %d" when readlink returns -1.
+//
+// Use the Linux value for S_IFLNK so the macro is non-zero (callers
+// that fold it into bitmasks don't silently match dirs/regular files)
+// and provide a readlink() that returns -1 / EINVAL.
+#ifndef S_IFLNK
+#define S_IFLNK 0xA000
+#endif
+
+static inline ssize_t readlink(const char *path, char *buf, size_t bufsiz) {
+    (void)path;
+    (void)buf;
+    (void)bufsiz;
+    errno = EINVAL;
+    return -1;
+}
+
 static inline long sysconf(int name) {
     SYSTEM_INFO si;
     switch (name) {
