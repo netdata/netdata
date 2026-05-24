@@ -599,6 +599,16 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 #define _SC_OPEN_MAX            6
 #endif
 
+// Winsock's WSAPoll() is the documented Windows equivalent of POSIX
+// poll() since Vista, with identical signature for struct pollfd and
+// the POLLIN/POLLOUT/POLLHUP/POLLERR constants. Macro-rename so call
+// sites compile unchanged. The macro is self-referencing -- C99 6.10.3
+// guarantees the inner identifier resolves to the function, not the
+// macro -- so no infinite expansion.
+#ifndef poll
+#define poll(fds, nfds, timeout) WSAPoll((fds), (nfds), (timeout))
+#endif
+
 // UCRT64 has no readlink() (POSIX) and no S_IFLNK in <sys/stat.h>:
 // Windows reparse points are reachable through GetFinalPathNameByHandle,
 // not through readlink semantics. Two Windows-built call sites
