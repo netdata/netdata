@@ -886,6 +886,24 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 // consumer reading the resulting status can recognise it.
 #define SIGTRAP 5
 #endif
+// Remaining POSIX-only signal numbers used by signals.c (deadly-signal
+// unblock list). mingw-w64's <signal.h> gates SIGBUS/SIGSYS on _POSIX;
+// SIGXCPU and SIGXFSZ are not defined at all. Use the standard glibc
+// numeric values so the signal_code lookup tables stay consistent if
+// any of these ever do appear on the wire under a Cygwin-emulation
+// path -- on a clean UCRT64 Windows process they never get raised.
+#ifndef SIGBUS
+#define SIGBUS    10
+#endif
+#ifndef SIGSYS
+#define SIGSYS    12
+#endif
+#ifndef SIGXCPU
+#define SIGXCPU   24
+#endif
+#ifndef SIGXFSZ
+#define SIGXFSZ   25
+#endif
 
 // Winsock's WSAPoll() is the documented Windows equivalent of POSIX
 // poll() since Vista, with identical signature for struct pollfd and
@@ -933,6 +951,16 @@ static inline char *strcasestr(const char *haystack, const char *needle) {
     }
     return NULL;
 }
+
+// lstat() is a POSIX symlink-aware stat. UCRT has stat() but no lstat()
+// (Windows symlinks via reparse points are reachable through different
+// APIs, not the POSIX file-mode model). Since S_IFLNK is also missing,
+// readlink() is a stub, and we don't follow Windows symlinks elsewhere,
+// alias lstat -> stat. dir_size.c's inode-device loop detection still
+// works against the regular stat path.
+#ifndef lstat
+#define lstat(path, buf) stat((path), (buf))
+#endif
 
 // UCRT64 has no readlink() (POSIX) and no S_IFLNK in <sys/stat.h>:
 // Windows reparse points are reachable through GetFinalPathNameByHandle,
