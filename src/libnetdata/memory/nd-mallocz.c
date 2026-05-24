@@ -495,7 +495,15 @@ int posix_memalignz(void **memptr, size_t alignment, size_t size) {
 ALWAYS_INLINE
 void posix_memalign_freez(void *ptr) {
     workers_memory_call(WORKERS_MEMORY_CALL_LIBC_POSIX_MEMALIGN_FREE);
+#if defined(OS_WINDOWS)
+    // Memory from our posix_memalign shim (common.h) was allocated
+    // via _aligned_malloc and must be released through _aligned_free.
+    // Calling plain free() on a _aligned_malloc result corrupts the
+    // heap on Windows.
+    _aligned_free(ptr);
+#else
     free(ptr);
+#endif
 }
 #endif
 

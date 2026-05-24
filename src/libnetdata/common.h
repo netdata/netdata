@@ -514,6 +514,25 @@ static inline int getpwnam_r(const char *name, struct passwd *pwd, char *buf, si
 // and socket/listen-sockets.c get the declaration for free.
 #include <iphlpapi.h>
 
+// posix_memalign() has no UCRT equivalent. UCRT exposes
+// _aligned_malloc(size, alignment) -- args swapped vs POSIX, returns
+// pointer-or-NULL instead of int-errno, and memory allocated this way
+// MUST be released with _aligned_free, NOT free(). Provide a POSIX
+// adapter so nd-mallocz.c's posix_memalignz() compiles unchanged.
+// nd-mallocz.c's matching posix_memalign_freez() is patched separately
+// to route through _aligned_free on Windows.
+#include <malloc.h>
+static inline int posix_memalign(void **memptr, size_t alignment, size_t size) {
+    if (!memptr) return EINVAL;
+    void *p = _aligned_malloc(size, alignment);
+    if (!p) {
+        *memptr = NULL;
+        return ENOMEM;
+    }
+    *memptr = p;
+    return 0;
+}
+
 // UCRT has the C-standard signal() / SIG_DFL / SIG_IGN / SIGINT etc.
 // but none of POSIX's sigaction / siginfo_t / sigset_t / sigsetjmp
 // API. signal-handler.c and protected-access.{h,c} use those types
