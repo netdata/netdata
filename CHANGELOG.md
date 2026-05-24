@@ -214,6 +214,9 @@
 - Add topology v1 payload contract and producers ([#22496](https://github.com/netdata/netdata/issues/22496))
 - Fix static journal facet filters ([#22456](https://github.com/netdata/netdata/issues/22456))
 - Update remove-node.md ([#22531](https://github.com/netdata/netdata/issues/22531))
+- Go.d/vsphere: migrate to framework v2 and expand coverage ([#22458](https://github.com/netdata/netdata/issues/22458))
+- Regenerate integrations docs ([#22549](https://github.com/netdata/netdata/issues/22549))
+- Improve ML chart access ([#22530](https://github.com/netdata/netdata/issues/22530))
 
 ## [2.10.0] - 2026-04-09
 
