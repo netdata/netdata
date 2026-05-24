@@ -476,9 +476,24 @@ ssize_t send_timeout(NETDATA_SSL *ssl, int sockfd, void *buf, size_t len, int fl
 #ifndef HAVE_ACCEPT4
 int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
     int fd = accept(sock, addr, addrlen);
-    int newflags = 0;
-
     if (fd < 0) return fd;
+
+#if defined(OS_WINDOWS)
+    // Winsock has plain accept() but no Linux SOCK_CLOEXEC /
+    // SOCK_NONBLOCK accept-flag mechanism. DEFAULT_SOCKET_FLAGS
+    // expands to 0 on Windows (SOCK_CLOEXEC undefined), and the only
+    // poll-events caller routes non-blocking through
+    // sock_setnonblock() post-accept, so the only valid flags value
+    // we can ever see here is 0. Reject anything else loudly rather
+    // than silently dropping a requested flag.
+    if (flags) {
+        closesocket((SOCKET)fd);
+        errno = EINVAL;
+        return -1;
+    }
+    return fd;
+#else
+    int newflags = 0;
 
 #ifdef SOCK_CLOEXEC
 #ifdef O_CLOEXEC
@@ -503,6 +518,7 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
     }
 
     return fd;
+#endif
 }
 #endif
 
