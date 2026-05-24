@@ -117,12 +117,55 @@ extern "C" {
 #include <grp.h>
 #else
 typedef uint32_t gid_t;
+// Windows has no POSIX group database (NTFS / SIDs / ACLs instead).
+// Provide a struct group + getgrgid/getgrnam/getgrgid_r stubs so
+// cross-platform callers compile. All stubs report "not found" so
+// the existing fallback paths (numeric gid formatting, default
+// group, etc.) take over.
+struct group {
+    char  *gr_name;
+    char  *gr_passwd;
+    gid_t  gr_gid;
+    char **gr_mem;
+};
+static inline struct group *getgrgid(gid_t gid) { (void)gid; return NULL; }
+static inline struct group *getgrnam(const char *name) { (void)name; return NULL; }
+static inline int getgrgid_r(gid_t gid, struct group *grp, char *buf, size_t buflen, struct group **result) {
+    (void)gid; (void)grp; (void)buf; (void)buflen;
+    if (result) *result = NULL;
+    return ENOENT;
+}
 #endif
 
 #ifdef HAVE_PWD_H
 #include <pwd.h>
 #else
 typedef uint32_t uid_t;
+// Windows has no POSIX user database. Same stub strategy as struct
+// group above: provide just enough surface so call sites compile, and
+// signal "no entry" at runtime so the existing pw == NULL / non-zero
+// return fallbacks run.
+struct passwd {
+    char  *pw_name;
+    char  *pw_passwd;
+    uid_t  pw_uid;
+    gid_t  pw_gid;
+    char  *pw_gecos;
+    char  *pw_dir;
+    char  *pw_shell;
+};
+static inline struct passwd *getpwuid(uid_t uid) { (void)uid; return NULL; }
+static inline struct passwd *getpwnam(const char *name) { (void)name; return NULL; }
+static inline int getpwuid_r(uid_t uid, struct passwd *pwd, char *buf, size_t buflen, struct passwd **result) {
+    (void)uid; (void)pwd; (void)buf; (void)buflen;
+    if (result) *result = NULL;
+    return ENOENT;
+}
+static inline int getpwnam_r(const char *name, struct passwd *pwd, char *buf, size_t buflen, struct passwd **result) {
+    (void)name; (void)pwd; (void)buf; (void)buflen;
+    if (result) *result = NULL;
+    return ENOENT;
+}
 #endif
 
 #ifdef HAVE_NET_IF_H
