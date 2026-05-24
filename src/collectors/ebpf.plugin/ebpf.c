@@ -847,7 +847,6 @@ static bool ebpf_pre_exit_check_done = false;
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
-struct cachestat_bpf *cachestat_bpf_obj = NULL;
 struct dc_bpf *dc_bpf_obj = NULL;
 struct disk_bpf *disk_bpf_obj = NULL;
 struct fd_bpf *fd_bpf_obj = NULL;
@@ -1230,7 +1229,6 @@ static void ebpf_parse_args(int argc, char **argv)
     static struct option long_options[] = {
         {"process", no_argument, 0, 0},
         {"net", no_argument, 0, 0},
-        {"cachestat", no_argument, 0, 0},
         {"sync", no_argument, 0, 0},
         {"dcstat", no_argument, 0, 0},
         {"swap", no_argument, 0, 0},
@@ -1297,14 +1295,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 select_threads |= 1 << EBPF_MODULE_SOCKET_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("EBPF enabling \"NET\" charts, because it was started with the option \"[-]-net\".");
-#endif
-                break;
-            }
-            case EBPF_MODULE_CACHESTAT_IDX: {
-                select_threads |= 1 << EBPF_MODULE_CACHESTAT_IDX;
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info(
-                    "EBPF enabling \"CACHESTAT\" charts, because it was started with the option \"[-]-cachestat\".");
 #endif
                 break;
             }

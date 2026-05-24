@@ -35,7 +35,6 @@
 
 extern size_t ebpf_hash_table_pids_count;
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
-#include "cachestat.skel.h"
 #include "dc.skel.h"
 #include "disk.skel.h"
 #include "fd.skel.h"
@@ -50,7 +49,6 @@ extern size_t ebpf_hash_table_pids_count;
 #include "swap.skel.h"
 #include "vfs.skel.h"
 
-extern struct cachestat_bpf *cachestat_bpf_obj;
 extern struct dc_bpf *dc_bpf_obj;
 extern struct disk_bpf *disk_bpf_obj;
 extern struct fd_bpf *fd_bpf_obj;

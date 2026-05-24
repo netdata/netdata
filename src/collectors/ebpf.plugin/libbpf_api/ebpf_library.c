@@ -534,11 +534,6 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
         ebpf_parse_service_name_section(&collector_config);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat", CONFIG_BOOLEAN_NO);
-    if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, *disable_cgroups);
-    }
-
     enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_cgroups);
