@@ -28,22 +28,58 @@ struct interrupt {
 // given a base, get a pointer to each record
 #define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[(line) * recordsize(cpus)])
 
+static inline void proc_interrupts_keep_colon_in_words(procfile *ff) {
+    if(ff)
+        ff->separators[(uint8_t)':'] = PF_CHAR_IS_WORD;
+}
+
+static inline char *proc_interrupts_lineword(procfile *ff, size_t line, size_t word) {
+    if(!ff)
+        return NULL;
+
+    if(!ff->lines)
+        return NULL;
+
+    if(!ff->words)
+        return NULL;
+
+    if(line >= ff->lines->len)
+        return NULL;
+
+    ffline *pfline = &ff->lines->lines[line];
+    if(word >= pfline->words)
+        return NULL;
+
+    size_t word_index = (size_t)pfline->first + word;
+    if(word_index >= ff->words->len)
+        return NULL;
+
+    return ff->words->words[word_index];
+}
+
 static inline bool proc_interrupts_word_is_number(const char *word) {
-    if(unlikely(!word || !*word))
+    if(word == NULL)
         return false;
 
-    while(*word) {
-        if(!isdigit((uint8_t)*word))
+    const unsigned char *p = (const unsigned char *)word;
+    if(*p == '\0')
+        return false;
+
+    while(*p) {
+        if(!isdigit(*p))
             return false;
 
-        word++;
+        p++;
     }
 
     return true;
 }
 
 static inline bool proc_interrupts_word_is_trigger(const char *word) {
-    return word && (
+    if(!word)
+        return false;
+
+    return (
         strcasecmp(word, "edge") == 0 ||
         strcasecmp(word, "level") == 0 ||
         strcasecmp(word, "fasteoi") == 0);
@@ -63,7 +99,7 @@ static size_t proc_interrupts_name_first_word(procfile *ff, size_t line, int cpu
     first++;
 
     while(first < words) {
-        const char *word = procfile_lineword(ff, line, (uint32_t)first);
+        const char *word = proc_interrupts_lineword(ff, line, first);
         if(proc_interrupts_word_is_number(word) ||
             proc_interrupts_word_is_trigger(word) ||
             proc_interrupts_word_has_trigger_suffix(word))
@@ -79,6 +115,18 @@ static inline char proc_interrupts_name_char(char c) {
     return (c == ':' || isspace((uint8_t)c)) ? '_' : c;
 }
 
+static size_t proc_interrupts_strnlen(const char *s, size_t max) {
+    size_t len = 0;
+
+    if(!s)
+        return 0;
+
+    while(len < max && s[len])
+        len++;
+
+    return len;
+}
+
 static inline void proc_interrupts_append_char(char *dst, size_t *len, char c) {
     if(*len < MAX_INTERRUPT_NAME) {
         dst[*len] = c;
@@ -88,7 +136,10 @@ static inline void proc_interrupts_append_char(char *dst, size_t *len, char c) {
 }
 
 static void proc_interrupts_append_id(char *name, const char *id, size_t idlen) {
-    if(unlikely(!id || !idlen))
+    if(!id)
+        return;
+
+    if(!idlen)
         return;
 
     if(unlikely(idlen >= MAX_INTERRUPT_NAME)) {
@@ -96,7 +147,7 @@ static void proc_interrupts_append_id(char *name, const char *id, size_t idlen) 
         return;
     }
 
-    size_t nlen = strlen(name);
+    size_t nlen = proc_interrupts_strnlen(name, MAX_INTERRUPT_NAME);
     if(likely(nlen + 1 + idlen <= MAX_INTERRUPT_NAME)) {
         name[nlen] = '_';
         strncpyz(&name[nlen + 1], id, MAX_INTERRUPT_NAME - nlen - 1);
@@ -119,8 +170,11 @@ static void proc_interrupts_build_name(
 
     size_t len = 0;
     for(size_t w = first_name_word; w < words ;w++) {
-        const char *word = procfile_lineword(ff, line, (uint32_t)w);
-        if(unlikely(!word || !*word))
+        const char *word = proc_interrupts_lineword(ff, line, w);
+        if(!word)
+            continue;
+
+        if(!*word)
             continue;
 
         if(len && dst[len - 1] != '_')
@@ -176,10 +230,8 @@ int do_proc_interrupts(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/interrupts");
-        ff = procfile_open(
-            inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "filename to monitor", filename),
-            " \t",
-            PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        proc_interrupts_keep_colon_in_words(ff);
     }
     if(unlikely(!ff))
         return 1;
@@ -201,7 +253,11 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         uint32_t w;
         cpus = 0;
         for(w = 0; w < words ; w++) {
-            if(likely(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0))
+            const char *word = proc_interrupts_lineword(ff, 0, w);
+            if(!word)
+                continue;
+
+            if(likely(strncmp(word, "CPU", 3) == 0))
                 cpus++;
         }
     }
@@ -224,8 +280,9 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         words = procfile_linewords(ff, l);
         if(unlikely(!words)) continue;
 
-        irr->id = procfile_lineword(ff, l, 0);
-        if(unlikely(!irr->id || !irr->id[0])) continue;
+        irr->id = proc_interrupts_lineword(ff, l, 0);
+        if(unlikely(!irr->id)) continue;
+        if(unlikely(!irr->id[0])) continue;
 
         size_t idlen = strlen(irr->id);
         if(irr->id[idlen - 1] == ':')
@@ -233,10 +290,11 @@ int do_proc_interrupts(int update_every, usec_t dt) {
 
         int c;
         for(c = 0; c < cpus ;c++) {
+            char *word = NULL;
             if(likely((c + 1) < (int)words))
-                irr->cpu[c].value = str2ull(procfile_lineword(ff, l, (uint32_t) (c + 1)), NULL);
-            else
-                irr->cpu[c].value = 0;
+                word = proc_interrupts_lineword(ff, l, (uint32_t)(c + 1));
+
+            irr->cpu[c].value = word ? str2ull(word, NULL) : 0;
 
             irr->total += irr->cpu[c].value;
         }
@@ -351,10 +409,13 @@ int do_proc_interrupts(int update_every, usec_t dt) {
 }
 
 int proc_interrupts_unittest(void) {
-    char filename[] = "/tmp/netdata-proc-interrupts-XXXXXX";
-    int fd = mkstemp(filename);
+#if !defined(__NR_memfd_create) || !defined(MFD_CLOEXEC)
+    fprintf(stderr, "%s skipped, memfd_create() is not available.\n", __FUNCTION__);
+    return 0;
+#else
+    int fd = (int)syscall(__NR_memfd_create, "netdata-proc-interrupts", MFD_CLOEXEC);
     if(fd == -1) {
-        fprintf(stderr, "Cannot create temporary /proc/interrupts fixture: %s\n", strerror(errno));
+        fprintf(stderr, "Cannot create in-memory /proc/interrupts fixture: %s\n", strerror(errno));
         return 1;
     }
 
@@ -367,29 +428,39 @@ int proc_interrupts_unittest(void) {
         " 27:          9         10   GICv3     27 Level        arch_timer\n";
 
     if(write(fd, fixture, sizeof(fixture) - 1) != (ssize_t)sizeof(fixture) - 1) {
-        fprintf(stderr, "Cannot write temporary /proc/interrupts fixture: %s\n", strerror(errno));
+        fprintf(stderr, "Cannot write in-memory /proc/interrupts fixture: %s\n", strerror(errno));
         close(fd);
-        unlink(filename);
         return 1;
     }
+
+    if(lseek(fd, 0, SEEK_SET) == -1) {
+        fprintf(stderr, "Cannot rewind in-memory /proc/interrupts fixture: %s\n", strerror(errno));
+        close(fd);
+        return 1;
+    }
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "/proc/self/fd/%d", fd);
+
+    procfile *ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
+    proc_interrupts_keep_colon_in_words(ff);
     close(fd);
 
-    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-    if(!ff) {
-        unlink(filename);
+    if(!ff)
         return 1;
-    }
 
     ff = procfile_readall(ff);
-    if(!ff) {
-        unlink(filename);
+    if(!ff)
         return 1;
-    }
 
     size_t words = procfile_linewords(ff, 0);
     int cpus = 0;
     for(uint32_t w = 0; w < words ;w++) {
-        if(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0)
+        const char *word = proc_interrupts_lineword(ff, 0, w);
+        if(!word)
+            continue;
+
+        if(strncmp(word, "CPU", 3) == 0)
             cpus++;
     }
 
@@ -415,8 +486,14 @@ int proc_interrupts_unittest(void) {
         }
 
         char id[MAX_INTERRUPT_NAME + 1];
-        strncpyz(id, procfile_lineword(ff, line, 0), MAX_INTERRUPT_NAME);
-        size_t idlen = strlen(id);
+        const char *id_word = proc_interrupts_lineword(ff, line, 0);
+        if(!id_word) {
+            rc = 1;
+            break;
+        }
+
+        strncpyz(id, id_word, MAX_INTERRUPT_NAME);
+        size_t idlen = proc_interrupts_strnlen(id, MAX_INTERRUPT_NAME);
         if(idlen && id[idlen - 1] == ':')
             id[--idlen] = '\0';
 
@@ -449,7 +526,7 @@ int proc_interrupts_unittest(void) {
     }
 
     procfile_close(ff);
-    unlink(filename);
 
     return rc;
+#endif
 }
