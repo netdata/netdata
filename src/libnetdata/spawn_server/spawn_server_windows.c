@@ -116,18 +116,11 @@ static BUFFER *argv_to_windows(const char **argv) {
 }
 
 int set_fd_blocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_GETFL) failed");
-        return -1;
-    }
-
-    flags &= ~O_NONBLOCK;
-    if (fcntl(fd, F_SETFL, flags) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_SETFL) failed");
-        return -1;
-    }
-
+    // UCRT's _pipe() returns blocking file descriptors by default; the
+    // POSIX fcntl(F_GETFL/F_SETFL, O_NONBLOCK) toggle has no equivalent
+    // here. Anonymous pipes never get put into non-blocking mode in
+    // this code path, so flipping back to blocking is a no-op.
+    (void)fd;
     return 0;
 }
 
@@ -164,21 +157,25 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     CLEAN_BUFFER *wb = argv_to_windows(argv);
     char *command = (char *)buffer_tostring(wb);
 
-    if (pipe(pipe_stdin) == -1) {
+    // UCRT exposes _pipe(int[2], size, mode) rather than POSIX pipe();
+    // pass a 64 KiB buffer (Cygwin's historical default) and request
+    // binary mode so the bytes flowing between netdata and the spawned
+    // plugin aren't subject to CRLF translation.
+    if (_pipe(pipe_stdin, 65536, _O_BINARY) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Cannot create stdin pipe() for request No %zu, command: %s",
                instance->request_id, command);
         goto cleanup;
     }
 
-    if (pipe(pipe_stdout) == -1) {
+    if (_pipe(pipe_stdout, 65536, _O_BINARY) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Cannot create stdout pipe() for request No %zu, command: %s",
                instance->request_id, command);
         goto cleanup;
     }
 
-    if (pipe(pipe_stderr) == -1) {
+    if (_pipe(pipe_stderr, 65536, _O_BINARY) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Cannot create stderr pipe() for request No %zu, command: %s",
                instance->request_id, command);
@@ -412,7 +409,11 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
         WaitForSingleObject(si->process_handle, timeout_ms);
 
     errno_clear();
-    if(si->child_pid != -1 && kill(si->child_pid, SIGTERM) != 0)
+    // POSIX kill(pid, SIGTERM) maps to Win32 TerminateProcess() with
+    // a chosen exit-code marker. STATUS_CONTROL_C_EXIT is what
+    // map_status_code_to_signal() recognises and translates back to
+    // SIGTERM in the wait path, preserving the cross-platform contract.
+    if(si->process_handle && !TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT))
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
                si->request_id, (int)si->child_pid, si->dwProcessId);

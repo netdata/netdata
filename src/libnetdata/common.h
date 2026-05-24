@@ -667,6 +667,13 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 // compile; it never matches a real spawned-process termination.
 #define SIGPIPE 13
 #endif
+#ifndef SIGTRAP
+// UCRT has no SIGTRAP. spawn_server_windows.c uses it as the target
+// of STATUS_BREAKPOINT / STATUS_SINGLE_STEP in its NTSTATUS-to-signal
+// mapper. Use the POSIX value (5) so the case compiles and any
+// consumer reading the resulting status can recognise it.
+#define SIGTRAP 5
+#endif
 
 // Winsock's WSAPoll() is the documented Windows equivalent of POSIX
 // poll() since Vista, with identical signature for struct pollfd and
