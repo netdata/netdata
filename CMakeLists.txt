@@ -3310,12 +3310,24 @@ if(OS_WINDOWS)
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
         set_target_properties(netdata_driver PROPERTIES PREFIX "")
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
+        # The mingw-w64 DDK headers live under <prefix>/include/ddk for
+        # whichever MSYSTEM the toolchain belongs to. Under the old MSYS
+        # cmake (a Cygwin binary), the literal path "/mingw64/include/ddk"
+        # got POSIX-translated transparently. Under the UCRT64 cmake we
+        # now use (a native Windows binary), there is no POSIX translation:
+        # "/mingw64/..." gets interpreted as a Windows root-relative path
+        # and resolves to <build-drive>:\mingw64\..., which doesn't exist.
+        #
+        # Use $ENV{MINGW_PREFIX} (set by MSYSTEM=UCRT64 to /ucrt64) and
+        # let cmake's path machinery resolve it to a real Windows path.
+        # The DDK headers ship in the same package on both MINGW64 and
+        # UCRT64 -- only the install prefix differs.
+        #
         # NOTE: BEFORE must precede the scope keyword (PRIVATE) in the
         # target_include_directories signature -- otherwise cmake parses
-        # it as another include-path component, which silently produces
-        # `-IBEFORE` (relativized to CMAKE_SOURCE_DIR) and drops the
-        # actual headers from the search path.
-        target_include_directories(netdata_driver BEFORE PRIVATE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
+        # it as another include-path component and silently emits
+        # `-IBEFORE`.
+        target_include_directories(netdata_driver BEFORE PRIVATE "$ENV{MINGW_PREFIX}/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
         target_compile_options(netdata_driver PRIVATE
                 -Wall
                 -Wextra
