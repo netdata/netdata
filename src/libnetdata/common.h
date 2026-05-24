@@ -642,6 +642,32 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 #define _SC_OPEN_MAX            6
 #endif
 
+// UCRT64 has no <sys/wait.h>: no WIFEXITED / WEXITSTATUS / WIFSIGNALED
+// / WTERMSIG, and no SIGPIPE. spawn_popen.c needs these to decode the
+// status word that spawn_server_exec_wait() returns. The Windows
+// spawn-server side already encodes results in POSIX format -- normal
+// exits as ((exit_code & 0xFF) << 8), abnormal exits as POSIX signal
+// numbers -- so the standard glibc-shaped macros DTRT here.
+#ifndef WIFEXITED
+#define WIFEXITED(status)    (((status) & 0x7F) == 0)
+#endif
+#ifndef WEXITSTATUS
+#define WEXITSTATUS(status)  (((status) >> 8) & 0xFF)
+#endif
+#ifndef WIFSIGNALED
+#define WIFSIGNALED(status)  (((status) & 0x7F) != 0 && ((status) & 0x7F) != 0x7F)
+#endif
+#ifndef WTERMSIG
+#define WTERMSIG(status)     ((status) & 0x7F)
+#endif
+#ifndef SIGPIPE
+// UCRT has no SIGPIPE -- there is no POSIX "write to closed pipe"
+// signal on Windows; the underlying write returns EPIPE / ERROR_BROKEN_PIPE
+// instead. Define the macro so switch cases over signal numbers
+// compile; it never matches a real spawned-process termination.
+#define SIGPIPE 13
+#endif
+
 // Winsock's WSAPoll() is the documented Windows equivalent of POSIX
 // poll() since Vista, with identical signature for struct pollfd and
 // the POLLIN/POLLOUT/POLLHUP/POLLERR constants. Macro-rename so call
