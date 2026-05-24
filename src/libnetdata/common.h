@@ -77,6 +77,14 @@ extern "C" {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+// UCRT exposes Microsoft's rand_s() in <stdlib.h>, but only if
+// _CRT_RAND_S is defined before the include. random.c calls rand_s()
+// when HAVE_RAND_S is set; define the macro here so the declaration
+// is in scope on Windows. No effect on Linux/macOS/FreeBSD.
+#if defined(OS_WINDOWS) && !defined(_CRT_RAND_S)
+#define _CRT_RAND_S
+#endif
+
 #include <pthread.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -509,6 +517,19 @@ static inline int getpwnam_r(const char *name, struct passwd *pwd, char *buf, si
 #include <process.h>
 #include <tlhelp32.h>
 #include <winevt.h>
+// if_nametoindex() lives in <net/if.h> on POSIX. Windows has had it
+// since Vista in <iphlpapi.h>; pull it in here so socket/connect-to.c
+// and socket/listen-sockets.c get the declaration for free.
+#include <iphlpapi.h>
+
+// ffs() (find-first-set, 1-based, returns 0 if no bits set) is a POSIX
+// function from <strings.h>. UCRT64 doesn't have it. gcc has
+// __builtin_ffs always available, and rrdenginelib.h calls ffs() in
+// the cache-bitmap helpers. Forward via macro on Windows; the builtin
+// emits the same single `bsf`/`tzcnt` instruction as glibc.
+#ifndef ffs
+#define ffs(x) __builtin_ffs(x)
+#endif
 
 // Winsock has no per-call MSG_DONTWAIT flag (POSIX recv/send/recvmsg/sendmsg
 // flag for "non-blocking just this once"). Cygwin's fhandler_socket layer
