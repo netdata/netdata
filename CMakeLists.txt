@@ -2700,6 +2700,7 @@ if(CAP_FOUND)
   set(HAVE_CAPABILITY True)
 endif()
 
+if(NOT OS_WINDOWS)
 set(NDRUN_FILES src/collectors/utils/nd-run.c)
 add_executable(nd-run ${NDRUN_FILES})
 if(CAP_FOUND)
@@ -2709,6 +2710,7 @@ target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
 install(TARGETS nd-run
         COMPONENT netdata
         DESTINATION "${BINDIR}")
+endif() # NOT OS_WINDOWS (nd-run is a POSIX privilege-drop helper)
 
 #
 # build plugins
@@ -2766,8 +2768,14 @@ if(ENABLE_PLUGIN_DEBUGFS)
     endif()
 endif()
 
-add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
-target_link_libraries(spawn-tester libnetdata)
+if(NOT OS_WINDOWS)
+    # spawn-tester exercises the SPAWN_SERVER_VERSION_NOFORK (POSIX
+    # fork+exec) path via raw fcntl/pipe/socket primitives. The Windows
+    # spawn-server is a separate implementation (SPAWN_SERVER_VERSION_WINDOWS)
+    # and is exercised through netdata.exe directly.
+    add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
+    target_link_libraries(spawn-tester libnetdata)
+endif()
 
 if(ENABLE_PLUGIN_APPS)
     set(APPS_PLUGIN_FILES
