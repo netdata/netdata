@@ -273,13 +273,6 @@ include:
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/16.0
-  - <<: *opensuse
-    version: "15.6"
-    base_image: opensuse/leap:15.6
-    eol_check: true
-    packages:
-      <<: *opensuse_packages
-      repo_distro: opensuse/15.6
 
   - &oracle
     distro: oraclelinux
@@ -447,6 +440,13 @@ legacy: # Info for platforms we used to support and still need to handle package
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.5
+  - <<: *opensuse
+    version: "15.6"
+    base_image: opensuse/leap:15.6
+    eol_check: true
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/15.6
   - <<: *centos_stream
     version: '8'
     base_image: 'quay.io/centos/centos:stream8'

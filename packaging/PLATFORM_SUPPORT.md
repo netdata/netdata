@@ -80,7 +80,6 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Fedora                   | 42             | x86\_64, AArch64              |                                                                                                                |
 | openSUSE                 | Tumbleweed     | x86\_64, AArch64              |                                                                                                                |
 | openSUSE                 | Leap 16.0      | x86\_64, AArch64              |                                                                                                                |
-| openSUSE                 | Leap 15.6      | x86\_64, AArch64              |                                                                                                                |
 | Oracle Linux             | 10.x           | x86\_64, AArch64              |                                                                                                                |
 | Oracle Linux             | 9.x            | x86\_64, AArch64              |                                                                                                                |
 | Oracle Linux             | 8.x            | x86\_64, AArch64              |                                                                                                                |
@@ -180,7 +179,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 | Debian   | 10.x      | EOL as of 2024-07-01 |
 | Fedora   | 41        | EOL as of 2025-12-15 |
 | Fedora   | 40        | EOL as of 2024-11-12 |
-| openSUSE | Leap 15.5 | EOL as of 2024-12-31 |
+| openSUSE | Leap 15.6 | EOL as of 2026-04-30 |
 | Ubuntu   | 25.04     | EOL as of 2026-01-17 |
 | Ubuntu   | 20.04     | EOL as of 2025-05-31 |
 | Ubuntu   | 18.04     | EOL as of 2023-04-02 |
