@@ -5,6 +5,20 @@
 #include <stdbool.h>
 #include <string.h>
 
+#if defined(_WIN32)
+// Under MSVC/UCRT-style stdio, stdout defaults to text mode -- which
+// translates \n -> \r\n on output. The .mc / manifest content in this
+// generator embeds literal \r\n in its printf format strings; in text
+// mode each \r\n on the wire becomes \r\r\n, and mc.exe rejects the
+// doubled-CR file with "Unterminated message definition" because the
+// `.` terminator line is no longer recognised. Flip stdout to binary
+// at startup so the bytes go through untouched. Master worked here
+// only because MSYS-gcc's Cygwin runtime defaulted redirected stdout
+// to binary already.
+#include <io.h>
+#include <fcntl.h>
+#endif
+
 // from winnt.h
 #define EVENTLOG_SUCCESS 0x0000
 #define EVENTLOG_ERROR_TYPE 0x0001
@@ -139,6 +153,12 @@ const char *get_msg_format(MESSAGE_ID msg) {
 
 int main(int argc, const char **argv) {
     (void)argc; (void)argv;
+
+#if defined(_WIN32)
+    // See top-of-file note: stdout must be binary so the embedded
+    // \r\n sequences in our format strings reach disk verbatim.
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
 
     const char *header = NULL, *footer = NULL, *s_header = NULL, *s_footer = NULL;
 
