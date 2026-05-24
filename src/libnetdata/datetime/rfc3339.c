@@ -200,10 +200,30 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
     char *s;
     usec_t timestamp, usec = 0;
 
-    // Parse date and time (up to seconds)
+    // Parse date and time (up to seconds). UCRT64 has no strptime();
+    // RFC 3339 mandates zero-padded fixed-width fields, so sscanf with
+    // explicit %d conversions accepts every well-formed input. Behaviour
+    // on Linux/macOS/FreeBSD is unchanged -- the strptime call path is
+    // bit-for-bit identical to before.
+#if defined(OS_WINDOWS)
+    {
+        int Y = 0, mon = 0, d = 0, H = 0, M = 0, S = 0, consumed = 0;
+        if (sscanf(rfc3339, "%d-%d-%dT%d:%d:%d%n",
+                   &Y, &mon, &d, &H, &M, &S, &consumed) != 6)
+            return 0; // Parsing error
+        tm.tm_year = Y - 1900;
+        tm.tm_mon  = mon - 1;
+        tm.tm_mday = d;
+        tm.tm_hour = H;
+        tm.tm_min  = M;
+        tm.tm_sec  = S;
+        s = (char *)rfc3339 + consumed;
+    }
+#else
     s = strptime(rfc3339, "%Y-%m-%dT%H:%M:%S", &tm);
     if (!s)
         return 0; // Parsing error
+#endif
 
     // Parse fractional seconds if present
     if (*s == '.') {
