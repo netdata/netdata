@@ -742,6 +742,22 @@ static inline int fchown(int fd, uid_t owner, gid_t group) {
     return 0;
 }
 
+// unsetenv() is POSIX; UCRT64 has no direct equivalent. _putenv("X=")
+// removes variable X from the process environment (empty value
+// triggers the delete path). Wrap with the POSIX signature.
+static inline int unsetenv(const char *name) {
+    if (!name || !*name || strchr(name, '=')) { errno = EINVAL; return -1; }
+    size_t len = strlen(name);
+    char *buf = (char *)malloc(len + 2);
+    if (!buf) { errno = ENOMEM; return -1; }
+    memcpy(buf, name, len);
+    buf[len]     = '=';
+    buf[len + 1] = '\0';
+    int rc = _putenv(buf);
+    free(buf);
+    return rc;
+}
+
 // fchmod() (by fd) is POSIX; UCRT64 has only chmod() (by path).
 // status-file-io.c uses fchmod() to set 0664 on the temp file after
 // writing it but before rename. On Windows file permissions are
