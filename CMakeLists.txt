@@ -3310,7 +3310,12 @@ if(OS_WINDOWS)
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
         set_target_properties(netdata_driver PROPERTIES PREFIX "")
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
-        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
+        # NOTE: BEFORE must precede the scope keyword (PRIVATE) in the
+        # target_include_directories signature -- otherwise cmake parses
+        # it as another include-path component, which silently produces
+        # `-IBEFORE` (relativized to CMAKE_SOURCE_DIR) and drops the
+        # actual headers from the search path.
+        target_include_directories(netdata_driver BEFORE PRIVATE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
         target_compile_options(netdata_driver PRIVATE
                 -Wall
                 -Wextra
