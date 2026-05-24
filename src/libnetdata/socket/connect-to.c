@@ -10,6 +10,17 @@
 // timeout     the timeout for establishing a connection
 
 static inline int connect_to_unix(const char *path, struct timeval *timeout) {
+#if defined(OS_WINDOWS)
+    // No struct sockaddr_un / AF_UNIX path-binding on UCRT64 (see
+    // listen-sockets.c for the matching server-side gate). Refuse
+    // the connection rather than silently no-op.
+    (void)timeout;
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "UNIX-domain-socket connections are not supported on Windows "
+           "('%s'); use tcp:<host>:<port> instead.",
+           path);
+    return -1;
+#else
     int fd = socket(AF_UNIX, SOCK_STREAM | DEFAULT_SOCKET_FLAGS, 0);
     if(fd == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -47,6 +58,7 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
            path);
 
     return fd;
+#endif
 }
 
 // connect_to_this_ip46()

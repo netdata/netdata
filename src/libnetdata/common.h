@@ -77,14 +77,6 @@ extern "C" {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-// UCRT exposes Microsoft's rand_s() in <stdlib.h>, but only if
-// _CRT_RAND_S is defined before the include. random.c calls rand_s()
-// when HAVE_RAND_S is set; define the macro here so the declaration
-// is in scope on Windows. No effect on Linux/macOS/FreeBSD.
-#if defined(OS_WINDOWS) && !defined(_CRT_RAND_S)
-#define _CRT_RAND_S
-#endif
-
 #include <pthread.h>
 #include <errno.h>
 #include <stdbool.h>

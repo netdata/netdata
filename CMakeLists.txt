@@ -126,6 +126,17 @@ function(netdata_windows_path_to_runtime_path output_var input_path)
 endfunction()
 
 if(OS_WINDOWS)
+  # UCRT exposes Microsoft's rand_s() in <stdlib.h> but only when
+  # _CRT_RAND_S is defined before <stdlib.h> is first parsed. Setting
+  # it via a directory-level compile definition guarantees it's in
+  # effect before ANY translation unit touches <stdlib.h>, regardless
+  # of which include orders other headers walk. Defining it inside
+  # common.h was insufficient because the macro must be set before
+  # <stdlib.h>'s `#ifdef _CRT_RAND_S` block runs, and the include
+  # graph in some translation units pulls <stdlib.h> via paths that
+  # don't visit common.h's preamble first.
+  add_compile_definitions(_CRT_RAND_S)
+
   set(NETDATA_WINDOWS_PATH_PREFIX "C:\\Program Files\\Netdata" CACHE STRING
       "Native Windows install prefix used to derive runtime paths")
   string(REGEX REPLACE "[/\\\\]+$" "" NETDATA_WINDOWS_PATH_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
