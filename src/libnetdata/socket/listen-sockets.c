@@ -59,6 +59,19 @@ static char *strdup_client_description(int family, const char *protocol, const c
 }
 
 static int create_listen_socket_unix(const char *path, int listen_backlog) {
+#if defined(OS_WINDOWS)
+    // Win32 has AF_UNIX since Windows 10 1803, but its on-disk model
+    // (unlink-before-bind, chmod, etc.) does not translate. Until we
+    // grow a proper Windows UDS adapter, refuse the config option
+    // rather than half-implement it. Listeners on tcp:/tcp6: still work.
+    (void)listen_backlog;
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "LISTENER: UNIX-domain-socket listeners are not supported on "
+           "Windows ('%s'); use tcp:<port> or tcp6:<port> in the bind-to "
+           "config instead.",
+           path);
+    return -1;
+#else
     int sock;
 
     sock = socket(AF_UNIX, SOCK_STREAM | DEFAULT_SOCKET_FLAGS, 0);
@@ -114,6 +127,7 @@ static int create_listen_socket_unix(const char *path, int listen_backlog) {
     }
 
     return sock;
+#endif
 }
 
 static int create_listen_socket4(int socktype, const char *ip, uint16_t port, int listen_backlog) {
