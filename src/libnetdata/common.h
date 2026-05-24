@@ -561,6 +561,65 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
     }
 }
 
+// UCRT64 has no <unistd.h> POSIX sysconf() interface. Provide a shim
+// that handles the _SC_* keys netdata actually queries. Each mapping
+// uses the closest Windows-native primitive:
+//
+//   * _SC_CLK_TCK -- Linux exposes kernel-jiffy rate (typically 100 or
+//     1000). netdata only consumes this through system_hz for /proc CPU
+//     accounting, which Windows builds never touch. Returning 100 keeps
+//     the global initialized to its compile-time default.
+//   * _SC_PAGESIZE / _SC_PAGE_SIZE -> GetSystemInfo().dwPageSize.
+//   * _SC_NPROCESSORS_ONLN / _SC_NPROCESSORS_CONF
+//       -> GetSystemInfo().dwNumberOfProcessors.
+//   * _SC_NGROUPS_MAX -- Windows uses SIDs / ACLs, not POSIX
+//     supplementary groups; the value just sizes a buffer in
+//     become_user(). Return the Linux default of 32 so the buffer
+//     allocates correctly on the unlikely path it is ever entered.
+//   * _SC_OPEN_MAX -> 8192 (matches the rlimit shim cap).
+#ifndef _SC_CLK_TCK
+#define _SC_CLK_TCK             1
+#endif
+#ifndef _SC_PAGESIZE
+#define _SC_PAGESIZE            2
+#endif
+#ifndef _SC_PAGE_SIZE
+#define _SC_PAGE_SIZE           _SC_PAGESIZE
+#endif
+#ifndef _SC_NPROCESSORS_ONLN
+#define _SC_NPROCESSORS_ONLN    3
+#endif
+#ifndef _SC_NPROCESSORS_CONF
+#define _SC_NPROCESSORS_CONF    4
+#endif
+#ifndef _SC_NGROUPS_MAX
+#define _SC_NGROUPS_MAX         5
+#endif
+#ifndef _SC_OPEN_MAX
+#define _SC_OPEN_MAX            6
+#endif
+
+static inline long sysconf(int name) {
+    SYSTEM_INFO si;
+    switch (name) {
+        case _SC_CLK_TCK:
+            return 100;
+        case _SC_PAGESIZE:
+            GetSystemInfo(&si);
+            return (long)si.dwPageSize;
+        case _SC_NPROCESSORS_ONLN:
+        case _SC_NPROCESSORS_CONF:
+            GetSystemInfo(&si);
+            return (long)si.dwNumberOfProcessors;
+        case _SC_NGROUPS_MAX:
+            return 32;
+        case _SC_OPEN_MAX:
+            return 8192;
+        default:
+            return -1;
+    }
+}
+
 #include <evntprov.h>
 #include <wbemidl.h>
 #include <sddl.h>
