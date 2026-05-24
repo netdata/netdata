@@ -742,6 +742,67 @@ static inline int fchown(int fd, uid_t owner, gid_t group) {
     return 0;
 }
 
+// daemon.c performs POSIX daemonization (fork + setsid + setuid +
+// chown of run/log directories). On Windows the agent runs as a
+// service hosted by the SCM; none of fork/setsid/setuid apply, and
+// privilege management is done via ACLs configured at install time,
+// not by the process at runtime. Stub the full POSIX surface so the
+// file compiles -- all stubs return 0 (success), making the
+// daemonization code path a no-op on Windows.
+static inline int chown(const char *path, uid_t owner, gid_t group) {
+    (void)path; (void)owner; (void)group; return 0;
+}
+static inline int dirfd(DIR *dir) {
+    (void)dir; return -1;
+}
+static inline int unlinkat(int dfd, const char *path, int flags) {
+    (void)dfd; (void)flags;
+    return unlink(path);  // dfd ignored; relative paths resolve to CWD
+}
+static inline uid_t getuid(void)  { return 0; }
+static inline uid_t geteuid(void) { return 0; }
+static inline gid_t getgid(void)  { return 0; }
+static inline gid_t getegid(void) { return 0; }
+static inline int setuid(uid_t uid)   { (void)uid; return 0; }
+static inline int seteuid(uid_t uid)  { (void)uid; return 0; }
+static inline int setgid(gid_t gid)   { (void)gid; return 0; }
+static inline int setegid(gid_t gid)  { (void)gid; return 0; }
+static inline int setgroups(int n, const gid_t *list) {
+    (void)n; (void)list; return 0;
+}
+
+// fork() and setsid() are POSIX daemonization primitives with no
+// Windows equivalent (services are launched by the SCM, not forked).
+// Stubs return -1 so any caller that expects "child branch on 0"
+// always sees the parent branch -- daemon.c gates these calls behind
+// flags that don't fire when running as a service.
+// (pid_t is already provided by mingw-w64's <sys/types.h>.)
+static inline pid_t fork(void)   { errno = ENOSYS; return -1; }
+static inline pid_t setsid(void) { errno = ENOSYS; return -1; }
+
+// sched_getparam / sched_setscheduler are POSIX scheduling primitives.
+// Windows uses SetPriorityClass / SetThreadPriority instead. daemon.c
+// calls sched_getparam to inspect the current priority before applying
+// SCHED_BATCH / SCHED_IDLE -- not applicable on Windows.
+struct sched_param { int sched_priority; };
+static inline int sched_getparam(pid_t pid, struct sched_param *p) {
+    (void)pid;
+    if (p) p->sched_priority = 0;
+    return 0;
+}
+static inline int sched_setscheduler(pid_t pid, int policy, const struct sched_param *p) {
+    (void)pid; (void)policy; (void)p; return 0;
+}
+#ifndef SCHED_OTHER
+#define SCHED_OTHER 0
+#endif
+#ifndef SCHED_BATCH
+#define SCHED_BATCH 3
+#endif
+#ifndef SCHED_IDLE
+#define SCHED_IDLE  5
+#endif
+
 // POSIX poll's "number of fds" type. mingw-w64 declares WSAPoll using
 // ULONG; provide the POSIX-shaped typedef so log-forwarder.c's
 // (nfds_t)-1 casts compile. ULONG is 32-bit under LLP64, matching
