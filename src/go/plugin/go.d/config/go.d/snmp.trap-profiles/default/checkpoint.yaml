@@ -29,7 +29,7 @@ varbinds:
     constraints: SIZE(0..255)
   fanSpeedSensorStatus:
     oid: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
-    type: INTEGER
+    type: Integer32
   fanSpeedSensorType:
     oid: 1.3.6.1.4.1.2620.1.6.7.8.2.1.5
     type: DisplayString
@@ -51,7 +51,7 @@ varbinds:
     type: DisplayString
   fwLSConnOverall:
     oid: 1.3.6.1.4.1.2620.1.1.30.1
-    type: INTEGER
+    type: Integer32
   fwLSConnOverallDesc:
     oid: 1.3.6.1.4.1.2620.1.1.30.2
     type: DisplayString
@@ -66,7 +66,7 @@ varbinds:
     type: DisplayString
   fwLocalLoggingStat:
     oid: 1.3.6.1.4.1.2620.1.1.30.5
-    type: INTEGER
+    type: Integer32
   haBlockState:
     oid: 1.3.6.1.4.1.2620.1.5.7
     type: DisplayString
@@ -76,7 +76,7 @@ varbinds:
     type: IpAddress
   haIdentifier:
     oid: 1.3.6.1.4.1.2620.1.5.8
-    type: INTEGER
+    type: Integer32
   haIfName:
     oid: 1.3.6.1.4.1.2620.1.5.12.1.2
     type: DisplayString
@@ -88,7 +88,7 @@ varbinds:
     type: DisplayString
   haProblemPriority:
     oid: 1.3.6.1.4.1.2620.1.5.13.1.4
-    type: INTEGER
+    type: Integer32
   haProblemStatus:
     oid: 1.3.6.1.4.1.2620.1.5.13.1.3
     type: DisplayString
@@ -97,10 +97,10 @@ varbinds:
     type: Unsigned32
   haShared:
     oid: 1.3.6.1.4.1.2620.1.5.12.1.7
-    type: INTEGER
+    type: Integer32
   haStatCode:
     oid: 1.3.6.1.4.1.2620.1.5.101
-    type: INTEGER
+    type: Integer32
   haStatLong:
     oid: 1.3.6.1.4.1.2620.1.5.103
     type: DisplayString
@@ -118,26 +118,22 @@ varbinds:
     type: DisplayString
   haTrusted:
     oid: 1.3.6.1.4.1.2620.1.5.12.1.6
-    type: INTEGER
+    type: Integer32
   memActiveReal64:
     oid: 1.3.6.1.4.1.2620.1.6.7.4.4
-    type: DisplayString
-    constraints: SIZE(0..255)
+    type: Counter64
   memActiveVirtual64:
     oid: 1.3.6.1.4.1.2620.1.6.7.4.2
-    type: DisplayString
-    constraints: SIZE(0..255)
+    type: Counter64
   memTotalReal64:
     oid: 1.3.6.1.4.1.2620.1.6.7.4.3
-    type: DisplayString
-    constraints: SIZE(0..255)
+    type: Counter64
   memTotalVirtual64:
     oid: 1.3.6.1.4.1.2620.1.6.7.4.1
-    type: DisplayString
-    constraints: SIZE(0..255)
+    type: Counter64
   multiDiskFreeAvailablePercent:
     oid: 1.3.6.1.4.1.2620.1.6.7.6.1.8
-    type: INTEGER
+    type: Gauge32
   multiDiskName:
     oid: 1.3.6.1.4.1.2620.1.6.7.6.1.2
     type: DisplayString
@@ -152,7 +148,7 @@ varbinds:
     type: Unsigned32
   multiProcRunQueue:
     oid: 1.3.6.1.4.1.2620.1.6.7.5.1.6
-    type: INTEGER
+    type: Integer32
   multiProcSystemTime:
     oid: 1.3.6.1.4.1.2620.1.6.7.5.1.3
     type: Unsigned32
@@ -170,25 +166,25 @@ varbinds:
     type: DisplayString
   raidDiskFlags:
     oid: 1.3.6.1.4.1.2620.1.6.7.7.2.1.10
-    type: INTEGER
+    type: Integer32
   raidDiskID:
     oid: 1.3.6.1.4.1.2620.1.6.7.7.2.1.3
-    type: INTEGER
+    type: Integer32
   raidDiskState:
     oid: 1.3.6.1.4.1.2620.1.6.7.7.2.1.9
-    type: INTEGER
+    type: Integer32
   raidDiskVolumeID:
     oid: 1.3.6.1.4.1.2620.1.6.7.7.2.1.2
-    type: INTEGER
+    type: Integer32
   raidVolumeFlags:
     oid: 1.3.6.1.4.1.2620.1.6.7.6.1.1.7
     type: DisplayString
   raidVolumeID:
     oid: 1.3.6.1.4.1.2620.1.6.7.7.1.1.2
-    type: INTEGER
+    type: Integer32
   raidVolumeState:
     oid: 1.3.6.1.4.1.2620.1.6.7.7.1.1.6
-    type: INTEGER
+    type: Integer32
   svnNetIfAddress:
     oid: 1.3.6.1.4.1.2620.1.6.50.1.1.4
     type: IpAddress
@@ -197,21 +193,20 @@ varbinds:
     type: DisplayString
   svnNetIfOperState:
     oid: 1.3.6.1.4.1.2620.1.6.50.1.1.10
-    type: INTEGER
+    type: Integer32
   svnNetIfRXDrops:
     oid: 1.3.6.1.4.1.2620.1.6.50.1.1.14
-    type: DisplayString
-    constraints: SIZE(0..255)
+    type: Counter64
   svnNetIfState:
     oid: 1.3.6.1.4.1.2620.1.6.50.1.1.7
-    type: INTEGER
+    type: Integer32
   tempertureSensorName:
     oid: 1.3.6.1.4.1.2620.1.6.7.8.1.1.2
     type: DisplayString
     constraints: SIZE(0..255)
   tempertureSensorStatus:
     oid: 1.3.6.1.4.1.2620.1.6.7.8.1.1.6
-    type: INTEGER
+    type: Integer32
   tempertureSensorType:
     oid: 1.3.6.1.4.1.2620.1.6.7.8.1.1.5
     type: DisplayString
@@ -230,7 +225,7 @@ varbinds:
     constraints: SIZE(0..255)
   voltageSensorStatus:
     oid: 1.3.6.1.4.1.2620.1.6.7.8.3.1.6
-    type: INTEGER
+    type: Integer32
   voltageSensorType:
     oid: 1.3.6.1.4.1.2620.1.6.7.8.3.1.5
     type: DisplayString
@@ -245,20 +240,18 @@ varbinds:
     constraints: SIZE(0..255)
 traps:
   - oid: 1.3.6.1.4.1.2620.1.1.0.1
-    name: fwTrap
+    name: CHECKPOINT-MIB::fwTrap
     category: diagnostic
     severity: info
-    description: "Check Point Firewall-1 event forwarded from {SNMP_DEVICE_HOSTNAME}\n  event data: {fwEvent}"
-    mib: CHECKPOINT-MIB
+    description: "Check Point Firewall-1 trap received on {SNMP_DEVICE_HOSTNAME}\n  fwEvent: {fwEvent}"
     status: current
     varbinds:
     - fwEvent
   - oid: 1.3.6.1.4.1.2620.1.2000.1.1
-    name: chkpntTrapNetIfState
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapNetIfState
     category: state_change
     severity: warning
-    description: "Network interface state change on {SNMP_DEVICE_HOSTNAME}\n  interface: {svnNetIfName}\n  IP address: {svnNetIfAddress}\n  state: {svnNetIfState}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Network interface state alert on {SNMP_DEVICE_HOSTNAME}\n  interface name: {svnNetIfName}\n  interface address: {svnNetIfAddress}\n  interface state: {svnNetIfState}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -270,11 +263,10 @@ traps:
     - svnNetIfAddress
     - svnNetIfState
   - oid: 1.3.6.1.4.1.2620.1.2000.1.2
-    name: chkpntTrapNetIfUnplugged
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapNetIfUnplugged
     category: state_change
     severity: warning
-    description: "Network interface unplugged on {SNMP_DEVICE_HOSTNAME}\n  interface: {svnNetIfName}\n  IP address: {svnNetIfAddress}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Interface unplugged on {SNMP_DEVICE_HOSTNAME}\n  interface: {svnNetIfName}\n  address: {svnNetIfAddress}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -285,11 +277,10 @@ traps:
     - svnNetIfName
     - svnNetIfAddress
   - oid: 1.3.6.1.4.1.2620.1.2000.1.3
-    name: chkpntTrapNewConnRate
-    category: diagnostic
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapNewConnRate
+    category: state_change
     severity: warning
-    description: "New connection rate threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  trap OID: {chkpntTrapOID}\n  value: {chkpntTrapOIDValue}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "New connection rate alert on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}\n  OID: {chkpntTrapOID} ({chkpntTrapOIDValue})"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -298,11 +289,10 @@ traps:
     - chkpntTrapSeverity
     - chkpntTrapCategory
   - oid: 1.3.6.1.4.1.2620.1.2000.1.4
-    name: chkpntTrapConcurrentConnRate
-    category: diagnostic
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapConcurrentConnRate
+    category: state_change
     severity: warning
-    description: "Check Point concurrent connection rate threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity level: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}\n  OID: {chkpntTrapOID} = {chkpntTrapOIDValue}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Check Point concurrent connections rate alert on {SNMP_DEVICE_HOSTNAME}\n  trap OID: {chkpntTrapOID}\n  OID value: {chkpntTrapOIDValue}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -311,11 +301,10 @@ traps:
     - chkpntTrapSeverity
     - chkpntTrapCategory
   - oid: 1.3.6.1.4.1.2620.1.2000.1.5
-    name: chkpntTrapBytesThroughput
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapBytesThroughput
     category: diagnostic
     severity: warning
-    description: "Bytes throughput threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  OID: {chkpntTrapOID}\n  value: {chkpntTrapOIDValue}\n  severity: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Throughput threshold alert on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}\n  OID: {chkpntTrapOID}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -324,11 +313,10 @@ traps:
     - chkpntTrapSeverity
     - chkpntTrapCategory
   - oid: 1.3.6.1.4.1.2620.1.2000.1.6
-    name: chkpntTrapAcceptedPacketRate
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapAcceptedPacketRate
     category: diagnostic
     severity: warning
-    description: "Check Point accepted packet rate threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  trap OID: {chkpntTrapOID}\n  OID value: {chkpntTrapOIDValue}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Check Point accepted packet rate alert on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}\n  OID: {chkpntTrapOID} ({chkpntTrapOIDValue})"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -337,11 +325,10 @@ traps:
     - chkpntTrapSeverity
     - chkpntTrapCategory
   - oid: 1.3.6.1.4.1.2620.1.2000.1.7
-    name: chkpntTrapNetIfOperState
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapNetIfOperState
     category: state_change
     severity: warning
-    description: "Network interface operational link status alert on {SNMP_DEVICE_HOSTNAME}\n  interface name: {svnNetIfName}\n  interface address: {svnNetIfAddress}\n  operational state: {svnNetIfOperState} (0=down)\n  alert message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Interface {svnNetIfName} ({svnNetIfAddress}) operational state changed on {SNMP_DEVICE_HOSTNAME}\n  state: {svnNetIfOperState}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -353,11 +340,10 @@ traps:
     - svnNetIfAddress
     - svnNetIfOperState
   - oid: 1.3.6.1.4.1.2620.1.2000.1.8
-    name: chkpntTrapNetIfRXDrop
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapNetIfRXDrop
     category: diagnostic
     severity: warning
-    description: "Check Point interface RX drop alert on {SNMP_DEVICE_HOSTNAME}\n  interface: {svnNetIfName}\n  state: {svnNetIfState}\n  RX drops: {svnNetIfRXDrops}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Network interface RX drops changed on {SNMP_DEVICE_HOSTNAME}\n  interface: {svnNetIfName}\n  state: {svnNetIfState}\n  RX drops: {svnNetIfRXDrops}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -369,11 +355,10 @@ traps:
     - svnNetIfState
     - svnNetIfRXDrops
   - oid: 1.3.6.1.4.1.2620.1.2000.2.1
-    name: chkpntDiskSpaceTrap
-    category: diagnostic
-    severity: crit
-    description: "Disk space critically low on {SNMP_DEVICE_HOSTNAME}\n  filesystem: {multiDiskName}\n  free space: {multiDiskFreeAvailablePercent}%\n  message: {chkpntTrapMsgText}\n  severity level: {chkpntTrapSeverity}"
-    mib: CHECKPOINT-TRAP-MIB
+    name: CHECKPOINT-TRAP-MIB::chkpntDiskSpaceTrap
+    category: state_change
+    severity: err
+    description: "Disk space alert on {SNMP_DEVICE_HOSTNAME}\n  partition: {multiDiskName}\n  free space: {multiDiskFreeAvailablePercent}%\n  message: {chkpntTrapMsgText}\n  severity level: {chkpntTrapSeverity}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -384,11 +369,10 @@ traps:
     - multiDiskName
     - multiDiskFreeAvailablePercent
   - oid: 1.3.6.1.4.1.2620.1.2000.2.2
-    name: chkpntRAIDVolumeTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntRAIDVolumeTrap
     category: diagnostic
     severity: crit
-    description: "RAID volume failure on {SNMP_DEVICE_HOSTNAME}\n  Volume ID: {raidVolumeID}\n  State: {raidVolumeState}\n  Message: {chkpntTrapMsgText}\n  Severity level: {chkpntTrapSeverity}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "RAID volume {raidVolumeID} on {SNMP_DEVICE_HOSTNAME} is in state {raidVolumeState}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -399,11 +383,10 @@ traps:
     - raidVolumeID
     - raidVolumeState
   - oid: 1.3.6.1.4.1.2620.1.2000.2.3
-    name: chkpntRAIDDiskTrap
-    category: state_change
+    name: CHECKPOINT-TRAP-MIB::chkpntRAIDDiskTrap
+    category: diagnostic
     severity: crit
-    description: "RAID disk state alert on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  volume ID: {raidDiskVolumeID}\n  disk ID: {raidDiskID}\n  state: {raidDiskState}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "RAID disk state alert on {SNMP_DEVICE_HOSTNAME}\n  volume ID: {raidDiskVolumeID}\n  disk ID: {raidDiskID}\n  state: {raidDiskState}\n  message: {chkpntTrapMsgText}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -415,11 +398,10 @@ traps:
     - raidDiskID
     - raidDiskState
   - oid: 1.3.6.1.4.1.2620.1.2000.2.4
-    name: chkpntRAIDDiskFlagsTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntRAIDDiskFlagsTrap
     category: diagnostic
     severity: warning
-    description: "RAID disk flag alert on {SNMP_DEVICE_HOSTNAME}\n  Volume ID: {raidDiskVolumeID}\n  Disk ID: {raidDiskID}\n  Disk State: {raidDiskState}\n  Flags: {raidDiskFlags}\n  Severity: {chkpntTrapSeverity}\n  Message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "RAID disk flag alert on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  volume ID: {raidDiskVolumeID}\n  disk ID: {raidDiskID}\n  disk state: {raidDiskState}\n  disk flags: {raidDiskFlags}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -432,11 +414,10 @@ traps:
     - raidDiskState
     - raidDiskFlags
   - oid: 1.3.6.1.4.1.2620.1.2000.3.1
-    name: chkpntCPUCoreUtilTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntCPUCoreUtilTrap
     category: diagnostic
     severity: warning
-    description: "CPU core utilization alert on {SNMP_DEVICE_HOSTNAME}\n  core index: {multiProcIndex}\n  utilization: {multiProcUsage}%\n  user time: {multiProcUserTime}\n  system time: {multiProcSystemTime}\n  idle time: {multiProcIdleTime}\n  run queue: {multiProcRunQueue}\n  interrupts: {multiProcInterrupts}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Check Point CPU core utilization alert on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  core index: {multiProcIndex}\n  usage: {multiProcUsage}\n  user time: {multiProcUserTime}\n  system time: {multiProcSystemTime}\n  idle time: {multiProcIdleTime}\n  run queue: {multiProcRunQueue}\n  interrupts: {multiProcInterrupts}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -452,11 +433,10 @@ traps:
     - multiProcRunQueue
     - multiProcInterrupts
   - oid: 1.3.6.1.4.1.2620.1.2000.3.2
-    name: chkpntCPUCoreInterruptsTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntCPUCoreInterruptsTrap
     category: diagnostic
-    severity: err
-    description: "Check Point CPU core interrupt threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  core index: {multiProcIndex}\n  interrupts: {multiProcInterrupts}\n  usage: {multiProcUsage}%\n  user time: {multiProcUserTime}\n  system time: {multiProcSystemTime}\n  idle time: {multiProcIdleTime}\n  run queue: {multiProcRunQueue}"
-    mib: CHECKPOINT-TRAP-MIB
+    severity: warning
+    description: "CPU core interrupt alert on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}\n  core index: {multiProcIndex}\n  interrupts: {multiProcInterrupts}\n  usage: {multiProcUsage}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -472,11 +452,10 @@ traps:
     - multiProcRunQueue
     - multiProcInterrupts
   - oid: 1.3.6.1.4.1.2620.1.2000.4.1
-    name: chkpntSwapMemoryTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntSwapMemoryTrap
     category: diagnostic
     severity: warning
-    description: "Check Point swap memory utilization alert on {SNMP_DEVICE_HOSTNAME}\n  active virtual memory: {memActiveVirtual64}\n  total virtual memory: {memTotalVirtual64}\n  alert message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Swap memory utilization alert on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  total virtual memory: {memTotalVirtual64}\n  active virtual memory: {memActiveVirtual64}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -487,11 +466,10 @@ traps:
     - memTotalVirtual64
     - memActiveVirtual64
   - oid: 1.3.6.1.4.1.2620.1.2000.4.2
-    name: chkpntRealMemoryTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntRealMemoryTrap
     category: diagnostic
     severity: warning
-    description: "Real memory utilization alert on {SNMP_DEVICE_HOSTNAME}\n  trap OID: {chkpntTrapOID}\n  value: {chkpntTrapOIDValue}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  category: {chkpntTrapCategory}\n  active memory: {memActiveReal64}\n  total memory: {memTotalReal64}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Real memory utilization alert on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  severity: {chkpntTrapSeverity}\n  active memory: {memActiveReal64}\n  total memory: {memTotalReal64}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -502,11 +480,10 @@ traps:
     - memTotalReal64
     - memActiveReal64
   - oid: 1.3.6.1.4.1.2620.1.2000.5.1.1
-    name: chkpntTempertureTrap
-    category: state_change
-    severity: warning
-    description: "Temperature sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor: {tempertureSensorName}\n  value: {tempertureSensorValue}{tempertureSensorUnit}\n  type: {tempertureSensorType}\n  status: {tempertureSensorStatus}\n  severity level: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    name: CHECKPOINT-TRAP-MIB::chkpntTempertureTrap
+    category: diagnostic
+    severity: crit
+    description: "Temperature sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor: {tempertureSensorName}\n  value: {tempertureSensorValue} {tempertureSensorUnit}\n  type: {tempertureSensorType}\n  status: {tempertureSensorStatus}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -520,11 +497,10 @@ traps:
     - tempertureSensorType
     - tempertureSensorStatus
   - oid: 1.3.6.1.4.1.2620.1.2000.5.2.1
-    name: chkpntFanSpeedTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntFanSpeedTrap
     category: state_change
     severity: warning
-    description: "Fan speed sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor: {fanSpeedSensorName}\n  value: {fanSpeedSensorValue} {fanSpeedSensorUnit}\n  type: {fanSpeedSensorType}\n  status: {fanSpeedSensorStatus}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Fan speed sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor: {fanSpeedSensorName}\n  value: {fanSpeedSensorValue} {fanSpeedSensorUnit}\n  type: {fanSpeedSensorType}\n  status: {fanSpeedSensorStatus}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -538,11 +514,10 @@ traps:
     - fanSpeedSensorType
     - fanSpeedSensorStatus
   - oid: 1.3.6.1.4.1.2620.1.2000.5.3.1
-    name: chkpntVoltageTrap
-    category: state_change
-    severity: warning
-    description: "Voltage sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor: {voltageSensorName}\n  value: {voltageSensorValue} {voltageSensorUnit}\n  type: {voltageSensorType}\n  status: out of range ({voltageSensorStatus})\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    name: CHECKPOINT-TRAP-MIB::chkpntVoltageTrap
+    category: diagnostic
+    severity: crit
+    description: "Voltage sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor: {voltageSensorName}\n  value: {voltageSensorValue} {voltageSensorUnit}\n  type: {voltageSensorType}\n  status: {voltageSensorStatus}\n  message: {chkpntTrapMsgText}\n  severity level: {chkpntTrapSeverity}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -556,11 +531,10 @@ traps:
     - voltageSensorType
     - voltageSensorStatus
   - oid: 1.3.6.1.4.1.2620.1.2000.6.1
-    name: chkpntClusterMemberStateTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntClusterMemberStateTrap
     category: state_change
     severity: warning
-    description: "High availability cluster member state changed on {SNMP_DEVICE_HOSTNAME}\n  HA identifier: {haIdentifier}\n  HA state: {haState}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Cluster member state changed on {SNMP_DEVICE_HOSTNAME}\n  HA identifier: {haIdentifier}\n  HA state: {haState}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -571,11 +545,10 @@ traps:
     - haIdentifier
     - haState
   - oid: 1.3.6.1.4.1.2620.1.2000.6.2
-    name: chkpntClusterBlockStateTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntClusterBlockStateTrap
     category: state_change
-    severity: err
-    description: "Cluster block state alert on {SNMP_DEVICE_HOSTNAME}\n  HA identifier: {haIdentifier}\n  Block state: {haBlockState}\n  HA state: {haState}\n  Severity: {chkpntTrapSeverity}\n  Message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    severity: crit
+    description: "High Availability cluster block state alert on {SNMP_DEVICE_HOSTNAME}\n  HA identifier: {haIdentifier}\n  HA blocking state: {haBlockState}\n  HA state: {haState}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -587,11 +560,10 @@ traps:
     - haBlockState
     - haState
   - oid: 1.3.6.1.4.1.2620.1.2000.6.3
-    name: chkpntClusterStateTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntClusterStateTrap
     category: state_change
-    severity: warning
-    description: "Check Point HA cluster state alert on {SNMP_DEVICE_HOSTNAME}\n  HA identifier: {haIdentifier}\n  HA state: {haState}\n  HA block state: {haBlockState}\n  status code: {haStatCode}\n  status short: {haStatShort}\n  status long: {haStatLong}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    severity: crit
+    description: "Check Point cluster state change on {SNMP_DEVICE_HOSTNAME}\n  HA identifier: {haIdentifier}\n  HA state: {haState}\n  HA status code: {haStatCode}\n  status short: {haStatShort}\n  status long: {haStatLong}\n  severity: {chkpntTrapSeverity}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -606,11 +578,10 @@ traps:
     - haStatShort
     - haStatLong
   - oid: 1.3.6.1.4.1.2620.1.2000.6.4
-    name: chkpntClusterProblemStateTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntClusterProblemStateTrap
     category: state_change
-    severity: warning
-    description: "Check Point cluster problem detected on {SNMP_DEVICE_HOSTNAME}\n  problem name: {haProblemName}\n  status: {haProblemStatus}\n  priority: {haProblemPriority}\n  verified: {haProblemVerified}\n  description: {haProblemDescr}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    severity: crit
+    description: "High Availability problem detected on {SNMP_DEVICE_HOSTNAME}\n  status: {haProblemStatus}\n  problem name: {haProblemName}\n  priority: {haProblemPriority}\n  description: {haProblemDescr}\n  severity level: {chkpntTrapSeverity}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -624,11 +595,10 @@ traps:
     - haProblemVerified
     - haProblemDescr
   - oid: 1.3.6.1.4.1.2620.1.2000.6.5
-    name: chkpntClusterInterfaceStateTrap
+    name: CHECKPOINT-TRAP-MIB::chkpntClusterInterfaceStateTrap
     category: state_change
-    severity: warning
-    description: "Cluster interface status alert on {SNMP_DEVICE_HOSTNAME}\n  interface: {haIfName}\n  IP: {haIP}\n  status: {haStatus}\n  trusted: {haTrusted}\n  shared: {haShared}\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    severity: crit
+    description: "Cluster interface {haIfName} on {SNMP_DEVICE_HOSTNAME} HA status changed to {haStatus}\n  IP: {haIP}\n  Message: {chkpntTrapMsgText}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -642,11 +612,10 @@ traps:
     - haTrusted
     - haShared
   - oid: 1.3.6.1.4.1.2620.1.2000.7.1
-    name: chkpntTrapLSConnState
-    category: diagnostic
-    severity: err
-    description: "Check Point log server connectivity problem on {SNMP_DEVICE_HOSTNAME}\n  log server: {fwLSConnName}\n  connection state: {fwLSConnState} ({fwLSConnStateDesc})\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}\n  local logging status: {fwLocalLoggingStat} ({fwLocalLoggingDesc})"
-    mib: CHECKPOINT-TRAP-MIB
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapLSConnState
+    category: state_change
+    severity: crit
+    description: "Connection to log server {fwLSConnName} on {SNMP_DEVICE_HOSTNAME} is in error state\n  state: {fwLSConnState}\n  description: {fwLSConnStateDesc}\n  local logging: {fwLocalLoggingStat} ({fwLocalLoggingDesc})"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -660,11 +629,10 @@ traps:
     - fwLocalLoggingDesc
     - fwLocalLoggingStat
   - oid: 1.3.6.1.4.1.2620.1.2000.7.2
-    name: chkpntTrapOverallLSConnState
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapOverallLSConnState
     category: state_change
     severity: err
-    description: "Log server connectivity problem on {SNMP_DEVICE_HOSTNAME}\n  overall connectivity state: {fwLSConnOverall}\n  connectivity description: {fwLSConnOverallDesc}\n  local logging status: {fwLocalLoggingStat}\n  local logging description: {fwLocalLoggingDesc}\n  alert severity: {chkpntTrapSeverity}\n  alert message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    description: "Log server connectivity issue on {SNMP_DEVICE_HOSTNAME}\n  status: {fwLSConnOverallDesc} ({fwLSConnOverall})\n  message: {chkpntTrapMsgText}\n  local logging: {fwLocalLoggingDesc} (state: {fwLocalLoggingStat})"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -677,11 +645,10 @@ traps:
     - fwLocalLoggingDesc
     - fwLocalLoggingStat
   - oid: 1.3.6.1.4.1.2620.1.2000.7.3
-    name: chkpntTrapLocalLoggingState
-    category: diagnostic
-    severity: err
-    description: "Log server connectivity problem on {SNMP_DEVICE_HOSTNAME} caused fallback to local logging\n  connectivity status: {fwLSConnOverall} ({fwLSConnOverallDesc})\n  local logging status: {fwLocalLoggingStat} ({fwLocalLoggingDesc})\n  severity: {chkpntTrapSeverity}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-TRAP-MIB
+    name: CHECKPOINT-TRAP-MIB::chkpntTrapLocalLoggingState
+    category: state_change
+    severity: warning
+    description: "Log server connectivity issue on {SNMP_DEVICE_HOSTNAME} caused fallback to local logging\n  overall connectivity status: {fwLSConnOverall} ({fwLSConnOverallDesc})\n  local logging status: {fwLocalLoggingStat} ({fwLocalLoggingDesc})\n  alert message: {chkpntTrapMsgText}\n  severity level: {chkpntTrapSeverity}"
     status: current
     varbinds:
     - chkpntTrapOID
@@ -694,11 +661,10 @@ traps:
     - fwLocalLoggingDesc
     - fwLocalLoggingStat
   - oid: 1.3.6.1.4.1.2620.1.3000.10.1.1
-    name: chkpntSystemConfigurationChangeTrap
+    name: CHECKPOINT-GAIA-TRAP-MIB::chkpntSystemConfigurationChangeTrap
     category: config_change
     severity: notice
     description: "System configuration changed on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-GAIA-TRAP-MIB
     status: current
     varbinds:
     - chkpntTrapMsgText
@@ -706,11 +672,10 @@ traps:
       type: DisplayString
       name: chkpntTrapMsgText
   - oid: 1.3.6.1.4.1.2620.1.3000.10.1.2
-    name: chkpntSystemConfigurationSaveTrap
+    name: CHECKPOINT-GAIA-TRAP-MIB::chkpntSystemConfigurationSaveTrap
     category: config_change
     severity: notice
     description: "System configuration saved on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-GAIA-TRAP-MIB
     status: current
     varbinds:
     - chkpntTrapMsgText
@@ -718,11 +683,10 @@ traps:
       type: DisplayString
       name: chkpntTrapMsgText
   - oid: 1.3.6.1.4.1.2620.1.3000.2.1.1
-    name: chkpntRAIDVolumeStateTrap
+    name: CHECKPOINT-GAIA-TRAP-MIB::chkpntRAIDVolumeStateTrap
     category: diagnostic
     severity: warning
     description: "RAID volume state not optimal on {SNMP_DEVICE_HOSTNAME}\n  message: {chkpntTrapMsgText}\n  volume state: {raidVolumeState}\n  volume flags: {raidVolumeFlags}"
-    mib: CHECKPOINT-GAIA-TRAP-MIB
     status: current
     varbinds:
     - chkpntTrapMsgText
@@ -735,11 +699,10 @@ traps:
       type: DisplayString
       name: raidVolumeState
   - oid: 1.3.6.1.4.1.2620.1.3000.5.1.1
-    name: chkpntTempertureTrap
-    category: diagnostic
+    name: CHECKPOINT-GAIA-TRAP-MIB::chkpntTempertureTrap
+    category: state_change
     severity: warning
     description: "Temperature sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor: {tempertureSensorName}\n  value: {tempertureSensorValue}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-GAIA-TRAP-MIB
     status: current
     varbinds:
     - chkpntTrapMsgText
@@ -755,11 +718,10 @@ traps:
       type: DisplayString
       name: tempertureSensorValue
   - oid: 1.3.6.1.4.1.2620.1.3000.5.2.1
-    name: chkpntFanSpeedTrap
-    category: state_change
+    name: CHECKPOINT-GAIA-TRAP-MIB::chkpntFanSpeedTrap
+    category: diagnostic
     severity: warning
-    description: "Fan speed sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor name: {fanSpeedSensorName}\n  current value: {fanSpeedSensorValue}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-GAIA-TRAP-MIB
+    description: "Fan speed sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor name: {fanSpeedSensorName}\n  sensor value: {fanSpeedSensorValue}\n  message: {chkpntTrapMsgText}"
     status: current
     varbinds:
     - chkpntTrapMsgText
@@ -775,11 +737,10 @@ traps:
       type: DisplayString
       name: fanSpeedSensorValue
   - oid: 1.3.6.1.4.1.2620.1.3000.5.3.1
-    name: chkpntVoltageTrap
-    category: diagnostic
+    name: CHECKPOINT-GAIA-TRAP-MIB::chkpntVoltageTrap
+    category: state_change
     severity: warning
     description: "Voltage sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor: {voltageSensorName}\n  value: {voltageSensorValue}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-GAIA-TRAP-MIB
     status: current
     varbinds:
     - chkpntTrapMsgText
@@ -795,11 +756,10 @@ traps:
       type: DisplayString
       name: voltageSensorValue
   - oid: 1.3.6.1.4.1.2620.1.3000.5.4.1
-    name: chkpntPowerSupplyTrap
-    category: diagnostic
-    severity: warning
-    description: "Power supply sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor: {powerSupplySensorName}\n  value: {powerSupplySensorValue}\n  message: {chkpntTrapMsgText}"
-    mib: CHECKPOINT-GAIA-TRAP-MIB
+    name: CHECKPOINT-GAIA-TRAP-MIB::chkpntPowerSupplyTrap
+    category: state_change
+    severity: crit
+    description: "Power supply sensor alert on {SNMP_DEVICE_HOSTNAME}\n  sensor name: {powerSupplySensorName}\n  sensor value: {powerSupplySensorValue}\n  message: {chkpntTrapMsgText}"
     status: current
     varbinds:
     - chkpntTrapMsgText

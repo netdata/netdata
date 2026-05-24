@@ -75,7 +75,7 @@ varbinds:
 # Trap definitions — each entry references varbinds by name.
 traps:
   - oid: 1.3.6.1.4.1.9.10.101.0.1
-    name: cospfIfConfigError
+    name: CISCO-OSPF-TRAP-MIB::cospfIfConfigError       # MIB-qualified, globally unique
     category: state_change
     severity: warning
     description: |
@@ -85,7 +85,6 @@ traps:
         source of mismatched packet: {cospfPacketSrc}
         error type: {cospfConfigErrorType}
         packet type: {cospfPacketType}
-    mib: CISCO-OSPF-TRAP-MIB
     status: current
     varbinds:
       - ospfRouterId
@@ -108,12 +107,23 @@ entry is the slim shipping form of a single MIB object:
 | `type`        | yes      | string | MIB syntax (e.g., `INTEGER`, `OctetString`, `Counter32`, `IpAddress`, `DisplayString`, `ZeroBasedCounter32`) or a TEXTUAL-CONVENTION name from the source MIB |
 | `enum`        | no       | map    | Numeric-string → label for `INTEGER` enumerations |
 | `constraints` | no       | string | Size/range constraint expression (e.g., `SIZE(0..16)`, `(1..65535)`) |
-| `display_hint`| no       | string | Render hint (e.g., `1x:` for MAC, `1d.1d.1d.1d` for IPv4) |
+
+> **Future field**: a `display_hint` member (render hint such as `1x:` for MAC
+> or `1d.1d.1d.1d` for IPv4) will be added when the plugin's renderer needs
+> it. The current generator does not extract DISPLAY-HINT from
+> TEXTUAL-CONVENTION definitions; the field is reserved.
 
 Plugin behaviour: varbinds that the plugin sees on a trap but cannot resolve
 via the file table fall back to MIB-index lookup, then to raw OID-keyed
 rendering. The varbind still lands in the `SNMP_TRAP_JSON` journal field with
 its OID, ASN.1-decoded type, and value.
+
+Generator rule: a varbind record produced by the MIB extractor that does
+NOT have both a resolvable `oid` AND a `type` (MIB syntax) is dropped at
+emit time — it never enters the `varbinds:` table, and any reference to it
+from a trap entry's `varbinds:` list is removed in lockstep. This keeps the
+shipped pack free of dangling references; description templates can only
+reference varbinds that survive to disk.
 
 ### Trap entries (`traps:` list)
 
@@ -122,15 +132,17 @@ Each list entry defines one trap notification.
 | Field         | Required | Type    | Notes |
 |---------------|----------|---------|-------|
 | `oid`         | yes      | string  | Numeric OID of the trap |
-| `name`        | rec.     | string  | Symbolic name (overrides MIB name when MIB isn't loaded) |
+| `name`        | yes      | string  | **MIB-qualified canonical form** `<MIB-MODULE>::<symbol>` (e.g. `IF-MIB::linkDown`, `CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged`). Globally unique — different OIDs MUST have different names. Mirrors the canonical SMI form produced by `snmptranslate`/`snmptrapd`/MIB browsers. The plugin writes this exact string to the `SNMP_TRAP_NAME` journal field. |
 | `category`    | yes      | string  | One of the 8 canonical categories — see below |
 | `severity`    | yes      | string  | One of the 8 syslog severities — see below |
 | `description` | rec.     | string  | Template rendered into the journal `MESSAGE` field |
-| `mib`         | no       | string  | Source MIB module name (informational only) |
 | `status`      | no       | string  | MIB status: `current`, `deprecated`, `obsolete` |
 | `varbinds`    | no       | list    | Names referencing the file-level table, or inline dicts (see below) |
 | `labels`      | no       | map     | Operator-overridable: key → template producing a `TRAP_<KEY>` journal field |
 | `dedup_key_varbinds` | no | list | Names of varbinds that participate in the deduplication fingerprint |
+
+> Note: the `name:` field encodes the source MIB module already. There is no
+> separate `mib:` field on a trap entry — that would be redundant.
 
 #### Varbind references
 
@@ -159,7 +171,7 @@ placeholders:
 
 | Reference                       | Resolved to |
 |---------------------------------|-------------|
-| `{<varbind_name>}`              | Varbind value, formatted per its `display_hint` / enum |
+| `{<varbind_name>}`              | Varbind value, formatted per its enum (and future `display_hint`) |
 | `{<varbind_name>.raw}`          | Varbind raw value (numeric for enums, undecoded bytes for OctetString) |
 | `{<numeric_oid>}`               | Varbind value by OID when no symbolic name is available |
 | `{SNMP_DEVICE_HOSTNAME}`        | Resolved device hostname (sysName or DNS) |

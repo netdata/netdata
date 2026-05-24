@@ -67,12 +67,11 @@ Many traps from network devices have metric-equivalents already polled by Netdat
 | **`mobility`** | MAC mobility / topology events with the actor — `macAddressMoved`, STP `newRoot` | LibreNMS handler classes; vendor MIBs |
 | **`state_change`** | Interface/port state, system lifecycle, routing protocol state, environmental state transitions — `linkDown`/`linkUp`, `coldStart`/`warmStart`, BGP transitions, fan/PSU/temp | Cohort-universal |
 | **`diagnostic`** | Vendor diagnostic events with device-determined context — reboot reasons, module insertion, RAID array, optical transceiver | Cisco/Juniper/Aruba diagnostic MIBs |
-| **`custom`** | Operator-authored OIDs — OT/IoT/industrial, application-specific | Tier-4 of `operator-features.md` |
-| **`unknown`** | No profile coverage — default for OIDs not in the catalogue | n/a |
+| **`unknown`** | No profile coverage — default for OIDs not in the catalogue. Also used for vendor MIBs that reserve user-defined trap slots (e.g. JANITZA `userTrap*`, SITEBOSS `s550notificationsUserTrap*`, NetApp `userDefined`), whose semantics are operator-determined at runtime, not in the profile | n/a |
 
 The category slug is assigned by the **profile** for known OIDs. For OIDs without profile coverage, the slug defaults to `unknown`. Operator can override the slug per-OID in plugin configuration if needed.
 
-**Category set is closed** — the 9 slugs above are the canonical taxonomy. Operators cannot extend this set; new slugs are added via Netdata releases when genuinely new content types emerge. For cross-cutting concerns (compliance scope, tenant, datacenter, change-window classification, etc.) operators use **labels** — see §7 (profile baseline labels) and §7.5 (plugin operator overrides). Labels are multi-valued per trap, free-form, and don't expand the metric dimension count.
+**Category set is closed** — the 8 slugs above are the canonical taxonomy. Operators cannot extend this set; new slugs are added via Netdata releases when genuinely new content types emerge. For cross-cutting concerns (compliance scope, tenant, datacenter, change-window classification, etc.) operators use **labels** — see §7 (profile baseline labels) and §7.5 (plugin operator overrides). Labels are multi-valued per trap, free-form, and don't expand the metric dimension count. Operator-authored OIDs default to `unknown` and the operator overrides category/severity/labels in plugin config — there is no separate "custom" category slug.
 
 PDU type (TRAP / INFORM / v1) is **not** a category — it is recorded separately in the journal field `SNMP_TRAP_PDU_TYPE`. The same OID can arrive as either TRAP or INFORM with identical meaning; the content category is independent of how it was delivered.
 
@@ -92,7 +91,7 @@ Cardinality discipline applies **only** to metric labels and dimensions. The jou
 **Allowed as metric labels** (bounded cardinality):
 - Device identifier (hub-local universe — bounded by site size)
 - OID family (bounded by profile catalogue)
-- Severity (bounded enum: info / warn / crit)
+- Severity (bounded enum: one of the 8 syslog levels per §11)
 - Reason code (bounded enum where the MIB defines it)
 - Feature name (license events — bounded per vendor)
 - Interface name when bounded per device
@@ -178,9 +177,9 @@ A profile entry per OID:
 
 ```yaml
 - oid: 1.3.6.1.4.1.9.9.315.0.1                  # ciscoPsmTrapSrvUnauthorized
-  name: ciscoPsmTrapSrvUnauthorized              # symbolic name (may also come from MIB if loaded)
+  name: CISCO-PORT-SECURITY-MIB::ciscoPsmTrapSrvUnauthorized   # MIB-qualified, globally unique
   category: security
-  severity: warn
+  severity: warning
 
   # Description — template, free use of varbinds (cardinality unrestricted, see §4).
   # Becomes the journal MESSAGE field.
@@ -200,7 +199,7 @@ A profile entry per OID:
     - oid: 1.3.6.1.4.1.9.9.315.1.2.1.1.1
       name: cpsIfViolationMacAddress
       type: OctetString
-      display_hint: "1x:"                        # render as MAC (aa:bb:cc:dd:ee:ff)
+      # display_hint: "1x:" — future field (not currently emitted; see profile-format.md)
     - oid: 1.3.6.1.4.1.9.9.315.1.2.1.1.2
       name: cpsIfViolationVlan
       type: INTEGER
@@ -458,9 +457,23 @@ Journal field names conform to `^[A-Z][A-Z0-9_]*$` per systemd-journal requireme
 
 ```
 MESSAGE=<rendered description template; free-form, high-cardinality content welcome>
-PRIORITY=<rfc-5424 severity, derived from category + severity_default>
+PRIORITY=<numeric 0-7 from the canonical 8-severity table below>
 SYSLOG_IDENTIFIER=netdata-snmptrap
 ```
+
+The closed 8-severity set (matches RFC 5424 / syslog and the values
+enforced in `classify.py` + `profile-format.md`):
+
+| Profile slug | PRIORITY | When to use |
+|---|---|---|
+| `emerg`   | 0 | System is unusable — exceptional vendor catastrophe |
+| `alert`   | 1 | Action must be taken immediately |
+| `crit`    | 2 | Critical conditions: hardware failure, security breach in progress |
+| `err`     | 3 | Error conditions: failure, fault, denial |
+| `warning` | 4 | Warning conditions: threshold breach, degradation, recoverable error |
+| `notice`  | 5 | Normal-but-significant: routine state changes, completed operations |
+| `info`    | 6 | Informational: status updates, periodic events |
+| `debug`   | 7 | Debug-level: rare; reserved for traps the MIB explicitly marks debug |
 
 `MESSAGE` is the rendered description template from the profile (§7) — fully resolved with varbind values, including high-cardinality content (MAC, source IP, username, packet details, etc.). This is the operator's primary view: `journalctl SNMP_TRAP_CATEGORY=security` shows one-line readable rows without further field inspection.
 
@@ -484,9 +497,9 @@ PRIORITY=4
 SYSLOG_IDENTIFIER=netdata-snmptrap
 SNMP_TRAP_REPORT_TYPE=trap
 SNMP_TRAP_OID=1.3.6.1.4.1.9.9.315.0.1
-SNMP_TRAP_NAME=ciscoPsmTrapSrvUnauthorized
+SNMP_TRAP_NAME=CISCO-PORT-SECURITY-MIB::ciscoPsmTrapSrvUnauthorized
 SNMP_TRAP_CATEGORY=security
-SNMP_TRAP_SEVERITY=warn
+SNMP_TRAP_SEVERITY=warning
 SNMP_TRAP_PDU_TYPE=trap
 SNMP_VERSION=v2c
 SNMP_SOURCE_IP=10.0.0.5
@@ -559,9 +572,9 @@ Two NIDL contexts, always emitted, used for plugin-health monitoring and broad-t
 | Aspect | Value |
 |---|---|
 | Instance | Per device (one instance per source device the hub knows about) |
-| Dimensions | Categories: `state_change`, `config_change`, `security`, `auth`, `license`, `mobility`, `diagnostic`, `custom`, `unknown` |
+| Dimensions | Categories: `state_change`, `config_change`, `security`, `auth`, `license`, `mobility`, `diagnostic`, `unknown` (the closed 8-slug set per §3) |
 | Unit | events/s (incremental counter) |
-| Labels | `severity` (info/warn/crit), `device`, `vendor`, `hub`, plus operator-defined labels from profile/plugin config |
+| Labels | `severity` (one of the 8 syslog severities per §11), `device`, `vendor`, `hub`, plus operator-defined labels from profile/plugin config |
 | Node / vnode | Per-device vnode — **inherited from the SNMP polling subsystem**. The trap plugin does not create vnodes; it emits metrics against the vnodes that SNMP polling already established for each monitored device. If polling is not configured for a given device, traps for that device emit against the hub vnode with `device` as a label. |
 | Title | "SNMP Traps Received" |
 

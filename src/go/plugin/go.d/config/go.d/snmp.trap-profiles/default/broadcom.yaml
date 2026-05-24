@@ -121,175 +121,155 @@ varbinds:
     type: InterfaceIndex
 traps:
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.1
-    name: multipleUsersTrap
-    category: security
-    severity: warning
-    description: Multiple users with administrative CLI access detected on {SNMP_DEVICE_HOSTNAME}. More than one administrator is currently logged in.
-    mib: EdgeSwitch-SWITCHING-MIB
+    name: EdgeSwitch-SWITCHING-MIB::multipleUsersTrap
+    category: auth
+    severity: notice
+    description: Multiple administrative users logged in via CLI on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.10
-    name: stpInstanceNewRootTrap
+    name: EdgeSwitch-SWITCHING-MIB::stpInstanceNewRootTrap
     category: mobility
     severity: notice
-    description: "Device {SNMP_DEVICE_HOSTNAME} elected as new STP root\n  MSTP instance ID: {agentStpMstId}"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: Device {SNMP_DEVICE_HOSTNAME} elected as new STP root for MST instance {agentStpMstId}
     status: current
     varbinds:
     - agentStpMstId
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.11
-    name: stpInstanceTopologyChangeTrap
-    category: state_change
+    name: EdgeSwitch-SWITCHING-MIB::stpInstanceTopologyChangeTrap
+    category: mobility
     severity: notice
-    description: "STP topology change detected on {SNMP_DEVICE_HOSTNAME}\n  MSTP instance ID: {agentStpMstId}"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "STP topology change detected on {SNMP_DEVICE_HOSTNAME}\n  MSTP instance: {agentStpMstId}"
     status: current
     varbinds:
     - agentStpMstId
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.12
-    name: powerSupplyStatusChangeTrap
+    name: EdgeSwitch-SWITCHING-MIB::powerSupplyStatusChangeTrap
     category: state_change
     severity: warning
     description: Power supply status changed on {SNMP_DEVICE_HOSTNAME}
-    mib: EdgeSwitch-SWITCHING-MIB
     status: obsolete
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.13
-    name: failedUserLoginTrap
+    name: EdgeSwitch-SWITCHING-MIB::failedUserLoginTrap
     category: auth
     severity: warning
-    description: User authentication failed on {SNMP_DEVICE_HOSTNAME} via CLI or Web interface
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: User failed to authenticate on {SNMP_DEVICE_HOSTNAME} via CLI or Web interface
     status: current
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.14
-    name: userLockoutTrap
+    name: EdgeSwitch-SWITCHING-MIB::userLockoutTrap
     category: auth
     severity: warning
-    description: User account locked on {SNMP_DEVICE_HOSTNAME} due to consecutive failed login attempts via CLI or Web interface
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: User account locked on {SNMP_DEVICE_HOSTNAME} due to consecutive failed login attempts
     status: current
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.15
-    name: daiIntfErrorDisabledTrap
+    name: EdgeSwitch-SWITCHING-MIB::daiIntfErrorDisabledTrap
     category: security
     severity: warning
-    description: "Dynamic ARP Inspection (DAI) error-disabled interface on {SNMP_DEVICE_HOSTNAME}\n  Interface {ifIndex} placed in error-disabled state\n  Cause: incoming packet rate exceeded configured rate limit during burst-interval"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "Dynamic ARP Inspection (DAI) error-disabled interface on {SNMP_DEVICE_HOSTNAME}\n  ifIndex: {ifIndex}\n  Reason: Incoming packet rate exceeded configured rate limit during burst-interval"
     status: current
     varbinds:
     - ifIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.16
-    name: stpInstanceLoopInconsistentStartTrap
+    name: EdgeSwitch-SWITCHING-MIB::stpInstanceLoopInconsistentStartTrap
     category: state_change
     severity: warning
-    description: "Port entered loop-inconsistent state on {SNMP_DEVICE_HOSTNAME}\n  STP instance ID: {agentStpMstId}\n  ifIndex: {ifIndex}\n  Reason: failed to receive BPDU"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "STP instance {agentStpMstId} on interface ifIndex {ifIndex} entered loop inconsistent state on {SNMP_DEVICE_HOSTNAME}\n  Reason: Failure to receive BPDU"
     status: current
     varbinds:
     - agentStpMstId
     - ifIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.17
-    name: stpInstanceLoopInconsistentEndTrap
+    name: EdgeSwitch-SWITCHING-MIB::stpInstanceLoopInconsistentEndTrap
     category: state_change
-    severity: notice
-    description: "Port exited STP loop-inconsistent state on {SNMP_DEVICE_HOSTNAME}\n  MSTP instance ID: {agentStpMstId}\n  interface: {ifIndex}\n\nThis indicates the port has recovered from a loop-guard blocking condition after receiving a valid BPDU."
-    mib: EdgeSwitch-SWITCHING-MIB
+    severity: info
+    description: "Port exited loop-inconsistent state on {SNMP_DEVICE_HOSTNAME}\n  MSTP instance ID: {agentStpMstId}\n  Interface: {ifIndex}\n  Recovery triggered by BPDU reception"
     status: current
     varbinds:
     - agentStpMstId
     - ifIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.18
-    name: dhcpSnoopingIntfErrorDisabledTrap
+    name: EdgeSwitch-SWITCHING-MIB::dhcpSnoopingIntfErrorDisabledTrap
     category: security
     severity: warning
-    description: "DHCP Snooping error-disabled on {SNMP_DEVICE_HOSTNAME}\n  Interface {ifIndex} placed in error-disabled state due to incoming DHCP packet rate exceeding configured limit during burst interval"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "DHCP Snooping error-disabled interface on {SNMP_DEVICE_HOSTNAME}\n  Interface: {ifIndex}\n  Reason: Incoming packet rate exceeded configured rate limit during burst-interval"
     status: current
     varbinds:
     - ifIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.19
-    name: noStartupConfigTrap
-    category: diagnostic
-    severity: info
-    description: Startup-config file exists and SSH is enabled on {SNMP_DEVICE_HOSTNAME}
-    mib: EdgeSwitch-SWITCHING-MIB
+    name: EdgeSwitch-SWITCHING-MIB::noStartupConfigTrap
+    category: config_change
+    severity: notice
+    description: Startup configuration file exists and SSH is enabled on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.2
-    name: broadcastStormStartTrap
+    name: EdgeSwitch-SWITCHING-MIB::broadcastStormStartTrap
     category: state_change
-    severity: err
-    description: Broadcast storm detected on {SNMP_DEVICE_HOSTNAME}. Network may experience severe degradation due to excessive broadcast traffic.
-    mib: EdgeSwitch-SWITCHING-MIB
+    severity: alert
+    description: Broadcast storm detected on {SNMP_DEVICE_HOSTNAME}
     status: obsolete
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.20
-    name: agentSwitchIpAddressConflictTrap
+    name: EdgeSwitch-SWITCHING-MIB::agentSwitchIpAddressConflictTrap
     category: security
     severity: warning
-    description: "IP address conflict detected on {SNMP_DEVICE_HOSTNAME}\n  Conflicting IP: {agentSwitchConflictIPAddr}\n  Host MAC causing conflict: {agentSwitchConflictMacAddr}\n\nAn ARP was received from another host claiming the same IP address assigned to the switch."
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "IP address conflict detected on {SNMP_DEVICE_HOSTNAME}\n  Conflicting IP: {agentSwitchConflictIPAddr}\n  Conflicting MAC: {agentSwitchConflictMacAddr}"
     status: current
     varbinds:
     - agentSwitchConflictIPAddr
     - agentSwitchConflictMacAddr
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.21
-    name: agentSwitchCpuRisingThresholdTrap
+    name: EdgeSwitch-SWITCHING-MIB::agentSwitchCpuRisingThresholdTrap
     category: diagnostic
     severity: warning
-    description: "CPU utilization on {SNMP_DEVICE_HOSTNAME} exceeded the configured rising threshold\n  threshold: {agentSwitchCpuProcessRisingThreshold}%\n  process: {agentSwitchCpuProcessName}"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "CPU utilization exceeded rising threshold on {SNMP_DEVICE_HOSTNAME}\n  process: {agentSwitchCpuProcessName}\n  rising threshold: {agentSwitchCpuProcessRisingThreshold}%"
     status: current
     varbinds:
     - agentSwitchCpuProcessRisingThreshold
     - agentSwitchCpuProcessName
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.22
-    name: agentSwitchCpuFallingThresholdTrap
+    name: EdgeSwitch-SWITCHING-MIB::agentSwitchCpuFallingThresholdTrap
     category: diagnostic
     severity: info
     description: "CPU utilization fell below the falling threshold on {SNMP_DEVICE_HOSTNAME}\n  falling threshold: {agentSwitchCpuProcessFallingThreshold}%"
-    mib: EdgeSwitch-SWITCHING-MIB
     status: current
     varbinds:
     - agentSwitchCpuProcessFallingThreshold
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.23
-    name: agentSwitchCpuFreeMemBelowThresholdTrap
+    name: EdgeSwitch-SWITCHING-MIB::agentSwitchCpuFreeMemBelowThresholdTrap
     category: diagnostic
     severity: warning
-    description: "CPU free memory fell below the configured threshold on {SNMP_DEVICE_HOSTNAME}\n  threshold: {agentSwitchCpuProcessFreeMemoryThreshold} KB\n  (A value of 0 indicates the notification feature is disabled.)"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "CPU free memory on {SNMP_DEVICE_HOSTNAME} fell below threshold\n  threshold: {agentSwitchCpuProcessFreeMemoryThreshold} KB"
     status: current
     varbinds:
     - agentSwitchCpuProcessFreeMemoryThreshold
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.24
-    name: agentSwitchCpuFreeMemAboveThresholdTrap
+    name: EdgeSwitch-SWITCHING-MIB::agentSwitchCpuFreeMemAboveThresholdTrap
     category: diagnostic
-    severity: info
-    description: "CPU free memory on {SNMP_DEVICE_HOSTNAME} rose to 10% above the configured threshold\n  threshold: {agentSwitchCpuProcessFreeMemoryThreshold} KB"
-    mib: EdgeSwitch-SWITCHING-MIB
+    severity: notice
+    description: "CPU free memory on {SNMP_DEVICE_HOSTNAME} rose above threshold\n  threshold: {agentSwitchCpuProcessFreeMemoryThreshold} KB"
     status: current
     varbinds:
     - agentSwitchCpuProcessFreeMemoryThreshold
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.25
-    name: topologyChangeInitiatedTrap
+    name: EdgeSwitch-SWITCHING-MIB::topologyChangeInitiatedTrap
     category: state_change
-    severity: warning
-    description: "STP topology change detected on {SNMP_DEVICE_HOSTNAME}\n  MSTP instance: {agentStpMstId}\n  ifIndex: {ifIndex}\n\nThis may cause temporary MAC-table flushing and forwarding disruption."
-    mib: EdgeSwitch-SWITCHING-MIB
+    severity: notice
+    description: "STP topology change detected on {SNMP_DEVICE_HOSTNAME}\n  MSTP instance ID: {agentStpMstId}\n  ifIndex: {ifIndex}"
     status: current
     varbinds:
     - agentStpMstId
     - ifIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.26
-    name: loopDetectedTrap
+    name: EdgeSwitch-SWITCHING-MIB::loopDetectedTrap
     category: state_change
     severity: warning
     description: "STP loop detected on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifIndex}"
-    mib: EdgeSwitch-SWITCHING-MIB
     status: current
     varbinds:
     - ifIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.27
-    name: agentSwitchMbufRisingThresholdTrap
-    category: diagnostic
+    name: EdgeSwitch-SWITCHING-MIB::agentSwitchMbufRisingThresholdTrap
+    category: state_change
     severity: warning
-    description: "Mbuf utilization exceeded rising threshold on {SNMP_DEVICE_HOSTNAME}\n  threshold: {agentSwitchMbufRisingThreshold}%\n  total mbufs: {agentSwitchMbufsTotal}\n  used mbufs: {agentSwitchMbufsUsed}\n  free mbufs: {agentSwitchMbufsFree}"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "Memory buffer (Mbuf) utilization exceeded rising threshold on {SNMP_DEVICE_HOSTNAME}\n  rising threshold: {agentSwitchMbufRisingThreshold}%\n  total Mbufs: {agentSwitchMbufsTotal}\n  Mbufs in use: {agentSwitchMbufsUsed}\n  Mbufs free: {agentSwitchMbufsFree}"
     status: current
     varbinds:
     - agentSwitchMbufRisingThreshold
@@ -297,11 +277,10 @@ traps:
     - agentSwitchMbufsUsed
     - agentSwitchMbufsFree
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.28
-    name: agentSwitchMbufFallingThresholdTrap
+    name: EdgeSwitch-SWITCHING-MIB::agentSwitchMbufFallingThresholdTrap
     category: diagnostic
-    severity: warning
-    description: "Memory buffer (Mbuf) utilization fell below the falling threshold on {SNMP_DEVICE_HOSTNAME}\n  falling threshold: {agentSwitchMbufFallingThreshold}%\n  total Mbufs: {agentSwitchMbufsTotal}\n  used Mbufs: {agentSwitchMbufsUsed}\n  free Mbufs: {agentSwitchMbufsFree}"
-    mib: EdgeSwitch-SWITCHING-MIB
+    severity: notice
+    description: "Mbuf utilization dropped below threshold on {SNMP_DEVICE_HOSTNAME}\n  falling threshold: {agentSwitchMbufFallingThreshold}%\n  total buffers: {agentSwitchMbufsTotal}\n  used buffers: {agentSwitchMbufsUsed}\n  free buffers: {agentSwitchMbufsFree}"
     status: current
     varbinds:
     - agentSwitchMbufFallingThreshold
@@ -309,68 +288,60 @@ traps:
     - agentSwitchMbufsUsed
     - agentSwitchMbufsFree
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.3
-    name: broadcastStormEndTrap
+    name: EdgeSwitch-SWITCHING-MIB::broadcastStormEndTrap
     category: state_change
     severity: notice
-    description: Broadcast storm condition has cleared on {SNMP_DEVICE_HOSTNAME}. Network traffic levels have returned to normal.
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: Broadcast storm ended on {SNMP_DEVICE_HOSTNAME}
     status: obsolete
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.4
-    name: linkFailureTrap
+    name: EdgeSwitch-SWITCHING-MIB::linkFailureTrap
     category: state_change
     severity: warning
     description: Link failure detected on {SNMP_DEVICE_HOSTNAME}
-    mib: EdgeSwitch-SWITCHING-MIB
     status: obsolete
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.5
-    name: vlanRequestFailureTrap
+    name: EdgeSwitch-SWITCHING-MIB::vlanRequestFailureTrap
     category: diagnostic
-    severity: warning
+    severity: err
     description: "VLAN request failure on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
-    mib: EdgeSwitch-SWITCHING-MIB
     status: obsolete
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.6
-    name: vlanDeleteLastTrap
+    name: EdgeSwitch-SWITCHING-MIB::vlanDeleteLastTrap
     category: config_change
     severity: warning
-    description: "Attempted to delete the last or default VLAN on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}\n\nNote: Deleting the last configured VLAN or the Default VLAN is not permitted."
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "Attempted deletion of the last configured VLAN or Default VLAN on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
     status: current
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.7
-    name: vlanDefaultCfgFailureTrap
+    name: EdgeSwitch-SWITCHING-MIB::vlanDefaultCfgFailureTrap
     category: config_change
     severity: err
-    description: "Failed to reset VLAN configuration to defaults on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "VLAN default configuration reset failed on {SNMP_DEVICE_HOSTNAME}\n  VLAN identifier: {dot1qVlanIndex}"
     status: current
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.8
-    name: vlanRestoreFailureTrap
-    category: diagnostic
+    name: EdgeSwitch-SWITCHING-MIB::vlanRestoreFailureTrap
+    category: state_change
     severity: err
-    description: "VLAN restore operation failed on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
-    mib: EdgeSwitch-SWITCHING-MIB
+    description: "VLAN restore failed on {SNMP_DEVICE_HOSTNAME}\n  VLAN identifier: {dot1qVlanIndex}"
     status: obsolete
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.4413.1.1.1.0.9
-    name: fanFailureTrap
-    category: state_change
-    severity: warning
+    name: EdgeSwitch-SWITCHING-MIB::fanFailureTrap
+    category: diagnostic
+    severity: alert
     description: Fan failure detected on {SNMP_DEVICE_HOSTNAME}
-    mib: EdgeSwitch-SWITCHING-MIB
     status: obsolete
   - oid: 1.3.6.1.4.1.4413.1.1.13.0.1
-    name: agentInventoryCardMismatch
+    name: EdgeSwitch-INVENTORY-MIB::agentInventoryCardMismatch
     category: diagnostic
     severity: warning
-    description: "Card mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  unit: {agentInventoryUnitNumber}\n  slot: {agentInventorySlotNumber}\n  inserted card type: {agentInventorySlotInsertedCardType}\n  configured card type: {agentInventorySlotConfiguredCardType}"
-    mib: EdgeSwitch-INVENTORY-MIB
+    description: "Card mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  Unit: {agentInventoryUnitNumber}\n  Slot: {agentInventorySlotNumber}\n  Inserted card type: {agentInventorySlotInsertedCardType}\n  Configured card type: {agentInventorySlotConfiguredCardType}"
     status: current
     varbinds:
     - agentInventoryUnitNumber
@@ -378,118 +349,106 @@ traps:
     - agentInventorySlotInsertedCardType
     - agentInventorySlotConfiguredCardType
   - oid: 1.3.6.1.4.1.4413.1.1.13.0.2
-    name: agentInventoryCardUnsupported
+    name: EdgeSwitch-INVENTORY-MIB::agentInventoryCardUnsupported
     category: diagnostic
-    severity: warning
-    description: "Unsupported card detected in slot on {SNMP_DEVICE_HOSTNAME}\n  unit: {agentInventoryUnitNumber}\n  slot: {agentInventorySlotNumber}\n  inserted card type: {agentInventorySlotInsertedCardType}"
-    mib: EdgeSwitch-INVENTORY-MIB
+    severity: crit
+    description: "Unsupported card detected on {SNMP_DEVICE_HOSTNAME}\n  unit: {agentInventoryUnitNumber}\n  slot: {agentInventorySlotNumber}\n  inserted card type: {agentInventorySlotInsertedCardType}"
     status: current
     varbinds:
     - agentInventoryUnitNumber
     - agentInventorySlotNumber
     - agentInventorySlotInsertedCardType
   - oid: 1.3.6.1.4.1.4413.1.1.13.0.3
-    name: agentInventoryStackPortLinkUp
+    name: EdgeSwitch-INVENTORY-MIB::agentInventoryStackPortLinkUp
     category: state_change
-    severity: info
-    description: "Stack port link up on {SNMP_DEVICE_HOSTNAME}\n  unit: {agentInventoryStackPortUnit}\n  port: {agentInventoryStackPortTag}"
-    mib: EdgeSwitch-INVENTORY-MIB
+    severity: notice
+    description: Stack port {agentInventoryStackPortTag} on unit {agentInventoryStackPortUnit} linked up on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - agentInventoryStackPortUnit
     - agentInventoryStackPortTag
   - oid: 1.3.6.1.4.1.4413.1.1.13.0.4
-    name: agentInventoryStackPortLinkDown
+    name: EdgeSwitch-INVENTORY-MIB::agentInventoryStackPortLinkDown
     category: state_change
     severity: warning
     description: "Stack port link down on {SNMP_DEVICE_HOSTNAME}\n  unit: {agentInventoryStackPortUnit}\n  port: {agentInventoryStackPortTag}"
-    mib: EdgeSwitch-INVENTORY-MIB
     status: current
     varbinds:
     - agentInventoryStackPortUnit
     - agentInventoryStackPortTag
   - oid: 1.3.6.1.4.1.4413.1.1.13.0.5
-    name: agentInventorySFSStart
-    category: diagnostic
-    severity: info
-    description: "Stack Firmware Synchronization (SFS) started on {SNMP_DEVICE_HOSTNAME}\n  stack unit number: {agentInventoryStackUnitNumber}"
-    mib: EdgeSwitch-INVENTORY-MIB
+    name: EdgeSwitch-INVENTORY-MIB::agentInventorySFSStart
+    category: state_change
+    severity: notice
+    description: "Stack Firmware Synchronization started on {SNMP_DEVICE_HOSTNAME}\n  stack unit: {agentInventoryStackUnitNumber}"
     status: current
     varbinds:
     - agentInventoryStackUnitNumber
   - oid: 1.3.6.1.4.1.4413.1.1.13.0.6
-    name: agentInventorySFSComplete
+    name: EdgeSwitch-INVENTORY-MIB::agentInventorySFSComplete
     category: state_change
-    severity: info
-    description: "Stack Firmware Synchronization (SFS) completed on {SNMP_DEVICE_HOSTNAME}\n  stack unit number: {agentInventoryStackUnitNumber}"
-    mib: EdgeSwitch-INVENTORY-MIB
+    severity: notice
+    description: "Stack firmware synchronization complete on {SNMP_DEVICE_HOSTNAME}\n  stack unit: {agentInventoryStackUnitNumber}"
     status: current
     varbinds:
     - agentInventoryStackUnitNumber
   - oid: 1.3.6.1.4.1.4413.1.1.13.0.7
-    name: agentInventorySFSFail
+    name: EdgeSwitch-INVENTORY-MIB::agentInventorySFSFail
     category: diagnostic
-    severity: warning
-    description: "Stack Firmware Synchronization (SFS) failed on {SNMP_DEVICE_HOSTNAME}\n  stack unit number: {agentInventoryStackUnitNumber}"
-    mib: EdgeSwitch-INVENTORY-MIB
+    severity: err
+    description: Stack Firmware Synchronization failed for unit {agentInventoryStackUnitNumber} on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - agentInventoryStackUnitNumber
   - oid: 1.3.6.1.4.1.4413.1.1.14.5.1.1
-    name: agentLogEmailSendFailed
+    name: EdgeSwitch-LOGGING-MIB::agentLogEmailSendFailed
     category: diagnostic
-    severity: notice
-    description: "Email notification failure on {SNMP_DEVICE_HOSTNAME}\n  cumulative failure count: {agentLogEmailStatsemailsFailureCount}\n\nThe device failed to send an email to the configured SMTP server. Repeated failures may indicate SMTP server misconfiguration, network reachability issues, or authentication problems with the mail relay."
-    mib: EdgeSwitch-LOGGING-MIB
+    severity: warning
+    description: "Email notification failed on {SNMP_DEVICE_HOSTNAME}\n  SMTP connection failure count: {agentLogEmailStatsemailsFailureCount}"
     status: current
     varbinds:
     - agentLogEmailStatsemailsFailureCount
   - oid: 1.3.6.1.4.1.4413.1.1.43.0.1
-    name: boxsFanStateChange
+    name: EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxsFanStateChange
     category: state_change
     severity: warning
     description: "Fan state change on {SNMP_DEVICE_HOSTNAME}\n  fan index: {boxServicesFansIndex}\n  event: {boxsItemStateChangeEvent}"
-    mib: EdgeSwitch-BOXSERVICES-PRIVATE-MIB
     status: current
     varbinds:
     - boxServicesFansIndex
     - boxsItemStateChangeEvent
   - oid: 1.3.6.1.4.1.4413.1.1.43.0.2
-    name: boxsPowSupplyStateChange
+    name: EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxsPowSupplyStateChange
     category: state_change
     severity: warning
-    description: "Power supply state change on {SNMP_DEVICE_HOSTNAME}\n  power supply index: {boxServicesPowSupplyIndex}\n  state change event: {boxsItemStateChangeEvent}"
-    mib: EdgeSwitch-BOXSERVICES-PRIVATE-MIB
+    description: "Power supply state change detected on {SNMP_DEVICE_HOSTNAME}\n  index: {boxServicesPowSupplyIndex}\n  event: {boxsItemStateChangeEvent}"
     status: current
     varbinds:
     - boxServicesPowSupplyIndex
     - boxsItemStateChangeEvent
   - oid: 1.3.6.1.4.1.4413.1.1.43.0.3
-    name: boxsTemperatureChange
+    name: EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxsTemperatureChange
     category: state_change
     severity: warning
     description: "Temperature threshold event on {SNMP_DEVICE_HOSTNAME}\n  sensor index: {boxServicesTempSensorIndex}\n  event type: {boxsTemperatureChangeEvent}"
-    mib: EdgeSwitch-BOXSERVICES-PRIVATE-MIB
     status: obsolete
     varbinds:
     - boxServicesTempSensorIndex
     - boxsTemperatureChangeEvent
   - oid: 1.3.6.1.4.1.4413.1.1.43.0.4
-    name: boxsThermalShutdown
-    category: diagnostic
-    severity: crit
+    name: EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxsThermalShutdown
+    category: state_change
+    severity: alert
     description: "Thermal shutdown initiated on {SNMP_DEVICE_HOSTNAME}\n  sensor: {boxServicesThermalShutdownSensor}\n  temperature: {boxServicesThermalShutdownTemperature}"
-    mib: EdgeSwitch-BOXSERVICES-PRIVATE-MIB
     status: current
     varbinds:
     - boxServicesThermalShutdownSensor
     - boxServicesThermalShutdownTemperature
   - oid: 1.3.6.1.4.1.4413.1.1.43.0.5
-    name: boxsTemperatureStateChange
+    name: EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxsTemperatureStateChange
     category: state_change
     severity: warning
-    description: "Temperature state change on {SNMP_DEVICE_HOSTNAME}\n  unit index: {boxServicesTempUnitIndex}\n  previous status: {boxsTemperatureStatusPreviousEvent}\n  current status: {boxsTemperatureStatusCurrentEvent}"
-    mib: EdgeSwitch-BOXSERVICES-PRIVATE-MIB
+    description: "Temperature threshold crossed on {SNMP_DEVICE_HOSTNAME}\n  unit index: {boxServicesTempUnitIndex}\n  current status: {boxsTemperatureStatusCurrentEvent}\n  previous status: {boxsTemperatureStatusPreviousEvent}"
     status: current
     varbinds:
     - boxServicesTempUnitIndex

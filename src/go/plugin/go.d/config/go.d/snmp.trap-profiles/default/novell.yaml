@@ -15,20 +15,18 @@ varbinds:
     type: INTEGER
 traps:
   - oid: 1.3.6.1.4.1.23.2.5.5.0.1
-    name: ipxTrapCircuitDown
+    name: IPX::ipxTrapCircuitDown
     category: state_change
     severity: warning
-    description: "IPX circuit down on {SNMP_DEVICE_HOSTNAME}\n  SysInstance: {ipxCircSysInstance}\n  CircIndex: {ipxCircIndex}"
-    mib: NOVELL-IPX-MIB
+    description: IPX circuit {ipxCircIndex} on instance {ipxCircSysInstance} went down on {SNMP_DEVICE_HOSTNAME}
     varbinds:
     - ipxCircSysInstance
     - ipxCircIndex
   - oid: 1.3.6.1.4.1.23.2.5.5.0.2
-    name: ipxTrapCircuitUp
+    name: IPX::ipxTrapCircuitUp
     category: state_change
     severity: info
-    description: "IPX circuit up on {SNMP_DEVICE_HOSTNAME}\n  SysInstance: {ipxCircSysInstance}\n  CircIndex: {ipxCircIndex}"
-    mib: NOVELL-IPX-MIB
+    description: "IPX circuit has come up on {SNMP_DEVICE_HOSTNAME}\n  SysInstance: {ipxCircSysInstance}\n  Circuit Index: {ipxCircIndex}"
     varbinds:
     - ipxCircSysInstance
     - ipxCircIndex

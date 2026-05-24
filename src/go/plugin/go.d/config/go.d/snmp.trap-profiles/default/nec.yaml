@@ -66,50 +66,45 @@ varbinds:
     constraints: (1..2147483647)
 traps:
   - oid: 1.3.6.1.4.1.119.2.3.84.3.2.0.1
-    name: pikeTunnelStart
+    name: PICO-IPSEC-FLOW-MONITOR-MIB::pikeTunnelStart
     category: state_change
     severity: info
-    description: "IPsec Phase-1 IKE tunnel became active on {SNMP_DEVICE_HOSTNAME}\n  local peer: {pikePeerLocalAddr}\n  remote peer: {pikePeerRemoteAddr}\n  negotiated lifetime: {pikeTunLifeTime} seconds"
-    mib: PICO-IPSEC-FLOW-MONITOR-MIB
+    description: "IPsec Phase-1 IKE tunnel activated on {SNMP_DEVICE_HOSTNAME}\n  local peer: {pikePeerLocalAddr}\n  remote peer: {pikePeerRemoteAddr}\n  negotiated lifetime: {pikeTunLifeTime} seconds"
     varbinds:
     - pikePeerLocalAddr
     - pikePeerRemoteAddr
     - pikeTunLifeTime
   - oid: 1.3.6.1.4.1.119.2.3.84.3.2.0.11
-    name: pipSecEarlyTunTerm
+    name: PICO-IPSEC-FLOW-MONITOR-MIB::pipSecEarlyTunTerm
     category: state_change
     severity: warning
-    description: "IPsec Phase-2 tunnel terminated early on {SNMP_DEVICE_HOSTNAME}\n  active time: {pipSecTunActiveTime} hundredths of seconds\n  protocol: {pipSecSpiProtocol}"
-    mib: PICO-IPSEC-FLOW-MONITOR-MIB
+    description: "IPsec Phase-2 tunnel terminated early on {SNMP_DEVICE_HOSTNAME}\n  active time: {pipSecTunActiveTime}\n  SPI protocol: {pipSecSpiProtocol}"
     varbinds:
     - pipSecTunActiveTime
     - pipSecSpiProtocol
   - oid: 1.3.6.1.4.1.119.2.3.84.3.2.0.2
-    name: pikeTunnelStop
+    name: PICO-IPSEC-FLOW-MONITOR-MIB::pikeTunnelStop
     category: state_change
-    severity: warning
-    description: "IPsec Phase-1 IKE tunnel became inactive on {SNMP_DEVICE_HOSTNAME}\n  termination reason: {pikeTunHistTermReason}\n  local peer: {pikePeerLocalAddr}\n  remote peer: {pikePeerRemoteAddr}\n  active time: {pikeTunActiveTime}"
-    mib: PICO-IPSEC-FLOW-MONITOR-MIB
+    severity: notice
+    description: "IPsec Phase-1 IKE Tunnel stopped on {SNMP_DEVICE_HOSTNAME}\n  local peer: {pikePeerLocalAddr}\n  remote peer: {pikePeerRemoteAddr}\n  termination reason: {pikeTunHistTermReason}\n  active duration: {pikeTunActiveTime}"
     varbinds:
     - pikeTunHistTermReason
     - pikePeerLocalAddr
     - pikePeerRemoteAddr
     - pikeTunActiveTime
   - oid: 1.3.6.1.4.1.119.2.3.84.3.2.0.7
-    name: pipSecTunnelStart
+    name: PICO-IPSEC-FLOW-MONITOR-MIB::pipSecTunnelStart
     category: state_change
-    severity: info
-    description: "IPsec Phase-2 tunnel established on {SNMP_DEVICE_HOSTNAME}\n  negotiated lifetime: {pipSecTunLifeTime} seconds\n  negotiated lifesize: {pipSecTunLifeSize} KB"
-    mib: PICO-IPSEC-FLOW-MONITOR-MIB
+    severity: notice
+    description: "IPsec Phase-2 tunnel became active on {SNMP_DEVICE_HOSTNAME}\n  negotiated lifetime: {pipSecTunLifeTime} seconds\n  negotiated lifesize: {pipSecTunLifeSize} KB"
     varbinds:
     - pipSecTunLifeTime
     - pipSecTunLifeSize
   - oid: 1.3.6.1.4.1.119.2.3.84.3.2.0.8
-    name: pipSecTunnelStop
+    name: PICO-IPSEC-FLOW-MONITOR-MIB::pipSecTunnelStop
     category: state_change
-    severity: warning
-    description: "IPsec Phase-2 tunnel stopped on {SNMP_DEVICE_HOSTNAME}\n  termination reason: {pipSecTunHistTermReason}\n  active time (hundredths of sec): {pipSecTunActiveTime}"
-    mib: PICO-IPSEC-FLOW-MONITOR-MIB
+    severity: notice
+    description: "IPsec Phase-2 tunnel became inactive on {SNMP_DEVICE_HOSTNAME}\n  termination reason: {pipSecTunHistTermReason}\n  active duration: {pipSecTunActiveTime}"
     varbinds:
     - pipSecTunHistTermReason
     - pipSecTunActiveTime

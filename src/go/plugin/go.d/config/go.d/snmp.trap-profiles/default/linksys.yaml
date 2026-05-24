@@ -23,171 +23,154 @@ varbinds:
       '1': warning
 traps:
   - oid: 1.3.6.1.4.1.3955.1000.201.0.1
-    name: rlMacMulticastUnregFilterFailed
+    name: LINKSYS-rlBrgMulticast-MIB::rlMacMulticastUnregFilterFailed
     category: diagnostic
     severity: warning
-    description: "MAC unregistered filtering operation failed on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-rlBrgMulticast-MIB
+    description: "MAC unregistered multicast filter operation failed on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.180
-    name: rlCopyFinished
-    category: diagnostic
+    name: LINKSYS-COPY-MIB::rlCopyFinished
+    category: state_change
     severity: info
-    description: "Copy operation completed on {SNMP_DEVICE_HOSTNAME}\n  severity: {rndErrorSeverity}\n  description: {rndErrorDesc}"
-    mib: LINKSYS-COPY-MIB
+    description: "Copy operation completed successfully on {SNMP_DEVICE_HOSTNAME}\n  error description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.181
-    name: rlCopyFailed
+    name: LINKSYS-COPY-MIB::rlCopyFailed
     category: diagnostic
     severity: err
     description: "Copy operation failed on {SNMP_DEVICE_HOSTNAME}\n  error description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-COPY-MIB
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.186
-    name: rlStackUnitRemoved
-    category: diagnostic
-    severity: warning
-    description: "Stack unit removed on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-Physicaldescription-MIB
+    name: LINKSYS-Physicaldescription-MIB::rlStackUnitRemoved
+    category: state_change
+    severity: notice
+    description: "A unit was removed from the stack on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.187
-    name: rlStackConfigChangedRingChain
+    name: LINKSYS-Physicaldescription-MIB::rlStackConfigChangedRingChain
     category: config_change
     severity: notice
     description: "Stack topology configuration changed on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-Physicaldescription-MIB
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.188
-    name: rlStackBackupUnitRemoved
+    name: LINKSYS-Physicaldescription-MIB::rlStackBackupUnitRemoved
     category: state_change
     severity: warning
     description: "Backup unit removed from stack on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-Physicaldescription-MIB
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.189
-    name: rlStackMasterSwitchover
+    name: LINKSYS-Physicaldescription-MIB::rlStackMasterSwitchover
     category: state_change
-    severity: notice
-    description: "Stack master switchover on {SNMP_DEVICE_HOSTNAME}. A new master was elected; the old master is now the backup.\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-Physicaldescription-MIB
+    severity: warning
+    description: "Master switch elected on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.190
-    name: rlStackUnitDifferentSwVersion
-    category: diagnostic
+    name: LINKSYS-Physicaldescription-MIB::rlStackUnitDifferentSwVersion
+    category: state_change
     severity: warning
-    description: "Stack unit software version mismatch on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}\n\nA new unit joined the stack with a different software version than the master."
-    mib: LINKSYS-Physicaldescription-MIB
+    description: "Stack unit on {SNMP_DEVICE_HOSTNAME} has different software version than master\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.191
-    name: rlStackDuplicateUnitNotJoin
-    category: diagnostic
+    name: LINKSYS-Physicaldescription-MIB::rlStackDuplicateUnitNotJoin
+    category: state_change
     severity: warning
-    description: "Stacking unit rejected on {SNMP_DEVICE_HOSTNAME}: duplicate unit ID detected\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-Physicaldescription-MIB
+    description: "A stacking unit with a duplicate unit ID failed to join the stack on {SNMP_DEVICE_HOSTNAME}\n  error description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.195
-    name: rlStackLinkChange
+    name: LINKSYS-Physicaldescription-MIB::rlStackLinkChange
     category: state_change
     severity: warning
     description: "Stacking port link change on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-Physicaldescription-MIB
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.208
-    name: rlIgmpMldSnoopTriplePlayPort
-    category: diagnostic
+    name: LINKSYS-rlBrgMulticast-MIB::rlIgmpMldSnoopTriplePlayPort
+    category: state_change
     severity: info
-    description: "IGMP/MLD snoop query received on triple-play port on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-rlBrgMulticast-MIB
+    description: "IGMP/MLD snooping query received on triple play port on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.209
-    name: rlLldpTLVsTxOverloadingStateEnterTrap
-    category: diagnostic
+    name: LINKSYS-LLDP-MIB::rlLldpTLVsTxOverloadingStateEnterTrap
+    category: state_change
     severity: info
     description: "LLDP TLV transmission overloading state entered on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-LLDP-MIB
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.210
-    name: rlLldpTLVsTxOverloadingStateExitTrap
+    name: LINKSYS-LLDP-MIB::rlLldpTLVsTxOverloadingStateExitTrap
     category: state_change
     severity: info
-    description: "LLDP TLV transmit overloading state cleared on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-LLDP-MIB
+    description: "LLDP port on {SNMP_DEVICE_HOSTNAME} has exited the TLV overloading state\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.211
-    name: rlCopySWFinished
+    name: LINKSYS-COPY-MIB::rlCopySWFinished
     category: diagnostic
-    severity: notice
-    description: "Software copy operation completed successfully on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-COPY-MIB
+    severity: info
+    description: "Software image copy operation completed on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.212
-    name: rlCopySWToUnits
+    name: LINKSYS-COPY-MIB::rlCopySWToUnits
     category: diagnostic
     severity: info
-    description: "Software copy operation completed successfully on {SNMP_DEVICE_HOSTNAME}\n  severity: {rndErrorSeverity}\n  description: {rndErrorDesc}\n  units list: {rlCopyUnitsList}"
-    mib: LINKSYS-COPY-MIB
+    description: "Remote units finished image copy on {SNMP_DEVICE_HOSTNAME}\n  error description: {rndErrorDesc}\n  severity: {rndErrorSeverity}\n  units: {rlCopyUnitsList}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
     - rlCopyUnitsList
   - oid: 1.3.6.1.4.1.3955.1000.201.0.220
-    name: rlCopyMirrorFileIllegal
+    name: LINKSYS-COPY-MIB::rlCopyMirrorFileIllegal
     category: config_change
     severity: err
-    description: "Mirror configuration file is invalid on {SNMP_DEVICE_HOSTNAME} due to failed copy operation(s)\n  error description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-COPY-MIB
+    description: "Mirror configuration file is illegal on {SNMP_DEVICE_HOSTNAME} due to failed copy operation(s)\n  error desc: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc
     - rndErrorSeverity
   - oid: 1.3.6.1.4.1.3955.1000.201.0.227
-    name: rlbrgIgmpSnoopQrrDuplicateIP
+    name: LINKSYS-rlBrgMulticast-MIB::rlbrgIgmpSnoopQrrDuplicateIP
     category: state_change
     severity: warning
-    description: "IGMP snooping duplicate IP/IPv6 address detected on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
-    mib: LINKSYS-rlBrgMulticast-MIB
+    description: "Duplicate IP/IPv6 address detected between IGMP queries on {SNMP_DEVICE_HOSTNAME}\n  description: {rndErrorDesc}\n  severity: {rndErrorSeverity}"
     status: current
     varbinds:
     - rndErrorDesc

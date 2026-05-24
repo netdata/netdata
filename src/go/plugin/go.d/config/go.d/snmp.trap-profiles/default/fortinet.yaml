@@ -35,17 +35,6 @@ varbinds:
   facRadiusNasRemaining:
     oid: 1.3.6.1.4.1.12356.113.1.202.8
     type: FnIndex
-  facRaidStatus:
-    oid: 1.3.6.1.4.1.12356.113.1.202.28
-    type: INTEGER
-    enum:
-      '2': degraded
-      '3': failed
-      '4': initializing
-      '0': none
-      '1': ok
-      '6': rebuilding
-      '5': verifying
   facSysSerial:
     oid: 1.3.6.1.4.1.12356.113.1.2
     type: DisplayString
@@ -273,8 +262,6 @@ varbinds:
       '601': virus-detected
       '402': vpn-tunnel-down
       '401': vpn-tunnel-up
-  fnWafInfoDetail:
-    oid: 1.3.6.1.4.1.12356.107.10.1.1
   fsTrunkMember:
     oid: 1.3.6.1.4.1.12356.106.3.1
     type: DisplayString
@@ -332,285 +319,253 @@ varbinds:
     type: TimeTicks
 traps:
   - oid: 1.3.6.1.4.1.12356.0.0
-    name: fnTrapColdStart
+    name: FORTINET-TRAP-MIB::fnTrapColdStart
     category: state_change
-    severity: info
-    description: System cold start on {SNMP_DEVICE_HOSTNAME}. The device has completed a cold reboot.
-    mib: FORTINET-TRAP-MIB
+    severity: notice
+    description: System cold start (reboot) on {SNMP_DEVICE_HOSTNAME}
   - oid: 1.3.6.1.4.1.12356.0.10
-    name: fnTrapSystemDown
-    category: diagnostic
+    name: FORTINET-TRAP-MIB::fnTrapSystemDown
+    category: state_change
     severity: crit
-    description: SNMP agent on {SNMP_DEVICE_HOSTNAME} shut down due to SIGTERM
-    mib: FORTINET-TRAP-MIB
+    description: SNMP agent stopped on {SNMP_DEVICE_HOSTNAME}. The agent received SIGTERM and shut down.
   - oid: 1.3.6.1.4.1.12356.0.100
-    name: fnTrapInfChg
+    name: FORTINET-TRAP-MIB::fnTrapInfChg
     category: config_change
     severity: notice
-    description: "Interface IP address changed on FortiGate {fnTrapSysSn}\n  interface: {fnTrapIfName}\n  netmask: {fnTrapIfNetmask}"
-    mib: FORTINET-TRAP-MIB
+    description: "Interface IP address changed on {SNMP_DEVICE_HOSTNAME}\n  interface: {fnTrapIfName}\n  new netmask: {fnTrapIfNetmask}\n  device serial: {fnTrapSysSn}"
     varbinds:
     - fnTrapSysSn
     - fnTrapIfName
     - fnTrapIfNetmask
     - fnTrapSysSn
   - oid: 1.3.6.1.4.1.12356.0.1000
-    name: fnTrapMisc
+    name: FORTINET-TRAP-MIB::fnTrapMisc
     category: diagnostic
     severity: warning
-    description: "Fortinet miscellaneous system event on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
-    mib: FORTINET-TRAP-MIB
+    description: "Fortinet system issue detected on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
     varbinds:
     - fnTrapType
     - fnTrapDesc
   - oid: 1.3.6.1.4.1.12356.0.10000
-    name: fnTrapDemoUpdateConfig
+    name: FORTINET-TRAP-MIB::fnTrapDemoUpdateConfig
     category: config_change
     severity: notice
-    description: "FortiGate {fnTrapSysSn} requested configuration update from management application on {SNMP_DEVICE_HOSTNAME}.\n  interface: {fnTrapIfName}\n  netmask: {fnTrapIfNetmask}\nNote: This trap triggers a full configuration push that will overwrite the device's current running-config."
-    mib: FORTINET-TRAP-MIB
+    description: "FortiGate {SNMP_DEVICE_HOSTNAME} requested configuration update from management application\n  serial number: {fnTrapSysSn}\n  interface: {fnTrapIfName}\n  netmask: {fnTrapIfNetmask}"
     varbinds:
     - fnTrapSysSn
     - fnTrapIfName
     - fnTrapIfNetmask
     - fnTrapSysSn
   - oid: 1.3.6.1.4.1.12356.0.101
-    name: fnTrapCpuHigh
+    name: FORTINET-TRAP-MIB-280::fnTrapCpuHigh
     category: diagnostic
     severity: warning
     description: "High CPU usage detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.102
-    name: fnTrapMemLow
+    name: FORTINET-TRAP-MIB-280::fnTrapMemLow
     category: diagnostic
     severity: warning
-    description: "Memory usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
+    description: "Low memory condition detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.103
-    name: fnTrapLogFull
+    name: FORTINET-TRAP-MIB-280::fnTrapLogFull
     category: diagnostic
     severity: warning
-    description: "Log partition full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n\nInvestigate whether logs need to be archived/cleared or disk space needs expansion."
-    mib: FORTINET-TRAP-MIB-280
+    description: "Log storage full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.11
-    name: fnTrapAgentDown
-    category: diagnostic
+    name: FORTINET-TRAP-MIB::fnTrapAgentDown
+    category: state_change
     severity: alert
-    description: SNMP agent stopped on {SNMP_DEVICE_HOSTNAME}. The device can no longer be queried via SNMP.
-    mib: FORTINET-TRAP-MIB
+    description: SNMP agent stopped on {SNMP_DEVICE_HOSTNAME}
   - oid: 1.3.6.1.4.1.12356.0.12
-    name: fnTrapAgentUp
-    category: diagnostic
-    severity: info
+    name: FORTINET-TRAP-MIB::fnTrapAgentUp
+    category: state_change
+    severity: notice
     description: SNMP agent started on {SNMP_DEVICE_HOSTNAME}
-    mib: FORTINET-TRAP-MIB
   - oid: 1.3.6.1.4.1.12356.0.200
-    name: fnTrapFirewall
+    name: FORTINET-TRAP-MIB::fnTrapFirewall
     category: diagnostic
     severity: warning
-    description: "Fortinet firewall system event on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
-    mib: FORTINET-TRAP-MIB
+    description: "Fortinet system issue detected on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
     varbinds:
     - fnTrapType
     - fnTrapDesc
   - oid: 1.3.6.1.4.1.12356.0.201
-    name: fnTrapIpChange
-    category: config_change
-    severity: notice
+    name: FORTINET-TRAP-MIB-280::fnTrapIpChange
+    category: state_change
+    severity: warning
     description: "IP address changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  ifIndex: {ifIndex}"
-    mib: FORTINET-TRAP-MIB-280
     status: current
     varbinds:
     - fnSysSerial
     - ifIndex
   - oid: 1.3.6.1.4.1.12356.0.300
-    name: fnTrapUser
+    name: FORTINET-TRAP-MIB::fnTrapUser
     category: diagnostic
     severity: warning
-    description: "Fortinet system issue on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
-    mib: FORTINET-TRAP-MIB
+    description: "Fortinet system issue detected on {SNMP_DEVICE_HOSTNAME}\n  type: {fnTrapType}\n  description: {fnTrapDesc}"
     varbinds:
     - fnTrapType
     - fnTrapDesc
   - oid: 1.3.6.1.4.1.12356.0.301
-    name: fnTrapVpnTunUp
+    name: FORTINET-TRAP-MIB-280::fnTrapVpnTunUp
     category: state_change
-    severity: notice
-    description: "VPN tunnel established on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
+    severity: info
+    description: "VPN tunnel established on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.302
-    name: fnTrapVpnTunDown
+    name: FORTINET-TRAP-MIB-280::fnTrapVpnTunDown
     category: state_change
     severity: warning
     description: "VPN tunnel is down on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.400
-    name: fnTrapVpn
+    name: FORTINET-TRAP-MIB::fnTrapVpn
     category: diagnostic
     severity: warning
-    description: "Fortinet system issue on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
-    mib: FORTINET-TRAP-MIB
+    description: "Fortinet VPN system event on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
     varbinds:
     - fnTrapType
     - fnTrapDesc
   - oid: 1.3.6.1.4.1.12356.0.401
-    name: fnTrapHaSwitch
+    name: FORTINET-TRAP-MIB-280::fnTrapHaSwitch
     category: state_change
     severity: notice
-    description: "HA cluster master changed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
+    description: "HA cluster master changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.402
-    name: fnTrapHaStateChange
+    name: FORTINET-TRAP-MIB-280::fnTrapHaStateChange
     category: state_change
-    severity: notice
-    description: "HA cluster member state changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
+    severity: warning
+    description: "HA cluster member changed state on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.500
-    name: fnTrapNids
+    name: FORTINET-TRAP-MIB::fnTrapNids
     category: diagnostic
     severity: warning
     description: "Fortinet system issue detected on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
-    mib: FORTINET-TRAP-MIB
     varbinds:
     - fnTrapType
     - fnTrapDesc
   - oid: 1.3.6.1.4.1.12356.0.501
-    name: fnTrapIdsSynFlood
+    name: FORTINET-TRAP-MIB-280::fnTrapIdsSynFlood
     category: security
     severity: alert
-    description: "SYN flood attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
+    description: "SYN flood attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.502
-    name: fnTrapIdsPortScan
+    name: FORTINET-TRAP-MIB-280::fnTrapIdsPortScan
     category: security
-    severity: warning
-    description: "Port scan attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
+    severity: alert
+    description: "Port scan attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.503
-    name: fnTrapIpsSignature
+    name: FORTINET-TRAP-MIB-280::fnTrapIpsSignature
     category: security
     severity: warning
-    description: "IPS signature detected on {SNMP_DEVICE_HOSTNAME}\n  signature ID: {fnIpsSigId}\n  source IP: {fnIpsSigSrcIp}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
+    description: "IPS signature detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  signature ID: {fnIpsSigId}\n  source IP: {fnIpsSigSrcIp}"
     status: current
     varbinds:
     - fnSysSerial
     - fnIpsSigId
     - fnIpsSigSrcIp
   - oid: 1.3.6.1.4.1.12356.0.504
-    name: fnTrapIpsAnomaly
+    name: FORTINET-TRAP-MIB-280::fnTrapIpsAnomaly
     category: security
     severity: warning
     description: "IPS anomaly detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.600
-    name: fnTrapAntiVirus
+    name: FORTINET-TRAP-MIB::fnTrapAntiVirus
     category: diagnostic
-    severity: err
-    description: "System issue detected on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
-    mib: FORTINET-TRAP-MIB
+    severity: warning
+    description: "Fortinet system issue detected on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
     varbinds:
     - fnTrapType
     - fnTrapDesc
   - oid: 1.3.6.1.4.1.12356.0.601
-    name: fnTrapAvEvent
+    name: FORTINET-TRAP-MIB-280::fnTrapAvEvent
     category: security
     severity: warning
-    description: "Antivirus event on {SNMP_DEVICE_HOSTNAME}: virus detected\n  device serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
+    description: "Antivirus scanner on {SNMP_DEVICE_HOSTNAME} detected a virus\n  device serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.700
-    name: fnTrapWebFilter
+    name: FORTINET-TRAP-MIB::fnTrapWebFilter
     category: diagnostic
-    severity: err
-    description: "Fortinet web-filter system issue on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
-    mib: FORTINET-TRAP-MIB
+    severity: warning
+    description: "Fortinet system issue detected on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
     varbinds:
     - fnTrapType
     - fnTrapDesc
   - oid: 1.3.6.1.4.1.12356.0.701
-    name: fnTrapBridge
+    name: FORTINET-TRAP-MIB-280::fnTrapBridge
     category: state_change
     severity: alert
-    description: "FortiBridge on {SNMP_DEVICE_HOSTNAME} detected FortiGate failure\n  FortiGate serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
+    description: "FortiBridge detected FortiGate failure on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.800
-    name: fnTrapEmailFilter
+    name: FORTINET-TRAP-MIB::fnTrapEmailFilter
     category: diagnostic
     severity: warning
-    description: "Fortinet system notification on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
-    mib: FORTINET-TRAP-MIB
+    description: "Fortinet system issue detected on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
     varbinds:
     - fnTrapType
     - fnTrapDesc
   - oid: 1.3.6.1.4.1.12356.0.801
-    name: fnTrapImTableFull
+    name: FORTINET-TRAP-MIB-280::fnTrapImTableFull
     category: diagnostic
     severity: warning
-    description: "IM white/black list table is full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n\nNo new entries can be added until the list is cleared."
-    mib: FORTINET-TRAP-MIB-280
+    description: "Instant Message white/black list table is full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.0.900
-    name: fnTrapLog
+    name: FORTINET-TRAP-MIB::fnTrapLog
     category: diagnostic
     severity: warning
-    description: "Fortinet system log event on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
-    mib: FORTINET-TRAP-MIB
+    description: "Fortinet system issue detected on {SNMP_DEVICE_HOSTNAME}\n  trap type: {fnTrapType}\n  description: {fnTrapDesc}"
     varbinds:
     - fnTrapType
     - fnTrapDesc
   - oid: 1.3.6.1.4.1.12356.0.901
-    name: fnTrapFlgEventCount
+    name: FORTINET-TRAP-MIB-280::fnTrapFlgEventCount
     category: diagnostic
     severity: warning
     description: "FortiLog event count exceeded limit on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-TRAP-MIB-280
     status: current
     varbinds:
     - fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.1005
-    name: faTrapLogRateThreshold
+    name: FORTINET-FORTIANALYZER-MIB::faTrapLogRateThreshold
     category: diagnostic
     severity: warning
-    description: "Incoming log rate exceeded configured threshold on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIANALYZER-MIB
+    description: "Incoming log rate exceeded configured threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -619,11 +574,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.1006
-    name: faTrapDataRateThreshold
+    name: FORTINET-FORTIANALYZER-MIB::faTrapDataRateThreshold
     category: state_change
     severity: warning
-    description: "Incoming data rate exceeded configured threshold on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  Hostname: {sysName}"
-    mib: FORTINET-FORTIANALYZER-MIB
+    description: "Data rate threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -632,11 +586,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.101
-    name: fnTrapCpuThreshold
+    name: FORTINET-CORE-MIB::fnTrapCpuThreshold
     category: diagnostic
     severity: warning
-    description: "CPU usage exceeded the configured threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-CORE-MIB
+    description: "CPU usage exceeded configured threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -645,11 +598,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.102
-    name: fnTrapMemThreshold
+    name: FORTINET-CORE-MIB::fnTrapMemThreshold
     category: diagnostic
     severity: warning
-    description: "Memory usage exceeded configured threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-CORE-MIB
+    description: "Memory usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -658,11 +610,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.103
-    name: fnTrapLogDiskThreshold
+    name: FORTINET-CORE-MIB::fnTrapLogDiskThreshold
     category: diagnostic
     severity: warning
-    description: "Log disk usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  sysName: {sysName}"
-    mib: FORTINET-CORE-MIB
+    description: "Log disk usage exceeded configured threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -671,11 +622,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.104
-    name: fnTrapTempHigh
-    category: state_change
+    name: FORTINET-CORE-MIB::fnTrapTempHigh
+    category: diagnostic
     severity: warning
-    description: "Temperature sensor threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}"
-    mib: FORTINET-CORE-MIB
+    description: "Temperature threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -684,11 +634,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.105
-    name: fnTrapVoltageOutOfRange
-    category: state_change
+    name: FORTINET-CORE-MIB::fnTrapVoltageOutOfRange
+    category: diagnostic
     severity: warning
-    description: "Voltage out-of-range detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  sysName: {sysName}\n\nPower levels have fluctuated outside of normal levels."
-    mib: FORTINET-CORE-MIB
+    description: "Voltage out of range on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -697,11 +646,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.106
-    name: fnTrapPowerSupplyFailure
+    name: FORTINET-CORE-MIB::fnTrapPowerSupplyFailure
     category: state_change
-    severity: warning
-    description: "Power supply failure detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}\n\nNote: This device supports redundant power supplies. Verify whether additional power supplies remain operational."
-    mib: FORTINET-CORE-MIB
+    severity: crit
+    description: "Power supply failure detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}\n  Note: This may indicate loss of redundancy on devices supporting redundant power supplies."
     status: current
     varbinds:
     - fnSysSerial
@@ -710,11 +658,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.107
-    name: fnTrapAmcIfBypassMode
+    name: FORTINET-CORE-MIB::fnTrapAmcIfBypassMode
     category: state_change
     severity: warning
-    description: "AMC interface entered bypass mode on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fnSysSerial}\n\nBypass mode allows traffic to pass through without inspection. Verify whether this change was intended."
-    mib: FORTINET-CORE-MIB
+    description: "AMC interface entered bypass mode on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}\n\nNote: In bypass mode, traffic passes through without inspection. Verify this was intentional."
     status: current
     varbinds:
     - fnSysSerial
@@ -723,11 +670,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.108
-    name: fnTrapFanFailure
+    name: FORTINET-CORE-MIB::fnTrapFanFailure
     category: state_change
-    severity: crit
-    description: "Fan failure detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-CORE-MIB
+    severity: alert
+    description: "Fan failure detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -736,11 +682,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.201
-    name: fnTrapIpChange
+    name: FORTINET-CORE-MIB::fnTrapIpChange
     category: config_change
     severity: notice
-    description: "IP address changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n  ifIndex: {ifIndex}"
-    mib: FORTINET-CORE-MIB
+    description: "IP address changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n  interface index: {ifIndex}"
     status: current
     varbinds:
     - fnSysSerial
@@ -750,11 +695,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.100.1.3.0.999
-    name: fnTrapTest
+    name: FORTINET-CORE-MIB::fnTrapTest
     category: diagnostic
     severity: info
     description: "Diagnostic test trap sent by administrator on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-CORE-MIB
     status: current
     varbinds:
     - fnSysSerial
@@ -763,11 +707,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.1101
-    name: fgTrapServerLoadBalanceRealServerDown
+    name: FORTINET-FORTIGATE-MIB::fgTrapServerLoadBalanceRealServerDown
     category: state_change
     severity: warning
-    description: "Real server went down on FortiGate {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  Hostname: {sysName}\n  Virtual Server: {fgServerLoadBalanceVirtualServerName}\n  Real Server IP: {fgServerLoadBalanceRealServerAddress}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Real server down on {SNMP_DEVICE_HOSTNAME}\n  Virtual server: {fgServerLoadBalanceVirtualServerName}\n  Real server address: {fgServerLoadBalanceRealServerAddress}\n  Device name: {sysName}\n  Serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
@@ -778,11 +721,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.1201
-    name: fgTrapDeviceNew
-    category: diagnostic
+    name: FORTINET-FORTIGATE-MIB::fgTrapDeviceNew
+    category: mobility
     severity: notice
-    description: "New device discovered on {SNMP_DEVICE_HOSTNAME}\n  hostname: {sysName}\n  MAC: {fgDeviceMacAddress}\n  serial: {fnSysSerial}\n  virtual domain index: {fgVdEntIndex}\n  interface index: {ifIndex}\n  discovered: {fgDeviceCreated}\n  last seen: {fgDeviceLastSeen}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "New device discovered on {SNMP_DEVICE_HOSTNAME}\n  hostname: {sysName}\n  MAC: {fgDeviceMacAddress}\n  serial: {fnSysSerial}\n  virtual domain index: {fgVdEntIndex}\n  first seen: {fgDeviceCreated}\n  last seen: {fgDeviceLastSeen}"
     status: current
     varbinds:
     - fnSysSerial
@@ -796,11 +738,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.301
-    name: fgTrapVpnTunUp
+    name: FORTINET-FORTIGATE-MIB::fgTrapVpnTunUp
     category: state_change
     severity: info
-    description: "VPN tunnel established on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName} ({fnSysSerial})\n  local gateway: {fgVpnTrapLocalGateway}\n  remote gateway: {fgVpnTrapRemoteGateway}\n  phase1 name: {fgVpnTrapPhase1Name}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "VPN tunnel {fgVpnTrapPhase1Name} is up on {SNMP_DEVICE_HOSTNAME}\n  local gateway: {fgVpnTrapLocalGateway}\n  remote gateway: {fgVpnTrapRemoteGateway}"
     status: current
     varbinds:
     - fnSysSerial
@@ -812,11 +753,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.302
-    name: fgTrapVpnTunDown
+    name: FORTINET-FORTIGATE-MIB::fgTrapVpnTunDown
     category: state_change
     severity: warning
-    description: "VPN tunnel down on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName} ({fnSysSerial})\n  phase 1: {fgVpnTrapPhase1Name}\n  local gateway: {fgVpnTrapLocalGateway}\n  remote gateway: {fgVpnTrapRemoteGateway}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "VPN tunnel down on {SNMP_DEVICE_HOSTNAME}\n  local gateway: {fgVpnTrapLocalGateway}\n  remote gateway: {fgVpnTrapRemoteGateway}\n  phase 1 name: {fgVpnTrapPhase1Name}"
     status: current
     varbinds:
     - fnSysSerial
@@ -828,11 +768,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.401
-    name: fgTrapHaSwitch
+    name: FORTINET-FORTIGATE-MIB::fgTrapHaSwitch
     category: state_change
     severity: notice
-    description: "HA cluster role transition on {SNMP_DEVICE_HOSTNAME}: device became master\n  serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: 'HA cluster role transition on {SNMP_DEVICE_HOSTNAME}: member {sysName} (serial {fnSysSerial}) promoted from slave to master'
     status: current
     varbinds:
     - fnSysSerial
@@ -841,11 +780,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.402
-    name: fgTrapHaStateChange
+    name: FORTINET-FORTIGATE-MIB::fgTrapHaStateChange
     category: state_change
-    severity: warning
-    description: "HA cluster member state changed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-FORTIGATE-MIB
+    severity: notice
+    description: "HA cluster member state changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
     status: deprecated
     varbinds:
     - fnSysSerial
@@ -853,11 +791,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.403
-    name: fgTrapHaHBFail
+    name: FORTINET-FORTIGATE-MIB::fgTrapHaHBFail
     category: state_change
-    severity: warning
-    description: "FortiGate HA heartbeat failure threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  Heartbeat device failure count has surpassed the configured threshold, indicating potential HA cluster stability issues."
-    mib: FORTINET-FORTIGATE-MIB
+    severity: crit
+    description: "HA heartbeat failure detected on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  The heartbeat device failure count has exceeded the configured threshold."
     status: current
     varbinds:
     - fnSysSerial
@@ -865,11 +802,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.404
-    name: fgTrapHaMemberDown
+    name: FORTINET-FORTIGATE-MIB::fgTrapHaMemberDown
     category: state_change
-    severity: warning
-    description: "HA member down on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-FORTIGATE-MIB
+    severity: alert
+    description: "HA member down on {SNMP_DEVICE_HOSTNAME}\n  serial number: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
@@ -877,11 +813,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.405
-    name: fgTrapHaMemberUp
+    name: FORTINET-FORTIGATE-MIB::fgTrapHaMemberUp
     category: state_change
     severity: info
     description: "New HA cluster member joined on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-FORTIGATE-MIB
     status: current
     varbinds:
     - fnSysSerial
@@ -889,11 +824,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.503
-    name: fgTrapIpsSignature
+    name: FORTINET-FORTIGATE-MIB::fgTrapIpsSignature
     category: security
     severity: warning
-    description: "IPS signature triggered on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  signature ID: {fgIpsTrapSigId}\n  source IP: {fgIpsTrapSrcIp}\n  message: {fgIpsTrapSigMsg}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "IPS signature triggered on {SNMP_DEVICE_HOSTNAME}\n  signature ID: {fgIpsTrapSigId}\n  source IP: {fgIpsTrapSrcIp}\n  message: {fgIpsTrapSigMsg}\n  device serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
@@ -905,11 +839,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.504
-    name: fgTrapIpsAnomaly
+    name: FORTINET-FORTIGATE-MIB::fgTrapIpsAnomaly
     category: security
     severity: warning
-    description: "IPS anomaly detected on {SNMP_DEVICE_HOSTNAME}\n  signature ID: {fgIpsTrapSigId}\n  source IP: {fgIpsTrapSrcIp}\n  message: {fgIpsTrapSigMsg}\n  device serial: {fnSysSerial}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "IPS anomaly detected on {SNMP_DEVICE_HOSTNAME}\n  signature ID: {fgIpsTrapSigId}\n  source IP: {fgIpsTrapSrcIp}\n  message: {fgIpsTrapSigMsg}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
@@ -921,11 +854,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.505
-    name: fgTrapIpsPkgUpdate
+    name: FORTINET-FORTIGATE-MIB::fgTrapIpsPkgUpdate
     category: diagnostic
     severity: info
-    description: "IPS signature database updated on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "IPS signature database updated on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -934,11 +866,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.506
-    name: fgTrapIpsFailOpen
+    name: FORTINET-FORTIGATE-MIB::fgTrapIpsFailOpen
     category: diagnostic
     severity: warning
-    description: "IPS network buffer full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n\nThe IPS engine cannot accept new connections due to buffer saturation."
-    mib: FORTINET-FORTIGATE-MIB
+    description: "IPS network buffer full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -947,11 +878,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.601
-    name: fgTrapAvVirus
+    name: FORTINET-FORTIGATE-MIB::fgTrapAvVirus
     category: security
     severity: alert
-    description: "Anti-virus engine detected a virus on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}\n  virus: {fgAvTrapVirName}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Virus detected on {SNMP_DEVICE_HOSTNAME}\n  virus name: {fgAvTrapVirName}\n  device serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -961,11 +891,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.602
-    name: fgTrapAvOversize
+    name: FORTINET-FORTIGATE-MIB::fgTrapAvOversize
     category: security
     severity: warning
-    description: "Anti-virus oversized-file detection on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}\n\nA file exceeding the configured size limit was detected and blocked by the AV engine."
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Anti-virus oversized-file detection on {sysName} ({fnSysSerial})\n  A file exceeding the configured size limit was detected by the AV engine."
     status: current
     varbinds:
     - fnSysSerial
@@ -974,11 +903,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.603
-    name: fgTrapAvPattern
+    name: FORTINET-FORTIGATE-MIB::fgTrapAvPattern
     category: security
     severity: warning
-    description: "Anti-virus pattern match blocked a file on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Anti-virus engine blocked a file on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -987,11 +915,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.604
-    name: fgTrapAvFragmented
+    name: FORTINET-FORTIGATE-MIB::fgTrapAvFragmented
     category: security
     severity: warning
-    description: "Anti-virus engine on {SNMP_DEVICE_HOSTNAME} detected a fragmented file\n  hostname: {sysName}\n  serial: {fnSysSerial}\n  Note: Fragmented files may indicate attempt to evade AV scanning"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "FortiGate anti-virus engine detected a fragmented file on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1000,11 +927,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.605
-    name: fgTrapAvEnterConserve
-    category: state_change
+    name: FORTINET-FORTIGATE-MIB::fgTrapAvEnterConserve
+    category: diagnostic
     severity: warning
-    description: "Anti-virus engine on {SNMP_DEVICE_HOSTNAME} entered conservation mode due to low memory\n  serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Anti-virus engine on {SNMP_DEVICE_HOSTNAME} entered conservation mode due to low memory\n  device serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1013,11 +939,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.606
-    name: fgTrapAvBypass
+    name: FORTINET-FORTIGATE-MIB::fgTrapAvBypass
     category: diagnostic
     severity: warning
-    description: "Anti-virus engine bypassed on {SNMP_DEVICE_HOSTNAME} due to conservation mode\n  device name: {sysName}\n  serial: {fnSysSerial}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Anti-virus engine bypassed on {SNMP_DEVICE_HOSTNAME} due to conservation mode\n  serial: {fnSysSerial}\n  name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1026,11 +951,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.607
-    name: fgTrapAvOversizePass
-    category: diagnostic
-    severity: warning
-    description: "Antivirus oversize file passthrough on {SNMP_DEVICE_HOSTNAME}\n  An over-sized file was detected but passed due to configuration.\n  Serial: {fnSysSerial}\n  Hostname: {sysName}"
-    mib: FORTINET-FORTIGATE-MIB
+    name: FORTINET-FORTIGATE-MIB::fgTrapAvOversizePass
+    category: state_change
+    severity: notice
+    description: "FortiGate detected an oversized file on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}\n  Action: File passed due to configuration"
     status: current
     varbinds:
     - fnSysSerial
@@ -1039,11 +963,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.608
-    name: fgTrapAvOversizeBlock
+    name: FORTINET-FORTIGATE-MIB::fgTrapAvOversizeBlock
     category: security
     severity: warning
-    description: "Antivirus oversize-file block on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n  An over-sized file has been detected and has been blocked"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Antivirus oversize-file block on {sysName} ({fnSysSerial})\n  An oversized file was detected and blocked."
     status: current
     varbinds:
     - fnSysSerial
@@ -1052,11 +975,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.701
-    name: fgTrapFazDisconnect
+    name: FORTINET-FORTIGATE-MIB::fgTrapFazDisconnect
     category: state_change
     severity: warning
-    description: FortiGate device {fnSysSerial} has been disconnected from the FortiAnalyzer on {SNMP_DEVICE_HOSTNAME}
-    mib: FORTINET-FORTIGATE-MIB
+    description: "FortiGate {SNMP_DEVICE_HOSTNAME} disconnected from FortiAnalyzer\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1064,11 +986,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.801
-    name: fgTrapWcApUp
+    name: FORTINET-FORTIGATE-MIB::fgTrapWcApUp
     category: state_change
     severity: info
-    description: "Wireless Access Point {fgWcApName} ({fgWcApSerial}) came up on {SNMP_DEVICE_HOSTNAME}\n  VDOM: {fgWcApVdom}\n  AP name: {fgWcApName}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Wireless AP {fgWcApName} (serial {fgWcApSerial}) is up on {SNMP_DEVICE_HOSTNAME}\n  VDOM: {fgWcApVdom}\n  Device serial: {fnSysSerial}\n  System name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1080,11 +1001,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.802
-    name: fgTrapWcApDown
+    name: FORTINET-FORTIGATE-MIB::fgTrapWcApDown
     category: state_change
     severity: warning
-    description: "Wireless Access Point {fgWcApName} ({fgWcApSerial}) is down on {SNMP_DEVICE_HOSTNAME}\n  VDOM: {fgWcApVdom}\n  AP serial: {fgWcApSerial}\n  AP name: {fgWcApName}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Wireless AP is down on {SNMP_DEVICE_HOSTNAME}\n  AP name: {fgWcApName}\n  AP serial: {fgWcApSerial}\n  VDOM: {fgWcApVdom}\n  device serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1096,11 +1016,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.901
-    name: fgTrapFcSwUp
+    name: FORTINET-FORTIGATE-MIB::fgTrapFcSwUp
     category: state_change
     severity: info
-    description: "Switch controller session is up on {SNMP_DEVICE_HOSTNAME}\n  switch name: {fgFcSwName}\n  switch serial: {fgFcSwSerial}\n  VDOM: {fgFcSwVdom}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "FortiSwitch controller session established on {SNMP_DEVICE_HOSTNAME}\n  switch name: {fgFcSwName}\n  switch serial: {fgFcSwSerial}\n  virtual domain: {fgFcSwVdom}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1112,11 +1031,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.2.0.902
-    name: fgTrapFcSwDown
+    name: FORTINET-FORTIGATE-MIB::fgTrapFcSwDown
     category: state_change
     severity: warning
-    description: "Switch controller session down on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  device name: {sysName}\n  VDOM: {fgFcSwVdom}\n  switch serial: {fgFcSwSerial}\n  switch name: {fgFcSwName}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "FortiGate switch controller session down on {SNMP_DEVICE_HOSTNAME}\n  VDOM: {fgFcSwVdom}\n  Switch serial: {fgFcSwSerial}\n  Switch name: {fgFcSwName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1128,11 +1046,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.6.0.1000
-    name: fgFmTrapDeployComplete
+    name: FORTINET-FORTIGATE-MIB::fgFmTrapDeployComplete
     category: config_change
     severity: notice
     description: "Configuration deployment completed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}"
-    mib: FORTINET-FORTIGATE-MIB
     status: current
     varbinds:
     - fnSysSerial
@@ -1140,11 +1057,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.6.0.1002
-    name: fgFmTrapDeployInProgress
+    name: FORTINET-FORTIGATE-MIB::fgFmTrapDeployInProgress
     category: config_change
     severity: info
-    description: "Configuration deployment in progress on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  Note: Change is not immediately applied; deployment verified by FortiManager"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Configuration deployment in progress on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  Change initiated via FortiManager and pending completion."
     status: current
     varbinds:
     - fnSysSerial
@@ -1152,11 +1068,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.6.0.1003
-    name: fgFmTrapConfChange
+    name: FORTINET-FORTIGATE-MIB::fgFmTrapConfChange
     category: config_change
     severity: notice
-    description: "Configuration changed on FortiGate {SNMP_DEVICE_HOSTNAME} by a source other than the managing FortiManager\n  device serial: {fnSysSerial}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Configuration changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  Note: Change detected from source other than FortiManager"
     status: current
     varbinds:
     - fnSysSerial
@@ -1164,11 +1079,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.101.6.0.1004
-    name: fgFmTrapIfChange
+    name: FORTINET-FORTIGATE-MIB::fgFmTrapIfChange
     category: config_change
     severity: notice
-    description: "Interface IP address changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  interface: {ifName}\n  IPv4: {fgManIfIp}/{fgManIfMask}\n  IPv6: {fgManIfIp6}"
-    mib: FORTINET-FORTIGATE-MIB
+    description: "Interface IP address changed on FortiGate {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  Interface: {ifName}\n  IPv4: {fgManIfIp}/{fgManIfMask}\n  IPv6: {fgManIfIp6}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1180,11 +1094,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.102.0.0.1001
-    name: faTrapSystemEvent
+    name: FORTINET-FORTIANALYZER-MIB::faTrapSystemEvent
     category: diagnostic
-    severity: info
-    description: "System event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  event type: {faSystemEvent}"
-    mib: FORTINET-FORTIANALYZER-MIB
+    severity: notice
+    description: "FortiAnalyzer system event triggered on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  event code: {faSystemEvent}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1193,11 +1106,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.102.0.0.1002
-    name: faTrapRAIDStatusChange
+    name: FORTINET-FORTIANALYZER-MIB::faTrapRAIDStatusChange
     category: diagnostic
     severity: warning
-    description: "RAID status change on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  RAID device: {faRAIDDevIndex}\n  new status: {faRAIDStatus}"
-    mib: FORTINET-FORTIANALYZER-MIB
+    description: "RAID array status changed on {SNMP_DEVICE_HOSTNAME}\n  RAID device: {faRAIDDevIndex}\n  new status: {faRAIDStatus}\n  device serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1207,11 +1119,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.102.0.0.1003
-    name: faTrapGenAlert
+    name: FORTINET-FORTIANALYZER-MIB::faTrapGenAlert
     category: diagnostic
     severity: warning
-    description: "Threshold exceeded on FortiAnalyzer {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  event message: {fnGenTrapMsg}"
-    mib: FORTINET-FORTIANALYZER-MIB
+    description: "FortiAnalyzer event parameter exceeded configured limit on {SNMP_DEVICE_HOSTNAME}\n  message: {fnGenTrapMsg}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1220,11 +1131,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.401
-    name: fmTrapHASwitch
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapHASwitch
     category: state_change
     severity: notice
-    description: "High availability cluster reconfiguration on {SNMP_DEVICE_HOSTNAME}. New master elected.\n  Serial: {fnSysSerial}\n  Hostname: {sysName}"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    description: "FortiManager HA cluster on {SNMP_DEVICE_HOSTNAME} has undergone master election.\n  New master serial: {fnSysSerial}\n  New master hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1233,11 +1143,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.402
-    name: fmTrapRAIDStatusChange
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapRAIDStatusChange
     category: diagnostic
-    severity: err
-    description: "RAID status change on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  sysName: {sysName}\n  RAID device: {fmRAIDDevIndex}\n  new status: {fmRAIDStatus}"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    severity: warning
+    description: "RAID status change on {SNMP_DEVICE_HOSTNAME}\n  device: {fmRAIDDevIndex}\n  new status: {fmRAIDStatus}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1248,11 +1157,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.403
-    name: fmTrapLogAlert
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapLogAlert
     category: diagnostic
-    severity: notice
+    severity: warning
     description: "Log-based alert triggered on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  sysName: {sysName}\n  message: {fnGenTrapMsg}"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     status: current
     varbinds:
     - fnSysSerial
@@ -1262,11 +1170,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.404
-    name: fmTrapLogRateThreshold
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapLogRateThreshold
     category: diagnostic
     severity: warning
-    description: "Log rate threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n  current rate: {fmLogRate} logs/sec\n  threshold: {fmLogRateThreshold} logs/sec"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    description: "Log rate threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}\n  current rate: {fmLogRate} logs/sec\n  threshold: {fmLogRateThreshold} logs/sec"
     status: current
     varbinds:
     - fnSysSerial
@@ -1277,11 +1184,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.405
-    name: fmTrapLogDataRateThreshold
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapLogDataRateThreshold
     category: diagnostic
-    severity: notice
-    description: "Incoming log data rate exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName} ({fnSysSerial})\n  current rate: {fmLogDataRate} KB/s\n  threshold: {fmLogDataRateThreshold} KB/s"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    severity: warning
+    description: "Log data rate threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  current rate: {fmLogDataRate} KB/s\n  threshold: {fmLogDataRateThreshold} KB/s"
     status: current
     varbinds:
     - fnSysSerial
@@ -1292,11 +1198,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.407
-    name: fmTrapLicGbDayThreshold
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapLicGbDayThreshold
     category: license
-    severity: crit
-    description: "Log usage exceeded licensed GB/day threshold on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName} ({fnSysSerial})\n  current usage: {fmLicGbDay} GB/day\n  licensed threshold: {fmLicGbDayThreshold} GB/day"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    severity: warning
+    description: "Log usage exceeded licensed GB/Day threshold on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  Hostname: {sysName}\n  Current usage: {fmLicGbDay} GB/day\n  Licensed threshold: {fmLicGbDayThreshold} GB/day"
     status: current
     varbinds:
     - fnSysSerial
@@ -1307,11 +1212,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.408
-    name: fmTrapLicDevQuotaThreshold
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapLicDevQuotaThreshold
     category: license
-    severity: crit
-    description: "Device quota threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}\n  current usage: {fmLicDevQuota} GB\n  licensed threshold: {fmLicDevQuotaThreshold} GB"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    severity: warning
+    description: "Device quota exceeded licensed threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n  quota used: {fmLicDevQuota} GB\n  licensed threshold: {fmLicDevQuotaThreshold} GB"
     status: current
     varbinds:
     - fnSysSerial
@@ -1322,11 +1226,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.409
-    name: fmTrapCpuThresholdExcludeNice
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapCpuThresholdExcludeNice
     category: diagnostic
     severity: warning
-    description: "CPU usage (excluding nice processes) exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    description: "CPU usage (excluding nice) exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  system name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1335,11 +1238,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.410
-    name: fmTrapPowerStateChange
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapPowerStateChange
     category: state_change
     severity: warning
-    description: "Power supply state change on {SNMP_DEVICE_HOSTNAME}\n  sensor name: {fmSensorName}\n  sensor state: {fmSensorState}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    description: "Power supply state change detected on {SNMP_DEVICE_HOSTNAME}\n  sensor name: {fmSensorName}\n  sensor state: {fmSensorState}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1350,11 +1252,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.411
-    name: fmTrapFanStateChange
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapFanStateChange
     category: state_change
     severity: warning
-    description: "Fan state change on {SNMP_DEVICE_HOSTNAME}\n  sensor name: {fmSensorName}\n  sensor state: {fmSensorState}\n  serial: {fnSysSerial}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    description: "Fan state change detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sensor name: {fmSensorName}\n  sensor status: {fmSensorState}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1365,11 +1266,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.412
-    name: fmTrapTemperatureStateChange
-    category: diagnostic
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapTemperatureStateChange
+    category: state_change
     severity: warning
-    description: "Temperature sensor state change on {SNMP_DEVICE_HOSTNAME}\n  sensor name: {fmSensorName}\n  sensor state: {fmSensorState}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    description: "Temperature sensor state change on {sysName} ({fnSysSerial})\n  sensor: {fmSensorName}\n  state: {fmSensorState}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1380,11 +1280,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.103.0.0.413
-    name: fmTrapVoltageStateChange
-    category: state_change
+    name: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB::fmTrapVoltageStateChange
+    category: diagnostic
     severity: warning
-    description: "Voltage sensor state change on {SNMP_DEVICE_HOSTNAME}\n  sensor name: {fmSensorName}\n  sensor state: {fmSensorState}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
+    description: "Voltage sensor state change on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  sensor name: {fmSensorName}\n  current state: {fmSensorState}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1395,74 +1294,66 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.105.0.101
-    name: fmlTrapCpuHighThreshold
-    category: state_change
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapCpuHighThreshold
+    category: diagnostic
     severity: warning
-    description: "CPU usage exceeded high threshold on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fmlSysSerial}"
-    mib: FORTINET-FORTIMAIL-MIB
+    description: "High CPU usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial number: {fmlSysSerial}"
     status: obsolete
     varbinds:
     - fmlSysSerial
   - oid: 1.3.6.1.4.1.12356.105.0.102
-    name: fmlTrapMemLowThreshold
-    category: state_change
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapMemLowThreshold
+    category: diagnostic
     severity: warning
-    description: "Memory usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n\nMemory usage has risen above the configured low threshold."
-    mib: FORTINET-FORTIMAIL-MIB
+    description: "Memory usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}"
     status: obsolete
     varbinds:
     - fmlSysSerial
   - oid: 1.3.6.1.4.1.12356.105.0.103
-    name: fmlTrapLogDiskHighThreshold
-    category: diagnostic
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapLogDiskHighThreshold
+    category: state_change
     severity: warning
-    description: "Log disk usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}"
-    mib: FORTINET-FORTIMAIL-MIB
+    description: "Log disk usage threshold exceeded on FortiMail device {SNMP_DEVICE_HOSTNAME}\n  Serial: {fmlSysSerial}\n  Action recommended: Archive or purge logs before disk fills completely"
     status: obsolete
     varbinds:
     - fmlSysSerial
   - oid: 1.3.6.1.4.1.12356.105.0.104
-    name: fmlTrapMailDiskHighThreshold
-    category: state_change
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapMailDiskHighThreshold
+    category: diagnostic
     severity: warning
-    description: "Mailbox disk usage exceeded high threshold on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fmlSysSerial}"
-    mib: FORTINET-FORTIMAIL-MIB
+    description: "Mailbox disk usage high threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}"
     status: current
     varbinds:
     - fmlSysSerial
   - oid: 1.3.6.1.4.1.12356.105.0.105
-    name: fmlTrapMailDeferredQueueHighThreshold
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapMailDeferredQueueHighThreshold
     category: diagnostic
     severity: warning
-    description: "FortiMail deferred email queue threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}"
-    mib: FORTINET-FORTIMAIL-MIB
+    description: "FortiMail deferred email queue high threshold reached on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}"
     status: current
     varbinds:
     - fmlSysSerial
   - oid: 1.3.6.1.4.1.12356.105.0.106
-    name: fmlTrapAvThresholdEvent
-    category: diagnostic
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapAvThresholdEvent
+    category: security
     severity: warning
-    description: "Antivirus threshold reached on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  The number of detected viruses has crossed the configured threshold"
-    mib: FORTINET-FORTIMAIL-MIB
+    description: "Virus threshold reached on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fmlSysSerial}"
     status: current
     varbinds:
     - fmlSysSerial
   - oid: 1.3.6.1.4.1.12356.105.0.107
-    name: fmlTrapSpamThresholdEvent
-    category: diagnostic
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapSpamThresholdEvent
+    category: security
     severity: warning
-    description: "Spam detection threshold reached on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fmlSysSerial}"
-    mib: FORTINET-FORTIMAIL-MIB
+    description: "Spam threshold reached on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}"
     status: current
     varbinds:
     - fmlSysSerial
   - oid: 1.3.6.1.4.1.12356.105.0.108
-    name: fmlTrapPSUFailureEvent
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapPSUFailureEvent
     category: diagnostic
-    severity: crit
-    description: "Power supply unit failure detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  sensor: {fmlHwSensorEntName}\n  reading: {fmlHwSensorEntValue}\n  alarm active: {fmlHwSensorEntAlarmStatus}"
-    mib: FORTINET-FORTIMAIL-MIB
+    severity: alert
+    description: "Power supply unit failure detected on {SNMP_DEVICE_HOSTNAME}\n  sensor name: {fmlHwSensorEntName}\n  sensor reading: {fmlHwSensorEntValue}\n  alarm status: {fmlHwSensorEntAlarmStatus}\n  device serial: {fmlSysSerial}"
     status: obsolete
     varbinds:
     - fmlSysSerial
@@ -1470,32 +1361,29 @@ traps:
     - fmlHwSensorEntValue
     - fmlHwSensorEntAlarmStatus
   - oid: 1.3.6.1.4.1.12356.105.0.201
-    name: fmlTrapSystemEvent
-    category: diagnostic
-    severity: alert
-    description: "System event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  event code: {fmlSysEventCode}"
-    mib: FORTINET-FORTIMAIL-MIB
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapSystemEvent
+    category: state_change
+    severity: warning
+    description: "FortiMail system event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  event code: {fmlSysEventCode}"
     status: current
     varbinds:
     - fmlSysSerial
     - fmlSysEventCode
   - oid: 1.3.6.1.4.1.12356.105.0.202
-    name: fmlTrapRAIDEvent
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapRAIDEvent
     category: diagnostic
     severity: err
     description: "RAID event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  device: {fmlRAIDDevName}\n  event code: {fmlRAIDCode}"
-    mib: FORTINET-FORTIMAIL-MIB
     status: current
     varbinds:
     - fmlSysSerial
     - fmlRAIDCode
     - fmlRAIDDevName
   - oid: 1.3.6.1.4.1.12356.105.0.203
-    name: fmlTrapHAEvent
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapHAEvent
     category: state_change
-    severity: err
-    description: "High Availability event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  event ID: {fmlHAEventId}\n  unit IP: {fmlHAUnitIp}\n  reason: {fmlHAEventReason}"
-    mib: FORTINET-FORTIMAIL-MIB
+    severity: notice
+    description: "HA event on FortiMail {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  event ID: {fmlHAEventId}\n  unit IP: {fmlHAUnitIp}\n  reason: {fmlHAEventReason}"
     status: current
     varbinds:
     - fmlSysSerial
@@ -1503,31 +1391,28 @@ traps:
     - fmlHAUnitIp
     - fmlHAEventReason
   - oid: 1.3.6.1.4.1.12356.105.0.205
-    name: fmlTrapRemoteStorage
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapRemoteStorage
     category: state_change
     severity: warning
-    description: "Remote storage status changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  status: {fmlRemoteStorageStatus}"
-    mib: FORTINET-FORTIMAIL-MIB
+    description: "Remote storage status changed on FortiMail device {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  remote storage status: {fmlRemoteStorageStatus}"
     status: obsolete
     varbinds:
     - fmlSysSerial
     - fmlRemoteStorageStatus
   - oid: 1.3.6.1.4.1.12356.105.0.301
-    name: fmlTrapIpChange
+    name: FORTINET-FORTIMAIL-MIB::fmlTrapIpChange
     category: state_change
-    severity: info
-    description: "IP address changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fmlSysSerial}\n  ifIndex: {ifIndex}"
-    mib: FORTINET-FORTIMAIL-MIB
+    severity: notice
+    description: "IP address changed on interface {ifIndex} of FortiMail device {SNMP_DEVICE_HOSTNAME}\n  Serial: {fmlSysSerial}\n  ifIndex: {ifIndex}"
     status: obsolete
     varbinds:
     - fmlSysSerial
     - ifIndex
   - oid: 1.3.6.1.4.1.12356.106.2.0.701
-    name: fsTrapHBFail
-    category: diagnostic
-    severity: crit
-    description: "Heartbeat failure on {SNMP_DEVICE_HOSTNAME} — no heartbeat packets received\n  serial: {fnSysSerial}\n  system name: {sysName}\n  trunk member: {fsTrunkMember}"
-    mib: FORTINET-FORTISWITCH-MIB
+    name: FORTINET-FORTISWITCH-MIB::fsTrapHBFail
+    category: state_change
+    severity: alert
+    description: "Heartbeat failure detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}\n  trunk member: {fsTrunkMember}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1537,11 +1422,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.106.2.0.702
-    name: fsTrapHBReceived
-    category: diagnostic
+    name: FORTINET-FORTISWITCH-MIB::fsTrapHBReceived
+    category: state_change
     severity: info
-    description: "Heartbeat packet received by {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}\n  trunk member: {fsTrunkMember}"
-    mib: FORTINET-FORTISWITCH-MIB
+    description: "Heartbeat received from {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}\n  trunk member: {fsTrunkMember}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1551,11 +1435,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.106.2.0.703
-    name: fsTrapMemberDown
+    name: FORTINET-FORTISWITCH-MIB::fsTrapMemberDown
     category: state_change
     severity: warning
-    description: "Trunk member down on {sysName} ({SNMP_DEVICE_HOSTNAME})\n  trunk member: {fsTrunkMember}\n  device serial: {fnSysSerial}"
-    mib: FORTINET-FORTISWITCH-MIB
+    description: "Trunk member {fsTrunkMember} left the trunk on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1565,11 +1448,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.106.2.0.704
-    name: fsTrapMemberUp
+    name: FORTINET-FORTISWITCH-MIB::fsTrapMemberUp
     category: state_change
-    severity: info
-    description: "Trunk member joined on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  device name: {sysName}\n  trunk member: {fsTrunkMember}"
-    mib: FORTINET-FORTISWITCH-MIB
+    severity: notice
+    description: "Trunk member joined on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  member: {fsTrunkMember}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1579,11 +1461,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.1
-    name: fwTrapHaHBFail
+    name: FORTINET-FORTIWEB-MIB::fwTrapHaHBFail
     category: state_change
-    severity: warning
-    description: "HA heartbeat failure on {SNMP_DEVICE_HOSTNAME}: Master detected Slave is offline\n  device serial: {fnSysSerial}\n  device name: {sysName}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: crit
+    description: "HA Master detected that Slave is offline on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1592,11 +1473,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.10
-    name: fwTrapXMLIntrusionAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapXMLIntrusionAttack
     category: security
-    severity: warning
+    severity: alert
     description: "XML intrusion attack detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}"
-    mib: FORTINET-FORTIWEB-MIB
     status: current
     varbinds:
     - fnSysSerial
@@ -1605,11 +1485,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.11
-    name: fwTrapXMLSchemaAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapXMLSchemaAttack
     category: security
-    severity: warning
-    description: "XML Schema attack detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: alert
+    description: "FortiWeb detected an XML Schema attack on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1618,11 +1497,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.12
-    name: fwTrapXMLFilterAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapXMLFilterAttack
     category: security
     severity: warning
-    description: "XML filter attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "XML filter attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1631,11 +1509,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.13
-    name: fwTrapXMLSigEncAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapXMLSigEncAttack
     category: security
-    severity: warning
-    description: "XML Signature/Encryption attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: alert
+    description: "XML Signature/Encryption attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1644,11 +1521,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.14
-    name: fwTrapXMLWSDLAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapXMLWSDLAttack
     category: security
-    severity: warning
-    description: "XML WSDL attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: alert
+    description: "FortiWeb detected XML WSDL attack on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1657,11 +1533,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.15
-    name: fwTrapXMLSqlAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapXMLSqlAttack
     category: security
     severity: alert
-    description: "XML SQL injection attack detected on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  Hostname: {sysName}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "XML SQL injection attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1670,11 +1545,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.2
-    name: fwTrapModeChange
+    name: FORTINET-FORTIWEB-MIB::fwTrapModeChange
     category: state_change
-    severity: warning
-    description: "System run mode changed on FortiWeb device {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n  Mode types: inline, offline, or transparent"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: notice
+    description: "FortiWeb run mode changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1683,11 +1557,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.3
-    name: fwTrapPolicyStart
+    name: FORTINET-FORTIWEB-MIB::fwTrapPolicyStart
     category: state_change
-    severity: info
-    description: "Security policy started on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: notice
+    description: "Policy processing started on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1696,95 +1569,82 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.30
-    name: fwTrapWAFAMethodAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFAMethodAttack
     category: security
     severity: err
-    description: "WAF method attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "WAF method attack detected on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  Hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.31
-    name: fwTrapWAFXSSAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFXSSAttack
     category: security
-    severity: warning
-    description: "Cross-Site Scripting (XSS) attack detected by WAF on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: alert
+    description: "WAF XSS attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.32
-    name: fwTrapWAFSqlAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFSqlAttack
     category: security
-    severity: warning
-    description: "WAF SQL injection attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n  detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: alert
+    description: "SQL injection attack detected by WAF on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.33
-    name: fwTrapWAFExploitAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFExploitAttack
     category: security
     severity: alert
-    description: "WAF exploit attack detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "WAF exploit attack detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.34
-    name: fwTrapWAFDisclosureAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFDisclosureAttack
     category: security
     severity: warning
-    description: "WAF information disclosure attack detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}\n  details: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "WAF Information Disclosure attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.35
-    name: fwTrapWAFAccessAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFAccessAttack
     category: security
     severity: warning
-    description: "WAF access attack detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "WAF access attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.36
-    name: fwTrapWAFSPageAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFSPageAttack
     category: security
-    severity: warning
-    description: "WAF start-page-rule attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: alert
+    description: "WAF page attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1793,11 +1653,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.37
-    name: fwTrapWAFPValidAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFPValidAttack
     category: security
     severity: warning
-    description: "WAF parameter validation rule triggered a valid attack detection on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "WAF parameter validation rule triggered on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1806,39 +1665,34 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.38
-    name: fwTrapWAFBListAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFBListAttack
     category: security
     severity: warning
-    description: "WAF blacklist attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  device name: {sysName}\n  attack details: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "WAF blacklist attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.39
-    name: fwTrapWAFBLoginAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFBLoginAttack
     category: security
-    severity: alert
-    description: "Brute force login attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: warning
+    description: "Brute force login attack detected on FortiWeb {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.4
-    name: fwTrapPolicyStop
+    name: FORTINET-FORTIWEB-MIB::fwTrapPolicyStop
     category: state_change
-    severity: warning
-    description: "FortiWeb policy stopped on {sysName}\n  serial: {fnSysSerial}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: crit
+    description: "Policy stopped on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1847,95 +1701,82 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.40
-    name: fwTrapWAFRobotAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFRobotAttack
     category: security
-    severity: warning
-    description: "WAF Robot attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: err
+    description: "WAF robot attack detected on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  Hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.41
-    name: fwTrapWAFHideFieldAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFHideFieldAttack
     category: security
     severity: warning
-    description: "WAF hide-field attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}\n  details: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "WAF hide-field attack detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.42
-    name: fwTrapWAFUrlAccessAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFUrlAccessAttack
     category: security
     severity: warning
-    description: "WAF URL access attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "WAF URL access attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.43
-    name: fwTrapWAFBadRobotAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFBadRobotAttack
     category: security
-    severity: err
-    description: "WAF Bad Robot attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: warning
+    description: "WAF Bad Robot attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.44
-    name: fwTrapWAFSignatureAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFSignatureAttack
     category: security
     severity: warning
-    description: "WAF signature attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    description: "WAF signature-based attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.45
-    name: fwTrapWAFWListAttack
+    name: FORTINET-FORTIWEB-MIB::fwTrapWAFWListAttack
     category: security
-    severity: warning
-    description: "WAF whitelist attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  hostname: {sysName}\n  attack detail: {fnWafInfoDetail}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: notice
+    description: "WAF whitelist event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  device name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
     - sysName
-    - fnWafInfoDetail
     - oid: 1.3.6.1.4.1.12356.100.1.1.1
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.107.10.0.5
-    name: fwTrapPServerFailed
+    name: FORTINET-FORTIWEB-MIB::fwTrapPServerFailed
     category: state_change
-    severity: warning
-    description: "Physical server marked as drop-line (unavailable) on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIWEB-MIB
+    severity: crit
+    description: "Physical server drop-line detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}"
     status: current
     varbinds:
     - fnSysSerial
@@ -1944,762 +1785,692 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.112.0.101
-    name: fadcTrapCpuHighThreshold
+    name: FORTINET-FORTIADC-MIB::fadcTrapCpuHighThreshold
     category: diagnostic
     severity: warning
-    description: "CPU usage exceeded high threshold on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "FortiADC CPU usage exceeded high threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.102
-    name: fadcTrapMemLowThreshold
+    name: FORTINET-FORTIADC-MIB::fadcTrapMemLowThreshold
     category: diagnostic
     severity: warning
-    description: "Memory usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Memory usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.103
-    name: fadcTrapLogDiskHighThreshold
+    name: FORTINET-FORTIADC-MIB::fadcTrapLogDiskHighThreshold
     category: state_change
     severity: warning
-    description: "Log disk usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Log disk usage exceeded high threshold on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.401
-    name: fadcTrapDosAttackStart
+    name: FORTINET-FORTIADC-MIB::fadcTrapDosAttackStart
     category: security
-    severity: warning
-    description: "DoS attack started on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "DoS attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.402
-    name: fadcTrapDosAttackStop
+    name: FORTINET-FORTIADC-MIB::fadcTrapDosAttackStop
     category: security
-    severity: notice
-    description: "DoS attack stopped on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "DoS attack stopped on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.403
-    name: fadcTrapFwConnectionLimit
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapFwConnectionLimit
+    category: state_change
     severity: warning
-    description: "Firewall connection limit exceeded on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Priority: {fadcAlertPriority}\n  Hostname: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "FortiADC {SNMP_DEVICE_HOSTNAME} exceeded allowed firewall connections\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.404
-    name: fadcTrapFwSnatLimit
+    name: FORTINET-FORTIADC-MIB::fadcTrapFwSnatLimit
     category: diagnostic
-    severity: err
-    description: "FW SNAT pool exhausted on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Priority: {fadcAlertPriority}\n  System name: {sysName}\n\nNew source NAT translations cannot be created until addresses are released."
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "FW SNAT pool exhausted on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}\n\nA firewall SNAT pool has reached its address allocation limit. New outbound NAT translations may fail."
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.405
-    name: fadcTrapRequestBlocked
+    name: FORTINET-FORTIADC-MIB::fadcTrapRequestBlocked
     category: security
     severity: warning
-    description: "HTTP request blocked on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "HTTP request blocked on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.406
-    name: fadcTrapXSSAttack
+    name: FORTINET-FORTIADC-MIB::fadcTrapXSSAttack
     category: security
-    severity: warning
-    description: "XSS attack detected by signature on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "XSS attack detected by signature on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.407
-    name: fadcTrapSQLInjectionAttack
+    name: FORTINET-FORTIADC-MIB::fadcTrapSQLInjectionAttack
     category: security
     severity: alert
-    description: "SQL injection attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "SQL Injection attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.408
-    name: fadcTrapGenericAttack
+    name: FORTINET-FORTIADC-MIB::fadcTrapGenericAttack
     category: security
     severity: warning
-    description: "Generic attack detected by signature on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Generic attack detected by signature on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  hostname: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.409
-    name: fadcTrapExploitsAttack
+    name: FORTINET-FORTIADC-MIB::fadcTrapExploitsAttack
     category: security
     severity: alert
-    description: "Known exploits attack detected by signature on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "FortiADC detected a known exploits attack on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.410
-    name: fadcTrapTrojansAttack
+    name: FORTINET-FORTIADC-MIB::fadcTrapTrojansAttack
     category: security
-    severity: alert
-    description: "Trojan attack detected by signature on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "Trojan attack detected by signature on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.411
-    name: fadcTrapInfoDisclosureAttack
+    name: FORTINET-FORTIADC-MIB::fadcTrapInfoDisclosureAttack
     category: security
-    severity: warning
-    description: "Information Disclosure attack detected by signature on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: err
+    description: "Information Disclosure attack detected by signature on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.412
-    name: fadcTrapURLPattenViolate
+    name: FORTINET-FORTIADC-MIB::fadcTrapURLPattenViolate
     category: security
     severity: warning
-    description: "URL pattern violation detected on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "URL pattern violation detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.413
-    name: fadcTrapProtocolConstraint
+    name: FORTINET-FORTIADC-MIB::fadcTrapProtocolConstraint
     category: security
     severity: warning
     description: "HTTP Protocol Constraint violation detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.414
-    name: fadcTrapGeoViolateDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapGeoViolateDetected
     category: security
     severity: warning
-    description: "Geographic policy violation detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Geo-violation detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.415
-    name: fadcTrapReputationViolateDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapReputationViolateDetected
     category: security
     severity: warning
-    description: "IP Reputation violation detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "IP reputation violation detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.416
-    name: fadcTrapBotDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapBotDetected
     category: security
-    severity: warning
-    description: "Bot activity detected on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "Bot detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.417
-    name: fadcTrapFwConnectionDeny
+    name: FORTINET-FORTIADC-MIB::fadcTrapFwConnectionDeny
     category: security
     severity: warning
-    description: "Firewall policy denied a connection on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Firewall policy denied connection on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.418
-    name: fadcTrapXmlDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapXmlDetected
     category: security
-    severity: warning
-    description: "XML violation detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "FortiADC XML violation detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.419
-    name: fadcTrapJsonDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapJsonDetected
     category: security
     severity: warning
-    description: "JSON policy violation detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "JSON violation detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.420
-    name: fadcTrapSoapDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapSoapDetected
     category: security
     severity: warning
-    description: "SOAP protocol violation detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  hostname: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "SOAP violation detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.421
-    name: fadcTrapDlpDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapDlpDetected
     category: security
-    severity: warning
-    description: "WAF DLP detection on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "WAF DLP detection on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.422
-    name: fadcTrapHtmlDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapHtmlDetected
     category: security
     severity: warning
-    description: "WAF HTML validation detected on {SNMP_DEVICE_HOSTNAME}\n  virtual server: {sysName}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "WAF HTML validation detected on {SNMP_DEVICE_HOSTNAME}\n  source IP: {fadcAlertPriority}\n  virtual server: {sysName}\n  serial: {fadcSysSerial}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.423
-    name: fadcTrapWpdDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapWpdDetected
     category: security
-    severity: warning
+    severity: alert
     description: "Web page defacement detected on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.424
-    name: fadcTrapCsrfDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapCsrfDetected
     category: security
     severity: warning
-    description: "CSRF attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "CSRF attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.425
-    name: fadcTrapDdosIpFragmentation
+    name: FORTINET-FORTIADC-MIB::fadcTrapDdosIpFragmentation
     category: security
     severity: alert
-    description: "DDoS IP fragmentation attack detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "DDoS IP Fragmentation attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.426
-    name: fadcTrapDdosTcpSlowDataAttack
+    name: FORTINET-FORTIADC-MIB::fadcTrapDdosTcpSlowDataAttack
     category: security
-    severity: warning
-    description: "DDoS TCP slow data attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "DDoS TCP slow data attack detected on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.427
-    name: fadcTrapDdosTcpAccessFlood
+    name: FORTINET-FORTIADC-MIB::fadcTrapDdosTcpAccessFlood
     category: security
     severity: alert
-    description: "DDoS TCP access flood attack detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "DDoS TCP access flood attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.428
-    name: fadcTrapDdosHttpConnectionFlood
+    name: FORTINET-FORTIADC-MIB::fadcTrapDdosHttpConnectionFlood
     category: security
-    severity: warning
-    description: "DDoS HTTP connection flood attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: err
+    description: "DDoS HTTP connection flood attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.429
-    name: fadcTrapDdosHttpRequestFlood
+    name: FORTINET-FORTIADC-MIB::fadcTrapDdosHttpRequestFlood
     category: security
-    severity: warning
-    description: "DDoS HTTP request flood attack detected on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "DDoS HTTP request flood attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.430
-    name: fadcTrapDdosHttpAccessLimit
+    name: FORTINET-FORTIADC-MIB::fadcTrapDdosHttpAccessLimit
     category: security
     severity: alert
-    description: "DDoS HTTP access limit attack detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "DDoS HTTP access limit attack detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.431
-    name: fadcTrapPeriodBlockIP
+    name: FORTINET-FORTIADC-MIB::fadcTrapPeriodBlockIP
     category: security
     severity: warning
-    description: "IP address blocked by period-based policy on {SNMP_DEVICE_HOSTNAME}\n  system name: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Periodic IP block triggered on {SNMP_DEVICE_HOSTNAME}\n  system name: {sysName}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.432
-    name: fadcTrapCorsViolateDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapCorsViolateDetected
     category: security
     severity: warning
-    description: "CORS (Cross-Origin Resource Sharing) policy violation detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "CORS policy violation detected on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Source: Client IP attempted cross-origin access on virtual server"
     status: current
     varbinds:
     - fadcSysSerial
   - oid: 1.3.6.1.4.1.12356.112.0.433
-    name: fadcTrapThresholdViolateDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapThresholdViolateDetected
     category: security
     severity: warning
-    description: "WAF detection on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Event: WAF detected from client IP on virtual server"
-    mib: FORTINET-FORTIADC-MIB
+    description: "WAF detection on {SNMP_DEVICE_HOSTNAME}\n  WAF detected from client IP on virtual server\n  serial: {fadcSysSerial}"
     status: current
     varbinds:
     - fadcSysSerial
   - oid: 1.3.6.1.4.1.12356.112.0.434
-    name: fadcTrapBiometricsBaseDetected
+    name: FORTINET-FORTIADC-MIB::fadcTrapBiometricsBaseDetected
     category: security
     severity: warning
-    description: "WAF detection on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Event: WAF pattern detected from client IP on virtual server"
-    mib: FORTINET-FORTIADC-MIB
+    description: "WAF detection on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Source: client IP\n  Target: virtual server"
     status: current
     varbinds:
     - fadcSysSerial
   - oid: 1.3.6.1.4.1.12356.112.0.435
-    name: fadcTrapSysUserLoginFailedAndBlocked
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysUserLoginFailedAndBlocked
     category: auth
     severity: warning
     description: "User login failed and IP blocked on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}"
-    mib: FORTINET-FORTIADC-MIB
     status: current
     varbinds:
     - fadcSysSerial
   - oid: 1.3.6.1.4.1.12356.112.0.501
-    name: fadcTrapCPUTempHigh
-    category: state_change
-    severity: warning
-    description: "CPU temperature threshold exceeded on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapCPUTempHigh
+    category: diagnostic
+    severity: alert
+    description: "CPU temperature high on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.502
-    name: fadcTrapCPUTempNormal
+    name: FORTINET-FORTIADC-MIB::fadcTrapCPUTempNormal
     category: state_change
     severity: info
-    description: "CPU temperature returned to normal on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  hostname: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "CPU temperature returned to normal on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.503
-    name: fadcTrapDeviceTempHigh
-    category: state_change
-    severity: warning
-    description: "Device temperature threshold exceeded on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapDeviceTempHigh
+    category: diagnostic
+    severity: alert
+    description: "Device temperature high on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.504
-    name: fadcTrapDeviceTempNormal
+    name: FORTINET-FORTIADC-MIB::fadcTrapDeviceTempNormal
     category: state_change
     severity: info
-    description: "Device temperature returned to normal on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  previous alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Device temperature returned to normal on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  prior alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.505
-    name: fadcTrapPSUTempHigh
-    category: state_change
-    severity: warning
-    description: "PSU temperature threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapPSUTempHigh
+    category: diagnostic
+    severity: crit
+    description: "PSU temperature threshold exceeded on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.506
-    name: fadcTrapPSUTempNormal
+    name: FORTINET-FORTIADC-MIB::fadcTrapPSUTempNormal
     category: state_change
     severity: info
-    description: "PSU temperature returned to normal on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "PSU temperature returned to normal on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.507
-    name: fadcTrapPSUFanSlow
-    category: state_change
+    name: FORTINET-FORTIADC-MIB::fadcTrapPSUFanSlow
+    category: diagnostic
     severity: warning
-    description: "PSU fan speed low on {sysName} (serial: {fadcSysSerial})\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "PSU fan speed too slow on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.508
-    name: fadcTrapDeviceFanSlow
-    category: state_change
+    name: FORTINET-FORTIADC-MIB::fadcTrapDeviceFanSlow
+    category: diagnostic
     severity: warning
-    description: "Fan speed below threshold on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Fan speed slow on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.509
-    name: fadcTrapPSUFanBad
+    name: FORTINET-FORTIADC-MIB::fadcTrapPSUFanBad
     category: state_change
-    severity: crit
-    description: "PSU fan failure detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "PSU fan failure detected on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.510
-    name: fadcTrapPSUFanGood
+    name: FORTINET-FORTIADC-MIB::fadcTrapPSUFanGood
     category: state_change
-    severity: info
-    description: "PSU fan status restored to good on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: notice
+    description: "PSU fan status recovered to good on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.511
-    name: fadcTrapDeviceFanBad
-    category: state_change
+    name: FORTINET-FORTIADC-MIB::fadcTrapDeviceFanBad
+    category: diagnostic
     severity: warning
-    description: "Device fan failure detected on {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Device fan failure detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.512
-    name: fadcTrapDeviceFanGood
+    name: FORTINET-FORTIADC-MIB::fadcTrapDeviceFanGood
     category: state_change
     severity: info
-    description: "Fan status returned to good on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Device fan status returned to good on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  system name: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.513
-    name: fadcTrapVoltageHigh
+    name: FORTINET-FORTIADC-MIB::fadcTrapVoltageHigh
     category: diagnostic
-    severity: crit
-    description: "Voltage threshold exceeded on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}\n  condition: voltage too high"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "High voltage detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.514
-    name: fadcTrapPowerSupplyHigh
-    category: state_change
-    severity: warning
-    description: "Power supply voltage exceeded high threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapPowerSupplyHigh
+    category: diagnostic
+    severity: alert
+    description: "Power supply voltage high on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.515
-    name: fadcTrapPSUVoltageHigh
-    category: state_change
-    severity: crit
-    description: "PSU voltage exceeded high threshold on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapPSUVoltageHigh
+    category: diagnostic
+    severity: alert
+    description: "PSU voltage high on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.516
-    name: fadcTrapVoltageLow
+    name: FORTINET-FORTIADC-MIB::fadcTrapVoltageLow
     category: diagnostic
-    severity: err
-    description: "Low voltage detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "Low voltage detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.517
-    name: fadcTrapPowerSupplyLow
-    category: state_change
-    severity: warning
-    description: "Power supply voltage low on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapPowerSupplyLow
+    category: diagnostic
+    severity: alert
+    description: "Power supply voltage low on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.518
-    name: fadcTrapPSUVoltageLow
-    category: state_change
-    severity: warning
-    description: "PSU voltage low on {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapPSUVoltageLow
+    category: diagnostic
+    severity: alert
+    description: "PSU voltage low on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.519
-    name: fadcTrapPSUFailure
+    name: FORTINET-FORTIADC-MIB::fadcTrapPSUFailure
     category: state_change
-    severity: warning
-    description: "PSU failure detected on {sysName}\n  Serial: {fadcSysSerial}\n  Alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "PSU failure detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.520
-    name: fadcTrapARPConflict
-    category: security
+    name: FORTINET-FORTIADC-MIB::fadcTrapARPConflict
+    category: state_change
     severity: warning
-    description: "ARP conflict detected on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  system name: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "ARP conflict detected on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.521
-    name: fadcTrapExternalLinkChange
+    name: FORTINET-FORTIADC-MIB::fadcTrapExternalLinkChange
     category: state_change
     severity: warning
-    description: "External interface link status changed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "External interface link status changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.522
-    name: fadcTrapLogDiskCloseThreshold
+    name: FORTINET-FORTIADC-MIB::fadcTrapLogDiskCloseThreshold
     category: diagnostic
     severity: warning
-    description: "Log disk space threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Priority: {fadcAlertPriority}\n  sysName: {sysName}\n\nDisk partition free space is below the configured limit (default 30%)."
-    mib: FORTINET-FORTIADC-MIB
+    description: "Disk space on {SNMP_DEVICE_HOSTNAME} is below threshold\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.523
-    name: fadcTrapLogDiskLost
+    name: FORTINET-FORTIADC-MIB::fadcTrapLogDiskLost
     category: diagnostic
-    severity: crit
-    description: "Log disk failed to mount on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: err
+    description: "Log disk failed to mount on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.524
-    name: fadcTrapSsdMwiNearThreshold
+    name: FORTINET-FORTIADC-MIB::fadcTrapSsdMwiNearThreshold
     category: diagnostic
     severity: warning
-    description: "SSD disk wear-out indicator approaching threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  device name: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "SSD wear-out indicator near threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.525
-    name: fadcTrapSsdMwiReachedThreshold
+    name: FORTINET-FORTIADC-MIB::fadcTrapSsdMwiReachedThreshold
     category: diagnostic
     severity: warning
-    description: "SSD disk wear-out indicator reached threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "SSD wear-out threshold reached on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.526
-    name: fadcTrapHAPeerLost
+    name: FORTINET-FORTIADC-MIB::fadcTrapHAPeerLost
     category: state_change
-    severity: warning
-    description: "HA peer lost on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "HA peer lost on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.527
-    name: fadcTrapHAMasterFailover
+    name: FORTINET-FORTIADC-MIB::fadcTrapHAMasterFailover
     category: state_change
-    severity: warning
-    description: "HA master failover occurred on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  system name: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "HA Master failover occurred on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.528
-    name: fadcTrapPortStatusChange
+    name: FORTINET-FORTIADC-MIB::fadcTrapPortStatusChange
     category: state_change
     severity: warning
-    description: "Monitor port status changed on {SNMP_DEVICE_HOSTNAME} in HA mode\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Monitor port status changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.529
-    name: fadcTrapDiskStatusChange
-    category: state_change
-    severity: warning
-    description: "Disk status changed on FortiADC device {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}\n  Event: disk status change in HA mode"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapDiskStatusChange
+    category: diagnostic
+    severity: alert
+    description: "FortiADC disk status change detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.530
-    name: fadcTrapInetPortExhaustion
-    category: diagnostic
-    severity: crit
-    description: "Source port exhaustion on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Priority: {fadcAlertPriority}\n  sysName: {sysName}\n\nThe device has run out of source ports and cannot open new communications channels."
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapInetPortExhaustion
+    category: state_change
+    severity: alert
+    description: "Source port exhaustion detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}\n\nThe device has run out of source ports and cannot open new communications channels with other machines."
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.531
-    name: fadcTrapCertExpire
+    name: FORTINET-FORTIADC-MIB::fadcTrapCertExpire
     category: license
     severity: warning
-    description: "SSL certificate expiring soon on {SNMP_DEVICE_HOSTNAME}\n  hostname: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "SSL certificate expiring soon on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.532
-    name: fadcTrapLogicalInterfaceUp
+    name: FORTINET-FORTIADC-MIB::fadcTrapLogicalInterfaceUp
     category: state_change
     severity: info
-    description: "Logical interface {fadcIntfName} came up on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  hostname: {sysName}\n  priority: {fadcAlertPriority}\n  uptime: {sysUpTime}"
-    mib: FORTINET-FORTIADC-MIB
+    description: 'Logical interface {fadcIntfName} on {SNMP_DEVICE_HOSTNAME} (serial: {fadcSysSerial}) transitioned to UP state.'
     status: current
     varbinds:
     - sysUpTime
@@ -2708,11 +2479,10 @@ traps:
     - sysName
     - fadcIntfName
   - oid: 1.3.6.1.4.1.12356.112.0.533
-    name: fadcTrapLogicalInterfaceDown
+    name: FORTINET-FORTIADC-MIB::fadcTrapLogicalInterfaceDown
     category: state_change
     severity: warning
-    description: "Logical interface went down on {SNMP_DEVICE_HOSTNAME}\n  interface name: {fadcIntfName}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Logical interface {fadcIntfName} went down on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - sysUpTime
@@ -2721,11 +2491,10 @@ traps:
     - sysName
     - fadcIntfName
   - oid: 1.3.6.1.4.1.12356.112.0.534
-    name: fadcTrapLogicalInterfaceDisabled
+    name: FORTINET-FORTIADC-MIB::fadcTrapLogicalInterfaceDisabled
     category: state_change
     severity: warning
-    description: "Logical interface disabled on {SNMP_DEVICE_HOSTNAME}\n  interface name: {fadcIntfName}\n  device serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Logical interface disabled on {SNMP_DEVICE_HOSTNAME}\n  interface: {fadcIntfName}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
@@ -2733,11 +2502,10 @@ traps:
     - sysName
     - fadcIntfName
   - oid: 1.3.6.1.4.1.12356.112.0.535
-    name: fadcTrapAlertTrigger
+    name: FORTINET-FORTIADC-MIB::fadcTrapAlertTrigger
     category: diagnostic
     severity: warning
-    description: "System alert triggered on {sysName} ({fadcSysSerial})\n  alert name: {fadcAlertName}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "System alert triggered on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert: {fadcAlertName}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
@@ -2745,971 +2513,863 @@ traps:
     - sysName
     - fadcAlertName
   - oid: 1.3.6.1.4.1.12356.112.0.536
-    name: fadcTrapSysConnMemHigh
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysConnMemHigh
     category: diagnostic
-    severity: warning
-    description: "Connection memory usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: err
+    description: "Connection memory usage exceeded threshold on {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.537
-    name: fadcTrapSysLicenseExpiryNotif
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysLicenseExpiryNotif
     category: license
     severity: crit
-    description: "License expired on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "License expired on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.538
-    name: fadcTrapSysDeviceRebooted
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysDeviceRebooted
     category: state_change
-    severity: info
-    description: "System rebooted on {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: notice
+    description: "System rebooted on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.539
-    name: fadcTrapSysDeviceStarted
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysDeviceStarted
     category: state_change
     severity: info
-    description: "Device started on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  hostname: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Device started on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.540
-    name: fadcTrapSysUpgradeComplete
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysUpgradeComplete
+    category: state_change
     severity: info
-    description: "System upgrade completed on {SNMP_DEVICE_HOSTNAME}\n  hostname: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "System upgrade completed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.541
-    name: fadcTrapSysUserLogin
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysUserLogin
     category: auth
-    severity: info
-    description: "User login on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: notice
+    description: "User login event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.542
-    name: fadcTrapSysUserLogout
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysUserLogout
     category: auth
-    severity: info
-    description: "User logout on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  system name: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: notice
+    description: "User logout on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.543
-    name: fadcTrapSysDhcpIpAllocFailure
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysDhcpIpAllocFailure
+    category: state_change
     severity: warning
-    description: "DHCP IP address allocation failure on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "IP address allocation failure on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.544
-    name: fadcTrapSysMetricsDbDiskFull
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysMetricsDbDiskFull
     category: diagnostic
-    severity: err
-    description: "Metrics database disk full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "Metrics DB Disk full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.545
-    name: fadcTrapSysStatisticsDbDiskFull
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysStatisticsDbDiskFull
     category: diagnostic
-    severity: crit
-    description: "Statistics database disk full on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  System Name: {sysName}\n  Alert Priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "Statistics DB disk full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.546
-    name: fadcTrapSysLogFull
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysLogFull
     category: diagnostic
-    severity: crit
-    description: "Log disk full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "Log disk full on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  hostname: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.547
-    name: fadcTrapSysFwBandwidthLimit
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysFwBandwidthLimit
     category: diagnostic
     severity: warning
-    description: "Traffic dropped due to FW QoS bandwidth limit on {sysName}\n  Serial: {fadcSysSerial}\n  Alert Priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "FortiADC {sysName} (Serial: {fadcSysSerial}) triggered bandwidth limit trap\n  priority: {fadcAlertPriority}\n  Reason: Traffic dropped due to FW QoS"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.548
-    name: fadcTrapConfigExecute
+    name: FORTINET-FORTIADC-MIB::fadcTrapConfigExecute
     category: config_change
     severity: notice
-    description: "Configuration executed on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Configuration executed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.549
-    name: fadcTrapConfigCreate
+    name: FORTINET-FORTIADC-MIB::fadcTrapConfigCreate
     category: config_change
     severity: notice
-    description: "Configuration created on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Configuration created on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.550
-    name: fadcTrapConfigDelete
+    name: FORTINET-FORTIADC-MIB::fadcTrapConfigDelete
     category: config_change
     severity: warning
-    description: "Configuration deleted on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Configuration deleted on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.551
-    name: fadcTrapConfigUpdate
+    name: FORTINET-FORTIADC-MIB::fadcTrapConfigUpdate
     category: config_change
     severity: notice
-    description: "Configuration updated on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Configuration update detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.552
-    name: fadcTrapSysOcspResponseExpires
-    category: security
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysOcspResponseExpires
+    category: diagnostic
     severity: warning
-    description: "OCSP response expired on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "OCSP response expired on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.553
-    name: fadcTrapSysSslCertificateRevoked
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysSslCertificateRevoked
     category: security
-    severity: crit
-    description: "SSL certificate revoked on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "SSL certificate revoked on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.554
-    name: fadcTrapSysCrlExpires
+    name: FORTINET-FORTIADC-MIB::fadcTrapSysCrlExpires
     category: license
     severity: crit
-    description: "SYS CRL (Certificate Revocation List) expired on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "System CRL (Certificate Revocation List) expired on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.600
-    name: fadcTrapMemberConnRateStart
-    category: state_change
+    name: FORTINET-FORTIADC-MIB::fadcTrapMemberConnRateStart
+    category: diagnostic
     severity: warning
     description: "Pool member exceeded allowed connection rate on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.601
-    name: fadcTrapVSConnRateStart
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapVSConnRateStart
+    category: state_change
     severity: warning
-    description: "Virtual server exceeded configured connection rate on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual server connection rate exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.602
-    name: fadcTrapMemberConnLimitStart
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapMemberConnLimitStart
+    category: state_change
     severity: warning
-    description: "Pool member connection limit exceeded on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Pool member connection limit reached on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.603
-    name: fadcTrapVSConnLimitStart
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapVSConnLimitStart
+    category: state_change
     severity: warning
-    description: "Virtual server on {sysName} ({fadcSysSerial}) has exceeded its allowed connection limit\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual server connection limit reached on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.604
-    name: fadcTrapMemberConnRateStop
+    name: FORTINET-FORTIADC-MIB::fadcTrapMemberConnRateStop
     category: state_change
     severity: warning
-    description: "Pool member connection rate dropped below threshold on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Pool member connection rate stopped on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.605
-    name: fadcTrapVSConnRateStop
+    name: FORTINET-FORTIADC-MIB::fadcTrapVSConnRateStop
     category: state_change
     severity: warning
-    description: "Virtual server on {SNMP_DEVICE_HOSTNAME} is dropping connections due to exceeded rate limit\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual server on {sysName} ({fadcSysSerial}) has stopped accepting connections due to exceeded connection rate limit\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.606
-    name: fadcTrapMemberConnLimitStop
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapMemberConnLimitStop
+    category: state_change
     severity: warning
-    description: "Pool member on {SNMP_DEVICE_HOSTNAME} has started dropping connections due to connection limit\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Pool member connection limit reached on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.607
-    name: fadcTrapVSConnLimitStop
+    name: FORTINET-FORTIADC-MIB::fadcTrapVSConnLimitStop
     category: state_change
-    severity: err
-    description: "Virtual server on {SNMP_DEVICE_HOSTNAME} has begun dropping connections due to connection limit.\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "Virtual server on {SNMP_DEVICE_HOSTNAME} has begun dropping connections due to connection limit reached\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.608
-    name: fadcTrapVSTransactionRateStart
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapVSTransactionRateStart
+    category: state_change
     severity: warning
-    description: "Virtual server on {SNMP_DEVICE_HOSTNAME} has exceeded the allowed transaction rate\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual server transaction rate exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.609
-    name: fadcTrapVSTransactionRateStop
+    name: FORTINET-FORTIADC-MIB::fadcTrapVSTransactionRateStop
     category: state_change
     severity: warning
-    description: "Virtual server transaction rate stopped on {SNMP_DEVICE_HOSTNAME}\n  virtual server: {sysName}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual server transaction rate limit reached on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.610
-    name: fadcTrapMemberHCDown
+    name: FORTINET-FORTIADC-MIB::fadcTrapMemberHCDown
     category: state_change
     severity: warning
-    description: "Health check failed for a pool member on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  node name: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Pool member health check down on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.611
-    name: fadcTrapVSHealthChange
+    name: FORTINET-FORTIADC-MIB::fadcTrapVSHealthChange
     category: state_change
     severity: warning
-    description: "Virtual server health status changed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual server health status changed on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.612
-    name: fadcTrapMemberHCUp
+    name: FORTINET-FORTIADC-MIB::fadcTrapMemberHCUp
     category: state_change
-    severity: notice
-    description: "Pool member health check recovered on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: info
+    description: "Health check passed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  node name: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.613
-    name: fadcTrapVSAuthFail
+    name: FORTINET-FORTIADC-MIB::fadcTrapVSAuthFail
     category: auth
     severity: warning
-    description: "Virtual server authentication failure on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual server authentication failure on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.614
-    name: fadcTrapVSIPPoolLimit
-    category: diagnostic
-    severity: err
-    description: "Virtual Server IP pool exhausted on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapVSIPPoolLimit
+    category: state_change
+    severity: warning
+    description: "VS IP pool exhausted on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.615
-    name: fadcTrapGatewayHCDown
+    name: FORTINET-FORTIADC-MIB::fadcTrapGatewayHCDown
     category: state_change
     severity: warning
-    description: "Health check down detected on {SNMP_DEVICE_HOSTNAME} for a link group member\n  device: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Health check down on link group member\n  Device: {sysName}\n  Serial: {fadcSysSerial}\n  Alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.616
-    name: fadcTrapLinkGroupHCDown
+    name: FORTINET-FORTIADC-MIB::fadcTrapLinkGroupHCDown
     category: state_change
-    severity: warning
-    description: "Link group health check is down on {sysName}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "Link group health check down on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.617
-    name: fadcTrapGatewayHCUp
+    name: FORTINET-FORTIADC-MIB::fadcTrapGatewayHCUp
     category: state_change
     severity: info
-    description: "Health check up on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Health check up for link group member on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.618
-    name: fadcTrapLinkGroupHCUp
+    name: FORTINET-FORTIADC-MIB::fadcTrapLinkGroupHCUp
     category: state_change
-    severity: notice
-    description: "Link group health check is now UP on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: info
+    description: "Link group health check recovered on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.619
-    name: fadcTrapGatewayInboundBandwidth
+    name: FORTINET-FORTIADC-MIB::fadcTrapGatewayInboundBandwidth
     category: state_change
     severity: warning
-    description: "Link group member exceeded allowed inbound bandwidth on {sysName}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Inbound bandwidth threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.620
-    name: fadcTrapGatewayOutboundBandwidth
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapGatewayOutboundBandwidth
+    category: state_change
     severity: warning
-    description: "Link group member exceeded allowed outbound bandwidth on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Outbound bandwidth threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.621
-    name: fadcTrapGatewayInboundSpillover
+    name: FORTINET-FORTIADC-MIB::fadcTrapGatewayInboundSpillover
     category: state_change
-    severity: err
-    description: "Gateway inbound spillover threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "Link group member exceeded inbound spillover threshold on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Priority: {fadcAlertPriority}\n  Hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.622
-    name: fadcTrapGatewayOutboundSpillover
+    name: FORTINET-FORTIADC-MIB::fadcTrapGatewayOutboundSpillover
     category: state_change
     severity: warning
-    description: "Link group member exceeded outbound spillover threshold on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Priority: {fadcAlertPriority}\n  System name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Outbound spillover exceeded for a link group member on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.623
-    name: fadcTrapGatewayTotalSpillover
+    name: FORTINET-FORTIADC-MIB::fadcTrapGatewayTotalSpillover
     category: state_change
     severity: warning
-    description: "Link group member exceeded spillover threshold on {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "FortiADC link group member exceeded total spillover limit on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.624
-    name: fadcTrapGlbServerNotAvail
+    name: FORTINET-FORTIADC-MIB::fadcTrapGlbServerNotAvail
     category: state_change
     severity: warning
-    description: "Server became unavailable in global traffic management on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  node name: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Server became unavailable in global traffic management on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.625
-    name: fadcTrapGlbServerAvail
+    name: FORTINET-FORTIADC-MIB::fadcTrapGlbServerAvail
     category: state_change
-    severity: notice
-    description: "Server became available in global traffic management on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: info
+    description: "Server became available in global traffic management on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.626
-    name: fadcTrapGlbVSNotAvail
+    name: FORTINET-FORTIADC-MIB::fadcTrapGlbVSNotAvail
     category: state_change
-    severity: warning
-    description: "Virtual Server became unavailable on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "Virtual Server unavailable on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.627
-    name: fadcTrapGlbVSAvail
+    name: FORTINET-FORTIADC-MIB::fadcTrapGlbVSAvail
     category: state_change
     severity: info
-    description: "Virtual Server became available on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual Server became available on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.633
-    name: fadcTrapGlbGWNotAvail
+    name: FORTINET-FORTIADC-MIB::fadcTrapGlbGWNotAvail
     category: state_change
-    severity: warning
-    description: "Gateway became unavailable in global traffic management on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "Global traffic management gateway became unavailable on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.634
-    name: fadcTrapGlbGWAvail
+    name: FORTINET-FORTIADC-MIB::fadcTrapGlbGWAvail
     category: state_change
-    severity: notice
-    description: "Gateway became available in global traffic management on {SNMP_DEVICE_HOSTNAME}\n  hostname: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: info
+    description: "Gateway became available in global traffic management on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.635
-    name: fadcTrapSlbPoolDown
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbPoolDown
     category: state_change
-    severity: warning
-    description: "Server Load Balancer pool is down on {SNMP_DEVICE_HOSTNAME}\n  system name: {sysName}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "Load balancer pool is down on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.636
-    name: fadcTrapSlbPoolUp
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbPoolUp
     category: state_change
-    severity: notice
-    description: "SLB pool is now up on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: info
+    description: "SLB pool is up on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.637
-    name: fadcTrapSlbPoolHealthChange
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbPoolHealthChange
     category: state_change
     severity: warning
-    description: "SLB pool health check state changed on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "SLB pool health check state changed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.638
-    name: fadcTrapSlbServerHealthChange
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbServerHealthChange
     category: state_change
     severity: warning
-    description: "Server health check status changed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Server health status changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.639
-    name: fadcTrapSlbServerEnabled
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbServerEnabled
     category: state_change
-    severity: info
-    description: "SLB server enabled on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: notice
+    description: "Server enabled on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.640
-    name: fadcTrapSlbServerDisabled
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbServerDisabled
     category: state_change
     severity: warning
-    description: "Server disabled on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Server disabled on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.641
-    name: fadcTrapSlbServerMaintain
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbServerMaintain
     category: state_change
-    severity: notice
-    description: "Server entered maintenance mode on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "Server maintain mode activated on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.642
-    name: fadcTrapSlbVirtualServerDown
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbVirtualServerDown
     category: state_change
-    severity: err
-    description: "Virtual server is down on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: alert
+    description: "Virtual server is down on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.643
-    name: fadcTrapSlbVirtualServerUp
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbVirtualServerUp
     category: state_change
     severity: info
-    description: "Virtual server is up on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual server is up on {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.644
-    name: fadcTrapSlbVirtualServerEnabled
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbVirtualServerEnabled
     category: state_change
     severity: info
-    description: "Virtual server enabled on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  hostname: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Virtual server enabled on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.645
-    name: fadcTrapSlbVirtualServerDisabled
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbVirtualServerDisabled
     category: state_change
-    severity: err
-    description: "Virtual server disabled on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  node name: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "Virtual server disabled on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.646
-    name: fadcTrapSlbVirtualServerMaintain
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbVirtualServerMaintain
     category: state_change
-    severity: warning
-    description: "Virtual server entered maintenance mode on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: notice
+    description: "Virtual server entered maintenance mode on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.647
-    name: fadcTrapSlbFlowTblHigh
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbFlowTblHigh
     category: diagnostic
-    severity: crit
-    description: "Server Load Balancing flow table usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  hostname: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "Flow table usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.648
-    name: fadcTrapSlbPersistTblHigh
-    category: state_change
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbPersistTblHigh
+    category: diagnostic
     severity: warning
-    description: "Persistence table usage exceeded threshold on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "FortiADC Persistence table usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.649
-    name: fadcTrapSlbPktBuffHigh
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbPktBuffHigh
     category: diagnostic
     severity: warning
-    description: "Packet buffer usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Packet buffer usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.650
-    name: fadcTrapSlbSynCacheUsageHigh
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbSynCacheUsageHigh
     category: diagnostic
     severity: warning
-    description: "SYN cache usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "SYN cache usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.651
-    name: fadcTrapSlbSynTblHigh
-    category: diagnostic
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbSynTblHigh
+    category: state_change
     severity: warning
-    description: "SYN table usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "SYN table usage threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.652
-    name: fadcTrapSlbConnDropMaxFlowTbl
-    category: diagnostic
-    severity: err
-    description: "FortiADC SLB flow table limit reached on {sysName}\n  Connections dropped due to flow table capacity exceeded\n  Serial: {fadcSysSerial}\n  Alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbConnDropMaxFlowTbl
+    category: state_change
+    severity: warning
+    description: "Connection dropped due to flow table limit on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.653
-    name: fadcTrapSlbConnDropMaxPersistTbl
-    category: diagnostic
-    severity: err
-    description: "Connections dropped on {SNMP_DEVICE_HOSTNAME} ({sysName}) due to persistence table limit\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbConnDropMaxPersistTbl
+    category: state_change
+    severity: warning
+    description: "Connection(s) dropped due to persistence table limit on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.654
-    name: fadcTrapSlbConnDropMaxSysTbl
-    category: state_change
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbConnDropMaxSysTbl
+    category: diagnostic
     severity: warning
-    description: "Connection(s) dropped on {SNMP_DEVICE_HOSTNAME} due to SYN table limit reached\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Connection(s) dropped on {SNMP_DEVICE_HOSTNAME} due to SYN table limit\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.655
-    name: fadcTrapSlbConnDropNoConnMem
-    category: diagnostic
-    severity: err
-    description: "Server Load Balancer connections dropped on {SNMP_DEVICE_HOSTNAME} due to SYN table memory limit\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbConnDropNoConnMem
+    category: state_change
+    severity: warning
+    description: "Connection dropped due to SYN table limit on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.656
-    name: fadcTrapSlbConnDropNoPktBuff
-    category: diagnostic
-    severity: crit
-    description: "Connection(s) dropped on {SNMP_DEVICE_HOSTNAME} due to low packet buffer\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  system name: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbConnDropNoPktBuff
+    category: state_change
+    severity: warning
+    description: "Connection dropped due to low packet buffer on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.657
-    name: fadcTrapSlbConnDropPoolLBFailure
-    category: diagnostic
-    severity: crit
-    description: "SLB pool load balancing decision failed on {sysName} ({fadcSysSerial})\n  alert priority: {fadcAlertPriority}\n\nLoad balancing decisions for a server pool have failed, preventing proper traffic distribution."
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbConnDropPoolLBFailure
+    category: state_change
+    severity: warning
+    description: "Pool load balancing decision failed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.658
-    name: fadcTrapSlbPktDropNoPktBuff
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbPktDropNoPktBuff
     category: diagnostic
-    severity: err
-    description: "Packet drop due to low packet buffer on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: warning
+    description: "Packet drop due to low packet buffer on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.659
-    name: fadcTrapSlbPktBuffAllocFail
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbPktBuffAllocFail
     category: diagnostic
     severity: crit
-    description: "Packet buffer allocation failure on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fadcSysSerial}\n  Priority: {fadcAlertPriority}\n  System: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Packet buffer allocation failure on {sysName} ({fadcSysSerial})\n  priority: {fadcAlertPriority}\n  Impact: SLB unable to allocate memory for packet processing"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.660
-    name: fadcTrapSlbCertExpire
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbCertExpire
     category: license
-    severity: warning
-    description: "SSL certificate expired on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    severity: crit
+    description: "SSL certificate expired on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.661
-    name: fadcTrapSlbCacheOBJAllocFail
+    name: FORTINET-FORTIADC-MIB::fadcTrapSlbCacheOBJAllocFail
     category: diagnostic
     severity: err
-    description: "HTTP cacheable objects dropped on {SNMP_DEVICE_HOSTNAME} due to memory allocation failure\n  serial: {fadcSysSerial}\n  priority: {fadcAlertPriority}\n  hostname: {sysName}"
-    mib: FORTINET-FORTIADC-MIB
+    description: "Memory allocation failure caused HTTP cacheable objects to be dropped on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  sysName: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.112.0.662
-    name: fadcTrapLlbVSThroughputLimit
-    category: diagnostic
-    severity: err
-    description: "Virtual service throughput limit reached on {SNMP_DEVICE_HOSTNAME}, packets dropped\n  device serial: {fadcSysSerial}\n  sysName: {sysName}\n  alert priority: {fadcAlertPriority}"
-    mib: FORTINET-FORTIADC-MIB
+    name: FORTINET-FORTIADC-MIB::fadcTrapLlbVSThroughputLimit
+    category: state_change
+    severity: warning
+    description: "Virtual service bandwidth limit exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fadcSysSerial}\n  alert priority: {fadcAlertPriority}\n  device name: {sysName}"
     status: current
     varbinds:
     - fadcSysSerial
     - fadcAlertPriority
     - sysName
   - oid: 1.3.6.1.4.1.12356.113.0.100
-    name: facTrapAuthUsersThreshold
+    name: FORTINET-FORTIAUTHENTICATOR-MIB::facTrapAuthUsersThreshold
     category: license
     severity: warning
-    description: "User authentication table nearing capacity on {SNMP_DEVICE_HOSTNAME}\n  Serial: {facSysSerial}\n  Remaining slots: {facAuthUsersRemaining}"
-    mib: FORTINET-FORTIAUTHENTICATOR-MIB
+    description: "User authentication table nearing capacity on {SNMP_DEVICE_HOSTNAME}\n  serial: {facSysSerial}\n  remaining slots: {facAuthUsersRemaining}"
     status: current
     varbinds:
     - facSysSerial
     - facAuthUsersRemaining
   - oid: 1.3.6.1.4.1.12356.113.0.101
-    name: facTrapAuthGroupThreshold
-    category: diagnostic
+    name: FORTINET-FORTIAUTHENTICATOR-MIB::facTrapAuthGroupThreshold
+    category: state_change
     severity: warning
-    description: "User group table threshold warning on {SNMP_DEVICE_HOSTNAME}\n  Serial: {facSysSerial}\n  Remaining slots: {facAuthGroupRemaining}\n\nThe user group table is nearly full."
-    mib: FORTINET-FORTIAUTHENTICATOR-MIB
+    description: "FortiAuthenticator user group table near capacity on {SNMP_DEVICE_HOSTNAME}\n  serial: {facSysSerial}\n  remaining groups: {facAuthGroupRemaining}"
     status: current
     varbinds:
     - facSysSerial
     - facAuthGroupRemaining
   - oid: 1.3.6.1.4.1.12356.113.0.102
-    name: facTrapRadiusNasThreshold
+    name: FORTINET-FORTIAUTHENTICATOR-MIB::facTrapRadiusNasThreshold
     category: diagnostic
     severity: warning
-    description: "RADIUS NAS table nearing capacity on {SNMP_DEVICE_HOSTNAME}\n  Serial: {facSysSerial}\n  Remaining slots: {facRadiusNasRemaining}"
-    mib: FORTINET-FORTIAUTHENTICATOR-MIB
+    description: "RADIUS NAS table near capacity on {SNMP_DEVICE_HOSTNAME}\n  serial: {facSysSerial}\n  remaining NAS slots: {facRadiusNasRemaining}"
     status: current
     varbinds:
     - facSysSerial
     - facRadiusNasRemaining
   - oid: 1.3.6.1.4.1.12356.113.0.103
-    name: facTrapAuthEventsThreshold
+    name: FORTINET-FORTIAUTHENTICATOR-MIB::facTrapAuthEventsThreshold
     category: auth
     severity: warning
-    description: "Authentication request rate exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {facSysSerial}\n  auth events (last 5 min): {facAuthEvents5Mins}"
-    mib: FORTINET-FORTIAUTHENTICATOR-MIB
+    description: "Authentication event rate threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {facSysSerial}\n  auth events (5 min): {facAuthEvents5Mins}"
     status: current
     varbinds:
     - facSysSerial
     - facAuthEvents5Mins
   - oid: 1.3.6.1.4.1.12356.113.0.104
-    name: facTrapAuthFailureThreshold
+    name: FORTINET-FORTIAUTHENTICATOR-MIB::facTrapAuthFailureThreshold
     category: auth
-    severity: notice
-    description: "Authentication failure rate threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {facSysSerial}\n  failures in last 5 minutes: {facAuthFailures5Mins}"
-    mib: FORTINET-FORTIAUTHENTICATOR-MIB
+    severity: err
+    description: "Authentication failure threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {facSysSerial}\n  failures in last 5 minutes: {facAuthFailures5Mins}"
     status: current
     varbinds:
     - facSysSerial
     - facAuthFailures5Mins
   - oid: 1.3.6.1.4.1.12356.113.0.105
-    name: facTrapUserLockout
+    name: FORTINET-FORTIAUTHENTICATOR-MIB::facTrapUserLockout
     category: auth
-    severity: err
-    description: "User account locked out on {SNMP_DEVICE_HOSTNAME} due to repeated login failures\n  device serial: {facSysSerial}\n  hostname: {sysName}\n  message: {fnGenTrapMsg}"
-    mib: FORTINET-FORTIAUTHENTICATOR-MIB
+    severity: warning
+    description: "User lockout due to repeated login failures on {SNMP_DEVICE_HOSTNAME}\n  device serial: {facSysSerial}\n  hostname: {sysName}\n  message: {fnGenTrapMsg}"
     status: current
     varbinds:
     - facSysSerial
     - sysName
     - fnGenTrapMsg
   - oid: 1.3.6.1.4.1.12356.113.0.106
-    name: facTrapHAStatusChange
+    name: FORTINET-FORTIAUTHENTICATOR-MIB::facTrapHAStatusChange
     category: state_change
-    severity: warning
-    description: "HA status changed on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName}\n  serial: {facSysSerial}\n  current HA status: {facHaCurrentStatus}\n  message: {fnGenTrapMsg}"
-    mib: FORTINET-FORTIAUTHENTICATOR-MIB
+    severity: notice
+    description: "HA status changed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {facSysSerial}\n  current HA status: {facHaCurrentStatus}\n  message: {fnGenTrapMsg}"
     status: current
     varbinds:
     - facSysSerial
     - sysName
     - facHaCurrentStatus
     - fnGenTrapMsg
-  - oid: 1.3.6.1.4.1.12356.113.0.107
-    name: facTrapHASyncActivityLow
-    category: diagnostic
-    severity: info
-    description: "Low HA sync activity detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {facSysSerial}\n  hostname: {sysName}\n  message: {fnGenTrapMsg}"
-    mib: FORTINET-FORTIAUTHENTICATOR-MIB
-    status: current
-    varbinds:
-    - facSysSerial
-    - sysName
-    - fnGenTrapMsg
-  - oid: 1.3.6.1.4.1.12356.113.0.108
-    name: facTrapRaidStatusChange
-    category: diagnostic
-    severity: crit
-    description: "RAID status changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {facSysSerial}\n  RAID status: {facRaidStatus}"
-    mib: FORTINET-FORTIAUTHENTICATOR-MIB
-    status: current
-    varbinds:
-    - facSysSerial
-    - facRaidStatus
   - oid: 1.3.6.1.4.1.12356.115.0.104
-    name: fvTrapStorageDiskHighThreshold
-    category: state_change
+    name: FORTINET-FORTIVOICE-MIB::fvTrapStorageDiskHighThreshold
+    category: diagnostic
     severity: warning
-    description: "Storage disk usage exceeded high threshold on {SNMP_DEVICE_HOSTNAME}\n  serial: {fvSysSerial}"
-    mib: FORTINET-FORTIVOICE-MIB
+    description: "Storage disk usage high threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  serial: {fvSysSerial}"
     status: current
     varbinds:
     - fvSysSerial
   - oid: 1.3.6.1.4.1.12356.115.0.201
-    name: fvTrapSystemEvent
+    name: FORTINET-FORTIVOICE-MIB::fvTrapSystemEvent
     category: state_change
     severity: warning
-    description: "FortiVoice system event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fvSysSerial}\n  event code: {fvSysEventCode}\n\nSystem component transitioned (e.g., halt, reboot, or upgrade initiated)."
-    mib: FORTINET-FORTIVOICE-MIB
+    description: "System event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fvSysSerial}\n  event code: {fvSysEventCode}"
     status: current
     varbinds:
     - fvSysSerial
     - fvSysEventCode
   - oid: 1.3.6.1.4.1.12356.115.0.203
-    name: fvTrapHAEvent
+    name: FORTINET-FORTIVOICE-MIB::fvTrapHAEvent
     category: state_change
-    severity: warning
-    description: "HA event on {SNMP_DEVICE_HOSTNAME}\n  serial: {fvSysSerial}\n  event type: {fvHAEventId}\n  unit IP: {fvHAUnitIp}\n  reason: {fvHAEventReason}"
-    mib: FORTINET-FORTIVOICE-MIB
+    severity: notice
+    description: "HA event occurred on {SNMP_DEVICE_HOSTNAME}\n  serial: {fvSysSerial}\n  event ID: {fvHAEventId}\n  unit IP: {fvHAUnitIp}\n  reason: {fvHAEventReason}"
     status: current
     varbinds:
     - fvSysSerial
@@ -3717,11 +3377,10 @@ traps:
     - fvHAUnitIp
     - fvHAEventReason
   - oid: 1.3.6.1.4.1.12356.118.2.0.501
-    name: fsaTrapMalware
+    name: FORTINET-FORTISANDBOX-MIB::fsaTrapMalware
     category: security
-    severity: warning
-    description: "Malware detected by FortiSandbox on {SNMP_DEVICE_HOSTNAME}\n  hostname: {sysName}\n  serial: {fnSysSerial}\n  job ID: {fsaTrapJobId}"
-    mib: FORTINET-FORTISANDBOX-MIB
+    severity: alert
+    description: "Malware detected on {SNMP_DEVICE_HOSTNAME}\n  Serial: {fnSysSerial}\n  Job ID: {fsaTrapJobId}"
     status: current
     varbinds:
     - fnSysSerial
@@ -3731,11 +3390,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.118.2.0.502
-    name: fsaTrapCPUHigh
+    name: FORTINET-FORTISANDBOX-MIB::fsaTrapCPUHigh
     category: diagnostic
     severity: warning
-    description: "CPU usage high on {SNMP_DEVICE_HOSTNAME}\n  CPU rate: {fsaTrapCPUrate}\n  Serial: {fnSysSerial}\n  sysName: {sysName}"
-    mib: FORTINET-FORTISANDBOX-MIB
+    description: "High CPU usage detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}\n  CPU rate: {fsaTrapCPUrate}"
     status: current
     varbinds:
     - fnSysSerial
@@ -3745,11 +3403,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.118.2.0.503
-    name: fsaTrapMemHigh
+    name: FORTINET-FORTISANDBOX-MIB::fsaTrapMemHigh
     category: diagnostic
     severity: warning
-    description: "Memory usage is too high on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}\n  memory usage rate: {fsaTrapMUrate}"
-    mib: FORTINET-FORTISANDBOX-MIB
+    description: "High memory usage detected on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}\n  usage rate: {fsaTrapMUrate}"
     status: current
     varbinds:
     - fnSysSerial
@@ -3759,11 +3416,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.118.2.0.504
-    name: fsaTrapDUHigh
+    name: FORTINET-FORTISANDBOX-MIB::fsaTrapDUHigh
     category: diagnostic
-    severity: crit
-    description: "Hard drive space usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}\n  hostname: {sysName}\n  serial: {fnSysSerial}\n  disk usage rate: {fsaTrapDUrate}"
-    mib: FORTINET-FORTISANDBOX-MIB
+    severity: warning
+    description: "Hard drive space usage is too high on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  disk usage rate: {fsaTrapDUrate}"
     status: current
     varbinds:
     - fnSysSerial
@@ -3773,11 +3429,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.118.2.0.505
-    name: fsaTrapPSUC
+    name: FORTINET-FORTISANDBOX-MIB::fsaTrapPSUC
     category: state_change
     severity: warning
-    description: "Power supply unit state changed on {SNMP_DEVICE_HOSTNAME}\n  hostname: {sysName}\n  serial: {fnSysSerial}\n  PSU state: {fsaTrapPSUFailure}"
-    mib: FORTINET-FORTISANDBOX-MIB
+    description: "Power supply unit state changed on {SNMP_DEVICE_HOSTNAME}\n  device name: {sysName}\n  serial: {fnSysSerial}\n  PSU state: {fsaTrapPSUFailure}"
     status: current
     varbinds:
     - fnSysSerial
@@ -3787,11 +3442,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.118.2.0.506
-    name: fsaTrapHCT
-    category: config_change
+    name: FORTINET-FORTISANDBOX-MIB::fsaTrapHCT
+    category: state_change
     severity: notice
-    description: "Topology map of High Capacity (HC) changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  sysName: {sysName}\n  topology: {fsaTrapHCTopology}"
-    mib: FORTINET-FORTISANDBOX-MIB
+    description: "FortiSandbox topology map changed on {SNMP_DEVICE_HOSTNAME}\n  serial: {fnSysSerial}\n  name: {sysName}\n  topology: {fsaTrapHCTopology}"
     status: current
     varbinds:
     - fnSysSerial
@@ -3801,11 +3455,10 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.118.2.0.507
-    name: fsaTrapHCH
+    name: FORTINET-FORTISANDBOX-MIB::fsaTrapHCH
     category: state_change
     severity: warning
-    description: "Health status of HC changed on {SNMP_DEVICE_HOSTNAME}\n  device serial: {fnSysSerial}\n  sysName: {sysName}\n  HC health status: {fsaTrapHCHealth}"
-    mib: FORTINET-FORTISANDBOX-MIB
+    description: "Health status of HC changed on {SNMP_DEVICE_HOSTNAME}\n  device: {sysName}\n  serial: {fnSysSerial}\n  HC health status: {fsaTrapHCHealth}"
     status: current
     varbinds:
     - fnSysSerial
@@ -3815,111 +3468,99 @@ traps:
       type: DisplayString
       name: fnSysSerial
   - oid: 1.3.6.1.4.1.12356.120.0.1
-    name: fapDevUp
+    name: FORTINET-FORTIAP-MIB::fapDevUp
     category: state_change
     severity: info
-    description: "FortiAP device is up on {SNMP_DEVICE_HOSTNAME}\n  serial number: {fapSerialNum}"
-    mib: FORTINET-FORTIAP-MIB
+    description: FortiAP device {fapSerialNum} is up on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - fapSerialNum
   - oid: 1.3.6.1.4.1.12356.120.0.2
-    name: fapCpuOverload
-    category: state_change
+    name: FORTINET-FORTIAP-MIB::fapCpuOverload
+    category: diagnostic
     severity: warning
-    description: "CPU overload detected on FortiAP {SNMP_DEVICE_HOSTNAME}\n  serial number: {fapSerialNum}\n  CPU usage has exceeded the configured threshold"
-    mib: FORTINET-FORTIAP-MIB
+    description: FortiAP {fapSerialNum} CPU overload detected on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - fapSerialNum
   - oid: 1.3.6.1.4.1.12356.120.0.3
-    name: fapMemOverload
-    category: state_change
+    name: FORTINET-FORTIAP-MIB::fapMemOverload
+    category: diagnostic
     severity: warning
-    description: "Memory threshold exceeded on FortiAP {SNMP_DEVICE_HOSTNAME}\n  serial: {fapSerialNum}\n  memory usage has surpassed the configured overload threshold"
-    mib: FORTINET-FORTIAP-MIB
+    description: FortiAP {fapSerialNum} memory usage exceeded threshold on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - fapSerialNum
   - oid: 1.3.6.1.4.1.12356.120.0.4
-    name: fapDevDown
+    name: FORTINET-FORTIAP-MIB::fapDevDown
     category: state_change
-    severity: warning
-    description: "Access Point is down on {SNMP_DEVICE_HOSTNAME}\n  FortiAP Serial Number: {fapSerialNum}"
-    mib: FORTINET-FORTIAP-MIB
+    severity: alert
+    description: FortiAP device {fapSerialNum} is down on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - fapSerialNum
   - oid: 1.3.6.1.4.1.12356.120.0.5
-    name: fapAcConnected
+    name: FORTINET-FORTIAP-MIB::fapAcConnected
     category: state_change
     severity: info
-    description: "FortiAP connected to AC on {SNMP_DEVICE_HOSTNAME}\n  AP serial: {fapSerialNum}\n  AC IP: {fapAcIpAddr}"
-    mib: FORTINET-FORTIAP-MIB
+    description: FortiAP {fapSerialNum} connected to AC {fapAcIpAddr} on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - fapAcIpAddr
     - fapSerialNum
   - oid: 1.3.6.1.4.1.12356.121.100.101
-    name: fextTrapSystemReboot
-    category: diagnostic
+    name: FORTINET-FORTIEXTENDER-MIB::fextTrapSystemReboot
+    category: state_change
     severity: notice
-    description: FortiExtender system reboot initiated on {fextInfoEXTDHostName}
-    mib: FORTINET-FORTIEXTENDER-MIB
+    description: "System reboot initiated on {SNMP_DEVICE_HOSTNAME}\n  hostname: {fextInfoEXTDHostName}"
     status: current
     varbinds:
     - fextInfoEXTDHostName
   - oid: 1.3.6.1.4.1.12356.121.100.102
-    name: fextTrapOSImageFallback
-    category: state_change
+    name: FORTINET-FORTIEXTENDER-MIB::fextTrapOSImageFallback
+    category: diagnostic
     severity: warning
-    description: FortiExtender {fextInfoEXTDHostName} started using fallback OS image on {SNMP_DEVICE_HOSTNAME}. Primary OS image may have failed to boot.
-    mib: FORTINET-FORTIEXTENDER-MIB
+    description: "FortiExtender {SNMP_DEVICE_HOSTNAME} started OS image fallback\n  hostname: {fextInfoEXTDHostName}"
     status: current
     varbinds:
     - fextInfoEXTDHostName
   - oid: 1.3.6.1.4.1.12356.121.100.103
-    name: fextTrapModeSwitch
+    name: FORTINET-FORTIEXTENDER-MIB::fextTrapModeSwitch
     category: state_change
     severity: notice
-    description: System networking mode switched on {fextInfoEXTDHostName}
-    mib: FORTINET-FORTIEXTENDER-MIB
+    description: FortiExtender {fextInfoEXTDHostName} switched networking mode on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - fextInfoEXTDHostName
   - oid: 1.3.6.1.4.1.12356.121.100.104
-    name: fextTrapFGTBackupModeSwitch
+    name: FORTINET-FORTIEXTENDER-MIB::fextTrapFGTBackupModeSwitch
     category: state_change
-    severity: warning
-    description: "FortiGate backup work mode activated on {fextInfoEXTDHostName}\n  This may indicate primary unit failure or planned failover"
-    mib: FORTINET-FORTIEXTENDER-MIB
+    severity: notice
+    description: "FortiGate backup mode switched on {SNMP_DEVICE_HOSTNAME}\n  hostname: {fextInfoEXTDHostName}"
     status: current
     varbinds:
     - fextInfoEXTDHostName
   - oid: 1.3.6.1.4.1.12356.121.100.201
-    name: fextTrapDataExhausted
-    category: diagnostic
+    name: FORTINET-FORTIEXTENDER-MIB::fextTrapDataExhausted
+    category: license
     severity: warning
     description: "Data plan exhausted on {SNMP_DEVICE_HOSTNAME}\n  hostname: {fextInfoEXTDHostName}"
-    mib: FORTINET-FORTIEXTENDER-MIB
     status: current
     varbinds:
     - fextInfoEXTDHostName
   - oid: 1.3.6.1.4.1.12356.121.100.202
-    name: fextTrapSessionDisconnect
+    name: FORTINET-FORTIEXTENDER-MIB::fextTrapSessionDisconnect
     category: state_change
     severity: warning
-    description: "LTE data session disconnected on {SNMP_DEVICE_HOSTNAME}\n  hostname: {fextInfoEXTDHostName}"
-    mib: FORTINET-FORTIEXTENDER-MIB
+    description: LTE data session disconnected on {fextInfoEXTDHostName}
     status: current
     varbinds:
     - fextInfoEXTDHostName
   - oid: 1.3.6.1.4.1.12356.121.100.203
-    name: fextTrapLowSignalStrength
-    category: state_change
+    name: FORTINET-FORTIEXTENDER-MIB::fextTrapLowSignalStrength
+    category: diagnostic
     severity: warning
-    description: "LTE signal strength is below threshold on {SNMP_DEVICE_HOSTNAME}\n  hostname: {fextInfoEXTDHostName}"
-    mib: FORTINET-FORTIEXTENDER-MIB
+    description: "Low LTE signal strength detected on {SNMP_DEVICE_HOSTNAME}\n  host: {fextInfoEXTDHostName}"
     status: current
     varbinds:
     - fextInfoEXTDHostName

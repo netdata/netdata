@@ -162,9 +162,6 @@ varbinds:
   dot11DisassociateStation:
     oid: 1.2.840.10036.1.1.1.16
     type: MacAddress
-  dot1agCfmMepHighestPrDefect:
-    oid: 1.3.111.2.802.1.1.8.1.7.1.1.13
-    type: Dot1agCfmHighestDefectPri
   dvmrpInterfaceLocalAddress:
     oid: 1.3.6.1.3.62.1.1.3.1.4
     type: IpAddress
@@ -188,54 +185,51 @@ varbinds:
   h221ErrorPerformance:
     oid: 1.3.6.1.3.221.2.1.6
     type: Counter32
-  ieee8021PbbTeProtectionGroupConfigCommandLast:
-    oid: 1.3.111.2.802.1.1.10.1.5.1.3
-    type: IEEE8021PbbTeProtectionGroupConfigAdmin
-  ieee8021PbbTeProtectionGroupConfigCommandStatus:
-    oid: 1.3.111.2.802.1.1.10.1.5.1.2
-    type: IEEE8021PbbTeProtectionGroupConfigAdmin
-  ieee8021PbbTeProtectionGroupConfigState:
-    oid: 1.3.111.2.802.1.1.10.1.5.1.1
-    type: INTEGER
-    enum:
-      '4': protAdmin
-      '2': protectionPat
-      '3': waitToRestore
-      '1': workingPath
-  ieee8021TeipsIpgConfigCommandLast:
-    oid: 1.3.111.2.802.1.1.24.1.4.1.3
-    type: IEEE8021TeipsIpgConfigAdmin
-  ieee8021TeipsIpgConfigCommandStatus:
-    oid: 1.3.111.2.802.1.1.24.1.4.1.2
-    type: IEEE8021TeipsIpgConfigAdmin
-  ieee8021TeipsIpgConfigState:
-    oid: 1.3.111.2.802.1.1.24.1.4.1.1
-    type: INTEGER
-    enum:
-      '4': protAdmin
-      '2': protectionSegment
-      '3': waitToRestore
-      '1': workingSegment
-  ieee8021TeipsV2IpgConfigCommandLast:
-    oid: 1.3.111.2.802.1.1.27.1.4.1.3
-    type: IEEE8021TeipsIpgConfigAdmin
-  ieee8021TeipsV2IpgConfigCommandStatus:
-    oid: 1.3.111.2.802.1.1.27.1.4.1.2
-    type: IEEE8021TeipsIpgConfigAdmin
-  ieee8021TeipsV2IpgConfigState:
-    oid: 1.3.111.2.802.1.1.27.1.4.1.1
-    type: INTEGER
-    enum:
-      '4': protAdmin
-      '2': protectionSegment
-      '3': waitToRestore
-      '1': workingSegment
   ifIndex:
     oid: 1.3.6.1.2.1.2.2.1.1
     type: InterfaceIndex
   ifName:
     oid: 1.3.6.1.2.1.31.1.1.1.1
     type: DisplayString
+  iscsiInstLastSsnFailureType:
+    oid: 1.3.6.1.3.9999.1.2.1.1.11
+    type: OCTET STRING
+  iscsiInstLastSsnRmtNodeName:
+    oid: 1.3.6.1.3.9999.1.2.1.1.12
+    type: IscsiName
+  iscsiInstSsnFailures:
+    oid: 1.3.6.1.3.9999.1.2.1.1.10
+    type: Counter
+  iscsiIntrLastFailureType:
+    oid: 1.3.6.1.3.9999.1.9.1.1.3
+    type: OCTET STRING
+  iscsiIntrLastTgtFailureAddr:
+    oid: 1.3.6.1.3.9999.1.9.1.1.6
+    type: InetAddress
+  iscsiIntrLastTgtFailureAddrType:
+    oid: 1.3.6.1.3.9999.1.9.1.1.5
+    type: InetAddressType
+  iscsiIntrLastTgtFailureName:
+    oid: 1.3.6.1.3.9999.1.9.1.1.4
+    type: IscsiName
+  iscsiIntrLoginFailures:
+    oid: 1.3.6.1.3.9999.1.9.1.1.1
+    type: Counter
+  iscsiTgtLastFailureType:
+    oid: 1.3.6.1.3.9999.1.7.1.1.3
+    type: OCTET STRING
+  iscsiTgtLastIntrFailureAddr:
+    oid: 1.3.6.1.3.9999.1.7.1.1.6
+    type: InetAddress
+  iscsiTgtLastIntrFailureAddrType:
+    oid: 1.3.6.1.3.9999.1.7.1.1.5
+    type: InetAddressType
+  iscsiTgtLastIntrFailureName:
+    oid: 1.3.6.1.3.9999.1.7.1.1.4
+    type: IscsiName
+  iscsiTgtLoginFailures:
+    oid: 1.3.6.1.3.9999.1.7.1.1.1
+    type: Counter
   isisAdjState:
     oid: 1.2.826.0.1.1578918.5.63.1.1.10.1.5
     type: INTEGER
@@ -389,18 +383,6 @@ varbinds:
   isisSysOperStatus:
     oid: 1.2.826.0.1.1578918.5.63.1.1.1.1.1.14
     type: IsisOperStatus
-  lldpV2StatsRemTablesAgeouts:
-    oid: 1.3.111.2.802.1.1.13.1.2.5
-    type: ZeroBasedCounter32
-  lldpV2StatsRemTablesDeletes:
-    oid: 1.3.111.2.802.1.1.13.1.2.3
-    type: ZeroBasedCounter32
-  lldpV2StatsRemTablesDrops:
-    oid: 1.3.111.2.802.1.1.13.1.2.4
-    type: ZeroBasedCounter32
-  lldpV2StatsRemTablesInserts:
-    oid: 1.3.111.2.802.1.1.13.1.2.2
-    type: ZeroBasedCounter32
   mplsInSegmentAdminStatus:
     oid: 1.3.6.1.3.96.1.3.1.10
     type: INTEGER
@@ -470,10 +452,10 @@ varbinds:
       '4': unknown
       '1': up
   msdpPeerFsmEstablishedTransitions:
-    oid: 1.3.6.1.3.92.1.1.5.1.15
+    oid: 1.3.6.1.3.92.1.3.1.15
     type: Counter32
   msdpPeerState:
-    oid: 1.3.6.1.3.92.1.1.5.1.3
+    oid: 1.3.6.1.3.92.1.3.1.3
     type: INTEGER
     enum:
       '3': connecting
@@ -848,21 +830,19 @@ varbinds:
       '1': up
 traps:
   - oid: 1.2.826.0.1.1578918.5.61.1.2.0.1
-    name: rtmOperStateChange
+    name: DC-RTM-MIB::rtmOperStateChange
     category: state_change
     severity: warning
-    description: "DC-RTM operational state changed on {SNMP_DEVICE_HOSTNAME}\n  FTE Index: {rtmTrapEntityFteIndex}\n  Operational Status: {rtmEntityOperStatus}"
-    mib: DC-RTM-MIB
+    description: "DC-RTM entity operational state changed on {SNMP_DEVICE_HOSTNAME}\n  entity index: {rtmTrapEntityFteIndex}\n  current status: {rtmEntityOperStatus}"
     status: current
     varbinds:
     - rtmTrapEntityFteIndex
     - rtmEntityOperStatus
   - oid: 1.2.826.0.1.1578918.5.61.1.2.0.2
-    name: rtmStaticRouteChange
+    name: DC-RTM-MIB::rtmStaticRouteChange
     category: state_change
-    severity: warning
-    description: "Static route state changed on {SNMP_DEVICE_HOSTNAME}\n  destination: {rtmTrapStaticRtDestAddr}/{rtmTrapStaticRtDestLen}\n  next-hop: {rtmTrapStaticRtNextHop}\n  interface ifIndex: {rtmTrapStaticRtIfIndex}\n  reason: {rtmStaticRtTrapReason}\n  BFD support: {rtmStaticRtBfdSupport}, BFD session status: {rtmStaticRtBfdStatus}"
-    mib: DC-RTM-MIB
+    severity: notice
+    description: "Static route eligibility changed on {SNMP_DEVICE_HOSTNAME}\n  destination: {rtmTrapStaticRtDestAddr}/{rtmTrapStaticRtDestLen}\n  next-hop: {rtmTrapStaticRtNextHop}\n  interface: {rtmTrapStaticRtIfIndex}\n  reason: {rtmStaticRtTrapReason}"
     status: current
     varbinds:
     - rtmTrapEntityFteIndex
@@ -876,11 +856,10 @@ traps:
     - rtmStaticRtBfdSupport
     - rtmStaticRtBfdStatus
   - oid: 1.2.826.0.1.1578918.5.61.1.2.0.3
-    name: rtmPathActivityChange
+    name: DC-RTM-MIB::rtmPathActivityChange
     category: state_change
-    severity: warning
-    description: "Routing path changed state on {SNMP_DEVICE_HOSTNAME}\n  FTE index: {rtmTrapEntityFteIndex}\n  destination: {rtmTrapRibDest}/{rtmTrapRibDestLen}\n  next hop: {rtmTrapRibNextHop}\n  interface: {rtmTrapRibIfIndex}\n  protocol: {rtmTrapRibProto}\n  reason: {rtmPathTrapReason}"
-    mib: DC-RTM-MIB
+    severity: notice
+    description: "Routing path activity changed on {SNMP_DEVICE_HOSTNAME}\n  destination: {rtmTrapRibDest}\n  next-hop: {rtmTrapRibNextHop}\n  interface: {rtmTrapRibIfIndex}\n  protocol: {rtmTrapRibProto}\n  reason: {rtmPathTrapReason}"
     status: current
     varbinds:
     - rtmTrapEntityFteIndex
@@ -895,33 +874,30 @@ traps:
     - rtmTrapRibRpmIndex
     - rtmPathTrapReason
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.1
-    name: isisDatabaseOverload
+    name: DC-ISIS-MIB::isisDatabaseOverload
     category: state_change
-    severity: err
-    description: "ISIS database entered or left Overload state on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  overload state: {isisSysLevelOverloadState}"
-    mib: DC-ISIS-MIB
+    severity: warning
+    description: "IS-IS system {isisNotificationSysInstance} level {isisNotificationSysLevelIndex} entered Overload state on {SNMP_DEVICE_HOSTNAME}\n  overload state: {isisSysLevelOverloadState}"
     status: current
     varbinds:
     - isisNotificationSysInstance
     - isisNotificationSysLevelIndex
     - isisSysLevelOverloadState
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.10
-    name: isisAttemptToExceedMaxSequence
+    name: DC-ISIS-MIB::isisAttemptToExceedMaxSequence
     category: state_change
     severity: notice
-    description: "ISIS LSP sequence number wrapped on {SNMP_DEVICE_HOSTNAME}, triggering purge and re-announcement.\n  Instance: {isisNotificationSysInstance}\n  Level Index: {isisNotificationSysLevelIndex}\n  LSP ID: {isisPduLspId}"
-    mib: DC-ISIS-MIB
+    description: "ISIS LSP sequence number wrap on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  LSP ID: {isisPduLspId}"
     status: current
     varbinds:
     - isisNotificationSysInstance
     - isisNotificationSysLevelIndex
     - isisPduLspId
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.11
-    name: isisSequenceNumberSkip
-    category: diagnostic
+    name: DC-ISIS-MIB::isisSequenceNumberSkip
+    category: state_change
     severity: warning
-    description: "ISIS sequence number skip detected on {SNMP_DEVICE_HOSTNAME}. The device received an LSP containing its own System ID with differing contents, indicating a duplicate System ID configuration.\n  Instance: {isisNotificationSysInstance}\n  Level: {isisNotificationSysLevelIndex}\n  Interface Index: {isisCircIfIndex}\n  LSP ID: {isisPduLspId}"
-    mib: DC-ISIS-MIB
+    description: "IS-IS sequence number skip detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  interface: {isisCircIfIndex}\n  LSP ID: {isisPduLspId}\n\nThis indicates a potential duplicate System ID or LSP inconsistency requiring sequence number increment."
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -929,11 +905,10 @@ traps:
     - isisCircIfIndex
     - isisPduLspId
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.12
-    name: isisCircIndTable
+    name: DC-ISIS-MIB::isisCircIndTable
     category: state_change
     severity: warning
-    description: "ISIS circuit state changed on {SNMP_DEVICE_HOSTNAME}\n  interface ifIndex: {isisCircIfIndex}\n  operational state: {isisCircOperState}\n  administrative state: {isisCircAdminState}\n  ISIS level: {isisCircLevel}\n  circuit existence: {isisCircExistState}"
-    mib: DC-ISIS-MIB
+    description: "IS-IS circuit state changed on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  interface ifIndex: {isisCircIfIndex}\n  operational state: {isisCircOperState}\n  administrative state: {isisCircAdminState}\n  existence state: {isisCircExistState}\n  IS-IS level: {isisCircLevel}\n  T1 timer running: {isisCircT1TimerRunning}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -944,11 +919,10 @@ traps:
     - isisCircT1TimerRunning
     - isisCircLevel
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.13
-    name: isisExtPassCircuitInd
+    name: DC-ISIS-MIB::isisExtPassCircuitInd
     category: state_change
     severity: warning
-    description: "IS-IS external/passive circuit operational state changed on {SNMP_DEVICE_HOSTNAME}\n  circuit ifIndex: {isisCircIfIndex}\n  operational state: {isisCircOperState}\n  existence state: {isisCircExistState}\n  admin state: {isisCircAdminState}\n  IS-IS level: {isisCircLevel}\n  instance: {isisNotificationSysInstance}"
-    mib: DC-ISIS-MIB
+    description: "IS-IS external/passive circuit operational state changed on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  interface ifIndex: {isisCircIfIndex}\n  operational state: {isisCircOperState}\n  circuit level: {isisCircLevel}\n  administrative state: {isisCircAdminState}\n  existence state: {isisCircExistState}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -958,21 +932,19 @@ traps:
     - isisCircOperState
     - isisCircLevel
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.14
-    name: isisOperStateChange
+    name: DC-ISIS-MIB::isisOperStateChange
     category: state_change
-    severity: warning
-    description: "IS-IS operational state changed on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  operational status: {isisSysOperStatus}"
-    mib: DC-ISIS-MIB
+    severity: alert
+    description: "IS-IS operational state change on {SNMP_DEVICE_HOSTNAME}\n  instance ID: {isisNotificationSysInstance}\n  operational status: {isisSysOperStatus}"
     status: current
     varbinds:
     - isisNotificationSysInstance
     - isisSysOperStatus
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.15
-    name: isisLspAuthFailure
-    category: auth
-    severity: warning
-    description: "IS-IS LSP authentication failure on {SNMP_DEVICE_HOSTNAME}\n  system instance: {isisNotificationSysInstance}\n  level index: {isisNotificationSysLevelIndex}\n  interface ifIndex: {isisCircIfIndex}\n  LSP ID: {isisPduLspId}"
-    mib: DC-ISIS-MIB
+    name: DC-ISIS-MIB::isisLspAuthFailure
+    category: security
+    severity: alert
+    description: "IS-IS LSP authentication failure on {SNMP_DEVICE_HOSTNAME}\n  SysInstance: {isisNotificationSysInstance}\n  Level Index: {isisNotificationSysLevelIndex}\n  Circuit ifIndex: {isisCircIfIndex}\n  LSP ID: {isisPduLspId}\n\nA received Link State PDU failed authentication, indicating potential unauthorized route injection."
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -980,11 +952,10 @@ traps:
     - isisCircIfIndex
     - isisPduLspId
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.16
-    name: isisHelloAuthFailure
+    name: DC-ISIS-MIB::isisHelloAuthFailure
     category: auth
-    severity: err
-    description: "IS-IS Hello authentication failure on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  system level: {isisNotificationSysLevelIndex}\n  interface (ifIndex): {isisCircIfIndex}\n  neighbor system ID: {isisNotificationNeighSysID}"
-    mib: DC-ISIS-MIB
+    severity: warning
+    description: "IS-IS authentication failure on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  interface: {isisCircIfIndex}\n  neighbor sysID: {isisNotificationNeighSysID}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -992,22 +963,20 @@ traps:
     - isisCircIfIndex
     - isisNotificationNeighSysID
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.17
-    name: isisAttachedStateChange
+    name: DC-ISIS-MIB::isisAttachedStateChange
     category: state_change
-    severity: warning
-    description: "ISIS Attached state changed on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  MT-ID: {isisNotificationMtId}\n  attached state: {isisNotificationAttachedState}"
-    mib: DC-ISIS-MIB
+    severity: notice
+    description: "IS-IS Attached state changed on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  topology ID: {isisNotificationMtId}\n  state: {isisNotificationAttachedState}"
     status: current
     varbinds:
     - isisNotificationSysInstance
     - isisNotificationMtId
     - isisNotificationAttachedState
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.18
-    name: isisDisChange
+    name: DC-ISIS-MIB::isisDisChange
     category: state_change
     severity: notice
-    description: "IS-IS DIS changed on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  interface ifIndex: {isisCircIfIndex}\n  DIS state: {isisNotificationDisState}\n  LAN Designated IS ID: {isisCircLevelDesIS}"
-    mib: DC-ISIS-MIB
+    description: "IS-IS DIS changed on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  interface: {isisCircIfIndex}\n  new DIS state: {isisNotificationDisState}\n  DIS ID: {isisCircLevelDesIS}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -1016,21 +985,19 @@ traps:
     - isisNotificationDisState
     - isisCircLevelDesIS
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.2
-    name: isisManualAddressDrops
+    name: DC-ISIS-MIB::isisManualAddressDrops
     category: state_change
-    severity: notice
-    description: "ISIS manual area address dropped from route computation on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  dropped area address: {isisNotificationAreaAddress}"
-    mib: DC-ISIS-MIB
+    severity: warning
+    description: "IS-IS manual area address {isisNotificationAreaAddress} dropped for instance {isisNotificationSysInstance} on {SNMP_DEVICE_HOSTNAME}\n  This indicates a routing computation change where a configured area address was ignored."
     status: current
     varbinds:
     - isisNotificationSysInstance
     - isisNotificationAreaAddress
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.3
-    name: isisIDLenMismatch
+    name: DC-ISIS-MIB::isisIDLenMismatch
     category: state_change
     severity: warning
-    description: "IS-IS System ID length mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  expected ID length vs received: see {isisPduFieldLen}\n  circuit ifIndex: {isisCircIfIndex}\n  PDU fragment: {isisPduFragment}"
-    mib: DC-ISIS-MIB
+    description: "IS-IS protocol error on {SNMP_DEVICE_HOSTNAME}: received PDU with mismatched System ID Length on circuit {isisCircIfIndex}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  reported length: {isisPduFieldLen}\n  PDU header: {isisPduFragment}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -1039,11 +1006,10 @@ traps:
     - isisCircIfIndex
     - isisPduFragment
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.4
-    name: isisMaxAreaAddressesMismatch
+    name: DC-ISIS-MIB::isisMaxAreaAddressesMismatch
     category: state_change
     severity: warning
-    description: "IS-IS Maximum Area Addresses mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  reported max area addresses: {isisPduMaxAreaAddress}\n  interface (ifIndex): {isisCircIfIndex}\n  PDU fragment: {isisPduFragment}"
-    mib: DC-ISIS-MIB
+    description: "IS-IS adjacency mismatch on {SNMP_DEVICE_HOSTNAME}\n  Instance: {isisNotificationSysInstance}\n  Level: {isisNotificationSysLevelIndex}\n  Interface: {isisCircIfIndex}\n  Max Area Addresses in PDU: {isisPduMaxAreaAddress}\n  PDU Header: {isisPduFragment}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -1052,11 +1018,10 @@ traps:
     - isisCircIfIndex
     - isisPduFragment
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.5
-    name: isisOwnLSPPurge
-    category: diagnostic
+    name: DC-ISIS-MIB::isisOwnLSPPurge
+    category: state_change
     severity: warning
-    description: "ISIS received own LSP with zero age on {SNMP_DEVICE_HOSTNAME}, indicating potential system-ID confusion\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  circuit ifIndex: {isisCircIfIndex}\n  LSP ID: {isisPduLspId}"
-    mib: DC-ISIS-MIB
+    description: "IS-IS LSP purge detected on {SNMP_DEVICE_HOSTNAME}\n  Instance: {isisNotificationSysInstance}\n  Level: {isisNotificationSysLevelIndex}\n  Interface: {isisCircIfIndex}\n  LSP ID: {isisPduLspId}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -1064,22 +1029,20 @@ traps:
     - isisCircIfIndex
     - isisPduLspId
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.6
-    name: isisAreaMismatch
+    name: DC-ISIS-MIB::isisAreaMismatch
     category: state_change
     severity: warning
-    description: "ISIS area mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  An IS-IS Hello PDU was received from a neighbor that shares no common area address.\n  Instance: {isisNotificationSysInstance}\n  Interface ifIndex: {isisCircIfIndex}\n  PDU fragment (first 64 bytes): {isisPduFragment}\n  Adjacency cannot be established until area addressing is reconciled."
-    mib: DC-ISIS-MIB
+    description: "IS-IS area mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  IS-IS instance: {isisNotificationSysInstance}\n  Interface: {isisCircIfIndex}\n  PDU fragment: {isisPduFragment}"
     status: current
     varbinds:
     - isisNotificationSysInstance
     - isisCircIfIndex
     - isisPduFragment
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.7
-    name: isisRejectedAdjacency
+    name: DC-ISIS-MIB::isisRejectedAdjacency
     category: state_change
     severity: warning
-    description: "ISIS adjacency rejected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  system level: {isisNotificationSysLevelIndex}\n  interface ifIndex: {isisCircIfIndex}\n  triggering PDU fragment: {isisPduFragment}"
-    mib: DC-ISIS-MIB
+    description: "IS-IS adjacency rejected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  interface: {isisCircIfIndex}\n  PDU fragment: {isisPduFragment}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -1087,11 +1050,10 @@ traps:
     - isisCircIfIndex
     - isisPduFragment
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.8
-    name: isisAdjacencyChange
+    name: DC-ISIS-MIB::isisAdjacencyChange
     category: state_change
-    severity: warning
-    description: "ISIS adjacency state changed on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  interface ifIndex: {isisCircIfIndex}\n  neighbor SystemID: {isisPduLspId} (first 6 bytes)\n  adjacency state: {isisAdjState}\n  neighbor SNPA: {isisISAdjNeighSNPAAddress}"
-    mib: DC-ISIS-MIB
+    severity: notice
+    description: "IS-IS adjacency state change on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  interface: {isisCircIfIndex}\n  neighbor SNPA: {isisISAdjNeighSNPAAddress}\n  new state: {isisAdjState}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -1102,11 +1064,10 @@ traps:
     - isisNotificationISAdjIndex
     - isisISAdjNeighSNPAAddress
   - oid: 1.2.826.0.1.1578918.5.63.1.2.0.9
-    name: isisLSPErrorDetected
+    name: DC-ISIS-MIB::isisLSPErrorDetected
     category: diagnostic
     severity: err
-    description: "Malformed IS-IS LSP detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  LSP ID: {isisPduLspId}\n  interface (ifIndex): {isisCircIfIndex}\n  PDU fragment: {isisPduFragment}\n  error offset: {isisErrorOffset}\n  malformed TLV type: {isisErrorTLVType}"
-    mib: DC-ISIS-MIB
+    description: "Malformed IS-IS LSP detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisNotificationSysInstance}\n  level: {isisNotificationSysLevelIndex}\n  LSP ID: {isisPduLspId}\n  circuit ifIndex: {isisCircIfIndex}\n  error offset: {isisErrorOffset}\n  malformed TLV type: {isisErrorTLVType}\n  PDU fragment (first 64 bytes): {isisPduFragment}"
     status: current
     varbinds:
     - isisNotificationSysInstance
@@ -1117,11 +1078,10 @@ traps:
     - isisErrorOffset
     - isisErrorTLVType
   - oid: 1.2.826.0.1.1578918.5.65.1.1.0.1
-    name: bgpTrapData
+    name: DC-BGP-MIB::bgpTrapData
     category: state_change
     severity: notice
-    description: "BGP peer state change on {SNMP_DEVICE_HOSTNAME}\n  local address: {bgpNotifPeerLocalAddrType} {bgpNotifPeerLocalAddr}:{bgpNotifPeerLocalPort}\n  remote address: {bgpNotifPeerRemoteAddrType} {bgpNotifPeerRemoteAddr}:{bgpNotifPeerRemotePort}\n  peer state: {bgpPeerState}\n  last error: {bgpPeerLastError}\n  last failure cause: {bgpPeerLastFailureCause}\n  restart status: {bgpPeerRstrStatus}"
-    mib: DC-BGP-MIB
+    description: "BGP peer state change on {SNMP_DEVICE_HOSTNAME}\n  peer address: {bgpNotifPeerRemoteAddr}\n  local address: {bgpNotifPeerLocalAddr}\n  current state: {bgpPeerState}\n  last error: {bgpPeerLastError}\n  restart status: {bgpPeerRstrStatus}"
     status: current
     varbinds:
     - bgpNotifPeerLocalAddr
@@ -1138,21 +1098,19 @@ traps:
     - bgpNotifPeerLocalAddrScopeId
     - bgpPeerRstrStatus
   - oid: 1.2.826.0.1.1578918.5.65.1.1.0.2
-    name: bgpEntTrapData
+    name: DC-BGP-MIB::bgpEntTrapData
     category: state_change
     severity: warning
-    description: "BGP RIB Manager entity operational state changed on {SNMP_DEVICE_HOSTNAME}\n  rmEntIndex: {bgpNotifRmEntIndex}\n  operational status: {bgpRmEntOperStatus}"
-    mib: DC-BGP-MIB
+    description: "BGP RIB Manager entity state changed on {SNMP_DEVICE_HOSTNAME}\n  entity index: {bgpNotifRmEntIndex}\n  operational status: {bgpRmEntOperStatus}"
     status: current
     varbinds:
     - bgpNotifRmEntIndex
     - bgpRmEntOperStatus
   - oid: 1.2.826.0.1.1578918.5.65.1.1.0.3
-    name: bgpPeerSessionEstablished
+    name: DC-BGP-MIB::bgpPeerSessionEstablished
     category: state_change
     severity: info
-    description: "BGP peer session established on {SNMP_DEVICE_HOSTNAME}\n  local: {bgpNotifPeerLocalAddrType} {bgpNotifPeerLocalAddr}:{bgpNotifPeerLocalPort}\n  remote: {bgpNotifPeerRemoteAddrType} {bgpNotifPeerRemoteAddr}:{bgpNotifPeerRemotePort}\n  state: {bgpPeerState}\n  last error: {bgpPeerLastError}"
-    mib: DC-BGP-MIB
+    description: "BGP peer session established on {SNMP_DEVICE_HOSTNAME}\n  local address: {bgpNotifPeerLocalAddr}\n  remote address: {bgpNotifPeerRemoteAddr}\n  peer state: {bgpPeerState}"
     status: current
     varbinds:
     - bgpNotifPeerLocalAddr
@@ -1169,11 +1127,10 @@ traps:
     - bgpNotifPeerLocalAddrScopeId
     - bgpPeerRstrStatus
   - oid: 1.2.826.0.1.1578918.5.65.1.1.0.4
-    name: bgpPeerSessionBackward
+    name: DC-BGP-MIB::bgpPeerSessionBackward
     category: state_change
     severity: warning
-    description: "BGP peer session backward transition on {SNMP_DEVICE_HOSTNAME}\n  local address: {bgpNotifPeerLocalAddr} ({bgpNotifPeerLocalAddrType})\n  remote address: {bgpNotifPeerRemoteAddr} ({bgpNotifPeerRemoteAddrType})\n  current state: {bgpPeerState}\n  last error: {bgpPeerLastError}\n  failure cause: {bgpPeerLastFailureCause}"
-    mib: DC-BGP-MIB
+    description: "BGP peer session backward transition on {SNMP_DEVICE_HOSTNAME}\n  peer: {bgpNotifPeerRemoteAddr} (remote) / {bgpNotifPeerLocalAddr} (local)\n  current state: {bgpPeerState}\n  failure cause: {bgpPeerLastFailureCause}\n  last error: {bgpPeerLastError}"
     status: current
     varbinds:
     - bgpNotifPeerLocalAddr
@@ -1190,11 +1147,10 @@ traps:
     - bgpNotifPeerLocalAddrScopeId
     - bgpPeerRstrStatus
   - oid: 1.2.826.0.1.1578918.5.65.1.1.0.5
-    name: bgpPeerAfiSafiMaxPrefix
+    name: DC-BGP-MIB::bgpPeerAfiSafiMaxPrefix
     category: state_change
-    severity: err
-    description: "BGP peer reached maximum prefix limit for an AFI/SAFI on {SNMP_DEVICE_HOSTNAME}\n  local address: {bgpNotifPeerLocalAddrType} {bgpNotifPeerLocalAddr}:{bgpNotifPeerLocalPort}\n  remote address: {bgpNotifPeerRemoteAddrType} {bgpNotifPeerRemoteAddr}:{bgpNotifPeerRemotePort}\n  peer state: {bgpPeerState}\n  last error: {bgpPeerLastError}\n  failure cause: {bgpPeerLastFailureCause}"
-    mib: DC-BGP-MIB
+    severity: warning
+    description: "BGP peer {bgpNotifPeerRemoteAddr} reached maximum prefix limit on {SNMP_DEVICE_HOSTNAME}\n  local address: {bgpNotifPeerLocalAddr}\n  peer state: {bgpPeerState}\n  last failure cause: {bgpPeerLastFailureCause}"
     status: current
     varbinds:
     - bgpNotifPeerLocalAddr
@@ -1211,11 +1167,10 @@ traps:
     - bgpNotifPeerLocalAddrScopeId
     - bgpPeerRstrStatus
   - oid: 1.2.826.0.1.1578918.5.65.1.1.0.6
-    name: bgpPeerAfiSafiPrefixThreshold
+    name: DC-BGP-MIB::bgpPeerAfiSafiPrefixThreshold
     category: state_change
     severity: warning
     description: "BGP prefix threshold breached on {SNMP_DEVICE_HOSTNAME}\n  Local address: {bgpNotifPeerLocalAddrType} {bgpNotifPeerLocalAddr}\n  Remote address: {bgpNotifPeerRemoteAddrType} {bgpNotifPeerRemoteAddr}\n  Local port: {bgpNotifPeerLocalPort}\n  Remote port: {bgpNotifPeerRemotePort}\n  Peer state: {bgpPeerState}\n  Last error: {bgpPeerLastError}\n  Failure cause: {bgpPeerLastFailureCause}\n  Restart status: {bgpPeerRstrStatus}"
-    mib: DC-BGP-MIB
     status: current
     varbinds:
     - bgpNotifPeerLocalAddr
@@ -1232,21 +1187,19 @@ traps:
     - bgpNotifPeerLocalAddrScopeId
     - bgpPeerRstrStatus
   - oid: 1.2.826.0.1.1578918.5.65.1.1.0.7
-    name: bgpEntOperStatusChange
+    name: DC-BGP-MIB::bgpEntOperStatusChange
     category: state_change
     severity: warning
-    description: "BGP RIB Manager operational state changed on {SNMP_DEVICE_HOSTNAME}\n  entity index: {bgpNotifRmEntIndex}\n  operational status: {bgpRmEntOperStatus}"
-    mib: DC-BGP-MIB
+    description: BGP RIB Manager entity {bgpNotifRmEntIndex} operational status changed to {bgpRmEntOperStatus} on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - bgpNotifRmEntIndex
     - bgpRmEntOperStatus
   - oid: 1.2.826.0.1.1578918.5.65.1.1.0.8
-    name: bgpEntRestartHelperChange
+    name: DC-BGP-MIB::bgpEntRestartHelperChange
     category: state_change
     severity: notice
-    description: "BGP graceful restart helper state changed on {SNMP_DEVICE_HOSTNAME}\n  local address: {bgpNotifPeerLocalAddrType} {bgpNotifPeerLocalAddr}\n  remote address: {bgpNotifPeerRemoteAddrType} {bgpNotifPeerRemoteAddr}\n  peer state: {bgpPeerState}\n  restart status: {bgpPeerRstrStatus}\n  last error: {bgpPeerLastError}\n  last failure cause: {bgpPeerLastFailureCause}"
-    mib: DC-BGP-MIB
+    description: "BGP Graceful Restart helper state changed for peer {bgpNotifPeerRemoteAddr} on {SNMP_DEVICE_HOSTNAME}\n  local address: {bgpNotifPeerLocalAddr}\n  peer state: {bgpPeerState}\n  restart status: {bgpPeerRstrStatus}"
     status: current
     varbinds:
     - bgpNotifPeerLocalAddr
@@ -1263,185 +1216,102 @@ traps:
     - bgpNotifPeerLocalAddrScopeId
     - bgpPeerRstrStatus
   - oid: 1.2.840.10006.300.43.0.1
-    name: dot3adAggLinkUpNotification
+    name: IEEE8023-LAG-MIB::dot3adAggLinkUpNotification
     category: state_change
     severity: info
-    description: Link aggregation aggregator link up on {SNMP_DEVICE_HOSTNAME}
-    mib: IEEE8023-LAG-MIB
+    description: Link aggregation aggregator went up on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.2.840.10006.300.43.0.2
-    name: dot3adAggLinkDownNotification
+    name: IEEE8023-LAG-MIB::dot3adAggLinkDownNotification
     category: state_change
     severity: warning
-    description: Link Aggregation (IEEE 802.1AX) aggregator state changed to down on {SNMP_DEVICE_HOSTNAME}. The notification indicates the Operational State of the Aggregator transitioned from 'up' to 'down'. Check aggregated port members and underlying physical links.
-    mib: IEEE8023-LAG-MIB
+    description: Link aggregation group aggregator went down on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.2.840.10036.1.6.0.1
-    name: dot11Disassociate
+    name: IEEE802dot11-MIB::dot11Disassociate
     category: state_change
-    severity: info
-    description: "Wireless station disassociated from {SNMP_DEVICE_HOSTNAME}\n  ifIndex: {ifIndex}\n  station MAC: {dot11DisassociateStation}\n  reason code: {dot11DisassociateReason}"
-    mib: IEEE802dot11-MIB
+    severity: notice
+    description: "802.11 station disassociated on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifIndex}\n  station MAC: {dot11DisassociateStation}\n  reason: {dot11DisassociateReason}"
     status: current
     varbinds:
     - ifIndex
     - dot11DisassociateReason
     - dot11DisassociateStation
   - oid: 1.2.840.10036.1.6.0.2
-    name: dot11Deauthenticate
+    name: IEEE802dot11-MIB::dot11Deauthenticate
     category: state_change
-    severity: warning
-    description: "Wireless client deauthenticated on {SNMP_DEVICE_HOSTNAME}\n  interface: ifIndex {ifIndex}\n  station MAC: {dot11DeauthenticateStation}\n  reason code: {dot11DeauthenticateReason}"
-    mib: IEEE802dot11-MIB
+    severity: notice
+    description: "802.11 station deauthenticated on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifIndex}\n  station MAC: {dot11DeauthenticateStation}\n  reason: {dot11DeauthenticateReason}"
     status: current
     varbinds:
     - ifIndex
     - dot11DeauthenticateReason
     - dot11DeauthenticateStation
   - oid: 1.2.840.10036.1.6.0.3
-    name: dot11AuthenticateFail
+    name: IEEE802dot11-MIB::dot11AuthenticateFail
     category: auth
-    severity: info
-    description: "IEEE 802.11 authentication failure on {SNMP_DEVICE_HOSTNAME}\n  interface: ifIndex {ifIndex}\n  station MAC: {dot11AuthenticateFailStation}\n  status code: {dot11AuthenticateFailStatus}"
-    mib: IEEE802dot11-MIB
+    severity: warning
+    description: "802.11 authentication failure on {SNMP_DEVICE_HOSTNAME}\n  station MAC: {dot11AuthenticateFailStation}\n  interface: {ifIndex}\n  status code: {dot11AuthenticateFailStatus}"
     status: current
     varbinds:
     - ifIndex
     - dot11AuthenticateFailStatus
     - dot11AuthenticateFailStation
-  - oid: 1.3.111.2.802.1.1.10.0.1
-    name: ieee8021PbbTeProtectionGroupAdminFailure
-    category: state_change
-    severity: err
-    description: "PBB-TE protection group admin command failed on {SNMP_DEVICE_HOSTNAME}\n  current state: {ieee8021PbbTeProtectionGroupConfigState}\n  command status: {ieee8021PbbTeProtectionGroupConfigCommandStatus}\n  last attempted command: {ieee8021PbbTeProtectionGroupConfigCommandLast}"
-    mib: IEEE8021-PBBTE-MIB
-    status: current
-    varbinds:
-    - ieee8021PbbTeProtectionGroupConfigState
-    - ieee8021PbbTeProtectionGroupConfigCommandStatus
-    - ieee8021PbbTeProtectionGroupConfigCommandLast
-  - oid: 1.3.111.2.802.1.1.13.0.0.1
-    name: lldpV2RemTablesChange
-    category: diagnostic
-    severity: info
-    description: "LLDP remote systems table changed on {SNMP_DEVICE_HOSTNAME}\n  inserts: {lldpV2StatsRemTablesInserts}\n  deletes: {lldpV2StatsRemTablesDeletes}\n  drops: {lldpV2StatsRemTablesDrops}\n  ageouts: {lldpV2StatsRemTablesAgeouts}"
-    mib: LLDP-V2-MIB
-    status: current
-    varbinds:
-    - lldpV2StatsRemTablesInserts
-    - lldpV2StatsRemTablesDeletes
-    - lldpV2StatsRemTablesDrops
-    - lldpV2StatsRemTablesAgeouts
-  - oid: 1.3.111.2.802.1.1.24.0.1
-    name: ieee8021TeipsIpgAdminFailure
-    category: diagnostic
-    severity: warning
-    description: "Administrative command failed on {SNMP_DEVICE_HOSTNAME} protection group\n  last command attempted: {ieee8021TeipsIpgConfigCommandLast}\n  command status: {ieee8021TeipsIpgConfigCommandStatus}\n  current state: {ieee8021TeipsIpgConfigState}\n  Possible cause: signal failure condition preventing manual switch"
-    mib: IEEE8021-TEIPS-MIB
-    status: current
-    varbinds:
-    - ieee8021TeipsIpgConfigState
-    - ieee8021TeipsIpgConfigCommandStatus
-    - ieee8021TeipsIpgConfigCommandLast
-  - oid: 1.3.111.2.802.1.1.27.0.1
-    name: ieee8021TeipsV2IpgAdminFailure
-    category: diagnostic
-    severity: notice
-    description: "Administrative command failed on {SNMP_DEVICE_HOSTNAME} for IPG protection group\n  last command attempted: {ieee8021TeipsV2IpgConfigCommandLast}\n  command status: {ieee8021TeipsV2IpgConfigCommandStatus}\n  current IPG state: {ieee8021TeipsV2IpgConfigState}"
-    mib: IEEE8021-TEIPS-V2-MIB
-    status: current
-    varbinds:
-    - ieee8021TeipsV2IpgConfigState
-    - ieee8021TeipsV2IpgConfigCommandStatus
-    - ieee8021TeipsV2IpgConfigCommandLast
-  - oid: 1.3.111.2.802.1.1.3.0.1
-    name: ieee8021SpanningTreeNewRoot
-    category: mobility
-    severity: notice
-    description: Device {SNMP_DEVICE_HOSTNAME} elected as new STP root bridge
-    mib: IEEE8021-SPANNING-TREE-MIB
-    status: current
-  - oid: 1.3.111.2.802.1.1.3.0.2
-    name: ieee8021SpanningTreeTopologyChange
-    category: state_change
-    severity: notice
-    description: Spanning Tree topology change detected on {SNMP_DEVICE_HOSTNAME}. One or more ports transitioned between STP port states (Learning/Forwarding/Blocking).
-    mib: IEEE8021-SPANNING-TREE-MIB
-    status: current
-  - oid: 1.3.111.2.802.1.1.8.0.1
-    name: dot1agCfmFaultAlarm
-    category: diagnostic
-    severity: warning
-    description: "Connectivity Fault Management fault alarm on {SNMP_DEVICE_HOSTNAME}\n  A MEP has detected a persistent defect condition.\n  Highest priority defect: {dot1agCfmMepHighestPrDefect}\n\nThis indicates a connectivity problem detected by IEEE 802.1Q CFM (e.g., erroneous MAC, wrong VLAN assignment, loopback failure, or similar defect) that has persisted since the Fault Notification Generator State Machine was last reset."
-    mib: IEEE8021-CFM-MIB
-    status: current
-    varbinds:
-    - dot1agCfmMepHighestPrDefect
   - oid: 1.3.6.1.3.118.0.1
-    name: mplsVrfIfUp
+    name: MPLS-VPN-MIB::mplsVrfIfUp
     category: state_change
-    severity: notice
-    description: Interface associated with a VRF transitioned to up state on {SNMP_DEVICE_HOSTNAME}
-    mib: MPLS-VPN-MIB
+    severity: info
+    description: MPLS VRF interface transitioned to up state on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.3.118.0.2
-    name: mplsVrfIfDown
+    name: MPLS-VPN-MIB::mplsVrfIfDown
     category: state_change
     severity: warning
-    description: An interface associated with a VRF went down or was disassociated from the VRF on {SNMP_DEVICE_HOSTNAME}
-    mib: MPLS-VPN-MIB
+    description: VRF-associated interface went down or was disassociated from a VRF on {SNMP_DEVICE_HOSTNAME}. Either the interface operational status changed to down(1), or an interface previously associated with the VRF was removed.
     status: current
   - oid: 1.3.6.1.3.118.0.3
-    name: mplsNumVrfRouteMidThreshExceeded
-    category: diagnostic
-    severity: warning
-    description: VRF route count exceeded mid-route threshold on {SNMP_DEVICE_HOSTNAME}. Notification mplsNumVrfRouteMidThreshExceeded indicates the number of routes in the VRF has surpassed the configured mplsVrfMidRouteThreshold value.
-    mib: MPLS-VPN-MIB
-    status: current
-  - oid: 1.3.6.1.3.118.0.4
-    name: mplsNumVrfRouteMaxThreshExceeded
+    name: MPLS-VPN-MIB::mplsNumVrfRouteMidThreshExceeded
     category: state_change
     severity: warning
-    description: "VRF on {SNMP_DEVICE_HOSTNAME} has reached or attempted to exceed its maximum route threshold.\n  This may indicate a VRF is approaching capacity and routing could be impacted."
-    mib: MPLS-VPN-MIB
+    description: "MPLS VRF route count exceeded mid-threshold on {SNMP_DEVICE_HOSTNAME}\n  The number of routes in the VRF has exceeded the configured threshold."
+    status: current
+  - oid: 1.3.6.1.3.118.0.4
+    name: MPLS-VPN-MIB::mplsNumVrfRouteMaxThreshExceeded
+    category: state_change
+    severity: warning
+    description: "VRF route count threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  The number of routes in the specified VRF has reached or attempted to exceed the maximum allowed value (mplsVrfMaxRouteThreshold)."
     status: current
   - oid: 1.3.6.1.3.118.0.5
-    name: mplsNumVrfSecIllegalLabelThreshExceeded
+    name: MPLS-VPN-MIB::mplsNumVrfSecIllegalLabelThreshExceeded
     category: security
     severity: warning
-    description: 'MPLS VPN security violation on {SNMP_DEVICE_HOSTNAME}: number of illegal label violations on a VRF has exceeded the configured threshold.
-  
-      This may indicate label spoofing or injection attacks targeting the MPLS infrastructure.'
-    mib: MPLS-VPN-MIB
+    description: "MPLS VRF illegal label threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  The number of illegal label violations has surpassed the configured threshold, indicating potential security or configuration issues in the MPLS VPN environment."
     status: current
   - oid: 1.3.6.1.3.126.0.0.1
-    name: smfNotifAdminStatusChange
-    category: config_change
+    name: SMF-MIB::smfNotifAdminStatusChange
+    category: state_change
     severity: notice
-    description: "SMF (Simplified Multicast Forwarding) administrative status changed on {SNMP_DEVICE_HOSTNAME}\n  router ID: {smfCfgRouterID}\n  address type: {smfCfgRouterIDAddrType}\n  new admin status: {smfCfgAdminStatus}"
-    mib: SMF-MIB
+    description: "SMF process administrative status changed on {SNMP_DEVICE_HOSTNAME}\n  Router ID: {smfCfgRouterID} (type: {smfCfgRouterIDAddrType})\n  New admin status: {smfCfgAdminStatus}"
     status: current
     varbinds:
     - smfCfgRouterIDAddrType
     - smfCfgRouterID
     - smfCfgAdminStatus
   - oid: 1.3.6.1.3.126.0.0.2
-    name: smfNotifConfiguredOpModeChange
-    category: state_change
-    severity: info
-    description: "SMF operational mode changed on {SNMP_DEVICE_HOSTNAME}\n  router ID address type: {smfCfgRouterIDAddrType}\n  router ID: {smfCfgRouterID}\n  new operational mode: {smfCfgOperationalMode}"
-    mib: SMF-MIB
+    name: SMF-MIB::smfNotifConfiguredOpModeChange
+    category: config_change
+    severity: notice
+    description: "SMF operational mode changed on {SNMP_DEVICE_HOSTNAME}\n  Router ID type: {smfCfgRouterIDAddrType}\n  Router ID: {smfCfgRouterID}\n  New operational mode: {smfCfgOperationalMode}"
     status: current
     varbinds:
     - smfCfgRouterIDAddrType
     - smfCfgRouterID
     - smfCfgOperationalMode
   - oid: 1.3.6.1.3.126.0.0.3
-    name: smfNotifIfAdminStatusChange
+    name: SMF-MIB::smfNotifIfAdminStatusChange
     category: state_change
     severity: notice
-    description: "SMF interface administrative status changed on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifName}\n  router ID: {smfCfgRouterID} ({smfCfgRouterIDAddrType})\n  new admin status: {smfCfgIfAdminStatus}"
-    mib: SMF-MIB
+    description: "SMF interface administrative status changed on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifName}\n  router ID: {smfCfgRouterID} (type: {smfCfgRouterIDAddrType})\n  new admin status: {smfCfgIfAdminStatus}"
     status: current
     varbinds:
     - smfCfgRouterIDAddrType
@@ -1449,42 +1319,38 @@ traps:
     - ifName
     - smfCfgIfAdminStatus
   - oid: 1.3.6.1.3.126.0.0.4
-    name: smfNotifDpdMemoryOverflowEvent
+    name: SMF-MIB::smfNotifDpdMemoryOverflowEvent
     category: diagnostic
     severity: warning
-    description: "SMF Duplicate Packet Detection (DPD) memory overflow threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  Router ID address type: {smfCfgRouterIDAddrType}\n  Router ID: {smfCfgRouterID}\n  Memory overflow count: {smfStateDpdMemoryOverflow}\n\nDPD records have been flushed to prevent memory overrun."
-    mib: SMF-MIB
+    description: "SMF DPD memory overflow detected on {SNMP_DEVICE_HOSTNAME}\n  Router ID: {smfCfgRouterID} (type: {smfCfgRouterIDAddrType})\n  Flushed records: {smfStateDpdMemoryOverflow}"
     status: current
     varbinds:
     - smfCfgRouterIDAddrType
     - smfCfgRouterID
     - smfStateDpdMemoryOverflow
   - oid: 1.3.6.1.3.221.2.2.1
-    name: h221TooManyErrors
+    name: H221-MIB::h221TooManyErrors
     category: diagnostic
     severity: warning
-    description: "Excessive line errors detected on {SNMP_DEVICE_HOSTNAME}\n  error performance counter: {h221ErrorPerformance}\n  H.221 protocol reporting high CRC block error rate"
-    mib: H221-MIB
+    description: "Excessive line errors detected on {SNMP_DEVICE_HOSTNAME}\n  error count: {h221ErrorPerformance}"
     status: current
     varbinds:
     - h221ErrorPerformance
   - oid: 1.3.6.1.3.37.2.0.1
-    name: isisD13DatabaseOverload
+    name: ISIS-D13-MIB::isisD13DatabaseOverload
     category: state_change
-    severity: crit
-    description: "IS-IS database overload state changed on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  overload state: {isisD13SysLevelOverloadState}\n\nNote: An overloaded database indicates the system is low on essential resources (e.g., memory) and may have reduced routing capability."
-    mib: ISIS-D13-MIB
+    severity: warning
+    description: "IS-IS router {SNMP_DEVICE_HOSTNAME} entered Overload state\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  overload state: {isisD13SysLevelOverloadState}"
     status: current
     varbinds:
     - isisD13SysInstance
     - isisD13SysLevelIndex
     - isisD13SysLevelOverloadState
   - oid: 1.3.6.1.3.37.2.0.10
-    name: isisD13AuthenticationFailure
+    name: ISIS-D13-MIB::isisD13AuthenticationFailure
     category: auth
     severity: warning
-    description: "IS-IS authentication failure on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface (ifIndex): {isisD13CircIfIndex}\n  PDU fragment (first 64 bytes): {isisD13PduFragment}"
-    mib: ISIS-D13-MIB
+    description: "IS-IS authentication failure on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface: {isisD13CircIfIndex}\n  PDU fragment: {isisD13PduFragment}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1492,11 +1358,10 @@ traps:
     - isisD13CircIfIndex
     - isisD13PduFragment
   - oid: 1.3.6.1.3.37.2.0.11
-    name: isisD13VersionSkew
+    name: ISIS-D13-MIB::isisD13VersionSkew
     category: state_change
     severity: warning
-    description: "IS-IS version skew detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface (ifIndex): {isisD13CircIfIndex}\n  remote protocol version: {isisD13PduProtocolVersion}\n  PDU fragment: {isisD13PduFragment}\n\nA Hello PDU was received from a neighbor running a different IS-IS protocol version. This may prevent adjacency formation or cause routing issues."
-    mib: ISIS-D13-MIB
+    description: "IS-IS protocol version mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  Instance: {isisD13SysInstance}\n  Level: {isisD13SysLevelIndex}\n  Interface: {isisD13CircIfIndex}\n  Received PDU version: {isisD13PduProtocolVersion}\n  PDU header: {isisD13PduFragment}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1505,11 +1370,10 @@ traps:
     - isisD13PduProtocolVersion
     - isisD13PduFragment
   - oid: 1.3.6.1.3.37.2.0.12
-    name: isisD13AreaMismatch
+    name: ISIS-D13-MIB::isisD13AreaMismatch
     category: state_change
-    severity: warning
-    description: "IS-IS area mismatch on {SNMP_DEVICE_HOSTNAME}: received Hello PDU from neighbor that shares no area address\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface (ifIndex): {isisD13CircIfIndex}\n  PDU header fragment: {isisD13PduFragment}"
-    mib: ISIS-D13-MIB
+    severity: err
+    description: "IS-IS adjacency issue on {SNMP_DEVICE_HOSTNAME}: Area mismatch detected\n  IS-IS instance: {isisD13SysInstance}\n  Level: {isisD13SysLevelIndex}\n  Interface: {isisD13CircIfIndex}\n  PDU fragment: {isisD13PduFragment}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1517,11 +1381,10 @@ traps:
     - isisD13CircIfIndex
     - isisD13PduFragment
   - oid: 1.3.6.1.3.37.2.0.13
-    name: isisD13RejectedAdjacency
+    name: ISIS-D13-MIB::isisD13RejectedAdjacency
     category: state_change
     severity: warning
-    description: "IS-IS adjacency rejected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface (ifIndex): {isisD13CircIfIndex}\n  rejected PDU fragment: {isisD13PduFragment}"
-    mib: ISIS-D13-MIB
+    description: "IS-IS adjacency rejected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface: {isisD13CircIfIndex}\n  PDU fragment: {isisD13PduFragment}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1529,11 +1392,10 @@ traps:
     - isisD13CircIfIndex
     - isisD13PduFragment
   - oid: 1.3.6.1.3.37.2.0.14
-    name: isisD13LSPTooLargeToPropagate
-    category: diagnostic
-    severity: warning
-    description: "IS-IS LSP too large to propagate on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface ifIndex: {isisD13CircIfIndex}\n  LSP size: {isisD13PduLspSize}\n  LSP ID: {isisD13PduLspId}"
-    mib: ISIS-D13-MIB
+    name: ISIS-D13-MIB::isisD13LSPTooLargeToPropagate
+    category: state_change
+    severity: err
+    description: "IS-IS LSP too large to propagate on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface ifIndex: {isisD13CircIfIndex}\n  LSP size: {isisD13PduLspSize} bytes\n  LSP ID: {isisD13PduLspId}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1542,11 +1404,10 @@ traps:
     - isisD13PduLspSize
     - isisD13PduLspId
   - oid: 1.3.6.1.3.37.2.0.15
-    name: isisD13OrigLSPBuffSizeMismatch
-    category: diagnostic
-    severity: err
-    description: "IS-IS LSP buffer size mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  circuit ifIndex: {isisD13CircIfIndex}\n  LSP ID: {isisD13PduLspId}\n  peer advertised buffer size: {isisD13PduOriginatingBufferSize}\n\nAn LSP was received with a buffer size that differs from the local isisD13OriginatingBufferSize configuration."
-    mib: ISIS-D13-MIB
+    name: ISIS-D13-MIB::isisD13OrigLSPBuffSizeMismatch
+    category: state_change
+    severity: warning
+    description: "ISIS LSP buffer size mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  IS-IS instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface ifIndex: {isisD13CircIfIndex}\n  LSP ID: {isisD13PduLspId}\n  peer's advertised buffer size: {isisD13PduOriginatingBufferSize}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1555,11 +1416,10 @@ traps:
     - isisD13PduLspId
     - isisD13PduOriginatingBufferSize
   - oid: 1.3.6.1.3.37.2.0.16
-    name: isisD13ProtocolsSupportedMismatch
+    name: ISIS-D13-MIB::isisD13ProtocolsSupportedMismatch
     category: state_change
-    severity: err
-    description: "IS-IS protocol mismatch on {SNMP_DEVICE_HOSTNAME}: received LSP with no matching protocols\n  system instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface ifIndex: {isisD13CircIfIndex}\n  local protocols supported: {isisD13PduProtocolsSupported}\n  remote LSP ID: {isisD13PduLspId}\n  PDU header (first 64 bytes): {isisD13PduFragment}"
-    mib: ISIS-D13-MIB
+    severity: warning
+    description: "IS-IS adjacency issue on {SNMP_DEVICE_HOSTNAME}\n  Instance: {isisD13SysInstance}\n  Level: {isisD13SysLevelIndex}\n  Interface: {isisD13CircIfIndex}\n  LSP ID: {isisD13PduLspId}\n  Protocols supported mismatch: {isisD13PduProtocolsSupported}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1569,11 +1429,10 @@ traps:
     - isisD13PduLspId
     - isisD13PduFragment
   - oid: 1.3.6.1.3.37.2.0.17
-    name: isisD13AdjacencyChange
+    name: ISIS-D13-MIB::isisD13AdjacencyChange
     category: state_change
     severity: warning
-    description: "IS-IS adjacency changed state on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface ifIndex: {isisD13CircIfIndex}\n  adjacent SystemID: {isisD13PduLspId}\n  new state: {isisD13AdjState}"
-    mib: ISIS-D13-MIB
+    description: "IS-IS adjacency state change on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface (ifIndex): {isisD13CircIfIndex}\n  adjacent SystemID: {isisD13PduLspId}\n  new state: {isisD13AdjState}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1582,44 +1441,40 @@ traps:
     - isisD13PduLspId
     - isisD13AdjState
   - oid: 1.3.6.1.3.37.2.0.2
-    name: isisD13ManualAddressDrops
-    category: state_change
-    severity: warning
-    description: "IS-IS manual area address dropped from route computation on {SNMP_DEVICE_HOSTNAME}\n  IS-IS instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  area address state: {isisD13ManAreaAddrExistState}"
-    mib: ISIS-D13-MIB
+    name: ISIS-D13-MIB::isisD13ManualAddressDrops
+    category: config_change
+    severity: notice
+    description: "IS-IS manual area address configuration ignored on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  area address state: {isisD13ManAreaAddrExistState}"
     status: current
     varbinds:
     - isisD13SysInstance
     - isisD13SysLevelIndex
     - isisD13ManAreaAddrExistState
   - oid: 1.3.6.1.3.37.2.0.3
-    name: isisD13CorruptedLSPDetected
-    category: diagnostic
+    name: ISIS-D13-MIB::isisD13CorruptedLSPDetected
+    category: state_change
     severity: err
-    description: "Corrupted Link State PDU detected on {SNMP_DEVICE_HOSTNAME}\n  IS-IS instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  LSP ID: {isisD13PduLspId}"
-    mib: ISIS-D13-MIB
+    description: "IS-IS LSP corruption detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  LSP ID: {isisD13PduLspId}"
     status: current
     varbinds:
     - isisD13SysInstance
     - isisD13SysLevelIndex
     - isisD13PduLspId
   - oid: 1.3.6.1.3.37.2.0.4
-    name: isisD13AttemptToExceedMaxSequence
+    name: ISIS-D13-MIB::isisD13AttemptToExceedMaxSequence
     category: state_change
-    severity: warning
-    description: "IS-IS LSP sequence number wrapped on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  LSP ID: {isisD13PduLspId}\n\nThe device purged and will re-announce the LSP."
-    mib: ISIS-D13-MIB
+    severity: notice
+    description: "IS-IS LSP sequence number wrapped on {SNMP_DEVICE_HOSTNAME}, triggering purge and re-announcement\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  LSP ID: {isisD13PduLspId}"
     status: current
     varbinds:
     - isisD13SysInstance
     - isisD13SysLevelIndex
     - isisD13PduLspId
   - oid: 1.3.6.1.3.37.2.0.5
-    name: isisD13IDLenMismatch
+    name: ISIS-D13-MIB::isisD13IDLenMismatch
     category: state_change
-    severity: warning
-    description: "IS-IS System ID length mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  received System ID length: {isisD13PduFieldLen}\n  interface (ifIndex): {isisD13CircIfIndex}\n  triggering PDU fragment: {isisD13PduFragment}"
-    mib: ISIS-D13-MIB
+    severity: err
+    description: "IS-IS System ID length mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface: {isisD13CircIfIndex}\n  reported length: {isisD13PduFieldLen}\n  PDU fragment: {isisD13PduFragment}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1628,11 +1483,10 @@ traps:
     - isisD13CircIfIndex
     - isisD13PduFragment
   - oid: 1.3.6.1.3.37.2.0.6
-    name: isisD13MaxAreaAddressesMismatch
+    name: ISIS-D13-MIB::isisD13MaxAreaAddressesMismatch
     category: state_change
     severity: warning
-    description: "IS-IS Max Area Addresses mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface (ifIndex): {isisD13CircIfIndex}\n  received Max Area Addresses: {isisD13PduMaxAreaAddress}\n  PDU fragment (first 64 bytes): {isisD13PduFragment}"
-    mib: ISIS-D13-MIB
+    description: "IS-IS adjacency mismatch on {SNMP_DEVICE_HOSTNAME}\n  Instance: {isisD13SysInstance}\n  Level: {isisD13SysLevelIndex}\n  Interface: {isisD13CircIfIndex}\n  Received Max Area Addresses: {isisD13PduMaxAreaAddress}\n  PDU Header: {isisD13PduFragment}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1641,11 +1495,10 @@ traps:
     - isisD13CircIfIndex
     - isisD13PduFragment
   - oid: 1.3.6.1.3.37.2.0.7
-    name: isisD13OwnLSPPurge
-    category: security
+    name: ISIS-D13-MIB::isisD13OwnLSPPurge
+    category: state_change
     severity: warning
-    description: "ISIS on {SNMP_DEVICE_HOSTNAME} received its own LSP with zero age — possible LSP spoofing or impersonation.\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  circuit ifIndex: {isisD13CircIfIndex}\n  LSP ID: {isisD13PduLspId}\n  remote router ID: {isisD13PduRemoteRouterID}"
-    mib: ISIS-D13-MIB
+    description: "IS-IS LSP purge detected on {SNMP_DEVICE_HOSTNAME}\n  Instance: {isisD13SysInstance}\n  Level: {isisD13SysLevelIndex}\n  Interface: {isisD13CircIfIndex}\n  LSP ID: {isisD13PduLspId}\n  Remote Router ID: {isisD13PduRemoteRouterID}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1654,11 +1507,10 @@ traps:
     - isisD13PduLspId
     - isisD13PduRemoteRouterID
   - oid: 1.3.6.1.3.37.2.0.8
-    name: isisD13SequenceNumberSkip
+    name: ISIS-D13-MIB::isisD13SequenceNumberSkip
     category: state_change
     severity: warning
-    description: "ISIS sequence number skip on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface ifIndex: {isisD13CircIfIndex}\n  LSP ID: {isisD13PduLspId}\n\nNote: This indicates the local IS-IS instance received its own LSP with differing contents and had to increment the sequence number by more than one. Possible causes include duplicate System ID configuration or synchronization issues."
-    mib: ISIS-D13-MIB
+    description: "IS-IS LSP sequence number skip detected on {SNMP_DEVICE_HOSTNAME}\n  Instance: {isisD13SysInstance}\n  Level: {isisD13SysLevelIndex}\n  Interface: {isisD13CircIfIndex}\n  LSP ID: {isisD13PduLspId}\n\nThis indicates a potential duplicate System ID or LSP regeneration requiring sequence number adjustment."
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1666,11 +1518,10 @@ traps:
     - isisD13CircIfIndex
     - isisD13PduLspId
   - oid: 1.3.6.1.3.37.2.0.9
-    name: isisD13AuthenticationTypeFailure
+    name: ISIS-D13-MIB::isisD13AuthenticationTypeFailure
     category: auth
     severity: warning
-    description: "IS-IS PDU received with invalid authentication type on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface (ifIndex): {isisD13CircIfIndex}\n  PDU header fragment: {isisD13PduFragment}"
-    mib: ISIS-D13-MIB
+    description: "IS-IS PDU received with invalid authentication type on {SNMP_DEVICE_HOSTNAME}\n  instance: {isisD13SysInstance}\n  level: {isisD13SysLevelIndex}\n  interface ifIndex: {isisD13CircIfIndex}\n  PDU header fragment: {isisD13PduFragment}"
     status: current
     varbinds:
     - isisD13SysInstance
@@ -1678,11 +1529,10 @@ traps:
     - isisD13CircIfIndex
     - isisD13PduFragment
   - oid: 1.3.6.1.3.555.2.0.1
-    name: mfrMibTrapBundleLinkMismatch
+    name: FRF16-MFR-MIB-EXP::mfrMibTrapBundleLinkMismatch
     category: state_change
     severity: warning
-    description: "Bundle link mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  Near-end bundle: {bundleNearEndName}\n  Far-end bundle: {bundleFarEndName}\n  Link near-end name: {bundleLinkNearEndName}\n  Link far-end name: {bundleLinkFarEndName}\n  Far-end bundle for link: {bundleLinkFarEndBundleName}"
-    mib: FRF16-MFR-MIB-EXP
+    description: "Bundle link mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  Near-end bundle: {bundleNearEndName}\n  Far-end bundle: {bundleFarEndName}\n  Bundle link near-end name: {bundleLinkNearEndName}\n  Bundle link far-end name: {bundleLinkFarEndName}\n  Far-end bundle for this link: {bundleLinkFarEndBundleName}"
     status: current
     varbinds:
     - bundleNearEndName
@@ -1691,20 +1541,18 @@ traps:
     - bundleLinkFarEndName
     - bundleLinkFarEndBundleName
   - oid: 1.3.6.1.3.61.1.0.1
-    name: pimNeighborLoss
+    name: PIM-MIB::pimNeighborLoss
     category: state_change
     severity: warning
-    description: "PIM neighbor adjacency lost on {SNMP_DEVICE_HOSTNAME}\n  interface ifIndex: {pimNeighborIfIndex}\n  Neighbor timer expired with no lower-IP backup neighbor on this segment."
-    mib: PIM-MIB
+    description: "PIM neighbor adjacency lost on {SNMP_DEVICE_HOSTNAME}\n  interface: {pimNeighborIfIndex}"
     status: current
     varbinds:
     - pimNeighborIfIndex
   - oid: 1.3.6.1.3.62.1.1.11.1
-    name: dvmrpNeighborLoss
+    name: DVMRP-MIB::dvmrpNeighborLoss
     category: state_change
     severity: warning
-    description: "DVMRP neighbor adjacency lost on {SNMP_DEVICE_HOSTNAME}\n  neighbor address: {dvmrpNeighborAddress}\n  neighbor state: {dvmrpNeighborState}\n  local interface address: {dvmrpInterfaceLocalAddress}\n  interface ifIndex: {dvmrpNeighborIfIndex}"
-    mib: DVMRP-MIB
+    description: "DVMRP neighbor adjacency lost on {SNMP_DEVICE_HOSTNAME}\n  neighbor address: {dvmrpNeighborAddress}\n  interface local address: {dvmrpInterfaceLocalAddress}\n  interface index: {dvmrpNeighborIfIndex}\n  new neighbor state: {dvmrpNeighborState}"
     status: current
     varbinds:
     - dvmrpInterfaceLocalAddress
@@ -1712,22 +1560,20 @@ traps:
     - dvmrpNeighborAddress
     - dvmrpNeighborState
   - oid: 1.3.6.1.3.62.1.1.11.2
-    name: dvmrpNeighborNotPruning
+    name: DVMRP-MIB::dvmrpNeighborNotPruning
     category: state_change
     severity: warning
-    description: "DVMRP neighbor not pruning on {SNMP_DEVICE_HOSTNAME}\n  neighbor address: {dvmrpNeighborAddress}\n  local interface address: {dvmrpInterfaceLocalAddress}\n  neighbor ifIndex: {dvmrpNeighborIfIndex}"
-    mib: DVMRP-MIB
+    description: "DVMRP neighbor not pruning on {SNMP_DEVICE_HOSTNAME}\n  local interface address: {dvmrpInterfaceLocalAddress}\n  neighbor ifIndex: {dvmrpNeighborIfIndex}\n  neighbor address: {dvmrpNeighborAddress}"
     status: current
     varbinds:
     - dvmrpInterfaceLocalAddress
     - dvmrpNeighborIfIndex
     - dvmrpNeighborAddress
   - oid: 1.3.6.1.3.62.1.1.7.1
-    name: dvmrpNeighborLoss
+    name: DVMRP-STD-MIB::dvmrpNeighborLoss
     category: state_change
     severity: warning
-    description: "DVMRP neighbor adjacency lost on {SNMP_DEVICE_HOSTNAME}\n  local interface address: {dvmrpInterfaceLocalAddress}\n  neighbor state changed to: {dvmrpNeighborState}"
-    mib: DVMRP-STD-MIB
+    description: "DVMRP neighbor adjacency lost on {SNMP_DEVICE_HOSTNAME}\n  interface local address: {dvmrpInterfaceLocalAddress}\n  neighbor state: {dvmrpNeighborState}"
     status: current
     varbinds:
     - dvmrpInterfaceLocalAddress
@@ -1744,11 +1590,10 @@ traps:
         '1': oneway
       name: dvmrpNeighborState
   - oid: 1.3.6.1.3.62.1.1.7.2
-    name: dvmrpNeighborNotPruning
+    name: DVMRP-STD-MIB::dvmrpNeighborNotPruning
     category: state_change
-    severity: warning
-    description: "DVMRP neighbor not pruning on {SNMP_DEVICE_HOSTNAME}\n  interface local address: {dvmrpInterfaceLocalAddress}\n  neighbor capabilities: {dvmrpNeighborCapabilities}\n\nA non-pruning neighbor has been detected. This may result in excess multicast traffic on the segment."
-    mib: DVMRP-STD-MIB
+    severity: notice
+    description: "DVMRP neighbor detected as non-pruning on {SNMP_DEVICE_HOSTNAME}\n  interface local address: {dvmrpInterfaceLocalAddress}\n  neighbor capabilities: {dvmrpNeighborCapabilities}"
     status: current
     varbinds:
     - dvmrpInterfaceLocalAddress
@@ -1757,11 +1602,10 @@ traps:
       type: IpAddress
       name: dvmrpInterfaceLocalAddress
   - oid: 1.3.6.1.3.88.0.1
-    name: slapmMonitoredEventNotAchieved
-    category: diagnostic
+    name: SLAPM-MIB::slapmMonitoredEventNotAchieved
+    category: state_change
     severity: warning
-    description: "SLA monitored event not achieved on {SNMP_DEVICE_HOSTNAME}\n  timestamp: {slapmPolicyMonitorIntTime}\n  monitor control: {slapmPolicyMonitorControl}\n  current status: {slapmPolicyMonitorStatus}\n  previous status: {slapmPolicyMonitorStatus}\n  current in rate: {slapmPolicyMonitorCurrentInRate}\n  current out rate: {slapmPolicyMonitorCurrentOutRate}\n  current delay rate: {slapmPolicyMonitorCurrentDelayRate}"
-    mib: SLAPM-MIB
+    description: "SLA performance threshold not achieved on {SNMP_DEVICE_HOSTNAME}\n  timestamp: {slapmPolicyMonitorIntTime}\n  monitored control: {slapmPolicyMonitorControl}\n  current status: {slapmPolicyMonitorStatus}\n  previous status: {slapmPolicyMonitorStatus}\n  current in rate: {slapmPolicyMonitorCurrentInRate}\n  current out rate: {slapmPolicyMonitorCurrentOutRate}\n  current delay rate: {slapmPolicyMonitorCurrentDelayRate}"
     status: deprecated
     varbinds:
     - slapmPolicyMonitorIntTime
@@ -1772,11 +1616,10 @@ traps:
     - slapmPolicyMonitorCurrentOutRate
     - slapmPolicyMonitorCurrentDelayRate
   - oid: 1.3.6.1.3.88.0.10
-    name: slapmPolicyRuleMonDeleted
+    name: SLAPM-MIB::slapmPolicyRuleMonDeleted
     category: config_change
-    severity: warning
-    description: "SLA policy rule monitoring entry deleted on {SNMP_DEVICE_HOSTNAME}\n  control bits: {slapmPRMonControl}\n  status: {slapmPRMonStatus}\n  interval: {slapmPRMonInterval}s\n  current rates - in: {slapmPRMonCurrentInRate}, out: {slapmPRMonCurrentOutRate}, delay: {slapmPRMonCurrentDelayRate}\n  min rate thresholds - low: {slapmPRMonMinRateLow}, high: {slapmPRMonMinRateHigh}\n  max rate thresholds - high: {slapmPRMonMaxRateHigh}, low: {slapmPRMonMaxRateLow}\n  max delay thresholds - high: {slapmPRMonMaxDelayHigh}, low: {slapmPRMonMaxDelayLow}\n  threshold violations - minInNotAchieved: {slapmPRMonMinInRateNotAchieves}, maxInExceeded: {slapmPRMonMaxInRateExceeds}, maxDelayExceeded: {slapmPRMonMaxDelayExceeds}, minOutNotAchieved: {slapmPRMonMinOutRateNotAchieves}, maxOutExceeded: {slapmPRMonMaxOutRateExceeds}"
-    mib: SLAPM-MIB
+    severity: notice
+    description: "SLA policy rule monitoring entry deleted on {SNMP_DEVICE_HOSTNAME}\n  control: {slapmPRMonControl}\n  status: {slapmPRMonStatus}\n  interval: {slapmPRMonInterval}\n  timestamp: {slapmPRMonIntTime}"
     status: current
     varbinds:
     - slapmPRMonControl
@@ -1798,11 +1641,10 @@ traps:
     - slapmPRMonMinOutRateNotAchieves
     - slapmPRMonMaxOutRateExceeds
   - oid: 1.3.6.1.3.88.0.11
-    name: slapmSubcMonitorNotOkay
-    category: diagnostic
-    severity: err
-    description: "SLA subcomponent monitor threshold not met on {SNMP_DEVICE_HOSTNAME}\n  system address: {slapmSubcomponentSystemAddress}\n  policy rule index: {slapmSubcomponentPolicyRuleIndex}\n  monitor control: {slapmPRMonControl}\n  current status: {slapmSubcomponentMonitorStatus}\n  previous status: {slapmSubcomponentMonitorStatus}\n  interval end time: {slapmSubcomponentMonitorIntTime}\n  current in-rate: {slapmSubcomponentMonitorCurrentInRate}\n  current out-rate: {slapmSubcomponentMonitorCurrentOutRate}\n  TCP round-trip time: {slapmSubcomponentTcpRoundTripTime} ms"
-    mib: SLAPM-MIB
+    name: SLAPM-MIB::slapmSubcMonitorNotOkay
+    category: state_change
+    severity: warning
+    description: "SLA performance monitoring threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  system: {slapmSubcomponentSystemAddress}\n  policy rule index: {slapmSubcomponentPolicyRuleIndex}\n  current status: {slapmSubcomponentMonitorStatus}\n  previous status: {slapmSubcomponentMonitorStatus}\n  interval end: {slapmSubcomponentMonitorIntTime}\n  current in rate: {slapmSubcomponentMonitorCurrentInRate}\n  current out rate: {slapmSubcomponentMonitorCurrentOutRate}\n  TCP RTT: {slapmSubcomponentTcpRoundTripTime}"
     status: current
     varbinds:
     - slapmSubcomponentSystemAddress
@@ -1815,11 +1657,10 @@ traps:
     - slapmSubcomponentMonitorCurrentOutRate
     - slapmSubcomponentTcpRoundTripTime
   - oid: 1.3.6.1.3.88.0.12
-    name: slapmSubcMonitorOkay
+    name: SLAPM-MIB::slapmSubcMonitorOkay
     category: state_change
     severity: notice
-    description: "SLA subcomponent monitor recovered to acceptable level on {SNMP_DEVICE_HOSTNAME}\n  system address: {slapmSubcomponentSystemAddress}\n  policy rule index: {slapmSubcomponentPolicyRuleIndex}\n  monitor status: {slapmSubcomponentMonitorStatus}\n  interval end time: {slapmSubcomponentMonitorIntTime}\n  current in rate: {slapmSubcomponentMonitorCurrentInRate}\n  current out rate: {slapmSubcomponentMonitorCurrentOutRate}\n  TCP round-trip time: {slapmSubcomponentTcpRoundTripTime} ms"
-    mib: SLAPM-MIB
+    description: "SLA performance monitoring status returned to acceptable level on {SNMP_DEVICE_HOSTNAME}\n  System Address: {slapmSubcomponentSystemAddress}\n  Policy Rule Index: {slapmSubcomponentPolicyRuleIndex}\n  Monitor Status: {slapmSubcomponentMonitorStatus}\n  Interval End Time: {slapmSubcomponentMonitorIntTime}\n  Current In Rate: {slapmSubcomponentMonitorCurrentInRate}\n  Current Out Rate: {slapmSubcomponentMonitorCurrentOutRate}\n  TCP Round Trip Time: {slapmSubcomponentTcpRoundTripTime}"
     status: current
     varbinds:
     - slapmSubcomponentSystemAddress
@@ -1832,11 +1673,10 @@ traps:
     - slapmSubcomponentMonitorCurrentOutRate
     - slapmSubcomponentTcpRoundTripTime
   - oid: 1.3.6.1.3.88.0.2
-    name: slapmMonitoredEventOkay
+    name: SLAPM-MIB::slapmMonitoredEventOkay
     category: state_change
-    severity: info
-    description: "SLA monitored event recovered to acceptable level on {SNMP_DEVICE_HOSTNAME}\n  timestamp: {slapmPolicyMonitorIntTime}\n  monitor control: {slapmPolicyMonitorControl}\n  current status: {slapmPolicyMonitorStatus}\n  previous status: {slapmPolicyMonitorStatus}\n  current in-rate: {slapmPolicyMonitorCurrentInRate}\n  current out-rate: {slapmPolicyMonitorCurrentOutRate}\n  current delay rate: {slapmPolicyMonitorCurrentDelayRate}"
-    mib: SLAPM-MIB
+    severity: notice
+    description: "SLA monitored event recovered to acceptable level on {SNMP_DEVICE_HOSTNAME}\n  timestamp: {slapmPolicyMonitorIntTime}\n  current status: {slapmPolicyMonitorStatus}\n  previous status: {slapmPolicyMonitorStatus}\n  current in rate: {slapmPolicyMonitorCurrentInRate}\n  current out rate: {slapmPolicyMonitorCurrentOutRate}\n  current delay rate: {slapmPolicyMonitorCurrentDelayRate}"
     status: deprecated
     varbinds:
     - slapmPolicyMonitorIntTime
@@ -1847,11 +1687,10 @@ traps:
     - slapmPolicyMonitorCurrentOutRate
     - slapmPolicyMonitorCurrentDelayRate
   - oid: 1.3.6.1.3.88.0.3
-    name: slapmPolicyProfileDeleted
+    name: SLAPM-MIB::slapmPolicyProfileDeleted
     category: config_change
-    severity: warning
-    description: "SLA policy deleted on {SNMP_DEVICE_HOSTNAME}\n  active connections: {slapmPolicyStatsActiveConns}\n  total connections: {slapmPolicyStatsTotalConns}\n  first activated: {slapmPolicyStatsFirstActivated}\n  last mapping: {slapmPolicyStatsLastMapping}\n  in octets: {slapmPolicyStatsInOctets}, out octets: {slapmPolicyStatsOutOctets}\n  in packets: {slapmPolicyStatsInPackets}, out packets: {slapmPolicyStatsOutPackets}\n  accepts: {slapmPolicyStatsCountAccepts}, denies: {slapmPolicyStatsCountDenies}\n  connection limit: {slapmPolicyStatsConnectionLimit}\n  min/max rate: {slapmPolicyStatsMinRate}/{slapmPolicyStatsMaxRate}\n  max delay: {slapmPolicyStatsMaxDelay}"
-    mib: SLAPM-MIB
+    severity: notice
+    description: "SLA policy profile deleted on {SNMP_DEVICE_HOSTNAME}\n  active connections at deletion: {slapmPolicyStatsActiveConns}\n  total connections affected: {slapmPolicyStatsTotalConns}\n  first activated: {slapmPolicyStatsFirstActivated}\n  last used: {slapmPolicyStatsLastMapping}"
     status: deprecated
     varbinds:
     - slapmPolicyStatsActiveConns
@@ -1873,11 +1712,10 @@ traps:
     - slapmPolicyStatsMaxRate
     - slapmPolicyStatsMaxDelay
   - oid: 1.3.6.1.3.88.0.4
-    name: slapmPolicyMonitorDeleted
-    category: config_change
-    severity: warning
-    description: "SLA policy monitor deleted on {SNMP_DEVICE_HOSTNAME}\n  status: {slapmPolicyMonitorStatus}\n  interval: {slapmPolicyMonitorInterval}s\n  last interval ended: {slapmPolicyMonitorIntTime}\n  current rates (in/out): {slapmPolicyMonitorCurrentInRate}/{slapmPolicyMonitorCurrentOutRate}\n  current delay rate: {slapmPolicyMonitorCurrentDelayRate}\n  min rate thresholds (low/high): {slapmPolicyMonitorMinRateLow}/{slapmPolicyMonitorMinRateHigh}\n  max rate thresholds (high/low): {slapmPolicyMonitorMaxRateHigh}/{slapmPolicyMonitorMaxRateLow}\n  max delay thresholds (high/low): {slapmPolicyMonitorMaxDelayHigh}/{slapmPolicyMonitorMaxDelayLow}\n  counters - min in/out not achieved: {slapmPolicyMonitorMinInRateNotAchieves}/{slapmPolicyMonitorMinOutRateNotAchieves}\n  counters - max in/out exceeded: {slapmPolicyMonitorMaxInRateExceeds}/{slapmPolicyMonitorMaxOutRateExceeds}\n  counters - max delay exceeded: {slapmPolicyMonitorMaxDelayExceeds}"
-    mib: SLAPM-MIB
+    name: SLAPM-MIB::slapmPolicyMonitorDeleted
+    category: state_change
+    severity: notice
+    description: "SLA policy monitor deleted on {SNMP_DEVICE_HOSTNAME}\n  status: {slapmPolicyMonitorStatus}\n  interval: {slapmPolicyMonitorInterval}\n  last interval end: {slapmPolicyMonitorIntTime}"
     status: deprecated
     varbinds:
     - slapmPolicyMonitorStatus
@@ -1898,11 +1736,10 @@ traps:
     - slapmPolicyMonitorMinOutRateNotAchieves
     - slapmPolicyMonitorMaxOutRateExceeds
   - oid: 1.3.6.1.3.88.0.5
-    name: slapmSubcomponentMonitoredEventNotAchieved
-    category: diagnostic
-    severity: err
-    description: "SLA subcomponent threshold not achieved on {SNMP_DEVICE_HOSTNAME}\n  system: {slapmSubcomponentSystemAddress}\n  policy: {slapmSubcomponentPolicyName}\n  traffic profile: {slapmSubcomponentTrafficProfileName}\n  current status: {slapmSubcomponentMonitorStatus}\n  previous status: {slapmSubcomponentMonitorStatus}\n  interval end: {slapmSubcomponentMonitorIntTime}\n  current in rate: {slapmSubcomponentMonitorCurrentInRate}\n  current out rate: {slapmSubcomponentMonitorCurrentOutRate}\n  TCP RTT: {slapmSubcomponentTcpRoundTripTime} ms"
-    mib: SLAPM-MIB
+    name: SLAPM-MIB::slapmSubcomponentMonitoredEventNotAchieved
+    category: state_change
+    severity: warning
+    description: "SLA performance threshold not achieved on {SNMP_DEVICE_HOSTNAME}\n  system: {slapmSubcomponentSystemAddress}\n  policy: {slapmSubcomponentPolicyName}\n  traffic profile: {slapmSubcomponentTrafficProfileName}\n  current status: {slapmSubcomponentMonitorStatus}\n  previous status: {slapmSubcomponentMonitorStatus}\n  interval end: {slapmSubcomponentMonitorIntTime}\n  current in rate: {slapmSubcomponentMonitorCurrentInRate}\n  current out rate: {slapmSubcomponentMonitorCurrentOutRate}\n  TCP RTT: {slapmSubcomponentTcpRoundTripTime}"
     status: deprecated
     varbinds:
     - slapmSubcomponentSystemAddress
@@ -1915,11 +1752,10 @@ traps:
     - slapmSubcomponentMonitorCurrentOutRate
     - slapmSubcomponentTcpRoundTripTime
   - oid: 1.3.6.1.3.88.0.6
-    name: slapmSubcomponentMonitoredEventOkay
-    category: diagnostic
-    severity: info
-    description: "SLA monitored subcomponent returned to acceptable levels on {SNMP_DEVICE_HOSTNAME}\n  system address: {slapmSubcomponentSystemAddress}\n  policy: {slapmSubcomponentPolicyName}\n  traffic profile: {slapmSubcomponentTrafficProfileName}\n  monitor status: {slapmSubcomponentMonitorStatus}\n  interval end time: {slapmSubcomponentMonitorIntTime}\n  current in rate: {slapmSubcomponentMonitorCurrentInRate}\n  current out rate: {slapmSubcomponentMonitorCurrentOutRate}\n  TCP round-trip time: {slapmSubcomponentTcpRoundTripTime} ms"
-    mib: SLAPM-MIB
+    name: SLAPM-MIB::slapmSubcomponentMonitoredEventOkay
+    category: state_change
+    severity: notice
+    description: "SLA monitored value reached acceptable level on {SNMP_DEVICE_HOSTNAME}\n  system: {slapmSubcomponentSystemAddress}\n  policy: {slapmSubcomponentPolicyName}\n  traffic profile: {slapmSubcomponentTrafficProfileName}\n  status: {slapmSubcomponentMonitorStatus}\n  interval end: {slapmSubcomponentMonitorIntTime}\n  in rate: {slapmSubcomponentMonitorCurrentInRate}\n  out rate: {slapmSubcomponentMonitorCurrentOutRate}\n  TCP RTT: {slapmSubcomponentTcpRoundTripTime}"
     status: deprecated
     varbinds:
     - slapmSubcomponentSystemAddress
@@ -1932,11 +1768,10 @@ traps:
     - slapmSubcomponentMonitorCurrentOutRate
     - slapmSubcomponentTcpRoundTripTime
   - oid: 1.3.6.1.3.88.0.7
-    name: slapmPolicyRuleMonNotOkay
-    category: diagnostic
+    name: SLAPM-MIB::slapmPolicyRuleMonNotOkay
+    category: state_change
     severity: warning
-    description: "SLA policy rule monitoring threshold not met on {SNMP_DEVICE_HOSTNAME}\n  timestamp: {slapmPRMonIntTime}\n  monitor control: {slapmPRMonControl}\n  current status: {slapmPRMonStatus}\n  previous status: {slapmPRMonStatus}\n  current in-rate: {slapmPRMonCurrentInRate}\n  current out-rate: {slapmPRMonCurrentOutRate}\n  current delay rate: {slapmPRMonCurrentDelayRate}"
-    mib: SLAPM-MIB
+    description: "SLA policy rule monitoring threshold not met on {SNMP_DEVICE_HOSTNAME}\n  timestamp: {slapmPRMonIntTime}\n  control: {slapmPRMonControl}\n  current status: {slapmPRMonStatus}\n  previous status: {slapmPRMonStatus}\n  current in rate: {slapmPRMonCurrentInRate}\n  current out rate: {slapmPRMonCurrentOutRate}\n  current delay rate: {slapmPRMonCurrentDelayRate}"
     status: current
     varbinds:
     - slapmPRMonIntTime
@@ -1947,11 +1782,10 @@ traps:
     - slapmPRMonCurrentOutRate
     - slapmPRMonCurrentDelayRate
   - oid: 1.3.6.1.3.88.0.8
-    name: slapmPolicyRuleMonOkay
+    name: SLAPM-MIB::slapmPolicyRuleMonOkay
     category: state_change
-    severity: info
-    description: "SLA policy rule monitoring recovered to acceptable levels on {SNMP_DEVICE_HOSTNAME}\n  timestamp: {slapmPRMonIntTime}\n  control bits: {slapmPRMonControl}\n  current status: {slapmPRMonStatus}\n  previous status: {slapmPRMonStatus}\n  current in rate: {slapmPRMonCurrentInRate}\n  current out rate: {slapmPRMonCurrentOutRate}\n  current delay rate: {slapmPRMonCurrentDelayRate}"
-    mib: SLAPM-MIB
+    severity: notice
+    description: "SLA policy rule {slapmPRMonControl} on {SNMP_DEVICE_HOSTNAME} returned to acceptable state\n  previous status: {slapmPRMonStatus}\n  current status: {slapmPRMonStatus}\n  interval end: {slapmPRMonIntTime}\n  in rate: {slapmPRMonCurrentInRate}\n  out rate: {slapmPRMonCurrentOutRate}\n  delay rate: {slapmPRMonCurrentDelayRate}"
     status: current
     varbinds:
     - slapmPRMonIntTime
@@ -1962,11 +1796,10 @@ traps:
     - slapmPRMonCurrentOutRate
     - slapmPRMonCurrentDelayRate
   - oid: 1.3.6.1.3.88.0.9
-    name: slapmPolicyRuleDeleted
+    name: SLAPM-MIB::slapmPolicyRuleDeleted
     category: config_change
     severity: notice
-    description: "SLA policy rule deleted on {SNMP_DEVICE_HOSTNAME}. Traffic previously governed by this policy will no longer receive SLA-based treatment.\n  Active connections: {slapmPolicyRuleStatsActiveConns}\n  Total connections: {slapmPolicyRuleStatsTotalConns}"
-    mib: SLAPM-MIB
+    description: "SLA policy rule deleted on {SNMP_DEVICE_HOSTNAME}\n  The slapmPolicyRuleStatsEntry was removed from the monitoring configuration.\n  Active connections at deletion: {slapmPolicyRuleStatsActiveConns}\n  Total connections affected: {slapmPolicyRuleStatsTotalConns}"
     status: current
     varbinds:
     - slapmPolicyRuleStatsActiveConns
@@ -1990,112 +1823,128 @@ traps:
     - slapmPolicyRuleStatsTotalRsvpFlows
     - slapmPolicyRuleStatsActRsvpFlows
   - oid: 1.3.6.1.3.90.2.0.1
-    name: xgcpUpDownNotification
+    name: XGCP-MIB::xgcpUpDownNotification
     category: state_change
     severity: warning
     description: "XGCP protocol status changed on {SNMP_DEVICE_HOSTNAME}\n  operational status: {xgcpOperStatus}"
-    mib: XGCP-MIB
     varbinds:
     - xgcpOperStatus
-  - oid: 1.3.6.1.3.92.1.1.0.1
-    name: msdpEstablished
+  - oid: 1.3.6.1.3.92.1.0.1
+    name: DRAFT-MSDP-MIB::msdpEstablished
     category: state_change
     severity: info
-    description: "MSDP peer entered ESTABLISHED state on {SNMP_DEVICE_HOSTNAME}\n  cumulative transitions to ESTABLISHED: {msdpPeerFsmEstablishedTransitions}"
-    mib: MSDP-MIB
+    description: "MSDP peer established on {SNMP_DEVICE_HOSTNAME}\n  established transitions: {msdpPeerFsmEstablishedTransitions}"
     status: current
     varbinds:
     - msdpPeerFsmEstablishedTransitions
-  - oid: 1.3.6.1.3.92.1.1.0.2
-    name: msdpBackwardTransition
+  - oid: 1.3.6.1.3.92.1.0.2
+    name: DRAFT-MSDP-MIB::msdpBackwardTransition
     category: state_change
     severity: warning
-    description: "MSDP peer transitioned to a lower state on {SNMP_DEVICE_HOSTNAME}\n  peer state: {msdpPeerState}\n  Note: Peer moved from a higher-numbered MSDP FSM state to a lower-numbered state, indicating degraded peering."
-    mib: MSDP-MIB
+    description: "MSDP peer state transitioned to a lower-numbered state on {SNMP_DEVICE_HOSTNAME}\n  current state: {msdpPeerState}"
     status: current
     varbinds:
     - msdpPeerState
+  - oid: 1.3.6.1.3.92.1.1.0.1
+    name: MSDP-MIB::msdpEstablished
+    category: state_change
+    severity: info
+    description: "MSDP peer established on {SNMP_DEVICE_HOSTNAME}\n  FSM established transitions: {msdpPeerFsmEstablishedTransitions}"
+    status: current
+    varbinds:
+    - msdpPeerFsmEstablishedTransitions
+    - oid: 1.3.6.1.3.92.1.1.5.1.15
+      type: Counter32
+      name: msdpPeerFsmEstablishedTransitions
+  - oid: 1.3.6.1.3.92.1.1.0.2
+    name: MSDP-MIB::msdpBackwardTransition
+    category: state_change
+    severity: warning
+    description: "MSDP peer state transitioned to a lower state on {SNMP_DEVICE_HOSTNAME}\n  current state: {msdpPeerState}"
+    status: current
+    varbinds:
+    - msdpPeerState
+    - oid: 1.3.6.1.3.92.1.1.5.1.3
+      type: INTEGER
+      enum:
+        '3': connecting
+        '5': disabled
+        '4': established
+        '1': inactive
+        '2': listen
+      name: msdpPeerState
   - oid: 1.3.6.1.3.94.0.1
-    name: connUnitStatusChange
+    name: FCMGMT-MIB::connUnitStatusChange
     category: state_change
     severity: alert
     description: "Connectivity unit status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {connUnitStatus}\n  state: {connUnitState}"
-    mib: FCMGMT-MIB
     varbinds:
     - connUnitStatus
     - connUnitState
   - oid: 1.3.6.1.3.94.0.3
-    name: connUnitDeletedTrap
+    name: FCMGMT-MIB::connUnitDeletedTrap
     category: state_change
     severity: warning
-    description: "Connectivity unit deleted from {SNMP_DEVICE_HOSTNAME}\n  connUnitId: {connUnitId}"
-    mib: FCMGMT-MIB
+    description: Connectivity unit {connUnitId} deleted on {SNMP_DEVICE_HOSTNAME}
     varbinds:
     - connUnitId
   - oid: 1.3.6.1.3.94.0.4
-    name: connUnitEventTrap
-    category: state_change
+    name: FCMGMT-MIB::connUnitEventTrap
+    category: diagnostic
     severity: info
-    description: "Generic connectivity unit event on {SNMP_DEVICE_HOSTNAME}\n  event ID: {connUnitEventId}\n  event type: {connUnitEventType}\n  object: {connUnitEventObject}\n  description: {connUnitEventDescr}"
-    mib: FCMGMT-MIB
+    description: "FCMGMT event on {SNMP_DEVICE_HOSTNAME}\n  event id: {connUnitEventId}\n  type: {connUnitEventType}\n  object: {connUnitEventObject}\n  description: {connUnitEventDescr}"
     varbinds:
     - connUnitEventId
     - connUnitEventType
     - connUnitEventObject
     - connUnitEventDescr
   - oid: 1.3.6.1.3.94.0.5
-    name: connUnitSensorStatusChange
+    name: FCMGMT-MIB::connUnitSensorStatusChange
     category: state_change
     severity: alert
-    description: "Connectivity unit sensor status changed on {SNMP_DEVICE_HOSTNAME}\n  sensor status: {connUnitSensorStatus}"
-    mib: FCMGMT-MIB
+    description: "FCMGMT sensor status changed on {SNMP_DEVICE_HOSTNAME}\n  sensor status: {connUnitSensorStatus}"
     varbinds:
     - connUnitSensorStatus
   - oid: 1.3.6.1.3.94.0.6
-    name: connUnitPortStatusChange
+    name: FCMGMT-MIB::connUnitPortStatusChange
     category: state_change
-    severity: notice
-    description: "Fibre Channel port status changed on {SNMP_DEVICE_HOSTNAME}\n  port protocol status: {connUnitPortStatus}\n  port hardware state: {connUnitPortState}"
-    mib: FCMGMT-MIB
+    severity: alert
+    description: "FC port status changed on {SNMP_DEVICE_HOSTNAME}\n  protocol status: {connUnitPortStatus}\n  hardware state: {connUnitPortState}"
     varbinds:
     - connUnitPortStatus
     - connUnitPortState
   - oid: 1.3.6.1.3.95.3.0.1
-    name: mplsTunnelUp
+    name: MPLS-TE-MIB::mplsTunnelUp
     category: state_change
     severity: info
-    description: "MPLS tunnel operational status changing from down on {SNMP_DEVICE_HOSTNAME}\n  admin status: {mplsTunnelAdminStatus}\n  operational status: {mplsTunnelOperStatus}"
-    mib: MPLS-TE-MIB
+    description: "MPLS TE tunnel transitioned out of down state on {SNMP_DEVICE_HOSTNAME}\n  admin status: {mplsTunnelAdminStatus}\n  operational status: {mplsTunnelOperStatus}"
     status: current
     varbinds:
     - mplsTunnelAdminStatus
     - mplsTunnelOperStatus
   - oid: 1.3.6.1.3.95.3.0.2
-    name: mplsTunnelDown
+    name: MPLS-TE-MIB::mplsTunnelDown
     category: state_change
-    severity: err
-    description: "MPLS TE tunnel entered down state on {SNMP_DEVICE_HOSTNAME}\n  admin status: {mplsTunnelAdminStatus}\n  operational status: {mplsTunnelOperStatus}"
-    mib: MPLS-TE-MIB
+    severity: warning
+    description: "MPLS TE tunnel {mplsTunnelAdminStatus} went down on {SNMP_DEVICE_HOSTNAME}\n  admin status: {mplsTunnelAdminStatus}\n  operational status: {mplsTunnelOperStatus}"
     status: current
     varbinds:
     - mplsTunnelAdminStatus
     - mplsTunnelOperStatus
   - oid: 1.3.6.1.3.95.3.0.3
-    name: mplsTunnelRerouted
+    name: MPLS-TE-MIB::mplsTunnelRerouted
     category: state_change
     severity: notice
     description: "MPLS TE tunnel rerouted or re-optimized on {SNMP_DEVICE_HOSTNAME}\n  admin status: {mplsTunnelAdminStatus}\n  operational status: {mplsTunnelOperStatus}"
-    mib: MPLS-TE-MIB
     status: current
     varbinds:
     - mplsTunnelAdminStatus
     - mplsTunnelOperStatus
   - oid: 1.3.6.1.3.96.2.1
-    name: mplsInSegmentUp
+    name: MPLS-LSR-MIB::mplsInSegmentUp
     category: state_change
-    severity: notice
-    description: "MPLS in-segment became operational on {SNMP_DEVICE_HOSTNAME}\n  interface index: {mplsInSegmentIfIndex}\n  incoming label: {mplsInSegmentLabel}\n  admin status: {mplsInSegmentAdminStatus}\n  operational status: {mplsInSegmentOperStatus}"
-    mib: MPLS-LSR-MIB
+    severity: info
+    description: "MPLS in-segment {mplsInSegmentIfIndex} (label {mplsInSegmentLabel}) transitioned to operational state on {SNMP_DEVICE_HOSTNAME}\n  admin status: {mplsInSegmentAdminStatus}\n  operational status: {mplsInSegmentOperStatus}"
     status: current
     varbinds:
     - mplsInSegmentIfIndex
@@ -2103,11 +1952,10 @@ traps:
     - mplsInSegmentAdminStatus
     - mplsInSegmentOperStatus
   - oid: 1.3.6.1.3.96.2.2
-    name: mplsInSegmentDown
+    name: MPLS-LSR-MIB::mplsInSegmentDown
     category: state_change
-    severity: err
+    severity: warning
     description: "MPLS in-segment went down on {SNMP_DEVICE_HOSTNAME}\n  interface index: {mplsInSegmentIfIndex}\n  incoming label: {mplsInSegmentLabel}\n  admin status: {mplsInSegmentAdminStatus}\n  operational status: {mplsInSegmentOperStatus}"
-    mib: MPLS-LSR-MIB
     status: current
     varbinds:
     - mplsInSegmentIfIndex
@@ -2115,33 +1963,30 @@ traps:
     - mplsInSegmentAdminStatus
     - mplsInSegmentOperStatus
   - oid: 1.3.6.1.3.96.2.3
-    name: mplsOutSegmentUp
+    name: MPLS-LSR-MIB::mplsOutSegmentUp
     category: state_change
     severity: info
-    description: "MPLS out-segment {mplsOutSegmentIndex} transitioning to up on {SNMP_DEVICE_HOSTNAME}\n  admin status: {mplsInSegmentAdminStatus}\n  operational status: {mplsInSegmentOperStatus}"
-    mib: MPLS-LSR-MIB
+    description: "MPLS out-segment operational status leaving DOWN state on {SNMP_DEVICE_HOSTNAME}\n  out-segment index: {mplsOutSegmentIndex}\n  in-segment admin status: {mplsInSegmentAdminStatus}\n  in-segment oper status: {mplsInSegmentOperStatus}"
     status: current
     varbinds:
     - mplsOutSegmentIndex
     - mplsInSegmentAdminStatus
     - mplsInSegmentOperStatus
   - oid: 1.3.6.1.3.96.2.4
-    name: mplsOutSegmentDown
+    name: MPLS-LSR-MIB::mplsOutSegmentDown
     category: state_change
     severity: warning
-    description: "MPLS out-segment on {SNMP_DEVICE_HOSTNAME} is transitioning to down state\n  out-segment index: {mplsOutSegmentIndex}\n  in-segment admin status: {mplsInSegmentAdminStatus}\n  in-segment oper status: {mplsInSegmentOperStatus}"
-    mib: MPLS-LSR-MIB
+    description: "MPLS out-segment {mplsOutSegmentIndex} is transitioning to down state on {SNMP_DEVICE_HOSTNAME}\n  in-segment admin status: {mplsInSegmentAdminStatus}\n  in-segment operational status: {mplsInSegmentOperStatus}"
     status: current
     varbinds:
     - mplsOutSegmentIndex
     - mplsInSegmentAdminStatus
     - mplsInSegmentOperStatus
   - oid: 1.3.6.1.3.96.2.5
-    name: mplsXCUp
+    name: MPLS-LSR-MIB::mplsXCUp
     category: state_change
-    severity: notice
-    description: "MPLS cross-connect transitioned from down on {SNMP_DEVICE_HOSTNAME}\n  XC index: {mplsXCIndex}\n  incoming interface: {mplsInSegmentIfIndex}\n  incoming label: {mplsInSegmentLabel}\n  outgoing segment index: {mplsOutSegmentIndex}\n  admin status: {mplsXCAdminStatus}\n  operational status: {mplsXCOperStatus}"
-    mib: MPLS-LSR-MIB
+    severity: info
+    description: "MPLS cross-connect leaving down state on {SNMP_DEVICE_HOSTNAME}\n  XC Index: {mplsXCIndex}\n  Admin Status: {mplsXCAdminStatus}\n  Operational Status: {mplsXCOperStatus}\n  Incoming Interface: {mplsInSegmentIfIndex}\n  Incoming Label: {mplsInSegmentLabel}\n  Out Segment Index: {mplsOutSegmentIndex}"
     status: current
     varbinds:
     - mplsXCIndex
@@ -2151,11 +1996,10 @@ traps:
     - mplsXCAdminStatus
     - mplsXCOperStatus
   - oid: 1.3.6.1.3.96.2.6
-    name: mplsXCDown
+    name: MPLS-LSR-MIB::mplsXCDown
     category: state_change
-    severity: err
-    description: "MPLS cross-connect going down on {SNMP_DEVICE_HOSTNAME}\n  XC Index: {mplsXCIndex}\n  incoming interface: {mplsInSegmentIfIndex}\n  incoming label: {mplsInSegmentLabel}\n  outgoing segment index: {mplsOutSegmentIndex}\n  admin status: {mplsXCAdminStatus}\n  current oper status: {mplsXCOperStatus}"
-    mib: MPLS-LSR-MIB
+    severity: warning
+    description: "MPLS cross-connect {mplsXCIndex} went down on {SNMP_DEVICE_HOSTNAME}\n  incoming interface: {mplsInSegmentIfIndex}\n  incoming label: {mplsInSegmentLabel}\n  admin status: {mplsXCAdminStatus}\n  operational status: {mplsXCOperStatus}"
     status: current
     varbinds:
     - mplsXCIndex
@@ -2164,3 +2008,34 @@ traps:
     - mplsOutSegmentIndex
     - mplsXCAdminStatus
     - mplsXCOperStatus
+  - oid: 1.3.6.1.3.9999.2.0.1
+    name: ISCSI-MIB::iscsiTgtLoginFailure
+    category: auth
+    severity: warning
+    description: "iSCSI target login failure on {SNMP_DEVICE_HOSTNAME}\n  failure count: {iscsiTgtLoginFailures}\n  failure type: {iscsiTgtLastFailureType}\n  initiator name: {iscsiTgtLastIntrFailureName}\n  initiator address type: {iscsiTgtLastIntrFailureAddrType}\n  initiator address: {iscsiTgtLastIntrFailureAddr}"
+    varbinds:
+    - iscsiTgtLoginFailures
+    - iscsiTgtLastFailureType
+    - iscsiTgtLastIntrFailureName
+    - iscsiTgtLastIntrFailureAddrType
+    - iscsiTgtLastIntrFailureAddr
+  - oid: 1.3.6.1.3.9999.2.0.2
+    name: ISCSI-MIB::iscsiIntrLoginFailure
+    category: auth
+    severity: warning
+    description: "iSCSI initiator login failure on {SNMP_DEVICE_HOSTNAME}\n  failure count: {iscsiIntrLoginFailures}\n  last failure type: {iscsiIntrLastFailureType}\n  failed target name: {iscsiIntrLastTgtFailureName}\n  target address type: {iscsiIntrLastTgtFailureAddrType}\n  target address: {iscsiIntrLastTgtFailureAddr}"
+    varbinds:
+    - iscsiIntrLoginFailures
+    - iscsiIntrLastFailureType
+    - iscsiIntrLastTgtFailureName
+    - iscsiIntrLastTgtFailureAddrType
+    - iscsiIntrLastTgtFailureAddr
+  - oid: 1.3.6.1.3.9999.2.0.3
+    name: ISCSI-MIB::iscsiInstSessionFailure
+    category: state_change
+    severity: err
+    description: "iSCSI session failure on {SNMP_DEVICE_HOSTNAME}\n  cumulative failures: {iscsiInstSsnFailures}\n  last failure type: {iscsiInstLastSsnFailureType}\n  remote node: {iscsiInstLastSsnRmtNodeName}"
+    varbinds:
+    - iscsiInstSsnFailures
+    - iscsiInstLastSsnFailureType
+    - iscsiInstLastSsnRmtNodeName

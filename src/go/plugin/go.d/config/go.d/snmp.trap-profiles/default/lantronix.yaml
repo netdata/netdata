@@ -138,132 +138,118 @@ varbinds:
       '5': wireless
 traps:
   - oid: 1.3.6.1.4.1.244.1.1.0.1
-    name: slcEventPowerSupply
+    name: LANTRONIX-SLC-MIB::slcEventPowerSupply
     category: state_change
-    severity: warning
-    description: "Power supply event on {SNMP_DEVICE_HOSTNAME}\n  power supply ID: {slcPowerSupplyId}\n  action: {slcPowerSupplyAction}"
-    mib: LANTRONIX-SLC-MIB
+    severity: crit
+    description: "Power supply {slcPowerSupplyId} status changed on {SNMP_DEVICE_HOSTNAME}\n  action: {slcPowerSupplyAction}"
     status: current
     varbinds:
     - slcPowerSupplyId
     - slcPowerSupplyAction
   - oid: 1.3.6.1.4.1.244.1.1.0.10
-    name: slcEventDevicePortDeviceHighHumidity
+    name: LANTRONIX-SLC-MIB::slcEventDevicePortDeviceHighHumidity
     category: diagnostic
     severity: warning
-    description: "High humidity threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Current Humidity: {slcDevPortCfgDevHumidity}\n  High Humidity Limit: {slcDevPortCfgDevHighHumidity}"
-    mib: LANTRONIX-SLC-MIB
+    description: "High humidity threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Actual humidity: {slcDevPortCfgDevHumidity}%\n  High humidity limit: {slcDevPortCfgDevHighHumidity}%"
     status: current
     varbinds:
     - slcDevPortId
     - slcDevPortCfgDevHumidity
     - slcDevPortCfgDevHighHumidity
   - oid: 1.3.6.1.4.1.244.1.1.0.11
-    name: slcEventDevicePortDeviceError
-    category: state_change
-    severity: warning
+    name: LANTRONIX-SLC-MIB::slcEventDevicePortDeviceError
+    category: diagnostic
+    severity: err
     description: "Device error detected on Device Port {slcDevPortId} at {SNMP_DEVICE_HOSTNAME}\n  error status: {slcDevPortDeviceErrorStatus}"
-    mib: LANTRONIX-SLC-MIB
     status: current
     varbinds:
     - slcDevPortId
     - slcDevPortDeviceErrorStatus
   - oid: 1.3.6.1.4.1.244.1.1.0.12
-    name: slcEventPCCardAction
-    category: state_change
+    name: LANTRONIX-SLC-MIB::slcEventPCCardAction
+    category: diagnostic
     severity: notice
-    description: "PC Card action on {SNMP_DEVICE_HOSTNAME}\n  slot: {slcPCCardSlot}\n  action: {slcPCCardAction}\n  card type: {slcPCCardType}"
-    mib: LANTRONIX-SLC-MIB
+    description: "PC Card slot event on {SNMP_DEVICE_HOSTNAME}\n  slot: {slcPCCardSlot}\n  action: {slcPCCardAction}\n  card type: {slcPCCardType}"
     status: current
     varbinds:
     - slcPCCardSlot
     - slcPCCardAction
     - slcPCCardType
   - oid: 1.3.6.1.4.1.244.1.1.0.13
-    name: slcEventSLCInternalTemp
-    category: state_change
+    name: LANTRONIX-SLC-MIB::slcEventSLCInternalTemp
+    category: diagnostic
     severity: warning
-    description: "Internal temperature out of acceptable operating range on {SNMP_DEVICE_HOSTNAME}\n  current temperature: {slcSystemInternalTemp}°C\n  note: value of 9999 indicates an error reading the temperature sensor"
-    mib: LANTRONIX-SLC-MIB
+    description: "Internal temperature of {SNMP_DEVICE_HOSTNAME} is outside acceptable operating range\n  temperature: {slcSystemInternalTemp}"
     status: current
     varbinds:
     - slcSystemInternalTemp
   - oid: 1.3.6.1.4.1.244.1.1.0.14
-    name: slcEventUSBAction
-    category: state_change
-    severity: info
-    description: "USB event on {SNMP_DEVICE_HOSTNAME}\n  USB Port ID: {slcDevUSBId}\n  Action: {slcUSBAction}\n  Device Type: {slcUSBType}"
-    mib: LANTRONIX-SLC-MIB
+    name: LANTRONIX-SLC-MIB::slcEventUSBAction
+    category: diagnostic
+    severity: notice
+    description: "USB port event on {SNMP_DEVICE_HOSTNAME}\n  USB ID: {slcDevUSBId}\n  action: {slcUSBAction}\n  device type: {slcUSBType}"
     status: current
     varbinds:
     - slcDevUSBId
     - slcUSBAction
     - slcUSBType
   - oid: 1.3.6.1.4.1.244.1.1.0.15
-    name: slcEventDevicePortError
-    category: diagnostic
+    name: LANTRONIX-SLC-MIB::slcEventDevicePortError
+    category: state_change
     severity: err
-    description: "Device port error on {SNMP_DEVICE_HOSTNAME}\n  port ID: {slcDevPortId}\n  error status: {slcDevPortErrorStatus}"
-    mib: LANTRONIX-SLC-MIB
+    description: 'Device Port {slcDevPortId} on {SNMP_DEVICE_HOSTNAME} reported error status: {slcDevPortErrorStatus}'
     status: current
     varbinds:
     - slcDevPortId
     - slcDevPortErrorStatus
   - oid: 1.3.6.1.4.1.244.1.1.0.16
-    name: slcEventSDCardAction
-    category: diagnostic
-    severity: info
-    description: "SD Card slot activity on {SNMP_DEVICE_HOSTNAME}\n  action: {slcSDCardAction}"
-    mib: LANTRONIX-SLC-MIB
+    name: LANTRONIX-SLC-MIB::slcEventSDCardAction
+    category: state_change
+    severity: warning
+    description: "SD Card slot event on {SNMP_DEVICE_HOSTNAME}\n  action: {slcSDCardAction}\n  Possible values: deviceInserted(1), deviceRemoved(2)\n  Note: Unexpected device removal may result in data loss or service interruption."
     status: current
     varbinds:
     - slcSDCardAction
   - oid: 1.3.6.1.4.1.244.1.1.0.17
-    name: slcEventNoDialToneAlarm
+    name: LANTRONIX-SLC-MIB::slcEventNoDialToneAlarm
     category: diagnostic
-    severity: err
-    description: Internal modem on {SNMP_DEVICE_HOSTNAME} has no dial tone — modem connectivity may be unavailable
-    mib: LANTRONIX-SLC-MIB
+    severity: warning
+    description: No dial tone detected on internal modem at {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.244.1.1.0.18
-    name: slcEventRPMAction
+    name: LANTRONIX-SLC-MIB::slcEventRPMAction
     category: diagnostic
-    severity: info
+    severity: notice
     description: "Remote Power Manager event on {SNMP_DEVICE_HOSTNAME}\n  RPM name: {slcDevRPMName}\n  action: {slcRPMAction}"
-    mib: LANTRONIX-SLC-MIB
     status: current
     varbinds:
     - slcDevRPMName
     - slcRPMAction
   - oid: 1.3.6.1.4.1.244.1.1.0.19
-    name: slcEventPingHostFails
+    name: LANTRONIX-SLC-MIB::slcEventPingHostFails
     category: state_change
     severity: warning
-    description: "Ping host unreachable on {SNMP_DEVICE_HOSTNAME}\n  host: {slcEventHost}\n  The SLC failed to ping the monitored host."
-    mib: LANTRONIX-SLC-MIB
+    description: "Host reachability check failed on {SNMP_DEVICE_HOSTNAME}\n  monitored host: {slcEventHost}"
     status: current
     varbinds:
     - slcEventHost
   - oid: 1.3.6.1.4.1.244.1.1.0.2
-    name: slcEventSysadminPassword
+    name: LANTRONIX-SLC-MIB::slcEventSysadminPassword
     category: config_change
     severity: notice
-    description: Sysadmin user password was changed on {SNMP_DEVICE_HOSTNAME}
-    mib: LANTRONIX-SLC-MIB
+    description: Sysadmin password changed on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.244.1.1.0.3
-    name: slcEventSLCShutdown
+    name: LANTRONIX-SLC-MIB::slcEventSLCShutdown
     category: state_change
-    severity: warning
-    description: SLC (Secure Console Manager) shutdown initiated on {SNMP_DEVICE_HOSTNAME}
-    mib: LANTRONIX-SLC-MIB
+    severity: notice
+    description: SLC shutdown initiated on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.244.1.1.0.4
-    name: slcEventDevicePortData
+    name: LANTRONIX-SLC-MIB::slcEventDevicePortData
     category: diagnostic
     severity: info
-    description: "Data received on Device Port {slcDevPortId} on {SNMP_DEVICE_HOSTNAME} ({slcHostname})\n  bytes received: {slcDevPortNumBytes}\n  trigger pattern: {slcDevPortCfgEmailTextString}\n  captured data: {slcDevPortData}"
-    mib: LANTRONIX-SLC-MIB
+    description: "Device port data event on {SNMP_DEVICE_HOSTNAME}\n  port ID: {slcDevPortId}\n  bytes received: {slcDevPortNumBytes}\n  data: {slcDevPortData}\n  trigger pattern: {slcDevPortCfgEmailTextString}\n  hostname: {slcHostname}"
     status: current
     varbinds:
     - slcDevPortId
@@ -272,55 +258,50 @@ traps:
     - slcDevPortCfgEmailTextString
     - slcHostname
   - oid: 1.3.6.1.4.1.244.1.1.0.5
-    name: slcEventDevicePortSLMData
+    name: LANTRONIX-SLC-MIB::slcEventDevicePortSLMData
     category: diagnostic
     severity: info
-    description: "Device Port data threshold reached on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Bytes received: {slcDevPortNumBytes}\n  Start byte offset: {slcDevPortStartByte}"
-    mib: LANTRONIX-SLC-MIB
+    description: "Device port data notification on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Bytes received: {slcDevPortNumBytes}\n  Start byte offset: {slcDevPortStartByte}\n\nThis trap fires when configured byte-count or time thresholds are met on a Device Port configured for SLM-directed alerting."
     status: current
     varbinds:
     - slcDevPortId
     - slcDevPortNumBytes
     - slcDevPortStartByte
   - oid: 1.3.6.1.4.1.244.1.1.0.6
-    name: slcEventDevicePortSLMConfig
+    name: LANTRONIX-SLC-MIB::slcEventDevicePortSLMConfig
     category: config_change
     severity: notice
-    description: "SLM logging configuration changed on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Bytes threshold: {slcDevPortNumBytes}\n  Time frame (seconds): {slcDevPortTimeFrame}"
-    mib: LANTRONIX-SLC-MIB
+    description: "SLM logging configuration changed on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Byte threshold: {slcDevPortNumBytes}\n  Time frame (seconds): {slcDevPortTimeFrame}"
     status: current
     varbinds:
     - slcDevPortId
     - slcDevPortNumBytes
     - slcDevPortTimeFrame
   - oid: 1.3.6.1.4.1.244.1.1.0.7
-    name: slcEventDevicePortDeviceLowTemp
-    category: state_change
+    name: LANTRONIX-SLC-MIB::slcEventDevicePortDeviceLowTemp
+    category: diagnostic
     severity: warning
-    description: "Low temperature limit exceeded on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Actual Temperature: {slcDevPortCfgDevTemperature}°C\n  Low Temp Limit: {slcDevPortCfgDevLowTemp}°C"
-    mib: LANTRONIX-SLC-MIB
+    description: "Device port {slcDevPortId} on {SNMP_DEVICE_HOSTNAME} reported low temperature\n  actual temperature: {slcDevPortCfgDevTemperature}\n  low temperature limit: {slcDevPortCfgDevLowTemp}"
     status: current
     varbinds:
     - slcDevPortId
     - slcDevPortCfgDevTemperature
     - slcDevPortCfgDevLowTemp
   - oid: 1.3.6.1.4.1.244.1.1.0.8
-    name: slcEventDevicePortDeviceHighTemp
+    name: LANTRONIX-SLC-MIB::slcEventDevicePortDeviceHighTemp
     category: state_change
     severity: warning
-    description: "High temperature threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Current temperature: {slcDevPortCfgDevTemperature} °C\n  Threshold: {slcDevPortCfgDevHighTemp} °C"
-    mib: LANTRONIX-SLC-MIB
+    description: "High temperature threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Current temperature: {slcDevPortCfgDevTemperature}\n  High temperature limit: {slcDevPortCfgDevHighTemp}"
     status: current
     varbinds:
     - slcDevPortId
     - slcDevPortCfgDevTemperature
     - slcDevPortCfgDevHighTemp
   - oid: 1.3.6.1.4.1.244.1.1.0.9
-    name: slcEventDevicePortDeviceLowHumidity
-    category: state_change
+    name: LANTRONIX-SLC-MIB::slcEventDevicePortDeviceLowHumidity
+    category: diagnostic
     severity: warning
-    description: "Low humidity threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Current humidity: {slcDevPortCfgDevHumidity}%\n  Low humidity limit: {slcDevPortCfgDevLowHumidity}%"
-    mib: LANTRONIX-SLC-MIB
+    description: "Low humidity threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  Device Port ID: {slcDevPortId}\n  Actual humidity: {slcDevPortCfgDevHumidity}%\n  Low humidity limit: {slcDevPortCfgDevLowHumidity}%"
     status: current
     varbinds:
     - slcDevPortId

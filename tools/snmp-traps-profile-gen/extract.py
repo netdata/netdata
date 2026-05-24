@@ -34,10 +34,12 @@ from pysmi.writer import CallbackWriter
 
 
 # Priority-ordered search path. First match for a given MIB name wins.
-# - IETF canonical first (netdisco/rfc), then vendor-canonical (cisco v2),
-#   then the broader community archives.
+# - IETF canonical first (netdisco/rfc), then pysnmp/mibs (canonical multi-
+#   vendor curation tracked by the pysnmp project), then vendor-canonical
+#   (cisco v2), then the broader community archives.
 DEFAULT_SOURCE_DIRS: List[str] = [
     "/opt/baddisk/monitoring/repos/netdisco/netdisco-mibs/rfc",
+    "/opt/baddisk/monitoring/repos/snmp/mibs/src",
     "/opt/baddisk/monitoring/repos/snmp/cisco__cisco-mibs/v2",
     "/opt/baddisk/monitoring/repos/snmp/cisco__cisco-mibs/v1",
     "/opt/baddisk/monitoring/repos/snmp/Poil__MIBs",
@@ -251,7 +253,12 @@ def build_global_symbols(modules: Dict[str, Dict[str, Any]]) -> Dict[Tuple[str, 
             continue
         for sym_name, sym in doc.items():
             if isinstance(sym, dict):
-                out[(mod_name, sym_name)] = sym
+                clean = demangle_pysmi_name(sym_name)
+                out[(mod_name, clean)] = sym
+                # Also keep the mangled alias so OBJECTS references that
+                # quote the mangled form still resolve to the same record.
+                if clean != sym_name:
+                    out[(mod_name, sym_name)] = sym
     return out
 
 
@@ -304,6 +311,20 @@ def render_syntax(syntax: Any) -> Tuple[Optional[str], Optional[str], Optional[D
     return (t, constraints_str, enum_map)
 
 
+# pysmi prefixes Python keywords with ``_pysmi_`` so its generated code is
+# syntactically valid Python. The mangled name is NOT the canonical SMI
+# symbol -- snmptranslate / snmptrapd / MIB browsers all use the original.
+# We strip the prefix everywhere we surface a name so the shipped pack
+# matches what real tools produce.
+_PYSMI_KEYWORD_PREFIX = "_pysmi_"
+
+
+def demangle_pysmi_name(name: Optional[str]) -> Optional[str]:
+    if isinstance(name, str) and name.startswith(_PYSMI_KEYWORD_PREFIX):
+        return name[len(_PYSMI_KEYWORD_PREFIX):]
+    return name
+
+
 def resolve_varbind(
     obj_ref: Any,
     symbols: Dict[Tuple[str, str], Dict[str, Any]],
@@ -319,11 +340,17 @@ def resolve_varbind(
         ref_mod = None
         ref_name = obj_ref if isinstance(obj_ref, str) else None
 
+    # Strip pysmi's Python-keyword prefix from BOTH the ref-name and the
+    # surfaced record name so downstream tooling sees the canonical SMI
+    # symbol.
+    ref_name_clean = demangle_pysmi_name(ref_name)
+
     rec: Dict[str, Any] = {
-        "name": ref_name,
+        "name": ref_name_clean,
         "module": ref_mod,
         "resolved": False,
     }
+    ref_name = ref_name_clean
     if not ref_name:
         return rec
 
@@ -394,7 +421,7 @@ def extract_traps_from_module(
         varbinds = [resolve_varbind(o, symbols) for o in objects]
         yield {
             "oid": sym.get("oid"),
-            "name": sym_name,
+            "name": demangle_pysmi_name(sym_name),
             "class": sym.get("class"),
             "mib": mib_name,
             **mib_meta,

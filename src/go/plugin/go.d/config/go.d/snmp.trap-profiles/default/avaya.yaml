@@ -290,6 +290,74 @@ varbinds:
   ipoPhonesType:
     oid: 1.3.6.1.4.1.6889.2.2.1.1.1.1.1.2.1.6
     type: PhoneType
+  mefServiceNotificationConfigurationChangeType:
+    oid: 1.3.6.1.4.1.15007.2.2.1.8.2
+    type: INTEGER
+    enum:
+      '1': entryAdded
+      '2': entryDeleted
+      '3': entryModified
+  mefServiceNotificationObjDateAndTime:
+    oid: 1.3.6.1.4.1.15007.2.2.1.8.1
+    type: DateAndTime
+  mefSoamDmCfgSessionStatus:
+    oid: 1.3.6.1.4.1.15007.1.3.1.3.1.1.32
+    type: MefSoamTcStatusType
+  mefSoamLmCfgSessionStatus:
+    oid: 1.3.6.1.4.1.15007.1.3.1.2.1.1.32
+    type: MefSoamTcStatusType
+  mefSoamLmCurrentAvailStatsBackwardAvailable:
+    oid: 1.3.6.1.4.1.15007.1.3.1.2.3.1.10
+    type: Gauge32
+  mefSoamLmCurrentAvailStatsBackwardUnavailable:
+    oid: 1.3.6.1.4.1.15007.1.3.1.2.3.1.12
+    type: Gauge32
+  mefSoamLmCurrentAvailStatsForwardAvailable:
+    oid: 1.3.6.1.4.1.15007.1.3.1.2.3.1.9
+    type: Gauge32
+  mefSoamLmCurrentAvailStatsForwardUnavailable:
+    oid: 1.3.6.1.4.1.15007.1.3.1.2.3.1.11
+    type: Gauge32
+  mefSoamLmMeasuredStatsAvailBackwardLastTransitionTime:
+    oid: 1.3.6.1.4.1.15007.1.3.1.2.2.1.6
+    type: DateAndTime
+  mefSoamLmMeasuredStatsAvailBackwardStatus:
+    oid: 1.3.6.1.4.1.15007.1.3.1.2.2.1.4
+    type: MefSoamTcAvailabilityType
+  mefSoamLmMeasuredStatsAvailForwardLastTransitionTime:
+    oid: 1.3.6.1.4.1.15007.1.3.1.2.2.1.5
+    type: DateAndTime
+  mefSoamLmMeasuredStatsAvailForwardStatus:
+    oid: 1.3.6.1.4.1.15007.1.3.1.2.2.1.3
+    type: MefSoamTcAvailabilityType
+  mefSoamPmNotificationObjCrossingType:
+    oid: 1.3.6.1.4.1.15007.1.3.1.5.6
+    type: INTEGER
+    enum:
+      '1': aboveAlarm
+      '3': clearAlarm
+      '2': setAlarm
+  mefSoamPmNotificationObjDateAndTime:
+    oid: 1.3.6.1.4.1.15007.1.3.1.5.1
+    type: DateAndTime
+  mefSoamPmNotificationObjDestinationMep:
+    oid: 1.3.6.1.4.1.15007.1.3.1.5.7
+    type: MacAddress
+  mefSoamPmNotificationObjPriority:
+    oid: 1.3.6.1.4.1.15007.1.3.1.5.8
+    type: MacAddress
+  mefSoamPmNotificationObjSuspect:
+    oid: 1.3.6.1.4.1.15007.1.3.1.5.5
+    type: TruthValue
+  mefSoamPmNotificationObjThresholdConfig:
+    oid: 1.3.6.1.4.1.15007.1.3.1.5.3
+    type: Unsigned32
+  mefSoamPmNotificationObjThresholdId:
+    oid: 1.3.6.1.4.1.15007.1.3.1.5.2
+    type: OBJECT IDENTIFIER
+  mefSoamPmNotificationObjThresholdValue:
+    oid: 1.3.6.1.4.1.15007.1.3.1.5.4
+    type: Unsigned32
   smepGTEventAppEntity:
     oid: 1.3.6.1.4.1.6889.2.48.1.2.1.4
     type: INTEGER
@@ -319,12 +387,72 @@ varbinds:
     type: DisplayString
     constraints: SIZE(0..255)
 traps:
-  - oid: 1.3.6.1.4.1.6889.2.2.1.1.1.0.1
-    name: ipoPhonesChangeEvent
+  - oid: 1.3.6.1.4.1.15007.1.3.0.1
+    name: MEF-SOAM-PM-MIB::mefSoamAvailabilityChangeAlarm
+    category: state_change
+    severity: warning
+    description: "SOAM availability status changed on {SNMP_DEVICE_HOSTNAME}\n  forward status: {mefSoamLmMeasuredStatsAvailForwardStatus}\n  backward status: {mefSoamLmMeasuredStatsAvailBackwardStatus}\n  forward last transition: {mefSoamLmMeasuredStatsAvailForwardLastTransitionTime}\n  backward last transition: {mefSoamLmMeasuredStatsAvailBackwardLastTransitionTime}\n  destination MEP: {mefSoamPmNotificationObjDestinationMep}\n  priority: {mefSoamPmNotificationObjPriority}\n  timestamp: {mefSoamPmNotificationObjDateAndTime}"
+    status: current
+    varbinds:
+    - mefSoamPmNotificationObjDateAndTime
+    - mefSoamLmMeasuredStatsAvailForwardStatus
+    - mefSoamLmMeasuredStatsAvailBackwardStatus
+    - mefSoamLmMeasuredStatsAvailForwardLastTransitionTime
+    - mefSoamLmMeasuredStatsAvailBackwardLastTransitionTime
+    - mefSoamLmCurrentAvailStatsForwardAvailable
+    - mefSoamLmCurrentAvailStatsForwardUnavailable
+    - mefSoamLmCurrentAvailStatsBackwardAvailable
+    - mefSoamLmCurrentAvailStatsBackwardUnavailable
+    - mefSoamPmNotificationObjDestinationMep
+    - mefSoamPmNotificationObjPriority
+  - oid: 1.3.6.1.4.1.15007.1.3.0.2
+    name: MEF-SOAM-PM-MIB::mefSoamLmSessionStartStopAlarm
     category: state_change
     severity: notice
-    description: "Phone type changed on Avaya IP Office {SNMP_DEVICE_HOSTNAME}\n  extension ID: {ipoPhonesExtID}\n  previous/new phone type: {ipoPhonesType}\n  port (entPhysicalIndex): {ipoPhonesPort}\n  severity: {ipoGTEventSeverity}\n  occurred: {ipoGTEventDateTime}"
-    mib: IPO-PHONES-MIB
+    description: "MEF SOAM LM session state change on {SNMP_DEVICE_HOSTNAME}\n  session status: {mefSoamLmCfgSessionStatus}\n  notification time: {mefSoamPmNotificationObjDateAndTime}\n  destination MEP MAC: {mefSoamPmNotificationObjDestinationMep}"
+    status: current
+    varbinds:
+    - mefSoamLmCfgSessionStatus
+    - mefSoamPmNotificationObjDateAndTime
+    - mefSoamPmNotificationObjDestinationMep
+  - oid: 1.3.6.1.4.1.15007.1.3.0.3
+    name: MEF-SOAM-PM-MIB::mefSoamDmSessionStartStopAlarm
+    category: state_change
+    severity: notice
+    description: "MEF SOAM DM session state change on {SNMP_DEVICE_HOSTNAME}\n  session status: {mefSoamDmCfgSessionStatus}\n  timestamp: {mefSoamPmNotificationObjDateAndTime}\n  destination MEP: {mefSoamPmNotificationObjDestinationMep}"
+    status: current
+    varbinds:
+    - mefSoamDmCfgSessionStatus
+    - mefSoamPmNotificationObjDateAndTime
+    - mefSoamPmNotificationObjDestinationMep
+  - oid: 1.3.6.1.4.1.15007.1.3.0.4
+    name: MEF-SOAM-PM-MIB::mefSoamPmThresholdCrossingAlarm
+    category: diagnostic
+    severity: warning
+    description: "MEF SOAM PM threshold crossing alarm on {SNMP_DEVICE_HOSTNAME}\n  crossing type: {mefSoamPmNotificationObjCrossingType}\n  threshold ID: {mefSoamPmNotificationObjThresholdId}\n  configured threshold: {mefSoamPmNotificationObjThresholdConfig}\n  measured value: {mefSoamPmNotificationObjThresholdValue}\n  suspect: {mefSoamPmNotificationObjSuspect}\n  timestamp: {mefSoamPmNotificationObjDateAndTime}\n  destination MEP: {mefSoamPmNotificationObjDestinationMep}"
+    status: current
+    varbinds:
+    - mefSoamPmNotificationObjCrossingType
+    - mefSoamPmNotificationObjThresholdId
+    - mefSoamPmNotificationObjThresholdConfig
+    - mefSoamPmNotificationObjThresholdValue
+    - mefSoamPmNotificationObjSuspect
+    - mefSoamPmNotificationObjDateAndTime
+    - mefSoamPmNotificationObjDestinationMep
+  - oid: 1.3.6.1.4.1.15007.2.2.0.1
+    name: MEF-UNI-EVC-MIB::mefServiceConfigurationAlarm
+    category: config_change
+    severity: notice
+    description: "MEF EVC configuration change on {SNMP_DEVICE_HOSTNAME}\n  change type: {mefServiceNotificationConfigurationChangeType}\n  timestamp: {mefServiceNotificationObjDateAndTime}"
+    status: current
+    varbinds:
+    - mefServiceNotificationObjDateAndTime
+    - mefServiceNotificationConfigurationChangeType
+  - oid: 1.3.6.1.4.1.6889.2.2.1.1.1.0.1
+    name: IPO-PHONES-MIB::ipoPhonesChangeEvent
+    category: state_change
+    severity: warning
+    description: "Phone type change detected on {SNMP_DEVICE_HOSTNAME}\n  extension: {ipoPhonesExtID}\n  new phone type: {ipoPhonesType}\n  port: {ipoPhonesPort}\n  event severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
@@ -333,11 +461,10 @@ traps:
     - ipoPhonesType
     - ipoPhonesPort
   - oid: 1.3.6.1.4.1.6889.2.2.1.1.1.0.2
-    name: ipoPhonesChangeSvcEvent
+    name: IPO-PHONES-MIB::ipoPhonesChangeSvcEvent
     category: state_change
-    severity: warning
-    description: "Phone type change detected on {SNMP_DEVICE_HOSTNAME}\n  extension ID: {ipoPhonesExtID}\n  phone type: {ipoPhonesType}\n  port: {ipoPhonesPort}\n  entity: {ipoGTEventEntityName}\n  device: {ipoGTEventDevID}\n  occurred: {ipoGTEventDateTime}"
-    mib: IPO-PHONES-MIB
+    severity: notice
+    description: "Phone type changed on {SNMP_DEVICE_HOSTNAME}\n  extension: {ipoPhonesExtID}\n  new phone type: {ipoPhonesType}\n  port: {ipoPhonesPort}\n  entity: {ipoGTEventEntityName}\n  event time: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -349,44 +476,40 @@ traps:
     - ipoPhonesPort
     - ipoGTEventEntityName
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.1
-    name: ipoGenEntityFailureEvent
+    name: IPO-MIB::ipoGenEntityFailureEvent
     category: state_change
     severity: crit
-    description: "Physical entity failure detected on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}\n  entity index: {ipoGTEventEntity}"
-    mib: IPO-MIB
+    description: "Physical entity failure detected on {SNMP_DEVICE_HOSTNAME}\n  entity index: {ipoGTEventEntity}\n  severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
     - ipoGTEventEntity
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.10
-    name: ipoGenAppFailureEvent
+    name: IPO-MIB::ipoGenAppFailureEvent
     category: state_change
     severity: err
     description: "IP Office application communication failure on {SNMP_DEVICE_HOSTNAME}\n  application: {ipoGTEventAppEntity}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}"
-    mib: IPO-MIB
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
     - ipoGTEventAppEntity
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.11
-    name: ipoGenAppOperationalEvent
+    name: IPO-MIB::ipoGenAppOperationalEvent
     category: state_change
     severity: info
-    description: "Communication restored between IP Office switch and application on {SNMP_DEVICE_HOSTNAME}\n  application: {ipoGTEventAppEntity}\n  severity: {ipoGTEventSeverity}\n  restored at: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    description: "Communication between IP Office switch and application {ipoGTEventAppEntity} restored on {SNMP_DEVICE_HOSTNAME}\n  event severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
     - ipoGTEventAppEntity
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.12
-    name: ipoGenAppEvent
-    category: diagnostic
-    severity: err
-    description: "Application event on {SNMP_DEVICE_HOSTNAME}\n  app entity: {ipoGTEventAppEntity}\n  event: {ipoGTEventAppEvent}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    name: IPO-MIB::ipoGenAppEvent
+    category: state_change
+    severity: warning
+    description: "Application event detected on {SNMP_DEVICE_HOSTNAME}\n  application entity: {ipoGTEventAppEntity}\n  event type: {ipoGTEventAppEvent}\n  severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
@@ -394,33 +517,30 @@ traps:
     - ipoGTEventAppEntity
     - ipoGTEventAppEvent
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.13
-    name: ipoGenSogHostFailureEvent
+    name: IPO-MIB::ipoGenSogHostFailureEvent
     category: state_change
-    severity: err
-    description: "Small Office Gateway subtending host failure on {SNMP_DEVICE_HOSTNAME}\n  host address: {ipoGTEventHostAddress}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    severity: crit
+    description: "Sub-tending host failure detected on {SNMP_DEVICE_HOSTNAME}\n  host address: {ipoGTEventHostAddress}\n  severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
     - ipoGTEventHostAddress
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.14
-    name: ipoGenSogModeChangeEvent
+    name: IPO-MIB::ipoGenSogModeChangeEvent
     category: state_change
     severity: warning
-    description: "Small Office Gateway operating mode changed on {SNMP_DEVICE_HOSTNAME}\n  mode: {ipoGTEventSOGMode}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}\n\nNote: survivable(1) mode indicates the control unit has no current host (config error or communication failure); subTending(2) mode indicates normal sub-tending operation."
-    mib: IPO-MIB
+    description: "Small Office Gateway operating mode changed on {SNMP_DEVICE_HOSTNAME}\n  new mode: {ipoGTEventSOGMode}\n  event severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
     - ipoGTEventSOGMode
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.15
-    name: ipoGenColdStartSvcEvent
+    name: IPO-MIB::ipoGenColdStartSvcEvent
     category: state_change
-    severity: notice
-    description: "Device {SNMP_DEVICE_HOSTNAME} performed a cold-start reinitialization\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  system description: {sysDescr}"
-    mib: IPO-MIB
+    severity: info
+    description: "Device {ipoGTEventDevID} performed a cold start on {SNMP_DEVICE_HOSTNAME}\n  timestamp: {ipoGTEventDateTime}\n  system description: {sysDescr}\n  perceived severity: {ipoGTEventStdSeverity}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -428,11 +548,10 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.16
-    name: ipoGenWarmStartSvcEvent
+    name: IPO-MIB::ipoGenWarmStartSvcEvent
     category: state_change
     severity: info
-    description: "Warm-start event on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  description: {sysDescr}"
-    mib: IPO-MIB
+    description: "Device {ipoGTEventDevID} ({sysDescr}) performed a warm start on {SNMP_DEVICE_HOSTNAME}\n  event severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -440,11 +559,10 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.17
-    name: ipoGenLinkDownSvcEvent
+    name: IPO-MIB::ipoGenLinkDownSvcEvent
     category: state_change
     severity: warning
-    description: "Link down event on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  system: {sysDescr}\n  interface index: {ifIndex}"
-    mib: IPO-MIB
+    description: "Link down event on {SNMP_DEVICE_HOSTNAME}\n  interface index: {ifIndex}\n  device identifier: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -453,11 +571,10 @@ traps:
     - sysDescr
     - ifIndex
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.18
-    name: ipoGenLinkUpSvcEvent
+    name: IPO-MIB::ipoGenLinkUpSvcEvent
     category: state_change
-    severity: info
-    description: "Network link came up on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  interface index: {ifIndex}\n  severity: {ipoGTEventStdSeverity}\n  occurred: {ipoGTEventDateTime}\n  system: {sysDescr}"
-    mib: IPO-MIB
+    severity: notice
+    description: "Link up event on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  system: {sysDescr}\n  interface: {ifIndex}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -466,11 +583,10 @@ traps:
     - sysDescr
     - ifIndex
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.19
-    name: ipoGenAuthFailureSvcEvent
+    name: IPO-MIB::ipoGenAuthFailureSvcEvent
     category: auth
     severity: warning
-    description: "Authentication failure on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  occurred: {ipoGTEventDateTime}\n  system: {sysDescr}"
-    mib: IPO-MIB
+    description: "Authentication failure on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  system: {sysDescr}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -478,22 +594,20 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.2
-    name: ipoGenEntityOperationalEvent
+    name: IPO-MIB::ipoGenEntityOperationalEvent
     category: state_change
-    severity: notice
-    description: "Physical entity recovered to operational state on {SNMP_DEVICE_HOSTNAME}\n  entity index: {ipoGTEventEntity}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    severity: warning
+    description: "Physical entity {ipoGTEventEntity} recovered to operational state on {SNMP_DEVICE_HOSTNAME}\n  event severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
     - ipoGTEventEntity
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.20
-    name: ipoGenEntityFailureSvcEvent
+    name: IPO-MIB::ipoGenEntityFailureSvcEvent
     category: state_change
-    severity: err
-    description: "Physical entity failure detected on {SNMP_DEVICE_HOSTNAME}. Entity transitioned from operational to failed state.\n  entity name: {ipoGTEventEntityName}\n  entity index: {ipoGTEventEntity}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  sysDescr: {sysDescr}"
-    mib: IPO-MIB
+    severity: alert
+    description: "Physical entity failure detected on {SNMP_DEVICE_HOSTNAME}\n  entity: {ipoGTEventEntityName}\n  entity index: {ipoGTEventEntity}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -503,11 +617,10 @@ traps:
     - ipoGTEventEntity
     - ipoGTEventEntityName
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.21
-    name: ipoGenEntityOperationalSvcEvent
+    name: IPO-MIB::ipoGenEntityOperationalSvcEvent
     category: state_change
     severity: info
-    description: "Physical entity recovered from failed state on {SNMP_DEVICE_HOSTNAME}\n  entity name: {ipoGTEventEntityName}\n  entity index: {ipoGTEventEntity}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  occurred: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    description: "Physical entity {ipoGTEventEntityName} (index {ipoGTEventEntity}) on {SNMP_DEVICE_HOSTNAME} transitioned from failed to operational state.\n  event severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -517,11 +630,10 @@ traps:
     - ipoGTEventEntity
     - ipoGTEventEntityName
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.22
-    name: ipoGenEntityErrorSvcEvent
+    name: IPO-MIB::ipoGenEntityErrorSvcEvent
     category: diagnostic
     severity: warning
-    description: "Transient error detected on physical entity at {SNMP_DEVICE_HOSTNAME}\n  entity name: {ipoGTEventEntityName}\n  entity index: {ipoGTEventEntity}\n  severity: {ipoGTEventStdSeverity}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}\n  system: {sysDescr}"
-    mib: IPO-MIB
+    description: "Physical entity error on {SNMP_DEVICE_HOSTNAME}\n  entity: {ipoGTEventEntityName}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -531,11 +643,10 @@ traps:
     - ipoGTEventEntity
     - ipoGTEventEntityName
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.23
-    name: ipoGenEntityChangeSvcEvent
+    name: IPO-MIB::ipoGenEntityChangeSvcEvent
     category: state_change
     severity: notice
-    description: "Physical entity change detected on {SNMP_DEVICE_HOSTNAME}\n  entity name: {ipoGTEventEntityName}\n  entity index: {ipoGTEventEntity}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  occurred: {ipoGTEventDateTime}\n  description: {sysDescr}"
-    mib: IPO-MIB
+    description: "Physical entity state change on {SNMP_DEVICE_HOSTNAME}\n  entity: {ipoGTEventEntityName}\n  entity index: {ipoGTEventEntity}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -545,11 +656,10 @@ traps:
     - ipoGTEventEntity
     - ipoGTEventEntityName
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.24
-    name: ipoGenLKSCommsFailureSvcEvent
+    name: IPO-MIB::ipoGenLKSCommsFailureSvcEvent
     category: license
-    severity: err
-    description: "Communication with License Key Server failed on {SNMP_DEVICE_HOSTNAME}\n  Device ID: {ipoGTEventDevID}\n  Event time: {ipoGTEventDateTime}\n  Severity: {ipoGTEventStdSeverity}\n  System: {sysDescr}"
-    mib: IPO-MIB
+    severity: warning
+    description: "Communication with License Key Server failed on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  system description: {sysDescr}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -557,11 +667,10 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.25
-    name: ipoGenLKSCommsOperationalSvcEvent
+    name: IPO-MIB::ipoGenLKSCommsOperationalSvcEvent
     category: state_change
-    severity: notice
-    description: "Communication with Licence Key Server restored on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  system: {sysDescr}"
-    mib: IPO-MIB
+    severity: info
+    description: "Licence Key Server communication restored to operational state on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -569,11 +678,10 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.26
-    name: ipoGenLKSCommsErrorSvcEvent
-    category: license
+    name: IPO-MIB::ipoGenLKSCommsErrorSvcEvent
+    category: state_change
     severity: warning
-    description: "Temporary License Key Server communication error on {SNMP_DEVICE_HOSTNAME}\n  device: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  occurred: {ipoGTEventDateTime}\n  system: {sysDescr}"
-    mib: IPO-MIB
+    description: "License Key Server communication error on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -581,11 +689,10 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.27
-    name: ipoGenLKSCommsChangeSvcEvent
-    category: license
-    severity: info
-    description: "Non-error License Key Server communication change on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  system: {sysDescr}"
-    mib: IPO-MIB
+    name: IPO-MIB::ipoGenLKSCommsChangeSvcEvent
+    category: state_change
+    severity: notice
+    description: "License Key Server communication status changed on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -593,11 +700,10 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.28
-    name: ipoGenLoopbackSvcEvent
+    name: IPO-MIB::ipoGenLoopbackSvcEvent
     category: state_change
-    severity: warning
-    description: "IP Office T1/DS1 CSU loopback status changed on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device: {ipoGTEventDevID}\n  entity: {ipoGTEventEntityName}\n  loopback status bits: {ipoGTEventLoopbackStatusBits}"
-    mib: IPO-MIB
+    severity: notice
+    description: "DS1 (T1) interface loopback status changed on {SNMP_DEVICE_HOSTNAME}\n  entity: {ipoGTEventEntityName}\n  loopback status: {ipoGTEventLoopbackStatusBits}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -608,11 +714,10 @@ traps:
     - ipoGTEventEntityName
     - ipoGTEventLoopbackStatusBits
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.29
-    name: ipoGenAppFailureSvcEvent
+    name: IPO-MIB::ipoGenAppFailureSvcEvent
     category: state_change
-    severity: err
-    description: "IP Office application communication failure on {SNMP_DEVICE_HOSTNAME}\n  application: {ipoGTEventAppEntity}\n  device: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  occurred: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    severity: crit
+    description: "Communication failure between IP Office switch and application on {SNMP_DEVICE_HOSTNAME}\n  application: {ipoGTEventAppEntity}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -621,22 +726,20 @@ traps:
     - sysDescr
     - ipoGTEventAppEntity
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.3
-    name: ipoGenEntityErrorEvent
+    name: IPO-MIB::ipoGenEntityErrorEvent
     category: diagnostic
     severity: warning
-    description: "Physical entity error on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}\n  entity (entPhysicalIndex): {ipoGTEventEntity}"
-    mib: IPO-MIB
+    description: "Physical entity error on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  entity index: {ipoGTEventEntity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
     - ipoGTEventEntity
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.30
-    name: ipoGenAppOperationalSvcEvent
+    name: IPO-MIB::ipoGenAppOperationalSvcEvent
     category: state_change
     severity: notice
-    description: "IP Office application communication restored on {SNMP_DEVICE_HOSTNAME}\n  application: {ipoGTEventAppEntity}\n  device: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  time: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    description: "IP Office application communication restored on {SNMP_DEVICE_HOSTNAME}\n  application: {ipoGTEventAppEntity}\n  device: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  occurred: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -645,11 +748,10 @@ traps:
     - sysDescr
     - ipoGTEventAppEntity
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.31
-    name: ipoGenAppSvcEvent
-    category: diagnostic
-    severity: err
-    description: "IP Office application service event on {SNMP_DEVICE_HOSTNAME}\n  app entity: {ipoGTEventAppEntity}\n  app event: {ipoGTEventAppEvent}\n  device ID: {ipoGTEventDevID}\n  datetime: {ipoGTEventDateTime}\n  description: {ipoGTEventAlarmDescription}"
-    mib: IPO-MIB
+    name: IPO-MIB::ipoGenAppSvcEvent
+    category: state_change
+    severity: warning
+    description: "IP Office application event detected on {SNMP_DEVICE_HOSTNAME}\n  application: {ipoGTEventAppEntity}\n  event: {ipoGTEventAppEvent}\n  severity: {ipoGTEventStdSeverity}\n  description: {ipoGTEventAlarmDescription}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -660,11 +762,10 @@ traps:
     - ipoGTEventAppEvent
     - ipoGTEventAlarmDescription
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.32
-    name: ipoGenSogHostFailureSvcEvent
+    name: IPO-MIB::ipoGenSogHostFailureSvcEvent
     category: state_change
     severity: crit
-    description: "Small Office Gateway subtending host failure on {SNMP_DEVICE_HOSTNAME}\n  host address: {ipoGTEventHostAddress}\n  severity: {ipoGTEventStdSeverity}\n  date/time: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  system: {sysDescr}"
-    mib: IPO-MIB
+    description: "Sub-tending host failure detected on {SNMP_DEVICE_HOSTNAME}\n  Host address: {ipoGTEventHostAddress}\n  Device ID: {ipoGTEventDevID}\n  Severity: {ipoGTEventStdSeverity}\n  Timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -673,11 +774,10 @@ traps:
     - sysDescr
     - ipoGTEventHostAddress
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.33
-    name: ipoGenSogModeChangeSvcEvent
+    name: IPO-MIB::ipoGenSogModeChangeSvcEvent
     category: state_change
     severity: warning
-    description: "Small Office Gateway operating mode changed on {SNMP_DEVICE_HOSTNAME}\n  mode: {ipoGTEventSOGMode}\n  severity: {ipoGTEventStdSeverity}\n  device ID: {ipoGTEventDevID}\n  occurred: {ipoGTEventDateTime}\nNote: survivable(1) indicates control unit has no host (config error or comm failure); subTending(2) is normal operation."
-    mib: IPO-MIB
+    description: "Small Office Gateway operating mode changed on {SNMP_DEVICE_HOSTNAME}\n  previous/current mode: {ipoGTEventSOGMode}\n  event severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -686,11 +786,10 @@ traps:
     - sysDescr
     - ipoGTEventSOGMode
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.34
-    name: ipoGenUPriLicChansReducedSvcEvent
+    name: IPO-MIB::ipoGenUPriLicChansReducedSvcEvent
     category: license
     severity: warning
-    description: "Number of Universal PRI licensed channels reduced on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  system: {sysDescr}"
-    mib: IPO-MIB
+    description: "Universal PRI licensed channels reduced on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -698,11 +797,10 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.35
-    name: ipoGenUPriLicCallRejectedSvcEvent
+    name: IPO-MIB::ipoGenUPriLicCallRejectedSvcEvent
     category: license
     severity: err
-    description: "Universal PRI call rejected on {SNMP_DEVICE_HOSTNAME} due to licensed channel unavailable\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device: {ipoGTEventDevID}\n  system: {sysDescr}"
-    mib: IPO-MIB
+    description: "Universal PRI call rejected on {SNMP_DEVICE_HOSTNAME} due to licensed channel not available\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  system: {sysDescr}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -710,11 +808,10 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.36
-    name: ipoGenQoSMonSvcEvent
-    category: diagnostic
+    name: IPO-MIB::ipoGenQoSMonSvcEvent
+    category: state_change
     severity: warning
-    description: "QoS threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  device: {ipoGTEventDevID} ({sysDescr})\n  timestamp: {ipoGTEventDateTime}\n  call ID: {ipoGTEventQoSMonCallId}\n  device type: {ipoGTEventQoSMonDevType}\n  device ID: {ipoGTEventQoSMonDevId}\n  extension: {ipoGTEventQoSMonExtnNo}\n  jitter (ms): {ipoGTEventQoSMonJitter}\n  round-trip delay (ms): {ipoGTEventQoSMonRndTrip}\n  packet loss: {ipoGTEventQoSMonPktLoss}"
-    mib: IPO-MIB
+    description: "QoS threshold exceeded for call {ipoGTEventQoSMonCallId} on {SNMP_DEVICE_HOSTNAME}\n  device type: {ipoGTEventQoSMonDevType}\n  device ID: {ipoGTEventQoSMonDevId}\n  jitter: {ipoGTEventQoSMonJitter} ms\n  round trip delay: {ipoGTEventQoSMonRndTrip} ms\n  packet loss: {ipoGTEventQoSMonPktLoss}\n  extension number: {ipoGTEventQoSMonExtnNo}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -729,11 +826,10 @@ traps:
     - ipoGTEventQoSMonDevId
     - ipoGTEventQoSMonExtnNo
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.37
-    name: ipoGenSystemShutdownSvcEvent
+    name: IPO-MIB::ipoGenSystemShutdownSvcEvent
     category: state_change
-    severity: warning
-    description: "System shutdown initiated on {SNMP_DEVICE_HOSTNAME}\n  Device ID: {ipoGTEventDevID}\n  Source: {ipoGTEventSystemShutdownSource}\n  Shutdown duration: {ipoGTEventSystemShutdownTimeout} minutes\n  Occurred: {ipoGTEventDateTime}\n  Severity: {ipoGTEventStdSeverity}"
-    mib: IPO-MIB
+    severity: alert
+    description: "System shutdown detected on {SNMP_DEVICE_HOSTNAME}\n  source: {ipoGTEventSystemShutdownSource}\n  timeout: {ipoGTEventSystemShutdownTimeout} minutes\n  event time: {ipoGTEventDateTime}\n  severity: {ipoGTEventStdSeverity}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -743,11 +839,10 @@ traps:
     - ipoGTEventSystemShutdownSource
     - ipoGTEventSystemShutdownTimeout
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.38
-    name: ipoGenSystemRunningBackupEvent
+    name: IPO-MIB::ipoGenSystemRunningBackupEvent
     category: state_change
     severity: warning
-    description: "System {SNMP_DEVICE_HOSTNAME} is running from alternate/backup software and/or configuration\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  occurred: {ipoGTEventDateTime}\n  system description: {sysDescr}"
-    mib: IPO-MIB
+    description: "System running from backup/alternate software or configuration on {SNMP_DEVICE_HOSTNAME}\n  event severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  system description: {sysDescr}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -755,11 +850,10 @@ traps:
     - ipoGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.39
-    name: ipoGenInvalidMemoryCardEvent
+    name: IPO-MIB::ipoGenInvalidMemoryCardEvent
     category: diagnostic
     severity: crit
-    description: "Invalid memory card detected on {SNMP_DEVICE_HOSTNAME}\n  slot: {ipoGTEventMemoryCardSlotId}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  Description: {sysDescr}\n\nA memory card was detected but cannot be used due to filesystem or card type check failure."
-    mib: IPO-MIB
+    description: "Invalid memory card detected on {SNMP_DEVICE_HOSTNAME}\n  The memory card is present but failed filesystem or type checks.\n  Slot ID: {ipoGTEventMemoryCardSlotId}\n  Event severity: {ipoGTEventStdSeverity}\n  Event time: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -768,22 +862,20 @@ traps:
     - sysDescr
     - ipoGTEventMemoryCardSlotId
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.4
-    name: ipoGenEntityChangeEvent
-    category: diagnostic
-    severity: notice
-    description: "Physical entity change detected on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}\n  entity index: {ipoGTEventEntity}\n\nNote: This notification is deprecated and replaced by ipoGenEntityChangeSvcEvent."
-    mib: IPO-MIB
+    name: IPO-MIB::ipoGenEntityChangeEvent
+    category: state_change
+    severity: warning
+    description: "Physical entity state change on {SNMP_DEVICE_HOSTNAME}\n  entity index: {ipoGTEventEntity}\n  severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
     - ipoGTEventEntity
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.40
-    name: ipoGenNoLicenceKeyDongleEvent
+    name: IPO-MIB::ipoGenNoLicenceKeyDongleEvent
     category: license
-    severity: warning
-    description: "License key dongle issue on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  reason: {ipoGTEventNoValidKeyReason}\n  device: {ipoGTEventDevID}\n  datetime: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    severity: crit
+    description: "License Feature Key Dongle validation failed on {SNMP_DEVICE_HOSTNAME}\n  reason: {ipoGTEventNoValidKeyReason}\n  perceived severity: {ipoGTEventStdSeverity}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -792,11 +884,10 @@ traps:
     - sysDescr
     - ipoGTEventNoValidKeyReason
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.41
-    name: ipoGenMemoryCardCapacityEvent
-    category: state_change
+    name: IPO-MIB::ipoGenMemoryCardCapacityEvent
+    category: diagnostic
     severity: warning
-    description: "Memory card capacity threshold event on {SNMP_DEVICE_HOSTNAME}\n  device: {ipoGTEventDevID}\n  slot: {ipoGTEventMemoryCardSlotId}\n  app event: {ipoGTEventAppEvent}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    description: "Memory card capacity threshold crossed on {SNMP_DEVICE_HOSTNAME}\n  slot: {ipoGTEventMemoryCardSlotId}\n  event type: {ipoGTEventAppEvent}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -806,11 +897,10 @@ traps:
     - ipoGTEventMemoryCardSlotId
     - ipoGTEventAppEvent
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.42
-    name: ipoGenConfigFailureSvcEvent
+    name: IPO-MIB::ipoGenConfigFailureSvcEvent
     category: state_change
-    severity: err
-    description: "Configuration component failure on {SNMP_DEVICE_HOSTNAME}\n  Device ID: {ipoGTEventDevID}\n  Reason code: {ipoGTEventReason}\n  Description: {ipoGTEventAlarmDescription}\n  Remedial action: {ipoGTEventAlarmRemedialAction}\n  Occurred: {ipoGTEventDateTime}\n  Additional data: {ipoGTEventData}"
-    mib: IPO-MIB
+    severity: crit
+    description: "Configuration component failed on {SNMP_DEVICE_HOSTNAME}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  data: {ipoGTEventData}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -822,11 +912,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.43
-    name: ipoGenConfigOperationalSvcEvent
+    name: IPO-MIB::ipoGenConfigOperationalSvcEvent
     category: state_change
     severity: notice
-    description: "Configuration component recovered to operational state on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  reason: {ipoGTEventReason}\n  severity: {ipoGTEventStdSeverity}\n  occurred: {ipoGTEventDateTime}\n  additional data: {ipoGTEventData}"
-    mib: IPO-MIB
+    description: "Configuration component on {SNMP_DEVICE_HOSTNAME} transitioned from failed to operational state.\n  event reason: {ipoGTEventReason}\n  event data: {ipoGTEventData}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -836,11 +925,10 @@ traps:
     - ipoGTEventReason
     - ipoGTEventData
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.44
-    name: ipoGenConfigErrorSvcEvent
+    name: IPO-MIB::ipoGenConfigErrorSvcEvent
     category: config_change
-    severity: alert
-    description: "Configuration error detected on {SNMP_DEVICE_HOSTNAME}\n  Device ID: {ipoGTEventDevID}\n  Reason: {ipoGTEventReason}\n  Severity: {ipoGTEventStdSeverity}\n  Time: {ipoGTEventDateTime}\n  Alarm: {ipoGTEventAlarmDescription}\n  Remedial Action: {ipoGTEventAlarmRemedialAction}\n  Additional Data: {ipoGTEventData}"
-    mib: IPO-MIB
+    severity: warning
+    description: "Configuration component error on {SNMP_DEVICE_HOSTNAME}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  data: {ipoGTEventData}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -852,11 +940,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.45
-    name: ipoGenConfigChangeSvcEvent
+    name: IPO-MIB::ipoGenConfigChangeSvcEvent
     category: config_change
     severity: notice
-    description: "Configuration change detected on {SNMP_DEVICE_HOSTNAME}\n  Device ID: {ipoGTEventDevID}\n  Reason: {ipoGTEventReason}\n  Description: {ipoGTEventAlarmDescription}\n  Remedial Action: {ipoGTEventAlarmRemedialAction}\n  Occurred: {ipoGTEventDateTime}\n  Severity: {ipoGTEventStdSeverity}"
-    mib: IPO-MIB
+    description: "Configuration change detected on {SNMP_DEVICE_HOSTNAME}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  event data: {ipoGTEventData}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -868,11 +955,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.46
-    name: ipoGenServiceFailureSvcEvent
+    name: IPO-MIB::ipoGenServiceFailureSvcEvent
     category: state_change
-    severity: err
-    description: "Service component failure on {SNMP_DEVICE_HOSTNAME}\n  device: {ipoGTEventDevID}\n  datetime: {ipoGTEventDateTime}\n  severity: {ipoGTEventStdSeverity}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remediation: {ipoGTEventAlarmRemedialAction}"
-    mib: IPO-MIB
+    severity: crit
+    description: "Service component failure on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  data: {ipoGTEventData}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -884,11 +970,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.47
-    name: ipoGenServiceOperationalSvcEvent
+    name: IPO-MIB::ipoGenServiceOperationalSvcEvent
     category: state_change
     severity: notice
-    description: "Service component recovered from failed state on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  reason: {ipoGTEventReason}\n  system: {sysDescr}\n  additional data: {ipoGTEventData}"
-    mib: IPO-MIB
+    description: "Service component recovered on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  reason: {ipoGTEventReason}\n  event data: {ipoGTEventData}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -898,11 +983,10 @@ traps:
     - ipoGTEventReason
     - ipoGTEventData
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.48
-    name: ipoGenServiceErrorSvcEvent
+    name: IPO-MIB::ipoGenServiceErrorSvcEvent
     category: diagnostic
-    severity: warning
-    description: "Temporary service error on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  supplementary data: {ipoGTEventData}"
-    mib: IPO-MIB
+    severity: err
+    description: "Service component error on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  reason code: {ipoGTEventReason}\n  alarm description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  data: {ipoGTEventData}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -914,11 +998,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.49
-    name: ipoGenServiceChangeSvcEvent
+    name: IPO-MIB::ipoGenServiceChangeSvcEvent
     category: state_change
-    severity: warning
-    description: "Service component state change on {SNMP_DEVICE_HOSTNAME}\n  device: {ipoGTEventDevID}\n  reason: {ipoGTEventReason}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  additional data: {ipoGTEventData}"
-    mib: IPO-MIB
+    severity: notice
+    description: "Service component state change on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  event data: {ipoGTEventData}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -930,21 +1013,19 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.5
-    name: ipoGenLKSCommsFailureEvent
-    category: state_change
-    severity: err
-    description: "Communication with License Key Server failed on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}\n\nNote: This notification is deprecated; use ipoGenLKSCommsFailureSvcEvent instead."
-    mib: IPO-MIB
+    name: IPO-MIB::ipoGenLKSCommsFailureEvent
+    category: license
+    severity: crit
+    description: "License Key Server communication failure on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.50
-    name: ipoGenTrunkFailureSvcEvent
+    name: IPO-MIB::ipoGenTrunkFailureSvcEvent
     category: state_change
-    severity: err
-    description: "Trunk component failure on {SNMP_DEVICE_HOSTNAME}\n  device: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}"
-    mib: IPO-MIB
+    severity: alert
+    description: "Trunk component failure on {SNMP_DEVICE_HOSTNAME}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  event time: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -956,11 +1037,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.51
-    name: ipoGenTrunkOperationalSvcEvent
+    name: IPO-MIB::ipoGenTrunkOperationalSvcEvent
     category: state_change
     severity: info
-    description: "Trunk component recovered to operational state on {SNMP_DEVICE_HOSTNAME}\n  Device: {ipoGTEventDevID}\n  Reason: {ipoGTEventReason}\n  Severity: {ipoGTEventStdSeverity}\n  Time: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    description: "Trunk component recovered to operational state on {SNMP_DEVICE_HOSTNAME}\n  reason: {ipoGTEventReason}\n  data: {ipoGTEventData}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -970,11 +1050,10 @@ traps:
     - ipoGTEventReason
     - ipoGTEventData
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.52
-    name: ipoGenTrunkErrorSvcEvent
+    name: IPO-MIB::ipoGenTrunkErrorSvcEvent
     category: state_change
     severity: warning
-    description: "Temporary trunk error detected on {SNMP_DEVICE_HOSTNAME}\n  device: {ipoGTEventDevID}\n  datetime: {ipoGTEventDateTime}\n  reason: {ipoGTEventReason}\n  severity: {ipoGTEventStdSeverity}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}"
-    mib: IPO-MIB
+    description: "Trunk component error on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  data: {ipoGTEventData}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -986,11 +1065,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.53
-    name: ipoGenTrunkChangeSvcEvent
+    name: IPO-MIB::ipoGenTrunkChangeSvcEvent
     category: state_change
-    severity: warning
-    description: "Trunk change event on {SNMP_DEVICE_HOSTNAME}\n  reason: {ipoGTEventReason}\n  severity: {ipoGTEventStdSeverity}\n  device: {ipoGTEventDevID}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}"
-    mib: IPO-MIB
+    severity: notice
+    description: "Trunk component state change on {SNMP_DEVICE_HOSTNAME}\n  event reason: {ipoGTEventReason}\n  alarm description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  event data: {ipoGTEventData}\n  device ID: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -1002,11 +1080,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.54
-    name: ipoGenLinkFailureSvcEvent
+    name: IPO-MIB::ipoGenLinkFailureSvcEvent
     category: state_change
-    severity: err
-    description: "Link component failure detected on {SNMP_DEVICE_HOSTNAME}\n  device: {ipoGTEventDevID}\n  severity: {ipoGTEventStdSeverity}\n  date/time: {ipoGTEventDateTime}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remediation: {ipoGTEventAlarmRemedialAction}\n  additional data: {ipoGTEventData}"
-    mib: IPO-MIB
+    severity: crit
+    description: "Link component failure on {SNMP_DEVICE_HOSTNAME}\n  alarm description: {ipoGTEventAlarmDescription}\n  reason: {ipoGTEventReason}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  event data: {ipoGTEventData}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -1018,11 +1095,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.55
-    name: ipoGenLinkOperationalSvcEvent
+    name: IPO-MIB::ipoGenLinkOperationalSvcEvent
     category: state_change
     severity: info
-    description: "Link component recovered and returned to operational state on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  event reason: {ipoGTEventReason}\n  severity: {ipoGTEventStdSeverity}\n  occurred at: {ipoGTEventDateTime}\n  additional data: {ipoGTEventData}"
-    mib: IPO-MIB
+    description: "Link component transitioned to operational state on {SNMP_DEVICE_HOSTNAME}\n  reason: {ipoGTEventReason}\n  data: {ipoGTEventData}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -1032,11 +1108,10 @@ traps:
     - ipoGTEventReason
     - ipoGTEventData
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.56
-    name: ipoGenLinkErrorSvcEvent
+    name: IPO-MIB::ipoGenLinkErrorSvcEvent
     category: state_change
     severity: warning
-    description: "Transient link error detected on {SNMP_DEVICE_HOSTNAME}\n  device ID: {ipoGTEventDevID}\n  reason code: {ipoGTEventReason}\n  alarm: {ipoGTEventAlarmDescription}\n  remedy: {ipoGTEventAlarmRemedialAction}\n  occurred: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    description: "Link error detected on {SNMP_DEVICE_HOSTNAME}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  event data: {ipoGTEventData}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -1048,11 +1123,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.57
-    name: ipoGenLinkChangeSvcEvent
+    name: IPO-MIB::ipoGenLinkChangeSvcEvent
     category: state_change
     severity: notice
-    description: "Link component state change on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  datetime: {ipoGTEventDateTime}\n  device: {ipoGTEventDevID}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remediation: {ipoGTEventAlarmRemedialAction}"
-    mib: IPO-MIB
+    description: "Link component status change on {SNMP_DEVICE_HOSTNAME}\n  event severity: {ipoGTEventStdSeverity}\n  reason: {ipoGTEventReason}\n  description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}\n  data: {ipoGTEventData}\n  device ID: {ipoGTEventDevID}\n  timestamp: {ipoGTEventDateTime}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -1064,11 +1138,10 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.58
-    name: ipoGenEmergencyCallSvcEvent
-    category: diagnostic
+    name: IPO-MIB::ipoGenEmergencyCallSvcEvent
+    category: state_change
     severity: alert
-    description: "Emergency call detected on {SNMP_DEVICE_HOSTNAME}\n  Device ID: {ipoGTEventDevID}\n  Date/Time: {ipoGTEventDateTime}\n  Severity: {ipoGTEventStdSeverity}\n  Reason: {ipoGTEventReason}\n  Description: {ipoGTEventAlarmDescription}\n  Remedial Action: {ipoGTEventAlarmRemedialAction}\n  Additional Data: {ipoGTEventData}"
-    mib: IPO-MIB
+    description: "Emergency call service event detected on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventStdSeverity}\n  timestamp: {ipoGTEventDateTime}\n  device ID: {ipoGTEventDevID}\n  reason: {ipoGTEventReason}\n  data: {ipoGTEventData}\n  alarm description: {ipoGTEventAlarmDescription}\n  remedial action: {ipoGTEventAlarmRemedialAction}"
     status: current
     varbinds:
     - ipoGTEventStdSeverity
@@ -1080,41 +1153,37 @@ traps:
     - ipoGTEventAlarmDescription
     - ipoGTEventAlarmRemedialAction
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.6
-    name: ipoGenLKSCommsOperationalEvent
+    name: IPO-MIB::ipoGenLKSCommsOperationalEvent
     category: state_change
     severity: notice
-    description: "Communication with the Licence Key Server on {SNMP_DEVICE_HOSTNAME} recovered from a failed state to an operational state.\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    description: "License Key Server communication restored on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.7
-    name: ipoGenLKSCommsErrorEvent
-    category: license
-    severity: err
-    description: "IP Office License Key Server communication error on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}\n\nNote: This notification is deprecated; see ipoGenLKSCommsErrorSvcEvent for replacement."
-    mib: IPO-MIB
+    name: IPO-MIB::ipoGenLKSCommsErrorEvent
+    category: state_change
+    severity: warning
+    description: "License Key Server communication error on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.8
-    name: ipoGenLKSCommsChangeEvent
-    category: license
+    name: IPO-MIB::ipoGenLKSCommsChangeEvent
+    category: state_change
     severity: notice
-    description: "License Key Server communication change on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}"
-    mib: IPO-MIB
+    description: "License Key Server communication state changed on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
     - ipoGTEventDateTime
   - oid: 1.3.6.1.4.1.6889.2.2.1.2.0.9
-    name: ipoGenLoopbackEvent
+    name: IPO-MIB::ipoGenLoopbackEvent
     category: state_change
     severity: warning
-    description: "T1/DS1 CSU loopback status changed on {SNMP_DEVICE_HOSTNAME}\n  severity: {ipoGTEventSeverity}\n  datetime: {ipoGTEventDateTime}\n  entity (entPhysicalIndex): {ipoGTEventEntity}\n  loopback status: {ipoGTEventLoopbackStatus}"
-    mib: IPO-MIB
+    description: "DS1 loopback status changed on {SNMP_DEVICE_HOSTNAME}\n  entity index: {ipoGTEventEntity}\n  loopback status: {ipoGTEventLoopbackStatus}\n  severity: {ipoGTEventSeverity}\n  timestamp: {ipoGTEventDateTime}"
     status: deprecated
     varbinds:
     - ipoGTEventSeverity
@@ -1122,11 +1191,10 @@ traps:
     - ipoGTEventEntity
     - ipoGTEventLoopbackStatus
   - oid: 1.3.6.1.4.1.6889.2.48.1.2.0.1
-    name: smepGenColdStartEvent
+    name: AV-SME-PLATFORM-MIB::smepGenColdStartEvent
     category: state_change
     severity: info
-    description: "Device cold-start on {SNMP_DEVICE_HOSTNAME}\n  device ID: {smepGTEventDevID}\n  date/time: {smepGTEventDateTime}\n  severity: {smepGTEventStdSeverity}\n  system description: {sysDescr}"
-    mib: AV-SME-PLATFORM-MIB
+    description: "Device {SNMP_DEVICE_HOSTNAME} performed a cold start (reinitialization) on {smepGTEventDateTime}\n  device ID: {smepGTEventDevID}\n  system description: {sysDescr}\n  perceived severity: {smepGTEventStdSeverity}"
     status: current
     varbinds:
     - smepGTEventStdSeverity
@@ -1134,11 +1202,10 @@ traps:
     - smepGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.48.1.2.0.2
-    name: smepGenWarmStartEvent
+    name: AV-SME-PLATFORM-MIB::smepGenWarmStartEvent
     category: state_change
     severity: info
-    description: "Warm-start event on {SNMP_DEVICE_HOSTNAME}\n  device ID: {smepGTEventDevID}\n  severity: {smepGTEventStdSeverity}\n  datetime: {smepGTEventDateTime}\n  sysDescr: {sysDescr}\nNote: Device reinitializing without configuration or implementation changes."
-    mib: AV-SME-PLATFORM-MIB
+    description: "Warm-start event on {SNMP_DEVICE_HOSTNAME}\n  device ID: {smepGTEventDevID}\n  datetime: {smepGTEventDateTime}\n  severity: {smepGTEventStdSeverity}\n  sysDescr: {sysDescr}\n\nNote: Device reinitializing without configuration or implementation changes."
     status: current
     varbinds:
     - smepGTEventStdSeverity
@@ -1146,11 +1213,10 @@ traps:
     - smepGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.48.1.2.0.3
-    name: smepGenLinkDownEvent
+    name: AV-SME-PLATFORM-MIB::smepGenLinkDownEvent
     category: state_change
     severity: warning
-    description: "Communication link down on {SNMP_DEVICE_HOSTNAME}\n  device ID: {smepGTEventDevID}\n  device description: {sysDescr}\n  interface index: {ifIndex}\n  severity: {smepGTEventStdSeverity}\n  occurred at: {smepGTEventDateTime}"
-    mib: AV-SME-PLATFORM-MIB
+    description: "Link down event on {SNMP_DEVICE_HOSTNAME}\n  interface index: {ifIndex}\n  device ID: {smepGTEventDevID}\n  severity: {smepGTEventStdSeverity}\n  timestamp: {smepGTEventDateTime}"
     status: current
     varbinds:
     - smepGTEventStdSeverity
@@ -1159,11 +1225,10 @@ traps:
     - sysDescr
     - ifIndex
   - oid: 1.3.6.1.4.1.6889.2.48.1.2.0.4
-    name: smepGenLinkUpEvent
+    name: AV-SME-PLATFORM-MIB::smepGenLinkUpEvent
     category: state_change
     severity: info
-    description: "Link up on {SNMP_DEVICE_HOSTNAME}\n  interface index: {ifIndex}\n  device ID: {smepGTEventDevID}\n  device description: {sysDescr}\n  event time: {smepGTEventDateTime}\n  severity: {smepGTEventStdSeverity}"
-    mib: AV-SME-PLATFORM-MIB
+    description: "Link came up on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifIndex}\n  device ID: {smepGTEventDevID}\n  timestamp: {smepGTEventDateTime}\n  severity: {smepGTEventStdSeverity}"
     status: current
     varbinds:
     - smepGTEventStdSeverity
@@ -1172,11 +1237,10 @@ traps:
     - sysDescr
     - ifIndex
   - oid: 1.3.6.1.4.1.6889.2.48.1.2.0.5
-    name: smepGenAuthFailureEvent
+    name: AV-SME-PLATFORM-MIB::smepGenAuthFailureEvent
     category: auth
     severity: warning
-    description: "Authentication failure on {SNMP_DEVICE_HOSTNAME}\n  device ID: {smepGTEventDevID}\n  severity: {smepGTEventStdSeverity}\n  datetime: {smepGTEventDateTime}\n  system description: {sysDescr}"
-    mib: AV-SME-PLATFORM-MIB
+    description: "Authentication failure detected on {SNMP_DEVICE_HOSTNAME}\n  device ID: {smepGTEventDevID}\n  severity: {smepGTEventStdSeverity}\n  timestamp: {smepGTEventDateTime}"
     status: current
     varbinds:
     - smepGTEventStdSeverity
@@ -1184,11 +1248,10 @@ traps:
     - smepGTEventDevID
     - sysDescr
   - oid: 1.3.6.1.4.1.6889.2.48.1.2.0.6
-    name: smepGenAppEvent
+    name: AV-SME-PLATFORM-MIB::smepGenAppEvent
     category: diagnostic
     severity: err
-    description: "Application event on {SNMP_DEVICE_HOSTNAME}\n  app entity: {smepGTEventAppEntity}\n  event type: {smepGTEventAppEvent}\n  severity: {smepGTEventStdSeverity}\n  datetime: {smepGTEventDateTime}\n  device ID: {smepGTEventDevID}\n  sysDescr: {sysDescr}"
-    mib: AV-SME-PLATFORM-MIB
+    description: "Application entity {smepGTEventAppEntity} on {SNMP_DEVICE_HOSTNAME} experienced an event\n  event type: {smepGTEventAppEvent}\n  severity: {smepGTEventStdSeverity}\n  device ID: {smepGTEventDevID}\n  timestamp: {smepGTEventDateTime}"
     status: current
     varbinds:
     - smepGTEventStdSeverity

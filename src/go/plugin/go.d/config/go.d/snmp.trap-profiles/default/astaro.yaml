@@ -8,1115 +8,958 @@
 #   traps:    each entry references varbinds by name from the table above
 traps:
   - oid: 1.3.6.1.4.1.9789.1500.1.0
-    name: INFO_000
+    name: ASTARO-MIB::INFO_000
     category: state_change
     severity: info
     description: System was restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.10
-    name: INFO_010
+    name: ASTARO-MIB::INFO_010
     category: config_change
     severity: info
     description: Automatic configuration backup completed on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.105
-    name: INFO_105
-    category: diagnostic
+    name: ASTARO-MIB::INFO_105
+    category: state_change
     severity: warning
-    description: User Authenticator service was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
-    mib: ASTARO-MIB
+    description: User Authenticator service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.106
-    name: INFO_106
-    category: diagnostic
-    severity: notice
-    description: Cron Task Scheduler on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.1.107
-    name: INFO_107
+    name: ASTARO-MIB::INFO_106
     category: diagnostic
     severity: warning
+    description: Cron task scheduler was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.1.107
+    name: ASTARO-MIB::INFO_107
+    category: state_change
+    severity: notice
     description: WebAdmin webserver on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.108
-    name: INFO_108
+    name: ASTARO-MIB::INFO_108
     category: diagnostic
-    severity: notice
+    severity: warning
     description: SSH server on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.11
-    name: INFO_011
+    name: ASTARO-MIB::INFO_011
     category: config_change
     severity: notice
     description: Configuration backup file created on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.110
-    name: INFO_110
+    name: ASTARO-MIB::INFO_110
     category: diagnostic
-    severity: err
-    description: Configuration daemon on {SNMP_DEVICE_HOSTNAME} stopped unexpectedly and was restarted
-    mib: ASTARO-MIB
+    severity: info
+    description: Configuration daemon restarted on {SNMP_DEVICE_HOSTNAME} after detecting it was not running
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.111
-    name: INFO_111
-    category: state_change
+    name: ASTARO-MIB::INFO_111
+    category: diagnostic
     severity: warning
-    description: Syslog server on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    description: Syslog server restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.112
-    name: INFO_112
+    name: ASTARO-MIB::INFO_112
     category: diagnostic
-    severity: info
-    description: Middleware component on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    severity: notice
+    description: Middleware process restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.114
-    name: INFO_114
+    name: ASTARO-MIB::INFO_114
     category: diagnostic
-    severity: info
-    description: Ulogd daemon was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: warning
+    description: Ulogd process was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.115
-    name: INFO_115
+    name: ASTARO-MIB::INFO_115
     category: diagnostic
     severity: info
-    description: Snort IDS/IPS service was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Snort process was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.116
-    name: INFO_116
+    name: ASTARO-MIB::INFO_116
     category: diagnostic
-    severity: info
-    description: SNMP daemon (snmpd) was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: warning
+    description: Snmpd daemon not running - restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.117
-    name: INFO_117
+    name: ASTARO-MIB::INFO_117
     category: diagnostic
-    severity: warning
-    description: POP3 proxy on {SNMP_DEVICE_HOSTNAME} stopped unexpectedly and was automatically restarted
-    mib: ASTARO-MIB
+    severity: notice
+    description: POP3 proxy service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.118
-    name: INFO_118
-    category: state_change
+    name: ASTARO-MIB::INFO_118
+    category: diagnostic
     severity: warning
-    description: FTP proxy service on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    description: FTP proxy service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.119
-    name: INFO_119
-    category: state_change
+    name: ASTARO-MIB::INFO_119
+    category: diagnostic
     severity: notice
-    description: Service 'named' was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Named process restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.120
-    name: INFO_120
+    name: ASTARO-MIB::INFO_120
     category: diagnostic
-    severity: info
-    description: Proxy daemon (sockd) was detected as not running and successfully restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: warning
+    description: Service sockd was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.121
-    name: INFO_121
+    name: ASTARO-MIB::INFO_121
     category: diagnostic
-    severity: info
-    description: Identd service was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: notice
+    description: Identd service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.122
-    name: INFO_122
-    category: diagnostic
-    severity: info
-    description: DHCP daemon (dhcpd) was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::INFO_122
+    category: state_change
+    severity: warning
+    description: "DHCP service restarted on {SNMP_DEVICE_HOSTNAME}\n  The DHCP daemon was not running and has been restarted."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.123
-    name: INFO_123
+    name: ASTARO-MIB::INFO_123
     category: diagnostic
-    severity: info
-    description: Internal daemon IRQd was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: warning
+    description: Internal process IRQd was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.124
-    name: INFO_124
+    name: ASTARO-MIB::INFO_124
     category: diagnostic
     severity: warning
-    description: Process 'ufod' was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Ufod process restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.125
-    name: INFO_125
+    name: ASTARO-MIB::INFO_125
     category: state_change
-    severity: notice
-    description: SMTP daemon (smtpd) was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: warning
+    description: SMTPD service was not running on {SNMP_DEVICE_HOSTNAME} and has been automatically restarted
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.126
-    name: INFO_126
-    category: diagnostic
-    severity: info
-    description: DynDNS service was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::INFO_126
+    category: state_change
+    severity: notice
+    description: Dyndns service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.127
-    name: INFO_127
+    name: ASTARO-MIB::INFO_127
     category: diagnostic
-    severity: notice
-    description: Spam filter service on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: Spam filter service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.128
-    name: INFO_128
+    name: ASTARO-MIB::INFO_128
     category: diagnostic
     severity: warning
-    description: PPTP daemon (pptpd) was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
-    mib: ASTARO-MIB
+    description: PPTP service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.129
-    name: INFO_129
+    name: ASTARO-MIB::INFO_129
     category: diagnostic
     severity: info
-    description: IPv6 watchdog service restarted on {SNMP_DEVICE_HOSTNAME} after it was detected as not running
-    mib: ASTARO-MIB
+    description: IPv6 Watchdog process was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.130
-    name: INFO_130
+    name: ASTARO-MIB::INFO_130
     category: diagnostic
-    severity: info
-    description: Service winbindd was not running and was restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: warning
+    description: Winbindd service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.131
-    name: INFO_131
+    name: ASTARO-MIB::INFO_131
     category: diagnostic
     severity: warning
-    description: Service xinetd stopped running on {SNMP_DEVICE_HOSTNAME} and was automatically restarted
-    mib: ASTARO-MIB
+    description: Xinetd service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.132
-    name: INFO_132
+    name: ASTARO-MIB::INFO_132
     category: diagnostic
-    severity: notice
-    description: ACC core daemon on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: ACC core daemon was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.133
-    name: INFO_133
+    name: ASTARO-MIB::INFO_133
     category: diagnostic
-    severity: info
-    description: ACC up2date cache was not running and was restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: notice
+    description: "ACC up2date cache service restarted on {SNMP_DEVICE_HOSTNAME}\n  The up2date cache service was not running and has been restarted."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.134
-    name: INFO_134
+    name: ASTARO-MIB::INFO_134
     category: diagnostic
-    severity: info
-    description: IPsec starter service was not running on {SNMP_DEVICE_HOSTNAME} and was automatically restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: "IPsec starter service restarted on {SNMP_DEVICE_HOSTNAME}\n  The IPsec starter was not running and has been restarted."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.135
-    name: INFO_135
+    name: ASTARO-MIB::INFO_135
     category: diagnostic
     severity: info
-    description: IPsec Pluto daemon was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: IPsec pluto daemon was not running and was restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.136
-    name: INFO_136
+    name: ASTARO-MIB::INFO_136
     category: diagnostic
-    severity: info
-    description: Software agent on {SNMP_DEVICE_HOSTNAME} was not running and has been automatically restarted
-    mib: ASTARO-MIB
+    severity: notice
+    description: Software agent on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.138
-    name: INFO_138
+    name: ASTARO-MIB::INFO_138
     category: diagnostic
-    severity: info
-    description: SMTP scan daemon on {SNMP_DEVICE_HOSTNAME} was not running and has been automatically restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: Smtp scan daemon not running - restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.139
-    name: INFO_139
+    name: ASTARO-MIB::INFO_139
     category: diagnostic
-    severity: info
-    description: Content Filter Framework on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: 'Content Filter Framework restarted on {SNMP_DEVICE_HOSTNAME}
+  
+      The service was not running and has been restarted.'
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.140
-    name: INFO_140
+    name: ASTARO-MIB::INFO_140
     category: diagnostic
     severity: notice
-    description: Notification daemon on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    description: Notification Daemon not running - restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.141
-    name: INFO_141
-    category: diagnostic
+    name: ASTARO-MIB::INFO_141
+    category: state_change
     severity: info
-    description: HTTP proxy service was not running and was automatically restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: HTTP proxy service restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.142
-    name: INFO_142
+    name: ASTARO-MIB::INFO_142
     category: state_change
-    severity: notice
-    description: OSPF daemon (ospfd) restarted on {SNMP_DEVICE_HOSTNAME} after it was found not running
-    mib: ASTARO-MIB
+    severity: warning
+    description: OSPF daemon (ospfd) was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.143
-    name: INFO_143
-    category: state_change
-    severity: notice
-    description: Dynamic routing daemon (quagga) on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::INFO_143
+    category: diagnostic
+    severity: warning
+    description: Dynamic routing daemon (quagga) not running - restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.144
-    name: INFO_144
+    name: ASTARO-MIB::INFO_144
     category: diagnostic
-    severity: err
-    description: HAL (Hardware Abstraction Layer) system daemon restarted on {SNMP_DEVICE_HOSTNAME} after it stopped running
-    mib: ASTARO-MIB
+    severity: warning
+    description: HAL (Hardware Abstraction Layer) system daemon stopped responding on {SNMP_DEVICE_HOSTNAME} and was restarted
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.145
-    name: INFO_145
+    name: ASTARO-MIB::INFO_145
     category: diagnostic
     severity: warning
-    description: Udev (system device manager) daemon on {SNMP_DEVICE_HOSTNAME} stopped unexpectedly and was restarted
-    mib: ASTARO-MIB
+    description: Udev daemon was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.146
-    name: INFO_146
-    category: diagnostic
-    severity: info
-    description: D-Bus system daemon was not running and was restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.1.147
-    name: INFO_147
-    category: diagnostic
-    severity: notice
-    description: NTP daemon on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.1.148
-    name: INFO_148
+    name: ASTARO-MIB::INFO_146
     category: diagnostic
     severity: warning
-    description: L2TP-over-IPsec daemon on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    description: DBus system daemon was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.1.147
+    name: ASTARO-MIB::INFO_147
+    category: diagnostic
+    severity: warning
+    description: "NTP daemon restarted on {SNMP_DEVICE_HOSTNAME}\n  The NTP daemon was not running and has been restarted."
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.1.148
+    name: ASTARO-MIB::INFO_148
+    category: diagnostic
+    severity: warning
+    description: L2TP-over-IPsec daemon was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.149
-    name: INFO_149
+    name: ASTARO-MIB::INFO_149
     category: diagnostic
-    severity: notice
-    description: Application Control daemon on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: Application Control daemon restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.150
-    name: INFO_150
+    name: ASTARO-MIB::INFO_150
     category: diagnostic
     severity: warning
     description: Root partition is filling up on {SNMP_DEVICE_HOSTNAME}. Please check disk usage.
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.153
-    name: INFO_153
+    name: ASTARO-MIB::INFO_153
     category: diagnostic
     severity: warning
-    description: Log disk is filling up on {SNMP_DEVICE_HOSTNAME}. Please check disk usage.
-    mib: ASTARO-MIB
+    description: Log disk is filling up on {SNMP_DEVICE_HOSTNAME}. Please check disk usage and take appropriate action.
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.154
-    name: INFO_154
+    name: ASTARO-MIB::INFO_154
     category: diagnostic
     severity: warning
-    description: Data disk is filling up on {SNMP_DEVICE_HOSTNAME}. Please check disk usage and free up space if necessary.
-    mib: ASTARO-MIB
+    description: "Data disk filling up on {SNMP_DEVICE_HOSTNAME}\n  Please check disk usage"
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.163
-    name: INFO_163
+    name: ASTARO-MIB::INFO_163
     category: diagnostic
     severity: warning
-    description: Log disk on {SNMP_DEVICE_HOSTNAME} is low on inodes. Please check the filesystem and clean up or increase inode allocation.
-    mib: ASTARO-MIB
+    description: Log disk is running low on inodes on {SNMP_DEVICE_HOSTNAME}. Please check disk space and inode usage.
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.164
-    name: INFO_164
-    category: state_change
+    name: ASTARO-MIB::INFO_164
+    category: diagnostic
     severity: warning
-    description: Data disk on {SNMP_DEVICE_HOSTNAME} is running low on inodes — please investigate
-    mib: ASTARO-MIB
+    description: "Data Disk is short of inodes on {SNMP_DEVICE_HOSTNAME}\n  Please check disk inode usage."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.170
-    name: INFO_170
+    name: ASTARO-MIB::INFO_170
     category: diagnostic
     severity: warning
-    description: High availability confd sync daemon was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: HA confd sync daemon not running and was restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.171
-    name: INFO_171
+    name: ASTARO-MIB::INFO_171
     category: diagnostic
-    severity: warning
-    description: High availability update proxy on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    severity: info
+    description: HA up2date proxy was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.172
-    name: INFO_172
+    name: ASTARO-MIB::INFO_172
     category: diagnostic
-    severity: info
-    description: High availability conntrack daemon restarted on {SNMP_DEVICE_HOSTNAME} after it was detected as not running
-    mib: ASTARO-MIB
+    severity: notice
+    description: High-availability conntrack daemon on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.173
-    name: INFO_173
+    name: ASTARO-MIB::INFO_173
     category: diagnostic
-    severity: info
-    description: High-availability csync2 daemon was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: HA csync2 daemon was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.175
-    name: INFO_175
+    name: ASTARO-MIB::INFO_175
     category: state_change
     severity: info
-    description: IPv6 Teredo Tunnel Broker client was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
-    mib: ASTARO-MIB
+    description: IPv6 Teredo Tunnel Broker client restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.176
-    name: INFO_176
+    name: ASTARO-MIB::INFO_176
     category: diagnostic
-    severity: notice
-    description: IPv6 gogo6 Tunnel Broker client was restarted on {SNMP_DEVICE_HOSTNAME} after detecting it was not running
-    mib: ASTARO-MIB
+    severity: warning
+    description: IPv6 gogo6 Tunnel Broker client restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.177
-    name: INFO_177
+    name: ASTARO-MIB::INFO_177
     category: diagnostic
-    severity: info
-    description: IPv6 Routing Advertisement daemon restarted on {SNMP_DEVICE_HOSTNAME} after detecting it was not running
-    mib: ASTARO-MIB
+    severity: warning
+    description: "IPv6 Routing Advertisement daemon restarted on {SNMP_DEVICE_HOSTNAME}\n  The daemon was not running and has been restarted."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.178
-    name: INFO_178
-    category: diagnostic
-    severity: info
-    description: IPv6 Hurricane Tunnel Broker client on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::INFO_178
+    category: state_change
+    severity: warning
+    description: IPv6 Hurricane Tunnel Broker client restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.179
-    name: INFO_179
+    name: ASTARO-MIB::INFO_179
     category: diagnostic
-    severity: notice
-    description: DNS resolver on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: DNS resolver not running - restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.180
-    name: INFO_180
+    name: ASTARO-MIB::INFO_180
     category: diagnostic
     severity: warning
-    description: Client Authentication daemon on {SNMP_DEVICE_HOSTNAME} stopped unexpectedly and was restarted
-    mib: ASTARO-MIB
+    description: Client Authentication daemon restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.181
-    name: INFO_181
+    name: ASTARO-MIB::INFO_181
     category: diagnostic
-    severity: info
+    severity: notice
     description: Service Monitor on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.182
-    name: INFO_182
+    name: ASTARO-MIB::INFO_182
     category: diagnostic
-    severity: info
-    description: Job queue manager (atd) was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: Job queue manager (atd) not running - restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.183
-    name: INFO_183
+    name: ASTARO-MIB::INFO_183
     category: state_change
     severity: warning
-    description: BGP daemon (bgpd) was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: BGP daemon (bgpd) restarted on {SNMP_DEVICE_HOSTNAME} after it was found not running
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.184
-    name: INFO_184
-    category: state_change
+    name: ASTARO-MIB::INFO_184
+    category: diagnostic
     severity: warning
-    description: RED server on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    description: "RED server process restarted on {SNMP_DEVICE_HOSTNAME}\n  The RED server was not running and has been restarted."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.185
-    name: INFO_185
+    name: ASTARO-MIB::INFO_185
     category: diagnostic
-    severity: info
-    description: RED client was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
-    mib: ASTARO-MIB
+    severity: warning
+    description: "Service restart detected on {SNMP_DEVICE_HOSTNAME}\n  trap: INFO_185\n  context: RED client not running - restarted"
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.186
-    name: INFO_186
+    name: ASTARO-MIB::INFO_186
     category: diagnostic
-    severity: info
-    description: Internal service 'Confd request queuer' was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: warning
+    description: 'Internal service restart on {SNMP_DEVICE_HOSTNAME}: Confd request queuer was not running and has been restarted'
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.187
-    name: INFO_187
+    name: ASTARO-MIB::INFO_187
     category: diagnostic
     severity: warning
-    description: Confd queue runner was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Confd queue runner process was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.188
-    name: INFO_188
-    category: diagnostic
-    severity: info
-    description: Process 'urid' was not running on {SNMP_DEVICE_HOSTNAME} and has been restarted
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.1.189
-    name: INFO_189
+    name: ASTARO-MIB::INFO_188
     category: state_change
     severity: notice
-    description: Web Application Firewall on {SNMP_DEVICE_HOSTNAME} was not running and has been restarted
-    mib: ASTARO-MIB
+    description: "Service restarted on {SNMP_DEVICE_HOSTNAME}\n  service: urid"
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.1.189
+    name: ASTARO-MIB::INFO_189
+    category: diagnostic
+    severity: info
+    description: Web Application Firewall was not running and has been restarted on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.20
-    name: INFO_020
+    name: ASTARO-MIB::INFO_020
     category: license
     severity: warning
-    description: 'License expiry warning on {SNMP_DEVICE_HOSTNAME}: a feature will expire'
-    mib: ASTARO-MIB
+    description: "License expiry warning on {SNMP_DEVICE_HOSTNAME}\n  A feature is approaching its expiration date."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.21
-    name: INFO_021
+    name: ASTARO-MIB::INFO_021
     category: license
     severity: crit
-    description: A licensed feature has expired on {SNMP_DEVICE_HOSTNAME}. The feature expires today.
-    mib: ASTARO-MIB
+    description: "License expired on {SNMP_DEVICE_HOSTNAME}\n  feature: INFO_021"
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.22
-    name: INFO_022
+    name: ASTARO-MIB::INFO_022
     category: license
     severity: crit
-    description: A licensed feature has expired on {SNMP_DEVICE_HOSTNAME}. One or more features may no longer be available until the license is renewed.
-    mib: ASTARO-MIB
+    description: "A licensed feature has expired on {SNMP_DEVICE_HOSTNAME}\n  trap: INFO_022"
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.301
-    name: INFO_301
-    category: diagnostic
-    severity: info
-    description: 'Firmware update available on {SNMP_DEVICE_HOSTNAME}: New version ready for installation'
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::INFO_301
+    category: config_change
+    severity: notice
+    description: Firmware update ready for installation on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.302
-    name: INFO_302
-    category: diagnostic
-    severity: info
-    description: Firmware updated successfully on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::INFO_302
+    category: config_change
+    severity: notice
+    description: Firmware updated to latest version on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.306
-    name: INFO_306
-    category: diagnostic
-    severity: info
-    description: Security pattern update installed on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::INFO_306
+    category: config_change
+    severity: notice
+    description: New Pattern Up2Dates installed on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.310
-    name: INFO_310
-    category: diagnostic
-    severity: notice
-    description: Up2Date prefetch service has recovered and is functioning normally on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::INFO_310
+    category: state_change
+    severity: info
+    description: Up2Date prefetch service resumed on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.320
-    name: INFO_320
+    name: ASTARO-MIB::INFO_320
     category: diagnostic
-    severity: info
+    severity: notice
     description: Database conversion started on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.321
-    name: INFO_321
+    name: ASTARO-MIB::INFO_321
     category: diagnostic
     severity: info
     description: Database conversion was adjourned on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.322
-    name: INFO_322
-    category: diagnostic
+    name: ASTARO-MIB::INFO_322
+    category: state_change
     severity: info
     description: Database conversion finished on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.40
-    name: INFO_040
+    name: ASTARO-MIB::INFO_040
     category: diagnostic
-    severity: info
-    description: Remote Configuration Manager sent system information to {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: notice
+    description: System information event INFO_040 received from {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.5
-    name: INFO_005
+    name: ASTARO-MIB::INFO_005
     category: auth
     severity: info
     description: Successful WebAdmin login on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.50
-    name: INFO_050
+    name: ASTARO-MIB::INFO_050
     category: state_change
     severity: info
     description: UPS device connected on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.51
-    name: INFO_051
+    name: ASTARO-MIB::INFO_051
     category: state_change
     severity: warning
-    description: UPS device disconnected on {SNMP_DEVICE_HOSTNAME}. Backup power monitoring may be unavailable.
-    mib: ASTARO-MIB
+    description: UPS device disconnected on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.53
-    name: INFO_053
+    name: ASTARO-MIB::INFO_053
     category: state_change
-    severity: notice
+    severity: info
     description: UPS power restored on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.6
-    name: INFO_006
+    name: ASTARO-MIB::INFO_006
     category: auth
     severity: notice
     description: Successful SSH login on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.601
-    name: INFO_601
+    name: ASTARO-MIB::INFO_601
     category: auth
-    severity: info
-    description: Hotspot password notification generated on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: notice
+    description: Hotspot authentication event on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.62
-    name: INFO_062
+    name: ASTARO-MIB::INFO_062
     category: diagnostic
-    severity: info
-    description: RAID rebuild process started on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: notice
+    description: Raid rebuild process started on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.63
-    name: INFO_063
+    name: ASTARO-MIB::INFO_063
     category: diagnostic
     severity: info
-    description: RAID rebuild process finished on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Raid rebuild process finished on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.65
-    name: CRIT_065
-    category: diagnostic
+    name: ASTARO-MIB::CRIT_065
+    category: state_change
     severity: crit
     description: IPv6 renumbering failed on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.700
-    name: INFO_700
+    name: ASTARO-MIB::INFO_700
     category: diagnostic
-    severity: info
-    description: Daily log file archive completed on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: notice
+    description: Daily log file archive event on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.710
-    name: INFO_710
+    name: ASTARO-MIB::INFO_710
     category: diagnostic
     severity: warning
     description: Log file partition is filling up on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.720
-    name: INFO_720
+    name: ASTARO-MIB::INFO_720
     category: diagnostic
     severity: info
-    description: Scheduled daily executive report generated on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Daily executive report triggered on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.721
-    name: INFO_721
-    category: diagnostic
-    severity: info
-    description: Scheduled weekly executive report generated on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.1.722
-    name: INFO_722
-    category: diagnostic
-    severity: info
-    description: Monthly Executive Report generated on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.1.723
-    name: INFO_723
-    category: diagnostic
-    severity: info
-    description: Scheduled daily executive report generated on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.1.724
-    name: INFO_724
+    name: ASTARO-MIB::INFO_721
     category: diagnostic
     severity: info
     description: Weekly Executive Report generated on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.1.722
+    name: ASTARO-MIB::INFO_722
+    category: unknown
+    severity: info
+    description: Scheduled monthly executive report generated on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.1.723
+    name: ASTARO-MIB::INFO_723
+    category: diagnostic
+    severity: notice
+    description: Daily Executive Report generated on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.1.724
+    name: ASTARO-MIB::INFO_724
+    category: unknown
+    severity: info
+    description: Scheduled weekly executive report generated on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.725
-    name: INFO_725
-    category: diagnostic
+    name: ASTARO-MIB::INFO_725
+    category: unknown
     severity: info
     description: Monthly Executive Report generated on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.726
-    name: INFO_726
+    name: ASTARO-MIB::INFO_726
     category: state_change
     severity: info
-    description: Site-to-Site VPN connection restored on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Site-to-Site VPN connection is up on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.727
-    name: INFO_727
+    name: ASTARO-MIB::INFO_727
     category: state_change
     severity: info
-    description: RED connection restored on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: RED connection is up again on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.80
-    name: INFO_080
+    name: ASTARO-MIB::INFO_080
     category: state_change
     severity: notice
-    description: HA node on {SNMP_DEVICE_HOSTNAME} transitioned to Master
-    mib: ASTARO-MIB
+    description: HA node on {SNMP_DEVICE_HOSTNAME} transitioned to Master role
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.81
-    name: INFO_081
+    name: ASTARO-MIB::INFO_081
     category: state_change
-    severity: info
-    description: HA node on {SNMP_DEVICE_HOSTNAME} transitioned to Slave state
-    mib: ASTARO-MIB
+    severity: notice
+    description: HA node transitioned to Slave role on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.83
-    name: INFO_083
+    name: ASTARO-MIB::INFO_083
     category: state_change
-    severity: notice
-    description: HA System is active and fully functional on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: info
+    description: HA system is active and fully functional on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.850
-    name: INFO_850
+    name: ASTARO-MIB::INFO_850
     category: security
-    severity: warning
-    description: Intrusion Prevention alert triggered on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: info
+    description: Intrusion Prevention Alert detected on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.852
-    name: INFO_852
+    name: ASTARO-MIB::INFO_852
     category: security
     severity: warning
-    description: 'Intrusion Prevention Alert on {SNMP_DEVICE_HOSTNAME}: packet dropped'
-    mib: ASTARO-MIB
+    description: Intrusion Prevention Alert (Packet dropped) on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.90
-    name: INFO_090
+    name: ASTARO-MIB::INFO_090
     category: state_change
     severity: notice
-    description: Cluster node on {SNMP_DEVICE_HOSTNAME} transitioned to Master role
-    mib: ASTARO-MIB
+    description: Cluster node role transitioned to Master on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.91
-    name: INFO_091
+    name: ASTARO-MIB::INFO_091
     category: state_change
     severity: notice
-    description: Cluster node on {SNMP_DEVICE_HOSTNAME} transitioned to Slave role
-    mib: ASTARO-MIB
+    description: Cluster node on {SNMP_DEVICE_HOSTNAME} transitioned to Slave state
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.92
-    name: INFO_092
+    name: ASTARO-MIB::INFO_092
     category: state_change
     severity: notice
-    description: Cluster node on {SNMP_DEVICE_HOSTNAME} transitioned to Worker role
-    mib: ASTARO-MIB
+    description: Cluster node role transitioned to Worker on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.93
-    name: INFO_093
+    name: ASTARO-MIB::INFO_093
     category: state_change
     severity: info
-    description: High-availability cluster on {SNMP_DEVICE_HOSTNAME} is active and fully functional
-    mib: ASTARO-MIB
+    description: Cluster is active and fully functional on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.94
-    name: INFO_094
-    category: diagnostic
+    name: ASTARO-MIB::INFO_094
+    category: state_change
     severity: info
-    description: Firmware/software upgrade download completed successfully on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Software upgrade download completed successfully on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.1.95
-    name: INFO_095
+    name: ASTARO-MIB::INFO_095
     category: license
-    severity: notice
-    description: RED unlock code applied on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: info
+    description: License unlock code received on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.103
-    name: WARN_103
-    category: state_change
+    name: ASTARO-MIB::WARN_103
+    category: diagnostic
     severity: warning
-    description: Swap usage exceeds threshold on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: High swap usage detected on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.129
-    name: WARN_129
+    name: ASTARO-MIB::WARN_129
     category: diagnostic
     severity: err
-    description: Spam filter on {SNMP_DEVICE_HOSTNAME} cannot query database servers
-    mib: ASTARO-MIB
+    description: Spam Filter cannot query database servers on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.136
-    name: WARN_136
+    name: ASTARO-MIB::WARN_136
     category: state_change
     severity: warning
     description: ACC server not reachable on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.160
-    name: WARN_160
+    name: ASTARO-MIB::WARN_160
     category: diagnostic
     severity: warning
-    description: 'Filesystem inode shortage detected on {SNMP_DEVICE_HOSTNAME}: root partition is low on inodes'
-    mib: ASTARO-MIB
+    description: Filesystem inode shortage detected on root partition of {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.161
-    name: WARN_161
+    name: ASTARO-MIB::WARN_161
     category: diagnostic
-    severity: err
-    description: RPM database corruption detected on {SNMP_DEVICE_HOSTNAME}. Package management operations may be impacted.
-    mib: ASTARO-MIB
+    severity: alert
+    description: "RPM database corruption detected on {SNMP_DEVICE_HOSTNAME}\n  This indicates a critical internal database integrity failure that may affect package management and system stability."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.162
-    name: WARN_162
+    name: ASTARO-MIB::WARN_162
     category: diagnostic
-    severity: err
-    description: RPM database corruption detected on {SNMP_DEVICE_HOSTNAME}; automatic rebuild failed
-    mib: ASTARO-MIB
+    severity: warning
+    description: Corrupted RPM database rebuild failed on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.201
-    name: WARN_201
-    category: license
-    severity: warning
-    description: RED device deauthorized automatically on {SNMP_DEVICE_HOSTNAME}. An authorized remote ethernet device has had its authorization revoked, possibly due to license expiry, quota exhaustion, or automated policy enforcement.
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::WARN_201
+    category: security
+    severity: alert
+    description: A RED device has been deauthorized automatically on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.25
-    name: WARN_025
+    name: ASTARO-MIB::WARN_025
     category: license
     severity: warning
-    description: License usage exceeded 90% of user count on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: License usage exceeding 90% of user count on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.30
-    name: WARN_030
+    name: ASTARO-MIB::WARN_030
     category: state_change
     severity: warning
-    description: Primary internet uplink is down on {SNMP_DEVICE_HOSTNAME}, automatically switching to backup line
-    mib: ASTARO-MIB
+    description: Primary internet uplink is down on {SNMP_DEVICE_HOSTNAME}, switching to backup line
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.31
-    name: WARN_031
+    name: ASTARO-MIB::WARN_031
     category: state_change
-    severity: notice
-    description: Primary internet uplink restored on {SNMP_DEVICE_HOSTNAME}, traffic switched back to main line
-    mib: ASTARO-MIB
+    severity: info
+    description: "Primary internet uplink is back online on {SNMP_DEVICE_HOSTNAME}\n  Switching to main line"
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.32
-    name: WARN_032
+    name: ASTARO-MIB::WARN_032
     category: state_change
     severity: warning
     description: Internet uplink is down on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.33
-    name: WARN_033
+    name: ASTARO-MIB::WARN_033
     category: state_change
     severity: info
-    description: Internet uplink is up again on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Internet uplink recovered on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.40
-    name: WARN_040
+    name: ASTARO-MIB::WARN_040
     category: security
     severity: warning
-    description: Weak certificate(s) detected on {SNMP_DEVICE_HOSTNAME}. The certificate check identified certificates using insufficient key strength or deprecated algorithms.
-    mib: ASTARO-MIB
+    description: "Weak certificate detected on {SNMP_DEVICE_HOSTNAME}\n  The device found weak certificates that may compromise security posture."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.5
-    name: WARN_005
+    name: ASTARO-MIB::WARN_005
     category: auth
     severity: warning
     description: Failed WebAdmin login on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.501
-    name: WARN_501
+    name: ASTARO-MIB::WARN_501
     category: security
-    severity: warning
-    description: Virus detected on endpoint at {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    severity: alert
+    description: Virus detected on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.52
-    name: WARN_052
+    name: ASTARO-MIB::WARN_052
     category: state_change
     severity: warning
-    description: UPS on {SNMP_DEVICE_HOSTNAME} has switched to battery power
-    mib: ASTARO-MIB
+    description: UPS on battery power on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.531
-    name: WARN_531
-    category: diagnostic
-    severity: warning
+    name: ASTARO-MIB::WARN_531
+    category: state_change
+    severity: notice
     description: Directory Services synchronization event on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.6
-    name: WARN_006
+    name: ASTARO-MIB::WARN_006
     category: auth
     severity: warning
     description: Failed SSH login on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.61
-    name: WARN_061
+    name: ASTARO-MIB::WARN_061
     category: diagnostic
     severity: crit
     description: 'RAID degraded on {SNMP_DEVICE_HOSTNAME}: defective hard disk inserted'
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.7
-    name: WARN_007
+    name: ASTARO-MIB::WARN_007
     category: auth
     severity: warning
     description: Failed console login on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.70
-    name: WARN_070
+    name: ASTARO-MIB::WARN_070
     category: auth
     severity: warning
-    description: Multiple failed login attempts detected on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Too many failed logins detected on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.711
-    name: WARN_711
-    category: diagnostic
-    severity: warning
+    name: ASTARO-MIB::WARN_711
+    category: config_change
+    severity: notice
     description: Log files have been deleted on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.715
-    name: WARN_715
+    name: ASTARO-MIB::WARN_715
     category: diagnostic
     severity: warning
     description: Remote log file storage failed on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.726
-    name: WARN_726
+    name: ASTARO-MIB::WARN_726
     category: state_change
     severity: warning
     description: Site-to-Site VPN connection is down on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.727
-    name: WARN_727
+    name: ASTARO-MIB::WARN_727
     category: state_change
     severity: warning
     description: RED connection is down on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.80
-    name: WARN_080
+    name: ASTARO-MIB::WARN_080
     category: diagnostic
     severity: warning
-    description: HA self-check warning on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: HA selfcheck warning on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.850
-    name: WARN_850
+    name: ASTARO-MIB::WARN_850
     category: security
     severity: warning
-    description: Intrusion Prevention Alert triggered on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Intrusion Prevention Alert on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.852
-    name: WARN_852
+    name: ASTARO-MIB::WARN_852
     category: security
     severity: warning
     description: 'Intrusion Prevention Alert on {SNMP_DEVICE_HOSTNAME}: Packet dropped'
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.856
-    name: WARN_856
+    name: ASTARO-MIB::WARN_856
     category: security
     severity: warning
     description: Portscan detected on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.90
-    name: WARN_090
+    name: ASTARO-MIB::WARN_090
     category: diagnostic
     severity: warning
-    description: Cluster selfcheck triggered on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Cluster selfcheck warning on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.2.94
-    name: WARN_094
-    category: diagnostic
-    severity: warning
-    description: Upgrade failed on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.3.25
-    name: CRIT_025
-    category: license
-    severity: crit
-    description: License usage exceeded 100% of allowed user count on {SNMP_DEVICE_HOSTNAME}. The installed license entitlements are insufficient for current user load.
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.3.26
-    name: CRIT_026
-    category: license
-    severity: crit
-    description: License usage exceeding 110% of allowed user count on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.3.27
-    name: CRIT_027
-    category: license
-    severity: crit
-    description: High availability license invalid on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.3.28
-    name: CRIT_028
-    category: license
-    severity: crit
-    description: Cluster license invalid or missing on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.9789.1500.3.310
-    name: CRIT_310
+    name: ASTARO-MIB::WARN_094
     category: diagnostic
     severity: err
-    description: Up2Date prefetch failed on {SNMP_DEVICE_HOSTNAME}. The automatic update retrieval did not complete successfully.
-    mib: ASTARO-MIB
+    description: Upgrade failed on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.3.25
+    name: ASTARO-MIB::CRIT_025
+    category: license
+    severity: crit
+    description: License usage exceeded 100% of permitted user count on {SNMP_DEVICE_HOSTNAME}. The installed license entitlements have been surpassed.
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.3.26
+    name: ASTARO-MIB::CRIT_026
+    category: license
+    severity: crit
+    description: "License usage exceeded on {SNMP_DEVICE_HOSTNAME}\n  The number of users has exceeded 110% of the licensed user count."
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.3.27
+    name: ASTARO-MIB::CRIT_027
+    category: license
+    severity: crit
+    description: No valid HA license on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.3.28
+    name: ASTARO-MIB::CRIT_028
+    category: license
+    severity: crit
+    description: 'License usage: No valid Cluster license on {SNMP_DEVICE_HOSTNAME}'
+    status: current
+  - oid: 1.3.6.1.4.1.9789.1500.3.310
+    name: ASTARO-MIB::CRIT_310
+    category: diagnostic
+    severity: err
+    description: Up2Date prefetch failed on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.311
-    name: CRIT_311
+    name: ASTARO-MIB::CRIT_311
     category: diagnostic
     severity: crit
     description: Firmware update installation failed on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.54
-    name: CRIT_054
-    category: diagnostic
-    severity: alert
-    description: Critical UPS power event on {SNMP_DEVICE_HOSTNAME}. The system is initiating a controlled shutdown due to critically low UPS power reserves.
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::CRIT_054
+    category: state_change
+    severity: crit
+    description: UPS power critical on {SNMP_DEVICE_HOSTNAME}, system shutting down
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.60
-    name: CRIT_060
+    name: ASTARO-MIB::CRIT_060
     category: diagnostic
     severity: crit
-    description: 'RAID array degraded on {SNMP_DEVICE_HOSTNAME}: hard disk replacement needed'
-    mib: ASTARO-MIB
+    description: "RAID array degraded on {SNMP_DEVICE_HOSTNAME}\n  harddisk replacement needed"
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.712
-    name: CRIT_712
-    category: diagnostic
-    severity: crit
+    name: ASTARO-MIB::CRIT_712
+    category: state_change
+    severity: alert
     description: System shut down on {SNMP_DEVICE_HOSTNAME} due to full log file partition
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.80
-    name: CRIT_080
+    name: ASTARO-MIB::CRIT_080
     category: state_change
     severity: crit
-    description: High Availability system on {SNMP_DEVICE_HOSTNAME} has no active slave node — redundancy is lost
-    mib: ASTARO-MIB
+    description: High Availability system on {SNMP_DEVICE_HOSTNAME} has no slave node configured or detected. Redundancy may be compromised; immediate inspection recommended.
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.81
-    name: CRIT_081
-    category: state_change
-    severity: alert
-    description: HA system version mismatch detected on {SNMP_DEVICE_HOSTNAME}. Installed system versions differ between HA nodes. Verify HA system configuration and synchronize software versions.
-    mib: ASTARO-MIB
+    name: ASTARO-MIB::CRIT_081
+    category: diagnostic
+    severity: crit
+    description: High Availability system version mismatch detected on {SNMP_DEVICE_HOSTNAME}. The installed system versions differ between HA nodes, which may prevent proper failover operations.
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.82
-    name: CRIT_082
+    name: ASTARO-MIB::CRIT_082
     category: state_change
-    severity: warning
-    description: "HA System on {SNMP_DEVICE_HOSTNAME}: One or more interfaces are unplugged\n  Action required: Inspect HA system configuration"
-    mib: ASTARO-MIB
+    severity: crit
+    description: "HA system on {SNMP_DEVICE_HOSTNAME} reports unplugged interfaces\n  Please check your HA System"
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.850
-    name: CRIT_850
+    name: ASTARO-MIB::CRIT_850
     category: security
     severity: alert
-    description: Intrusion Prevention Alert triggered on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
+    description: Intrusion Prevention Alert on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.852
-    name: CRIT_852
+    name: ASTARO-MIB::CRIT_852
     category: security
     severity: alert
-    description: 'Intrusion Prevention Alert on {SNMP_DEVICE_HOSTNAME}: Packet dropped'
-    mib: ASTARO-MIB
+    description: Intrusion Prevention Alert (Packet dropped) on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.861
-    name: CRIT_861
+    name: ASTARO-MIB::CRIT_861
     category: security
-    severity: crit
+    severity: alert
     description: Advanced Threat Protection alert triggered on {SNMP_DEVICE_HOSTNAME}
-    mib: ASTARO-MIB
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.90
-    name: CRIT_090
+    name: ASTARO-MIB::CRIT_090
     category: state_change
     severity: crit
-    description: 'Cluster node failure detected on {SNMP_DEVICE_HOSTNAME}: one or more nodes are dead. Check cluster status immediately.'
-    mib: ASTARO-MIB
+    description: "Cluster node failure detected on {SNMP_DEVICE_HOSTNAME}\n  One or more nodes are dead. Please check your Cluster."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.91
-    name: CRIT_091
-    category: state_change
+    name: ASTARO-MIB::CRIT_091
+    category: diagnostic
     severity: crit
-    description: Cluster version mismatch detected on {SNMP_DEVICE_HOSTNAME}. Installed system versions differ across cluster members. Verify cluster consistency.
-    mib: ASTARO-MIB
+    description: "Cluster version mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  The installed system versions differ across cluster nodes. Please check your Cluster configuration."
     status: current
   - oid: 1.3.6.1.4.1.9789.1500.3.92
-    name: CRIT_092
+    name: ASTARO-MIB::CRIT_092
     category: state_change
     severity: crit
-    description: 'Cluster interface failure on {SNMP_DEVICE_HOSTNAME}: some interfaces are unplugged. Check cluster connectivity and redundancy.'
-    mib: ASTARO-MIB
+    description: "Cluster interfaces unplugged on {SNMP_DEVICE_HOSTNAME}\n  Please check your Cluster configuration and physical connections."
     status: current

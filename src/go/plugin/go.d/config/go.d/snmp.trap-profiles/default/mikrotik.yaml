@@ -8,16 +8,14 @@
 #   traps:    each entry references varbinds by name from the table above
 traps:
   - oid: 1.3.6.1.4.1.14988.1.1.9.0.1
-    name: mtxrTrap
-    category: unknown
-    severity: info
-    description: Generic MikroTik trap received on {SNMP_DEVICE_HOSTNAME}. Trap OID 1.3.6.1.4.1.14988.1.1.9.0.1 with no varbinds provided.
-    mib: MIKROTIK-MIB
+    name: MIKROTIK-MIB::mtxrTrap
+    category: state_change
+    severity: notice
+    description: MikroTik device {SNMP_DEVICE_HOSTNAME} generated a generic state change trap
     status: current
   - oid: 1.3.6.1.4.1.14988.1.1.9.0.2
-    name: mtxrTemperatureException
-    category: state_change
+    name: MIKROTIK-MIB::mtxrTemperatureException
+    category: diagnostic
     severity: warning
     description: CPU temperature exception detected on {SNMP_DEVICE_HOSTNAME}
-    mib: MIKROTIK-MIB
     status: current

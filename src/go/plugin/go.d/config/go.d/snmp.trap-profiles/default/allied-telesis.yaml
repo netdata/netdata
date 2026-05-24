@@ -422,6 +422,61 @@ varbinds:
     oid: 1.3.6.1.4.1.207.8.33.11.2
     type: INTEGER
     constraints: (1..32)
+  atkkWiAcAP80211Spec:
+    oid: 1.3.6.1.4.1.207.8.42.6.3.1.1.3
+    type: INTEGER
+    enum:
+      '4': dot11a
+      '7': dot11ac
+      '2': dot11b
+      '3': dot11g
+      '6': dot11na
+      '5': dot11ng
+      '1': unknown
+  atkkWiAcAPAddress:
+    oid: 1.3.6.1.4.1.207.8.42.6.3.1.1.1
+    type: MacAddress
+  atkkWiAcAPChannel:
+    oid: 1.3.6.1.4.1.207.8.42.6.3.1.1.4
+    type: Integer32
+  atkkWiAcAPChannels:
+    oid: 1.3.6.1.4.1.207.8.42.6.3.1.1.7
+    type: ChannelString
+  atkkWiAcAPRSSI:
+    oid: 1.3.6.1.4.1.207.8.42.6.3.1.1.5
+    type: Integer32
+  atkkWiAcAPRadarDetected:
+    oid: 1.3.6.1.4.1.207.8.42.6.3.1.1.6
+    type: TrapString
+  atkkWiAcAPSSID:
+    oid: 1.3.6.1.4.1.207.8.42.6.3.1.1.2
+    type: SsidString
+  atkkWiAcClient80211Spec:
+    oid: 1.3.6.1.4.1.207.8.42.6.2.1.1.3
+    type: INTEGER
+    enum:
+      '4': dot11a
+      '7': dot11ac
+      '2': dot11b
+      '3': dot11g
+      '6': dot11na
+      '5': dot11ng
+      '1': unknown
+  atkkWiAcClientAddress:
+    oid: 1.3.6.1.4.1.207.8.42.6.2.1.1.1
+    type: MacAddress
+  atkkWiAcClientAge:
+    oid: 1.3.6.1.4.1.207.8.42.6.2.1.1.5
+    type: Counter32
+  atkkWiAcClientChannel:
+    oid: 1.3.6.1.4.1.207.8.42.6.2.1.1.4
+    type: Integer32
+  atkkWiAcClientSSID:
+    oid: 1.3.6.1.4.1.207.8.42.6.2.1.1.2
+    type: SsidString
+  atkkWiAcClientUserID:
+    oid: 1.3.6.1.4.1.207.8.42.6.2.1.1.6
+    type: UserIdString
   atrDot1xAuthLastAuthReason:
     oid: 1.3.6.1.4.1.207.8.4.4.4.118.1.1.2.1.1.17
     type: INTEGER
@@ -948,6 +1003,74 @@ varbinds:
   vcstackStkPortNameNotify:
     oid: 1.3.6.1.4.1.207.8.4.4.3.13.0.9
     type: DisplayString
+  wsAdHocClientMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.9.5.1.1
+    type: MacAddress
+  wsAssociatedClientMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.7.1.1.1
+    type: MacAddress
+  wsDetectedAPMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.9.5.1.2
+    type: MacAddress
+  wsDetectedAPRadioInterface:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.9.5.1.3
+    type: Integer32
+    constraints: (1..2)
+  wsFailedAPMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.9.3.1.1
+    type: MacAddress
+  wsFailedAPProtocolVersion:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.9.3.1.9
+    type: Integer32
+    constraints: (0..65535)
+  wsIPAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.1.12.1
+    type: IpAddress
+  wsManagedAPIpAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.6.1.1.2
+    type: IpAddress
+  wsManagedAPMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.6.1.1.1
+    type: MacAddress
+  wsManagedAPRadioInterface:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.6.4.1.1
+    type: Integer32
+    constraints: (1..2)
+  wsManagedAPRadioMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.6.4.1.2
+    type: MacAddress
+  wsManagedAPRadioWLANUtilization:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.6.4.1.6
+    type: Integer32
+    constraints: (0..100)
+  wsManagedAPSwitchIpAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.6.1.1.28
+    type: IpAddress
+  wsNeighborClientMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.6.8.1.1
+    type: MacAddress
+  wsPeerConfigReceived:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.8.1.1.13
+    type: Bits
+  wsPeerIpAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.8.1.1.1
+    type: IpAddress
+  wsPeerProtocolVersion:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.8.1.1.5
+    type: Integer32
+  wsPeerSwitchAPMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.8.3.1.2
+    type: MacAddress
+  wsRFScanAPMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.9.1.1.1
+    type: MacAddress
+  wsRFScanAPSSID:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.9.1.1.4
+    type: DisplayString
+    constraints: SIZE(1..32)
+  wsVAPMacAddress:
+    oid: 1.3.6.1.4.1.207.8.42.8.34.7.4.1.1
+    type: MacAddress
   xemInfoBayId:
     oid: 1.3.6.1.4.1.207.8.4.4.3.11.2.1.2
     type: Unsigned32
@@ -958,169 +1081,149 @@ varbinds:
     constraints: (1..8)
 traps:
   - oid: 1.3.6.1.4.1.207.0.101
-    name: newRoot
+    name: AtiL2-MIB::newRoot
     category: mobility
     severity: notice
     description: Device {SNMP_DEVICE_HOSTNAME} elected as new STP root bridge
-    mib: AtiL2-MIB
   - oid: 1.3.6.1.4.1.207.0.102
-    name: topologyChange
-    category: mobility
-    severity: notice
-    description: Topology change detected on {SNMP_DEVICE_HOSTNAME}. One or more STP ports have transitioned either from Learning to Forwarding state, or from Forwarding to Blocking state.
-    mib: AtiL2-MIB
+    name: AtiL2-MIB::topologyChange
+    category: state_change
+    severity: info
+    description: Bridge port state transition detected on {SNMP_DEVICE_HOSTNAME}. Port transitioned either from Learning to Forwarding state, or from Forwarding to Blocking state.
   - oid: 1.3.6.1.4.1.207.0.103
-    name: atiL2FanStopTrap
+    name: AtiL2-MIB::atiL2FanStopTrap
     category: diagnostic
-    severity: crit
-    description: "Fan stopped on {SNMP_DEVICE_HOSTNAME}\n  module ID: {atiL2TrapAttrModuleId}"
-    mib: AtiL2-MIB
+    severity: warning
+    description: Fan stopped on module {atiL2TrapAttrModuleId} on {SNMP_DEVICE_HOSTNAME}
     varbinds:
     - atiL2TrapAttrModuleId
   - oid: 1.3.6.1.4.1.207.0.104
-    name: atiL2TemperatureAbnormalTrap
-    category: state_change
+    name: AtiL2-MIB::atiL2TemperatureAbnormalTrap
+    category: diagnostic
     severity: warning
-    description: Temperature abnormality detected on module {atiL2TrapAttrModuleId} of {SNMP_DEVICE_HOSTNAME}
-    mib: AtiL2-MIB
+    description: Module {atiL2TrapAttrModuleId} reported abnormal temperature on {SNMP_DEVICE_HOSTNAME}
     varbinds:
     - atiL2TrapAttrModuleId
   - oid: 1.3.6.1.4.1.207.0.105
-    name: atiL2PowerSupplyOutage
-    category: diagnostic
-    severity: crit
-    description: "Power supply outage on {SNMP_DEVICE_HOSTNAME}\n  module ID: {atiL2TrapAttrModuleId}"
-    mib: AtiL2-MIB
+    name: AtiL2-MIB::atiL2PowerSupplyOutage
+    category: state_change
+    severity: warning
+    description: "Power supply outage on {SNMP_DEVICE_HOSTNAME}\n  module: {atiL2TrapAttrModuleId}"
     varbinds:
     - atiL2TrapAttrModuleId
   - oid: 1.3.6.1.4.1.207.0.106
-    name: atiL2IntruderAlert
+    name: AtiL2-MIB::atiL2IntruderAlert
     category: security
-    severity: warning
-    description: "Layer 2 intruder detected on {SNMP_DEVICE_HOSTNAME}\n  module: {atiL2TrapAttrModuleId}\n  port: {atiL2TrapAttrPortId}"
-    mib: AtiL2-MIB
+    severity: alert
+    description: "Intruder detected on {SNMP_DEVICE_HOSTNAME}\n  module: {atiL2TrapAttrModuleId}\n  port: {atiL2TrapAttrPortId}"
     varbinds:
     - atiL2TrapAttrModuleId
     - atiL2TrapAttrPortId
   - oid: 1.3.6.1.4.1.207.8.15.9.1
-    name: atiswitchFanStopTrap
+    name: AtiSwitch-MIB::atiswitchFanStopTrap
     category: diagnostic
     severity: warning
-    description: Fan operation error detected on {SNMP_DEVICE_HOSTNAME}. The fan has stopped or is malfunctioning.
-    mib: AtiSwitch-MIB
+    description: Fan operation error detected on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.207.8.15.9.2
-    name: atiswitchTemperatureAbnormalTrap
+    name: AtiSwitch-MIB::atiswitchTemperatureAbnormalTrap
     category: state_change
     severity: warning
-    description: Abnormal temperature detected on {SNMP_DEVICE_HOSTNAME}. Temperature has exceeded the normal operating threshold.
-    mib: AtiSwitch-MIB
+    description: Temperature abnormality detected on {SNMP_DEVICE_HOSTNAME}. Switch thermal sensors have reported readings outside normal operating parameters.
     status: current
   - oid: 1.3.6.1.4.1.207.8.4.4.2.1.1
-    name: igmpGeneralQueryNotReceivedEvent
+    name: AT-INTERFACES-MIB::igmpGeneralQueryNotReceivedEvent
     category: diagnostic
     severity: warning
-    description: "No IGMP General Query received on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifName}\n  Expected periodic IGMP queries have stopped on this interface."
-    mib: AT-INTERFACES-MIB
+    description: "No IGMP general query received on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifName}\n  Expected periodic IGMP queries have not arrived within the configured timeout period."
     status: current
     varbinds:
     - ifName
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.1
-    name: fanAndPsRpsConnectionTrap
+    name: AT-SYSINFO-MIB::fanAndPsRpsConnectionTrap
     category: state_change
     severity: warning
-    description: "Redundant Power Supply (RPS) connection status changed on {SNMP_DEVICE_HOSTNAME}\n  RPS connection status: {fanAndPsRpsConnectionStatus}"
-    mib: AT-SYSINFO-MIB
+    description: "Redundant Power Supply (RPS) connection status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {fanAndPsRpsConnectionStatus}"
     status: current
     varbinds:
     - fanAndPsRpsConnectionStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.10
-    name: fanAndPsAccelFanStatusTrap
+    name: AT-SYSINFO-MIB::fanAndPsAccelFanStatusTrap
     category: state_change
     severity: warning
-    description: "Accelerator fan status changed on {SNMP_DEVICE_HOSTNAME}\n  fan status: {fanAndPsAccelFanStatus}"
-    mib: AT-SYSINFO-MIB
+    description: "Accelerator card fan status changed on {SNMP_DEVICE_HOSTNAME}\n  fan status: {fanAndPsAccelFanStatus}"
     status: current
     varbinds:
     - fanAndPsAccelFanStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.2
-    name: fanAndPsMainPSUStatusTrap
+    name: AT-SYSINFO-MIB::fanAndPsMainPSUStatusTrap
     category: state_change
-    severity: notice
-    description: "Main power supply status changed on {SNMP_DEVICE_HOSTNAME}\n  PSU status: {fanAndPsMainPSUStatus}"
-    mib: AT-SYSINFO-MIB
+    severity: alert
+    description: "Main power supply status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {fanAndPsMainPSUStatus}"
     status: current
     varbinds:
     - fanAndPsMainPSUStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.3
-    name: fanAndPsRedundantPSUStatusTrap
+    name: AT-SYSINFO-MIB::fanAndPsRedundantPSUStatusTrap
     category: state_change
     severity: warning
-    description: "Redundant power supply status changed on {SNMP_DEVICE_HOSTNAME}\n  current status: {fanAndPsRedundantPSUStatus}"
-    mib: AT-SYSINFO-MIB
+    description: "Redundant power supply status changed on {SNMP_DEVICE_HOSTNAME}\n  RPS status: {fanAndPsRedundantPSUStatus}"
     status: current
     varbinds:
     - fanAndPsRedundantPSUStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.4
-    name: fanAndPsMainFanStatusTrap
+    name: AT-SYSINFO-MIB::fanAndPsMainFanStatusTrap
     category: state_change
     severity: warning
-    description: "Main Power Supply fan status changed on {SNMP_DEVICE_HOSTNAME}\n  current status: {fanAndPsMainFanStatus}"
-    mib: AT-SYSINFO-MIB
+    description: "Main fan status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {fanAndPsMainFanStatus}"
     status: current
     varbinds:
     - fanAndPsMainFanStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.5
-    name: fanAndPsRedundantFanStatusTrap
+    name: AT-SYSINFO-MIB::fanAndPsRedundantFanStatusTrap
     category: state_change
     severity: warning
-    description: "Redundant power supply fan status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {fanAndPsRedundantFanStatus}"
-    mib: AT-SYSINFO-MIB
+    description: "Redundant fan status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {fanAndPsRedundantFanStatus}"
     status: current
     varbinds:
     - fanAndPsRedundantFanStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.6
-    name: fanAndPsTemperatureStatusTrap
+    name: AT-SYSINFO-MIB::fanAndPsTemperatureStatusTrap
     category: state_change
     severity: warning
-    description: "Temperature status changed on {SNMP_DEVICE_HOSTNAME}\n  current status: {fanAndPsTemperatureStatus}"
-    mib: AT-SYSINFO-MIB
+    description: "Fan/PSU temperature status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {fanAndPsTemperatureStatus}"
     status: current
     varbinds:
     - fanAndPsTemperatureStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.7
-    name: fanAndPsFanTrayPresentTrap
+    name: AT-SYSINFO-MIB::fanAndPsFanTrayPresentTrap
     category: state_change
     severity: warning
-    description: "Fan tray presence status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {fanAndPsFanTrayPresent}"
-    mib: AT-SYSINFO-MIB
+    description: "Fan tray presence status changed on {SNMP_DEVICE_HOSTNAME}\n  current status: {fanAndPsFanTrayPresent}"
     status: current
     varbinds:
     - fanAndPsFanTrayPresent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.8
-    name: fanAndPsFanTrayStatusTrap
+    name: AT-SYSINFO-MIB::fanAndPsFanTrayStatusTrap
     category: state_change
     severity: warning
-    description: "Fan tray status changed on {SNMP_DEVICE_HOSTNAME}\n  fan tray status: {fanAndPsFanTrayStatus}"
-    mib: AT-SYSINFO-MIB
+    description: "Fan tray status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {fanAndPsFanTrayStatus}"
     status: current
     varbinds:
     - fanAndPsFanTrayStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.1.0.9
-    name: fanAndPsMainMonitoringStatusTrap
+    name: AT-SYSINFO-MIB::fanAndPsMainMonitoringStatusTrap
     category: state_change
     severity: warning
     description: "Main power supply monitoring status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {fanAndPsMainMonitoringStatus}"
-    mib: AT-SYSINFO-MIB
     status: current
     varbinds:
     - fanAndPsMainMonitoringStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.10.5.1
-    name: envMonFanAlarmSetEvent
+    name: AT-ENVMON-MIB::envMonFanAlarmSetEvent
     category: state_change
     severity: warning
-    description: "Fan speed alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  board index: {envMonFanBoardIndex}\n  fan index: {envMonFanIndex}\n  description: {envMonFanDescription}\n  current speed: {envMonFanCurrentSpeed} RPM\n  lower threshold: {envMonFanLowerThreshold} RPM"
-    mib: AT-ENVMON-MIB
+    description: "Fan speed alarm on {SNMP_DEVICE_HOSTNAME}\n  fan: {envMonFanDescription}\n  board index: {envMonFanBoardIndex}\n  fan index: {envMonFanIndex}\n  current speed: {envMonFanCurrentSpeed} RPM\n  lower threshold: {envMonFanLowerThreshold} RPM"
     status: current
     varbinds:
     - envMonFanBoardIndex
@@ -1129,11 +1232,10 @@ traps:
     - envMonFanLowerThreshold
     - envMonFanCurrentSpeed
   - oid: 1.3.6.1.4.1.207.8.4.4.3.10.5.2
-    name: envMonFanAlarmClearedEvent
+    name: AT-ENVMON-MIB::envMonFanAlarmClearedEvent
     category: state_change
     severity: notice
-    description: "Fan alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  description: {envMonFanDescription}\n  board index: {envMonFanBoardIndex}\n  fan index: {envMonFanIndex}\n  current speed: {envMonFanCurrentSpeed} RPM\n  lower threshold: {envMonFanLowerThreshold} RPM"
-    mib: AT-ENVMON-MIB
+    description: "Fan alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  board index: {envMonFanBoardIndex}\n  fan index: {envMonFanIndex}\n  description: {envMonFanDescription}\n  lower threshold: {envMonFanLowerThreshold}\n  current speed: {envMonFanCurrentSpeed}"
     status: current
     varbinds:
     - envMonFanBoardIndex
@@ -1142,11 +1244,10 @@ traps:
     - envMonFanLowerThreshold
     - envMonFanCurrentSpeed
   - oid: 1.3.6.1.4.1.207.8.4.4.3.10.5.3
-    name: envMonVoltAlarmSetEvent
-    category: state_change
+    name: AT-ENVMON-MIB::envMonVoltAlarmSetEvent
+    category: diagnostic
     severity: warning
-    description: "Voltage alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  rail: {envMonVoltageDescription}\n  current reading: {envMonVoltageCurrent} mV\n  acceptable range: {envMonVoltageLowerThreshold} – {envMonVoltageUpperThreshold} mV"
-    mib: AT-ENVMON-MIB
+    description: "Voltage rail {envMonVoltageDescription} on board {envMonVoltageBoardIndex} is out of tolerance on {SNMP_DEVICE_HOSTNAME}\n  current reading: {envMonVoltageCurrent} mV\n  lower threshold: {envMonVoltageLowerThreshold} mV\n  upper threshold: {envMonVoltageUpperThreshold} mV"
     status: current
     varbinds:
     - envMonVoltageBoardIndex
@@ -1156,11 +1257,10 @@ traps:
     - envMonVoltageLowerThreshold
     - envMonVoltageCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.10.5.4
-    name: envMonVoltAlarmClearedEvent
+    name: AT-ENVMON-MIB::envMonVoltAlarmClearedEvent
     category: state_change
     severity: notice
-    description: "Voltage alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {envMonVoltageDescription}\n  board index: {envMonVoltageBoardIndex}\n  rail index: {envMonVoltageIndex}\n  current reading: {envMonVoltageCurrent} mV\n  thresholds: {envMonVoltageLowerThreshold} – {envMonVoltageUpperThreshold} mV"
-    mib: AT-ENVMON-MIB
+    description: "Voltage rail {envMonVoltageDescription} on board index {envMonVoltageBoardIndex} returned to normal range on {SNMP_DEVICE_HOSTNAME}\n  current reading: {envMonVoltageCurrent} mV\n  acceptable range: {envMonVoltageLowerThreshold} mV to {envMonVoltageUpperThreshold} mV"
     status: current
     varbinds:
     - envMonVoltageBoardIndex
@@ -1170,11 +1270,10 @@ traps:
     - envMonVoltageLowerThreshold
     - envMonVoltageCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.10.5.5
-    name: envMonTempAlarmSetEvent
+    name: AT-ENVMON-MIB::envMonTempAlarmSetEvent
     category: state_change
-    severity: warning
-    description: "Temperature alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  Board Index: {envMonTemperatureBoardIndex}\n  Sensor Index: {envMonTemperatureIndex}\n  Description: {envMonTemperatureDescription}\n  Current Reading: {envMonTemperatureCurrent} tenths of degrees Celsius\n  Upper Threshold: {envMonTemperatureUpperThreshold} tenths of degrees Celsius"
-    mib: AT-ENVMON-MIB
+    severity: alert
+    description: "Temperature threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  board index: {envMonTemperatureBoardIndex}\n  sensor index: {envMonTemperatureIndex}\n  sensor: {envMonTemperatureDescription}\n  current reading: {envMonTemperatureCurrent}\n  upper threshold: {envMonTemperatureUpperThreshold}"
     status: current
     varbinds:
     - envMonTemperatureBoardIndex
@@ -1183,11 +1282,10 @@ traps:
     - envMonTemperatureUpperThreshold
     - envMonTemperatureCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.10.5.6
-    name: envMonTempAlarmClearedEvent
+    name: AT-ENVMON-MIB::envMonTempAlarmClearedEvent
     category: state_change
-    severity: info
-    description: "Temperature alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {envMonTemperatureDescription}\n  board index: {envMonTemperatureBoardIndex}\n  sensor index: {envMonTemperatureIndex}\n  current reading: {envMonTemperatureCurrent} tenths of °C\n  upper threshold: {envMonTemperatureUpperThreshold} tenths of °C"
-    mib: AT-ENVMON-MIB
+    severity: notice
+    description: "Temperature alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {envMonTemperatureDescription}\n  board index: {envMonTemperatureBoardIndex}\n  sensor index: {envMonTemperatureIndex}\n  upper threshold: {envMonTemperatureUpperThreshold} tenths °C\n  current reading: {envMonTemperatureCurrent} tenths °C"
     status: current
     varbinds:
     - envMonTemperatureBoardIndex
@@ -1196,11 +1294,10 @@ traps:
     - envMonTemperatureUpperThreshold
     - envMonTemperatureCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.10.5.7
-    name: envMonPsbAlarmSetEvent
+    name: AT-ENVMON-MIB::envMonPsbAlarmSetEvent
     category: diagnostic
-    severity: warning
-    description: "Power supply bay sensor alarm on {SNMP_DEVICE_HOSTNAME}\n  sensor description: {envMonPsbSensorDescription}\n  sensor type: {envMonPsbSensorType}\n  board index: {envMonPsbSensorBoardIndex}\n  sensor index: {envMonPsbSensorIndex}"
-    mib: AT-ENVMON-MIB
+    severity: alert
+    description: "Power supply bay sensor alarm on {SNMP_DEVICE_HOSTNAME}\n  board index: {envMonPsbSensorBoardIndex}\n  sensor index: {envMonPsbSensorIndex}\n  sensor type: {envMonPsbSensorType}\n  description: {envMonPsbSensorDescription}"
     status: current
     varbinds:
     - envMonPsbSensorBoardIndex
@@ -1208,11 +1305,10 @@ traps:
     - envMonPsbSensorType
     - envMonPsbSensorDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.10.5.8
-    name: envMonPsbAlarmClearedEvent
+    name: AT-ENVMON-MIB::envMonPsbAlarmClearedEvent
     category: state_change
     severity: notice
-    description: "Power supply bay sensor alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  board index: {envMonPsbSensorBoardIndex}\n  sensor index: {envMonPsbSensorIndex}\n  sensor type: {envMonPsbSensorType}\n  description: {envMonPsbSensorDescription}"
-    mib: AT-ENVMON-MIB
+    description: "Power supply bay sensor {envMonPsbSensorDescription} (index {envMonPsbSensorIndex} on board {envMonPsbSensorBoardIndex}) returned to normal state\n  sensor type: {envMonPsbSensorType}"
     status: current
     varbinds:
     - envMonPsbSensorBoardIndex
@@ -1220,41 +1316,37 @@ traps:
     - envMonPsbSensorType
     - envMonPsbSensorDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.11.0.1
-    name: xemInserted
+    name: AT-XEM-MIB::xemInserted
     category: diagnostic
-    severity: notice
-    description: "XEM inserted on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {xemInfoMemberId}\n  bay: {xemInfoBayId}"
-    mib: AT-XEM-MIB
+    severity: warning
+    description: "XEM inserted on {SNMP_DEVICE_HOSTNAME}\n  stack member: {xemInfoMemberId}\n  bay: {xemInfoBayId}"
     status: current
     varbinds:
     - xemInfoMemberId
     - xemInfoBayId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.11.0.2
-    name: xemRemoved
+    name: AT-XEM-MIB::xemRemoved
     category: diagnostic
     severity: crit
     description: "XEM removed from {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {xemInfoMemberId}\n  bay ID: {xemInfoBayId}"
-    mib: AT-XEM-MIB
     status: current
     varbinds:
     - xemInfoMemberId
     - xemInfoBayId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.11.0.3
-    name: xemInsertedFail
+    name: AT-XEM-MIB::xemInsertedFail
     category: diagnostic
     severity: crit
     description: "XEM insertion failed on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {xemInfoMemberId}\n  bay ID: {xemInfoBayId}"
-    mib: AT-XEM-MIB
     status: current
     varbinds:
     - xemInfoMemberId
     - xemInfoBayId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.1
-    name: atEnvMonv2FanAlarmSetNotify
-    category: state_change
+    name: AT-ENVMONv2-MIB::atEnvMonv2FanAlarmSetNotify
+    category: diagnostic
     severity: warning
-    description: "Fan speed below threshold on {SNMP_DEVICE_HOSTNAME}\n  fan: {atEnvMonv2FanDescription}\n  stack member: {atEnvMonv2FanStackMemberId}\n  board index: {atEnvMonv2FanBoardIndex}\n  fan index: {atEnvMonv2FanIndex}\n  current speed: {atEnvMonv2FanCurrentSpeed} RPM\n  lower threshold: {atEnvMonv2FanLowerThreshold} RPM"
-    mib: AT-ENVMONv2-MIB
+    description: "Fan speed below threshold on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2FanStackMemberId}\n  board index: {atEnvMonv2FanBoardIndex}\n  fan index: {atEnvMonv2FanIndex}\n  description: {atEnvMonv2FanDescription}\n  lower threshold: {atEnvMonv2FanLowerThreshold}\n  current speed: {atEnvMonv2FanCurrentSpeed}"
     status: current
     varbinds:
     - atEnvMonv2FanStackMemberId
@@ -1264,11 +1356,10 @@ traps:
     - atEnvMonv2FanLowerThreshold
     - atEnvMonv2FanCurrentSpeed
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.10
-    name: atEnvMonv2ContactInputCloseNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2ContactInputCloseNotify
     category: state_change
-    severity: warning
-    description: "Monitored contact input closed on {SNMP_DEVICE_HOSTNAME}\n  description: {atEnvMonv2ContactInputDescription}\n  stack member: {atEnvMonv2ContactInputStackMemberId}\n  board index: {atEnvMonv2ContactInputBoardIndex}\n  contact index: {atEnvMonv2ContactInputIndex}"
-    mib: AT-ENVMONv2-MIB
+    severity: notice
+    description: "Monitored contact input closed on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2ContactInputStackMemberId}\n  board index: {atEnvMonv2ContactInputBoardIndex}\n  contact input index: {atEnvMonv2ContactInputIndex}\n  description: {atEnvMonv2ContactInputDescription}"
     status: current
     varbinds:
     - atEnvMonv2ContactInputStackMemberId
@@ -1276,11 +1367,10 @@ traps:
     - atEnvMonv2ContactInputIndex
     - atEnvMonv2ContactInputDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.11
-    name: atEnvMonv2ExternalPSUAlarmSetNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2ExternalPSUAlarmSetNotify
     category: state_change
-    severity: warning
-    description: "External PSU alarm on {SNMP_DEVICE_HOSTNAME}\n  Stack Member: {atEnvMonv2ExternalPSUStackMemberId}\n  Board Index: {atEnvMonv2ExternalPSUBoardIndex}\n  PSU Index: {atEnvMonv2ExternalPSUIndex}\n  Description: {atEnvMonv2ExternalPSUDescription}\n  Status: External PSU supply potential not present"
-    mib: AT-ENVMONv2-MIB
+    severity: alert
+    description: External power supply {atEnvMonv2ExternalPSUDescription} (index {atEnvMonv2ExternalPSUIndex}) on board {atEnvMonv2ExternalPSUBoardIndex} of stack member {atEnvMonv2ExternalPSUStackMemberId} has lost supply potential on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - atEnvMonv2ExternalPSUStackMemberId
@@ -1288,11 +1378,10 @@ traps:
     - atEnvMonv2ExternalPSUIndex
     - atEnvMonv2ExternalPSUDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.12
-    name: atEnvMonv2ExternalPSUAlarmClearedNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2ExternalPSUAlarmClearedNotify
     category: state_change
-    severity: info
-    description: "External PSU alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  description: {atEnvMonv2ExternalPSUDescription}\n  stack member: {atEnvMonv2ExternalPSUStackMemberId}\n  board index: {atEnvMonv2ExternalPSUBoardIndex}\n  PSU index: {atEnvMonv2ExternalPSUIndex}\n\nThe monitored power supply has returned to an acceptable operating voltage."
-    mib: AT-ENVMONv2-MIB
+    severity: notice
+    description: "External PSU alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2ExternalPSUStackMemberId}\n  board index: {atEnvMonv2ExternalPSUBoardIndex}\n  PSU index: {atEnvMonv2ExternalPSUIndex}\n  description: {atEnvMonv2ExternalPSUDescription}"
     status: current
     varbinds:
     - atEnvMonv2ExternalPSUStackMemberId
@@ -1300,65 +1389,58 @@ traps:
     - atEnvMonv2ExternalPSUIndex
     - atEnvMonv2ExternalPSUDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.13
-    name: atEnvMonv2TempCriticalSetNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempCriticalSetNotify
     category: state_change
-    severity: err
+    severity: crit
     description: "Temperature critical threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {atEnvMonv2TemperatureStackMemberId}"
-    mib: AT-ENVMONv2-MIB
     status: current
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.14
-    name: atEnvMonv2TempCriticalClearedNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempCriticalClearedNotify
     category: state_change
     severity: notice
-    description: "Temperature returned to acceptable range on {SNMP_DEVICE_HOSTNAME}, clearing a previous critical alarm\n  stack member ID: {atEnvMonv2TemperatureStackMemberId}"
-    mib: AT-ENVMONv2-MIB
+    description: Temperature sensor {atEnvMonv2TemperatureStackMemberId} on {SNMP_DEVICE_HOSTNAME} returned to normal after being in alarm state
     status: current
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.15
-    name: atEnvMonv2TempCriticalLevel1SetNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempCriticalLevel1SetNotify
     category: state_change
-    severity: crit
-    description: "Temperature exceeded level 1 critical threshold on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {atEnvMonv2TemperatureStackMemberId}"
-    mib: AT-ENVMONv2-MIB
+    severity: alert
+    description: "Temperature sensor exceeded critical threshold on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {atEnvMonv2TemperatureStackMemberId}"
     status: current
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.16
-    name: atEnvMonv2TempCriticalLevel1ClearedNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempCriticalLevel1ClearedNotify
     category: state_change
     severity: notice
-    description: "Temperature recovered to acceptable level on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2TemperatureStackMemberId}\n  Previously in critical temperature level 1"
-    mib: AT-ENVMONv2-MIB
+    description: "Temperature recovered to acceptable level on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {atEnvMonv2TemperatureStackMemberId}\n  Previously in critical temperature level 1 condition."
     status: current
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.17
-    name: atEnvMonv2TempCriticalLevel2SetNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempCriticalLevel2SetNotify
     category: state_change
-    severity: crit
-    description: "Temperature sensor on {SNMP_DEVICE_HOSTNAME} exceeded Level 2 critical threshold\n  stack member ID: {atEnvMonv2TemperatureStackMemberId}"
-    mib: AT-ENVMONv2-MIB
+    severity: alert
+    description: "Temperature sensor exceeded critical level 2 threshold on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {atEnvMonv2TemperatureStackMemberId}"
     status: current
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.18
-    name: atEnvMonv2TempCriticalLevel2ClearedNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempCriticalLevel2ClearedNotify
     category: state_change
     severity: notice
-    description: "Temperature returned to acceptable level on {SNMP_DEVICE_HOSTNAME}, having previously been at critical level 2.\n  stack member: {atEnvMonv2TemperatureStackMemberId}"
-    mib: AT-ENVMONv2-MIB
+    description: "Temperature returned to acceptable level on {SNMP_DEVICE_HOSTNAME}, having recovered from critical level 2\n  stack member ID: {atEnvMonv2TemperatureStackMemberId}"
     status: current
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.19
-    name: atEnvMonv2PsbPresenceChangeNotify
-    category: state_change
+    name: AT-ENVMONv2-MIB::atEnvMonv2PsbPresenceChangeNotify
+    category: diagnostic
     severity: notice
-    description: "Power supply bay presence change on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2PsbSensorStackMemberId}\n  board index: {atEnvMonv2PsbSensorBoardIndex}\n  sensor index: {atEnvMonv2PsbSensorIndex}\n  sensor type: {atEnvMonv2PsbSensorType}\n  description: {atEnvMonv2PsbSensorDescription}\n  currently reading: {atEnvMonv2PsbSensorReading}"
-    mib: AT-ENVMONv2-MIB
+    description: "Power supply bay presence change detected on {SNMP_DEVICE_HOSTNAME}\n  sensor stack member: {atEnvMonv2PsbSensorStackMemberId}\n  board index: {atEnvMonv2PsbSensorBoardIndex}\n  sensor index: {atEnvMonv2PsbSensorIndex}\n  sensor type: {atEnvMonv2PsbSensorType}\n  sensor description: {atEnvMonv2PsbSensorDescription}\n  current reading: {atEnvMonv2PsbSensorReading}"
     status: current
     varbinds:
     - atEnvMonv2PsbSensorStackMemberId
@@ -1368,11 +1450,10 @@ traps:
     - atEnvMonv2PsbSensorDescription
     - atEnvMonv2PsbSensorReading
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.2
-    name: atEnvMonv2FanAlarmClearedNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2FanAlarmClearedNotify
     category: state_change
-    severity: info
-    description: "Fan speed returned to acceptable level on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2FanStackMemberId}\n  board index: {atEnvMonv2FanBoardIndex}\n  fan index: {atEnvMonv2FanIndex}\n  description: {atEnvMonv2FanDescription}\n  lower threshold: {atEnvMonv2FanLowerThreshold} RPM\n  current speed: {atEnvMonv2FanCurrentSpeed} RPM"
-    mib: AT-ENVMONv2-MIB
+    severity: notice
+    description: "Fan alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  fan: {atEnvMonv2FanDescription}\n  current speed: {atEnvMonv2FanCurrentSpeed} RPM\n  lower threshold: {atEnvMonv2FanLowerThreshold} RPM\n  board index: {atEnvMonv2FanBoardIndex}\n  stack member: {atEnvMonv2FanStackMemberId}"
     status: current
     varbinds:
     - atEnvMonv2FanStackMemberId
@@ -1382,11 +1463,10 @@ traps:
     - atEnvMonv2FanLowerThreshold
     - atEnvMonv2FanCurrentSpeed
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.3
-    name: atEnvMonv2VoltAlarmSetNotify
-    category: state_change
+    name: AT-ENVMONv2-MIB::atEnvMonv2VoltAlarmSetNotify
+    category: diagnostic
     severity: warning
-    description: "Voltage alarm on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2VoltageDescription}\n  stack member: {atEnvMonv2VoltageStackMemberId}\n  board: {atEnvMonv2VoltageBoardIndex}\n  rail index: {atEnvMonv2VoltageIndex}\n  current reading: {atEnvMonv2VoltageCurrent} mV\n  valid range: {atEnvMonv2VoltageLowerThreshold} – {atEnvMonv2VoltageUpperThreshold} mV"
-    mib: AT-ENVMONv2-MIB
+    description: "Voltage alarm on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2VoltageDescription}\n  stack member: {atEnvMonv2VoltageStackMemberId}\n  board index: {atEnvMonv2VoltageBoardIndex}\n  rail index: {atEnvMonv2VoltageIndex}\n  current reading: {atEnvMonv2VoltageCurrent} mV\n  range: {atEnvMonv2VoltageLowerThreshold} – {atEnvMonv2VoltageUpperThreshold} mV"
     status: current
     varbinds:
     - atEnvMonv2VoltageStackMemberId
@@ -1397,11 +1477,10 @@ traps:
     - atEnvMonv2VoltageLowerThreshold
     - atEnvMonv2VoltageCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.4
-    name: atEnvMonv2VoltAlarmClearedNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2VoltAlarmClearedNotify
     category: state_change
-    severity: warning
-    description: "Voltage alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  description: {atEnvMonv2VoltageDescription}\n  stack member: {atEnvMonv2VoltageStackMemberId}\n  board: {atEnvMonv2VoltageBoardIndex}\n  rail: {atEnvMonv2VoltageIndex}\n  current reading: {atEnvMonv2VoltageCurrent} mV\n  acceptable range: {atEnvMonv2VoltageLowerThreshold} – {atEnvMonv2VoltageUpperThreshold} mV"
-    mib: AT-ENVMONv2-MIB
+    severity: notice
+    description: "Voltage alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2VoltageStackMemberId}\n  board index: {atEnvMonv2VoltageBoardIndex}\n  voltage rail: {atEnvMonv2VoltageIndex}\n  description: {atEnvMonv2VoltageDescription}\n  current reading: {atEnvMonv2VoltageCurrent} mV\n  acceptable range: {atEnvMonv2VoltageLowerThreshold} mV to {atEnvMonv2VoltageUpperThreshold} mV"
     status: current
     varbinds:
     - atEnvMonv2VoltageStackMemberId
@@ -1412,11 +1491,10 @@ traps:
     - atEnvMonv2VoltageLowerThreshold
     - atEnvMonv2VoltageCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.5
-    name: atEnvMonv2TempAlarmSetNotify
-    category: state_change
-    severity: err
-    description: "Temperature threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2TemperatureDescription}\n  stack member: {atEnvMonv2TemperatureStackMemberId}, board: {atEnvMonv2TemperatureBoardIndex}, sensor index: {atEnvMonv2TemperatureIndex}\n  current reading: {atEnvMonv2TemperatureCurrent} tenths °C\n  upper threshold: {atEnvMonv2TemperatureUpperThreshold} tenths °C"
-    mib: AT-ENVMONv2-MIB
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempAlarmSetNotify
+    category: diagnostic
+    severity: alert
+    description: "Temperature alarm on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2TemperatureDescription}\n  current reading: {atEnvMonv2TemperatureCurrent} (tenths of degree Celsius)\n  upper threshold: {atEnvMonv2TemperatureUpperThreshold} (tenths of degree Celsius)\n  board index: {atEnvMonv2TemperatureBoardIndex}\n  stack member ID: {atEnvMonv2TemperatureStackMemberId}"
     status: current
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
@@ -1426,11 +1504,10 @@ traps:
     - atEnvMonv2TemperatureUpperThreshold
     - atEnvMonv2TemperatureCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.6
-    name: atEnvMonv2TempAlarmClearedNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempAlarmClearedNotify
     category: state_change
-    severity: info
-    description: "Temperature alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2TemperatureDescription}\n  stack member: {atEnvMonv2TemperatureStackMemberId}\n  board index: {atEnvMonv2TemperatureBoardIndex}\n  sensor index: {atEnvMonv2TemperatureIndex}\n  upper threshold: {atEnvMonv2TemperatureUpperThreshold} (tenths of °C)"
-    mib: AT-ENVMONv2-MIB
+    severity: notice
+    description: "Temperature alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2TemperatureDescription}\n  board index: {atEnvMonv2TemperatureBoardIndex}\n  sensor index: {atEnvMonv2TemperatureIndex}\n  stack member: {atEnvMonv2TemperatureStackMemberId}\n  upper threshold: {atEnvMonv2TemperatureUpperThreshold}"
     status: current
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
@@ -1439,11 +1516,10 @@ traps:
     - atEnvMonv2TemperatureDescription
     - atEnvMonv2TemperatureUpperThreshold
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.7
-    name: atEnvMonv2PsbAlarmSetNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2PsbAlarmSetNotify
     category: state_change
     severity: warning
-    description: "Power supply bay alarm triggered on {SNMP_DEVICE_HOSTNAME}: monitored parameter out of tolerance\n  stack member: {atEnvMonv2PsbSensorStackMemberId}\n  board index: {atEnvMonv2PsbSensorBoardIndex}\n  sensor index: {atEnvMonv2PsbSensorIndex}\n  sensor type: {atEnvMonv2PsbSensorType}\n  description: {atEnvMonv2PsbSensorDescription}"
-    mib: AT-ENVMONv2-MIB
+    description: "Power supply bay sensor out of tolerance on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2PsbSensorStackMemberId}\n  board index: {atEnvMonv2PsbSensorBoardIndex}\n  sensor index: {atEnvMonv2PsbSensorIndex}\n  type: {atEnvMonv2PsbSensorType}\n  description: {atEnvMonv2PsbSensorDescription}"
     status: current
     varbinds:
     - atEnvMonv2PsbSensorStackMemberId
@@ -1452,11 +1528,10 @@ traps:
     - atEnvMonv2PsbSensorType
     - atEnvMonv2PsbSensorDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.8
-    name: atEnvMonv2PsbAlarmClearedNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2PsbAlarmClearedNotify
     category: state_change
     severity: notice
-    description: "Power supply bay sensor alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2PsbSensorDescription}\n  type: {atEnvMonv2PsbSensorType}\n  stack member: {atEnvMonv2PsbSensorStackMemberId}\n  board index: {atEnvMonv2PsbSensorBoardIndex}\n  sensor index: {atEnvMonv2PsbSensorIndex}"
-    mib: AT-ENVMONv2-MIB
+    description: "Power supply bay sensor alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2PsbSensorStackMemberId}\n  board index: {atEnvMonv2PsbSensorBoardIndex}\n  sensor index: {atEnvMonv2PsbSensorIndex}\n  sensor type: {atEnvMonv2PsbSensorType}\n  description: {atEnvMonv2PsbSensorDescription}"
     status: current
     varbinds:
     - atEnvMonv2PsbSensorStackMemberId
@@ -1465,11 +1540,10 @@ traps:
     - atEnvMonv2PsbSensorType
     - atEnvMonv2PsbSensorDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.0.9
-    name: atEnvMonv2ContactInputOpenNotify
+    name: AT-ENVMONv2-MIB::atEnvMonv2ContactInputOpenNotify
     category: state_change
     severity: warning
-    description: "Environmental monitor contact input opened on {SNMP_DEVICE_HOSTNAME}\n  description: {atEnvMonv2ContactInputDescription}\n  stack member: {atEnvMonv2ContactInputStackMemberId}\n  board index: {atEnvMonv2ContactInputBoardIndex}\n  contact input index: {atEnvMonv2ContactInputIndex}"
-    mib: AT-ENVMONv2-MIB
+    description: Contact input {atEnvMonv2ContactInputDescription} on stack member {atEnvMonv2ContactInputStackMemberId}, board {atEnvMonv2ContactInputBoardIndex}, index {atEnvMonv2ContactInputIndex} opened on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - atEnvMonv2ContactInputStackMemberId
@@ -1477,11 +1551,10 @@ traps:
     - atEnvMonv2ContactInputIndex
     - atEnvMonv2ContactInputDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.5.1
-    name: atEnvMonv2FanAlarmSetEvent
+    name: AT-ENVMONv2-MIB::atEnvMonv2FanAlarmSetEvent
     category: state_change
     severity: warning
-    description: "Fan speed alarm on {SNMP_DEVICE_HOSTNAME}\n  description: {atEnvMonv2FanDescription}\n  stack member: {atEnvMonv2FanStackMemberId}\n  board index: {atEnvMonv2FanBoardIndex}\n  fan index: {atEnvMonv2FanIndex}\n  current speed: {atEnvMonv2FanCurrentSpeed} RPM\n  lower threshold: {atEnvMonv2FanLowerThreshold} RPM"
-    mib: AT-ENVMONv2-MIB
+    description: "Fan speed below threshold on {SNMP_DEVICE_HOSTNAME}\n  fan: {atEnvMonv2FanDescription}\n  stack member: {atEnvMonv2FanStackMemberId}\n  board index: {atEnvMonv2FanBoardIndex}\n  fan index: {atEnvMonv2FanIndex}\n  current speed: {atEnvMonv2FanCurrentSpeed} RPM\n  lower threshold: {atEnvMonv2FanLowerThreshold} RPM"
     status: deprecated
     varbinds:
     - atEnvMonv2FanStackMemberId
@@ -1491,11 +1564,10 @@ traps:
     - atEnvMonv2FanLowerThreshold
     - atEnvMonv2FanCurrentSpeed
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.5.2
-    name: atEnvMonv2FanAlarmClearedEvent
+    name: AT-ENVMONv2-MIB::atEnvMonv2FanAlarmClearedEvent
     category: state_change
     severity: notice
-    description: "Fan alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  description: {atEnvMonv2FanDescription}\n  stack member: {atEnvMonv2FanStackMemberId}\n  board: {atEnvMonv2FanBoardIndex}\n  fan index: {atEnvMonv2FanIndex}\n  current speed: {atEnvMonv2FanCurrentSpeed} RPM\n  lower threshold: {atEnvMonv2FanLowerThreshold} RPM"
-    mib: AT-ENVMONv2-MIB
+    description: "Fan alarm cleared on {SNMP_DEVICE_HOSTNAME}, fan returned to acceptable speed\n  description: {atEnvMonv2FanDescription}\n  stack member: {atEnvMonv2FanStackMemberId}\n  board index: {atEnvMonv2FanBoardIndex}\n  fan index: {atEnvMonv2FanIndex}\n  current speed: {atEnvMonv2FanCurrentSpeed} RPM\n  lower threshold: {atEnvMonv2FanLowerThreshold} RPM"
     status: deprecated
     varbinds:
     - atEnvMonv2FanStackMemberId
@@ -1505,11 +1577,10 @@ traps:
     - atEnvMonv2FanLowerThreshold
     - atEnvMonv2FanCurrentSpeed
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.5.3
-    name: atEnvMonv2VoltAlarmSetEvent
-    category: state_change
-    severity: warning
-    description: "Voltage alarm on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2VoltageDescription}\n  stack member: {atEnvMonv2VoltageStackMemberId}\n  board: {atEnvMonv2VoltageBoardIndex}\n  rail index: {atEnvMonv2VoltageIndex}\n  current: {atEnvMonv2VoltageCurrent} mV\n  range: {atEnvMonv2VoltageLowerThreshold} – {atEnvMonv2VoltageUpperThreshold} mV"
-    mib: AT-ENVMONv2-MIB
+    name: AT-ENVMONv2-MIB::atEnvMonv2VoltAlarmSetEvent
+    category: diagnostic
+    severity: alert
+    description: "Voltage rail out of tolerance on {SNMP_DEVICE_HOSTNAME}\n  stack member: {atEnvMonv2VoltageStackMemberId}\n  board index: {atEnvMonv2VoltageBoardIndex}\n  voltage rail index: {atEnvMonv2VoltageIndex}\n  description: {atEnvMonv2VoltageDescription}\n  current reading: {atEnvMonv2VoltageCurrent} mV\n  lower threshold: {atEnvMonv2VoltageLowerThreshold} mV\n  upper threshold: {atEnvMonv2VoltageUpperThreshold} mV"
     status: deprecated
     varbinds:
     - atEnvMonv2VoltageStackMemberId
@@ -1520,11 +1591,10 @@ traps:
     - atEnvMonv2VoltageLowerThreshold
     - atEnvMonv2VoltageCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.5.4
-    name: atEnvMonv2VoltAlarmClearedEvent
-    category: diagnostic
+    name: AT-ENVMONv2-MIB::atEnvMonv2VoltAlarmClearedEvent
+    category: state_change
     severity: notice
-    description: "Voltage alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2VoltageDescription}\n  current reading: {atEnvMonv2VoltageCurrent} mV\n  range: {atEnvMonv2VoltageLowerThreshold} – {atEnvMonv2VoltageUpperThreshold} mV\n  stack member: {atEnvMonv2VoltageStackMemberId}\n  board index: {atEnvMonv2VoltageBoardIndex}\n  rail index: {atEnvMonv2VoltageIndex}"
-    mib: AT-ENVMONv2-MIB
+    description: "Voltage alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  rail: {atEnvMonv2VoltageDescription}\n  current reading: {atEnvMonv2VoltageCurrent} mV\n  acceptable range: {atEnvMonv2VoltageLowerThreshold} mV to {atEnvMonv2VoltageUpperThreshold} mV\n  board index: {atEnvMonv2VoltageBoardIndex}\n  stack member: {atEnvMonv2VoltageStackMemberId}"
     status: deprecated
     varbinds:
     - atEnvMonv2VoltageStackMemberId
@@ -1535,11 +1605,10 @@ traps:
     - atEnvMonv2VoltageLowerThreshold
     - atEnvMonv2VoltageCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.5.5
-    name: atEnvMonv2TempAlarmSetEvent
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempAlarmSetEvent
     category: diagnostic
     severity: warning
-    description: "Temperature alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2TemperatureDescription}\n  stack member: {atEnvMonv2TemperatureStackMemberId}, board: {atEnvMonv2TemperatureBoardIndex}, sensor index: {atEnvMonv2TemperatureIndex}\n  current reading: {atEnvMonv2TemperatureCurrent} tenths °C\n  upper threshold: {atEnvMonv2TemperatureUpperThreshold} tenths °C"
-    mib: AT-ENVMONv2-MIB
+    description: "Temperature threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2TemperatureDescription}\n  current reading: {atEnvMonv2TemperatureCurrent}\n  upper threshold: {atEnvMonv2TemperatureUpperThreshold}\n  stack member: {atEnvMonv2TemperatureStackMemberId}\n  board index: {atEnvMonv2TemperatureBoardIndex}\n  sensor index: {atEnvMonv2TemperatureIndex}"
     status: deprecated
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
@@ -1549,11 +1618,10 @@ traps:
     - atEnvMonv2TemperatureUpperThreshold
     - atEnvMonv2TemperatureCurrent
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.5.6
-    name: atEnvMonv2TempAlarmClearedEvent
+    name: AT-ENVMONv2-MIB::atEnvMonv2TempAlarmClearedEvent
     category: state_change
-    severity: info
-    description: "Temperature alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2TemperatureDescription}\n  stack member: {atEnvMonv2TemperatureStackMemberId}\n  board index: {atEnvMonv2TemperatureBoardIndex}\n  sensor index: {atEnvMonv2TemperatureIndex}\n  upper threshold: {atEnvMonv2TemperatureUpperThreshold} tenths of °C"
-    mib: AT-ENVMONv2-MIB
+    severity: notice
+    description: "Temperature alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2TemperatureDescription}\n  board index: {atEnvMonv2TemperatureBoardIndex}\n  sensor index: {atEnvMonv2TemperatureIndex}\n  stack member: {atEnvMonv2TemperatureStackMemberId}\n  upper threshold: {atEnvMonv2TemperatureUpperThreshold}"
     status: deprecated
     varbinds:
     - atEnvMonv2TemperatureStackMemberId
@@ -1562,11 +1630,10 @@ traps:
     - atEnvMonv2TemperatureDescription
     - atEnvMonv2TemperatureUpperThreshold
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.5.7
-    name: atEnvMonv2PsbAlarmSetEvent
-    category: state_change
+    name: AT-ENVMONv2-MIB::atEnvMonv2PsbAlarmSetEvent
+    category: diagnostic
     severity: warning
-    description: "Power supply bay sensor alarm triggered on {SNMP_DEVICE_HOSTNAME}: a monitored parameter has gone out of tolerance.\n  Sensor description: {atEnvMonv2PsbSensorDescription}\n  Sensor type: {atEnvMonv2PsbSensorType}\n  Stack member: {atEnvMonv2PsbSensorStackMemberId}\n  Board index: {atEnvMonv2PsbSensorBoardIndex}\n  Sensor index: {atEnvMonv2PsbSensorIndex}"
-    mib: AT-ENVMONv2-MIB
+    description: "Power supply bay environmental sensor alarm on {SNMP_DEVICE_HOSTNAME}\n  sensor ID: {atEnvMonv2PsbSensorStackMemberId}\n  board index: {atEnvMonv2PsbSensorBoardIndex}\n  sensor index: {atEnvMonv2PsbSensorIndex}\n  sensor type: {atEnvMonv2PsbSensorType}\n  description: {atEnvMonv2PsbSensorDescription}"
     status: deprecated
     varbinds:
     - atEnvMonv2PsbSensorStackMemberId
@@ -1575,11 +1642,10 @@ traps:
     - atEnvMonv2PsbSensorType
     - atEnvMonv2PsbSensorDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.12.5.8
-    name: atEnvMonv2PsbAlarmClearedEvent
+    name: AT-ENVMONv2-MIB::atEnvMonv2PsbAlarmClearedEvent
     category: state_change
     severity: notice
-    description: "Power supply bay sensor alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor description: {atEnvMonv2PsbSensorDescription}\n  sensor type: {atEnvMonv2PsbSensorType}\n  stack member: {atEnvMonv2PsbSensorStackMemberId}\n  board index: {atEnvMonv2PsbSensorBoardIndex}\n  sensor index: {atEnvMonv2PsbSensorIndex}"
-    mib: AT-ENVMONv2-MIB
+    description: "Power supply bay sensor alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  sensor: {atEnvMonv2PsbSensorDescription}\n  sensor type: {atEnvMonv2PsbSensorType}\n  board index: {atEnvMonv2PsbSensorBoardIndex}\n  sensor index: {atEnvMonv2PsbSensorIndex}\n  stack member: {atEnvMonv2PsbSensorStackMemberId}"
     status: deprecated
     varbinds:
     - atEnvMonv2PsbSensorStackMemberId
@@ -1588,197 +1654,177 @@ traps:
     - atEnvMonv2PsbSensorType
     - atEnvMonv2PsbSensorDescription
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.0.1
-    name: vcstackRoleChangeNotify
+    name: AT-VCSTACK-MIB::vcstackRoleChangeNotify
     category: state_change
-    severity: warning
-    description: "Stack member role changed on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  new role: {vcstackRole}"
-    mib: AT-VCSTACK-MIB
+    severity: notice
+    description: "Virtual chassis stack member role changed on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  new role: {vcstackRole}"
     status: current
     varbinds:
     - vcstackId
     - vcstackRole
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.0.2
-    name: vcstackMemberJoinNotify
+    name: AT-VCSTACK-MIB::vcstackMemberJoinNotify
     category: state_change
     severity: info
-    description: "Stack member joined on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  neighbor member ID: {vcstackNbrMemberIdNotify}"
-    mib: AT-VCSTACK-MIB
+    description: "Virtual Chassis stack member joined on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  neighbor member ID: {vcstackNbrMemberIdNotify}"
     status: current
     varbinds:
     - vcstackId
     - vcstackNbrMemberIdNotify
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.0.3
-    name: vcstackMemberLeaveNotify
+    name: AT-VCSTACK-MIB::vcstackMemberLeaveNotify
     category: state_change
     severity: warning
-    description: "Stack member left the virtual chassis on {SNMP_DEVICE_HOSTNAME}\n  member ID: {vcstackId}\n  neighbor member ID: {vcstackNbrMemberIdNotify}"
-    mib: AT-VCSTACK-MIB
+    description: "Stack member {vcstackNbrMemberIdNotify} left the virtual chassis on {SNMP_DEVICE_HOSTNAME}\n  stack ID: {vcstackId}"
     status: current
     varbinds:
     - vcstackId
     - vcstackNbrMemberIdNotify
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.0.4
-    name: vcstackResiliencyLinkHealthCheckReceivingNotify
+    name: AT-VCSTACK-MIB::vcstackResiliencyLinkHealthCheckReceivingNotify
     category: state_change
-    severity: info
-    description: "Resiliency link activated on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  interface: {vcstackResiliencyLinkInterfaceName}"
-    mib: AT-VCSTACK-MIB
+    severity: notice
+    description: "Resiliency link activated on {SNMP_DEVICE_HOSTNAME}\n  stack member: {vcstackId}\n  interface: {vcstackResiliencyLinkInterfaceName}"
     status: current
     varbinds:
     - vcstackId
     - vcstackResiliencyLinkInterfaceName
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.0.5
-    name: vcstackResiliencyLinkHealthCheckTimeOutNotify
+    name: AT-VCSTACK-MIB::vcstackResiliencyLinkHealthCheckTimeOutNotify
     category: state_change
-    severity: warning
-    description: "Virtual Chassis stacking health-check timeout on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  resiliency link interface: {vcstackResiliencyLinkInterfaceName}\n  The slave has lost contact with the master via the resiliency link."
-    mib: AT-VCSTACK-MIB
+    severity: crit
+    description: "Resiliency link timeout on {SNMP_DEVICE_HOSTNAME}\n  Stack ID: {vcstackId}\n  Interface: {vcstackResiliencyLinkInterfaceName}\n  The slave has lost contact with the master via the resiliency link."
     status: current
     varbinds:
     - vcstackId
     - vcstackResiliencyLinkInterfaceName
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.0.6
-    name: vcstackStkPortLinkUpNotify
+    name: AT-VCSTACK-MIB::vcstackStkPortLinkUpNotify
     category: state_change
     severity: info
-    description: "Stack port link up on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  port: {vcstackStkPortNameNotify}"
-    mib: AT-VCSTACK-MIB
+    description: Stack port {vcstackStkPortNameNotify} on member {vcstackId} link is up on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - vcstackId
     - vcstackStkPortNameNotify
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.0.7
-    name: vcstackStkPortLinkDownNotify
+    name: AT-VCSTACK-MIB::vcstackStkPortLinkDownNotify
     category: state_change
     severity: warning
-    description: "Stack port link down on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  stack port: {vcstackStkPortNameNotify}"
-    mib: AT-VCSTACK-MIB
+    description: Stack port {vcstackStkPortNameNotify} on member {vcstackId} link down on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - vcstackId
     - vcstackStkPortNameNotify
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.6.1
-    name: vcstackRoleChange
+    name: AT-VCSTACK-MIB::vcstackRoleChange
     category: state_change
     severity: notice
-    description: "Stack member role changed on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  new role: {vcstackRole}"
-    mib: AT-VCSTACK-MIB
+    description: "Stack member role changed on {SNMP_DEVICE_HOSTNAME}\n  member ID: {vcstackId}\n  new role: {vcstackRole}"
     status: deprecated
     varbinds:
     - vcstackId
     - vcstackRole
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.6.2
-    name: vcstackMemberJoin
-    category: state_change
-    severity: info
+    name: AT-VCSTACK-MIB::vcstackMemberJoin
+    category: mobility
+    severity: notice
     description: "Stack member joined on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  neighbor member ID: {vcstackNbrMemberId}"
-    mib: AT-VCSTACK-MIB
     status: deprecated
     varbinds:
     - vcstackId
     - vcstackNbrMemberId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.6.3
-    name: vcstackMemberLeave
+    name: AT-VCSTACK-MIB::vcstackMemberLeave
     category: state_change
     severity: warning
-    description: "Stack member left the virtual chassis on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  neighbor member ID: {vcstackNbrMemberId}"
-    mib: AT-VCSTACK-MIB
+    description: "Stack member {vcstackNbrMemberId} left the stack on {SNMP_DEVICE_HOSTNAME}\n  stack ID: {vcstackId}"
     status: deprecated
     varbinds:
     - vcstackId
     - vcstackNbrMemberId
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.6.4
-    name: vcstackResiliencyLinkHealthCheckReceiving
+    name: AT-VCSTACK-MIB::vcstackResiliencyLinkHealthCheckReceiving
     category: state_change
-    severity: info
-    description: "Virtual chassis resiliency link activated on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  interface: {vcstackResiliencyLinkInterfaceName}"
-    mib: AT-VCSTACK-MIB
+    severity: notice
+    description: "Resiliency link activated on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  interface: {vcstackResiliencyLinkInterfaceName}"
     status: deprecated
     varbinds:
     - vcstackId
     - vcstackResiliencyLinkInterfaceName
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.6.5
-    name: vcstackResiliencyLinkHealthCheckTimeOut
+    name: AT-VCSTACK-MIB::vcstackResiliencyLinkHealthCheckTimeOut
     category: state_change
-    severity: warning
-    description: "Virtual Chassis stack member lost contact with the master via resiliency link on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  resiliency link interface: {vcstackResiliencyLinkInterfaceName}"
-    mib: AT-VCSTACK-MIB
+    severity: crit
+    description: "Resiliency link timeout on {SNMP_DEVICE_HOSTNAME}\n  Stack member ID: {vcstackId}\n  Interface: {vcstackResiliencyLinkInterfaceName}\n  The slave has lost contact with the master via the resiliency link."
     status: deprecated
     varbinds:
     - vcstackId
     - vcstackResiliencyLinkInterfaceName
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.6.6
-    name: vcstackStkPortLinkUp
+    name: AT-VCSTACK-MIB::vcstackStkPortLinkUp
     category: state_change
     severity: info
-    description: "Stack port link up on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  stack port name: {vcstackStkPortName}"
-    mib: AT-VCSTACK-MIB
+    description: Stack port {vcstackStkPortName} on member {vcstackId} is up on {SNMP_DEVICE_HOSTNAME}
     status: deprecated
     varbinds:
     - vcstackId
     - vcstackStkPortName
   - oid: 1.3.6.1.4.1.207.8.4.4.3.13.6.7
-    name: vcstackStkPortLinkDown
+    name: AT-VCSTACK-MIB::vcstackStkPortLinkDown
     category: state_change
     severity: warning
-    description: "Stack port link down on {SNMP_DEVICE_HOSTNAME}\n  stack member ID: {vcstackId}\n  stack port name: {vcstackStkPortName}"
-    mib: AT-VCSTACK-MIB
+    description: Stack port {vcstackStkPortName} on member {vcstackId} went down on {SNMP_DEVICE_HOSTNAME}
     status: deprecated
     varbinds:
     - vcstackId
     - vcstackStkPortName
   - oid: 1.3.6.1.4.1.207.8.4.4.3.2.11
-    name: restartNotification
+    name: AT-SYSINFO-MIB::restartNotification
     category: diagnostic
     severity: warning
     description: "Device {SNMP_DEVICE_HOSTNAME} restarted\n  restart cause: {restartCause}"
-    mib: AT-SYSINFO-MIB
     status: current
     varbinds:
     - restartCause
   - oid: 1.3.6.1.4.1.207.8.4.4.3.23.0.1
-    name: chassisCardRoleChangeNotify
+    name: AT-CHASSIS-MIB::chassisCardRoleChangeNotify
     category: state_change
-    severity: warning
+    severity: notice
     description: "Chassis card role changed on {SNMP_DEVICE_HOSTNAME}\n  slot: {slotNumber}\n  new role: {chassisRole}"
-    mib: AT-CHASSIS-MIB
     status: current
     varbinds:
     - slotNumber
     - chassisRole
   - oid: 1.3.6.1.4.1.207.8.4.4.3.23.0.2
-    name: chassisCardJoinNotify
-    category: state_change
-    severity: info
+    name: AT-CHASSIS-MIB::chassisCardJoinNotify
+    category: diagnostic
+    severity: notice
     description: "Card joined chassis on {SNMP_DEVICE_HOSTNAME}\n  slot: {slotNumber}"
-    mib: AT-CHASSIS-MIB
     status: current
     varbinds:
     - slotNumber
   - oid: 1.3.6.1.4.1.207.8.4.4.3.23.0.3
-    name: chassisCardLeaveNotify
-    category: diagnostic
+    name: AT-CHASSIS-MIB::chassisCardLeaveNotify
+    category: state_change
     severity: crit
     description: "Card detached from chassis on {SNMP_DEVICE_HOSTNAME}\n  slot: {slotNumber}"
-    mib: AT-CHASSIS-MIB
     status: current
     varbinds:
     - slotNumber
   - oid: 1.3.6.1.4.1.207.8.4.4.3.24.0.1
-    name: atHhmLogNotify
+    name: AT-HHM-MIB::atHhmLogNotify
     category: diagnostic
-    severity: notice
-    description: "Hardware Health Monitoring log event on {SNMP_DEVICE_HOSTNAME}\n  message: {atHhmLogMessage}"
-    mib: AT-HHM-MIB
+    severity: warning
+    description: "Hardware health monitoring log event on {SNMP_DEVICE_HOSTNAME}\n  message: {atHhmLogMessage}"
     status: current
     varbinds:
     - atHhmLogMessage
   - oid: 1.3.6.1.4.1.207.8.4.4.3.25.1
-    name: atLinkDown
+    name: AT-LINKTRAP-MIB::atLinkDown
     category: state_change
     severity: warning
-    description: "Interface link down on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifDescr}\n  ifIndex: {ifIndex}\n  admin status: {ifAdminStatus}\n  operational status: {ifOperStatus}"
-    mib: AT-LINKTRAP-MIB
+    description: "Interface {ifDescr} (ifIndex {ifIndex}) went down on {SNMP_DEVICE_HOSTNAME}\n  admin status: {ifAdminStatus}\n  operational status: {ifOperStatus}"
     status: current
     varbinds:
     - ifIndex
@@ -1786,11 +1832,10 @@ traps:
     - ifOperStatus
     - ifDescr
   - oid: 1.3.6.1.4.1.207.8.4.4.3.25.2
-    name: atLinkUp
+    name: AT-LINKTRAP-MIB::atLinkUp
     category: state_change
     severity: info
-    description: "Interface linked up on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifDescr}\n  ifIndex: {ifIndex}\n  admin status: {ifAdminStatus}\n  operational status: {ifOperStatus}"
-    mib: AT-LINKTRAP-MIB
+    description: "Interface {ifDescr} (index {ifIndex}) link up on {SNMP_DEVICE_HOSTNAME}\n  admin status: {ifAdminStatus}\n  operational status: {ifOperStatus}"
     status: current
     varbinds:
     - ifIndex
@@ -1798,11 +1843,10 @@ traps:
     - ifOperStatus
     - ifDescr
   - oid: 1.3.6.1.4.1.207.8.4.4.3.27.0.1
-    name: atFiberMonAlarmSetNotify
-    category: diagnostic
+    name: AT-FIBER-MONITORING-MIB::atFiberMonAlarmSetNotify
+    category: state_change
     severity: warning
-    description: "Optical power alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  interface: {atFiberMonIfname} (ifIndex {atFiberMonIfindex})\n  channel: {atFiberMonChannel}\n  current reading: {atFiberMonReading} x0.0001mW\n  alarm threshold: {atFiberMonThreshold} x0.0001mW"
-    mib: AT-FIBER-MONITORING-MIB
+    description: "Optical power alarm on {atFiberMonIfname} (channel {atFiberMonChannel}) at {SNMP_DEVICE_HOSTNAME}\n  current reading: {atFiberMonReading}\n  alarm threshold: {atFiberMonThreshold}"
     status: current
     varbinds:
     - atFiberMonIfindex
@@ -1811,11 +1855,10 @@ traps:
     - atFiberMonReading
     - atFiberMonThreshold
   - oid: 1.3.6.1.4.1.207.8.4.4.3.27.0.2
-    name: atFiberMonAlarmClearedNotify
-    category: diagnostic
-    severity: info
-    description: "Optical power alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  interface: {atFiberMonIfname} (ifIndex {atFiberMonIfindex})\n  channel: {atFiberMonChannel}\n  current reading: {atFiberMonReading} x0.0001mW\n  threshold: {atFiberMonThreshold} x0.0001mW"
-    mib: AT-FIBER-MONITORING-MIB
+    name: AT-FIBER-MONITORING-MIB::atFiberMonAlarmClearedNotify
+    category: state_change
+    severity: notice
+    description: "Optical power alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  interface: {atFiberMonIfname} (index {atFiberMonIfindex})\n  channel: {atFiberMonChannel}\n  current reading: {atFiberMonReading}\n  threshold: {atFiberMonThreshold}"
     status: current
     varbinds:
     - atFiberMonIfindex
@@ -1824,81 +1867,73 @@ traps:
     - atFiberMonReading
     - atFiberMonThreshold
   - oid: 1.3.6.1.4.1.207.8.4.4.3.4.1.0.1
-    name: generalTemperatureStatusTrap
+    name: AT-SYSINFO-MIB::generalTemperatureStatusTrap
     category: state_change
     severity: warning
-    description: "Temperature status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {generalTemperatureStatus}\n  current temperature: {generalTemperatureActualTemp}°C\n  threshold: {generalTemperatureThreshold}°C"
-    mib: AT-SYSINFO-MIB
+    description: "Temperature status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {generalTemperatureStatus}\n  current temperature: {generalTemperatureActualTemp} °C\n  threshold: {generalTemperatureThreshold} °C"
     status: current
     varbinds:
     - generalTemperatureStatus
     - generalTemperatureActualTemp
     - generalTemperatureThreshold
   - oid: 1.3.6.1.4.1.207.8.4.4.3.4.2.0.1
-    name: sbTempFixedThresholdTrap
+    name: AT-SYSINFO-MIB::sbTempFixedThresholdTrap
     category: state_change
     severity: warning
-    description: "Temperature threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {sbTempFixedThresholdStatus}\n  actual temperature: {sbTempActualTemperature} °C\n  fixed threshold: {sbTempFixedThreshold} °C"
-    mib: AT-SYSINFO-MIB
+    description: "Temperature threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {sbTempFixedThresholdStatus}\n  actual temperature: {sbTempActualTemperature}°C\n  fixed threshold: {sbTempFixedThreshold}°C"
     status: current
     varbinds:
     - sbTempFixedThresholdStatus
     - sbTempActualTemperature
     - sbTempFixedThreshold
   - oid: 1.3.6.1.4.1.207.8.4.4.3.4.2.0.2
-    name: sbTempSettableThresholdTrap
+    name: AT-SYSINFO-MIB::sbTempSettableThresholdTrap
     category: state_change
     severity: warning
-    description: "Settable temperature threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {sbTempSettableThresholdStatus}\n  actual temperature: {sbTempActualTemperature}\n  threshold: {sbTempSettableThreshold}"
-    mib: AT-SYSINFO-MIB
+    description: "Temperature threshold crossed on {SNMP_DEVICE_HOSTNAME}\n  status: {sbTempSettableThresholdStatus}\n  actual temperature: {sbTempActualTemperature}\n  threshold: {sbTempSettableThreshold}"
     status: current
     varbinds:
     - sbTempSettableThresholdStatus
     - sbTempActualTemperature
     - sbTempSettableThreshold
   - oid: 1.3.6.1.4.1.207.8.4.4.3.4.3.0.1
-    name: acceleratorTemperatureStatusTrap
+    name: AT-SYSINFO-MIB::acceleratorTemperatureStatusTrap
     category: state_change
     severity: warning
-    description: "Accelerator temperature status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {acceleratorTemperatureStatus}"
-    mib: AT-SYSINFO-MIB
+    description: "Device temperature status changed on {SNMP_DEVICE_HOSTNAME}\n  status: {acceleratorTemperatureStatus}"
     status: current
     varbinds:
     - acceleratorTemperatureStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.3.6.0.1
-    name: bbrNvsReinitialiseTrap
+    name: AT-SYSINFO-MIB::bbrNvsReinitialiseTrap
     category: diagnostic
     severity: warning
-    description: Battery-backed RAM (BBR) corruption detected and reinitialised on {SNMP_DEVICE_HOSTNAME}. This typically occurs when the BBR battery has depleted and the device was power-cycled.
-    mib: AT-SYSINFO-MIB
+    description: Battery-backed RAM (BBR) corruption detected and reinitialised on {SNMP_DEVICE_HOSTNAME}. This typically occurs when the BBR battery has depleted and the device experienced a power cycle.
     status: current
   - oid: 1.3.6.1.4.1.207.8.4.4.3.7.11
-    name: lowMemoryTrap
+    name: AT-SYSINFO-MIB::lowMemoryTrap
     category: diagnostic
     severity: warning
-    description: "Low memory condition on {SNMP_DEVICE_HOSTNAME}\n  free memory: {freeMemory}%\n  total buffers: {totalBuffers}"
-    mib: AT-SYSINFO-MIB
+    description: "Low memory condition detected on {SNMP_DEVICE_HOSTNAME}\n  free memory percentage: {freeMemory}\n  total buffers: {totalBuffers}"
     status: current
     varbinds:
     - freeMemory
     - totalBuffers
   - oid: 1.3.6.1.4.1.207.8.4.4.4.109.0.1
-    name: tcaTrap
-    category: diagnostic
+    name: AT-DS3-MIB::tcaTrap
+    category: state_change
     severity: warning
-    description: "DS3 threshold crossing alert on {SNMP_DEVICE_HOSTNAME}\n  error type: {ds3TrapError}\n  location: {ds3TrapLoc}\n  interval: {ds3TrapInterval}\n\nNote: Error types include CVs (code violations), ESs (error seconds), SESs (severely errored seconds), and LCs (line coding violations). Review ds3LineCurrentTable and ds3LineNoninvertData parity counters for details."
-    mib: AT-DS3-MIB
+    description: "DS3 threshold crossing alert on {SNMP_DEVICE_HOSTNAME}\n  error type: {ds3TrapError}\n  location: {ds3TrapLoc}\n  interval: {ds3TrapInterval}"
     status: current
     varbinds:
     - ds3TrapError
     - ds3TrapLoc
     - ds3TrapInterval
   - oid: 1.3.6.1.4.1.207.8.4.4.4.118.1.1.3.1
-    name: atrDot1xAuthenticated
-    category: mobility
-    severity: info
-    description: "802.1X supplicant authenticated on {SNMP_DEVICE_HOSTNAME}\n  port: {atrDot1xPaePortNumber}\n  MAC: {atrDot1xPaePortSuppMacAddress}\n  pre-auth VLAN: {atrDot1xAuthPreAuthVlan}\n  post-auth VLAN: {atrDot1xAuthPostAuthVlan}\n  last auth reason: {atrDot1xAuthLastAuthReason}"
-    mib: AT-PAE-MIB
+    name: AT-PAE-MIB::atrDot1xAuthenticated
+    category: auth
+    severity: notice
+    description: "802.1X authentication success on {SNMP_DEVICE_HOSTNAME}\n  port: {atrDot1xPaePortNumber}\n  supplicant MAC: {atrDot1xPaePortSuppMacAddress}\n  pre-auth VLAN: {atrDot1xAuthPreAuthVlan}\n  post-auth VLAN: {atrDot1xAuthPostAuthVlan}"
     status: current
     varbinds:
     - atrDot1xPaePortNumber
@@ -1907,11 +1942,10 @@ traps:
     - atrDot1xAuthPostAuthVlan
     - atrDot1xAuthLastAuthReason
   - oid: 1.3.6.1.4.1.207.8.4.4.4.118.1.1.3.2
-    name: atrDot1xUnauthenticated
+    name: AT-PAE-MIB::atrDot1xUnauthenticated
     category: auth
     severity: warning
-    description: "802.1X supplicant deauthorized on {SNMP_DEVICE_HOSTNAME}\n  Port: {atrDot1xPaePortNumber}\n  Supplicant MAC: {atrDot1xPaePortSuppMacAddress}\n  Pre-auth VLAN: {atrDot1xAuthPreAuthVlan}\n  Post-auth VLAN: {atrDot1xAuthPostAuthVlan}\n  Deauth reason: {atrDot1xAuthLastAuthReason}"
-    mib: AT-PAE-MIB
+    description: "802.1X authentication lost on {SNMP_DEVICE_HOSTNAME}\n  Port: {atrDot1xPaePortNumber}\n  Supplicant MAC: {atrDot1xPaePortSuppMacAddress}\n  Pre-auth VLAN: {atrDot1xAuthPreAuthVlan}\n  Post-auth VLAN: {atrDot1xAuthPostAuthVlan}\n  Last auth reason: {atrDot1xAuthLastAuthReason}"
     status: current
     varbinds:
     - atrDot1xPaePortNumber
@@ -1920,11 +1954,10 @@ traps:
     - atrDot1xAuthPostAuthVlan
     - atrDot1xAuthLastAuthReason
   - oid: 1.3.6.1.4.1.207.8.4.4.4.118.1.1.3.3
-    name: atrDot1xFailedAuth
+    name: AT-PAE-MIB::atrDot1xFailedAuth
     category: auth
     severity: warning
-    description: "802.1X authentication failed on {SNMP_DEVICE_HOSTNAME}\n  port: {atrDot1xPaePortNumber}\n  supplicant MAC: {atrDot1xPaePortSuppMacAddress}\n  pre-auth VLAN: {atrDot1xAuthPreAuthVlan}\n  post-auth VLAN: {atrDot1xAuthPostAuthVlan}\n  failure reason: {atrDot1xAuthLastAuthReason}"
-    mib: AT-PAE-MIB
+    description: "802.1X authentication failed on {SNMP_DEVICE_HOSTNAME}\n  Port: {atrDot1xPaePortNumber}\n  Supplicant MAC: {atrDot1xPaePortSuppMacAddress}\n  Pre-auth VLAN: {atrDot1xAuthPreAuthVlan}\n  Post-auth VLAN: {atrDot1xAuthPostAuthVlan}\n  Failure reason: {atrDot1xAuthLastAuthReason}"
     status: current
     varbinds:
     - atrDot1xPaePortNumber
@@ -1933,11 +1966,10 @@ traps:
     - atrDot1xAuthPostAuthVlan
     - atrDot1xAuthLastAuthReason
   - oid: 1.3.6.1.4.1.207.8.4.4.4.118.1.1.6.1
-    name: atrMacBasedAuthAuthenticated
-    category: state_change
-    severity: notice
-    description: "MAC-based authentication succeeded on {SNMP_DEVICE_HOSTNAME}\n  Port: {atrMacBasedAuthPaePortNumber}\n  Supplicant MAC: {atrMacBasedAuthPaePortSuppMacAddress}\n  Pre-auth VLAN: {atrMacBasedAuthPreAuthVlan}\n  Post-auth VLAN: {atrMacBasedAuthPostAuthVlan}"
-    mib: AT-PAE-MIB
+    name: AT-PAE-MIB::atrMacBasedAuthAuthenticated
+    category: mobility
+    severity: info
+    description: "Supplicant authenticated on {SNMP_DEVICE_HOSTNAME}\n  Port: {atrMacBasedAuthPaePortNumber}\n  MAC: {atrMacBasedAuthPaePortSuppMacAddress}\n  Pre-auth VLAN: {atrMacBasedAuthPreAuthVlan}\n  Post-auth VLAN: {atrMacBasedAuthPostAuthVlan}\n  Last auth reason: {atrMacBasedAuthLastAuthReason}"
     status: current
     varbinds:
     - atrMacBasedAuthPaePortNumber
@@ -1946,11 +1978,10 @@ traps:
     - atrMacBasedAuthPostAuthVlan
     - atrMacBasedAuthLastAuthReason
   - oid: 1.3.6.1.4.1.207.8.4.4.4.118.1.1.6.2
-    name: atrMacBasedAuthUnauthenticated
+    name: AT-PAE-MIB::atrMacBasedAuthUnauthenticated
     category: auth
     severity: warning
-    description: "Supplicant deauthorized on {SNMP_DEVICE_HOSTNAME}\n  Port: {atrMacBasedAuthPaePortNumber}\n  Supplicant MAC: {atrMacBasedAuthPaePortSuppMacAddress}\n  Pre-auth VLAN: {atrMacBasedAuthPreAuthVlan}\n  Post-auth VLAN: {atrMacBasedAuthPostAuthVlan}\n  Deauthorization reason: {atrMacBasedAuthLastAuthReason}"
-    mib: AT-PAE-MIB
+    description: "Supplicant {atrMacBasedAuthPaePortSuppMacAddress} on port {atrMacBasedAuthPaePortNumber} lost authorization on {SNMP_DEVICE_HOSTNAME}\n  pre-auth VLAN: {atrMacBasedAuthPreAuthVlan}\n  post-auth VLAN: {atrMacBasedAuthPostAuthVlan}\n  last auth reason: {atrMacBasedAuthLastAuthReason}"
     status: current
     varbinds:
     - atrMacBasedAuthPaePortNumber
@@ -1959,11 +1990,10 @@ traps:
     - atrMacBasedAuthPostAuthVlan
     - atrMacBasedAuthLastAuthReason
   - oid: 1.3.6.1.4.1.207.8.4.4.4.118.1.1.6.3
-    name: atrMacBasedAuthFailedAuth
+    name: AT-PAE-MIB::atrMacBasedAuthFailedAuth
     category: auth
     severity: warning
-    description: "MAC-based authentication failed on {SNMP_DEVICE_HOSTNAME}\n  Port: {atrMacBasedAuthPaePortNumber}\n  Supplicant MAC: {atrMacBasedAuthPaePortSuppMacAddress}\n  Pre-auth VLAN: {atrMacBasedAuthPreAuthVlan}\n  Post-auth VLAN: {atrMacBasedAuthPostAuthVlan}\n  Failure reason: {atrMacBasedAuthLastAuthReason}"
-    mib: AT-PAE-MIB
+    description: "MAC-based authentication failed on {SNMP_DEVICE_HOSTNAME}\n  Port: {atrMacBasedAuthPaePortNumber}\n  Supplicant MAC: {atrMacBasedAuthPaePortSuppMacAddress}\n  Pre-Auth VLAN: {atrMacBasedAuthPreAuthVlan}\n  Post-Auth VLAN: {atrMacBasedAuthPostAuthVlan}\n  Failure reason: {atrMacBasedAuthLastAuthReason}"
     status: current
     varbinds:
     - atrMacBasedAuthPaePortNumber
@@ -1972,11 +2002,10 @@ traps:
     - atrMacBasedAuthPostAuthVlan
     - atrMacBasedAuthLastAuthReason
   - oid: 1.3.6.1.4.1.207.8.4.4.4.136.1.1
-    name: epsrNodeTrap
+    name: AT-EPSR-MIB::epsrNodeTrap
     category: state_change
-    severity: warning
-    description: "EPSR node state transition on {SNMP_DEVICE_HOSTNAME}\n  domain: {epsrDomainName}\n  node type: {epsrNodeTrapType}\n  state change: {epsrFromState} → {epsrToState}\n  primary interface: ifIndex {epsrPrimaryIfIndex}, state {epsrPrimaryIfState}\n  secondary interface: ifIndex {epsrSecondaryIfIndex}, state {epsrSecondaryIfState}\n  control VLAN: {epsrControlVlanId}"
-    mib: AT-EPSR-MIB
+    severity: notice
+    description: "EPSR node state transition on {SNMP_DEVICE_HOSTNAME}\n  domain: {epsrDomainName}\n  node type: {epsrNodeTrapType}\n  transition: {epsrFromState} -> {epsrToState}\n  control VLAN: {epsrControlVlanId}\n  primary interface: {epsrPrimaryIfIndex} (state: {epsrPrimaryIfState})\n  secondary interface: {epsrSecondaryIfIndex} (state: {epsrSecondaryIfState})"
     status: current
     varbinds:
     - epsrNodeTrapType
@@ -1989,21 +2018,19 @@ traps:
     - epsrSecondaryIfIndex
     - epsrSecondaryIfState
   - oid: 1.3.6.1.4.1.207.8.4.4.4.140.0.1
-    name: pvstpmTopologyChange
+    name: AT-PVSTPM-MIB::pvstpmTopologyChange
     category: mobility
     severity: notice
-    description: "PVSTPM topology change detected on {SNMP_DEVICE_HOSTNAME}\n  bridge ID: {pvstpmBridgeId}\n  VLAN: {pvstpmTopologyChangeVlan}"
-    mib: AT-PVSTPM-MIB
+    description: "PVST/PVST+ topology change detected on {SNMP_DEVICE_HOSTNAME}\n  Bridge ID: {pvstpmBridgeId}\n  VLAN: {pvstpmTopologyChangeVlan}"
     status: current
     varbinds:
     - pvstpmBridgeId
     - pvstpmTopologyChangeVlan
   - oid: 1.3.6.1.4.1.207.8.4.4.4.140.0.2
-    name: pvstpmInconsistentBPDU
-    category: state_change
+    name: AT-PVSTPM-MIB::pvstpmInconsistentBPDU
+    category: security
     severity: warning
-    description: "PVSTPM inconsistent BPDU received on {SNMP_DEVICE_HOSTNAME}\n  bridge ID: {pvstpmBridgeId}\n  receiving port: {pvstpmRxPort}\n  receive VLAN: {pvstpmRxVlan}\n  transmit VLAN: {pvstpmTxVlan}"
-    mib: AT-PVSTPM-MIB
+    description: "Inconsistent PVSTPM BPDU received on {SNMP_DEVICE_HOSTNAME}\n  bridge ID: {pvstpmBridgeId}\n  received on port: {pvstpmRxPort}\n  received VLAN: {pvstpmRxVlan}\n  transmitted VLAN: {pvstpmTxVlan}"
     status: current
     varbinds:
     - pvstpmBridgeId
@@ -2011,20 +2038,18 @@ traps:
     - pvstpmRxVlan
     - pvstpmTxVlan
   - oid: 1.3.6.1.4.1.207.8.4.4.4.23.0.1
-    name: ethernetTrap
+    name: AT-ETH-MIB::ethernetTrap
     category: config_change
     severity: notice
-    description: "Bandwidth configured on an interface on {SNMP_DEVICE_HOSTNAME}\n  message: {ethernetTrapMessage}"
-    mib: AT-ETH-MIB
+    description: "Administrator configured bandwidth on an interface at {SNMP_DEVICE_HOSTNAME}\n  message: {ethernetTrapMessage}"
     status: current
     varbinds:
     - ethernetTrapMessage
   - oid: 1.3.6.1.4.1.207.8.4.4.4.31.0.1
-    name: flashFailureTrap
+    name: AT-FLASH-MIB::flashFailureTrap
     category: diagnostic
     severity: err
-    description: "Flash operation failure(s) detected on {SNMP_DEVICE_HOSTNAME}\n  Failed operations:\n    GET: {flashGetFailure}\n    OPEN: {flashOpenFailure}\n    READ: {flashReadFailure}\n    CLOSE: {flashCloseFailure}\n    COMPLETE: {flashCompleteFailure}\n    WRITE: {flashWriteFailure}\n    CREATE: {flashCreateFailure}\n    PUT: {flashPutFailure}\n    DELETE: {flashDeleteFailure}\n    CHECK: {flashCheckFailure}\n    ERASE: {flashEraseFailure}\n    COMPACT: {flashCompactFailure}\n    VERIFY: {flashVerifyFailure}"
-    mib: AT-FLASH-MIB
+    description: "Flash memory operation failures detected on {SNMP_DEVICE_HOSTNAME}\n  get failures: {flashGetFailure}\n  open failures: {flashOpenFailure}\n  read failures: {flashReadFailure}\n  close failures: {flashCloseFailure}\n  complete failures: {flashCompleteFailure}\n  write failures: {flashWriteFailure}\n  create failures: {flashCreateFailure}\n  put failures: {flashPutFailure}\n  delete failures: {flashDeleteFailure}\n  check failures: {flashCheckFailure}\n  erase failures: {flashEraseFailure}\n  compact failures: {flashCompactFailure}\n  verify failures: {flashVerifyFailure}"
     status: current
     varbinds:
     - flashGetFailure
@@ -2041,50 +2066,45 @@ traps:
     - flashCompactFailure
     - flashVerifyFailure
   - oid: 1.3.6.1.4.1.207.8.4.4.4.36.100.11
-    name: loginFailureTrap
+    name: AT-TTY-MIB::loginFailureTrap
     category: auth
     severity: warning
-    description: "Account locked out on {SNMP_DEVICE_HOSTNAME} due to excessive failed login attempts\n  user: {loginFailureUser}\n  source IP: {loginFailureIPAddress}\n  failed attempts: {loginFailureAttempts}"
-    mib: AT-TTY-MIB
+    description: "User {loginFailureUser} locked out due to consecutive failed logins from {loginFailureIPAddress}\n  failed attempts: {loginFailureAttempts}"
     status: current
     varbinds:
     - loginFailureUser
     - loginFailureIPAddress
     - loginFailureAttempts
   - oid: 1.3.6.1.4.1.207.8.4.4.4.49.0.1
-    name: configFileExistTrap
-    category: state_change
-    severity: crit
+    name: AT-INSTALL-MIB::configFileExistTrap
+    category: diagnostic
+    severity: alert
     description: "Boot configuration file missing on {SNMP_DEVICE_HOSTNAME}\n  configFileExist: {configFileExist}"
-    mib: AT-INSTALL-MIB
     status: current
     varbinds:
     - configFileExist
   - oid: 1.3.6.1.4.1.207.8.4.4.4.503.0.1
-    name: atQosv2StormDetectionTrap
-    category: security
+    name: AT-QOSv2-MIB::atQosv2StormDetectionTrap
+    category: state_change
     severity: warning
-    description: "QoS Storm Protection detected a storm on {SNMP_DEVICE_HOSTNAME}\n  interface index: {atQosv2IfIndex}\n  VLAN ID: {atQosv2VlanId}"
-    mib: AT-QOSv2-MIB
+    description: "QoS storm detected on {SNMP_DEVICE_HOSTNAME}\n  interface index: {atQosv2IfIndex}\n  VLAN ID: {atQosv2VlanId}"
     status: current
     varbinds:
     - atQosv2IfIndex
     - atQosv2VlanId
   - oid: 1.3.6.1.4.1.207.8.4.4.4.53.0.1
-    name: triggerTrap
+    name: AT-TRIGGER-MIB::triggerTrap
     category: diagnostic
     severity: notice
-    description: "Generic trigger activated on {SNMP_DEVICE_HOSTNAME}\n  trigger number: {triggerLastTriggerActivated}\n\nNote: This is a user-defined trigger. Investigate the trigger configuration to determine what condition caused this trap."
-    mib: AT-TRIGGER-MIB
+    description: "A configured trigger was activated on {SNMP_DEVICE_HOSTNAME}\n  trigger number: {triggerLastTriggerActivated}"
     status: current
     varbinds:
     - triggerLastTriggerActivated
   - oid: 1.3.6.1.4.1.207.8.4.4.4.536.0.1
-    name: atEpsrv2Notify
+    name: AT-EPSRv2-MIB::atEpsrv2Notify
     category: state_change
     severity: notice
-    description: "EPSRv2 state transition on {SNMP_DEVICE_HOSTNAME}\n  domain: {atEpsrv2DomainName} (ID={atEpsrv2DomainID})\n  node type: {atEpsrv2NodeType}\n  state: {atEpsrv2FromState} → {atEpsrv2CurrentState}\n  control VLAN: {atEpsrv2ControlVlanId}\n  primary interface: ifIndex {atEpsrv2PrimaryIfIndex}, state {atEpsrv2PrimaryIfState}\n  secondary interface: ifIndex {atEpsrv2SecondaryIfIndex}, state {atEpsrv2SecondaryIfState}\n  domain priority: {atEpsrv2DomainPriority}"
-    mib: AT-EPSRv2-MIB
+    description: "EPSRv2 node state transition on {SNMP_DEVICE_HOSTNAME}\n  node type: {atEpsrv2NodeType}\n  domain: {atEpsrv2DomainName} (ID: {atEpsrv2DomainID})\n  transition: {atEpsrv2FromState} -> {atEpsrv2CurrentState}\n  primary interface: {atEpsrv2PrimaryIfIndex} (state: {atEpsrv2PrimaryIfState})\n  secondary interface: {atEpsrv2SecondaryIfIndex} (state: {atEpsrv2SecondaryIfState})"
     status: current
     varbinds:
     - atEpsrv2NodeType
@@ -2103,11 +2123,10 @@ traps:
     - atEpsrv2HasControlOfPrimaryIf
     - atEpsrv2HasControlOfSecondaryIf
   - oid: 1.3.6.1.4.1.207.8.4.4.4.536.1.1
-    name: atEpsrv2NodeTrap
+    name: AT-EPSRv2-MIB::atEpsrv2NodeTrap
     category: state_change
-    severity: warning
-    description: "EPSRv2 node state transition on {SNMP_DEVICE_HOSTNAME}\n  domain: {atEpsrv2DomainName} (ID {atEpsrv2DomainID})\n  node type: {atEpsrv2NodeType}\n  state change: {atEpsrv2FromState} -> {atEpsrv2CurrentState}\n  control VLAN: {atEpsrv2ControlVlanId}\n  primary interface: ifIndex {atEpsrv2PrimaryIfIndex}, state {atEpsrv2PrimaryIfState}\n  secondary interface: ifIndex {atEpsrv2SecondaryIfIndex}, state {atEpsrv2SecondaryIfState}"
-    mib: AT-EPSRv2-MIB
+    severity: notice
+    description: "EPSRv2 node state transition on {SNMP_DEVICE_HOSTNAME}\n  domain: {atEpsrv2DomainName} (ID={atEpsrv2DomainID})\n  node type: {atEpsrv2NodeType}\n  state: {atEpsrv2FromState} → {atEpsrv2CurrentState}\n  control VLAN: {atEpsrv2ControlVlanId}\n  primary interface: ifIndex {atEpsrv2PrimaryIfIndex}, state {atEpsrv2PrimaryIfState}\n  secondary interface: ifIndex {atEpsrv2SecondaryIfIndex}, state {atEpsrv2SecondaryIfState}"
     status: deprecated
     varbinds:
     - atEpsrv2NodeType
@@ -2121,11 +2140,10 @@ traps:
     - atEpsrv2SecondaryIfIndex
     - atEpsrv2SecondaryIfState
   - oid: 1.3.6.1.4.1.207.8.4.4.4.537.0.1
-    name: atDhcpsnTrap
+    name: AT-DHCPSN-MIB::atDhcpsnTrap
     category: security
     severity: warning
-    description: "DHCP Snooping violation on {SNMP_DEVICE_HOSTNAME}\n  Port ifIndex: {atDhcpsnIfIndex}\n  VLAN: {atDhcpsnVid}\n  Violation Type: {atDhcpsnVioType}\n  Offending MAC: {atDhcpsnSmac}\n  BOOTP Opcode: {atDhcpsnOpcode}\n  Client IP (ciaddr): {atDhcpsnCiaddr}\n  Your IP (yiaddr): {atDhcpsnYiaddr}\n  Gateway IP (giaddr): {atDhcpsnGiaddr}\n  Server IP (siaddr): {atDhcpsnSiaddr}\n  Client HW (chaddr): {atDhcpsnChaddr}"
-    mib: AT-DHCPSN-MIB
+    description: "DHCP Snooping violation detected on {SNMP_DEVICE_HOSTNAME}\n  Interface: {atDhcpsnIfIndex}\n  VLAN: {atDhcpsnVid}\n  Source MAC: {atDhcpsnSmac}\n  Violation Type: {atDhcpsnVioType}\n  Packet Opcode: {atDhcpsnOpcode}\n  Client IP: {atDhcpsnCiaddr}\n  Your IP: {atDhcpsnYiaddr}\n  Gateway IP: {atDhcpsnGiaddr}\n  Server IP: {atDhcpsnSiaddr}\n  Chaddr: {atDhcpsnChaddr}"
     status: current
     varbinds:
     - atDhcpsnIfIndex
@@ -2139,11 +2157,10 @@ traps:
     - atDhcpsnChaddr
     - atDhcpsnVioType
   - oid: 1.3.6.1.4.1.207.8.4.4.4.537.0.2
-    name: atArpsecTrap
+    name: AT-DHCPSN-MIB::atArpsecTrap
     category: security
     severity: warning
-    description: "DHCP Snooping ARP Security violation on {SNMP_DEVICE_HOSTNAME}\n  interface: {atArpsecIfIndex}\n  client IP: {atArpsecClientIP}\n  source MAC: {atArpsecSrcMac}\n  VLAN: {atArpsecVid}\n  violation type: {atArpsecVioType}"
-    mib: AT-DHCPSN-MIB
+    description: "DHCP Snooping ARP Security violation on {SNMP_DEVICE_HOSTNAME}\n  interface: {atArpsecIfIndex}\n  source IP: {atArpsecClientIP}\n  source MAC: {atArpsecSrcMac}\n  VLAN: {atArpsecVid}\n  violation type: {atArpsecVioType}"
     status: current
     varbinds:
     - atArpsecIfIndex
@@ -2152,33 +2169,30 @@ traps:
     - atArpsecVid
     - atArpsecVioType
   - oid: 1.3.6.1.4.1.207.8.4.4.4.54.0.1
-    name: atLoopProtectDetectedLoopBlockedTrap
+    name: AT-LOOPPROTECT-MIB::atLoopProtectDetectedLoopBlockedTrap
     category: state_change
-    severity: warning
-    description: "Loop Protection detected a loop and blocked interface on {SNMP_DEVICE_HOSTNAME}\n  interface: {atLoopProtectIfIndex}\n  VLAN: {atLoopProtectVlanId}\n  action taken: {atLoopProtectAction}"
-    mib: AT-LOOPPROTECT-MIB
+    severity: err
+    description: "Loop Protection blocked an interface on {SNMP_DEVICE_HOSTNAME}\n  interface: {atLoopProtectIfIndex}\n  VLAN: {atLoopProtectVlanId}\n  action: {atLoopProtectAction}"
     status: current
     varbinds:
     - atLoopProtectIfIndex
     - atLoopProtectVlanId
     - atLoopProtectAction
   - oid: 1.3.6.1.4.1.207.8.4.4.4.54.0.2
-    name: atLoopProtectRecoverLoopBlockedTrap
+    name: AT-LOOPPROTECT-MIB::atLoopProtectRecoverLoopBlockedTrap
     category: state_change
     severity: notice
-    description: "Loop Protection feature restored blocked interface to normal operation on {SNMP_DEVICE_HOSTNAME}\n  interface index: {atLoopProtectIfIndex}\n  VLAN ID: {atLoopProtectVlanId}\n  action: {atLoopProtectAction}"
-    mib: AT-LOOPPROTECT-MIB
+    description: "Loop protection recovered interface {atLoopProtectIfIndex} on VLAN {atLoopProtectVlanId} on {SNMP_DEVICE_HOSTNAME}\n  action: {atLoopProtectAction}"
     status: current
     varbinds:
     - atLoopProtectIfIndex
     - atLoopProtectVlanId
     - atLoopProtectAction
   - oid: 1.3.6.1.4.1.207.8.4.4.4.54.0.3
-    name: atLoopProtectDetectedByLoopDetectionTrap
+    name: AT-LOOPPROTECT-MIB::atLoopProtectDetectedByLoopDetectionTrap
     category: state_change
     severity: warning
-    description: "Loop Protection detected a loop on {SNMP_DEVICE_HOSTNAME}\n  interface: {atLoopProtectIfIndex}\n  VLAN: {atLoopProtectVlanId}\n  loop detection frame received on interface: {atLoopProtectRxLDFIfIndex}\n  loop detection frame received on VLAN: {atLoopProtectRxLDFVlanId}"
-    mib: AT-LOOPPROTECT-MIB
+    description: "Loop protection detected a loop on {SNMP_DEVICE_HOSTNAME}\n  interface: {atLoopProtectIfIndex}\n  VLAN: {atLoopProtectVlanId}\n  RX LDF interface: {atLoopProtectRxLDFIfIndex}\n  RX LDF VLAN: {atLoopProtectRxLDFVlanId}"
     status: current
     varbinds:
     - atLoopProtectIfIndex
@@ -2186,66 +2200,59 @@ traps:
     - atLoopProtectRxLDFIfIndex
     - atLoopProtectRxLDFVlanId
   - oid: 1.3.6.1.4.1.207.8.4.4.4.54.0.4
-    name: atLoopProtectDetectedByThrashLimitTrap
-    category: state_change
+    name: AT-LOOPPROTECT-MIB::atLoopProtectDetectedByThrashLimitTrap
+    category: security
     severity: warning
-    description: "Loop detected on {SNMP_DEVICE_HOSTNAME} via MAC address-table Thrash-Limiting\n  Interface: {atLoopProtectIfIndex}\n  VLAN: {atLoopProtectVlanId}"
-    mib: AT-LOOPPROTECT-MIB
+    description: "Loop protection detected a loop on {SNMP_DEVICE_HOSTNAME}\n  interface: {atLoopProtectIfIndex}\n  VLAN: {atLoopProtectVlanId}"
     status: current
     varbinds:
     - atLoopProtectIfIndex
     - atLoopProtectVlanId
   - oid: 1.3.6.1.4.1.207.8.4.4.4.550.0.1
-    name: atUdldPortDisabledTrap
+    name: AT-UDLD-MIB::atUdldPortDisabledTrap
     category: state_change
     severity: warning
-    description: "UDLD detected a uni-directional link on {SNMP_DEVICE_HOSTNAME} and disabled the interface\n  ifIndex: {atUdldIfIndex}"
-    mib: AT-UDLD-MIB
+    description: UDLD disabled interface {atUdldIfIndex} on {SNMP_DEVICE_HOSTNAME} due to uni-directional link detection
     status: current
     varbinds:
     - atUdldIfIndex
   - oid: 1.3.6.1.4.1.207.8.4.4.4.550.0.2
-    name: atUdldPortRecoveredTrap
+    name: AT-UDLD-MIB::atUdldPortRecoveredTrap
     category: state_change
-    severity: info
-    description: "UDLD port recovered from error-disable state on {SNMP_DEVICE_HOSTNAME}\n  interface index: {atUdldIfIndex}\n  previous condition: uni-directional link detected"
-    mib: AT-UDLD-MIB
+    severity: notice
+    description: "UDLD port recovered from error-disable on {SNMP_DEVICE_HOSTNAME}\n  interface index: {atUdldIfIndex}"
     status: current
     varbinds:
     - atUdldIfIndex
   - oid: 1.3.6.1.4.1.207.8.4.4.4.58.0.1
-    name: pingTrap
+    name: AT-PING-MIB::pingTrap
     category: diagnostic
     severity: info
-    description: Ping operation completed on {SNMP_DEVICE_HOSTNAME}. Trap generated upon ping completion or premature termination.
-    mib: AT-PING-MIB
+    description: Ping operation completed on {SNMP_DEVICE_HOSTNAME}. Trap generated because pingTrapOnCompletion was enabled.
     status: current
   - oid: 1.3.6.1.4.1.207.8.4.4.4.601.0.1
-    name: logProcessKilledNotify
+    name: AT-LOG-MIB::logProcessKilledNotify
     category: diagnostic
-    severity: err
-    description: "A process was killed on {SNMP_DEVICE_HOSTNAME}\n  process: {logProcessKilled}"
-    mib: AT-LOG-MIB
+    severity: warning
+    description: "Process killed on {SNMP_DEVICE_HOSTNAME}\n  process: {logProcessKilled}"
     status: current
     varbinds:
     - logProcessKilled
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.1
-    name: atAtmfBackupStatusTrap
+    name: AT-ATMF-MIB::atAtmfBackupStatusTrap
     category: diagnostic
     severity: err
-    description: "ATMF backup operation {atAtmfTrapBackupStatus} on {SNMP_DEVICE_HOSTNAME}\n  node name: {atAtmfTrapNodeName}\n  master node: {atAtmfTrapMasterNodeName}"
-    mib: AT-ATMF-MIB
+    description: "ATMF backup operation failed on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  master: {atAtmfTrapMasterNodeName}\n  status: {atAtmfTrapBackupStatus}"
     status: current
     varbinds:
     - atAtmfTrapNodeName
     - atAtmfTrapMasterNodeName
     - atAtmfTrapBackupStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.10
-    name: atAtmfControllerAreaRemoteBackupStatusTrap
+    name: AT-ATMF-MIB::atAtmfControllerAreaRemoteBackupStatusTrap
     category: diagnostic
-    severity: err
-    description: "ATMF remote backup operation failed on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  area: {atAtmfControllerAreaName}\n  master node: {atAtmfTrapMasterNodeName}\n  status: {atAtmfTrapBackupStatus}"
-    mib: AT-ATMF-MIB
+    severity: warning
+    description: "ATMF remote area backup status on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  controller area: {atAtmfControllerAreaName}\n  master node: {atAtmfTrapMasterNodeName}\n  backup status: {atAtmfTrapBackupStatus}"
     status: current
     varbinds:
     - atAtmfTrapNodeName
@@ -2253,44 +2260,40 @@ traps:
     - atAtmfTrapMasterNodeName
     - atAtmfTrapBackupStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.2
-    name: atAtmfNodeStatusChangeTrap
+    name: AT-ATMF-MIB::atAtmfNodeStatusChangeTrap
     category: state_change
     severity: notice
-    description: "ATMF node status changed on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  network: {atAtmfTrapNetworkName}\n  status: {atAtmfTrapNodeStatusChange}"
-    mib: AT-ATMF-MIB
+    description: ATMF node {atAtmfTrapNodeName} status changed to {atAtmfTrapNodeStatusChange} in network {atAtmfTrapNetworkName} on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - atAtmfTrapNodeName
     - atAtmfTrapNodeStatusChange
     - atAtmfTrapNetworkName
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.3
-    name: atAtmfNodeRecoveryTrap
-    category: diagnostic
-    severity: err
-    description: "ATMF node recovery failed on {SNMP_DEVICE_HOSTNAME}\n  recovering node: {atAtmfTrapNodeName}\n  master node: {atAtmfTrapMasterNodeName}\n  status: {atAtmfTrapNodeRecoveryStatus}"
-    mib: AT-ATMF-MIB
+    name: AT-ATMF-MIB::atAtmfNodeRecoveryTrap
+    category: state_change
+    severity: warning
+    description: "ATMF node recovery attempt on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  master: {atAtmfTrapMasterNodeName}\n  status: {atAtmfTrapNodeRecoveryStatus}"
     status: current
     varbinds:
     - atAtmfTrapNodeName
     - atAtmfTrapMasterNodeName
     - atAtmfTrapNodeRecoveryStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.4
-    name: atAtmfInterfaceStatusChangeTrap
+    name: AT-ATMF-MIB::atAtmfInterfaceStatusChangeTrap
     category: state_change
-    severity: warning
-    description: "ATMF interface status changed on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  interface: {atAtmfTrapInterfaceName}\n  new status: {atAtmfTrapInterfaceStatusChange} ({blocking=1\\|forwarding=2})"
-    mib: AT-ATMF-MIB
+    severity: notice
+    description: ATMF interface {atAtmfTrapInterfaceName} on node {atAtmfTrapNodeName} changed status to {atAtmfTrapInterfaceStatusChange} on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - atAtmfTrapNodeName
     - atAtmfTrapInterfaceName
     - atAtmfTrapInterfaceStatusChange
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.5
-    name: atAtmfExternalMediaLowMemoryTrap
+    name: AT-ATMF-MIB::atAtmfExternalMediaLowMemoryTrap
     category: diagnostic
     severity: warning
-    description: "External media low memory on ATMF master node {SNMP_DEVICE_HOSTNAME}\n  master node: {atAtmfTrapMasterNodeName}\n  media type: {atAtmfTrapMediaType}\n  total memory: {atAtmfTrapMediaTotal} MB\n  free memory: {atAtmfTrapMediaFree} MB"
-    mib: AT-ATMF-MIB
+    description: "External storage low-memory threshold reached on ATMF master node\n  Device: {SNMP_DEVICE_HOSTNAME}\n  Master node: {atAtmfTrapMasterNodeName}\n  Media type: {atAtmfTrapMediaType}\n  Total memory: {atAtmfTrapMediaTotal} MB\n  Free memory: {atAtmfTrapMediaFree} MB"
     status: current
     varbinds:
     - atAtmfTrapMasterNodeName
@@ -2298,21 +2301,19 @@ traps:
     - atAtmfTrapMediaTotal
     - atAtmfTrapMediaFree
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.6
-    name: atAtmfRollingRebootCompleteTrap
-    category: diagnostic
+    name: AT-ATMF-MIB::atAtmfRollingRebootCompleteTrap
+    category: state_change
     severity: notice
     description: "ATMF rolling reboot completed on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  status: {atAtmfTrapRollingRebootStatus}"
-    mib: AT-ATMF-MIB
     status: current
     varbinds:
     - atAtmfTrapNodeName
     - atAtmfTrapRollingRebootStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.7
-    name: atAtmfRollingRebootReleaseCompleteTrap
-    category: diagnostic
+    name: AT-ATMF-MIB::atAtmfRollingRebootReleaseCompleteTrap
+    category: state_change
     severity: err
-    description: "ATMF rolling reboot release complete on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  reboot status: {atAtmfTrapRollingRebootStatus}\n  release file: {atAtmfTrapRollingRebootReleaseName}\n  release status: {atAtmfTrapRollingRebootReleaseStatus}"
-    mib: AT-ATMF-MIB
+    description: "ATMF rolling reboot release failed on node {atAtmfTrapNodeName}\n  release: {atAtmfTrapRollingRebootReleaseName}\n  release status: {atAtmfTrapRollingRebootReleaseStatus}\n  overall status: {atAtmfTrapRollingRebootStatus}"
     status: current
     varbinds:
     - atAtmfTrapNodeName
@@ -2320,11 +2321,10 @@ traps:
     - atAtmfTrapRollingRebootReleaseName
     - atAtmfTrapRollingRebootReleaseStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.8
-    name: atAtmfRemoteBackupStatusTrap
+    name: AT-ATMF-MIB::atAtmfRemoteBackupStatusTrap
     category: state_change
     severity: warning
-    description: "ATMF remote backup server availability changed on {SNMP_DEVICE_HOSTNAME}\n  node name: {atAtmfTrapNodeName}\n  server name: {atAtmfTrapRemoteBackupServerName}\n  server id: {atAtmfTrapRemoteBackupServerId}\n  status: {atAtmfTrapRemoteServerStatus}\n  servers available: {atAtmfTrapRemoteServersAvailable}"
-    mib: AT-ATMF-MIB
+    description: "Remote backup server availability changed on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  server ID: {atAtmfTrapRemoteBackupServerId}\n  server name: {atAtmfTrapRemoteBackupServerName}\n  status: {atAtmfTrapRemoteServerStatus}\n  servers available: {atAtmfTrapRemoteServersAvailable}"
     status: current
     varbinds:
     - atAtmfTrapNodeName
@@ -2333,72 +2333,65 @@ traps:
     - atAtmfTrapRemoteServerStatus
     - atAtmfTrapRemoteServersAvailable
   - oid: 1.3.6.1.4.1.207.8.4.4.4.603.0.9
-    name: atAtmfControllerAreaStatusChangeTrap
+    name: AT-ATMF-MIB::atAtmfControllerAreaStatusChangeTrap
     category: state_change
     severity: warning
-    description: "ATMF controller area reachability state changed on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  controller area: {atAtmfControllerAreaName}\n  reachability status: {atAtmfControllerAreaStatus}"
-    mib: AT-ATMF-MIB
+    description: "ATM controller area {atAtmfControllerAreaName} reachability changed on {SNMP_DEVICE_HOSTNAME}\n  node: {atAtmfTrapNodeName}\n  status: {atAtmfControllerAreaStatus}"
     status: current
     varbinds:
     - atAtmfTrapNodeName
     - atAtmfControllerAreaName
     - atAtmfControllerAreaStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.4.604.0.1
-    name: atG8032v2InstanceNotify
+    name: AT-G8032v2-MIB::atG8032v2InstanceNotify
     category: state_change
-    severity: warning
-    description: "G.8032v2 ERP instance state transition on {SNMP_DEVICE_HOSTNAME}\n  instance name: {atG8032v2NotificationInstanceName}\n  from state: {atG8032v2NotificationInstanceFromState}\n  to state: {atG8032v2NotificationInstanceCurrentState}"
-    mib: AT-G8032v2-MIB
+    severity: notice
+    description: G.8032 ERP Instance "{atG8032v2NotificationInstanceName}" transitioned from {atG8032v2NotificationInstanceFromState} to {atG8032v2NotificationInstanceCurrentState} on {SNMP_DEVICE_HOSTNAME}
     status: current
     varbinds:
     - atG8032v2NotificationInstanceName
     - atG8032v2NotificationInstanceFromState
     - atG8032v2NotificationInstanceCurrentState
   - oid: 1.3.6.1.4.1.207.8.4.4.4.604.0.2
-    name: atG8032v2SystemAlarmNotify
+    name: AT-G8032v2-MIB::atG8032v2SystemAlarmNotify
     category: state_change
-    severity: warning
-    description: "G.8032 Ethernet Ring Protection alarm condition on {SNMP_DEVICE_HOSTNAME}\n  alarm state: {atG8032v2NotificationSystemAlarmState}\n  One or more ERP instances are in alarm state"
-    mib: AT-G8032v2-MIB
+    severity: alert
+    description: "G.8032v2 Ethernet Ring Protection Switching alarm condition detected on {SNMP_DEVICE_HOSTNAME}\n  System alarm state: {atG8032v2NotificationSystemAlarmState}"
     status: current
     varbinds:
     - atG8032v2NotificationSystemAlarmState
   - oid: 1.3.6.1.4.1.207.8.4.4.4.605.0.1
-    name: atUfoVlanBlackHoleTrap
+    name: AT-UFO-MIB::atUfoVlanBlackHoleTrap
     category: state_change
     severity: warning
     description: "UFO private VLAN blackhole state changed on {SNMP_DEVICE_HOSTNAME}\n  VLAN ID: {atUfoVlanId}\n  previous state: {atUfoPreviousState}\n  current state: {atUfoCurrentState}"
-    mib: AT-UFO-MIB
     status: current
     varbinds:
     - atUfoVlanId
     - atUfoPreviousState
     - atUfoCurrentState
   - oid: 1.3.6.1.4.1.207.8.4.4.4.605.0.2
-    name: atUfoBlackHoleAlarmTrap
+    name: AT-UFO-MIB::atUfoBlackHoleAlarmTrap
     category: state_change
     severity: warning
-    description: "UFO private VLAN blackhole state transition on {SNMP_DEVICE_HOSTNAME}\n  alarm state: {atUfoAlarmState}\n  When true: one or more private VLANs entered blackhole state, alarm triggered.\n  When false: all private VLANs exited blackhole state, alarm cleared."
-    mib: AT-UFO-MIB
+    description: "UFO private VLAN blackhole state change on {SNMP_DEVICE_HOSTNAME}\n  alarm state: {atUfoAlarmState}"
     status: current
     varbinds:
     - atUfoAlarmState
   - oid: 1.3.6.1.4.1.207.8.4.4.4.70.0.1
-    name: dhcpRangeExhaustedTrap
+    name: AT-DHCP-MIB::dhcpRangeExhaustedTrap
     category: state_change
-    severity: err
-    description: "DHCP address pool exhausted on {SNMP_DEVICE_HOSTNAME}\n  gateway: {dhcpRangeExhaustedGateway}\n  interface: {dhcpRangeExhaustedInterface}\n\nNo DHCP addresses available in the configured range. New client requests cannot be fulfilled."
-    mib: AT-DHCP-MIB
+    severity: warning
+    description: "DHCP address pool exhausted on {SNMP_DEVICE_HOSTNAME}\n  gateway: {dhcpRangeExhaustedGateway}\n  interface: {dhcpRangeExhaustedInterface}"
     status: current
     varbinds:
     - dhcpRangeExhaustedGateway
     - dhcpRangeExhaustedInterface
   - oid: 1.3.6.1.4.1.207.8.4.4.4.70.0.2
-    name: dhcpRangeExceededThresholdTrap
+    name: AT-DHCP-MIB::dhcpRangeExceededThresholdTrap
     category: state_change
     severity: warning
-    description: "DHCP pool threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  interface: {dhcpRangeExhaustedInterface}\n  range: {dhcpRangeExceededRange}\n  total addresses: {dhcpRangeExceededClients}\n  remaining: {dhcpRangeExceededRemaining}\n  utilization: {dhcpRangeExceededPercentage}%"
-    mib: AT-DHCP-MIB
+    description: "DHCP range {dhcpRangeExceededRange} on {SNMP_DEVICE_HOSTNAME} has exceeded usage threshold\n  interface: {dhcpRangeExhaustedInterface}\n  total clients: {dhcpRangeExceededClients}\n  remaining: {dhcpRangeExceededRemaining}\n  usage percentage: {dhcpRangeExceededPercentage}%"
     status: current
     varbinds:
     - dhcpRangeExhaustedInterface
@@ -2407,11 +2400,10 @@ traps:
     - dhcpRangeExceededRemaining
     - dhcpRangeExceededPercentage
   - oid: 1.3.6.1.4.1.207.8.4.4.4.70.0.3
-    name: dhcpRangeExceededThresholdClearTrap
-    category: diagnostic
-    severity: info
-    description: "DHCP range utilization fell below threshold on {SNMP_DEVICE_HOSTNAME}\n  interface: {dhcpRangeExhaustedInterface}\n  range: {dhcpRangeExceededRange}\n  total clients: {dhcpRangeExceededClients}\n  remaining: {dhcpRangeExceededRemaining}\n  utilization: {dhcpRangeExceededPercentage}%"
-    mib: AT-DHCP-MIB
+    name: AT-DHCP-MIB::dhcpRangeExceededThresholdClearTrap
+    category: state_change
+    severity: notice
+    description: "DHCP range exhaustion cleared on {SNMP_DEVICE_HOSTNAME}\n  interface: {dhcpRangeExhaustedInterface}\n  range: {dhcpRangeExceededRange}\n  allocated clients: {dhcpRangeExceededClients}\n  remaining: {dhcpRangeExceededRemaining}\n  usage percentage: {dhcpRangeExceededPercentage}%"
     status: current
     varbinds:
     - dhcpRangeExhaustedInterface
@@ -2420,75 +2412,454 @@ traps:
     - dhcpRangeExceededRemaining
     - dhcpRangeExceededPercentage
   - oid: 1.3.6.1.4.1.207.8.4.4.4.77.0.1
-    name: firewallTrap
+    name: ALLIEDTELESYN-MIB::firewallTrap
     category: security
-    severity: warning
-    description: "Firewall on {SNMP_DEVICE_HOSTNAME} detected an intrusion or attack\n  message: {firewallTrapMessage}"
-    mib: ALLIEDTELESYN-MIB
+    severity: alert
+    description: "Firewall intrusion/attack detected on {SNMP_DEVICE_HOSTNAME}\n  message: {firewallTrapMessage}"
     varbinds:
     - firewallTrapMessage
   - oid: 1.3.6.1.4.1.207.8.4.4.4.87.0.6
-    name: swiIntrusionDetectionTrap
+    name: AT-SWITCH-MIB::swiIntrusionDetectionTrap
     category: security
     severity: warning
-    description: "Intrusion detection triggered on {SNMP_DEVICE_HOSTNAME}\n  Port: {swiPortNumber}\n  Condition: Number of MAC addresses learned exceeded the configured learn limit"
-    mib: AT-SWITCH-MIB
+    description: "Intrusion detection triggered on {SNMP_DEVICE_HOSTNAME}\n  port: {swiPortNumber}\n  cause: number of MAC addresses learned exceeded the configured learn limit"
     status: current
     varbinds:
     - swiPortNumber
   - oid: 1.3.6.1.4.1.207.8.4.4.4.87.9
-    name: swiPortVlanStateNotify
+    name: AT-SWITCH-MIB::swiPortVlanStateNotify
     category: state_change
-    severity: warning
-    description: "Port state changed on {SNMP_DEVICE_HOSTNAME}\n  port: {swiPortVlanPortNumber}\n  VLAN: {swiPortVlanVlanId}\n  state: {swiPortVlanControl}"
-    mib: AT-SWITCH-MIB
+    severity: notice
+    description: "Port {swiPortVlanPortNumber} VLAN state changed on {SNMP_DEVICE_HOSTNAME}\n  VLAN ID: {swiPortVlanVlanId}\n  State: {swiPortVlanControl}"
     status: current
     varbinds:
     - swiPortVlanPortNumber
     - swiPortVlanVlanId
     - swiPortVlanControl
   - oid: 1.3.6.1.4.1.207.8.4.4.4.97.0.1
-    name: pim4NeighbourAddedTrap
+    name: AT-PIM-MIB::pim4NeighbourAddedTrap
     category: state_change
-    severity: info
+    severity: notice
     description: "PIM neighbor added on {SNMP_DEVICE_HOSTNAME}\n  interface ifIndex: {pimNeighborIfIndex}"
-    mib: AT-PIM-MIB
     status: current
     varbinds:
     - pimNeighborIfIndex
   - oid: 1.3.6.1.4.1.207.8.4.4.4.97.0.2
-    name: pim4NeighbourDeletedTrap
+    name: AT-PIM-MIB::pim4NeighbourDeletedTrap
     category: state_change
-    severity: err
-    description: "PIM neighbor deleted on {SNMP_DEVICE_HOSTNAME}\n  interface ifIndex: {pimNeighborIfIndex}"
-    mib: AT-PIM-MIB
+    severity: notice
+    description: "PIM neighbor deleted on {SNMP_DEVICE_HOSTNAME}\n  interface: {pimNeighborIfIndex}"
     status: current
     varbinds:
     - pimNeighborIfIndex
   - oid: 1.3.6.1.4.1.207.8.4.4.4.97.0.3
-    name: pim4InterfaceUpTrap
+    name: AT-PIM-MIB::pim4InterfaceUpTrap
     category: state_change
     severity: info
     description: "PIM interface enabled and active on {SNMP_DEVICE_HOSTNAME}\n  interface status: {pimInterfaceStatus}"
-    mib: AT-PIM-MIB
     status: current
     varbinds:
     - pimInterfaceStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.4.97.0.4
-    name: pim4InterfaceDownTrap
+    name: AT-PIM-MIB::pim4InterfaceDownTrap
     category: state_change
     severity: warning
-    description: "PIM interface disabled on {SNMP_DEVICE_HOSTNAME}\n  interface status: {pimInterfaceStatus}"
-    mib: AT-PIM-MIB
+    description: "PIM interface disabled on {SNMP_DEVICE_HOSTNAME}\n  status: {pimInterfaceStatus}"
     status: current
     varbinds:
     - pimInterfaceStatus
   - oid: 1.3.6.1.4.1.207.8.4.4.4.97.0.5
-    name: pim4ErrorTrap
+    name: AT-PIM-MIB::pim4ErrorTrap
     category: diagnostic
     severity: err
-    description: "PIM protocol error on {SNMP_DEVICE_HOSTNAME}\n  error type: {pim4ErrorTrapType}"
-    mib: AT-PIM-MIB
+    description: "PIM4 error detected on {SNMP_DEVICE_HOSTNAME}\n  error type: {pim4ErrorTrapType}"
     status: current
     varbinds:
     - pim4ErrorTrapType
+  - oid: 1.3.6.1.4.1.207.8.42.6.5.0.1
+    name: ATKK-WLAN-ACCESS::atkkWiAcAssociated
+    category: state_change
+    severity: notice
+    description: "Wireless STA associated on {SNMP_DEVICE_HOSTNAME}\n  MAC: {atkkWiAcClientAddress}\n  SSID: {atkkWiAcClientSSID}\n  802.11 spec: {atkkWiAcClient80211Spec}\n  channel: {atkkWiAcClientChannel}\n  age: {atkkWiAcClientAge} seconds\n  user ID: {atkkWiAcClientUserID}"
+    status: current
+    varbinds:
+    - atkkWiAcClientAddress
+    - atkkWiAcClientSSID
+    - atkkWiAcClient80211Spec
+    - atkkWiAcClientChannel
+    - atkkWiAcClientAge
+    - atkkWiAcClientUserID
+  - oid: 1.3.6.1.4.1.207.8.42.6.5.0.2
+    name: ATKK-WLAN-ACCESS::atkkWiAcDisassociated
+    category: state_change
+    severity: notice
+    description: "Wireless STA disassociated from {SNMP_DEVICE_HOSTNAME}\n  Client MAC: {atkkWiAcClientAddress}\n  SSID: {atkkWiAcClientSSID}\n  802.11 spec: {atkkWiAcClient80211Spec}\n  Channel: {atkkWiAcClientChannel}\n  Associated duration: {atkkWiAcClientAge}s\n  User ID: {atkkWiAcClientUserID}"
+    status: current
+    varbinds:
+    - atkkWiAcClientAddress
+    - atkkWiAcClientSSID
+    - atkkWiAcClient80211Spec
+    - atkkWiAcClientChannel
+    - atkkWiAcClientAge
+    - atkkWiAcClientUserID
+  - oid: 1.3.6.1.4.1.207.8.42.6.5.0.3
+    name: ATKK-WLAN-ACCESS::atkkWiAcUnknownAP
+    category: security
+    severity: warning
+    description: "Unknown AP detected on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {atkkWiAcAPAddress}\n  SSID: {atkkWiAcAPSSID}\n  802.11 spec: {atkkWiAcAP80211Spec}\n  Channel: {atkkWiAcAPChannel}\n  RSSI: {atkkWiAcAPRSSI}"
+    status: current
+    varbinds:
+    - atkkWiAcAPAddress
+    - atkkWiAcAPSSID
+    - atkkWiAcAP80211Spec
+    - atkkWiAcAPChannel
+    - atkkWiAcAPRSSI
+  - oid: 1.3.6.1.4.1.207.8.42.6.5.0.4
+    name: ATKK-WLAN-ACCESS::atkkWiAcFiltered
+    category: security
+    severity: warning
+    description: "Wireless STA denied by MAC filter on {SNMP_DEVICE_HOSTNAME}\n  client MAC: {atkkWiAcClientAddress}\n  SSID: {atkkWiAcClientSSID}\n  802.11 spec: {atkkWiAcClient80211Spec}\n  channel: {atkkWiAcClientChannel}\n  time associated: {atkkWiAcClientAge}s\n  user ID: {atkkWiAcClientUserID}"
+    status: current
+    varbinds:
+    - atkkWiAcClientAddress
+    - atkkWiAcClientSSID
+    - atkkWiAcClient80211Spec
+    - atkkWiAcClientChannel
+    - atkkWiAcClientAge
+    - atkkWiAcClientUserID
+  - oid: 1.3.6.1.4.1.207.8.42.6.5.0.5
+    name: ATKK-WLAN-ACCESS::atkkWiAcRadiusAuthSucceeded
+    category: auth
+    severity: info
+    description: "RADIUS authentication succeeded for STA on {SNMP_DEVICE_HOSTNAME}\n  MAC: {atkkWiAcClientAddress}\n  SSID: {atkkWiAcClientSSID}\n  UserID: {atkkWiAcClientUserID}"
+    status: current
+    varbinds:
+    - atkkWiAcClientAddress
+    - atkkWiAcClientSSID
+    - atkkWiAcClientUserID
+  - oid: 1.3.6.1.4.1.207.8.42.6.5.0.6
+    name: ATKK-WLAN-ACCESS::atkkWiAcRadiusAuthFailed
+    category: auth
+    severity: warning
+    description: "RADIUS authentication failed for STA on {SNMP_DEVICE_HOSTNAME}\n  MAC: {atkkWiAcClientAddress}\n  SSID: {atkkWiAcClientSSID}\n  UserID: {atkkWiAcClientUserID}"
+    status: current
+    varbinds:
+    - atkkWiAcClientAddress
+    - atkkWiAcClientSSID
+    - atkkWiAcClientUserID
+  - oid: 1.3.6.1.4.1.207.8.42.6.5.0.7
+    name: ATKK-WLAN-ACCESS::atkkWiAcRadarDetected
+    category: security
+    severity: alert
+    description: "Radar detected on {SNMP_DEVICE_HOSTNAME}\n  message: {atkkWiAcAPRadarDetected}\n  channels: {atkkWiAcAPChannels}"
+    status: current
+    varbinds:
+    - atkkWiAcAPRadarDetected
+    - atkkWiAcAPChannels
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.1
+    name: AT-UWC-WLAN-SWITCH-MIB::wsModeEnabled
+    category: state_change
+    severity: info
+    description: Wireless functionality enabled on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.10
+    name: AT-UWC-WLAN-SWITCH-MIB::wsPeerSwitchFailed
+    category: state_change
+    severity: err
+    description: "Peer controller connection failed on {SNMP_DEVICE_HOSTNAME}\n  peer IP: {wsPeerIpAddress}"
+    status: current
+    varbinds:
+    - wsPeerIpAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.11
+    name: AT-UWC-WLAN-SWITCH-MIB::wsPeerSwitchUnknownProtocol
+    category: state_change
+    severity: warning
+    description: "Unknown protocol detected between wireless controllers on {SNMP_DEVICE_HOSTNAME}\n  peer IP: {wsPeerIpAddress}\n  peer protocol version: {wsPeerProtocolVersion}"
+    status: current
+    varbinds:
+    - wsPeerIpAddress
+    - wsPeerProtocolVersion
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.12
+    name: AT-UWC-WLAN-SWITCH-MIB::wsManagedAPDiscovered
+    category: state_change
+    severity: info
+    description: "Managed AP discovered on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {wsManagedAPMacAddress}"
+    status: current
+    varbinds:
+    - wsManagedAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.13
+    name: AT-UWC-WLAN-SWITCH-MIB::wsManagedAPFailed
+    category: state_change
+    severity: warning
+    description: "Managed AP failed on {SNMP_DEVICE_HOSTNAME}\n  AP MAC Address: {wsManagedAPMacAddress}"
+    status: current
+    varbinds:
+    - wsManagedAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.14
+    name: AT-UWC-WLAN-SWITCH-MIB::wsManagedAPUnknownProtocol
+    category: state_change
+    severity: warning
+    description: "Unknown protocol detected between wireless controller and managed AP on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {wsFailedAPMacAddress}\n  AP protocol version: {wsFailedAPProtocolVersion}"
+    status: current
+    varbinds:
+    - wsFailedAPMacAddress
+    - wsFailedAPProtocolVersion
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.15
+    name: AT-UWC-WLAN-SWITCH-MIB::wsAPAssociationFailure
+    category: state_change
+    severity: warning
+    description: "Access Point association failure on {SNMP_DEVICE_HOSTNAME}\n  Failed AP MAC: {wsFailedAPMacAddress}"
+    status: current
+    varbinds:
+    - wsFailedAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.16
+    name: AT-UWC-WLAN-SWITCH-MIB::wsAPAuthenticationFailure
+    category: auth
+    severity: warning
+    description: "AP authentication failed on {SNMP_DEVICE_HOSTNAME}\n  Failed AP MAC: {wsFailedAPMacAddress}"
+    status: current
+    varbinds:
+    - wsFailedAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.17
+    name: AT-UWC-WLAN-SWITCH-MIB::wsRFScanRogueAPDetected
+    category: security
+    severity: warning
+    description: "Rogue AP detected by RF scan on {SNMP_DEVICE_HOSTNAME}\n  Managed AP MAC: {wsManagedAPMacAddress}\n  Radio Interface: {wsManagedAPRadioInterface}\n  Rogue AP MAC: {wsRFScanAPMacAddress}\n  SSID: {wsRFScanAPSSID}"
+    status: current
+    varbinds:
+    - wsManagedAPMacAddress
+    - wsManagedAPRadioInterface
+    - wsRFScanAPMacAddress
+    - wsRFScanAPSSID
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.18
+    name: AT-UWC-WLAN-SWITCH-MIB::wsRFScanAPDetected
+    category: security
+    severity: warning
+    description: "Unauthorized AP detected via RF scan on {SNMP_DEVICE_HOSTNAME}\n  Managed AP MAC: {wsManagedAPMacAddress}\n  Managed AP Radio Interface: {wsManagedAPRadioInterface}\n  Detected AP MAC: {wsRFScanAPMacAddress}\n  Detected AP SSID: {wsRFScanAPSSID}"
+    status: current
+    varbinds:
+    - wsManagedAPMacAddress
+    - wsManagedAPRadioInterface
+    - wsRFScanAPMacAddress
+    - wsRFScanAPSSID
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.19
+    name: AT-UWC-WLAN-SWITCH-MIB::wsRFScanNewClientDetected
+    category: mobility
+    severity: info
+    description: "New wireless client detected via RF scan on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {wsManagedAPMacAddress}\n  Radio interface: {wsManagedAPRadioInterface}\n  Client MAC: {wsNeighborClientMacAddress}"
+    status: current
+    varbinds:
+    - wsManagedAPMacAddress
+    - wsManagedAPRadioInterface
+    - wsNeighborClientMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.2
+    name: AT-UWC-WLAN-SWITCH-MIB::wsModeDisabled
+    category: state_change
+    severity: notice
+    description: Wireless functionality has been disabled on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.20
+    name: AT-UWC-WLAN-SWITCH-MIB::wsClientAssociationDetected
+    category: mobility
+    severity: notice
+    description: "Wireless client association detected on {SNMP_DEVICE_HOSTNAME}\n  Client MAC: {wsAssociatedClientMacAddress}\n  VAP MAC: {wsVAPMacAddress}\n  Managed AP MAC: {wsManagedAPMacAddress}"
+    status: current
+    varbinds:
+    - wsAssociatedClientMacAddress
+    - wsVAPMacAddress
+    - wsManagedAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.21
+    name: AT-UWC-WLAN-SWITCH-MIB::wsClientDisassociationDetected
+    category: state_change
+    severity: notice
+    description: "Client disassociation detected on {SNMP_DEVICE_HOSTNAME}\n  client MAC: {wsAssociatedClientMacAddress}\n  VAP MAC: {wsVAPMacAddress}\n  managed AP MAC: {wsManagedAPMacAddress}"
+    status: current
+    varbinds:
+    - wsAssociatedClientMacAddress
+    - wsVAPMacAddress
+    - wsManagedAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.22
+    name: AT-UWC-WLAN-SWITCH-MIB::wsClientRoamDetected
+    category: mobility
+    severity: info
+    description: "Wireless client roaming detected on {SNMP_DEVICE_HOSTNAME}\n  client MAC: {wsAssociatedClientMacAddress}\n  VAP MAC: {wsVAPMacAddress}\n  managed AP MAC: {wsManagedAPMacAddress}"
+    status: current
+    varbinds:
+    - wsAssociatedClientMacAddress
+    - wsVAPMacAddress
+    - wsManagedAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.23
+    name: AT-UWC-WLAN-SWITCH-MIB::wsClientAssociationFailure
+    category: state_change
+    severity: warning
+    description: "Client association failure detected on {SNMP_DEVICE_HOSTNAME}\n  Client MAC: {wsNeighborClientMacAddress}"
+    status: current
+    varbinds:
+    - wsNeighborClientMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.24
+    name: AT-UWC-WLAN-SWITCH-MIB::wsClientAuthenticationFailure
+    category: auth
+    severity: warning
+    description: "Client authentication failure on {SNMP_DEVICE_HOSTNAME}\n  client MAC: {wsNeighborClientMacAddress}"
+    status: current
+    varbinds:
+    - wsNeighborClientMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.25
+    name: AT-UWC-WLAN-SWITCH-MIB::wsAdHocClientDetected
+    category: security
+    severity: warning
+    description: "Ad hoc client detected on {SNMP_DEVICE_HOSTNAME}\n  ad hoc client MAC: {wsAdHocClientMacAddress}\n  detecting AP MAC: {wsDetectedAPMacAddress}\n  radio interface: {wsDetectedAPRadioInterface}"
+    status: current
+    varbinds:
+    - wsAdHocClientMacAddress
+    - wsDetectedAPMacAddress
+    - wsDetectedAPRadioInterface
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.26
+    name: AT-UWC-WLAN-SWITCH-MIB::wsWLANBandwidthUtilizationExceeded
+    category: diagnostic
+    severity: warning
+    description: "WLAN bandwidth utilization exceeded on {SNMP_DEVICE_HOSTNAME}\n  Managed AP MAC: {wsManagedAPMacAddress}\n  Radio MAC: {wsManagedAPRadioMacAddress}\n  Radio Interface: {wsManagedAPRadioInterface}\n  Utilization: {wsManagedAPRadioWLANUtilization}"
+    status: current
+    varbinds:
+    - wsManagedAPMacAddress
+    - wsManagedAPRadioMacAddress
+    - wsManagedAPRadioInterface
+    - wsManagedAPRadioWLANUtilization
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.27
+    name: AT-UWC-WLAN-SWITCH-MIB::wsAdHocClientListFull
+    category: state_change
+    severity: warning
+    description: Ad hoc client database is full on {SNMP_DEVICE_HOSTNAME}. New ad hoc clients may be rejected.
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.28
+    name: AT-UWC-WLAN-SWITCH-MIB::wsPeerSwitchConfigurationCommandReceived
+    category: config_change
+    severity: notice
+    description: "Configuration command received from peer controller on {SNMP_DEVICE_HOSTNAME}\n  peer IP: {wsPeerIpAddress}\n  config mask: {wsPeerConfigReceived}"
+    status: current
+    varbinds:
+    - wsPeerIpAddress
+    - wsPeerConfigReceived
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.29
+    name: AT-UWC-WLAN-SWITCH-MIB::wsPeerSwitchManagedAPLimitExceeded
+    category: state_change
+    severity: warning
+    description: "Managed AP limit exceeded on {SNMP_DEVICE_HOSTNAME}\n  peer controller IP: {wsPeerIpAddress}\n  AP MAC: {wsPeerSwitchAPMacAddress}"
+    status: current
+    varbinds:
+    - wsPeerIpAddress
+    - wsPeerSwitchAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.3
+    name: AT-UWC-WLAN-SWITCH-MIB::wsManagedAPDatabaseFull
+    category: diagnostic
+    severity: warning
+    description: "AP Database is full on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {wsManagedAPMacAddress}"
+    status: current
+    varbinds:
+    - wsManagedAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.30
+    name: AT-UWC-WLAN-SWITCH-MIB::wsPeerSwitchClientLimitExceeded
+    category: state_change
+    severity: warning
+    description: "Peer controller client limit exceeded on {SNMP_DEVICE_HOSTNAME}\n  peer IP: {wsPeerIpAddress}\n  client MAC: {wsAssociatedClientMacAddress}"
+    status: current
+    varbinds:
+    - wsPeerIpAddress
+    - wsAssociatedClientMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.32
+    name: AT-UWC-WLAN-SWITCH-MIB::wsClusterControllerElected
+    category: state_change
+    severity: notice
+    description: "Wireless controller elected as Cluster Controller on {SNMP_DEVICE_HOSTNAME}\n  controller IP: {wsIPAddress}"
+    status: current
+    varbinds:
+    - wsIPAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.33
+    name: AT-UWC-WLAN-SWITCH-MIB::wsClusterMaxAPExceeded
+    category: diagnostic
+    severity: warning
+    description: "Maximum managed AP count exceeded on {SNMP_DEVICE_HOSTNAME}\n  wireless controller IP: {wsIPAddress}\n  managed AP MAC: {wsManagedAPMacAddress}\n  managed AP IP: {wsManagedAPIpAddress}\n  managing switch IP: {wsManagedAPSwitchIpAddress}"
+    status: current
+    varbinds:
+    - wsIPAddress
+    - wsManagedAPMacAddress
+    - wsManagedAPIpAddress
+    - wsManagedAPSwitchIpAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.34
+    name: AT-UWC-WLAN-SWITCH-MIB::wsRoguesPresent
+    category: security
+    severity: alert
+    description: "Rogue devices detected on the network by {SNMP_DEVICE_HOSTNAME}\n  This trap indicates the presence of unauthorized wireless access points or rogue clients."
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.35
+    name: AT-UWC-WLAN-SWITCH-MIB::wsDetectedClientListFull
+    category: diagnostic
+    severity: warning
+    description: Detected client database is full on {SNMP_DEVICE_HOSTNAME}. New clients may not be tracked until the database is cleared or capacity is increased.
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.36
+    name: AT-UWC-WLAN-SWITCH-MIB::wsRogueClientsPresent
+    category: security
+    severity: alert
+    description: "Rogue clients detected on {SNMP_DEVICE_HOSTNAME}\n  This trap indicates that one or more unauthorized wireless clients have been detected in the network."
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.37
+    name: AT-UWC-WLAN-SWITCH-MIB::wsChannelPlanAlgoComplete
+    category: diagnostic
+    severity: notice
+    description: Channel algorithm complete on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.38
+    name: AT-UWC-WLAN-SWITCH-MIB::wsPowerPlanAlgoComplete
+    category: diagnostic
+    severity: info
+    description: Power algorithm completed on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.4
+    name: AT-UWC-WLAN-SWITCH-MIB::wsManagedAPNeighborAPListFull
+    category: state_change
+    severity: warning
+    description: Managed AP neighbor list is full on {SNMP_DEVICE_HOSTNAME}. No new neighbor APs can be discovered until existing entries are removed or the list is cleared.
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.41
+    name: AT-UWC-WLAN-SWITCH-MIB::wsLocallyManagedAPLimitExceeded
+    category: state_change
+    severity: warning
+    description: "Locally managed AP limit exceeded on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {wsManagedAPMacAddress}"
+    status: current
+    varbinds:
+    - wsManagedAPMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.5
+    name: AT-UWC-WLAN-SWITCH-MIB::wsManagedAPNeighborClientListFull
+    category: state_change
+    severity: warning
+    description: ManagedAP neighbor client list is full on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.6
+    name: AT-UWC-WLAN-SWITCH-MIB::wsAPFailureListFull
+    category: diagnostic
+    severity: warning
+    description: AP failure list is full on {SNMP_DEVICE_HOSTNAME}. The device has reached its maximum capacity for tracking failed Access Points.
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.7
+    name: AT-UWC-WLAN-SWITCH-MIB::wsRFScanAPListFull
+    category: diagnostic
+    severity: warning
+    description: RF scan AP list is full on {SNMP_DEVICE_HOSTNAME}. The device has detected that the list of Access Points for RF scanning has reached its capacity.
+    status: current
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.8
+    name: AT-UWC-WLAN-SWITCH-MIB::wsClientAssociationDatabaseFull
+    category: state_change
+    severity: warning
+    description: "Client association database full on {SNMP_DEVICE_HOSTNAME}\n  MAC: {wsAssociatedClientMacAddress}"
+    status: current
+    varbinds:
+    - wsAssociatedClientMacAddress
+  - oid: 1.3.6.1.4.1.207.8.42.8.34.0.9
+    name: AT-UWC-WLAN-SWITCH-MIB::wsPeerSwitchDiscovered
+    category: state_change
+    severity: info
+    description: "Peer controller discovered on {SNMP_DEVICE_HOSTNAME}\n  peer IP: {wsPeerIpAddress}"
+    status: current
+    varbinds:
+    - wsPeerIpAddress

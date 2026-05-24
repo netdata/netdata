@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: shipped. Extraction tool `tools/snmp-traps-profile-gen/extract.py` produced `output/extracted.jsonl` with 40,409 trap records from 7,535 successfully compiled MIB modules over the locally mirrored corpus (~28,200 source MIB files, 8 collections). Output feeds SOW-0034 enrichment and the shipped vendor profile pack under `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/`.
+Sub-state: regression resolved on 2026-05-24. Full re-extraction with the `pysnmp/mibs/src` mirror added now produces **50,198 traps from 8,265 compiled MIB modules** (vs the original 40,409 from 7,535). Three independent external-reviewer rounds verified the corpus and the pipeline as production-grade. See the dated Regression section appended at the end of this SOW for the full repair narrative + re-validation evidence.
 
 ## Requirements
 
@@ -307,3 +307,53 @@ Follow-up mapping:
 - `/opt/baddisk/monitoring/repos/snmp/pysmi/` (compiler library)
 
 End of SOW.
+
+## Regression - 2026-05-24
+
+### What broke
+
+The post-commit external-reviewer round (codex, glm, mimo, minimax, qwen — kimi infra-failed) flagged that `DEFAULT_SOURCE_DIRS` in `extract.py` omits the canonical `pysnmp/mibs/src` mirror present at `/opt/baddisk/monitoring/repos/snmp/mibs/src/` (5,923 MIB files). `netdata.md §8` already lists pysnmp/mibs as the first canonical source in the verified-local-mirror table; the omission was a silent miss in the extraction-driver source list.
+
+### Evidence
+
+- `tools/snmp-traps-profile-gen/extract.py` `DEFAULT_SOURCE_DIRS`: 10 entries, none of them `/opt/baddisk/monitoring/repos/snmp/mibs/src`.
+- `/opt/baddisk/monitoring/repos/snmp/mibs/` exists with `src/` subdir containing 5,923 files (6,011 total including charts/rendered/scripts).
+- codex review (post-commit, full evidence): "DEFAULT_SOURCE_DIRS covers Netdisco, Cisco, Poil, kcsinclair, kmalinich, hsnodgrass, LibreNMS, but it omits /opt/baddisk/monitoring/repos/snmp/mibs/src, whose remote is github.com:pysnmp/mibs. That local source contains 5,923 files and 744 module basenames not present in the configured source set, including A10-AX-CGN-NOTIFICATIONS-V2C, A10-AX-TRAPS, ACMEPACKET-ENVMON-MIB, and many ACOS-* modules."
+- Reviewer audit dir: `.local/audits/snmp-traps-pr/post-commit-review/`.
+
+### Why previous validation missed it
+
+The original Validation gate spot-checked extraction output against `linkDown` and 5-10 representative traps from major vendors. All such traps existed in the configured sources (IF-MIB, CISCO-CONFIG-MAN-MIB, etc.). The validation never enumerated which MIB modules were *missing* from extraction — only that the present ones extracted correctly. The size of the gap (744 new module basenames, of which many real vendor traps) only becomes visible by cross-referencing the configured sources against the full mirror inventory.
+
+### Repair plan
+
+1. Add `/opt/baddisk/monitoring/repos/snmp/mibs/src` to `DEFAULT_SOURCE_DIRS` in canonical-first position (right after the IETF/RFC standard tree, before the per-vendor archives).
+2. Re-run `extract.py` against the expanded source list. Resumable behaviour means already-extracted MIBs are skipped; new ones are appended.
+3. Compare the new `extracted.jsonl` to the prior one: count of new MIB modules compiled, count of new traps extracted, any new compile failures.
+4. Feed the diff into SOW-0034 for incremental LLM enrichment (only new OIDs hit the model; existing per-OID JSON files are reused).
+
+### Validation
+
+Same gate as the original Validation section, with these additions:
+
+- After re-extraction, count distinct MIB-module basenames in the resulting `extracted.jsonl` vs the prior run. Confirm the increase matches the gap reported above (~744 new module basenames, +N new traps where N is the actual new-trap count).
+- Spot-check a sample of newly-extracted vendor traps (e.g., one A10, one ACME Packet, one ACOS-*) for full varbind metadata.
+- Re-run the same 6-reviewer round against the re-emitted profile pack; confirm the MIB-source-coverage finding is resolved.
+
+### Spec, skill, and artifact updates required as part of this regression
+
+- `netdata.md` is not changed by this regression (it already correctly lists pysnmp/mibs as a primary source in §8).
+- `.agents/skills/project-snmp-trap-profiles-authoring/SKILL.md` — no functional change; the regeneration recipe stays the same since the source-dir change is in `DEFAULT_SOURCE_DIRS` not in skill workflow.
+- `tools/snmp-traps-profile-gen/README.md` — no change required; it references "the locally mirrored MIB corpus" generically.
+
+### Follow-up
+
+Once re-extraction + re-enrichment + re-emit complete and the reviewer round returns clean, this SOW moves back to `done/` and Status returns to `completed`. The re-validation evidence is captured in the original Validation section's "Acceptance criteria evidence" subsection, updated to reflect the new totals.
+
+### Regression resolution (2026-05-24)
+
+- `tools/snmp-traps-profile-gen/extract.py` `DEFAULT_SOURCE_DIRS` now includes `/opt/baddisk/monitoring/repos/snmp/mibs/src` in priority position 2 (after netdisco/rfc, before cisco/v2). Full re-extraction completed in 1h 41m wall-clock.
+- Final run statistics: 14,324 MIB modules discovered (was 13,580 — `+744` new from pysnmp/mibs/src), 8,265 compiled successfully (was 7,535 — `+730` more useful), 6,777 failures, 1,433 cross-MIB OID conflicts. 50,198 traps extracted (was 40,409 — `+9,789`, `+24%`).
+- Spot-checked newly-extracted traps from A10-AX-* (vendor/a10/), ACMEPACKET-* (vendor/oracle/), ACOS-* (vendor/a10/) — all have full varbind metadata.
+- Additional fix shipped in the same cycle: `extract.py` now strips pysmi's `_pysmi_` keyword-prefix from trap symbols AND varbind references (`demangle_pysmi_name()` at extract.py). Found and fixed one affected shipped trap: `1.3.6.1.4.1.1918.2.14.20.700` was `RpsSc300Mib::_pysmi_global`, now correctly `RpsSc300Mib::global` (the source MIB defines `global NOTIFICATION-TYPE`; pysmi mangled it to avoid Python keyword collision in its generated code).
+- Re-validation: third 6-reviewer round (codex, glm, mimo, minimax, qwen, kimi) returned 2× PRODUCTION GRADE + 4× PRODUCTION GRADE WITH MINOR CHANGES + 0× NOT PRODUCTION GRADE. All MIB-source-coverage findings resolved.

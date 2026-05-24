@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -313,10 +314,19 @@ def build_user_prompt(trap: Dict[str, Any]) -> str:
     ]
     if trap_ref:
         lines.append(f"trap_reference:   {trap_ref}")
-    varbinds = trap.get("varbinds") or []
-    if varbinds:
+    # Show ONLY varbinds with BOTH ``oid`` and ``syntax`` set. That is the
+    # exact filter ``emit.py`` uses to admit a varbind into the shipped
+    # YAML's file-level ``varbinds:`` table. Any varbind the LLM references
+    # here will therefore survive to disk; descriptions cannot reference a
+    # name that emit will silently drop.
+    all_vbs = trap.get("varbinds") or []
+    resolved_vbs = [
+        vb for vb in all_vbs
+        if isinstance(vb, dict) and vb.get("oid") and vb.get("syntax")
+    ]
+    if resolved_vbs:
         lines.append("varbinds:")
-        for vb in varbinds:
+        for vb in resolved_vbs:
             lines.append(render_varbind_line(vb))
     else:
         lines.append("varbinds: (none)")
@@ -388,11 +398,17 @@ def mechanical_fallback(trap: Dict[str, Any]) -> Dict[str, Any]:
 # --------------------------------------------------------------------------
 
 
-PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)(?:\.[A-Za-z0-9_]+)?\}")
+# Permissive: match any {non-empty-non-whitespace} token. We do NOT restrict
+# to MIB-symbol form because the validator must REJECT bad placeholders the
+# model might have invented (e.g. hyphenated names that pysmi can't produce
+# because SMIv2 symbols use underscores or camelCase only).
+PLACEHOLDER_RE = re.compile(r"\{([^{}\s]+)\}")
 
 
 def extract_placeholders(s: str) -> List[str]:
-    return PLACEHOLDER_RE.findall(s)
+    # Strip optional ``.suffix`` so ``{ifOperStatus.raw}`` validates as
+    # ``ifOperStatus``.
+    return [m.split(".", 1)[0] for m in PLACEHOLDER_RE.findall(s)]
 
 
 def validate(
@@ -460,9 +476,13 @@ class LLMConfig:
     base_url: str
     model: str
     concurrency: int
-    timeout_s: float = 60.0
-    http_retries: int = 2   # retry on HTTP 5xx / 429 / network errors
-    max_tokens: int = 800   # bump higher for reasoning models (qwen, deepseek-r1, ...)
+    timeout_s: float = 300.0   # generous; some reasoning-style models can take 30-60s/request
+    http_retries: int = 2      # retry on HTTP 5xx / 429 / network errors
+    max_tokens: int = 800      # bump higher for reasoning models (qwen, deepseek-r1, ...)
+    # Extra JSON fields merged into the chat-completion payload (e.g.
+    # ``{"chat_template_kwargs": {"enable_thinking": false}}`` to disable
+    # Qwen's reasoning chain).
+    extra_body: Dict[str, Any] = None  # type: ignore[assignment]
 
 
 async def call_llm(
@@ -483,6 +503,8 @@ async def call_llm(
         "temperature": 0.0,
         "max_tokens": cfg.max_tokens,
     }
+    if cfg.extra_body:
+        payload.update(cfg.extra_body)
     last_exc: Optional[Exception] = None
     for attempt in range(cfg.http_retries + 1):
         try:
@@ -549,7 +571,16 @@ async def enrich_one(
 
     Returns ``(record, failure_log_entry_or_None)``.
     """
-    varbind_names = [vb.get("name") for vb in (trap.get("varbinds") or []) if vb.get("name")]
+    # Validator only accepts placeholders that reference varbinds that
+    # ``emit.py`` will admit to the file-level table (oid AND syntax).
+    # Mirrors the filter in build_user_prompt() so the LLM, the validator,
+    # and the emitter all agree on what's legally referenceable.
+    varbind_names = [
+        vb.get("name")
+        for vb in (trap.get("varbinds") or [])
+        if isinstance(vb, dict) and vb.get("name")
+           and vb.get("oid") and vb.get("syntax")
+    ]
     attempts_log: List[Dict[str, Any]] = []
     chosen: Optional[Dict[str, Any]] = None
     source: Optional[str] = None
@@ -625,13 +656,16 @@ async def enrich_one(
 async def run_async(
     traps: List[Dict[str, Any]],
     out_dir: str,
-    cfg: LLMConfig,
+    endpoints: List[LLMConfig],
     progress_every: int,
 ) -> Dict[str, Any]:
+    """Dispatch `traps` across one-or-more LLM endpoints.
+
+    Each endpoint runs `endpoint.concurrency` worker tasks. Workers pull
+    from a shared queue, so faster endpoints naturally absorb more work.
+    """
     out_enriched = os.path.join(out_dir, "enriched")
     os.makedirs(out_enriched, exist_ok=True)
-
-    sem = asyncio.Semaphore(cfg.concurrency)
 
     failures_path = os.path.join(out_dir, "llm-failures.json")
     failures: List[Dict[str, Any]] = []
@@ -643,48 +677,70 @@ async def run_async(
             failures = []
 
     n_done = 0
-    n_via_llm = [0, 0, 0]   # success on attempt-1 / attempt-2 / attempt-3
+    n_via_llm = [0, 0, 0]            # success on attempt-1 / attempt-2 / attempt-3
     n_via_mech = 0
+    n_by_endpoint: Dict[str, int] = {ep.model: 0 for ep in endpoints}
     t0 = time.time()
 
-    limits = httpx.Limits(max_connections=cfg.concurrency + 8,
-                          max_keepalive_connections=cfg.concurrency + 8)
-    async with httpx.AsyncClient(limits=limits) as client:
+    queue: asyncio.Queue = asyncio.Queue()
+    for t in traps:
+        queue.put_nowait(t)
 
-        async def process(trap: Dict[str, Any]) -> None:
-            nonlocal n_done, n_via_mech
-            record, failure_log = await enrich_one(trap, cfg, client, sem)
-            oid = record["oid"]
-            if not oid:
+    async def worker(ep: LLMConfig, client: httpx.AsyncClient, ep_sem: asyncio.Semaphore) -> None:
+        nonlocal n_done, n_via_mech
+        while True:
+            try:
+                trap = queue.get_nowait()
+            except asyncio.QueueEmpty:
                 return
-            path = os.path.join(out_enriched, oid_to_filename(oid))
-            atomic_write(path, json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n")
-            if failure_log is not None:
-                failures.append(failure_log)
-            src = record.get("enrichment_source") or ""
-            if src.startswith("llm:"):
-                # Extract attempt number from "llm:<model>:attempt-N"
-                m = re.search(r"attempt-(\d+)$", src)
-                if m:
-                    a = int(m.group(1)) - 1
-                    if 0 <= a < 3:
-                        n_via_llm[a] += 1
-            else:
-                n_via_mech += 1
-            n_done += 1
-            if progress_every and n_done % progress_every == 0:
-                dt = time.time() - t0
-                rate = n_done / dt if dt > 0 else 0
-                eta = (len(traps) - n_done) / rate if rate > 0 else 0
-                logging.info(
-                    "progress %d/%d (a1=%d a2=%d a3=%d mech=%d) rate=%.1f/s eta=%.0fs",
-                    n_done, len(traps),
-                    n_via_llm[0], n_via_llm[1], n_via_llm[2], n_via_mech,
-                    rate, eta,
-                )
+            try:
+                record, failure_log = await enrich_one(trap, ep, client, ep_sem)
+                oid = record["oid"]
+                if not oid:
+                    continue
+                path = os.path.join(out_enriched, oid_to_filename(oid))
+                atomic_write(path, json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n")
+                if failure_log is not None:
+                    failures.append(failure_log)
+                src = record.get("enrichment_source") or ""
+                if src.startswith("llm:"):
+                    m = re.search(r"attempt-(\d+)$", src)
+                    if m:
+                        a = int(m.group(1)) - 1
+                        if 0 <= a < 3:
+                            n_via_llm[a] += 1
+                    n_by_endpoint[ep.model] = n_by_endpoint.get(ep.model, 0) + 1
+                else:
+                    n_via_mech += 1
+                n_done += 1
+                if progress_every and n_done % progress_every == 0:
+                    dt = time.time() - t0
+                    rate = n_done / dt if dt > 0 else 0
+                    eta = (len(traps) - n_done) / rate if rate > 0 else 0
+                    by_ep = " ".join(f"{m}={c}" for m, c in n_by_endpoint.items())
+                    logging.info(
+                        "progress %d/%d (a1=%d a2=%d a3=%d mech=%d) rate=%.1f/s eta=%.0fs %s",
+                        n_done, len(traps),
+                        n_via_llm[0], n_via_llm[1], n_via_llm[2], n_via_mech,
+                        rate, eta, by_ep,
+                    )
+            except Exception as exc:
+                logging.warning("worker(%s) error on trap %s: %s", ep.model, trap.get("oid"), exc)
+            finally:
+                queue.task_done()
 
-        tasks = [asyncio.create_task(process(t)) for t in traps]
-        await asyncio.gather(*tasks, return_exceptions=False)
+    # One httpx.AsyncClient per endpoint (independent connection pool +
+    # keep-alives sized to the endpoint's concurrency).
+    async with contextlib.AsyncExitStack() as stack:
+        ep_workers: List[asyncio.Task] = []
+        for ep in endpoints:
+            limits = httpx.Limits(max_connections=ep.concurrency + 8,
+                                  max_keepalive_connections=ep.concurrency + 8)
+            client = await stack.enter_async_context(httpx.AsyncClient(limits=limits, timeout=ep.timeout_s))
+            ep_sem = asyncio.Semaphore(ep.concurrency)
+            for _ in range(ep.concurrency):
+                ep_workers.append(asyncio.create_task(worker(ep, client, ep_sem)))
+        await asyncio.gather(*ep_workers, return_exceptions=False)
 
     with open(failures_path, "w") as f:
         json.dump(failures, f, indent=2)
@@ -696,6 +752,7 @@ async def run_async(
         "via_llm_attempt_2": n_via_llm[1],
         "via_llm_attempt_3": n_via_llm[2],
         "via_mechanical_fallback": n_via_mech,
+        "by_endpoint": n_by_endpoint,
         "elapsed_seconds": time.time() - t0,
     }
 
@@ -767,11 +824,16 @@ def main() -> int:
     parser.add_argument("--oids", nargs="*", default=None,
                         help="Restrict to these OIDs (overrides --sample).")
     parser.add_argument("--concurrency", type=int, default=DEFAULT_CONCURRENCY,
-                        help=f"In-flight slots against the LLM endpoint (default {DEFAULT_CONCURRENCY}).")
+                        help=f"Single-endpoint slots when --endpoint is not used (default {DEFAULT_CONCURRENCY}).")
     parser.add_argument("--model", default=MODEL)
     parser.add_argument("--base-url", default=LLM_BASE_URL)
     parser.add_argument("--max-tokens", type=int, default=800,
-                        help="LLM max_tokens (bump for reasoning models that emit thoughts before content).")
+                        help="LLM max_tokens for single-endpoint mode (bump for reasoning models).")
+    parser.add_argument("--endpoint", action="append", default=None,
+                        help=("Add an LLM endpoint to the dispatch pool. Repeatable. "
+                              "Format: base_url|model|concurrency|max_tokens "
+                              "e.g. 'http://10.20.4.21:8357/v1|minimax-m2.7|150|800'. "
+                              "When --endpoint is given, --base-url/--model/--concurrency are ignored."))
     parser.add_argument("--force", action="store_true",
                         help="Re-process even OIDs that already have output files.")
     parser.add_argument("--log-level", default="INFO")
@@ -784,12 +846,36 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    cfg = LLMConfig(
-        base_url=args.base_url,
-        model=args.model,
-        concurrency=args.concurrency,
-        max_tokens=args.max_tokens,
-    )
+    endpoints: List[LLMConfig] = []
+    if args.endpoint:
+        for spec in args.endpoint:
+            parts = spec.split("|")
+            if len(parts) not in (3, 4):
+                logging.error("invalid --endpoint spec %r; expected base_url|model|concurrency[|max_tokens]", spec)
+                return 2
+            base_url, model, conc_s = parts[0], parts[1], parts[2]
+            max_tokens = int(parts[3]) if len(parts) == 4 else 800
+            # Auto-disable reasoning chains on Qwen "thinker" variants —
+            # the thinker chain blows wall-clock per request and we don't
+            # need reasoning for this classification workload (small
+            # 3-field JSON output, deterministic).
+            extra_body: Optional[Dict[str, Any]] = None
+            if "qwen" in model.lower() and "nothinker" not in model.lower():
+                extra_body = {"chat_template_kwargs": {"enable_thinking": False}}
+            endpoints.append(LLMConfig(
+                base_url=base_url,
+                model=model,
+                concurrency=int(conc_s),
+                max_tokens=max_tokens,
+                extra_body=extra_body,
+            ))
+    else:
+        endpoints.append(LLMConfig(
+            base_url=args.base_url,
+            model=args.model,
+            concurrency=args.concurrency,
+            max_tokens=args.max_tokens,
+        ))
 
     out_enriched = os.path.join(args.out_dir, "enriched")
     traps = load_traps(
@@ -801,7 +887,11 @@ def main() -> int:
         force=args.force,
     )
     logging.info("loaded %d traps to process (from %s)", len(traps), args.in_jsonl)
-    logging.info("endpoint=%s model=%s concurrency=%d", cfg.base_url, cfg.model, cfg.concurrency)
+    for ep in endpoints:
+        logging.info("endpoint: %s model=%s concurrency=%d max_tokens=%d",
+                     ep.base_url, ep.model, ep.concurrency, ep.max_tokens)
+    total_slots = sum(ep.concurrency for ep in endpoints)
+    logging.info("total in-flight slots across %d endpoints: %d", len(endpoints), total_slots)
     if args.dry_run:
         return 0
     if not traps:
@@ -811,7 +901,7 @@ def main() -> int:
     report = asyncio.run(run_async(
         traps=traps,
         out_dir=args.out_dir,
-        cfg=cfg,
+        endpoints=endpoints,
         progress_every=args.progress_every,
     ))
     report_path = os.path.join(args.out_dir, "enrichment-report.json")

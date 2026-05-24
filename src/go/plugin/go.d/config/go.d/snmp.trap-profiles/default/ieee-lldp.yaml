@@ -42,11 +42,10 @@ varbinds:
     type: LldpPortNumber
 traps:
   - oid: 1.0.8802.1.1.2.0.0.1
-    name: lldpRemTablesChange
+    name: LLDP-MIB::lldpRemTablesChange
     category: state_change
-    severity: info
+    severity: notice
     description: "LLDP remote systems table changed on {SNMP_DEVICE_HOSTNAME}\n  inserts: {lldpStatsRemTablesInserts}\n  deletes: {lldpStatsRemTablesDeletes}\n  drops: {lldpStatsRemTablesDrops}\n  ageouts: {lldpStatsRemTablesAgeouts}"
-    mib: LLDP-MIB
     status: current
     varbinds:
     - lldpStatsRemTablesInserts
@@ -54,112 +53,100 @@ traps:
     - lldpStatsRemTablesDrops
     - lldpStatsRemTablesAgeouts
   - oid: 1.0.8802.1.1.2.1.5.4795.0.1
-    name: lldpXMedTopologyChangeDetected
+    name: LLDP-EXT-MED-MIB::lldpXMedTopologyChangeDetected
     category: mobility
     severity: notice
-    description: "LLDP-MED topology change detected on {SNMP_DEVICE_HOSTNAME}\n  A remote device connected, disconnected, or moved to a different port.\n  Chassis ID subtype: {lldpRemChassisIdSubtype}\n  Chassis ID: {lldpRemChassisId}\n  Remote device class: {lldpXMedRemDeviceClass}"
-    mib: LLDP-EXT-MED-MIB
+    description: "LLDP topology change detected on {SNMP_DEVICE_HOSTNAME}\n  Remote chassis ID type: {lldpRemChassisIdSubtype}\n  Remote chassis ID: {lldpRemChassisId}\n  Remote device class: {lldpXMedRemDeviceClass}"
     status: current
     varbinds:
     - lldpRemChassisIdSubtype
     - lldpRemChassisId
     - lldpXMedRemDeviceClass
   - oid: 1.0.8802.1.1.2.1.5.6945.0.1
-    name: lldpXdcbxMiscControlError
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxMiscControlError
     category: diagnostic
-    severity: warning
-    description: "DCBX control error on {SNMP_DEVICE_HOSTNAME}\n  port number: {lldpXdcbxPortNumber}\n\nA miscellaneous DCBX control error was detected for which no specific trap exists."
-    mib: LLDP-EXT-DCBX-MIB
+    severity: err
+    description: "DCBX control error on {SNMP_DEVICE_HOSTNAME}\n  port number: {lldpXdcbxPortNumber}\n  Note: This is a catch-all trap for DCBX errors that have no dedicated trap defined."
     status: current
     varbinds:
     - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.2.1.5.6945.0.10
-    name: lldpXdcbxPeerConfigMismatch
-    category: diagnostic
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxPeerConfigMismatch
+    category: state_change
     severity: warning
-    description: "LLDP DCBX peer configuration mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  Port Number: {lldpXdcbxPortNumber}\n\nThe configuration received from the peer results in a partial or complete mismatch, which may affect Data Center Bridging exchange protocol functionality."
-    mib: LLDP-EXT-DCBX-MIB
+    description: "DCBX peer configuration mismatch detected on {SNMP_DEVICE_HOSTNAME}\n  port number: {lldpXdcbxPortNumber}\n  The configuration received from the peer results in a partial or complete mismatch."
     status: current
     varbinds:
     - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.2.1.5.6945.0.2
-    name: lldpXdcbxMiscFeatureError
-    category: diagnostic
-    severity: crit
-    description: "DCBX feature error on {SNMP_DEVICE_HOSTNAME}\n  error flag: {lldpXdcbxFeatError}\n  Details: An error occurred during configuration exchange with the peer. The OperCfg and OperMode of a feature could not be set as the protocol requires."
-    mib: LLDP-EXT-DCBX-MIB
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxMiscFeatureError
+    category: state_change
+    severity: err
+    description: "DCBX configuration exchange error on {SNMP_DEVICE_HOSTNAME}\n  Feature error status: {lldpXdcbxFeatError}"
     status: current
     varbinds:
     - lldpXdcbxFeatError
   - oid: 1.0.8802.1.1.2.1.5.6945.0.3
-    name: lldpXdcbxMultiplePeers
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxMultiplePeers
     category: state_change
     severity: warning
-    description: Multiple LLDP neighbors detected on port {lldpXdcbxPortNumber} of {SNMP_DEVICE_HOSTNAME}. DCBX operates over point-to-point links and will behave as if peer DCBX TLVs are not present until this condition clears.
-    mib: LLDP-EXT-DCBX-MIB
+    description: Multiple LLDP neighbors detected on port {lldpXdcbxPortNumber} of {SNMP_DEVICE_HOSTNAME}. DCBX operates over point-to-point links; when multiple peers are present, DCBX TLVs are treated as absent until the condition clears.
     status: current
     varbinds:
     - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.2.1.5.6945.0.4
-    name: lldpXdcbxLldpTxDisabled
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxLldpTxDisabled
     category: state_change
-    severity: warning
-    description: "LLDP transmit disabled on {SNMP_DEVICE_HOSTNAME}, affecting DCBX protocol\n  port number: {lldpXdcbxPortNumber}\n  Note: DCBX requires both LLDP Rx and Tx to be enabled. With Tx disabled, DCBX control and feature state machines will not run on this port."
-    mib: LLDP-EXT-DCBX-MIB
+    severity: notice
+    description: "LLDP transmit disabled on port {lldpXdcbxPortNumber} on {SNMP_DEVICE_HOSTNAME}\n  This disables DCBX operation on the interface as LLDP Tx is required for DCBX."
     status: current
     varbinds:
     - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.2.1.5.6945.0.5
-    name: lldpXdcbxLldpRxDisabled
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxLldpRxDisabled
     category: state_change
     severity: warning
-    description: "LLDP receive (Rx) has been disabled on {SNMP_DEVICE_HOSTNAME}\n  port number: {lldpXdcbxPortNumber}\n\nNote: DCBX requires both LLDP Rx and Tx to be enabled. Disabling LLDP Rx will disable DCBX on this interface."
-    mib: LLDP-EXT-DCBX-MIB
+    description: "LLDP receive has been disabled on {SNMP_DEVICE_HOSTNAME}, which also disables DCBX on the affected port.\n  port number: {lldpXdcbxPortNumber}\n\nNote: Both LLDP Rx and Tx must be enabled for DCBX to operate correctly."
     status: current
     varbinds:
     - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.2.1.5.6945.0.6
-    name: lldpXdcbxDupControlTlv
-    category: diagnostic
-    severity: err
-    description: "Duplicate DCBX Control TLV detected on {SNMP_DEVICE_HOSTNAME}\n  Port Number: {lldpXdcbxPortNumber}\n  Impact: Errors affect all DCBX features"
-    mib: LLDP-EXT-DCBX-MIB
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxDupControlTlv
+    category: state_change
+    severity: warning
+    description: "LLDP DCBX duplicate control Sub-TLV detected on port {lldpXdcbxPortNumber} at {SNMP_DEVICE_HOSTNAME}\n  This indicates a protocol violation where duplicate Sub-TLVs were found in the DCBX TLV, which may cause errors for all features."
     status: current
     varbinds:
     - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.2.1.5.6945.0.7
-    name: lldpXdcbxDupFeatureTlv
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxDupFeatureTlv
     category: diagnostic
-    severity: err
-    description: "Duplicate DCBX feature Sub-TLV detected on {SNMP_DEVICE_HOSTNAME}\n  feature type: {lldpXdcbxFeatType}\n  This indicates a configuration error where more than one Sub-TLV exists for the same DCB feature (Priority Groups, Priority Flow Control, or Application Protocol)."
-    mib: LLDP-EXT-DCBX-MIB
+    severity: warning
+    description: "DCBX configuration error detected on {SNMP_DEVICE_HOSTNAME}\n  Duplicate feature Sub-TLV detected\n  Feature type: {lldpXdcbxFeatType}"
     status: current
     varbinds:
     - lldpXdcbxFeatType
   - oid: 1.0.8802.1.1.2.1.5.6945.0.8
-    name: lldpXdcbxPeerNoFeat
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxPeerNoFeat
     category: state_change
-    severity: warning
-    description: "LLDP DCBX peer does not support a feature on {SNMP_DEVICE_HOSTNAME}\n  feature type: {lldpXdcbxFeatType}\n\nNote: This may indicate the peer lacks hardware capability, or the feature's advertise flag is disabled (potential configuration issue)."
-    mib: LLDP-EXT-DCBX-MIB
+    severity: notice
+    description: "LLDP DCBX peer feature not supported on {SNMP_DEVICE_HOSTNAME}\n  feature type: {lldpXdcbxFeatType}"
     status: current
     varbinds:
     - lldpXdcbxFeatType
   - oid: 1.0.8802.1.1.2.1.5.6945.0.9
-    name: lldpXdcbxPeerNoResp
+    name: LLDP-EXT-DCBX-MIB::lldpXdcbxPeerNoResp
     category: state_change
     severity: warning
-    description: "DCBX peer stopped responding on {SNMP_DEVICE_HOSTNAME}\n  Port Number: {lldpXdcbxPortNumber}\n  Reason: LLDP timeout"
-    mib: LLDP-EXT-DCBX-MIB
+    description: "DCBX peer stopped responding on {SNMP_DEVICE_HOSTNAME}\n  port number: {lldpXdcbxPortNumber}\n  Peer is no longer sending LLDP updates (LLDP timeout event)."
     status: current
     varbinds:
     - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.3.0.1
-    name: dot1agCfmFaultAlarm
+    name: IEEE802171-CFM-MIB::dot1agCfmFaultAlarm
     category: state_change
-    severity: warning
-    description: "Connectivity Fault Management fault alarm on {SNMP_DEVICE_HOSTNAME}\n  A MEP has detected a persistent defect condition.\n  Highest priority defect: {dot1agCfmMepHighestPrDefect}"
-    mib: IEEE802171-CFM-MIB
+    severity: alert
+    description: "CFM fault alarm on {SNMP_DEVICE_HOSTNAME}\n  highest priority defect: {dot1agCfmMepHighestPrDefect}"
     status: current
     varbinds:
     - dot1agCfmMepHighestPrDefect

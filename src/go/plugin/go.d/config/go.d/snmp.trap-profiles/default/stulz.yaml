@@ -13,2324 +13,2066 @@ varbinds:
     constraints: SIZE(0..64)
 traps:
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.1
-    name: trpairflow1
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpairflow1
+    category: state_change
     severity: warning
-    description: "Airflow alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Airflow alarm on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.10
-    name: trpreturnAirHumidTooHighAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpreturnAirHumidTooHighAlarm
+    category: state_change
     severity: warning
-    description: "Return air humidity too high alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "High return air humidity alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.100
-    name: trpextAlarm9Active
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpextAlarm9Active
+    category: state_change
     severity: warning
-    description: "External alarm 9 activated on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Alarm active on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.101
-    name: trpextAlarm10Active
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpextAlarm10Active
+    category: state_change
     severity: warning
     description: "Active alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.102
-    name: trphotgasHeatingAlarm
-    category: diagnostic
-    severity: err
-    description: "Hot-gas heating alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trphotgasHeatingAlarm
+    category: state_change
+    severity: alert
+    description: "Hot gas heating alarm on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.103
-    name: trpeev1PressureSensorError
+    name: Stulz-WIB8000-MIB::trpeev1PressureSensorError
     category: diagnostic
     severity: warning
-    description: "Pressure sensor error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Pressure sensor error detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.104
-    name: trpeev1TemperatureSensorError
+    name: Stulz-WIB8000-MIB::trpeev1TemperatureSensorError
     category: diagnostic
     severity: warning
     description: "Temperature sensor error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.105
-    name: trpeev1StepperMotorError
+    name: Stulz-WIB8000-MIB::trpeev1StepperMotorError
     category: diagnostic
-    severity: err
+    severity: alert
     description: "Stepper motor error detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.106
-    name: trpeev2PressureSensorError
+    name: Stulz-WIB8000-MIB::trpeev2PressureSensorError
     category: diagnostic
-    severity: warning
-    description: "EEV2 pressure sensor error detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: err
+    description: "Pressure sensor error detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.107
-    name: trpeev2TemperatureSensorError
+    name: Stulz-WIB8000-MIB::trpeev2TemperatureSensorError
     category: diagnostic
     severity: warning
     description: "Temperature sensor error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.108
-    name: trpeev2StepperMotorError
+    name: Stulz-WIB8000-MIB::trpeev2StepperMotorError
     category: diagnostic
-    severity: err
-    description: "Stepper motor error detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Stepper motor error detected on {SNMP_DEVICE_HOSTNAME}\n  error text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.109
-    name: trpwaterflowFailure
-    category: diagnostic
-    severity: warning
+    name: Stulz-WIB8000-MIB::trpwaterflowFailure
+    category: state_change
+    severity: crit
     description: "Water flow failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.11
-    name: trpsupplyAirTempTooHighAlarm
+    name: Stulz-WIB8000-MIB::trpsupplyAirTempTooHighAlarm
     category: state_change
     severity: warning
     description: "Supply air temperature too high alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.110
-    name: trpunitOffline
+    name: Stulz-WIB8000-MIB::trpunitOffline
     category: state_change
-    severity: warning
-    description: "Unit went offline on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Unit offline on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.111
-    name: trpalarmQueryError
+    name: Stulz-WIB8000-MIB::trpalarmQueryError
     category: diagnostic
     severity: warning
-    description: "Alarms queried too quickly on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Query error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.112
-    name: trpcompr3LowPressAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpcompr3LowPressAlarm
+    category: diagnostic
     severity: warning
-    description: "Low pressure alarm triggered for compressor 3 on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor 3 low pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.113
-    name: trpcompr4LowPressAlarm
+    name: Stulz-WIB8000-MIB::trpcompr4LowPressAlarm
     category: diagnostic
     severity: warning
-    description: "Compressor 4 low pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor 4 low-pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.114
-    name: trpcompr5LowPressAlarm
+    name: Stulz-WIB8000-MIB::trpcompr5LowPressAlarm
     category: diagnostic
-    severity: warning
-    description: "Compressor 5 low pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Low pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.115
-    name: trpcompr6LowPressAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpcompr6LowPressAlarm
+    category: state_change
     severity: warning
-    description: "Low pressure alarm triggered on compressor 6 of {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Low pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.116
-    name: trpcondensor1Alarm
+    name: Stulz-WIB8000-MIB::trpcondensor1Alarm
     category: diagnostic
     severity: warning
-    description: "Condenser 1 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Condensor 1 alarm on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.117
-    name: trpcondensor2Alarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpcondensor2Alarm
+    category: state_change
     severity: warning
     description: "Condenser 2 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.118
-    name: trpoutAirTempTooHigh
+    name: Stulz-WIB8000-MIB::trpoutAirTempTooHigh
     category: state_change
     severity: warning
-    description: "Outlet air temperature exceeds threshold on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "High air temperature detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.119
-    name: trpoutAirTempTooLow
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpoutAirTempTooLow
+    category: diagnostic
     severity: warning
-    description: "Outside air temperature too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Low air temperature detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.12
-    name: trpsupplyAirHumidTooHighAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsupplyAirHumidTooHighAlarm
+    category: diagnostic
     severity: warning
-    description: "Supply air humidity too high on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Supply air humidity too high alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.120
-    name: trpioExtError
+    name: Stulz-WIB8000-MIB::trpioExtError
     category: diagnostic
-    severity: err
-    description: "I/O extension error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "IO extension error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.121
-    name: trpwaterOutTempTooHigh
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpwaterOutTempTooHigh
+    category: diagnostic
     severity: warning
-    description: "Water outlet temperature exceeded high threshold on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Water outlet temperature too high on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.122
-    name: trpwaterOutTempTooLow
+    name: Stulz-WIB8000-MIB::trpwaterOutTempTooLow
     category: diagnostic
     severity: warning
     description: "Water outlet temperature too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.123
-    name: trpfreeze
+    name: Stulz-WIB8000-MIB::trpfreeze
     category: diagnostic
     severity: warning
-    description: "Trap freeze event on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Freeze alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.124
-    name: trpunit1Failure
+    name: Stulz-WIB8000-MIB::trpunit1Failure
     category: diagnostic
-    severity: crit
-    description: "Unit 1 failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Unit failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.125
-    name: trpunit2Failure
+    name: Stulz-WIB8000-MIB::trpunit2Failure
     category: diagnostic
-    severity: err
-    description: "Unit 2 failure reported by {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Unit failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.126
-    name: trptransmissionFailure
+    name: Stulz-WIB8000-MIB::trptransmissionFailure
     category: diagnostic
     severity: err
-    description: "Transmission failure on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Transmission failure reported on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.127
-    name: trpcontrollerFailure
+    name: Stulz-WIB8000-MIB::trpcontrollerFailure
     category: diagnostic
-    severity: err
-    description: "Controller failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Controller failure on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.128
-    name: trpreheaterFailure
+    name: Stulz-WIB8000-MIB::trpreheaterFailure
     category: diagnostic
-    severity: err
-    description: "Pre-heater failure on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: crit
+    description: "Preheater failure on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.129
-    name: trproomHighPressureAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trproomHighPressureAlarm
+    category: state_change
     severity: warning
-    description: "Room high pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Room high-pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.13
-    name: trpwaterTempTooHighAlarm
+    name: Stulz-WIB8000-MIB::trpwaterTempTooHighAlarm
     category: state_change
     severity: warning
     description: "Water temperature too high alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.130
-    name: trpfilter1Alarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpfilter1Alarm
+    category: diagnostic
     severity: warning
     description: "Filter 1 clogged alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.131
-    name: trpfilter2Alarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpfilter2Alarm
+    category: diagnostic
     severity: warning
-    description: "Filter 2 clogged alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Filter 2 clogged on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.132
-    name: trpfilter3Alarm
+    name: Stulz-WIB8000-MIB::trpfilter3Alarm
     category: diagnostic
     severity: warning
-    description: "Filter 3 clogged alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Filter 3 clogged on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.133
-    name: trpcomp1ciruitBreakerAlarm
+    name: Stulz-WIB8000-MIB::trpcomp1ciruitBreakerAlarm
     category: state_change
-    severity: warning
-    description: "Compressor 1 circuit breaker triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Compressor 1 circuit breaker alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.134
-    name: trpcomp2ciruitBreakerAlarm
-    category: state_change
-    severity: warning
-    description: "Compressor 2 circuit breaker triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpcomp2ciruitBreakerAlarm
+    category: diagnostic
+    severity: alert
+    description: "Circuit breaker alarm triggered on compressor 2 at {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.135
-    name: trpfan1blockedAlarm
+    name: Stulz-WIB8000-MIB::trpfan1blockedAlarm
     category: diagnostic
     severity: warning
-    description: "Fan 1 blocked alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Fan 1 blocked on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.136
-    name: trpfan2blockedAlarm
+    name: Stulz-WIB8000-MIB::trpfan2blockedAlarm
     category: state_change
     severity: warning
-    description: "Fan 2 blocked alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Fan 2 blocked on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.137
-    name: trppowerFailureAlarm
+    name: Stulz-WIB8000-MIB::trppowerFailureAlarm
     category: state_change
-    severity: alert
+    severity: crit
     description: "Power failure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.138
-    name: trpcomp1MotorprotectAlarm
-    category: diagnostic
-    severity: warning
-    description: "Compressor 1 motor protection alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpcomp1MotorprotectAlarm
+    category: state_change
+    severity: alert
+    description: "Compressor 1 motor protection alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.139
-    name: trpcomp2MotorprotectAlarm
-    category: diagnostic
-    severity: err
-    description: "Compressor 2 motor protection alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpcomp2MotorprotectAlarm
+    category: state_change
+    severity: crit
+    description: "Compressor 2 motor protection alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.14
-    name: trpreturnAirTempTooLowAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpreturnAirTempTooLowAlarm
+    category: state_change
     severity: warning
     description: "Return air temperature too low alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.140
-    name: trpintrusionAlarm
+    name: Stulz-WIB8000-MIB::trpintrusionAlarm
     category: security
-    severity: warning
-    description: "Intrusion alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Intrusion alarm detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.141
-    name: trpcondFan1blockedAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpcondFan1blockedAlarm
+    category: diagnostic
     severity: warning
-    description: "Condenser fan 1 blocked on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Condensor fan 1 blocked on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.142
-    name: trpcondFan2blockedAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpcondFan2blockedAlarm
+    category: diagnostic
     severity: warning
-    description: "Condenser fan 2 blocked on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Condensor fan 2 blocked on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.143
-    name: trpintTempProbeAlarm
+    name: Stulz-WIB8000-MIB::trpintTempProbeAlarm
     category: state_change
     severity: warning
     description: "Temperature probe alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.144
-    name: trpextTempProbeAlarm
+    name: Stulz-WIB8000-MIB::trpextTempProbeAlarm
     category: state_change
     severity: warning
     description: "External temperature probe alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.145
-    name: trpcondTempProbeAlarm
+    name: Stulz-WIB8000-MIB::trpcondTempProbeAlarm
     category: diagnostic
     severity: warning
-    description: "Condenser temperature probe alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Condensor temperature probe alarm on {SNMP_DEVICE_HOSTNAME}\n  message: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.146
-    name: trpsuply1TempProbeAlarm
+    name: Stulz-WIB8000-MIB::trpsuply1TempProbeAlarm
     category: diagnostic
-    severity: crit
-    description: "Temperature probe alarm on {SNMP_DEVICE_HOSTNAME}\n  probe: Supply 1\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "Supply temperature probe 1 error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.147
-    name: trpsuply2TempProbeAlarm
+    name: Stulz-WIB8000-MIB::trpsuply2TempProbeAlarm
     category: diagnostic
     severity: warning
-    description: "Temperature probe alarm on power supply 2 for {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Supply temperature probe 2 error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.148
-    name: trpmovEvapAlarm
+    name: Stulz-WIB8000-MIB::trpmovEvapAlarm
     category: diagnostic
     severity: err
     description: "Movable evaporator alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.149
-    name: trpfanThermMotorProtAlarm
-    category: diagnostic
-    severity: warning
+    name: Stulz-WIB8000-MIB::trpfanThermMotorProtAlarm
+    category: state_change
+    severity: alert
     description: "Fan thermal motor protection alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.15
-    name: trpreturnAirHumidTooLowAlarm
+    name: Stulz-WIB8000-MIB::trpreturnAirHumidTooLowAlarm
     category: state_change
     severity: warning
-    description: "Return air humidity too low alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Return-air humidity too-low alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.150
-    name: trpextFilterAlarm
+    name: Stulz-WIB8000-MIB::trpextFilterAlarm
     category: diagnostic
     severity: warning
     description: "External filter alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.151
-    name: trpwaterTempIn1lowAlarm
+    name: Stulz-WIB8000-MIB::trpwaterTempIn1lowAlarm
     category: diagnostic
     severity: warning
-    description: "Water temperature at inlet 1 is below minimum threshold on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Water temperature at inlet 1 is too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.152
-    name: trpwaterTempIn1highAlarm
+    name: Stulz-WIB8000-MIB::trpwaterTempIn1highAlarm
     category: state_change
-    severity: warning
-    description: "Water temperature at inlet 1 exceeded high threshold on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Water temperature at inlet 1 is too high on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.153
-    name: trpwaterTempOut1lowAlarm
+    name: Stulz-WIB8000-MIB::trpwaterTempOut1lowAlarm
     category: state_change
     severity: warning
-    description: "Water temperature at outlet 1 dropped below minimum threshold on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Water temperature at outlet 1 is too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.154
-    name: trpwaterTempOut1highAlarm
-    category: state_change
-    severity: warning
-    description: "Water temperature high alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpwaterTempOut1highAlarm
+    category: diagnostic
+    severity: alert
+    description: "Water temperature at outlet 1 is too high on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.155
-    name: trpwaterTempIn2lowAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpwaterTempIn2lowAlarm
+    category: diagnostic
     severity: warning
-    description: "Water temperature at inlet 2 fell below minimum threshold on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Water temperature at inlet 2 is too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.156
-    name: trpwaterTempIn2highAlarm
+    name: Stulz-WIB8000-MIB::trpwaterTempIn2highAlarm
     category: state_change
     severity: warning
     description: "Water temperature at inlet 2 exceeds threshold on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.157
-    name: trpwaterTempOut2lowAlarm
+    name: Stulz-WIB8000-MIB::trpwaterTempOut2lowAlarm
     category: diagnostic
     severity: warning
-    description: "Water temperature at outlet 2 too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Water temperature at outlet 2 is too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.158
-    name: trpwaterTempOut2highAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpwaterTempOut2highAlarm
+    category: diagnostic
     severity: warning
-    description: "Water temperature at outlet 2 exceeds high threshold on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Water temperature at outlet 2 is too high on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.159
-    name: trpalarmMailnotSentAlarm
+    name: Stulz-WIB8000-MIB::trpalarmMailnotSentAlarm
     category: diagnostic
     severity: warning
-    description: "Failed to send alarm email on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Alarm notification failure on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.16
-    name: trpsupplyAirTempTooLowAlarm
+    name: Stulz-WIB8000-MIB::trpsupplyAirTempTooLowAlarm
     category: state_change
     severity: warning
     description: "Supply air temperature too low alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.160
-    name: trplogMailnotSentAlarm
+    name: Stulz-WIB8000-MIB::trplogMailnotSentAlarm
     category: diagnostic
-    severity: err
-    description: "Failed to send datalog email on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "Datalog email transmission failed on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.161
-    name: trpeventMailnotSentAlarm
+    name: Stulz-WIB8000-MIB::trpeventMailnotSentAlarm
     category: diagnostic
     severity: err
-    description: "Failed to send email notification on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Failed to send event email on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.162
-    name: trpcannotStartUnitAlarm
-    category: diagnostic
-    severity: crit
+    name: Stulz-WIB8000-MIB::trpcannotStartUnitAlarm
+    category: state_change
+    severity: warning
     description: "Unit failed to start on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.163
-    name: trpcannotStopUnitAlarm
+    name: Stulz-WIB8000-MIB::trpcannotStopUnitAlarm
     category: diagnostic
     severity: err
-    description: "Stulz unit on {SNMP_DEVICE_HOSTNAME} failed to stop when commanded\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Unit failed to stop on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.164
-    name: trpeev1reliabilityAlarm
+    name: Stulz-WIB8000-MIB::trpeev1reliabilityAlarm
     category: diagnostic
     severity: warning
-    description: "EEV 1 reliability alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Reliability alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.165
-    name: trpeev2reliabilityAlarm
+    name: Stulz-WIB8000-MIB::trpeev2reliabilityAlarm
     category: diagnostic
     severity: err
-    description: "EEV (Electronic Expansion Valve) reliability alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "EEV2 reliability alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.166
-    name: trpcondFan3blockedAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpcondFan3blockedAlarm
+    category: diagnostic
     severity: warning
     description: "Fan 3 blocked alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.167
-    name: trpcondFan4blockedAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpcondFan4blockedAlarm
+    category: diagnostic
     severity: warning
     description: "Fan 4 blocked alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.168
-    name: trpcondFan5blockedAlarm
+    name: Stulz-WIB8000-MIB::trpcondFan5blockedAlarm
     category: state_change
-    severity: warning
+    severity: alert
     description: "Fan 5 blocked alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.169
-    name: trpcondFan6blockedAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpcondFan6blockedAlarm
+    category: diagnostic
     severity: warning
     description: "Fan 6 blocked alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.17
-    name: trpsupplyAirHumidTooLowAlarm
+    name: Stulz-WIB8000-MIB::trpsupplyAirHumidTooLowAlarm
     category: state_change
     severity: warning
     description: "Supply air humidity too low alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.170
-    name: trpfan2ThermMotorProtAlarm
+    name: Stulz-WIB8000-MIB::trpfan2ThermMotorProtAlarm
     category: state_change
-    severity: warning
+    severity: alert
     description: "Fan 2 thermal motor protection alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.171
-    name: trpfan3ThermMotorProtAlarm
-    category: diagnostic
-    severity: warning
-    description: "Fan 3 thermal motor protection alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpfan3ThermMotorProtAlarm
+    category: state_change
+    severity: alert
+    description: "Fan 3 thermal motor protection alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.172
-    name: trpwaterflowTooHighAlarm
+    name: Stulz-WIB8000-MIB::trpwaterflowTooHighAlarm
     category: diagnostic
     severity: warning
-    description: "Waterflow too high alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Water flow alarm on {SNMP_DEVICE_HOSTNAME}\n  message: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.173
-    name: trpsuply3TempProbeAlarm
+    name: Stulz-WIB8000-MIB::trpsuply3TempProbeAlarm
     category: diagnostic
     severity: warning
     description: "Supply temperature probe 3 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.174
-    name: trpreturn1TempProbeAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpreturn1TempProbeAlarm
+    category: diagnostic
     severity: warning
-    description: "Return temperature probe 1 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Temperature probe 1 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.175
-    name: trpreturn2TempProbeAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpreturn2TempProbeAlarm
+    category: diagnostic
     severity: warning
     description: "Temperature probe 2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.176
-    name: trpreturn3TempProbeAlarm
-    category: diagnostic
-    severity: warning
-    description: "Temperature probe alarm on {SNMP_DEVICE_HOSTNAME}\n  probe: return temperature probe 3\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpreturn3TempProbeAlarm
+    category: state_change
+    severity: alert
+    description: "Temperature probe 3 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.177
-    name: trpinverterGeneralAlarm
+    name: Stulz-WIB8000-MIB::trpinverterGeneralAlarm
     category: diagnostic
     severity: warning
     description: "Inverter general alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.178
-    name: trpinverterGlobalAlarm
+    name: Stulz-WIB8000-MIB::trpinverterGlobalAlarm
     category: diagnostic
     severity: err
     description: "Inverter global alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.179
-    name: trpinverterOfflineAlarm
+    name: Stulz-WIB8000-MIB::trpinverterOfflineAlarm
     category: state_change
-    severity: warning
+    severity: crit
     description: "Inverter offline alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.18
-    name: trpwaterTempTooLowAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpwaterTempTooLowAlarm
+    category: diagnostic
     severity: warning
     description: "Water temperature too low alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.180
-    name: trphumidifierThermicAlarm
+    name: Stulz-WIB8000-MIB::trphumidifierThermicAlarm
     category: diagnostic
-    severity: warning
+    severity: alert
     description: "Humidifier thermal protection alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.181
-    name: trpcondensateWaterLevelAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpcondensateWaterLevelAlarm
+    category: diagnostic
     severity: warning
     description: "Condensate water level alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.182
-    name: trpoutdoorUnitAlarm
+    name: Stulz-WIB8000-MIB::trpoutdoorUnitAlarm
     category: diagnostic
     severity: warning
     description: "Outdoor unit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.183
-    name: trpoutdoorUnitCommunicationAlarm
+    name: Stulz-WIB8000-MIB::trpoutdoorUnitCommunicationAlarm
     category: diagnostic
-    severity: err
+    severity: warning
     description: "Outdoor unit communication alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.184
-    name: trpminimumTemperatureAlarm
+    name: Stulz-WIB8000-MIB::trpminimumTemperatureAlarm
     category: state_change
     severity: warning
     description: "Minimum temperature alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.185
-    name: trpmaximumTemperatureAlarm
-    category: diagnostic
-    severity: warning
+    name: Stulz-WIB8000-MIB::trpmaximumTemperatureAlarm
+    category: state_change
+    severity: alert
     description: "Maximum temperature alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.186
-    name: trpiccCompressorShutOff
+    name: Stulz-WIB8000-MIB::trpiccCompressorShutOff
     category: state_change
     severity: warning
-    description: "Compressor shut off by ICC on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor shut off on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.187
-    name: trpiccProbeBrokenB3
+    name: Stulz-WIB8000-MIB::trpiccProbeBrokenB3
     category: diagnostic
-    severity: warning
-    description: "ICC probe B3 broken on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: err
+    description: "ICC probe B3 reported broken on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.188
-    name: trpiccProbeBrokenB4
-    category: diagnostic
-    severity: alert
+    name: Stulz-WIB8000-MIB::trpiccProbeBrokenB4
+    category: state_change
+    severity: crit
     description: "ICC probe B4 broken on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.189
-    name: trpiccProbeBrokenB5
+    name: Stulz-WIB8000-MIB::trpiccProbeBrokenB5
     category: diagnostic
-    severity: crit
-    description: "ICC probe B5 broken on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: err
+    description: "ICC probe B5 reported broken on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.19
-    name: trpsensor1LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor1LimitAlarm
+    category: diagnostic
     severity: warning
-    description: "Sensor 1 limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.190
-    name: trpiccProbeBrokenB6
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpiccProbeBrokenB6
+    category: diagnostic
     severity: warning
     description: "ICC probe B6 broken on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.191
-    name: trpiccMaxDischargePressure
+    name: Stulz-WIB8000-MIB::trpiccMaxDischargePressure
     category: diagnostic
     severity: warning
     description: "ICC maximum discharge pressure exceeded on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.192
-    name: trpiccMinSuctionPressure
+    name: Stulz-WIB8000-MIB::trpiccMinSuctionPressure
     category: state_change
     severity: warning
     description: "ICC below minimum suction pressure on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.193
-    name: trpiccDischargeTemperature
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpiccDischargeTemperature
+    category: state_change
     severity: warning
     description: "ICC discharge temperature alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.194
-    name: trpiccPressuredifferenceTooLow
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpiccPressuredifferenceTooLow
+    category: diagnostic
     severity: warning
     description: "ICC pressure difference too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.195
-    name: trpiccCompressorStartFailure
+    name: Stulz-WIB8000-MIB::trpiccCompressorStartFailure
     category: diagnostic
-    severity: err
-    description: "ICC compressor failed to start on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: crit
+    description: "Compressor start failure on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.196
-    name: trpiccCompressorOutOfWorkEnv
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpiccCompressorOutOfWorkEnv
+    category: state_change
     severity: warning
-    description: "ICC compressor on {SNMP_DEVICE_HOSTNAME} has exceeded maximum allowed time operating outside its design envelope\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "ICC compressor exceeded maximum allowed time operating outside its work envelope on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.197
-    name: trpiccEEVlowSuperheat
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpiccEEVlowSuperheat
+    category: state_change
     severity: warning
-    description: "ICC EEV low superheat alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "EEV low superheat alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.198
-    name: trpiccEEVmopAlarm
+    name: Stulz-WIB8000-MIB::trpiccEEVmopAlarm
     category: diagnostic
     severity: warning
-    description: "ICC EEV mop alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "EEV mop alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.199
-    name: trpiccEEVsuctionTempTooLow
+    name: Stulz-WIB8000-MIB::trpiccEEVsuctionTempTooLow
     category: diagnostic
     severity: warning
-    description: "ICC EEV suction temperature too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "EEV suction temperature too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.2
-    name: trpairflow2
+    name: Stulz-WIB8000-MIB::trpairflow2
     category: diagnostic
     severity: warning
-    description: "Airflow alert on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Airflow alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.20
-    name: trpsensor2LimitAlarm
+    name: Stulz-WIB8000-MIB::trpsensor2LimitAlarm
     category: state_change
     severity: warning
-    description: "Sensor 2 limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor 2 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.200
-    name: trpiccEVDevotunesAlarm
+    name: Stulz-WIB8000-MIB::trpiccEVDevotunesAlarm
     category: diagnostic
     severity: warning
-    description: "EvD evoTUNES alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Alarm event on {SNMP_DEVICE_HOSTNAME}\n  message: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.201
-    name: trpiccEVDregulationAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpiccEVDregulationAlarm
+    category: state_change
     severity: warning
-    description: "EVD regulation alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Regulation alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.202
-    name: trpiccEVDevoSystemProbeError
+    name: Stulz-WIB8000-MIB::trpiccEVDevoSystemProbeError
     category: diagnostic
     severity: err
-    description: "System probe error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "ICC EVD Evo system probe error on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.203
-    name: trpiccgeneralInverterError
+    name: Stulz-WIB8000-MIB::trpiccgeneralInverterError
     category: diagnostic
-    severity: err
-    description: "General inverter error detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Inverter error on {SNMP_DEVICE_HOSTNAME}\n  error text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.204
-    name: trpiccInverterCommunicationLost
-    category: state_change
-    severity: warning
+    name: Stulz-WIB8000-MIB::trpiccInverterCommunicationLost
+    category: diagnostic
+    severity: alert
     description: "ICC communication with power inverter lost on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.205
-    name: trpiccCommunicationLost
+    name: Stulz-WIB8000-MIB::trpiccCommunicationLost
     category: state_change
     severity: warning
     description: "ICC communication lost on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.206
-    name: trpiccInverterIncompatible
+    name: Stulz-WIB8000-MIB::trpiccInverterIncompatible
     category: diagnostic
     severity: warning
-    description: "ICC inverter incompatibility detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Inverter incompatible detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.207
-    name: trpMaxDeltaPexceeded
+    name: Stulz-WIB8000-MIB::trpMaxDeltaPexceeded
     category: diagnostic
     severity: warning
-    description: "Maximum delta pressure threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Max delta P exceeded on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.208
-    name: trpCondFanThermalProtection
+    name: Stulz-WIB8000-MIB::trpCondFanThermalProtection
     category: state_change
     severity: warning
-    description: "Condenser fan thermal protection activated on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Condenser fan thermal protection triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.209
-    name: trpOil1OilLevelAlarmCompressor1
+    name: Stulz-WIB8000-MIB::trpOil1OilLevelAlarmCompressor1
     category: diagnostic
-    severity: warning
-    description: "Oil level alarm triggered for Compressor 1 on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Oil level alarm on compressor 1 of {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.21
-    name: trpsensor3LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor3LimitAlarm
+    category: diagnostic
     severity: warning
-    description: "Sensor 3 limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.210
-    name: trpOil2OilLevelAlarmCompressor2
+    name: Stulz-WIB8000-MIB::trpOil2OilLevelAlarmCompressor2
     category: diagnostic
     severity: warning
-    description: "Oil level alarm active for compressor 2 on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Oil level alarm on compressor 2 at {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.211
-    name: trpprotectionDeviceCompressor1
-    category: diagnostic
-    severity: warning
+    name: Stulz-WIB8000-MIB::trpprotectionDeviceCompressor1
+    category: state_change
+    severity: err
     description: "Protection device triggered for compressor 1 on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.212
-    name: trpprotectionDeviceCompressor2
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpprotectionDeviceCompressor2
+    category: diagnostic
     severity: warning
     description: "Protection device triggered for compressor 2 on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.213
-    name: trpprotectionDeviceCompressor3
-    category: state_change
-    severity: err
+    name: Stulz-WIB8000-MIB::trpprotectionDeviceCompressor3
+    category: diagnostic
+    severity: warning
     description: "Compressor 3 protection device triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.214
-    name: trpprotectionDeviceCompressor4
+    name: Stulz-WIB8000-MIB::trpprotectionDeviceCompressor4
     category: state_change
-    severity: warning
-    description: "Protection device triggered for compressor 4 on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Compressor 4 protection device triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.215
-    name: trpprotectionDeviceCompressor5
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpprotectionDeviceCompressor5
+    category: diagnostic
     severity: warning
-    description: "Protection device triggered for compressor 5 on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor 5 protection device triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.216
-    name: trpprotectionDeviceCompressor6
-    category: diagnostic
-    severity: warning
-    description: "Protection device triggered for compressor 6 on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpprotectionDeviceCompressor6
+    category: state_change
+    severity: crit
+    description: "Compressor 6 protection device triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.217
-    name: trpuPCalarmShutOffCompressor
+    name: Stulz-WIB8000-MIB::trpuPCalarmShutOffCompressor
     category: state_change
-    severity: warning
-    description: "Compressor shut off due to uPC alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: err
+    description: "Precision air conditioner compressor shut off due to alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.218
-    name: trpuPCiocOffline
-    category: diagnostic
-    severity: crit
-    description: "uPC BMS I/O controller offline on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpuPCiocOffline
+    category: state_change
+    severity: warning
+    description: "uPC BMS offline on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.219
-    name: trpuPCglobalAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpuPCglobalAlarm
+    category: state_change
     severity: warning
-    description: "Global general alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "uPC global general alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.22
-    name: trpsensor4LimitAlarm
+    name: Stulz-WIB8000-MIB::trpsensor4LimitAlarm
     category: state_change
     severity: warning
     description: "Sensor 4 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.220
-    name: trpuPCdeltaPtooHigh
-    category: diagnostic
-    severity: warning
-    description: "Stulz WIB8000 device {SNMP_DEVICE_HOSTNAME} reported uPC delta P exceeded allowable limit at startup\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpuPCdeltaPtooHigh
+    category: state_change
+    severity: alert
+    description: "uPC delta P exceeded allowable limit on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.221
-    name: trpuPCdpStartDisable
+    name: Stulz-WIB8000-MIB::trpuPCdpStartDisable
     category: state_change
     severity: warning
     description: "uPC difference pressure start disable alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.222
-    name: trpComp1MinOilLevelAlarm
-    category: state_change
-    severity: warning
+    name: Stulz-WIB8000-MIB::trpComp1MinOilLevelAlarm
+    category: diagnostic
+    severity: crit
     description: "Compressor 1 minimum oil level alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.223
-    name: trpComp2MinOilLevelAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpComp2MinOilLevelAlarm
+    category: diagnostic
     severity: warning
     description: "Compressor 2 minimum oil level alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.224
-    name: trpComp3MinOilLevelAlarm
-    category: diagnostic
-    severity: warning
+    name: Stulz-WIB8000-MIB::trpComp3MinOilLevelAlarm
+    category: state_change
+    severity: alert
     description: "Compressor 3 minimum oil level alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.225
-    name: trpComp4MinOilLevelAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpComp4MinOilLevelAlarm
+    category: diagnostic
     severity: warning
     description: "Compressor 4 minimum oil level alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.226
-    name: trpComp5MinOilLevelAlarm
+    name: Stulz-WIB8000-MIB::trpComp5MinOilLevelAlarm
     category: diagnostic
     severity: warning
     description: "Compressor 5 minimum oil level alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.227
-    name: trpComp6MinOilLevelAlarm
+    name: Stulz-WIB8000-MIB::trpComp6MinOilLevelAlarm
     category: diagnostic
     severity: warning
-    description: "Minimum oil level alarm on Compressor 6 of {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor 6 minimum oil level alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.228
-    name: trpComp1CircuitbreakerAlarm
+    name: Stulz-WIB8000-MIB::trpComp1CircuitbreakerAlarm
     category: state_change
-    severity: warning
-    description: "Compressor 1 circuit breaker alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Compressor 1 circuit breaker alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.229
-    name: trpComp2CircuitbreakerAlarm
+    name: Stulz-WIB8000-MIB::trpComp2CircuitbreakerAlarm
     category: state_change
-    severity: warning
-    description: "Compressor 2 circuit breaker alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Compressor 2 circuit breaker alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.23
-    name: trpsensor5LimitAlarm
+    name: Stulz-WIB8000-MIB::trpsensor5LimitAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor 5 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.230
-    name: trpComp3CircuitbreakerAlarm
+    name: Stulz-WIB8000-MIB::trpComp3CircuitbreakerAlarm
     category: state_change
-    severity: err
+    severity: alert
     description: "Compressor 3 circuit breaker alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.231
-    name: trpComp4CircuitbreakerAlarm
+    name: Stulz-WIB8000-MIB::trpComp4CircuitbreakerAlarm
     category: state_change
     severity: warning
-    description: "Compressor 4 circuit breaker alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor 4 circuit breaker alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.232
-    name: trpComp5CircuitbreakerAlarm
+    name: Stulz-WIB8000-MIB::trpComp5CircuitbreakerAlarm
     category: state_change
-    severity: err
+    severity: alert
     description: "Compressor 5 circuit breaker alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.233
-    name: trpComp6CircuitbreakerAlarm
+    name: Stulz-WIB8000-MIB::trpComp6CircuitbreakerAlarm
     category: state_change
-    severity: warning
-    description: "Compressor 6 circuit breaker alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Circuit breaker alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.234
-    name: trpComp1EnvelopLeftAlarm
+    name: Stulz-WIB8000-MIB::trpComp1EnvelopLeftAlarm
     category: diagnostic
     severity: warning
-    description: "Compressor 1 left operating envelope alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor 1 left operating envelope on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.235
-    name: trpComp2EnvelopLeftAlarm
+    name: Stulz-WIB8000-MIB::trpComp2EnvelopLeftAlarm
     category: state_change
     severity: warning
     description: "Compressor 2 left operating envelope alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.236
-    name: trpComp3EnvelopLeftAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpComp3EnvelopLeftAlarm
+    category: diagnostic
     severity: warning
-    description: "Compressor 3 operating envelope alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor 3 left operating envelope on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.237
-    name: trpComp4EnvelopLeftAlarm
-    category: state_change
-    severity: alert
+    name: Stulz-WIB8000-MIB::trpComp4EnvelopLeftAlarm
+    category: diagnostic
+    severity: warning
     description: "Compressor 4 left operating envelope on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.238
-    name: trpComp5EnvelopLeftAlarm
+    name: Stulz-WIB8000-MIB::trpComp5EnvelopLeftAlarm
     category: diagnostic
     severity: warning
     description: "Compressor 5 left operating envelope alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.239
-    name: trpComp6EnvelopLeftAlarm
+    name: Stulz-WIB8000-MIB::trpComp6EnvelopLeftAlarm
     category: state_change
     severity: warning
-    description: "Compressor 6 left operating envelope on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor 6 operating envelope alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.24
-    name: trpsensor6LimitAlarm
-    category: state_change
-    severity: warning
-    description: "Sensor limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpsensor6LimitAlarm
+    category: diagnostic
+    severity: notice
+    description: "Sensor 6 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.240
-    name: trpFreecoolingFailedAlarm
+    name: Stulz-WIB8000-MIB::trpFreecoolingFailedAlarm
     category: state_change
-    severity: warning
-    description: "Free cooling failure on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: crit
+    description: "Freecooling failed on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.241
-    name: trpSupAirPresTooHighAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpSupAirPresTooHighAlarm
+    category: state_change
     severity: warning
-    description: "Supply air pressure too high on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Supply air pressure too high alarm on {SNMP_DEVICE_HOSTNAME}\n  message: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.242
-    name: trpSupAirPresTooLowAlarm
+    name: Stulz-WIB8000-MIB::trpSupAirPresTooLowAlarm
     category: diagnostic
-    severity: warning
+    severity: crit
     description: "Supply air pressure too low alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.243
-    name: trpWaterflowfailure2Alarm
-    category: diagnostic
-    severity: crit
-    description: "Waterflow failure 2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpWaterflowfailure2Alarm
+    category: state_change
+    severity: alert
+    description: "Water flow failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.244
-    name: trpExternalUnit1Alarm
+    name: Stulz-WIB8000-MIB::trpExternalUnit1Alarm
     category: diagnostic
     severity: warning
     description: "External unit 1 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.245
-    name: trpFreecoolingValveFeedbackAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpFreecoolingValveFeedbackAlarm
+    category: state_change
     severity: warning
-    description: "Free-cooling valve feedback alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Freecooling valve feedback alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.246
-    name: trpSupAirPresTooHighPreAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpSupAirPresTooHighPreAlarm
+    category: diagnostic
     severity: warning
-    description: "Supply air pressure pre-alarm on {SNMP_DEVICE_HOSTNAME}: pressure too high\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Supply air pressure pre-alarm on {SNMP_DEVICE_HOSTNAME}\n  message: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.247
-    name: trpSupAirPresTooLowPreAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpSupAirPresTooLowPreAlarm
+    category: state_change
     severity: warning
-    description: "Pre-alarm: Supply air pressure too low on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Supply air pressure low pre-alarm on {SNMP_DEVICE_HOSTNAME}\n  message: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.248
-    name: trpFrostCirculationAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpFrostCirculationAlarm
+    category: diagnostic
     severity: warning
-    description: "Frost circulation alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Frost circulation alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.249
-    name: trpPhaseFailure1Alarm
+    name: Stulz-WIB8000-MIB::trpPhaseFailure1Alarm
     category: state_change
-    severity: err
+    severity: alert
     description: "Phase 1 failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.25
-    name: trpsensor7LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor7LimitAlarm
+    category: diagnostic
     severity: warning
-    description: "Sensor 7 limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.250
-    name: trpPhaseFailure2Alarm
+    name: Stulz-WIB8000-MIB::trpPhaseFailure2Alarm
     category: state_change
     severity: err
-    description: "Phase 2 failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Power phase 2 failure on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.251
-    name: trpPhaseFailure3Alarm
-    category: state_change
-    severity: err
+    name: Stulz-WIB8000-MIB::trpPhaseFailure3Alarm
+    category: diagnostic
+    severity: alert
     description: "Phase 3 failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.252
-    name: trpPhaseFailure4Alarm
+    name: Stulz-WIB8000-MIB::trpPhaseFailure4Alarm
     category: state_change
-    severity: err
+    severity: alert
     description: "Phase 4 failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.253
-    name: trpLouver1Alarm
+    name: Stulz-WIB8000-MIB::trpLouver1Alarm
     category: state_change
     severity: warning
     description: "Louver 1 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.254
-    name: trpLouver2Alarm
+    name: Stulz-WIB8000-MIB::trpLouver2Alarm
     category: diagnostic
     severity: warning
     description: "Louver 2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.255
-    name: trpLouver3Alarm
+    name: Stulz-WIB8000-MIB::trpLouver3Alarm
     category: state_change
     severity: warning
     description: "Louver 3 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.256
-    name: trpFan4Alarm
-    category: diagnostic
-    severity: warning
+    name: Stulz-WIB8000-MIB::trpFan4Alarm
+    category: state_change
+    severity: alert
     description: "Fan 4 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.257
-    name: trpFan4FilterAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpFan4FilterAlarm
+    category: diagnostic
     severity: warning
     description: "Fan 4 filter alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.258
-    name: trpExternalUnit2Alarm
+    name: Stulz-WIB8000-MIB::trpExternalUnit2Alarm
     category: diagnostic
     severity: warning
     description: "External unit 2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.26
-    name: trpsensor8LimitAlarm
+    name: Stulz-WIB8000-MIB::trpsensor8LimitAlarm
     category: state_change
     severity: warning
     description: "Sensor 8 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.27
-    name: trpsensor9LimitAlarm
+    name: Stulz-WIB8000-MIB::trpsensor9LimitAlarm
     category: state_change
     severity: warning
-    description: "Sensor 9 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor9 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.28
-    name: trpsensor10LimitAlarm
+    name: Stulz-WIB8000-MIB::trpsensor10LimitAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor 10 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.29
-    name: trpsensor11LimitAlarm
-    category: diagnostic
-    severity: warning
-    description: "Sensor 11 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpsensor11LimitAlarm
+    category: state_change
+    severity: alert
+    description: "Sensor limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.3
-    name: trpairflow3
+    name: Stulz-WIB8000-MIB::trpairflow3
     category: diagnostic
     severity: warning
-    description: "Airflow alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Airflow alarm on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.30
-    name: trpsensor12LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor12LimitAlarm
+    category: diagnostic
     severity: warning
-    description: "Sensor 12 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.31
-    name: trpsensor13LimitAlarm
+    name: Stulz-WIB8000-MIB::trpsensor13LimitAlarm
     category: state_change
     severity: warning
-    description: "Sensor 13 limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor 13 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.32
-    name: trpsensor14LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor14LimitAlarm
+    category: diagnostic
     severity: warning
     description: "Sensor 14 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.33
-    name: trpsensor15LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor15LimitAlarm
+    category: diagnostic
     severity: warning
-    description: "Sensor 15 limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.34
-    name: trpsensor16LimitAlarm
+    name: Stulz-WIB8000-MIB::trpsensor16LimitAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor 16 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor 16 limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.35
-    name: trpsensor17LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor17LimitAlarm
+    category: diagnostic
     severity: warning
     description: "Sensor 17 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.36
-    name: trpsensor18LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor18LimitAlarm
+    category: diagnostic
     severity: warning
-    description: "Sensor 18 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.37
-    name: trpsensor19LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor19LimitAlarm
+    category: diagnostic
     severity: warning
-    description: "Sensor 19 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.38
-    name: trpsensor20LimitAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor20LimitAlarm
+    category: diagnostic
     severity: warning
-    description: "Sensor limit alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.39
-    name: trpsensor21LimitAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpsensor21LimitAlarm
+    category: state_change
     severity: warning
-    description: "Sensor 21 limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor limit alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.4
-    name: trphighpressure1
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trphighpressure1
+    category: state_change
     severity: warning
     description: "High pressure alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.40
-    name: trpsensor1DefectAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpsensor1DefectAlarm
+    category: diagnostic
     severity: warning
-    description: "Sensor 1 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.41
-    name: trpsensor2DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor2DefectAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor 2 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.42
-    name: trpsensor3DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor3DefectAlarm
     category: diagnostic
-    severity: err
-    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.43
-    name: trpsensor4DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor4DefectAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor 4 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.44
-    name: trpsensor5DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor5DefectAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor 5 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.45
-    name: trpsensor6DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor6DefectAlarm
     category: diagnostic
-    severity: err
-    description: "Sensor 6 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.46
-    name: trpsensor7DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor7DefectAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor 7 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.47
-    name: trpsensor8DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor8DefectAlarm
     category: diagnostic
-    severity: err
+    severity: alert
     description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.48
-    name: trpsensor9DefectAlarm
-    category: diagnostic
-    severity: err
-    description: "Sensor 9 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpsensor9DefectAlarm
+    category: state_change
+    severity: warning
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.49
-    name: trpsensor10DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor10DefectAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor 10 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.5
-    name: trphighpressure2
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trphighpressure2
+    category: state_change
     severity: warning
     description: "High pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.50
-    name: trpsensor11DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor11DefectAlarm
     category: diagnostic
     severity: warning
     description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.51
-    name: trpsensor12DefectAlarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpsensor12DefectAlarm
+    category: state_change
     severity: err
     description: "Sensor 12 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.52
-    name: trpsensor13DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor13DefectAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor 13 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.53
-    name: trpsensor14DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor14DefectAlarm
     category: diagnostic
-    severity: err
+    severity: alert
     description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.54
-    name: trpsensor15DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor15DefectAlarm
     category: diagnostic
     severity: warning
     description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.55
-    name: trpsensor16DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor16DefectAlarm
     category: diagnostic
     severity: warning
     description: "Sensor 16 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.56
-    name: trpsensor17DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor17DefectAlarm
     category: diagnostic
     severity: warning
-    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Sensor 17 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.57
-    name: trpsensor18DefectAlarm
-    category: diagnostic
-    severity: err
-    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  sensor: 18\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpsensor18DefectAlarm
+    category: state_change
+    severity: warning
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.58
-    name: trpsensor19DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor19DefectAlarm
     category: diagnostic
-    severity: err
-    description: "Sensor 19 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.59
-    name: trpsensor20DefectAlarm
+    name: Stulz-WIB8000-MIB::trpsensor20DefectAlarm
     category: diagnostic
-    severity: err
-    description: "Sensor 20 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.6
-    name: trpwaterDetector
+    name: Stulz-WIB8000-MIB::trpwaterDetector
     category: diagnostic
-    severity: warning
-    description: "Water detector alert on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Water detector alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.60
-    name: trpsensor21DefectAlarm
-    category: diagnostic
-    severity: warning
-    description: "Sensor 21 defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpsensor21DefectAlarm
+    category: state_change
+    severity: err
+    description: "Sensor defect alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.61
-    name: trpcompr1Alarm
+    name: Stulz-WIB8000-MIB::trpcompr1Alarm
     category: diagnostic
     severity: warning
-    description: "Compressor 1 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Alarm detected on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.62
-    name: trpcompr2Alarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpcompr2Alarm
+    category: state_change
     severity: warning
-    description: "Compressor 2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.63
-    name: trpcompr1LowPressAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpcompr1LowPressAlarm
+    category: diagnostic
     severity: warning
-    description: "Compressor 1 low-pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Low pressure alarm on compressor 1 at {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.64
-    name: trpcompr2LowPressAlarm
+    name: Stulz-WIB8000-MIB::trpcompr2LowPressAlarm
     category: diagnostic
     severity: warning
-    description: "Compressor 2 low-pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Compressor low pressure alarm on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.65
-    name: trpelecHeating1Alarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpelecHeating1Alarm
+    category: state_change
     severity: warning
-    description: "Electrical heating element 1 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Heating element alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.66
-    name: trpelecHeating2Alarm
-    category: diagnostic
-    severity: warning
-    description: "Electrical heating element 2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trpelecHeating2Alarm
+    category: state_change
+    severity: alert
+    description: "Heating element 2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.67
-    name: trpelecHeating3Alarm
+    name: Stulz-WIB8000-MIB::trpelecHeating3Alarm
     category: diagnostic
     severity: warning
     description: "Electrical heating element 3 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.68
-    name: trpelecHeating4Alarm
+    name: Stulz-WIB8000-MIB::trpelecHeating4Alarm
     category: diagnostic
     severity: warning
-    description: "Electrical heating element 4 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Heating alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.69
-    name: trpdrycooler1Alarm
+    name: Stulz-WIB8000-MIB::trpdrycooler1Alarm
     category: diagnostic
     severity: warning
-    description: "Dry cooler 1 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Drycooler alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.7
-    name: trpphasecheck
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpphasecheck
+    category: state_change
     severity: warning
-    description: "Power phase check alert on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Phase check event on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.70
-    name: trpdrycooler2Alarm
+    name: Stulz-WIB8000-MIB::trpdrycooler2Alarm
     category: diagnostic
-    severity: err
-    description: "Dry cooler #2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "Drycooler 2 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.71
-    name: trpdrycooler3Alarm
+    name: Stulz-WIB8000-MIB::trpdrycooler3Alarm
     category: diagnostic
     severity: warning
-    description: "Dry cooler 3 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Dry cooler 3 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.72
-    name: trpdrycooler4Alarm
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpdrycooler4Alarm
+    category: state_change
     severity: warning
-    description: "Dry cooler 4 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Drycooler alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.73
-    name: trppump1Alarm
+    name: Stulz-WIB8000-MIB::trppump1Alarm
     category: diagnostic
     severity: warning
     description: "Pump 1 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.74
-    name: trppump2Alarm
+    name: Stulz-WIB8000-MIB::trppump2Alarm
     category: diagnostic
     severity: warning
     description: "Pump 2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.75
-    name: trppump3Alarm
-    category: diagnostic
-    severity: err
-    description: "Pump 3 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trppump3Alarm
+    category: state_change
+    severity: alert
+    description: "Pump alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.76
-    name: trppump4Alarm
+    name: Stulz-WIB8000-MIB::trppump4Alarm
     category: diagnostic
     severity: warning
-    description: "Pump 4 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Pump4 alarm on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.77
-    name: trphumidifier1Alarm
+    name: Stulz-WIB8000-MIB::trphumidifier1Alarm
     category: diagnostic
     severity: warning
-    description: "Humidifier 1 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Humidifier alarm on {SNMP_DEVICE_HOSTNAME}\n  text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.78
-    name: trphumidifier2Alarm
+    name: Stulz-WIB8000-MIB::trphumidifier2Alarm
     category: diagnostic
     severity: warning
-    description: "Humidifier 2 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Humidifier 2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.79
-    name: trphumidifier3Alarm
+    name: Stulz-WIB8000-MIB::trphumidifier3Alarm
     category: diagnostic
-    severity: err
-    description: "Humidifier 3 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "Humidifier 3 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.8
-    name: trpfireSmoke
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpfireSmoke
+    category: state_change
     severity: alert
     description: "Fire/smoke alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.80
-    name: trphumidifier1Alarm5uS
+    name: Stulz-WIB8000-MIB::trphumidifier1Alarm5uS
     category: diagnostic
     severity: warning
-    description: "Humidifier alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Humidifier alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.81
-    name: trphumidifier2Alarm5uS
+    name: Stulz-WIB8000-MIB::trphumidifier2Alarm5uS
     category: diagnostic
     severity: warning
     description: "Humidifier alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.82
-    name: trphumidifier3Alarm5uS
+    name: Stulz-WIB8000-MIB::trphumidifier3Alarm5uS
     category: diagnostic
     severity: warning
-    description: "Humidifier alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Humidifier alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.83
-    name: trphumidifier1Alarm20uS
+    name: Stulz-WIB8000-MIB::trphumidifier1Alarm20uS
     category: diagnostic
-    severity: err
-    description: "Humidifier alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: warning
+    description: "Humidifier alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.84
-    name: trphumidifier2Alarm20uS
+    name: Stulz-WIB8000-MIB::trphumidifier2Alarm20uS
     category: diagnostic
-    severity: warning
-    description: "Humidifier 2 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Humidifier2 alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.85
-    name: trphumidifier3Alarm20uS
-    category: diagnostic
-    severity: warning
-    description: "Humidifier alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    name: Stulz-WIB8000-MIB::trphumidifier3Alarm20uS
+    category: state_change
+    severity: alert
+    description: "Humidifier alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.86
-    name: trpfan1Alarm
+    name: Stulz-WIB8000-MIB::trpfan1Alarm
     category: state_change
-    severity: warning
-    description: "Fan alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    severity: alert
+    description: "Fan1 alarm on {SNMP_DEVICE_HOSTNAME}\n  message: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.87
-    name: trpfan2Alarm
+    name: Stulz-WIB8000-MIB::trpfan2Alarm
     category: state_change
     severity: warning
-    description: "Fan 2 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Fan alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.88
-    name: trpfan3Alarm
+    name: Stulz-WIB8000-MIB::trpfan3Alarm
     category: state_change
     severity: warning
     description: "Fan 3 alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.89
-    name: trpfan1FilterAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpfan1FilterAlarm
+    category: diagnostic
     severity: warning
-    description: "Fan filter alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Fan filter alarm on {SNMP_DEVICE_HOSTNAME}\n  message: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.9
-    name: trpreturnAirTempTooHighAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpreturnAirTempTooHighAlarm
+    category: diagnostic
     severity: warning
-    description: "Return air temperature too high alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "High return air temperature alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.90
-    name: trpfan2FilterAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpfan2FilterAlarm
+    category: diagnostic
     severity: warning
-    description: "Fan/filter alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Fan filter alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.91
-    name: trpfan3FilterAlarm
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpfan3FilterAlarm
+    category: diagnostic
     severity: warning
-    description: "Fan or filter alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Fan/filter alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.92
-    name: trpextAlarm1Active
+    name: Stulz-WIB8000-MIB::trpextAlarm1Active
     category: diagnostic
     severity: warning
     description: "External alarm 1 activated on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.93
-    name: trpextAlarm2Active
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpextAlarm2Active
+    category: state_change
     severity: warning
-    description: "External alarm 2 activated on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Active alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.94
-    name: trpextAlarm3Active
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpextAlarm3Active
+    category: state_change
     severity: warning
-    description: "External alarm 3 activated on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Active alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.95
-    name: trpextAlarm4Active
+    name: Stulz-WIB8000-MIB::trpextAlarm4Active
     category: state_change
-    severity: err
+    severity: warning
     description: "Active alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.96
-    name: trpextAlarm5Active
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpextAlarm5Active
+    category: state_change
     severity: warning
-    description: "Active alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "External alarm 5 activated on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.97
-    name: trpextAlarm6Active
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpextAlarm6Active
+    category: state_change
     severity: warning
-    description: "External alarm 6 activated on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Active alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.98
-    name: trpextAlarm7Active
-    category: diagnostic
+    name: Stulz-WIB8000-MIB::trpextAlarm7Active
+    category: state_change
     severity: warning
-    description: "Active alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm channel: 7\n  message: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Active alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText
   - oid: 1.3.6.1.4.1.29462.10.1.12.0.99
-    name: trpextAlarm8Active
-    category: state_change
+    name: Stulz-WIB8000-MIB::trpextAlarm8Active
+    category: diagnostic
     severity: warning
-    description: "Alarm 8 activated on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
-    mib: Stulz-WIB8000-MIB
+    description: "Active alarm on {SNMP_DEVICE_HOSTNAME}\n  alarm text: {wibAlarmText}"
     status: current
     varbinds:
     - wibAlarmText

@@ -624,95 +624,82 @@ varbinds:
     constraints: SIZE(0..512)
 traps:
   - oid: 1.3.6.1.4.1.14179.1.50.0.1
-    name: multipleUsersTrap
-    category: auth
-    severity: info
-    description: Multiple users logged into {SNMP_DEVICE_HOSTNAME}
-    mib: AIRESPACE-SWITCHING-MIB
+    name: AIRESPACE-SWITCHING-MIB::multipleUsersTrap
+    category: security
+    severity: warning
+    description: Multiple users log event detected on {SNMP_DEVICE_HOSTNAME}
   - oid: 1.3.6.1.4.1.14179.1.50.0.10
-    name: stpInstanceNewRootTrap
+    name: AIRESPACE-SWITCHING-MIB::stpInstanceNewRootTrap
     category: mobility
     severity: notice
-    description: "STP instance elected new root on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
-    mib: AIRESPACE-SWITCHING-MIB
+    description: "STP new root elected on {SNMP_DEVICE_HOSTNAME}\n  VLAN: {dot1qVlanIndex}"
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.14179.1.50.0.11
-    name: stpInstanceTopologyChangeTrap
+    name: AIRESPACE-SWITCHING-MIB::stpInstanceTopologyChangeTrap
     category: mobility
     severity: notice
     description: "STP topology change detected on {SNMP_DEVICE_HOSTNAME}\n  VLAN: {dot1qVlanIndex}"
-    mib: AIRESPACE-SWITCHING-MIB
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.14179.1.50.0.12
-    name: powerSupplyStatusChangeTrap
+    name: AIRESPACE-SWITCHING-MIB::powerSupplyStatusChangeTrap
     category: state_change
     severity: warning
     description: Power supply status changed on {SNMP_DEVICE_HOSTNAME}
-    mib: AIRESPACE-SWITCHING-MIB
   - oid: 1.3.6.1.4.1.14179.1.50.0.2
-    name: broadcastStormStartTrap
-    category: diagnostic
+    name: AIRESPACE-SWITCHING-MIB::broadcastStormStartTrap
+    category: state_change
     severity: warning
     description: Broadcast storm detected on {SNMP_DEVICE_HOSTNAME}
-    mib: AIRESPACE-SWITCHING-MIB
   - oid: 1.3.6.1.4.1.14179.1.50.0.3
-    name: broadcastStormEndTrap
+    name: AIRESPACE-SWITCHING-MIB::broadcastStormEndTrap
     category: state_change
     severity: notice
-    description: Broadcast storm ended on {SNMP_DEVICE_HOSTNAME}. Network traffic levels have returned to normal.
-    mib: AIRESPACE-SWITCHING-MIB
+    description: Broadcast storm ended on {SNMP_DEVICE_HOSTNAME}
   - oid: 1.3.6.1.4.1.14179.1.50.0.4
-    name: linkFailureTrap
+    name: AIRESPACE-SWITCHING-MIB::linkFailureTrap
     category: state_change
     severity: warning
     description: Link failure detected on {SNMP_DEVICE_HOSTNAME}
-    mib: AIRESPACE-SWITCHING-MIB
   - oid: 1.3.6.1.4.1.14179.1.50.0.5
-    name: vlanRequestFailureTrap
-    category: diagnostic
-    severity: err
-    description: "VLAN request failure on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
-    mib: AIRESPACE-SWITCHING-MIB
+    name: AIRESPACE-SWITCHING-MIB::vlanRequestFailureTrap
+    category: state_change
+    severity: warning
+    description: "VLAN request failed on {SNMP_DEVICE_HOSTNAME}\n  VLAN identifier: {dot1qVlanIndex}"
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.14179.1.50.0.6
-    name: vlanDeleteLastTrap
+    name: AIRESPACE-SWITCHING-MIB::vlanDeleteLastTrap
     category: config_change
-    severity: warning
-    description: "Last VLAN deleted on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
-    mib: AIRESPACE-SWITCHING-MIB
+    severity: notice
+    description: "VLAN deleted on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.14179.1.50.0.7
-    name: vlanDefaultCfgFailureTrap
-    category: diagnostic
-    severity: warning
-    description: "Default VLAN configuration failure on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
-    mib: AIRESPACE-SWITCHING-MIB
+    name: AIRESPACE-SWITCHING-MIB::vlanDefaultCfgFailureTrap
+    category: config_change
+    severity: err
+    description: "VLAN configuration failed on {SNMP_DEVICE_HOSTNAME}\n  VLAN ID: {dot1qVlanIndex}"
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.14179.1.50.0.8
-    name: vlanRestoreFailureTrap
-    category: state_change
+    name: AIRESPACE-SWITCHING-MIB::vlanRestoreFailureTrap
+    category: config_change
     severity: err
-    description: "VLAN restore failure on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}\n\nThe specified VLAN failed to restore and may be unavailable until manually recovered."
-    mib: AIRESPACE-SWITCHING-MIB
+    description: "VLAN restore operation failed on {SNMP_DEVICE_HOSTNAME}\n  VLAN index: {dot1qVlanIndex}"
     varbinds:
     - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.14179.1.50.0.9
-    name: fanFailureTrap
+    name: AIRESPACE-SWITCHING-MIB::fanFailureTrap
     category: state_change
-    severity: warning
-    description: Fan failure detected on {SNMP_DEVICE_HOSTNAME}. Hardware environmental monitoring has logged a fan malfunction.
-    mib: AIRESPACE-SWITCHING-MIB
+    severity: alert
+    description: "Fan failure detected on {SNMP_DEVICE_HOSTNAME}\n  A cooling component has failed, potentially impacting thermal management and device reliability."
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.1
-    name: bsnDot11StationDisassociate
-    category: mobility
-    severity: warning
-    description: "Wireless station disassociated from AP on {SNMP_DEVICE_HOSTNAME}\n  AP: {bsnAPName} ({bsnStationAPMacAddr}), slot {bsnStationAPIfSlotId}\n  client: {bsnStationMacAddress} ({bsnStationUserName})\n  IP: {bsnUserIpAddress}\n  reason: {bsnStationReasonCode}"
-    mib: AIRESPACE-WIRELESS-MIB
+    name: AIRESPACE-WIRELESS-MIB::bsnDot11StationDisassociate
+    category: state_change
+    severity: notice
+    description: "Wireless station disassociated from AP on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnStationAPMacAddr}\n  AP slot: {bsnStationAPIfSlotId}\n  client MAC: {bsnStationMacAddress}\n  client IP: {bsnUserIpAddress}\n  client user: {bsnStationUserName}\n  reason: {bsnStationReasonCode}"
     varbinds:
     - bsnStationAPMacAddr
     - bsnStationAPIfSlotId
@@ -722,11 +709,10 @@ traps:
     - bsnStationMacAddress
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.10
-    name: bsnAPIfDown
+    name: AIRESPACE-WIRELESS-MIB::bsnAPIfDown
     category: state_change
     severity: warning
-    description: "Access Point interface went down on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  slot ID: {bsnAPIfSlotId}\n  interface admin status: {bsnAPIfAdminStatus}\n  cause: {bsnAPIfUpDownCause}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "AP interface {bsnAPName} (MAC: {bsnAPDot3MacAddress}) went down on {SNMP_DEVICE_HOSTNAME}\n  slot: {bsnAPIfSlotId}\n  admin status: {bsnAPIfAdminStatus}\n  AP admin status: {bsnAPAdminStatus}\n  down cause: {bsnAPIfUpDownCause}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
@@ -735,41 +721,37 @@ traps:
     - bsnAPIfUpDownCause
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.11
-    name: bsnAPLoadProfileFailed
-    category: state_change
-    severity: warning
-    description: "LOAD Profile transitioned from PASS to FAIL on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  Slot ID: {bsnAPIfSlotId}"
-    mib: AIRESPACE-WIRELESS-MIB
+    name: AIRESPACE-WIRELESS-MIB::bsnAPLoadProfileFailed
+    category: diagnostic
+    severity: err
+    description: "AP load profile failed on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  MAC: {bsnAPDot3MacAddress}\n  slot ID: {bsnAPIfSlotId}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.12
-    name: bsnAPNoiseProfileFailed
+    name: AIRESPACE-WIRELESS-MIB::bsnAPNoiseProfileFailed
     category: diagnostic
     severity: warning
-    description: "Noise profile failed on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  slot ID: {bsnAPIfSlotId}\n  State transitioned from PASS to FAIL"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Noise profile check failed for AP {bsnAPName} on {SNMP_DEVICE_HOSTNAME}\n  MAC: {bsnAPDot3MacAddress}\n  Slot ID: {bsnAPIfSlotId}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.13
-    name: bsnAPInterferenceProfileFailed
+    name: AIRESPACE-WIRELESS-MIB::bsnAPInterferenceProfileFailed
     category: state_change
     severity: warning
-    description: "Interference profile state changed from PASS to FAIL on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  Slot ID: {bsnAPIfSlotId}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Interference profile check failed for AP {bsnAPName} on {SNMP_DEVICE_HOSTNAME}\n  MAC: {bsnAPDot3MacAddress}\n  Slot ID: {bsnAPIfSlotId}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.14
-    name: bsnAPCoverageProfileFailed
+    name: AIRESPACE-WIRELESS-MIB::bsnAPCoverageProfileFailed
     category: state_change
     severity: warning
-    description: "Coverage profile transitioned from PASS to FAIL on {SNMP_DEVICE_HOSTNAME}\n  AP: {bsnAPNameTrapVariable} ({bsnAPMacAddrTrapVariable})\n  slot: {bsnAPSlotIdTrapVariable}\n  clients failing threshold: {bsnAPCoverageFailedClients} / {bsnAPCoverageTotalClients}\n  threshold: {bsnAPCoverageThresholdTrapVariable}\n  affected client: {bsnClientMacAddr}\n  client RSSI: {bsnClientRssi}, SNR: {bsnClientSnr}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Coverage profile failed on AP {bsnAPNameTrapVariable} (MAC: {bsnAPMacAddrTrapVariable})\n  slot: {bsnAPSlotIdTrapVariable}\n  failed clients: {bsnAPCoverageFailedClients} / {bsnAPCoverageTotalClients}\n  threshold: {bsnAPCoverageThresholdTrapVariable}\n  client MAC: {bsnClientMacAddr}\n  client RSSI: {bsnClientRssi}\n  client SNR: {bsnClientSnr}"
     varbinds:
     - bsnAPMacAddrTrapVariable
     - bsnAPNameTrapVariable
@@ -782,22 +764,20 @@ traps:
     - bsnClientSnr
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.15
-    name: bsnAPCurrentTxPowerChanged
+    name: AIRESPACE-WIRELESS-MIB::bsnAPCurrentTxPowerChanged
     category: state_change
-    severity: info
-    description: "Airespeed AP transmit power auto-adjusted on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  MAC: {bsnAPDot3MacAddress}\n  slot: {bsnAPIfSlotId}\n  new TX power level: {bsnAPIfPhyTxPowerLevel}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "AP {bsnAPName} (MAC: {bsnAPDot3MacAddress}) transmit power changed on {SNMP_DEVICE_HOSTNAME}\n  slot: {bsnAPIfSlotId}\n  current TxPower level: {bsnAPIfPhyTxPowerLevel}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPIfPhyTxPowerLevel
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.16
-    name: bsnAPCurrentChannelChanged
+    name: AIRESPACE-WIRELESS-MIB::bsnAPCurrentChannelChanged
     category: state_change
     severity: notice
-    description: "Access Point changed channel on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  Slot: {bsnAPSlotIdTrapVariable}\n  Previous channel: {bsnAPPreviousChannelNumberTrapVariable}\n  New channel: {bsnAPChannelNumberTrapVariable}\n  Reason: {bsnAPReasonCodeTrapVariable}\n  Noise: {bsnNoiseBeforeChannelUpdate} -> {bsnNoiseAfterChannelUpdate}\n  Interference energy: {bsnInterferenceEnergyBeforeChannelUpdate} -> {bsnInterferenceEnergyAfterChannelUpdate}\n  Interference: {bsnInterferenceBeforeChannelUpdate} -> {bsnInterferenceAfterChannelUpdate}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Wireless AP {bsnAPName} (MAC {bsnAPMacAddrTrapVariable}) changed operating channel on slot {bsnAPSlotIdTrapVariable}\n  previous channel: {bsnAPPreviousChannelNumberTrapVariable}\n  new channel: {bsnAPChannelNumberTrapVariable}\n  reason: {bsnAPReasonCodeTrapVariable}"
     varbinds:
     - bsnAPMacAddrTrapVariable
     - bsnAPSlotIdTrapVariable
@@ -812,11 +792,10 @@ traps:
     - bsnInterferenceAfterChannelUpdate
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.2
-    name: bsnDot11StationDeauthenticate
+    name: AIRESPACE-WIRELESS-MIB::bsnDot11StationDeauthenticate
     category: state_change
-    severity: warning
-    description: "Wireless client deauthenticated on {SNMP_DEVICE_HOSTNAME}\n  client MAC: {bsnStationMacAddress}\n  username: {bsnStationUserName}\n  client IP: {bsnUserIpAddress}\n  AP: {bsnAPName} ({bsnStationAPMacAddr})\n  slot: {bsnStationAPIfSlotId}\n  reason: {bsnStationReasonCode}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "Wireless station deauthenticated on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnStationAPMacAddr}\n  AP Name: {bsnAPName}\n  Station MAC: {bsnStationMacAddress}\n  User: {bsnStationUserName}\n  Reason: {bsnStationReasonCode}"
     varbinds:
     - bsnStationAPMacAddr
     - bsnStationAPIfSlotId
@@ -826,82 +805,72 @@ traps:
     - bsnStationMacAddress
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.21
-    name: bsnRrmDot11aGroupingDone
-    category: mobility
+    name: AIRESPACE-WIRELESS-MIB::bsnRrmDot11aGroupingDone
+    category: state_change
     severity: notice
-    description: "Wireless RRM grouping completed on {SNMP_DEVICE_HOSTNAME}\n  New group leader MAC: {bsnRrmDot11aGroupLeaderMacAddr}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "802.11a RRM grouping completed on {SNMP_DEVICE_HOSTNAME}\n  new group leader MAC: {bsnRrmDot11aGroupLeaderMacAddr}"
     varbinds:
     - bsnRrmDot11aGroupLeaderMacAddr
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.22
-    name: bsnRrmDot11bGroupingDone
-    category: mobility
+    name: AIRESPACE-WIRELESS-MIB::bsnRrmDot11bGroupingDone
+    category: state_change
     severity: notice
-    description: "Radio Resource Management (RRM) grouping completed on {SNMP_DEVICE_HOSTNAME}\n  New group leader MAC: {bsnRrmDot11bGroupLeaderMacAddr}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "802.11b grouping completed on {SNMP_DEVICE_HOSTNAME}\n  new group leader MAC: {bsnRrmDot11bGroupLeaderMacAddr}"
     varbinds:
     - bsnRrmDot11bGroupLeaderMacAddr
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.23
-    name: bsnConfigSaved
+    name: AIRESPACE-WIRELESS-MIB::bsnConfigSaved
     category: config_change
     severity: notice
-    description: Configuration saved on {SNMP_DEVICE_HOSTNAME}. Trap sent to notify NMS to perform a refresh.
-    mib: AIRESPACE-WIRELESS-MIB
+    description: Configuration saved on {SNMP_DEVICE_HOSTNAME}. Trap sent to notify NMS to refresh configuration data.
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.24
-    name: bsnDot11EssCreated
-    category: diagnostic
+    name: AIRESPACE-WIRELESS-MIB::bsnDot11EssCreated
+    category: state_change
     severity: notice
-    description: "New WLAN (ESS) created on {SNMP_DEVICE_HOSTNAME}\n  ESS Index: {bsnDot11EssIndex}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "New ESS (WLAN) created on {SNMP_DEVICE_HOSTNAME}\n  ESS Index: {bsnDot11EssIndex}"
     varbinds:
     - bsnDot11EssIndex
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.25
-    name: bsnDot11EssDeleted
-    category: config_change
+    name: AIRESPACE-WIRELESS-MIB::bsnDot11EssDeleted
+    category: state_change
     severity: notice
-    description: "WLAN (ESS) deleted on {SNMP_DEVICE_HOSTNAME}\n  ESS index: {bsnDot11EssIndex}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "WLAN ESS deleted on {SNMP_DEVICE_HOSTNAME}\n  ESS index: {bsnDot11EssIndex}"
     varbinds:
     - bsnDot11EssIndex
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.26
-    name: bsnRADIUSServerNotResponding
-    category: state_change
-    severity: alert
-    description: All RADIUS servers are not responding on {SNMP_DEVICE_HOSTNAME}. Wireless clients will be unable to authenticate until at least one RADIUS server becomes available.
-    mib: AIRESPACE-WIRELESS-MIB
-  - oid: 1.3.6.1.4.1.14179.2.6.3.0.27
-    name: bsnAuthenticationFailure
+    name: AIRESPACE-WIRELESS-MIB::bsnRADIUSServerNotResponding
     category: auth
     severity: warning
-    description: "Client authentication failure on {SNMP_DEVICE_HOSTNAME}\n  user type: {bsnAuthFailureUserType}\n  user name/MAC: {bsnAuthFailureUserName}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: RADIUS server(s) not responding to authentication requests on {SNMP_DEVICE_HOSTNAME}
+  - oid: 1.3.6.1.4.1.14179.2.6.3.0.27
+    name: AIRESPACE-WIRELESS-MIB::bsnAuthenticationFailure
+    category: auth
+    severity: warning
+    description: "Client authentication failure on {SNMP_DEVICE_HOSTNAME}\n  user type: {bsnAuthFailureUserType}\n  user name: {bsnAuthFailureUserName}"
     varbinds:
     - bsnAuthFailureUserType
     - bsnAuthFailureUserName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.28
-    name: bsnIpsecEspAuthFailureTrap
-    category: auth
-    severity: err
-    description: "IPsec ESP authentication failure on {SNMP_DEVICE_HOSTNAME}\n  remote IPv4: {bsnRemoteIPv4Address}\n  error count: {bsnIpsecErrorCount}"
-    mib: AIRESPACE-WIRELESS-MIB
+    name: AIRESPACE-WIRELESS-MIB::bsnIpsecEspAuthFailureTrap
+    category: security
+    severity: warning
+    description: "IPsec ESP authentication failure detected on {SNMP_DEVICE_HOSTNAME}\n  remote peer: {bsnRemoteIPv4Address}\n  accumulated error count: {bsnIpsecErrorCount}"
     varbinds:
     - bsnRemoteIPv4Address
     - bsnIpsecErrorCount
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.29
-    name: bsnIpsecEspReplayFailureTrap
+    name: AIRESPACE-WIRELESS-MIB::bsnIpsecEspReplayFailureTrap
     category: security
     severity: warning
-    description: "IPsec ESP replay failure detected on {SNMP_DEVICE_HOSTNAME}\n  remote IP: {bsnRemoteIPv4Address}\n  cumulative replay errors: {bsnIpsecErrorCount}\n\nNote: Invalid sequence numbers in inbound ESP SA may indicate a replay attack."
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "IPsec ESP replay failure detected on {SNMP_DEVICE_HOSTNAME}\n  remote peer: {bsnRemoteIPv4Address}\n  error count: {bsnIpsecErrorCount}"
     varbinds:
     - bsnRemoteIPv4Address
     - bsnIpsecErrorCount
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.3
-    name: bsnDot11StationAuthenticateFail
-    category: security
+    name: AIRESPACE-WIRELESS-MIB::bsnDot11StationAuthenticateFail
+    category: auth
     severity: warning
-    description: "Wireless client authentication failure on {SNMP_DEVICE_HOSTNAME}\n  client MAC: {bsnStationMacAddress}\n  client IP: {bsnUserIpAddress}\n  client username: {bsnStationUserName}\n  AP MAC: {bsnStationAPMacAddr}\n  AP name: {bsnAPName}\n  slot ID: {bsnStationAPIfSlotId}\n  reason code: {bsnStationReasonCode}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Wireless station authentication failed on {SNMP_DEVICE_HOSTNAME}\n  AP: {bsnAPName} ({bsnStationAPMacAddr}), slot {bsnStationAPIfSlotId}\n  client MAC: {bsnStationMacAddress}\n  client IP: {bsnUserIpAddress}\n  user: {bsnStationUserName}\n  reason: {bsnStationReasonCode}"
     varbinds:
     - bsnStationAPMacAddr
     - bsnStationAPIfSlotId
@@ -911,20 +880,18 @@ traps:
     - bsnStationMacAddress
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.31
-    name: bsnIpsecEspInvalidSpiTrap
+    name: AIRESPACE-WIRELESS-MIB::bsnIpsecEspInvalidSpiTrap
     category: security
     severity: warning
-    description: "IPSec ESP packet with invalid SPI detected on {SNMP_DEVICE_HOSTNAME}\n  remote peer: {bsnRemoteIPv4Address}\n  invalid SPI: {bsnIpsecSPI}\n\nThis may indicate a misconfigured peer, stale security association, or potentially malicious traffic probing the VPN."
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "IPsec ESP invalid SPI detected on {SNMP_DEVICE_HOSTNAME}\n  remote peer: {bsnRemoteIPv4Address}\n  SPI: {bsnIpsecSPI}"
     varbinds:
     - bsnRemoteIPv4Address
     - bsnIpsecSPI
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.33
-    name: bsnIpsecIkeNegFailure
-    category: security
+    name: AIRESPACE-WIRELESS-MIB::bsnIpsecIkeNegFailure
+    category: state_change
     severity: err
-    description: "IPsec IKE Phase 1 SA negotiation failed on {SNMP_DEVICE_HOSTNAME}\n  remote IPv4: {bsnRemoteIPv4Address}\n  remote UDP port: {bsnRemoteUdpPort}\n  auth method: {bsnIkeAuthMethod}\n  init failures: {bsnIkeTotalInitFailures}\n  init no-response: {bsnIkeTotalInitNoResponses}\n  resp failures: {bsnIkeTotalRespFailures}\n  notifies sent: {bsnNotifiesSent}\n  notifies received: {bsnNotifiesReceived}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "IKE phase 1 negotiation failed on {SNMP_DEVICE_HOSTNAME}\n  remote IP: {bsnRemoteIPv4Address}\n  remote UDP port: {bsnRemoteUdpPort}\n  auth method: {bsnIkeAuthMethod}\n  total init failures: {bsnIkeTotalInitFailures}\n  total init no responses: {bsnIkeTotalInitNoResponses}\n  total response failures: {bsnIkeTotalRespFailures}\n  notifies sent: {bsnNotifiesSent}\n  notifies received: {bsnNotifiesReceived}"
     varbinds:
     - bsnRemoteIPv4Address
     - bsnRemoteUdpPort
@@ -935,11 +902,10 @@ traps:
     - bsnNotifiesSent
     - bsnNotifiesReceived
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.34
-    name: bsnIpsecSuiteNegFailure
-    category: diagnostic
-    severity: notice
-    description: "IPsec Phase 2 SA suite negotiation failure on {SNMP_DEVICE_HOSTNAME}\n  remote IPv4: {bsnRemoteIPv4Address}\n  initiator failures: {bsnSuiteInitFailures}\n  responder failures: {bsnSuiteRespondFailures}\n  notifies sent: {bsnNotifiesSent}\n  notifies received: {bsnNotifiesReceived}"
-    mib: AIRESPACE-WIRELESS-MIB
+    name: AIRESPACE-WIRELESS-MIB::bsnIpsecSuiteNegFailure
+    category: security
+    severity: err
+    description: "IPsec Phase 2 SA suite negotiation failed on {SNMP_DEVICE_HOSTNAME}\n  remote IPv4 address: {bsnRemoteIPv4Address}\n  initiator failures: {bsnSuiteInitFailures}\n  responder failures: {bsnSuiteRespondFailures}\n  notifies sent: {bsnNotifiesSent}\n  notifies received: {bsnNotifiesReceived}"
     varbinds:
     - bsnRemoteIPv4Address
     - bsnSuiteInitFailures
@@ -947,11 +913,10 @@ traps:
     - bsnNotifiesSent
     - bsnNotifiesReceived
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.35
-    name: bsnIpsecInvalidCookieTrap
+    name: AIRESPACE-WIRELESS-MIB::bsnIpsecInvalidCookieTrap
     category: security
     severity: warning
-    description: "ISAKMP invalid-cookie trap on {SNMP_DEVICE_HOSTNAME}\n  source IP: {bsnRemoteIPv4Address}\n  UDP port: {bsnRemoteUdpPort}\n  initiator cookie: {bsnInitiatorCookie}\n  responder cookie: {bsnResponderCookie}\n  invalid cookie count: {bsnIsakmpInvalidCookies}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "ISAKMP packets with invalid cookies detected on {SNMP_DEVICE_HOSTNAME}\n  source: {bsnRemoteIPv4Address}:{bsnRemoteUdpPort}\n  initiator cookie: {bsnInitiatorCookie}\n  responder cookie: {bsnResponderCookie}\n  invalid cookie count: {bsnIsakmpInvalidCookies}"
     varbinds:
     - bsnRemoteIPv4Address
     - bsnRemoteUdpPort
@@ -959,11 +924,10 @@ traps:
     - bsnResponderCookie
     - bsnIsakmpInvalidCookies
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.36
-    name: bsnRogueAPDetected
+    name: AIRESPACE-WIRELESS-MIB::bsnRogueAPDetected
     category: security
-    severity: warning
-    description: "Rogue access point detected on {SNMP_DEVICE_HOSTNAME}\n  Rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  SSID: {bsnRogueAPSsid}\n  Channel: {bsnRogueAPChannelNumber}\n  Class: {bsnRogueAPClassType}\n  On wired network: {bsnRogueAPOnWiredNetwork}\n  Adhoc mode: {bsnRogueAdhocMode}\n  Radio type: {bsnRogueAPRadioType}\n  Detecting AP: {bsnRogueAPAirespaceAPName} ({bsnRogueAPAirespaceAPMacAddress})\n  Slot ID: {bsnRogueAPAirespaceAPSlotId}\n  RSSI: {bsnRogueAPAirespaceAPRSSI}\n  SNR: {bsnRogueAPAirespaceAPSNR}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: alert
+    description: "Rogue AP detected on {SNMP_DEVICE_HOSTNAME}\n  Rogue MAC: {bsnRogueAPDot11MacAddress}\n  SSID: {bsnRogueAPSsid}\n  Class: {bsnRogueAPClassType}\n  Detected by: {bsnRogueAPAirespaceAPName} (Slot {bsnRogueAPAirespaceAPSlotId})\n  RSSI: {bsnRogueAPAirespaceAPRSSI}\n  SNR: {bsnRogueAPAirespaceAPSNR}\n  Channel: {bsnRogueAPChannelNumber}\n  Radio Type: {bsnRogueAPRadioType}\n  On Wired Network: {bsnRogueAPOnWiredNetwork}\n  Adhoc Mode: {bsnRogueAdhocMode}"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnRogueAPAirespaceAPMacAddress
@@ -978,41 +942,37 @@ traps:
     - bsnRogueAPAirespaceAPName
     - bsnRogueAPClassType
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.37
-    name: bsnAPLoadProfileUpdatedToPass
+    name: AIRESPACE-WIRELESS-MIB::bsnAPLoadProfileUpdatedToPass
     category: state_change
     severity: notice
-    description: "LOAD Profile state changed from FAIL to PASS on {SNMP_DEVICE_HOSTNAME}\n  AP Name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  Slot ID: {bsnAPIfSlotId}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Access Point {bsnAPName} (MAC {bsnAPDot3MacAddress}) load profile state changed to PASS on {SNMP_DEVICE_HOSTNAME}\n  slot ID: {bsnAPIfSlotId}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.38
-    name: bsnAPNoiseProfileUpdatedToPass
+    name: AIRESPACE-WIRELESS-MIB::bsnAPNoiseProfileUpdatedToPass
     category: state_change
-    severity: info
-    description: "Noise profile changed from FAIL to PASS on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  slot ID: {bsnAPIfSlotId}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "AP noise profile updated to PASS on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  MAC address: {bsnAPDot3MacAddress}\n  slot ID: {bsnAPIfSlotId}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.39
-    name: bsnAPInterferenceProfileUpdatedToPass
+    name: AIRESPACE-WIRELESS-MIB::bsnAPInterferenceProfileUpdatedToPass
     category: state_change
     severity: notice
-    description: "Access Point interference profile recovered on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  MAC address: {bsnAPDot3MacAddress}\n  slot ID: {bsnAPIfSlotId}\n  profile state: FAIL → PASS"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: AP {bsnAPName} (MAC {bsnAPDot3MacAddress}, slot {bsnAPIfSlotId}) interference profile updated to PASS on {SNMP_DEVICE_HOSTNAME}
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.4
-    name: bsnDot11StationAssociateFail
-    category: diagnostic
+    name: AIRESPACE-WIRELESS-MIB::bsnDot11StationAssociateFail
+    category: security
     severity: warning
-    description: "Wireless station association failure on {SNMP_DEVICE_HOSTNAME}\n  AP: {bsnAPName} ({bsnStationAPMacAddr}), slot {bsnStationAPIfSlotId}\n  client MAC: {bsnStationMacAddress}\n  client IP: {bsnUserIpAddress}\n  user: {bsnStationUserName}\n  reason: {bsnStationReasonCode}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Wireless station association failure on {SNMP_DEVICE_HOSTNAME}\n  AP: {bsnAPName} ({bsnStationAPMacAddr}, slot {bsnStationAPIfSlotId})\n  client MAC: {bsnStationMacAddress}\n  client IP: {bsnUserIpAddress}\n  user: {bsnStationUserName}\n  reason code: {bsnStationReasonCode}"
     varbinds:
     - bsnStationAPMacAddr
     - bsnStationAPIfSlotId
@@ -1022,21 +982,19 @@ traps:
     - bsnStationMacAddress
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.40
-    name: bsnAPCoverageProfileUpdatedToPass
+    name: AIRESPACE-WIRELESS-MIB::bsnAPCoverageProfileUpdatedToPass
     category: state_change
     severity: notice
-    description: "Wireless AP coverage profile transitioned from FAIL to PASS on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  slot ID: {bsnAPIfSlotId}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: 'AP {bsnAPName} (MAC: {bsnAPDot3MacAddress}, slot: {bsnAPIfSlotId}) coverage profile updated to PASS on {SNMP_DEVICE_HOSTNAME}'
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.41
-    name: bsnRogueAPRemoved
+    name: AIRESPACE-WIRELESS-MIB::bsnRogueAPRemoved
     category: security
-    severity: info
-    description: "Rogue access point no longer detected on {SNMP_DEVICE_HOSTNAME}\n  rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  detected by AP: {bsnRogueAPAirespaceAPName} ({bsnRogueAPAirespaceAPMacAddress})\n  AP slot ID: {bsnRogueAPAirespaceAPSlotId}\n  radio type: {bsnRogueAPRadioType}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "Rogue AP removed on {SNMP_DEVICE_HOSTNAME}\n  Rogue MAC: {bsnRogueAPDot11MacAddress}\n  Detected by AP: {bsnRogueAPAirespaceAPName} (Slot: {bsnRogueAPAirespaceAPSlotId}, Radio: {bsnRogueAPRadioType})"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnRogueAPAirespaceAPMacAddress
@@ -1044,100 +1002,88 @@ traps:
     - bsnRogueAPRadioType
     - bsnRogueAPAirespaceAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.42
-    name: bsnRadiosExceedLicenseCount
+    name: AIRESPACE-WIRELESS-MIB::bsnRadiosExceedLicenseCount
     category: license
     severity: crit
-    description: "Number of associated radios exceeds the licensed count on {SNMP_DEVICE_HOSTNAME}\n  current radios: {bsnCurrentRadiosCount}\n  licensed radios: {bsnLicenseRadioCount}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "License limit exceeded on {SNMP_DEVICE_HOSTNAME}\n  current radios: {bsnCurrentRadiosCount}\n  licensed radios: {bsnLicenseRadioCount}"
     varbinds:
     - bsnCurrentRadiosCount
     - bsnLicenseRadioCount
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.43
-    name: bsnSensedTemperatureTooHigh
-    category: state_change
+    name: AIRESPACE-WIRELESS-MIB::bsnSensedTemperatureTooHigh
+    category: diagnostic
     severity: alert
-    description: "Temperature threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  current temperature: {bsnSensorTemperature}°C\n  Action: Immediate attention required to prevent potential hardware damage"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Temperature sensor on {SNMP_DEVICE_HOSTNAME} reported high temperature\n  current temperature: {bsnSensorTemperature} °C"
     varbinds:
     - bsnSensorTemperature
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.44
-    name: bsnSensedTemperatureTooLow
-    category: state_change
+    name: AIRESPACE-WIRELESS-MIB::bsnSensedTemperatureTooLow
+    category: diagnostic
     severity: warning
-    description: "Temperature sensor threshold exceeded on {SNMP_DEVICE_HOSTNAME}: sensed temperature too low\n  current temperature: {bsnSensorTemperature}°C"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Temperature sensor on {SNMP_DEVICE_HOSTNAME} reports low temperature\n  current temperature: {bsnSensorTemperature}"
     varbinds:
     - bsnSensorTemperature
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.45
-    name: bsnTemperatureSensorFailure
+    name: AIRESPACE-WIRELESS-MIB::bsnTemperatureSensorFailure
     category: diagnostic
-    severity: crit
-    description: Temperature sensor hardware failure on {SNMP_DEVICE_HOSTNAME}. Sensor has failed and temperature readings are now unknown.
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: alert
+    description: "Temperature sensor hardware failure on {SNMP_DEVICE_HOSTNAME}\n  The temperature sensor has failed and the temperature reading is unknown."
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.46
-    name: bsnTemperatureSensorClear
+    name: AIRESPACE-WIRELESS-MIB::bsnTemperatureSensorClear
     category: state_change
-    severity: info
-    description: "Temperature sensor alarm cleared on {SNMP_DEVICE_HOSTNAME}. Sensor now operating within normal temperature range.\n  current temperature: {bsnSensorTemperature}°C"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "Temperature sensor alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  current temperature: {bsnSensorTemperature}"
     varbinds:
     - bsnSensorTemperature
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.47
-    name: bsnPOEControllerFailure
+    name: AIRESPACE-WIRELESS-MIB::bsnPOEControllerFailure
     category: diagnostic
-    severity: crit
-    description: PoE controller has failed on {SNMP_DEVICE_HOSTNAME}. User intervention is required.
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: alert
+    description: "POE Controller has failed on {SNMP_DEVICE_HOSTNAME}\n  This is a critical hardware failure requiring immediate user intervention."
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.48
-    name: bsnMaxRogueCountExceeded
+    name: AIRESPACE-WIRELESS-MIB::bsnMaxRogueCountExceeded
     category: security
     severity: warning
-    description: "Number of rogue devices exceeded the configured maximum on {SNMP_DEVICE_HOSTNAME}\n  current rogue count: {bsnMaxRogueCount}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Rogue device count exceeded maximum threshold on {SNMP_DEVICE_HOSTNAME}\n  current rogue count: {bsnMaxRogueCount}"
     varbinds:
     - bsnMaxRogueCount
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.49
-    name: bsnMaxRogueCountClear
-    category: diagnostic
+    name: AIRESPACE-WIRELESS-MIB::bsnMaxRogueCountClear
+    category: state_change
     severity: notice
-    description: Rogue AP count cleared on {SNMP_DEVICE_HOSTNAME}; current rogue count ({bsnMaxRogueCount}) is now within the maximum allowed threshold
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Rogue detection count cleared on {SNMP_DEVICE_HOSTNAME}\n  rogue count: {bsnMaxRogueCount}"
     varbinds:
     - bsnMaxRogueCount
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.5
-    name: bsnAPUp
+    name: AIRESPACE-WIRELESS-MIB::bsnAPUp
     category: state_change
     severity: info
-    description: "Access point operational on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: Access Point bsnAPDot3MacAddress {bsnAPDot3MacAddress} is now operational on {SNMP_DEVICE_HOSTNAME}
     varbinds:
     - bsnAPDot3MacAddress
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.50
-    name: bsnApMaxRogueCountExceeded
+    name: AIRESPACE-WIRELESS-MIB::bsnApMaxRogueCountExceeded
     category: security
     severity: warning
-    description: "Rogue AP count threshold exceeded on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  current rogue count: {bsnMaxRogueCount}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Maximum rogue AP count exceeded on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  AP Name: {bsnAPName}\n  Rogue count: {bsnMaxRogueCount}"
     varbinds:
     - bsnAPMacAddrTrapVariable
     - bsnMaxRogueCount
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.51
-    name: bsnApMaxRogueCountClear
-    category: security
-    severity: info
-    description: "Rogue count cleared on AP {bsnAPName} ({bsnAPMacAddrTrapVariable}) on {SNMP_DEVICE_HOSTNAME}\n  Current max rogue count threshold: {bsnMaxRogueCount}\n  Number of detected rogues is now within the allowed limit."
-    mib: AIRESPACE-WIRELESS-MIB
+    name: AIRESPACE-WIRELESS-MIB::bsnApMaxRogueCountClear
+    category: state_change
+    severity: notice
+    description: "Maximum rogue count cleared on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  AP Name: {bsnAPName}\n  Max Rogue Count: {bsnMaxRogueCount}"
     varbinds:
     - bsnAPMacAddrTrapVariable
     - bsnMaxRogueCount
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.52
-    name: bsnDot11StationBlacklisted
+    name: AIRESPACE-WIRELESS-MIB::bsnDot11StationBlacklisted
     category: security
     severity: warning
-    description: "Wireless client blacklisted on {SNMP_DEVICE_HOSTNAME}\n  client MAC: {bsnStationMacAddress}\n  username: {bsnStationUserName}\n  client IP: {bsnUserIpAddress}\n  AP: {bsnAPName} ({bsnStationAPMacAddr})\n  AP slot: {bsnStationAPIfSlotId}\n  reason: {bsnStationBlacklistingReasonCode}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Wireless client blacklisted on {SNMP_DEVICE_HOSTNAME}\n  MAC: {bsnStationMacAddress}\n  AP: {bsnAPName} (Slot: {bsnStationAPIfSlotId}, MAC: {bsnStationAPMacAddr})\n  Reason: {bsnStationBlacklistingReasonCode}\n  IP: {bsnUserIpAddress}\n  Username: {bsnStationUserName}"
     varbinds:
     - bsnStationAPMacAddr
     - bsnStationAPIfSlotId
@@ -1147,11 +1093,10 @@ traps:
     - bsnStationMacAddress
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.53
-    name: bsnDot11StationAssociate
+    name: AIRESPACE-WIRELESS-MIB::bsnDot11StationAssociate
     category: mobility
-    severity: info
-    description: "Wireless client associated with AP on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnStationAPMacAddr}\n  Radio slot: {bsnStationAPIfSlotId}\n  Client MAC: {bsnStationMacAddress}\n  Client IP: {bsnUserIpAddress}\n  Client user: {bsnStationUserName}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "Wireless client associated with AP on {SNMP_DEVICE_HOSTNAME}\n  client MAC: {bsnStationMacAddress}\n  client IP: {bsnUserIpAddress}\n  client username: {bsnStationUserName}\n  AP MAC: {bsnStationAPMacAddr}\n  AP name: {bsnAPName}\n  radio slot: {bsnStationAPIfSlotId}"
     varbinds:
     - bsnStationAPMacAddr
     - bsnStationAPIfSlotId
@@ -1160,41 +1105,37 @@ traps:
     - bsnStationUserName
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.55
-    name: bsnApBigNavDosAttack
+    name: AIRESPACE-WIRELESS-MIB::bsnApBigNavDosAttack
     category: security
     severity: alert
-    description: "Denial of Service attack detected on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  slot ID: {bsnAPSlotIdTrapVariable}\n  attacker MAC: {bsnNavDosAttackSourceMacAddr}\n  method: Large NAV field flooding"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Denial of service attack detected on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  AP Name: {bsnAPName}\n  Source MAC: {bsnNavDosAttackSourceMacAddr}\n  Slot ID: {bsnAPSlotIdTrapVariable}"
     varbinds:
     - bsnAPMacAddrTrapVariable
     - bsnAPSlotIdTrapVariable
     - bsnNavDosAttackSourceMacAddr
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.56
-    name: bsnTooManyUnsuccessLoginAttempts
+    name: AIRESPACE-WIRELESS-MIB::bsnTooManyUnsuccessLoginAttempts
     category: auth
     severity: warning
-    description: "Too many unsuccessful login attempts on {SNMP_DEVICE_HOSTNAME}\n  user IP address: {bsnUserIpAddress}\n  username: {bsnStationUserName}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Too many unsuccessful login attempts on {SNMP_DEVICE_HOSTNAME}\n  IP address: {bsnUserIpAddress}\n  Username: {bsnStationUserName}"
     varbinds:
     - bsnUserIpAddress
     - bsnStationUserName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.57
-    name: bsnWepKeyDecryptError
-    category: diagnostic
+    name: AIRESPACE-WIRELESS-MIB::bsnWepKeyDecryptError
+    category: security
     severity: err
-    description: "WEP decryption error on {SNMP_DEVICE_HOSTNAME}\n  station MAC: {bsnStationMacAddress}\n  AP MAC: {bsnStationAPMacAddr}\n  AP slot: {bsnStationAPIfSlotId}\n  Possible cause: incorrect WEP key configured at the station"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "WEP key decryption error on {SNMP_DEVICE_HOSTNAME}\n  station MAC: {bsnStationMacAddress}\n  AP MAC: {bsnStationAPMacAddr}\n  AP slot ID: {bsnStationAPIfSlotId}\nNote: The WEP key configured at the station may be incorrect."
     varbinds:
     - bsnStationMacAddress
     - bsnStationAPMacAddr
     - bsnStationAPIfSlotId
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.58
-    name: bsnWpaMicErrorCounterActivated
+    name: AIRESPACE-WIRELESS-MIB::bsnWpaMicErrorCounterActivated
     category: security
     severity: warning
-    description: "WPA MIC error counter measure activated on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  Station MAC: {bsnStationMacAddress}\n  AP MAC: {bsnStationAPMacAddr}\n  Slot ID: {bsnStationAPIfSlotId}\n  WLAN ID: {bsnWlanIdTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "WPA MIC error counter measure activated on {SNMP_DEVICE_HOSTNAME}\n  Station MAC: {bsnStationMacAddress}\n  AP MAC: {bsnStationAPMacAddr}\n  AP Name: {bsnAPName}\n  WLAN ID: {bsnWlanIdTrapVariable}"
     varbinds:
     - bsnStationMacAddress
     - bsnStationAPMacAddr
@@ -1202,38 +1143,34 @@ traps:
     - bsnWlanIdTrapVariable
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.59
-    name: bsnRogueAPDetectedOnWiredNetwork
+    name: AIRESPACE-WIRELESS-MIB::bsnRogueAPDetectedOnWiredNetwork
     category: security
-    severity: warning
-    description: "Rogue AP detected on wired network by {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  rogue MAC: {bsnRogueAPDot11MacAddress}\n  on wired network: {bsnRogueAPOnWiredNetwork}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: alert
+    description: "Rogue AP detected on wired network on {SNMP_DEVICE_HOSTNAME}\n  rogue MAC: {bsnRogueAPDot11MacAddress}\n  AP name: {bsnAPName}\n  wired network flag: {bsnRogueAPOnWiredNetwork}"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnRogueAPOnWiredNetwork
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.6
-    name: bsnAPDown
+    name: AIRESPACE-WIRELESS-MIB::bsnAPDown
     category: state_change
     severity: warning
-    description: "Access Point went down on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: Wireless AP {bsnAPDot3MacAddress} went down on {SNMP_DEVICE_HOSTNAME}
     varbinds:
     - bsnAPDot3MacAddress
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.60
-    name: bsnApHasNoRadioCards
-    category: diagnostic
+    name: AIRESPACE-WIRELESS-MIB::bsnApHasNoRadioCards
+    category: state_change
     severity: warning
-    description: Access Point {bsnAPName} ({bsnAPMacAddrTrapVariable}) on {SNMP_DEVICE_HOSTNAME} has no radio cards installed and cannot provide wireless services
-    mib: AIRESPACE-WIRELESS-MIB
+    description: Access Point {bsnAPName} ({bsnAPMacAddrTrapVariable}) on {SNMP_DEVICE_HOSTNAME} has no radio cards installed
     varbinds:
     - bsnAPMacAddrTrapVariable
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.61
-    name: bsnDuplicateIpAddressReported
+    name: AIRESPACE-WIRELESS-MIB::bsnDuplicateIpAddressReported
     category: security
     severity: warning
-    description: "Duplicate IP address detected on {SNMP_DEVICE_HOSTNAME}\n  reported by AP: {bsnDuplicateIpReportedByAP}\n  duplicate IP: {bsnDuplicateIpTrapVariable}\n  rogue MAC: {bsnDuplicateIpTrapClear}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  AP name: {bsnAPName}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Duplicate IP address detected on {SNMP_DEVICE_HOSTNAME}\n  duplicate IP: {bsnDuplicateIpTrapVariable}\n  MAC of conflicting station: {bsnRogueAPDot11MacAddress}\n  reported by AP: {bsnDuplicateIpReportedByAP}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  AP Name: {bsnAPName}"
     varbinds:
     - bsnDuplicateIpReportedByAP
     - bsnAPMacAddrTrapVariable
@@ -1242,11 +1179,10 @@ traps:
     - bsnDuplicateIpTrapClear
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.62
-    name: bsnAPContainedAsARogue
+    name: AIRESPACE-WIRELESS-MIB::bsnAPContainedAsARogue
     category: security
     severity: warning
-    description: "AP containment event on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  interface slot: {bsnAPIfSlotId}\n  interface type: {bsnAPIfType}\n  containment cleared: {bsnClearTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "AP {bsnAPName} ({bsnAPDot3MacAddress}) detected as being contained as a rogue on interface slot {bsnAPIfSlotId} (type {bsnAPIfType}) on {SNMP_DEVICE_HOSTNAME}\n  clear flag: {bsnClearTrapVariable}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
@@ -1254,88 +1190,79 @@ traps:
     - bsnClearTrapVariable
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.63
-    name: bsnTrustedApHasInvalidSsid
+    name: AIRESPACE-WIRELESS-MIB::bsnTrustedApHasInvalidSsid
     category: security
     severity: warning
-    description: "Trusted Rogue AP auto-contained on {SNMP_DEVICE_HOSTNAME} for advertising invalid SSID\n  Rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  Clear trap: {bsnClearTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Trusted Rogue AP auto-contained for invalid SSID on {SNMP_DEVICE_HOSTNAME}\n  Rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  Clear flag: {bsnClearTrapVariable}"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnClearTrapVariable
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.64
-    name: bsnTrustedApIsMissing
+    name: AIRESPACE-WIRELESS-MIB::bsnTrustedApIsMissing
     category: security
     severity: warning
-    description: "Trusted Rogue AP missing or failed on {SNMP_DEVICE_HOSTNAME}\n  Rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  Clear trap: {bsnClearTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Trusted Rogue AP missing or failed on {SNMP_DEVICE_HOSTNAME}\n  MAC: {bsnRogueAPDot11MacAddress}\n  clear flag: {bsnClearTrapVariable}"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnClearTrapVariable
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.65
-    name: bsnAdhocRogueAutoContained
+    name: AIRESPACE-WIRELESS-MIB::bsnAdhocRogueAutoContained
     category: security
     severity: warning
-    description: "Adhoc rogue AP auto-contained on {SNMP_DEVICE_HOSTNAME}\n  rogue MAC: {bsnRogueAPDot11MacAddress}\n  clear alert: {bsnClearTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Adhoc rogue AP auto-contained on {SNMP_DEVICE_HOSTNAME}\n  MAC: {bsnRogueAPDot11MacAddress}\n  clear flag: {bsnClearTrapVariable}"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnClearTrapVariable
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.66
-    name: bsnRogueApAutoContained
+    name: AIRESPACE-WIRELESS-MIB::bsnRogueApAutoContained
     category: security
     severity: warning
-    description: "Rogue AP auto-contained on {SNMP_DEVICE_HOSTNAME} for advertising the configured SSID\n  Rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  Clear alert: {bsnClearTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Rogue AP auto-contained on {SNMP_DEVICE_HOSTNAME} for advertising the legitimate SSID\n  Rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  Clear trap: {bsnClearTrapVariable}"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnClearTrapVariable
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.67
-    name: bsnTrustedApHasInvalidEncryption
+    name: AIRESPACE-WIRELESS-MIB::bsnTrustedApHasInvalidEncryption
     category: security
     severity: alert
-    description: "Trusted Rogue AP auto-contained on {SNMP_DEVICE_HOSTNAME} for invalid encryption\n  Rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  Encryption used: {bsnTrustedApEncryptionUsed}\n  Encryption required: {bsnTrustedApEncryptionRequired}\n  Clear trap: {bsnClearTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Trusted Rogue AP auto-contained for invalid encryption on {SNMP_DEVICE_HOSTNAME}\n  Rogue MAC: {bsnRogueAPDot11MacAddress}\n  Encryption used: {bsnTrustedApEncryptionUsed}\n  Encryption required: {bsnTrustedApEncryptionRequired}\n  Clear flag: {bsnClearTrapVariable}"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnTrustedApEncryptionUsed
     - bsnTrustedApEncryptionRequired
     - bsnClearTrapVariable
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.68
-    name: bsnTrustedApHasInvalidRadioPolicy
+    name: AIRESPACE-WIRELESS-MIB::bsnTrustedApHasInvalidRadioPolicy
     category: security
     severity: warning
-    description: "Trusted Rogue AP auto-contained on {SNMP_DEVICE_HOSTNAME} due to invalid radio policy\n  Rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  Policy used: {bsnTrustedApRadioPolicyUsed}\n  Policy required: {bsnTrustedApRadioPolicyRequired}\n  Clear trap: {bsnClearTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Trusted Rogue AP auto-contained for invalid radio policy on {SNMP_DEVICE_HOSTNAME}\n  MAC: {bsnRogueAPDot11MacAddress}\n  policy used: {bsnTrustedApRadioPolicyUsed}\n  policy required: {bsnTrustedApRadioPolicyRequired}\n  clear flag: {bsnClearTrapVariable}"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnTrustedApRadioPolicyUsed
     - bsnTrustedApRadioPolicyRequired
     - bsnClearTrapVariable
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.69
-    name: bsnNetworkStateChanged
+    name: AIRESPACE-WIRELESS-MIB::bsnNetworkStateChanged
     category: state_change
-    severity: warning
-    description: "Wireless network state changed on {SNMP_DEVICE_HOSTNAME}\n  network type: {bsnNetworkType}\n  state: {bsnNetworkState}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "Wireless network state changed on {SNMP_DEVICE_HOSTNAME}\n  network type: {bsnNetworkType}\n  new state: {bsnNetworkState}"
     varbinds:
     - bsnNetworkType
     - bsnNetworkState
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.7
-    name: bsnAPAssociated
+    name: AIRESPACE-WIRELESS-MIB::bsnAPAssociated
     category: state_change
-    severity: info
-    description: "Airespace access point associated to controller on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  Port number: {bsnAPPortNumberTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "Wireless AP associated on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  AP Name: {bsnAPName}\n  Port: {bsnAPPortNumberTrapVariable}"
     varbinds:
     - bsnAPMacAddrTrapVariable
     - bsnAPPortNumberTrapVariable
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.70
-    name: bsnSignatureAttackDetected
+    name: AIRESPACE-WIRELESS-MIB::bsnSignatureAttackDetected
     category: security
-    severity: alert
-    description: "Signature attack detected on {SNMP_DEVICE_HOSTNAME}\n  access point: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  AP interface type: {bsnAPIfType}, slot {bsnAPIfSlotId}\n  signature type: {bsnSignatureType}\n  signature name: {bsnSignatureName}\n  description: {bsnSignatureDescription}\n  attacker MAC: {bsnSignatureAttackerMacAddress}\n  frequency: {bsnSignatureAttackFrequency}\n  channel: {bsnSignatureAttackChannel}\n  precedence: {bsnSignatureAttackPreced}\n  clear trap: {bsnClearTrapVariable}\n  MAC tracking mode: {bsnSignatureMacInfo}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: warning
+    description: "Signature-based attack detected on {SNMP_DEVICE_HOSTNAME}\n  Access Point: {bsnAPName} ({bsnAPDot3MacAddress})\n  Interface type: {bsnAPIfType}, Slot: {bsnAPIfSlotId}\n  Signature type: {bsnSignatureType}\n  Signature name: {bsnSignatureName}\n  Description: {bsnSignatureDescription}\n  Attacker MAC: {bsnSignatureAttackerMacAddress}\n  Channel: {bsnSignatureAttackChannel}\n  Frequency: {bsnSignatureAttackFrequency}\n  Precedence: {bsnSignatureAttackPreced}\n  Clear trap: {bsnClearTrapVariable}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
@@ -1351,55 +1278,50 @@ traps:
     - bsnSignatureAttackerMacAddress
     - bsnSignatureMacInfo
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.71
-    name: bsnAPRadioCardTxFailure
-    category: state_change
-    severity: warning
-    description: "Radio card TX failure on AP {bsnAPName} ({bsnAPDot3MacAddress})\n  slot: {bsnAPIfSlotId}\n  radio type: {bsnAPIfType}\n  Radio has stopped transmitting on {SNMP_DEVICE_HOSTNAME}"
-    mib: AIRESPACE-WIRELESS-MIB
+    name: AIRESPACE-WIRELESS-MIB::bsnAPRadioCardTxFailure
+    category: diagnostic
+    severity: alert
+    description: "Radio card transmission failure on AP {bsnAPName} ({bsnAPDot3MacAddress})\n  Slot ID: {bsnAPIfSlotId}\n  Interface Type: {bsnAPIfType}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPIfType
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.72
-    name: bsnAPRadioCardTxFailureClear
+    name: AIRESPACE-WIRELESS-MIB::bsnAPRadioCardTxFailureClear
     category: state_change
-    severity: info
-    description: "Radio card transmit failure cleared on {SNMP_DEVICE_HOSTNAME}\n  AP Name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  Slot ID: {bsnAPIfSlotId}\n  Radio Type: {bsnAPIfType}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "Radio card transmission failure cleared on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}\n  AP Name: {bsnAPName}\n  Slot ID: {bsnAPIfSlotId}\n  Interface Type: {bsnAPIfType}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPIfType
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.73
-    name: bsnAPRadioCardRxFailure
+    name: AIRESPACE-WIRELESS-MIB::bsnAPRadioCardRxFailure
     category: state_change
-    severity: err
-    description: "Radio card receive failure on AP {bsnAPName} ({bsnAPDot3MacAddress}) at {SNMP_DEVICE_HOSTNAME}\n  slot: {bsnAPIfSlotId}\n  radio type: {bsnAPIfType}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: warning
+    description: "Radio card on AP {bsnAPName} stopped receiving on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}\n  Interface slot: {bsnAPIfSlotId}\n  Interface type: {bsnAPIfType}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPIfType
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.74
-    name: bsnAPRadioCardRxFailureClear
+    name: AIRESPACE-WIRELESS-MIB::bsnAPRadioCardRxFailureClear
     category: state_change
     severity: info
-    description: "Radio card receive failure cleared on AP {bsnAPName} ({bsnAPDot3MacAddress})\n  slot: {bsnAPIfSlotId}\n  type: {bsnAPIfType}\nThe radio card has resumed receiving after a prior failure."
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Radio card receive function recovered on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  slot: {bsnAPIfSlotId}\n  radio type: {bsnAPIfType}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPIfType
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.75
-    name: bsnAPImpersonationDetected
+    name: AIRESPACE-WIRELESS-MIB::bsnAPImpersonationDetected
     category: security
-    severity: warning
-    description: "AP impersonation attack detected on {SNMP_DEVICE_HOSTNAME}\n  detecting AP: {bsnAPName} ({bsnAPDot3MacAddress})\n  slot: {bsnAPIfSlotId}, radio type: {bsnAPIfType}\n  impersonated AP MAC: {bsnImpersonatedAPMacAddr}\n  impersonating source MAC: {bsnImpersonatingSourceMacAddr}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: alert
+    description: "AP impersonation attack detected on {SNMP_DEVICE_HOSTNAME}\n  Impersonated AP MAC: {bsnImpersonatedAPMacAddr}\n  Impersonating source MAC: {bsnImpersonatingSourceMacAddr}\n  Detecting AP: {bsnAPName} ({bsnAPDot3MacAddress})\n  Interface slot: {bsnAPIfSlotId}\n  Radio type: {bsnAPIfType}"
     varbinds:
     - bsnImpersonatedAPMacAddr
     - bsnImpersonatingSourceMacAddr
@@ -1408,154 +1330,138 @@ traps:
     - bsnAPIfType
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.76
-    name: bsnTrustedApHasInvalidPreamble
+    name: AIRESPACE-WIRELESS-MIB::bsnTrustedApHasInvalidPreamble
     category: security
     severity: warning
-    description: "Trusted Rogue AP auto-contained on {SNMP_DEVICE_HOSTNAME} for using invalid preamble\n  Rogue AP MAC: {bsnRogueAPDot11MacAddress}\n  preamble used: {bsnTrustedApPreambleUsed}\n  preamble required: {bsnTrustedApPreambleRequired}\n  clear trap: {bsnClearTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Trusted Rogue AP auto-contained due to invalid preamble on {SNMP_DEVICE_HOSTNAME}\n  Rogue MAC: {bsnRogueAPDot11MacAddress}\n  Preamble used: {bsnTrustedApPreambleUsed}\n  Preamble required: {bsnTrustedApPreambleRequired}\n  Clear flag: {bsnClearTrapVariable}"
     varbinds:
     - bsnRogueAPDot11MacAddress
     - bsnTrustedApPreambleUsed
     - bsnTrustedApPreambleRequired
     - bsnClearTrapVariable
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.77
-    name: bsnAPIPAddressFallback
+    name: AIRESPACE-WIRELESS-MIB::bsnAPIPAddressFallback
     category: state_change
     severity: warning
-    description: "Access Point {bsnAPName} on {SNMP_DEVICE_HOSTNAME} fell back to DHCP after failing to establish external connectivity with its static IP.\n  AP MAC: {bsnAPDot3MacAddress}\n  Configured static IP: {bsnAPStaticIPAddress}\n  Current IP (DHCP-assigned): {bsnApIpAddress}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: AP {bsnAPName} ({bsnAPDot3MacAddress}) fell back to DHCP on {bsnApIpAddress} from static IP {bsnAPStaticIPAddress} on {SNMP_DEVICE_HOSTNAME}
     varbinds:
     - bsnAPDot3MacAddress
     - bsnApIpAddress
     - bsnAPStaticIPAddress
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.78
-    name: bsnAPFunctionalityDisabled
+    name: AIRESPACE-WIRELESS-MIB::bsnAPFunctionalityDisabled
     category: license
     severity: crit
-    description: "AP functionality disabled on {SNMP_DEVICE_HOSTNAME} due to license issue\n  reason code: {bsnApFunctionalityDisableReasonCode}\n  license key: {bsnLicenseKeyTrapVariable}\n  feature set: {bsnLicenseKeyFeatureSetTrapVariable}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "AP functionality disabled on {SNMP_DEVICE_HOSTNAME} due to license issue\n  reason: {bsnApFunctionalityDisableReasonCode}\n  license key: {bsnLicenseKeyTrapVariable}\n  feature set: {bsnLicenseKeyFeatureSetTrapVariable}"
     varbinds:
     - bsnApFunctionalityDisableReasonCode
     - bsnLicenseKeyTrapVariable
     - bsnLicenseKeyFeatureSetTrapVariable
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.79
-    name: bsnAPRegulatoryDomainMismatch
+    name: AIRESPACE-WIRELESS-MIB::bsnAPRegulatoryDomainMismatch
     category: state_change
-    severity: warning
-    description: "AP failed to associate with controller on {SNMP_DEVICE_HOSTNAME} due to regulatory domain mismatch\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  AP regulatory domain: {bsnApRegulatoryDomain}\n  Configured country: {bsnGlobalDot11CountryIndex}"
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: crit
+    description: "AP {bsnAPName} ({bsnAPDot3MacAddress}) failed to associate with {SNMP_DEVICE_HOSTNAME} due to regulatory domain mismatch\n  AP regulatory domain: {bsnApRegulatoryDomain}\n  Switch country index: {bsnGlobalDot11CountryIndex}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPName
     - bsnApRegulatoryDomain
     - bsnGlobalDot11CountryIndex
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.8
-    name: bsnAPDisassociated
+    name: AIRESPACE-WIRELESS-MIB::bsnAPDisassociated
     category: state_change
     severity: warning
-    description: "Access Point disassociated from wireless controller on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPMacAddrTrapVariable}\n  AP Name: {bsnAPName}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: AP {bsnAPName} (MAC {bsnAPMacAddrTrapVariable}) disassociated from switch on {SNMP_DEVICE_HOSTNAME}
     varbinds:
     - bsnAPMacAddrTrapVariable
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.80
-    name: bsnRxMulticastQueueFull
+    name: AIRESPACE-WIRELESS-MIB::bsnRxMulticastQueueFull
     category: diagnostic
     severity: warning
-    description: CPU Receive Multicast Queue is full on {SNMP_DEVICE_HOSTNAME}. This may result in dropped multicast packets and degraded wireless client performance.
-    mib: AIRESPACE-WIRELESS-MIB
+    description: Receive Multicast Queue is full on {SNMP_DEVICE_HOSTNAME}. This indicates the CPU's receive path for multicast traffic is saturated, which may lead to packet drops or processing delays.
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.81
-    name: bsnRadarChannelDetected
-    category: diagnostic
-    severity: warning
-    description: "Radar signal detected on wireless channel at {SNMP_DEVICE_HOSTNAME}\n  AP: {bsnAPName}\n  MAC: {bsnAPDot3MacAddress}\n  Slot: {bsnAPIfSlotId}\n  Channel: {bsnAPIfPhyChannelNumber}\n\nThe AP will likely attempt to move to a different channel to avoid interference."
-    mib: AIRESPACE-WIRELESS-MIB
+    name: AIRESPACE-WIRELESS-MIB::bsnRadarChannelDetected
+    category: state_change
+    severity: notice
+    description: "Radar signal detected on AP {bsnAPName} (MAC: {bsnAPDot3MacAddress})\n  interface slot: {bsnAPIfSlotId}\n  channel: {bsnAPIfPhyChannelNumber}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPIfPhyChannelNumber
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.82
-    name: bsnRadarChannelCleared
+    name: AIRESPACE-WIRELESS-MIB::bsnRadarChannelCleared
     category: state_change
-    severity: info
-    description: "DFS radar channel cleared on {SNMP_DEVICE_HOSTNAME}\n  AP: {bsnAPName} ({bsnAPDot3MacAddress})\n  slot: {bsnAPIfSlotId}\n  channel: {bsnAPIfPhyChannelNumber}\n\nNote: Channel was previously blocked due to radar detection; clearance follows the Non-Occupancy Period expiry."
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: notice
+    description: "Radar channel cleared on {SNMP_DEVICE_HOSTNAME}\n  AP: {bsnAPName}\n  MAC: {bsnAPDot3MacAddress}\n  Slot: {bsnAPIfSlotId}\n  Channel: {bsnAPIfPhyChannelNumber}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPIfPhyChannelNumber
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.83
-    name: bsnAPAuthorizationFailure
-    category: security
+    name: AIRESPACE-WIRELESS-MIB::bsnAPAuthorizationFailure
+    category: auth
     severity: warning
-    description: "AP authorization failure on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}\n  AP name: {bsnAPName}\n  certificate type: {bsnAPAuthCertificateType}\n  failure cause: {bsnAPAuthorizationFailureCause}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "AP authorization failure on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}\n  AP Name: {bsnAPName}\n  Certificate Type: {bsnAPAuthCertificateType}\n  Failure Cause: {bsnAPAuthorizationFailureCause}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPName
     - bsnAPAuthCertificateType
     - bsnAPAuthorizationFailureCause
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.84
-    name: radioCoreDumpTrap
+    name: AIRESPACE-WIRELESS-MIB::radioCoreDumpTrap
     category: diagnostic
-    severity: crit
-    description: "Radio module core dump on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}\n  AP Name: {bsnAPName}\n  Slot ID: {bsnAPIfSlotId}\n\nThe core file can be retrieved on demand."
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: alert
+    description: "Radio module core dump on {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}\n  AP Name: {bsnAPName}\n  Slot ID: {bsnAPIfSlotId}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.85
-    name: invalidRadioTrap
-    category: diagnostic
-    severity: notice
-    description: "Unsupported radio detected on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  slot ID: {bsnAPIfSlotId}\n  radio type: {bsnAPInvalidRadioType}"
-    mib: AIRESPACE-WIRELESS-MIB
+    name: AIRESPACE-WIRELESS-MIB::invalidRadioTrap
+    category: state_change
+    severity: warning
+    description: "Access Point using unsupported radio on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  slot ID: {bsnAPIfSlotId}\n  radio type: {bsnAPInvalidRadioType}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId
     - bsnAPInvalidRadioType
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.86
-    name: countryChangeTrap
+    name: AIRESPACE-WIRELESS-MIB::countryChangeTrap
     category: config_change
     severity: notice
-    description: "Operator changed country of operation on {SNMP_DEVICE_HOSTNAME}\n  new country code: {bsnGlobalDot11CountryIndex}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Country of operation changed on {SNMP_DEVICE_HOSTNAME}\n  new country index: {bsnGlobalDot11CountryIndex}"
     varbinds:
     - bsnGlobalDot11CountryIndex
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.87
-    name: unsupportedAPTrap
+    name: AIRESPACE-WIRELESS-MIB::unsupportedAPTrap
     category: diagnostic
     severity: warning
-    description: "Unsupported AP attempted to join {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}\n  AP Name: {bsnAPName}\n  Reason: AP model incompatible with 40xx/410x or 3500 controllers with 64MB flash"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "Unsupported AP attempted to join {SNMP_DEVICE_HOSTNAME}\n  AP MAC: {bsnAPDot3MacAddress}\n  AP Name: {bsnAPName}\n  Note: Unsupported AP models (40xx/410x/3500 with 64MB flash) cannot associate"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.88
-    name: heartbeatLossTrap
+    name: AIRESPACE-WIRELESS-MIB::heartbeatLossTrap
     category: state_change
-    severity: err
-    description: Controller lost heartbeat connection with embedded Supervisor Switch on {SNMP_DEVICE_HOSTNAME}. No keepalive responses received.
-    mib: AIRESPACE-WIRELESS-MIB
+    severity: crit
+    description: "Heartbeat loss detected on {SNMP_DEVICE_HOSTNAME}\n  The controller has lost connection with the Supervisor Switch and is no longer receiving heartbeat keepalives."
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.89
-    name: locationNotifyTrap
-    category: mobility
-    severity: info
-    description: "Location event notification received from {SNMP_DEVICE_HOSTNAME}\n  content: {locationNotifyContent}"
-    mib: AIRESPACE-WIRELESS-MIB
+    name: AIRESPACE-WIRELESS-MIB::locationNotifyTrap
+    category: state_change
+    severity: notice
+    description: "Location event notification received on {SNMP_DEVICE_HOSTNAME}\n  content: {locationNotifyContent}"
     varbinds:
     - locationNotifyContent
   - oid: 1.3.6.1.4.1.14179.2.6.3.0.9
-    name: bsnAPIfUp
+    name: AIRESPACE-WIRELESS-MIB::bsnAPIfUp
     category: state_change
     severity: info
-    description: "Access Point interface up on {SNMP_DEVICE_HOSTNAME}\n  AP name: {bsnAPName}\n  AP MAC: {bsnAPDot3MacAddress}\n  slot: {bsnAPIfSlotId}\n  switch port: {bsnAPPortNumber}\n  cause: {bsnAPIfUpDownCause}"
-    mib: AIRESPACE-WIRELESS-MIB
+    description: "AP interface {bsnAPName} (MAC: {bsnAPDot3MacAddress}) on slot {bsnAPIfSlotId}, port {bsnAPPortNumber} is up.\n  Up cause: {bsnAPIfUpDownCause}"
     varbinds:
     - bsnAPDot3MacAddress
     - bsnAPIfSlotId

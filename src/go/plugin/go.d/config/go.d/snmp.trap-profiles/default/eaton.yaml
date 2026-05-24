@@ -34,6 +34,31 @@ varbinds:
       '-1': contactBad
       '1': contactClosed
       '0': contactOpen
+  digitalInputAlarm:
+    oid: 1.3.6.1.4.1.534.6.8.1.4.3.1.1
+    type: AlarmLevelType
+  digitalInputAlarmChangeSince:
+    oid: 1.3.6.1.4.1.534.6.8.1.4.3.1.2
+    type: UnixTimeStamp
+  digitalInputCommunicationStatus:
+    oid: 1.3.6.1.4.1.534.6.8.1.4.3.1.5
+    type: CommunicationStatus
+  digitalInputCommunicationStatusSince:
+    oid: 1.3.6.1.4.1.534.6.8.1.4.3.1.6
+    type: UnixTimeStamp
+  digitalInputIndex:
+    oid: 1.3.6.1.4.1.534.6.8.1.4.1.1.1
+    type: Integer32
+    constraints: (1..2)
+  digitalInputState:
+    oid: 1.3.6.1.4.1.534.6.8.1.4.3.1.3
+    type: StateType
+  digitalInputStateSince:
+    oid: 1.3.6.1.4.1.534.6.8.1.4.3.1.4
+    type: UnixTimeStamp
+  digitalInputUuid:
+    oid: 1.3.6.1.4.1.534.6.8.1.4.1.1.2
+    type: OCTET STRING
   groupBreakerStatus:
     oid: 1.3.6.1.4.1.534.6.6.7.5.1.1.5
     type: INTEGER
@@ -57,9 +82,6 @@ varbinds:
     oid: 1.3.6.1.4.1.534.6.6.7.5.1.1.1
     type: Integer32
     constraints: (1..64)
-  groupName:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.15
-    type: DisplayString
   groupVoltage:
     oid: 1.3.6.1.4.1.534.6.6.7.5.3.1.3
     type: Integer32
@@ -72,6 +94,18 @@ varbinds:
       '3': highWarning
       '2': lowCritical
       '1': lowWarning
+  humidityAlarm:
+    oid: 1.3.6.1.4.1.534.6.8.1.3.3.1.1
+    type: AlarmType
+  humidityAlarmChangeSince:
+    oid: 1.3.6.1.4.1.534.6.8.1.3.3.1.2
+    type: UnixTimeStamp
+  humidityCommunicationStatus:
+    oid: 1.3.6.1.4.1.534.6.8.1.3.3.1.4
+    type: CommunicationStatus
+  humidityCommunicationStatusSince:
+    oid: 1.3.6.1.4.1.534.6.8.1.3.3.1.5
+    type: UnixTimeStamp
   humidityIndex:
     oid: 1.3.6.1.4.1.534.6.6.7.7.2.1.1
     type: Integer32
@@ -85,19 +119,12 @@ varbinds:
       '3': highWarning
       '2': lowCritical
       '1': lowWarning
+  humidityUuid:
+    oid: 1.3.6.1.4.1.534.6.8.1.3.1.1.2
+    type: OCTET STRING
   humidityValue:
     oid: 1.3.6.1.4.1.534.6.6.7.7.2.1.4
     type: Integer32
-  ifDescr:
-    oid: 1.3.6.1.2.1.2.2.1.2
-    type: DisplayString
-    constraints: SIZE(0..255)
-  ifIndex:
-    oid: 1.3.6.1.2.1.2.2.1.1
-    type: InterfaceIndex
-  imageVersion:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.18
-    type: DisplayString
   inputCurrent:
     oid: 1.3.6.1.4.1.534.6.6.7.3.3.1.4
     type: Integer32
@@ -149,15 +176,6 @@ varbinds:
     enum:
       '0': good
       '1': internalFailure
-  ipAddress:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.3
-    type: IpAddress
-  objectInstance:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.13
-    type: DisplayString
-  objectName:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.12
-    type: DisplayString
   outletControlStatus:
     oid: 1.3.6.1.4.1.534.6.6.7.6.6.1.2
     type: INTEGER
@@ -182,17 +200,6 @@ varbinds:
     oid: 1.3.6.1.4.1.534.6.6.7.6.1.1.1
     type: Integer32
     constraints: (1..64)
-  outletLabel:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.2.2.1.2
-    type: DisplayString
-  outletOperationalState:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.2.2.1.3
-    type: INTEGER
-    enum:
-      '2': cycling
-      '-1': error
-      '0': 'off'
-      '1': 'on'
   outletVoltage:
     oid: 1.3.6.1.4.1.534.6.6.7.6.3.1.2
     type: Integer32
@@ -205,15 +212,22 @@ varbinds:
       '3': highWarning
       '2': lowCritical
       '1': lowWarning
-  sensorDescr:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.19
-    type: DisplayString
-  slaveIpAddress:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.24
-    type: IpAddress
-  status:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.23
-    type: DisplayString
+  sensorCount:
+    oid: 1.3.6.1.4.1.534.6.8.1.1.1
+    type: Integer32
+  sensorIndex:
+    oid: 1.3.6.1.4.1.534.6.8.1.1.2.1.1
+    type: Integer32
+    constraints: (1..3)
+  sensorStatus:
+    oid: 1.3.6.1.4.1.534.6.8.1.1.4.1.1
+    type: CommunicationStatus
+  sensorStatusSince:
+    oid: 1.3.6.1.4.1.534.6.8.1.1.4.1.2
+    type: UnixTimeStamp
+  sensorUuid:
+    oid: 1.3.6.1.4.1.534.6.8.1.1.2.1.2
+    type: OCTET STRING
   strappingIndex:
     oid: 1.3.6.1.4.1.534.6.6.7.1.2.1.1
     type: Integer32
@@ -224,9 +238,22 @@ varbinds:
     enum:
       '1': communicationLost
       '0': good
-  targetUser:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.14
+  sysName:
+    oid: 1.3.6.1.2.1.1.5
     type: DisplayString
+    constraints: SIZE(0..255)
+  temperatureAlarm:
+    oid: 1.3.6.1.4.1.534.6.8.1.2.3.1.1
+    type: AlarmType
+  temperatureAlarmChangeSince:
+    oid: 1.3.6.1.4.1.534.6.8.1.2.3.1.2
+    type: UnixTimeStamp
+  temperatureCommunicationStatus:
+    oid: 1.3.6.1.4.1.534.6.8.1.2.3.1.4
+    type: CommunicationStatus
+  temperatureCommunicationStatusSince:
+    oid: 1.3.6.1.4.1.534.6.8.1.2.3.1.5
+    type: UnixTimeStamp
   temperatureIndex:
     oid: 1.3.6.1.4.1.534.6.6.7.7.1.1.1
     type: Integer32
@@ -247,35 +274,33 @@ varbinds:
       '3': highWarning
       '2': lowCritical
       '1': lowWarning
+  temperatureUuid:
+    oid: 1.3.6.1.4.1.534.6.8.1.2.1.1.2
+    type: OCTET STRING
   temperatureValue:
     oid: 1.3.6.1.4.1.534.6.6.7.7.1.1.4
     type: Integer32
-  thresholdDescr:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.20
-    type: DisplayString
-  thresholdEventType:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.22
-    type: DisplayString
-  thresholdSeverity:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.21
-    type: DisplayString
   userName:
-    oid: 1.3.6.1.4.1.534.6.6.6.1.1.10
-    type: DisplayString
+    oid: 1.3.6.1.4.1.534.6.6.7.1.2.1.40
+    type: OCTET STRING
+    constraints: SIZE(0..31)
   xupsAlarmDescr:
     oid: 1.3.6.1.4.1.534.1.7.2.1.2
     type: OBJECT IDENTIFIER
   xupsAlarmID:
     oid: 1.3.6.1.4.1.534.1.7.2.1.1
-    type: INTEGER
+    type: Integer32
     constraints: (1..2147483647)
+  xupsAlarms:
+    oid: 1.3.6.1.4.1.534.1.7.1
+    type: Gauge32
   xupsContactDescr:
     oid: 1.3.6.1.4.1.534.1.6.8.1.4
     type: DisplayString
     constraints: SIZE(0..63)
   xupsContactIndex:
     oid: 1.3.6.1.4.1.534.1.6.8.1.1
-    type: INTEGER
+    type: Integer32
     constraints: (1..1024)
   xupsContactState:
     oid: 1.3.6.1.4.1.534.1.6.8.1.3
@@ -295,40 +320,44 @@ varbinds:
       '4': notUsed
   xupsEnvAmbientLowerLimit:
     oid: 1.3.6.1.4.1.534.1.6.2
-    type: INTEGER
+    type: Integer32
     constraints: (-100..200)
   xupsEnvAmbientTemp:
     oid: 1.3.6.1.4.1.534.1.6.1
-    type: INTEGER
+    type: Integer32
     constraints: (-100..200)
   xupsEnvAmbientUpperLimit:
     oid: 1.3.6.1.4.1.534.1.6.3
-    type: INTEGER
+    type: Integer32
     constraints: (-100..200)
   xupsEnvRemoteHumidity:
     oid: 1.3.6.1.4.1.534.1.6.6
-    type: INTEGER
+    type: Integer32
     constraints: (0..100)
   xupsEnvRemoteHumidityLowerLimit:
     oid: 1.3.6.1.4.1.534.1.6.11
-    type: INTEGER
+    type: Integer32
     constraints: (0..100)
   xupsEnvRemoteHumidityUpperLimit:
     oid: 1.3.6.1.4.1.534.1.6.12
-    type: INTEGER
+    type: Integer32
     constraints: (0..100)
   xupsEnvRemoteTemp:
     oid: 1.3.6.1.4.1.534.1.6.5
-    type: INTEGER
+    type: Integer32
     constraints: (-100..200)
   xupsEnvRemoteTempLowerLimit:
     oid: 1.3.6.1.4.1.534.1.6.9
-    type: INTEGER
+    type: Integer32
     constraints: (-100..200)
   xupsEnvRemoteTempUpperLimit:
     oid: 1.3.6.1.4.1.534.1.6.10
-    type: INTEGER
+    type: Integer32
     constraints: (-100..200)
+  xupsIdentModel:
+    oid: 1.3.6.1.4.1.534.1.1.2
+    type: DisplayString
+    constraints: SIZE(0..63)
   xupsInputSource:
     oid: 1.3.6.1.4.1.534.1.3.5
     type: INTEGER
@@ -341,327 +370,262 @@ varbinds:
       '1': other
       '3': primaryUtility
       '5': secondaryUtility
+  xupsLastGeneralTest:
+    oid: 1.3.6.1.4.1.534.1.8.3
+    type: INTEGER
+    enum:
+      '5': flashLightsTest
+      '2': noTestStarted
+      '4': testSecondarySource
+      '3': testSystem
+  xupsLastGeneralTestResult:
+    oid: 1.3.6.1.4.1.534.1.8.4
+    type: INTEGER
+    enum:
+      '3': failed
+      '4': inProgress
+      '6': inhibited
+      '5': notSupported
+      '2': passed
+      '7': scheduled
+      '1': unknown
+  xupsOutputSource:
+    oid: 1.3.6.1.4.1.534.1.4.5
+    type: INTEGER
+    enum:
+      '5': battery
+      '6': booster
+      '4': bypass
+      '12': essMode
+      '10': highEfficiencyMode
+      '11': maintenanceBypass
+      '2': none
+      '3': normal
+      '1': other
+      '8': parallelCapacity
+      '9': parallelRedundant
+      '7': reducer
+  xupsTestBatteryStatus:
+    oid: 1.3.6.1.4.1.534.1.8.2
+    type: INTEGER
+    enum:
+      '3': failed
+      '4': inProgress
+      '6': inhibited
+      '5': notSupported
+      '2': passed
+      '7': scheduled
+      '1': unknown
   xupsTrapMessage:
     oid: 1.3.6.1.4.1.534.1.11.3
     type: DisplayString
     constraints: SIZE(0..79)
 traps:
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.1
-    name: xupstbControlOff
-    category: state_change
-    severity: crit
-    description: Controlled UPS output shutdown initiated on {SNMP_DEVICE_HOSTNAME}. The UPS output power will turn off after the configured delay period.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.10
-    name: xupstbInverterFailure
-    category: diagnostic
-    severity: crit
-    description: UPS inverter failure on {SNMP_DEVICE_HOSTNAME}. The inverter is unavailable due to an internal failure.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.11
-    name: xupstbOnBypass
-    category: state_change
-    severity: warning
-    description: UPS on {SNMP_DEVICE_HOSTNAME} has switched to bypass mode
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.12
-    name: xupstbBypassNotAvailable
-    category: state_change
-    severity: warning
-    description: UPS bypass unavailable on {SNMP_DEVICE_HOSTNAME}. The bypass power path is not available, which may affect maintenance transfer capability or redundancy.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.13
-    name: xupstbOutputOff
-    category: state_change
-    severity: warning
-    description: UPS output switched off on {SNMP_DEVICE_HOSTNAME}. Connected loads will lose power.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.14
-    name: xupstbInputFailure
-    category: diagnostic
-    severity: crit
-    description: "UPS input power failure detected on {SNMP_DEVICE_HOSTNAME}\n  Issue: input power is incorrect in voltage, frequency, or phase rotation"
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.15
-    name: xupstbBuildingAlarm
-    category: diagnostic
-    severity: alert
-    description: Building alarm triggered on {SNMP_DEVICE_HOSTNAME}. One of the configured building alarm thresholds or conditions has been exceeded.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.16
-    name: xupstbShutdownImminent
-    category: state_change
-    severity: alert
-    description: UPS shutdown imminent on {SNMP_DEVICE_HOSTNAME}. The UPS has initiated a controlled shutdown sequence and will cease providing power to connected loads shortly.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.17
-    name: xupstbOnInverter
-    category: state_change
-    severity: notice
-    description: "UPS on {SNMP_DEVICE_HOSTNAME} has returned to utility power and resumed inverter operation\n  Event: Returned from bypass or battery backup"
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.2
-    name: xupstbControlOn
-    category: state_change
-    severity: notice
-    description: "UPS output power turning on shortly on {SNMP_DEVICE_HOSTNAME}\n  Delay interval defined by upsControlOutputOnTrapDelay"
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.20
-    name: xupstbBreakerOpen
-    category: state_change
-    severity: warning
-    description: UPS breaker or contactor opened on {SNMP_DEVICE_HOSTNAME}. This indicates a potential overload condition, fault, or manual intervention affecting the UPS power path.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.21
-    name: xupstbAlarmEntryAdded
-    category: diagnostic
-    severity: warning
-    description: An undefined alarm was added to the alarm table on {SNMP_DEVICE_HOSTNAME}. This alarm is not among the xups Well Known Alarms (e.g., it may be defined in RFC1628).
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.22
-    name: xupstbAlarmEntryRemoved
-    category: diagnostic
-    severity: notice
-    description: Non-critical alarm entry removed from the alarm table on {SNMP_DEVICE_HOSTNAME}. This indicates a previously active alarm condition has cleared.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.3
-    name: xupstbOnBattery
-    category: state_change
-    severity: warning
-    description: UPS on {SNMP_DEVICE_HOSTNAME} has lost AC input power and is running on battery
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.4
-    name: xupstbLowBattery
-    category: state_change
-    severity: crit
-    description: UPS battery low on {SNMP_DEVICE_HOSTNAME}. The UPS batteries have reached a low charge level and may not provide adequate runtime during a power outage.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.5
-    name: xupstbUtilityPowerRestored
-    category: state_change
-    severity: notice
-    description: Utility power restored on {SNMP_DEVICE_HOSTNAME} after running on battery backup
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.6
-    name: xupstbReturnFromLowBattery
-    category: state_change
-    severity: notice
-    description: Battery has recovered from low battery condition on {SNMP_DEVICE_HOSTNAME}
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.7
-    name: xupstbOutputOverload
-    category: diagnostic
-    severity: crit
-    description: UPS output overload detected on {SNMP_DEVICE_HOSTNAME}. Load exceeded 106% of rated capacity.
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.8
-    name: xupstbInternalFailure
-    category: diagnostic
-    severity: crit
-    description: 'Internal UPS component failure on {SNMP_DEVICE_HOSTNAME}. One or more of the following have failed: rectifier, inverter, or control panel.'
-    mib: XUPS-MIB
-  - oid: 1.3.6.1.4.1.534.1.0.0.0.9
-    name: xupstbBatteryDischarged
-    category: state_change
-    severity: crit
-    description: Battery totally discharged on {SNMP_DEVICE_HOSTNAME}. The UPS battery bank has reached full discharge and can no longer provide backup power during an outage.
-    mib: XUPS-MIB
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.1
-    name: xupstdControlOff
+    name: XUPS-MIB::xupstdControlOff
     category: state_change
-    severity: warning
-    description: "UPS output power shutdown initiated on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: alert
+    description: "UPS output power is turning off on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.10
-    name: xupstdInverterFailure
+    name: XUPS-MIB::xupstdInverterFailure
     category: diagnostic
-    severity: crit
-    description: "UPS inverter failure on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: alert
+    description: "UPS inverter failure on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description reference: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.100
+    name: XUPS-MIB::xupstdTestTrap
+    category: diagnostic
+    severity: info
+    description: "Test trap received from {SNMP_DEVICE_HOSTNAME}\n  sysName: {sysName}\n  message: {xupsTrapMessage}"
+    status: current
+    varbinds:
+    - sysName
+    - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.11
-    name: xupstdOnBypass
+    name: XUPS-MIB::xupstdOnBypass
     category: state_change
     severity: warning
-    description: "UPS on {SNMP_DEVICE_HOSTNAME} has entered bypass mode\n  alarm ID: {xupsAlarmID}\n  alarm description ref: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "UPS on {SNMP_DEVICE_HOSTNAME} has entered bypass mode\n  Alarm ID: {xupsAlarmID}\n  Description OID: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.12
-    name: xupstdBypassNotAvailable
+    name: XUPS-MIB::xupstdBypassNotAvailable
     category: state_change
-    severity: warning
-    description: "UPS bypass unavailable on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description reference: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: alert
+    description: "UPS bypass unavailable on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description ref: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.13
-    name: xupstdOutputOff
+    name: XUPS-MIB::xupstdOutputOff
     category: state_change
     severity: crit
-    description: "UPS output switched off on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "UPS output switched off on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.14
-    name: xupstdInputFailure
+    name: XUPS-MIB::xupstdInputFailure
     category: state_change
-    severity: warning
-    description: "UPS input power failure on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: crit
+    description: "UPS input power anomaly on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.15
-    name: xupstdBuildingAlarm
-    category: diagnostic
-    severity: warning
-    description: "Building alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    name: XUPS-MIB::xupstdBuildingAlarm
+    category: state_change
+    severity: alert
+    description: "Building alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description reference: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.16
-    name: xupstdShutdownImminent
-    category: diagnostic
+    name: XUPS-MIB::xupstdShutdownImminent
+    category: state_change
     severity: alert
-    description: "UPS shutdown imminent on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "UPS on {SNMP_DEVICE_HOSTNAME} is shutting down imminently\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.17
-    name: xupstdOnInverter
+    name: XUPS-MIB::xupstdOnInverter
     category: state_change
-    severity: info
-    description: "UPS on {SNMP_DEVICE_HOSTNAME} returned to utility power running the inverter\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: notice
+    description: "UPS on {SNMP_DEVICE_HOSTNAME} returned to utility power running the inverter\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.2
-    name: xupstdControlOn
+    name: XUPS-MIB::xupstdControlOn
     category: state_change
     severity: notice
-    description: "UPS output power activating on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "UPS output power turning on on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.20
-    name: xupstdBreakerOpen
+    name: XUPS-MIB::xupstdBreakerOpen
     category: state_change
-    severity: warning
-    description: "UPS breaker or contactor opened on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: alert
+    description: "UPS breaker or contactor opened on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description reference: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.21
-    name: xupstdAlarmEntryAdded
+    name: XUPS-MIB::xupstdAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: "Generic alarm entry added on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "Vendor-defined alarm entry added to UPS alarm table on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID reference: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.22
-    name: xupstdAlarmEntryRemoved
+    name: XUPS-MIB::xupstdAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: "Non-standard alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "UPS alarm cleared on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.23
-    name: xupstdAlarmBatteryBad
-    category: diagnostic
-    severity: crit
-    description: "UPS battery bad on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    name: XUPS-MIB::xupstdAlarmBatteryBad
+    category: state_change
+    severity: warning
+    description: "UPS battery failure detected on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description OID: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.24
-    name: xupstdOutputOffAsRequested
+    name: XUPS-MIB::xupstdOutputOffAsRequested
     category: state_change
-    severity: notice
-    description: "UPS output shutdown completed on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm descriptor: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: warning
+    description: "UPS output shutdown as requested on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.25
-    name: xupstdDiagnosticTestFailed
+    name: XUPS-MIB::xupstdDiagnosticTestFailed
     category: diagnostic
-    severity: err
-    description: "Diagnostic test failed on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description reference: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: crit
+    description: "Diagnostic test failed on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.26
-    name: xupstdCommunicationsLost
-    category: state_change
-    severity: err
-    description: "Communications lost between agent and UPS on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    name: XUPS-MIB::xupstdCommunicationsLost
+    category: diagnostic
+    severity: crit
+    description: "Communications lost between agent and UPS on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.27
-    name: xupstdUpsShutdownPending
+    name: XUPS-MIB::xupstdUpsShutdownPending
     category: state_change
     severity: warning
-    description: "UPS output shutdown countdown is active on {SNMP_DEVICE_HOSTNAME}.\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}\n\nAn xupsControlOutputOffDelay countdown is underway — the UPS will shut off output power to connected loads after the configured delay unless the shutdown is cancelled."
-    mib: XUPS-MIB
+    description: "UPS on {SNMP_DEVICE_HOSTNAME} is pending output shutdown\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.28
-    name: xupstdAlarmTestInProgress
+    name: XUPS-MIB::xupstdAlarmTestInProgress
     category: diagnostic
     severity: info
-    description: "Battery test in progress on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description ref: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "Diagnostic test in progress on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}\n\nNote: Upon completion, a follow-up trap will indicate pass/fail/cancel."
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.29
-    name: xupstdAmbientTempBad
-    category: state_change
+    name: XUPS-MIB::xupstdAmbientTempBad
+    category: diagnostic
     severity: warning
-    description: "Ambient temperature out of range on {SNMP_DEVICE_HOSTNAME}\n  current temp: {xupsEnvAmbientTemp}\n  lower limit: {xupsEnvAmbientLowerLimit}\n  upper limit: {xupsEnvAmbientUpperLimit}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "Ambient temperature out of range on {SNMP_DEVICE_HOSTNAME}\n  current temperature: {xupsEnvAmbientTemp}\n  lower limit: {xupsEnvAmbientLowerLimit}\n  upper limit: {xupsEnvAmbientUpperLimit}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
@@ -670,154 +634,154 @@ traps:
     - xupsEnvAmbientLowerLimit
     - xupsEnvAmbientUpperLimit
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.3
-    name: xupstdOnBattery
+    name: XUPS-MIB::xupstdOnBattery
     category: state_change
     severity: warning
-    description: "UPS on {SNMP_DEVICE_HOSTNAME} has lost AC input power and is now running on battery.\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "UPS {SNMP_DEVICE_HOSTNAME} switched to battery power\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.30
-    name: xupstdContactActiveNotice
+    name: XUPS-MIB::xupstdContactActiveNotice
     category: state_change
     severity: warning
-    description: "UPS contact active on {SNMP_DEVICE_HOSTNAME}\n  contact: {xupsContactDescr}\n  index: {xupsContactIndex}\n  type: {xupsContactType}\n  state: {xupsContactState}"
-    mib: XUPS-MIB
+    description: "Contact input activated on {SNMP_DEVICE_HOSTNAME}\n  contact index: {xupsContactIndex}\n  description: {xupsContactDescr}\n  contact type: {xupsContactType}\n  current state: {xupsContactState}"
+    status: current
     varbinds:
     - xupsContactIndex
     - xupsContactType
     - xupsContactState
     - xupsContactDescr
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.31
-    name: xupstdContactInactiveNotice
+    name: XUPS-MIB::xupstdContactInactiveNotice
     category: state_change
-    severity: warning
-    description: "UPS contact input changed to inactive state on {SNMP_DEVICE_HOSTNAME}\n  contact index: {xupsContactIndex}\n  description: {xupsContactDescr}\n  contact type: {xupsContactType}\n  current state: {xupsContactState}"
-    mib: XUPS-MIB
+    severity: info
+    description: "UPS contact entered inactive state on {SNMP_DEVICE_HOSTNAME}\n  contact index: {xupsContactIndex}\n  description: {xupsContactDescr}\n  contact type (normal): {xupsContactType}\n  current state: {xupsContactState}"
+    status: current
     varbinds:
     - xupsContactIndex
     - xupsContactType
     - xupsContactState
     - xupsContactDescr
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.32
-    name: xupstdLossOfRedundancy
+    name: XUPS-MIB::xupstdLossOfRedundancy
     category: state_change
     severity: warning
-    description: "Parallel UPS system on {SNMP_DEVICE_HOSTNAME} has lost N+1 redundancy.\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}\n  Possible causes: module failure, module removal, or overloading."
-    mib: XUPS-MIB
+    description: "Parallel UPS system on {SNMP_DEVICE_HOSTNAME} has lost N+1 redundancy\n  Possible causes: module failure/removal or overloading\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.33
-    name: xupstdAlarmTempBad
-    category: state_change
+    name: XUPS-MIB::xupstdAlarmTempBad
+    category: diagnostic
     severity: warning
-    description: "Internal temperature out of tolerance on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description ref: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "UPS internal temperature out of tolerance on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.34
-    name: xupstdAlarmChargerFailed
-    category: diagnostic
+    name: XUPS-MIB::xupstdAlarmChargerFailed
+    category: state_change
     severity: crit
-    description: "UPS charger failure detected on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description reference: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "UPS charger subsystem failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.35
-    name: xupstdAlarmFanFailure
-    category: state_change
-    severity: warning
-    description: "Fan failure detected in UPS on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description reference: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    name: XUPS-MIB::xupstdAlarmFanFailure
+    category: diagnostic
+    severity: crit
+    description: "Fan failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.36
-    name: xupstdAlarmFuseFailure
+    name: XUPS-MIB::xupstdAlarmFuseFailure
     category: diagnostic
     severity: crit
-    description: "Fuse failure detected on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "Fuse failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.37
-    name: xupstdPowerSwitchBad
+    name: XUPS-MIB::xupstdPowerSwitchBad
     category: diagnostic
     severity: crit
-    description: "Power switch failure on {SNMP_DEVICE_HOSTNAME}: a relay, contactor, or breaker has failed.\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "Power switch (relay/contactor/breaker) failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.38
-    name: xupstdModuleFailure
-    category: state_change
+    name: XUPS-MIB::xupstdModuleFailure
+    category: diagnostic
     severity: crit
-    description: "A module has failed in a parallel or composite system on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm descriptor: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "UPS module failure on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.39
-    name: xupstdOnAlternatePowerSource
+    name: XUPS-MIB::xupstdOnAlternatePowerSource
     category: state_change
-    severity: warning
-    description: "UPS on {SNMP_DEVICE_HOSTNAME} switched to alternate power source\n  current source: {xupsInputSource}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: notice
+    description: "UPS {SNMP_DEVICE_HOSTNAME} switched to alternate power source\n  source type: {xupsInputSource}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
     - xupsInputSource
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.4
-    name: xupstdLowBattery
+    name: XUPS-MIB::xupstdLowBattery
     category: state_change
-    severity: alert
-    description: "UPS battery low on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: crit
+    description: "Low battery condition on UPS {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description reference: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.40
-    name: xupstdAltPowerNotAvailable
+    name: XUPS-MIB::xupstdAltPowerNotAvailable
     category: state_change
     severity: warning
-    description: "Alternate power source not available on {SNMP_DEVICE_HOSTNAME}. If the primary power source fails longer than battery runtime allows, the UPS will lose power.\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "Alternate power source unavailable on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.41
-    name: xupstdNoticeCondition
+    name: XUPS-MIB::xupstdNoticeCondition
     category: diagnostic
-    severity: notice
-    description: "UPS notice condition on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: warning
+    description: "UPS notice condition on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.42
-    name: xupstdRemoteTempBad
-    category: state_change
+    name: XUPS-MIB::xupstdRemoteTempBad
+    category: diagnostic
     severity: warning
-    description: "Remote temperature out-of-range on {SNMP_DEVICE_HOSTNAME}\n  current reading: {xupsEnvRemoteTemp}\n  lower limit: {xupsEnvRemoteTempLowerLimit}\n  upper limit: {xupsEnvRemoteTempUpperLimit}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "Remote temperature out of range on {SNMP_DEVICE_HOSTNAME}\n  current temperature: {xupsEnvRemoteTemp}\n  lower limit: {xupsEnvRemoteTempLowerLimit}\n  upper limit: {xupsEnvRemoteTempUpperLimit}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
@@ -826,11 +790,11 @@ traps:
     - xupsEnvRemoteTempLowerLimit
     - xupsEnvRemoteTempUpperLimit
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.43
-    name: xupstdRemoteHumidityBad
-    category: diagnostic
+    name: XUPS-MIB::xupstdRemoteHumidityBad
+    category: state_change
     severity: warning
-    description: "Remote humidity out of range on {SNMP_DEVICE_HOSTNAME}\n  current reading: {xupsEnvRemoteHumidity}% RH\n  lower limit: {xupsEnvRemoteHumidityLowerLimit}% RH\n  upper limit: {xupsEnvRemoteHumidityUpperLimit}% RH\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "Remote humidity out of range on {SNMP_DEVICE_HOSTNAME}\n  current reading: {xupsEnvRemoteHumidity}\n  lower limit: {xupsEnvRemoteHumidityLowerLimit}\n  upper limit: {xupsEnvRemoteHumidityUpperLimit}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
@@ -838,1020 +802,307 @@ traps:
     - xupsEnvRemoteHumidity
     - xupsEnvRemoteHumidityLowerLimit
     - xupsEnvRemoteHumidityUpperLimit
-  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.5
-    name: xupstdUtilityPowerRestored
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.44
+    name: XUPS-MIB::xupstdHeartbeat
     category: state_change
     severity: notice
-    description: "Utility power restored on {SNMP_DEVICE_HOSTNAME} after running on battery\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    description: "Periodic UPS status heartbeat from {SNMP_DEVICE_HOSTNAME}\n  Input power source: {xupsInputSource}\n  Output power source: {xupsOutputSource}\n  Active alarms: {xupsAlarms}"
+    status: current
+    varbinds:
+    - xupsInputSource
+    - xupsOutputSource
+    - xupsAlarms
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.45
+    name: XUPS-MIB::xupstdDiagnosticTestPassed
+    category: diagnostic
+    severity: info
+    description: "Diagnostic test passed on {SNMP_DEVICE_HOSTNAME}\n  test type: {xupsLastGeneralTest}\n  test result: {xupsLastGeneralTestResult}\n  battery status: {xupsTestBatteryStatus}"
+    status: current
+    varbinds:
+    - xupsTestBatteryStatus
+    - xupsLastGeneralTest
+    - xupsLastGeneralTestResult
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.46
+    name: XUPS-MIB::xupstdOutputBad
+    category: state_change
+    severity: warning
+    description: "UPS output condition out of tolerance on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
+    varbinds:
+    - xupsAlarmID
+    - xupsAlarmDescr
+    - xupsTrapMessage
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.47
+    name: XUPS-MIB::xupstdAwaitingPower
+    category: state_change
+    severity: warning
+    description: "UPS output is off on {SNMP_DEVICE_HOSTNAME} while awaiting return of input power\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
+    varbinds:
+    - xupsAlarmID
+    - xupsAlarmDescr
+    - xupsTrapMessage
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.48
+    name: XUPS-MIB::xupstdOnMaintenanceBypass
+    category: state_change
+    severity: warning
+    description: "UPS on {SNMP_DEVICE_HOSTNAME} entered Maintenance/Manual Bypass\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
+    status: current
+    varbinds:
+    - xupsAlarmID
+    - xupsAlarmDescr
+    - xupsTrapMessage
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.49
+    name: XUPS-MIB::xupstdCommEstablished
+    category: state_change
+    severity: info
+    description: "SNMP agent established communication link with UPS on {SNMP_DEVICE_HOSTNAME}\n  Model: {xupsIdentModel}\n  Output source: {xupsOutputSource}"
+    status: current
+    varbinds:
+    - xupsIdentModel
+    - xupsOutputSource
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.5
+    name: XUPS-MIB::xupstdUtilityPowerRestored
+    category: state_change
+    severity: info
+    description: "Utility power restored on {SNMP_DEVICE_HOSTNAME} after running on battery\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
+    status: current
+    varbinds:
+    - xupsAlarmID
+    - xupsAlarmDescr
+    - xupsTrapMessage
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.50
+    name: XUPS-MIB::xupstdAgentDown
+    category: state_change
+    severity: notice
+    description: SNMP agent on {SNMP_DEVICE_HOSTNAME} is exiting or closing down gracefully
+    status: current
+  - oid: 1.3.6.1.4.1.534.1.11.4.1.0.51
+    name: XUPS-MIB::xupstdOutputNotProtected
+    category: state_change
+    severity: crit
+    description: "UPS output protection lost on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.6
-    name: xupstdReturnFromLowBattery
+    name: XUPS-MIB::xupstdReturnFromLowBattery
     category: state_change
-    severity: info
-    description: "UPS battery on {SNMP_DEVICE_HOSTNAME} has recovered from a low battery condition.\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    severity: notice
+    description: "UPS battery recovered from low battery condition on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.7
-    name: xupstdOutputOverload
-    category: state_change
-    severity: alert
-    description: "UPS output overload detected on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
+    name: XUPS-MIB::xupstdOutputOverload
+    category: diagnostic
+    severity: crit
+    description: "UPS output overload detected on {SNMP_DEVICE_HOSTNAME}\n  Load exceeded 106% of rated capacity.\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.8
-    name: xupstdInternalFailure
+    name: XUPS-MIB::xupstdInternalFailure
     category: diagnostic
     severity: crit
-    description: "Internal UPS component failure on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}\n\nAffected components may include: rectifier, inverter, or control panel."
-    mib: XUPS-MIB
+    description: "Internal UPS component failure on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
   - oid: 1.3.6.1.4.1.534.1.11.4.1.0.9
-    name: xupstdBatteryDischarged
-    category: state_change
-    severity: crit
-    description: "Battery totally discharged on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.1
-    name: xupstpControlOff
-    category: state_change
-    severity: warning
-    description: "UPS output power shutting down on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})\n\nShutdown will occur after the configured delay period."
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.10
-    name: xupstpInverterFailure
-    category: state_change
-    severity: crit
-    description: "UPS inverter failure on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.11
-    name: xupstpOnBypass
-    category: state_change
-    severity: warning
-    description: "UPS on {SNMP_DEVICE_HOSTNAME} has entered bypass mode\n  alarm ID: {xupsAlarmID}\n  alarm descr: {xupsAlarmDescr}\n  message: {xupsTrapMessage}\n  interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.12
-    name: xupstpBypassNotAvailable
-    category: state_change
-    severity: crit
-    description: "UPS bypass unavailable on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.13
-    name: xupstpOutputOff
-    category: state_change
-    severity: err
-    description: "UPS output switched off on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}\n  interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.14
-    name: xupstpInputFailure
-    category: state_change
-    severity: err
-    description: "UPS input power failure on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr}\n  Condition: input power incorrect (voltage, frequency, or phase rotation out of tolerance)"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.15
-    name: xupstpBuildingAlarm
-    category: diagnostic
-    severity: warning
-    description: "Building alarm triggered on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}\n  interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.16
-    name: xupstpShutdownImminent
-    category: state_change
-    severity: crit
-    description: "UPS shutdown imminent on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.17
-    name: xupstpOnInverter
-    category: state_change
-    severity: info
-    description: "UPS on {SNMP_DEVICE_HOSTNAME} returned to utility power running the inverter.\n  Alarm ID: {xupsAlarmID}\n  Alarm Description: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})\nContext: Recovery following either a bypass transfer or battery operation."
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.2
-    name: xupstpControlOn
-    category: state_change
-    severity: info
-    description: "UPS output power scheduled to turn on shortly on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}\n  interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.20
-    name: xupstpBreakerOpen
-    category: state_change
-    severity: warning
-    description: "UPS breaker or contactor opened on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.21
-    name: xupstpAlarmEntryAdded
-    category: diagnostic
-    severity: warning
-    description: "Generic UPS alarm added to Alarm Table on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  interface: {ifDescr} (ifIndex {ifIndex})\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.22
-    name: xupstpAlarmEntryRemoved
-    category: diagnostic
-    severity: notice
-    description: "Non-standard alarm entry removed from the Alarm Table on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  description OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}\n  interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.23
-    name: xupstpAlarmBatteryBad
+    name: XUPS-MIB::xupstdBatteryDischarged
     category: diagnostic
     severity: crit
-    description: "UPS battery bad on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
+    description: "UPS battery totally discharged on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}"
+    status: current
     varbinds:
     - xupsAlarmID
     - xupsAlarmDescr
     - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.24
-    name: xupstpOutputOffAsRequested
-    category: state_change
-    severity: crit
-    description: "UPS output shutdown executed on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsTrapMessage}\n  Interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.25
-    name: xupstpDiagnosticTestFailed
-    category: diagnostic
-    severity: warning
-    description: "UPS diagnostic test failed on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}\n  interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.26
-    name: xupstpCommunicationsLost
+  - oid: 1.3.6.1.4.1.534.10.2.10.1
+    name: EATON-ATS2-MIB::ats2TrapCommunicationLost
     category: state_change
     severity: alert
-    description: "Communications lost between agent and UPS on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.27
-    name: xupstpUpsShutdownPending
-    category: state_change
-    severity: warning
-    description: "UPS shutdown pending on {SNMP_DEVICE_HOSTNAME}: output off delay countdown is active.\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.28
-    name: xupstpAlarmTestInProgress
-    category: diagnostic
-    severity: info
-    description: "Battery test in progress on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.29
-    name: xupstpAmbientTempBad
-    category: state_change
-    severity: warning
-    description: "Ambient temperature out of range on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifDescr}\n  current temp: {xupsEnvAmbientTemp}\n  lower limit: {xupsEnvAmbientLowerLimit}\n  upper limit: {xupsEnvAmbientUpperLimit}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-    - xupsEnvAmbientTemp
-    - xupsEnvAmbientLowerLimit
-    - xupsEnvAmbientUpperLimit
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.3
-    name: xupstpOnBattery
-    category: state_change
-    severity: warning
-    description: "UPS on {SNMP_DEVICE_HOSTNAME} has lost AC input power and is now running on battery.\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.32
-    name: xupstpLossOfRedundancy
-    category: state_change
-    severity: crit
-    description: "Parallel UPS system on {SNMP_DEVICE_HOSTNAME} has lost N+1 redundancy\n  Alarm ID: {xupsAlarmID}\n  Description: {xupsTrapMessage}\n  Cause: module failure, module removal, or overloading\n  Interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.33
-    name: xupstpAlarmTempBad
-    category: state_change
-    severity: warning
-    description: "Internal temperature out of tolerance on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.34
-    name: xupstpAlarmChargerFailed
-    category: diagnostic
-    severity: crit
-    description: "UPS charger failure detected on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Description ref: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.35
-    name: xupstpAlarmFanFailure
-    category: state_change
-    severity: warning
-    description: "Fan failure detected on UPS {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.36
-    name: xupstpAlarmFuseFailure
-    category: diagnostic
-    severity: crit
-    description: "Fuse failure detected on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm description: {xupsAlarmDescr}\n  message: {xupsTrapMessage}\n  interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.37
-    name: xupstpPowerSwitchBad
-    category: diagnostic
-    severity: crit
-    description: "Power switch failure on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.38
-    name: xupstpModuleFailure
-    category: state_change
-    severity: warning
-    description: "UPS module failure on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Module: {ifDescr}\n  Interface Index: {ifIndex}\n  Message: {xupsTrapMessage}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.39
-    name: xupstpOnAlternatePowerSource
-    category: state_change
-    severity: warning
-    description: "System on {SNMP_DEVICE_HOSTNAME} switched to alternate power source\n  alarm ID: {xupsAlarmID}\n  input source: {xupsInputSource}\n  message: {xupsTrapMessage}\n  interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - xupsInputSource
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.4
-    name: xupstpLowBattery
-    category: state_change
-    severity: crit
-    description: "UPS low battery alarm on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.40
-    name: xupstpAltPowerNotAvailable
-    category: state_change
-    severity: warning
-    description: "Alternate power source not available on {SNMP_DEVICE_HOSTNAME}. If the primary power source fails, battery backup duration will be limited.\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.41
-    name: xupstpNoticeCondition
-    category: diagnostic
-    severity: notice
-    description: "UPS notice condition on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  alarm OID: {xupsAlarmDescr}\n  message: {xupsTrapMessage}\n  interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.42
-    name: xupstpRemoteTempBad
-    category: state_change
-    severity: warning
-    description: "Remote temperature out of range on {SNMP_DEVICE_HOSTNAME}\n  current reading: {xupsEnvRemoteTemp}\n  lower limit: {xupsEnvRemoteTempLowerLimit}\n  upper limit: {xupsEnvRemoteTempUpperLimit}\n  interface: {ifDescr}\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-    - xupsEnvRemoteTemp
-    - xupsEnvRemoteTempLowerLimit
-    - xupsEnvRemoteTempUpperLimit
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.43
-    name: xupstpRemoteHumidityBad
-    category: state_change
-    severity: warning
-    description: "Remote humidity out of range on {SNMP_DEVICE_HOSTNAME}\n  interface: {ifDescr}\n  current reading: {xupsEnvRemoteHumidity}% RH\n  lower limit: {xupsEnvRemoteHumidityLowerLimit}% RH\n  upper limit: {xupsEnvRemoteHumidityUpperLimit}% RH\n  message: {xupsTrapMessage}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-    - xupsEnvRemoteHumidity
-    - xupsEnvRemoteHumidityLowerLimit
-    - xupsEnvRemoteHumidityUpperLimit
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.5
-    name: xupstpUtilityPowerRestored
-    category: state_change
-    severity: info
-    description: "Utility power restored on {SNMP_DEVICE_HOSTNAME} after running on battery\n  alarm ID: {xupsAlarmID}\n  alarm description ref: {xupsAlarmDescr}\n  message: {xupsTrapMessage}\n  interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.6
-    name: xupstpReturnFromLowBattery
-    category: state_change
-    severity: notice
-    description: "UPS battery on {SNMP_DEVICE_HOSTNAME} has recovered from a low battery condition.\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.7
-    name: xupstpOutputOverload
-    category: diagnostic
-    severity: warning
-    description: "UPS output overload detected on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.8
-    name: xupstpInternalFailure
-    category: diagnostic
-    severity: crit
-    description: "UPS internal component failure on {SNMP_DEVICE_HOSTNAME}\n  Alarm ID: {xupsAlarmID}\n  Component: {xupsAlarmDescr}\n  Message: {xupsTrapMessage}\n  Interface: {ifDescr} (ifIndex {ifIndex})"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.1.11.4.2.0.9
-    name: xupstpBatteryDischarged
-    category: state_change
-    severity: crit
-    description: "Battery totally discharged on {SNMP_DEVICE_HOSTNAME}\n  alarm ID: {xupsAlarmID}\n  message: {xupsTrapMessage}\n  interface: {ifDescr}"
-    mib: XUPS-MIB
-    varbinds:
-    - xupsAlarmID
-    - xupsAlarmDescr
-    - xupsTrapMessage
-    - ifIndex
-    - ifDescr
-  - oid: 1.3.6.1.4.1.534.10.2.10.1
-    name: ats2TrapCommunicationLost
-    category: state_change
-    severity: warning
-    description: Communication with the ATS failed on {SNMP_DEVICE_HOSTNAME}
-    mib: EATON-ATS2-MIB
+    description: Communication with the Automatic Transfer Switch (ATS) on {SNMP_DEVICE_HOSTNAME} has been lost
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.10
-    name: ats2TrapSource1OutOfRange
-    category: state_change
+    name: EATON-ATS2-MIB::ats2TrapSource1OutOfRange
+    category: diagnostic
     severity: warning
-    description: Source 1 out of range on {SNMP_DEVICE_HOSTNAME}. One of the monitored power source parameters (e.g., voltage, frequency) has exceeded acceptable limits.
-    mib: EATON-ATS2-MIB
+    description: Source 1 voltage/current out of range on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.11
-    name: ats2TrapSource2Normal
+    name: EATON-ATS2-MIB::ats2TrapSource2Normal
     category: state_change
     severity: info
     description: Source 2 returned to normal on {SNMP_DEVICE_HOSTNAME}
-    mib: EATON-ATS2-MIB
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.12
-    name: ats2TrapSource2OutOfRange
+    name: EATON-ATS2-MIB::ats2TrapSource2OutOfRange
     category: state_change
     severity: warning
-    description: Source 2 out of range on {SNMP_DEVICE_HOSTNAME}. One of the two power sources monitored by this Eaton ATS has fallen outside acceptable operating parameters.
-    mib: EATON-ATS2-MIB
+    description: Source 2 out of range on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.13
-    name: ats2TrapSourceDesynchronized
+    name: EATON-ATS2-MIB::ats2TrapSourceDesynchronized
     category: state_change
     severity: warning
-    description: Sources 1 and 2 phase desynchronized on {SNMP_DEVICE_HOSTNAME}. The ATS cannot safely perform automatic transfer while sources are out of sync.
-    mib: EATON-ATS2-MIB
+    description: "ATS source synchronization lost on {SNMP_DEVICE_HOSTNAME}\n  Source 1 and Source 2 phase are desynchronized"
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.14
-    name: ats2TrapSourceSynchronized
-    category: state_change
-    severity: notice
-    description: 'Eaton ATS on {SNMP_DEVICE_HOSTNAME}: Source 1 and Source 2 phases are synchronized'
-    mib: EATON-ATS2-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.534.10.2.10.15
-    name: ats2TrapOutputPoweredBySource1
-    category: state_change
-    severity: notice
-    description: Output on {SNMP_DEVICE_HOSTNAME} is now powered by Source 1
-    mib: EATON-ATS2-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.534.10.2.10.16
-    name: ats2TrapOutputPoweredBySource2
-    category: state_change
-    severity: notice
-    description: Power source transferred to Source 2 on {SNMP_DEVICE_HOSTNAME}
-    mib: EATON-ATS2-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.534.10.2.10.2
-    name: ats2TrapCommunicationRecovered
-    category: state_change
-    severity: notice
-    description: Communication with the ATS recovered on {SNMP_DEVICE_HOSTNAME}
-    mib: EATON-ATS2-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.534.10.2.10.20
-    name: ats2TrapRemoteTempLow
-    category: state_change
-    severity: warning
-    description: Remote temperature low threshold exceeded on {SNMP_DEVICE_HOSTNAME}. Temperature has fallen below the configured lower limit.
-    mib: EATON-ATS2-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.534.10.2.10.21
-    name: ats2TrapRemoteTempHigh
-    category: state_change
-    severity: warning
-    description: Remote temperature exceeded upper limit on {SNMP_DEVICE_HOSTNAME}. Environmental sensor reading has risen above the configured threshold.
-    mib: EATON-ATS2-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.534.10.2.10.22
-    name: ats2TrapRemoteTempNormal
+    name: EATON-ATS2-MIB::ats2TrapSourceSynchronized
     category: state_change
     severity: info
-    description: Remote temperature returned to normal range on {SNMP_DEVICE_HOSTNAME}. The ats2EnvRemoteTemp sensor is now within configured lower and upper limits.
-    mib: EATON-ATS2-MIB
+    description: "ATS sources synchronized on {SNMP_DEVICE_HOSTNAME}\n  Source 1 and Source 2 phase are now synchronized."
+    status: current
+  - oid: 1.3.6.1.4.1.534.10.2.10.15
+    name: EATON-ATS2-MIB::ats2TrapOutputPoweredBySource1
+    category: state_change
+    severity: notice
+    description: ATS output powered by Source 1 on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.534.10.2.10.16
+    name: EATON-ATS2-MIB::ats2TrapOutputPoweredBySource2
+    category: state_change
+    severity: notice
+    description: ATS output source changed to Source 2 on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.534.10.2.10.2
+    name: EATON-ATS2-MIB::ats2TrapCommunicationRecovered
+    category: state_change
+    severity: info
+    description: Communication with the ATS recovered on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.534.10.2.10.20
+    name: EATON-ATS2-MIB::ats2TrapRemoteTempLow
+    category: diagnostic
+    severity: warning
+    description: Remote temperature below lower limit on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.534.10.2.10.21
+    name: EATON-ATS2-MIB::ats2TrapRemoteTempHigh
+    category: diagnostic
+    severity: warning
+    description: Remote temperature exceeded upper limit on {SNMP_DEVICE_HOSTNAME}
+    status: current
+  - oid: 1.3.6.1.4.1.534.10.2.10.22
+    name: EATON-ATS2-MIB::ats2TrapRemoteTempNormal
+    category: state_change
+    severity: info
+    description: Remote temperature returned to normal range on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.23
-    name: ats2TrapRemoteHumidityLow
+    name: EATON-ATS2-MIB::ats2TrapRemoteHumidityLow
     category: diagnostic
     severity: warning
-    description: Remote humidity dropped below the lower threshold on {SNMP_DEVICE_HOSTNAME}. Monitor environmental conditions for the connected load.
-    mib: EATON-ATS2-MIB
+    description: Remote humidity below lower limit on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.24
-    name: ats2TrapRemoteHumidityHigh
+    name: EATON-ATS2-MIB::ats2TrapRemoteHumidityHigh
     category: diagnostic
     severity: warning
-    description: Remote humidity has exceeded the upper limit on {SNMP_DEVICE_HOSTNAME}. Environmental conditions may require attention.
-    mib: EATON-ATS2-MIB
+    description: "Remote humidity exceeded upper limit on {SNMP_DEVICE_HOSTNAME}\n  The remote humidity has risen above the set upper limit."
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.25
-    name: ats2TrapRemoteHumidityNormal
+    name: EATON-ATS2-MIB::ats2TrapRemoteHumidityNormal
     category: state_change
     severity: info
     description: Remote humidity returned to normal range on {SNMP_DEVICE_HOSTNAME}
-    mib: EATON-ATS2-MIB
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.26
-    name: ats2Contact1ActiveNotice
+    name: EATON-ATS2-MIB::ats2Contact1ActiveNotice
     category: state_change
-    severity: info
-    description: Contact 1 activated on {SNMP_DEVICE_HOSTNAME}. This occurs when a normally-open contact closes with notice, a normally-closed contact opens with notice, or a contact configured for any-change detects a state transition.
-    mib: EATON-ATS2-MIB
+    severity: notice
+    description: "Contact 1 is now in Active state on {SNMP_DEVICE_HOSTNAME}. This trap fires when:\n  - Normally-open contact closes with notice\n  - Normally-closed contact opens with notice\n  - Any-change contact triggers open-with-notice or closed-with-notice"
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.27
-    name: ats2Contact1InactiveNotice
+    name: EATON-ATS2-MIB::ats2Contact1InactiveNotice
     category: state_change
-    severity: notice
-    description: Contact 1 on {SNMP_DEVICE_HOSTNAME} changed to inactive state
-    mib: EATON-ATS2-MIB
+    severity: warning
+    description: ATS Contact 1 changed to Inactive state on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.28
-    name: ats2Contact2ActiveNotice
+    name: EATON-ATS2-MIB::ats2Contact2ActiveNotice
     category: state_change
-    severity: warning
-    description: "Contact 2 activated on {SNMP_DEVICE_HOSTNAME}.\n  This auxiliary contact indicates a change in the ATS switching position or an alarm condition.\n  Possible triggers:\n    - Normally-open contact closed with notice\n    - Normally-closed contact opened with notice\n    - Any-change contact reached notice state"
-    mib: EATON-ATS2-MIB
+    severity: notice
+    description: ATS Contact 2 entered active state on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.29
-    name: ats2Contact2InactiveNotice
+    name: EATON-ATS2-MIB::ats2Contact2InactiveNotice
     category: state_change
     severity: warning
-    description: Contact 2 changed to inactive state on {SNMP_DEVICE_HOSTNAME}
-    mib: EATON-ATS2-MIB
+    description: ATS Contact 2 changed to inactive state on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.3
-    name: ats2TrapOutputPowered
+    name: EATON-ATS2-MIB::ats2TrapOutputPowered
     category: state_change
     severity: info
-    description: ATS output powered on {SNMP_DEVICE_HOSTNAME}. The transfer switch is now supplying power to the connected load.
-    mib: EATON-ATS2-MIB
+    description: ATS on {SNMP_DEVICE_HOSTNAME} powered the load
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.4
-    name: ats2TrapOutputNotPowered
+    name: EATON-ATS2-MIB::ats2TrapOutputNotPowered
     category: state_change
-    severity: crit
-    description: Eaton ATS output is not powering the load on {SNMP_DEVICE_HOSTNAME}. Downstream equipment may be without power.
-    mib: EATON-ATS2-MIB
+    severity: alert
+    description: ATS output is not powering the load on {SNMP_DEVICE_HOSTNAME}. The transfer switch is not delivering power to the connected load.
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.40
-    name: ats2TestTrap
+    name: EATON-ATS2-MIB::ats2TestTrap
     category: diagnostic
-    severity: info
-    description: Trap test feature activated on {SNMP_DEVICE_HOSTNAME}. This is a deliberate test trap to verify trap delivery functionality.
-    mib: EATON-ATS2-MIB
+    severity: debug
+    description: "ATS2 test trap triggered on {SNMP_DEVICE_HOSTNAME}\n  This is a diagnostic test event from the communication card."
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.5
-    name: ats2TrapOverload
-    category: state_change
-    severity: crit
-    description: Critical overload detected by ATS on {SNMP_DEVICE_HOSTNAME}. The transfer switch has sensed a load condition exceeding safe operational limits.
-    mib: EATON-ATS2-MIB
+    name: EATON-ATS2-MIB::ats2TrapOverload
+    category: diagnostic
+    severity: alert
+    description: "ATS2 overload detected on {SNMP_DEVICE_HOSTNAME}\n  The Automatic Transfer Switch has sensed a critical overload condition."
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.6
-    name: ats2TrapNoOverLoad
+    name: EATON-ATS2-MIB::ats2TrapNoOverLoad
     category: state_change
     severity: notice
-    description: Critical overload condition cleared on {SNMP_DEVICE_HOSTNAME}. The ATS has returned to normal operation.
-    mib: EATON-ATS2-MIB
+    description: Overload condition cleared on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.7
-    name: ats2TrapInternalFailure
+    name: EATON-ATS2-MIB::ats2TrapInternalFailure
     category: diagnostic
     severity: crit
-    description: Internal hardware failure detected on Eaton ATS device {SNMP_DEVICE_HOSTNAME}. This trap aggregates all hardware internal failure conditions.
-    mib: EATON-ATS2-MIB
+    description: Internal hardware failure detected on Eaton ATS {SNMP_DEVICE_HOSTNAME}. All internal HW failure conditions have been triggered.
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.8
-    name: ats2TrapNoInternalFailure
+    name: EATON-ATS2-MIB::ats2TrapNoInternalFailure
     category: diagnostic
-    severity: notice
-    description: Eaton ATS internal failure cleared on {SNMP_DEVICE_HOSTNAME}
-    mib: EATON-ATS2-MIB
+    severity: info
+    description: Internal failure condition has cleared on {SNMP_DEVICE_HOSTNAME}. The ATS has returned to normal operation.
     status: current
   - oid: 1.3.6.1.4.1.534.10.2.10.9
-    name: ats2TrapSource1Normal
+    name: EATON-ATS2-MIB::ats2TrapSource1Normal
     category: state_change
-    severity: notice
-    description: 'Eaton ATS on {SNMP_DEVICE_HOSTNAME}: Source 1 has returned to normal operation'
-    mib: EATON-ATS2-MIB
-    status: current
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.1
-    name: rebootStarted
-    category: state_change
-    severity: warning
-    description: "Reboot started on PDU {SNMP_DEVICE_HOSTNAME}\n  model: {objectName}\n  device: {objectInstance}\n  initiated by: {userName}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.11
-    name: userAdded
-    category: config_change
-    severity: notice
-    description: "User added to PDU on {SNMP_DEVICE_HOSTNAME}\n  device model: {objectName}\n  device name: {objectInstance}\n  initiated by: {userName}\n  user added: {targetUser}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - targetUser
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.12
-    name: userModified
-    category: config_change
-    severity: notice
-    description: "A user account was modified on {SNMP_DEVICE_HOSTNAME}\n  device model: {objectName}\n  device name: {objectInstance}\n  modified by user: {userName}\n  affected user record: {targetUser}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - targetUser
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.13
-    name: userDeleted
-    category: config_change
-    severity: notice
-    description: "A user account was deleted on {SNMP_DEVICE_HOSTNAME}\n  user performing deletion: {userName}\n  deleted user: {targetUser}\n  device model: {objectName}\n  device name: {objectInstance}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - targetUser
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.14
-    name: groupAdded
-    category: config_change
-    severity: notice
-    description: "Group added on {SNMP_DEVICE_HOSTNAME}\n  device: {objectInstance} ({objectName})\n  user: {userName}\n  group: {groupName}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - groupName
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.15
-    name: groupModified
-    category: config_change
-    severity: notice
-    description: "Group configuration modified on {SNMP_DEVICE_HOSTNAME}\n  device model: {objectName}\n  device name: {objectInstance}\n  user: {userName}\n  group: {groupName}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - groupName
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.16
-    name: groupDeleted
-    category: config_change
-    severity: notice
-    description: "Group deleted on {SNMP_DEVICE_HOSTNAME}\n  device model: {objectName}\n  device name: {objectInstance}\n  performed by user: {userName}\n  group deleted: {groupName}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - groupName
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.2
-    name: rebootCompleted
-    category: diagnostic
     severity: info
-    description: "Reboot completed on {SNMP_DEVICE_HOSTNAME}\n  model: {objectName}\n  device: {objectInstance}"
-    mib: PDU-MIB
+    description: ATS Source 1 returned to normal on {SNMP_DEVICE_HOSTNAME}
     status: current
-    varbinds:
-    - objectName
-    - objectInstance
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.20
-    name: deviceUpdateStarted
-    category: diagnostic
-    severity: notice
-    description: "Firmware update started on {SNMP_DEVICE_HOSTNAME}\n  model: {objectName}\n  device: {objectInstance}\n  initiated by user: {userName}\n  source IP: {ipAddress}\n  image version: {imageVersion}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - ipAddress
-    - imageVersion
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.22
-    name: userBlocked
-    category: auth
-    severity: warning
-    description: "Blocked user attempted login on {SNMP_DEVICE_HOSTNAME}\n  user: {userName}\n  source IP: {ipAddress}\n  device model: {objectName}\n  device name: {objectInstance}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - ipAddress
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.23
-    name: powerControl
-    category: config_change
-    severity: notice
-    description: "Outlet switched on {SNMP_DEVICE_HOSTNAME}\n  outlet: {outletLabel}\n  new state: {outletOperationalState}\n  initiated by user: {userName} ({ipAddress})\n  device: {objectInstance} ({objectName})"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - ipAddress
-    - outletLabel
-    - outletOperationalState
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.24
-    name: userPasswordChanged
-    category: security
-    severity: notice
-    description: "User password changed on {SNMP_DEVICE_HOSTNAME}\n  device model: {objectName}\n  device name: {objectInstance}\n  acting user: {userName}\n  affected user: {targetUser}\n  source IP: {ipAddress}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - targetUser
-    - ipAddress
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.28
-    name: passwordSettingsChanged
-    category: config_change
-    severity: notice
-    description: "Password settings changed on {SNMP_DEVICE_HOSTNAME}\n  device: {objectInstance}\n  model: {objectName}\n  user: {userName}\n  status: {status}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - status
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.3
-    name: userLogin
-    category: auth
-    severity: info
-    description: "User logged in to {SNMP_DEVICE_HOSTNAME}\n  user: {userName}\n  IP: {ipAddress}\n  model: {objectName}\n  device: {objectInstance}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - ipAddress
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.36
-    name: firmwareFileDiscarded
-    category: diagnostic
-    severity: info
-    description: "Firmware file discarded on {SNMP_DEVICE_HOSTNAME}\n  model: {objectName}\n  device: {objectInstance}\n  user: {userName}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.38
-    name: firmwareValidationFailed
-    category: diagnostic
-    severity: crit
-    description: "Firmware validation failed on {SNMP_DEVICE_HOSTNAME}\n  model: {objectName}\n  device: {objectInstance}\n  attempted by user: {userName}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.39
-    name: securityViolation
-    category: security
-    severity: warning
-    description: "Security violation on {SNMP_DEVICE_HOSTNAME}\n  device: {objectInstance}\n  model: {objectName}\n  user: {userName}\n  IP address: {ipAddress}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - ipAddress
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.4
-    name: userLogout
-    category: auth
-    severity: notice
-    description: "User logged out on {SNMP_DEVICE_HOSTNAME}\n  device: {objectInstance}\n  model: {objectName}\n  user: {userName}\n  IP address: {ipAddress}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - ipAddress
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.41
-    name: logFileCleared
-    category: config_change
-    severity: notice
-    description: "Log file cleared on {SNMP_DEVICE_HOSTNAME}\n  device: {objectInstance}\n  model: {objectName}\n  user: {userName}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.45
-    name: thresholdAlarm
-    category: diagnostic
-    severity: warning
-    description: "Threshold alarm on {SNMP_DEVICE_HOSTNAME}\n  device: {objectInstance} ({objectName})\n  IP: {ipAddress}\n  sensor: {sensorDescr}\n  threshold: {thresholdDescr}\n  severity: {thresholdSeverity}\n  event: {thresholdEventType}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - ipAddress
-    - sensorDescr
-    - thresholdDescr
-    - thresholdSeverity
-    - thresholdEventType
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.5
-    name: userAuthenticationFailure
-    category: auth
-    severity: warning
-    description: "User authentication failed on {SNMP_DEVICE_HOSTNAME}\n  device: {objectInstance} ({objectName})\n  user: {userName}\n  source IP: {ipAddress}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - ipAddress
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.50
-    name: outletGroupingConnectivityLost
-    category: state_change
-    severity: warning
-    description: "Master PDU lost contact with slave PDU in outlet grouping configuration on {SNMP_DEVICE_HOSTNAME}\n  device model: {objectName}\n  device name: {objectInstance}\n  master IP: {ipAddress}\n  slave IP: {slaveIpAddress}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - ipAddress
-    - slaveIpAddress
-  - oid: 1.3.6.1.4.1.534.6.6.6.0.8
-    name: userSessionTimeout
-    category: auth
-    severity: info
-    description: "User session timed out on {SNMP_DEVICE_HOSTNAME}\n  device model: {objectName}\n  device name: {objectInstance}\n  user: {userName}\n  IP address: {ipAddress}"
-    mib: PDU-MIB
-    status: current
-    varbinds:
-    - objectName
-    - objectInstance
-    - userName
-    - ipAddress
   - oid: 1.3.6.1.4.1.534.6.6.7.0.1
-    name: notifyUserLogin
+    name: EATON-EPDU-MIB::notifyUserLogin
     category: auth
-    severity: notice
-    description: "User \"{userName}\" logged into PDU {SNMP_DEVICE_HOSTNAME}\n  interface: {commInterface}"
-    mib: EATON-EPDU-MIB
+    severity: info
+    description: "User logged into PDU on {SNMP_DEVICE_HOSTNAME}\n  username: {userName}\n  interface: {commInterface}"
     status: current
     varbinds:
     - userName
     - commInterface
-    - oid: 1.3.6.1.4.1.534.6.6.7.1.2.1.40
-      type: OCTET STRING
-      constraints: SIZE(0..31)
-      name: userName
   - oid: 1.3.6.1.4.1.534.6.6.7.0.11
-    name: notifyInputVoltageThStatus
+    name: EATON-EPDU-MIB::notifyInputVoltageThStatus
     category: state_change
     severity: warning
-    description: "Input voltage threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  input: {inputIndex}\n  voltage index: {inputVoltageIndex}\n  voltage: {inputVoltage} mV\n  threshold status: {inputVoltageThStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Input voltage threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  input index: {inputIndex}\n  voltage measurement index: {inputVoltageIndex}\n  measured voltage: {inputVoltage} mV\n  status: {inputVoltageThStatus}"
     status: current
     varbinds:
     - strappingIndex
@@ -1860,11 +1111,10 @@ traps:
     - inputVoltage
     - inputVoltageThStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.12
-    name: notifyInputCurrentThStatus
+    name: EATON-EPDU-MIB::notifyInputCurrentThStatus
     category: state_change
     severity: warning
-    description: "Input current threshold status change on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  input index: {inputIndex}\n  input current index: {inputCurrentIndex}\n  measured current: {inputCurrent} mA\n  threshold status: {inputCurrentThStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Input current threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  input index: {inputIndex}\n  current measurement index: {inputCurrentIndex}\n  current value: {inputCurrent} mA\n  status: {inputCurrentThStatus}"
     status: current
     varbinds:
     - strappingIndex
@@ -1873,11 +1123,10 @@ traps:
     - inputCurrent
     - inputCurrentThStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.13
-    name: notifyInputFrequencyStatus
+    name: EATON-EPDU-MIB::notifyInputFrequencyStatus
     category: state_change
     severity: warning
-    description: "Input frequency status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  input index: {inputIndex}\n  frequency: {inputFrequency} (0.1 Hz units)\n  status: {inputFrequencyStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Input frequency status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  input index: {inputIndex}\n  measured frequency: {inputFrequency} (0.1 Hz units)\n  status: {inputFrequencyStatus}"
     status: current
     varbinds:
     - strappingIndex
@@ -1885,25 +1134,19 @@ traps:
     - inputFrequency
     - inputFrequencyStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.2
-    name: notifyUserLogout
+    name: EATON-EPDU-MIB::notifyUserLogout
     category: auth
-    severity: info
-    description: "User logged out of PDU {SNMP_DEVICE_HOSTNAME}\n  username: {userName}\n  interface: {commInterface}"
-    mib: EATON-EPDU-MIB
+    severity: notice
+    description: User {userName} logged out from {SNMP_DEVICE_HOSTNAME} via {commInterface}
     status: current
     varbinds:
     - userName
     - commInterface
-    - oid: 1.3.6.1.4.1.534.6.6.7.1.2.1.40
-      type: OCTET STRING
-      constraints: SIZE(0..31)
-      name: userName
   - oid: 1.3.6.1.4.1.534.6.6.7.0.21
-    name: notifyGroupVoltageThStatus
+    name: EATON-EPDU-MIB::notifyGroupVoltageThStatus
     category: state_change
-    severity: warning
-    description: "Group voltage threshold status change on {SNMP_DEVICE_HOSTNAME}\n  group: {groupIndex}\n  voltage: {groupVoltage} mV\n  threshold status: {groupVoltageThStatus}"
-    mib: EATON-EPDU-MIB
+    severity: err
+    description: "Group voltage threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  group index: {groupIndex}\n  current voltage: {groupVoltage} mV\n  threshold status: {groupVoltageThStatus}"
     status: current
     varbinds:
     - strappingIndex
@@ -1911,11 +1154,10 @@ traps:
     - groupVoltage
     - groupVoltageThStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.22
-    name: notifyGroupCurrentThStatus
+    name: EATON-EPDU-MIB::notifyGroupCurrentThStatus
     category: state_change
     severity: warning
-    description: "Group current threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  group index: {groupIndex}\n  current reading: {groupCurrent} mA\n  threshold status: {groupCurrentThStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Group current threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  group index: {groupIndex}\n  current: {groupCurrent} mA\n  status: {groupCurrentThStatus}"
     status: current
     varbinds:
     - strappingIndex
@@ -1923,36 +1165,29 @@ traps:
     - groupCurrent
     - groupCurrentThStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.23
-    name: notifyGroupBreakerStatus
+    name: EATON-EPDU-MIB::notifyGroupBreakerStatus
     category: state_change
-    severity: warning
-    description: "Circuit breaker status changed on {SNMP_DEVICE_HOSTNAME}\n  group index: {groupIndex}\n  breaker status: {groupBreakerStatus}\n  strapping index: {strappingIndex}"
-    mib: EATON-EPDU-MIB
+    severity: notice
+    description: "Circuit breaker status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  group index: {groupIndex}\n  breaker status: {groupBreakerStatus}"
     status: current
     varbinds:
     - strappingIndex
     - groupIndex
     - groupBreakerStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.3
-    name: notifyFailedLogin
+    name: EATON-EPDU-MIB::notifyFailedLogin
     category: auth
     severity: warning
     description: "Failed login attempt on {SNMP_DEVICE_HOSTNAME}\n  username: {userName}\n  interface: {commInterface}"
-    mib: EATON-EPDU-MIB
     status: current
     varbinds:
     - userName
     - commInterface
-    - oid: 1.3.6.1.4.1.534.6.6.7.1.2.1.40
-      type: OCTET STRING
-      constraints: SIZE(0..31)
-      name: userName
   - oid: 1.3.6.1.4.1.534.6.6.7.0.31
-    name: notifyOutletVoltageThStatus
+    name: EATON-EPDU-MIB::notifyOutletVoltageThStatus
     category: state_change
     severity: warning
-    description: "Outlet voltage threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  outlet index: {outletIndex}\n  voltage: {outletVoltage} mV\n  threshold status: {outletVoltageThStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Outlet voltage threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strappingIndex: {strappingIndex}\n  outletIndex: {outletIndex}\n  measured voltage: {outletVoltage} mV\n  threshold status: {outletVoltageThStatus}"
     status: current
     varbinds:
     - strappingIndex
@@ -1960,11 +1195,10 @@ traps:
     - outletVoltage
     - outletVoltageThStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.32
-    name: notifyOutletCurrentThStatus
+    name: EATON-EPDU-MIB::notifyOutletCurrentThStatus
     category: state_change
     severity: warning
-    description: "Outlet current threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  outlet index: {outletIndex}\n  current reading: {outletCurrent} mA\n  threshold status: {outletCurrentThStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Outlet current threshold status change on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  outlet index: {outletIndex}\n  current: {outletCurrent} mA\n  threshold status: {outletCurrentThStatus}"
     status: current
     varbinds:
     - strappingIndex
@@ -1972,31 +1206,28 @@ traps:
     - outletCurrent
     - outletCurrentThStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.33
-    name: notifyOutletControlStatus
+    name: EATON-EPDU-MIB::notifyOutletControlStatus
     category: state_change
-    severity: notice
-    description: "Outlet state changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  outlet index: {outletIndex}\n  new status: {outletControlStatus}"
-    mib: EATON-EPDU-MIB
+    severity: info
+    description: "Outlet state changed on {SNMP_DEVICE_HOSTNAME}\n  outletIndex: {outletIndex}\n  strappingIndex: {strappingIndex}\n  new status: {outletControlStatus}"
     status: current
     varbinds:
     - strappingIndex
     - outletIndex
     - outletControlStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.4
-    name: notifyBootUp
+    name: EATON-EPDU-MIB::notifyBootUp
     category: state_change
     severity: info
-    description: "ePDU finished booting on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}"
-    mib: EATON-EPDU-MIB
+    description: "ePDU {SNMP_DEVICE_HOSTNAME} finished booting up\n  strapping index: {strappingIndex}"
     status: current
     varbinds:
     - strappingIndex
   - oid: 1.3.6.1.4.1.534.6.6.7.0.41
-    name: notifyTemperatureThStatus
+    name: EATON-EPDU-MIB::notifyTemperatureThStatus
     category: state_change
     severity: warning
-    description: "Temperature threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  temperature probe: {temperatureIndex}\n  current value: {temperatureValue} tenths of degree\n  threshold status: {temperatureThStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Temperature threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  temperature index: {temperatureIndex}\n  temperature value: {temperatureValue}\n  status: {temperatureThStatus}"
     status: current
     varbinds:
     - strappingIndex
@@ -2004,11 +1235,10 @@ traps:
     - temperatureValue
     - temperatureThStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.42
-    name: notifyHumidityThStatus
+    name: EATON-EPDU-MIB::notifyHumidityThStatus
     category: state_change
     severity: warning
-    description: "Humidity threshold status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  humidity probe index: {humidityIndex}\n  current value: {humidityValue} (%RH = value ÷ 10)\n  threshold status: {humidityThStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Humidity threshold status change on {SNMP_DEVICE_HOSTNAME}\n  humidityIndex: {humidityIndex}\n  humidityValue: {humidityValue} (%RH = {humidityValue}/10)\n  threshold status: {humidityThStatus}"
     status: current
     varbinds:
     - strappingIndex
@@ -2016,61 +1246,172 @@ traps:
     - humidityValue
     - humidityThStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.43
-    name: notifyContactState
+    name: EATON-EPDU-MIB::notifyContactState
     category: state_change
-    severity: warning
-    description: "Contact sensor state changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  contact index: {contactIndex}\n  new state: {contactState}"
-    mib: EATON-EPDU-MIB
+    severity: notice
+    description: "Contact sensor state changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  contact index: {contactIndex}\n  state: {contactState}"
     status: current
     varbinds:
     - strappingIndex
     - contactIndex
     - contactState
   - oid: 1.3.6.1.4.1.534.6.6.7.0.44
-    name: notifyProbeStatus
+    name: EATON-EPDU-MIB::notifyProbeStatus
     category: state_change
     severity: warning
-    description: "Temperature probe status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  temperature probe index: {temperatureIndex}\n  probe status: {temperatureProbeStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Environment probe status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  temperature index: {temperatureIndex}\n  probe status: {temperatureProbeStatus}"
     status: current
     varbinds:
     - strappingIndex
     - temperatureIndex
     - temperatureProbeStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.51
-    name: notifyCommunicationStatus
+    name: EATON-EPDU-MIB::notifyCommunicationStatus
     category: state_change
     severity: warning
-    description: "PDU communication status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  communication status: {communicationStatus}"
-    mib: EATON-EPDU-MIB
+    description: "PDU communication status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  status: {communicationStatus}"
     status: current
     varbinds:
     - strappingIndex
     - communicationStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.52
-    name: notifyInternalStatus
+    name: EATON-EPDU-MIB::notifyInternalStatus
     category: state_change
-    severity: warning
-    description: "PDU internal status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  internal status: {internalStatus}"
-    mib: EATON-EPDU-MIB
+    severity: crit
+    description: "Internal status change on {SNMP_DEVICE_HOSTNAME}\n  strapping index: {strappingIndex}\n  status: {internalStatus}"
     status: current
     varbinds:
     - strappingIndex
     - internalStatus
   - oid: 1.3.6.1.4.1.534.6.6.7.0.53
-    name: notifyTest
+    name: EATON-EPDU-MIB::notifyTest
     category: diagnostic
-    severity: notice
-    description: Trap test notification sent from {SNMP_DEVICE_HOSTNAME}. This confirms the SNMP trap communication path is functional.
-    mib: EATON-EPDU-MIB
+    severity: debug
+    description: Trap test feature triggered on {SNMP_DEVICE_HOSTNAME}
     status: current
   - oid: 1.3.6.1.4.1.534.6.6.7.0.54
-    name: notifyStrappingStatus
+    name: EATON-EPDU-MIB::notifyStrappingStatus
     category: state_change
     severity: warning
-    description: "Strapping communication status changed on {SNMP_DEVICE_HOSTNAME}\n  strapping unit index: {strappingIndex}\n  status: {strappingStatus}"
-    mib: EATON-EPDU-MIB
+    description: "Strapping communication status changed on {SNMP_DEVICE_HOSTNAME}\n  unit index: {strappingIndex}\n  status: {strappingStatus}"
     status: current
     varbinds:
     - strappingIndex
     - strappingStatus
+  - oid: 1.3.6.1.4.1.534.6.8.1.1.0.1
+    name: EATON-SENSOR-MIB::notifySensorCount
+    category: state_change
+    severity: notice
+    description: "Sensor count changed on {SNMP_DEVICE_HOSTNAME}\n  current count: {sensorCount}"
+    status: current
+    varbinds:
+    - sensorCount
+  - oid: 1.3.6.1.4.1.534.6.8.1.1.0.2
+    name: EATON-SENSOR-MIB::notifySensorStatus
+    category: state_change
+    severity: warning
+    description: "Sensor status changed on {SNMP_DEVICE_HOSTNAME}\n  sensorIndex: {sensorIndex}\n  sensorUuid: {sensorUuid}\n  status: {sensorStatus}\n  status changed since: {sensorStatusSince}"
+    status: current
+    varbinds:
+    - sensorIndex
+    - sensorUuid
+    - sensorStatus
+    - sensorStatusSince
+  - oid: 1.3.6.1.4.1.534.6.8.1.2.0.1
+    name: EATON-SENSOR-MIB::notifyTemperatureAlarm
+    category: state_change
+    severity: warning
+    description: "Temperature alarm state changed on {SNMP_DEVICE_HOSTNAME}\n  sensor index: {sensorIndex}\n  temperature index: {temperatureIndex}\n  alarm status: {temperatureAlarm}\n  measured value: {temperatureValue}"
+    status: current
+    varbinds:
+    - sensorIndex
+    - temperatureIndex
+    - temperatureUuid
+    - temperatureAlarm
+    - temperatureAlarmChangeSince
+    - temperatureValue
+    - oid: 1.3.6.1.4.1.534.6.8.1.2.1.1.1
+      type: Integer32
+      constraints: (1..2)
+      name: temperatureIndex
+    - oid: 1.3.6.1.4.1.534.6.8.1.2.3.1.3
+      type: Integer32
+      name: temperatureValue
+  - oid: 1.3.6.1.4.1.534.6.8.1.2.0.2
+    name: EATON-SENSOR-MIB::notifyTemperatureCommunicationStatus
+    category: diagnostic
+    severity: warning
+    description: "Temperature probe communication status changed on {SNMP_DEVICE_HOSTNAME}\n  sensor index: {sensorIndex}\n  temperature index: {temperatureIndex}\n  UUID: {temperatureUuid}\n  status: {temperatureCommunicationStatus}\n  status since: {temperatureCommunicationStatusSince}"
+    status: current
+    varbinds:
+    - sensorIndex
+    - temperatureIndex
+    - temperatureUuid
+    - temperatureCommunicationStatus
+    - temperatureCommunicationStatusSince
+    - oid: 1.3.6.1.4.1.534.6.8.1.2.1.1.1
+      type: Integer32
+      constraints: (1..2)
+      name: temperatureIndex
+  - oid: 1.3.6.1.4.1.534.6.8.1.3.0.1
+    name: EATON-SENSOR-MIB::notifyHumidityAlarm
+    category: state_change
+    severity: warning
+    description: "Humidity alarm state changed on {SNMP_DEVICE_HOSTNAME}\n  sensor index: {sensorIndex}\n  humidity index: {humidityIndex}\n  alarm status: {humidityAlarm}\n  current value: {humidityValue}\n  last change time: {humidityAlarmChangeSince}"
+    status: current
+    varbinds:
+    - sensorIndex
+    - humidityIndex
+    - humidityUuid
+    - humidityAlarm
+    - humidityAlarmChangeSince
+    - humidityValue
+    - oid: 1.3.6.1.4.1.534.6.8.1.3.1.1.1
+      type: Integer32
+      constraints: (1..2)
+      name: humidityIndex
+    - oid: 1.3.6.1.4.1.534.6.8.1.3.3.1.3
+      type: Integer32
+      name: humidityValue
+  - oid: 1.3.6.1.4.1.534.6.8.1.3.0.2
+    name: EATON-SENSOR-MIB::notifyHumidityCommunicationStatus
+    category: state_change
+    severity: warning
+    description: "Humidity sensor communication status changed on {SNMP_DEVICE_HOSTNAME}\n  sensor index: {sensorIndex}\n  humidity index: {humidityIndex}\n  UUID: {humidityUuid}\n  status: {humidityCommunicationStatus}\n  status changed at: {humidityCommunicationStatusSince}"
+    status: current
+    varbinds:
+    - sensorIndex
+    - humidityIndex
+    - humidityUuid
+    - humidityCommunicationStatus
+    - humidityCommunicationStatusSince
+    - oid: 1.3.6.1.4.1.534.6.8.1.3.1.1.1
+      type: Integer32
+      constraints: (1..2)
+      name: humidityIndex
+  - oid: 1.3.6.1.4.1.534.6.8.1.4.0.1
+    name: EATON-SENSOR-MIB::notifyDigitalInputAlarm
+    category: state_change
+    severity: warning
+    description: "Digital input alarm state changed on {SNMP_DEVICE_HOSTNAME}\n  sensor index: {sensorIndex}\n  digital input index: {digitalInputIndex}\n  UUID: {digitalInputUuid}\n  alarm level: {digitalInputAlarm}\n  alarm changed at: {digitalInputAlarmChangeSince}\n  input state: {digitalInputState}\n  state active since: {digitalInputStateSince}"
+    status: current
+    varbinds:
+    - sensorIndex
+    - digitalInputIndex
+    - digitalInputUuid
+    - digitalInputAlarm
+    - digitalInputAlarmChangeSince
+    - digitalInputState
+    - digitalInputStateSince
+  - oid: 1.3.6.1.4.1.534.6.8.1.4.0.2
+    name: EATON-SENSOR-MIB::notifydigitalInputCommunicationStatus
+    category: diagnostic
+    severity: warning
+    description: "Digital input communication status changed on {SNMP_DEVICE_HOSTNAME}\n  sensor index: {sensorIndex}\n  digital input index: {digitalInputIndex}\n  UUID: {digitalInputUuid}\n  status: {digitalInputCommunicationStatus}\n  status since: {digitalInputCommunicationStatusSince}"
+    status: current
+    varbinds:
+    - sensorIndex
+    - digitalInputIndex
+    - digitalInputUuid
+    - digitalInputCommunicationStatus
+    - digitalInputCommunicationStatusSince

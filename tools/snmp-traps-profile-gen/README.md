@@ -18,11 +18,16 @@ The trap subsystem design referencing it is
 
 ```
 tools/snmp-traps-profile-gen/
-  extract.py     # Phase 1 - SOW-0033, mechanical MIB extraction
-  classify.py    # Phase 2 - SOW-0034, LLM enrichment
-  emit.py        # Phase 3 - per-vendor YAML output
-  requirements.txt
-  output/        # all generated artefacts (gitignored)
+  extract.py                    # Phase 1 - SOW-0033, mechanical MIB extraction
+  classify.py                   # Phase 2 - SOW-0034, LLM enrichment (dual-endpoint pool)
+  emit.py                       # Phase 3 - per-vendor YAML output
+  iana_pens.py                  # IANA PEN registry parser used by emit.py
+  iana-enterprise-numbers.txt   # bundled IANA registry snapshot (~5 MB)
+  sample_review.py              # builds output/sample-review.md from a 200-trap sample
+  README.md                     # this file
+  requirements.txt              # pysmi, httpx, PyYAML
+  .gitignore                    # excludes output/, __pycache__/
+  output/                       # all generated artefacts (gitignored)
 ```
 
 The expected output sub-tree under `output/`:
@@ -78,22 +83,35 @@ MIB names are skipped.
 ```sh
 # 200-trap stratified sample.  Stop and review output/sample-review.md
 # before running the full batch.
-./classify.py --sample 200 --out-dir output
+./classify.py --sample 200 --out-dir output \
+  --endpoint 'http://10.20.4.21:8357/v1|minimax-m2.7|150|800' \
+  --endpoint 'http://10.20.4.205:8356/v1|qwen3.6-35b-a3b|150|800'
 
-# After review, full batch.
-./classify.py --out-dir output
+# After review, full batch (same --endpoint flags).
+./classify.py --out-dir output \
+  --endpoint 'http://10.20.4.21:8357/v1|minimax-m2.7|150|800' \
+  --endpoint 'http://10.20.4.205:8356/v1|qwen3.6-35b-a3b|150|800'
 ```
 
-`classify.py` is async + concurrent.  Defaults: 48 in-flight against the
-primary model (`minimax-m2.7-coder`), 6 against the fallback
-(`qwen3.6-35b-a3b-nothinker`).  Each trap is written atomically to
-`output/enriched/<OID>.json` as soon as it completes.  Re-running skips
-OIDs that already have output files; `--force` overrides.
+`classify.py` is async + concurrent. Dispatches across one or more LLM
+endpoints in parallel; workers per endpoint pull from a shared queue so
+the faster endpoint absorbs more work. Spec format per `--endpoint`:
+`base_url|model|concurrency|max_tokens` (last field optional, defaults
+800). Without `--endpoint` it falls back to single-endpoint defaults
+(`--base-url`, `--model`, `--concurrency`).
 
-If the primary model returns an invalid response (JSON parse failure,
-banned phrase, unknown placeholder, …) the fallback model is tried once;
-if it also fails, the trap is filled in via a deterministic regex-based
-fallback (`enrichment_source: fallback:mechanical`).
+For Qwen "thinker" variants, the helper auto-injects
+`chat_template_kwargs.enable_thinking=false` so per-request wall-clock
+stays low (without this, the reasoning chain blows the budget).
+
+Each trap is written atomically to `output/enriched/<OID>.json` as soon
+as it completes. Re-running skips OIDs that already have output files;
+`--force` overrides.
+
+Up to 3 LLM attempts per trap with the validator's reason fed back into
+the retry prompt. If all 3 attempts fail validation the trap is filled
+in via a deterministic regex-based fallback (`enrichment_source:
+fallback:mechanical`).
 
 ## Phase 3 - emit per-vendor YAML
 
