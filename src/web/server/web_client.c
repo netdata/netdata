@@ -542,6 +542,11 @@ static int web_server_static_file(struct web_client *w, char *filename) {
 
 #ifdef __APPLE__
     w->response.data->date = statbuf.st_mtimespec.tv_sec;
+#elif defined(OS_WINDOWS)
+    // UCRT's struct stat exposes second-resolution st_mtime only;
+    // no st_mtim nanosecond pair. Sec-resolution is fine here, the
+    // value just feeds an HTTP "Date" header.
+    w->response.data->date = statbuf.st_mtime;
 #else
     w->response.data->date = statbuf.st_mtim.tv_sec;
 #endif
