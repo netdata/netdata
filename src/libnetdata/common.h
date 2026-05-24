@@ -754,6 +754,31 @@ static inline int fchown(int fd, uid_t owner, gid_t group) {
 #define srandom(seed) srand((unsigned)(seed))
 #endif
 
+// link() (create a hard link) is POSIX; UCRT64 has no equivalent in
+// the standard C library. Windows exposes CreateHardLinkA() in
+// <windows.h> (NTFS supports hard links). Map the POSIX signature on
+// top of it: returns 0 on success, -1 with errno on failure. The
+// registry rotation in registry_db.c calls link(current, ".old") and
+// then unlink(current) to do an atomic backup.
+static inline int link(const char *oldpath, const char *newpath) {
+    if (!oldpath || !newpath) { errno = EINVAL; return -1; }
+    if (CreateHardLinkA(newpath, oldpath, NULL))
+        return 0;
+    DWORD err = GetLastError();
+    switch (err) {
+        case ERROR_FILE_NOT_FOUND:
+        case ERROR_PATH_NOT_FOUND:
+            errno = ENOENT; break;
+        case ERROR_ACCESS_DENIED:
+            errno = EACCES; break;
+        case ERROR_ALREADY_EXISTS:
+            errno = EEXIST; break;
+        default:
+            errno = EIO; break;
+    }
+    return -1;
+}
+
 // unsetenv() is POSIX; UCRT64 has no direct equivalent. _putenv("X=")
 // removes variable X from the process environment (empty value
 // triggers the delete path). Wrap with the POSIX signature.
