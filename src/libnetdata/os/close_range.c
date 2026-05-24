@@ -2,6 +2,20 @@
 
 #include "../libnetdata.h"
 
+#if defined(OS_WINDOWS)
+// Windows: a CRT fd is valid iff _get_osfhandle returns a real Win32
+// handle. FD_CLOEXEC maps to clearing HANDLE_FLAG_INHERIT so the
+// handle isn't duplicated into CreateProcess children.
+static int fd_is_valid(int fd) {
+    return _get_osfhandle(fd) != (intptr_t)INVALID_HANDLE_VALUE;
+}
+
+static void setcloexec(int fd) {
+    HANDLE h = (HANDLE)_get_osfhandle(fd);
+    if (h != INVALID_HANDLE_VALUE)
+        (void)SetHandleInformation(h, HANDLE_FLAG_INHERIT, 0);
+}
+#else
 static int fd_is_valid(int fd) {
     errno_clear();
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
@@ -12,6 +26,7 @@ static void setcloexec(int fd) {
     if (flags != -1)
         (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 }
+#endif
 
 int os_get_fd_open_max(void) {
     static int fd_open_max = CLOSE_RANGE_FD_MAX;
