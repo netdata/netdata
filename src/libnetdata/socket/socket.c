@@ -307,6 +307,20 @@ int sock_setreuse_port(int fd __maybe_unused, bool reuse __maybe_unused) {
 
 // Returns -1 for errors, 0 if FD_CLOEXEC is unset, 1 if FD_CLOEXEC is set
 int sock_setcloexec(int fd, bool cloexec) {
+#if defined(OS_WINDOWS)
+    // Windows has no FD_CLOEXEC; close-on-exec maps to the Win32
+    // handle-inherit flag. Sockets created via socket()/WSASocket()
+    // are inheritable by default unless WSA_FLAG_NO_HANDLE_INHERIT was
+    // passed. Clearing HANDLE_FLAG_INHERIT achieves the same effect
+    // as setting FD_CLOEXEC on POSIX: the handle is not duplicated
+    // into child processes spawned by CreateProcess.
+    HANDLE h = (HANDLE)(uintptr_t)fd; // socket fd IS the SOCKET handle on Windows
+    DWORD mask = HANDLE_FLAG_INHERIT;
+    DWORD desired = cloexec ? 0 : HANDLE_FLAG_INHERIT;
+    if (!SetHandleInformation(h, mask, desired))
+        return -1;
+    return cloexec ? 1 : 0;
+#else
     int rc = -1;
 
     // Get current file descriptor flags
@@ -329,6 +343,7 @@ int sock_setcloexec(int fd, bool cloexec) {
     }
 
     return rc;
+#endif
 }
 
 // Returns -1 for errors, 0 if TCP_DEFER_ACCEPT is unset, 1 if TCP_DEFER_ACCEPT is set
