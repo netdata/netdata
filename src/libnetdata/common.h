@@ -539,6 +539,30 @@ static inline struct tm *localtime_r(const time_t *timep, struct tm *result) {
     return (localtime_s(result, timep) == 0) ? result : NULL;
 }
 
+// UCRT64 has no POSIX fchown(). Windows uses ACLs/SIDs, not POSIX
+// uid/gid ownership. nd_log-to-file.c uses fchown() to re-chown an
+// already-opened log file after a privilege drop; that whole code
+// path is meaningless on Windows. Stub to return 0 so the caller's
+// "==-1" error check never trips.
+static inline int fchown(int fd, uid_t owner, gid_t group) {
+    (void)fd; (void)owner; (void)group;
+    return 0;
+}
+
+// POSIX poll's "number of fds" type. mingw-w64 declares WSAPoll using
+// ULONG; provide the POSIX-shaped typedef so log-forwarder.c's
+// (nfds_t)-1 casts compile. ULONG is 32-bit under LLP64, matching
+// glibc's nfds_t.
+typedef ULONG nfds_t;
+
+// POSIX pipe(int[2]) on UCRT64 is _pipe(int[2], unsigned size, int mode).
+// Adapt with a macro: 64 KiB buffer (Cygwin's historical default) +
+// binary mode (no CRLF translation) for log forwarder pipes and any
+// other unblocked-pipe consumers.
+#ifndef pipe
+#define pipe(fds) _pipe((fds), 65536, _O_BINARY)
+#endif
+
 // UCRT64 has no <endian.h> -- no htole16/32/64, htobe16/32/64,
 // le16toh/le32toh/le64toh, be16toh/be32toh/be64toh. Windows x86_64
 // is always little-endian (LLP64 host), so htole*() is identity and
