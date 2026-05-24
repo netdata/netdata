@@ -3,13 +3,13 @@
 #include "../libnetdata.h"
 
 #if defined(OS_WINDOWS)
-long netdata_registry_get_dword_from_open_key(unsigned int *out, void *lKey, char *name)
+long netdata_registry_get_dword_from_open_key(DWORD *out, void *lKey, char *name)
 {
-    DWORD length = 260;
+    DWORD length = sizeof(DWORD);
     return RegQueryValueEx(lKey, name, NULL, NULL, (LPBYTE) out, &length);
 }
 
-bool netdata_registry_get_dword(unsigned int *out, void *hKey, char *subKey, char *name)
+bool netdata_registry_get_dword(DWORD *out, void *hKey, char *subKey, char *name)
 {
     HKEY lKey;
     bool status = true;

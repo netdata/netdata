@@ -998,23 +998,44 @@ static inline int setrlimit(int resource, const struct rlimit *rl) {
 // consumer reading the resulting status can recognise it.
 #define SIGTRAP 5
 #endif
-// Remaining POSIX-only signal numbers used by signals.c (deadly-signal
-// unblock list). mingw-w64's <signal.h> gates SIGBUS/SIGSYS on _POSIX;
-// SIGXCPU and SIGXFSZ are not defined at all. Use the standard glibc
-// numeric values so the signal_code lookup tables stay consistent if
-// any of these ever do appear on the wire under a Cygwin-emulation
-// path -- on a clean UCRT64 Windows process they never get raised.
-#ifndef SIGBUS
-#define SIGBUS    10
+// Remaining POSIX signal numbers that mingw-w64's <signal.h> gates on
+// _POSIX (which we don't define) or doesn't define at all. signals.c
+// names them in the deadly-signal unblock list; signal-handler.c
+// names them in its signal-action table.
+//
+// Values: glibc/Linux numbering, chosen so each macro is distinct
+// from each other AND from the C-standard signals UCRT actually
+// raises (SIGINT=2, SIGILL=4, SIGFPE=8, SIGSEGV=11, SIGTERM=15,
+// SIGBREAK=21, SIGABRT=22). On a clean UCRT64 Windows process none
+// of these are ever raised; the macros exist only so the signal_code
+// diagnostic tables compile and never silently alias one logical
+// signal to another.
+#ifndef SIGHUP
+#define SIGHUP    1
 #endif
-#ifndef SIGSYS
-#define SIGSYS    12
+#ifndef SIGQUIT
+#define SIGQUIT   3
+#endif
+#ifndef SIGBUS
+#define SIGBUS    7
+#endif
+#ifndef SIGUSR1
+#define SIGUSR1   10
+#endif
+#ifndef SIGUSR2
+#define SIGUSR2   12
+#endif
+#ifndef SIGCHLD
+#define SIGCHLD   17
 #endif
 #ifndef SIGXCPU
 #define SIGXCPU   24
 #endif
 #ifndef SIGXFSZ
 #define SIGXFSZ   25
+#endif
+#ifndef SIGSYS
+#define SIGSYS    31
 #endif
 
 // Winsock's WSAPoll() is the documented Windows equivalent of POSIX
