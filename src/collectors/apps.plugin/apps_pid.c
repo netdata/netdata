@@ -366,11 +366,15 @@ static bool is_filename(const char *s) {
         if(end) *end = '\0';
     }
 
-    // linux, freebsd, macos, msys, cygwin
+    // linux, freebsd, macos, msys, cygwin -- on Windows the
+    // GetFileAttributesW block above handles the native-path case;
+    // statvfs is POSIX-only and not in UCRT64.
+#if !defined(OS_WINDOWS)
     if(*s == '/') {
         struct statvfs stat;
         return statvfs(s, &stat) == 0;
     }
+#endif
 
     return false;
 }
