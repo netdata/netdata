@@ -742,6 +742,42 @@ static inline int fchown(int fd, uid_t owner, gid_t group) {
     return 0;
 }
 
+// fchmod() (by fd) is POSIX; UCRT64 has only chmod() (by path).
+// status-file-io.c uses fchmod() to set 0664 on the temp file after
+// writing it but before rename. On Windows file permissions are
+// ACL-based, not POSIX mode bits, so the chmod request is
+// effectively informational -- stub to success.
+static inline int fchmod(int fd, mode_t mode) {
+    (void)fd; (void)mode; return 0;
+}
+
+// fsync() is POSIX; UCRT's equivalent is _commit(int fd) with the
+// same signature and semantics (flush all buffered modifications
+// for the open file to disk).
+#ifndef fsync
+#define fsync(fd) _commit(fd)
+#endif
+
+// utimensat() is the POSIX *at-family timestamp updater with
+// nanosecond precision. UCRT has utime() / _utime64() (second
+// precision, path-based, no dir-fd). machine-guid.c calls
+// utimensat(AT_FDCWD, path, times[2], 0). Provide AT_FDCWD as a
+// sentinel the stub ignores, then route the call through _utime64
+// with second-precision truncation. The persisted timestamp is used
+// for diagnostics, not correctness, so the nsec truncation is fine.
+#ifndef AT_FDCWD
+#define AT_FDCWD (-100)
+#endif
+#include <sys/utime.h>
+static inline int utimensat(int dirfd, const char *path, const struct timespec times[2], int flags) {
+    (void)dirfd; (void)flags;
+    if (!path || !times) { errno = EINVAL; return -1; }
+    struct __utimbuf64 ub;
+    ub.actime  = times[0].tv_sec;
+    ub.modtime = times[1].tv_sec;
+    return _utime64(path, &ub);
+}
+
 // daemon.c performs POSIX daemonization (fork + setsid + setuid +
 // chown of run/log directories). On Windows the agent runs as a
 // service hosted by the SCM; none of fork/setsid/setuid apply, and
