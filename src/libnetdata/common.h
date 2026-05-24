@@ -952,6 +952,17 @@ static inline char *strcasestr(const char *haystack, const char *needle) {
     return NULL;
 }
 
+// O_NOFOLLOW is a POSIX <fcntl.h> open flag that fails the call when
+// the trailing path component is a symlink. UCRT64 omits it because
+// POSIX symlinks don't exist on Windows (NTFS reparse points are
+// reached through entirely different APIs). Define it to 0 so callers
+// that OR it into open() flags get a no-op -- the open proceeds
+// without symlink protection, which is what we'd do anyway given the
+// file-mode model has no S_IFLNK here either.
+#ifndef O_NOFOLLOW
+#define O_NOFOLLOW 0
+#endif
+
 // lstat() is a POSIX symlink-aware stat. UCRT has stat() but no lstat()
 // (Windows symlinks via reparse points are reachable through different
 // APIs, not the POSIX file-mode model). Since S_IFLNK is also missing,
