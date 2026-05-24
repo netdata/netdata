@@ -32,7 +32,14 @@ bool netdata_registry_get_dword(unsigned int *out, void *hKey, char *subKey, cha
 
 long netdata_registry_get_string_from_open_key(char *out, unsigned int length, void *lKey, char *name)
 {
-    return RegQueryValueEx(lKey, name, NULL, NULL, (LPBYTE) out, &length);
+    // RegQueryValueEx() expects LPDWORD (unsigned long *) for the size
+    // in/out parameter, not unsigned int *. They are both 32 bits under
+    // LLP64 but `unsigned long *` and `unsigned int *` are distinct
+    // types and gcc rejects the implicit conversion. Bridge with a
+    // DWORD local; we ignore the returned-size update because callers
+    // never read it back.
+    DWORD len = length;
+    return RegQueryValueEx(lKey, name, NULL, NULL, (LPBYTE) out, &len);
 }
 
 bool netdata_registry_get_string(char *out, unsigned int length, void *hKey, char *subKey, char *name)
