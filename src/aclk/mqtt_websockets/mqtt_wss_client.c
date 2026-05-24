@@ -364,9 +364,9 @@ int mqtt_wss_connect(
     client->sockfd = fd;
 
 #ifndef SOCK_CLOEXEC
-    int flags = fcntl(client->sockfd, F_GETFD);
-    if (flags != -1)
-        (void) fcntl(client->sockfd, F_SETFD, flags| FD_CLOEXEC);
+    // sock_setcloexec routes to fcntl(F_SETFD, FD_CLOEXEC) on POSIX
+    // and SetHandleInformation(HANDLE_FLAG_INHERIT, 0) on Windows.
+    (void) sock_setcloexec(client->sockfd, true);
 #endif
 
     int flag = 1;
@@ -376,7 +376,7 @@ int mqtt_wss_connect(
 
     client->poll_fds[POLLFD_SOCKET].fd = client->sockfd;
 
-    if (fcntl(client->sockfd, F_SETFL, fcntl(client->sockfd, F_GETFL, 0) | O_NONBLOCK) == -1) {
+    if (sock_setnonblock(client->sockfd, true) < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting O_NONBLOCK to TCP socket. \"%s\"", strerror(errno));
         return -8;
     }

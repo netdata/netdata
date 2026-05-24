@@ -469,8 +469,9 @@ short int websocket_handle_handshake(struct web_client *w) {
 
     // Message structures are already initialized in websocket_client_create()
 
-    // Set socket to non-blocking mode
-    if (fcntl(wsc->sock.fd, F_SETFL, O_NONBLOCK) == -1) {
+    // Set socket to non-blocking mode (Windows-portable via Winsock
+    // ioctlsocket(FIONBIO) under sock_setnonblock())
+    if (sock_setnonblock(wsc->sock.fd, true) < 0) {
         websocket_error(wsc, "Failed to set WebSocket socket to non-blocking mode");
         websocket_client_free(wsc);
         return HTTP_RESP_WEBSOCKET_HANDSHAKE;

@@ -791,7 +791,7 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
         goto exit_buf_rx;
     }
 
-    if (fcntl(ctx->sock, F_SETFL, fcntl(ctx->sock, F_GETFL, 0) | O_NONBLOCK) == -1) {
+    if (sock_setnonblock(ctx->sock, true) < 0) {
         rc = HTTPS_CLIENT_RESP_NONBLOCK_FAILED;
         netdata_log_error("ACLK: error setting O_NONBLOCK to TCP socket.");
         goto exit_sock;

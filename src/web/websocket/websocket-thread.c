@@ -558,13 +558,15 @@ void websocket_thread(void *ptr) {
         if(elapsed < max_cleanup_time && wsc->sock.fd >= 0) {
             bool skip_client = false;
 
-            // Ensure socket is non-blocking
-            int flags = fcntl(wsc->sock.fd, F_GETFL, 0);
-            if(flags >= 0 && !(flags & O_NONBLOCK)) {
-                if(fcntl(wsc->sock.fd, F_SETFL, flags | O_NONBLOCK) < 0) {
-                    websocket_debug(wsc, "Failed to set O_NONBLOCK during shutdown: %s", strerror(errno));
-                    skip_client = true;
-                }
+            // Ensure socket is non-blocking. sock_setnonblock() routes
+            // to ioctlsocket(FIONBIO) on Windows and fcntl(F_SETFL,
+            // O_NONBLOCK) on POSIX; we cannot fetch the current state
+            // on Winsock (there is no get-counterpart to ioctlsocket
+            // FIONBIO), so always set unconditionally rather than
+            // gating on a prior F_GETFL probe.
+            if(sock_setnonblock(wsc->sock.fd, true) < 0) {
+                websocket_debug(wsc, "Failed to set O_NONBLOCK during shutdown: %s", strerror(errno));
+                skip_client = true;
             }
 
             if(!skip_client) {
