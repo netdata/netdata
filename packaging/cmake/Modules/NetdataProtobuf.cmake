@@ -113,7 +113,18 @@ macro(netdata_detect_protobuf)
                 endif()
                 set(PROTOBUF_CFLAGS_OTHER "")
                 set(PROTOBUF_INCLUDE_DIRS "")
-                set(PROTOBUF_LIBRARIES "-lprotobuf")
+
+                # MSYS2's mingw-w64-ucrt-x86_64-protobuf (v22+) ships a
+                # CMake Package Configuration module that pulls in the
+                # required Abseil deps through the protobuf::libprotobuf
+                # target. The bare "-lprotobuf" we used previously
+                # linked only protobuf itself and left Abseil symbols
+                # (absl::status_internal::*, absl::hash_internal::*,
+                # protobuf::internal::ThreadSafeArena::thread_cache_)
+                # undefined at netdata.exe link time. Use the CONFIG-
+                # mode find_package so the transitive deps come along.
+                find_package(Protobuf CONFIG REQUIRED)
+                set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
 
                 set(ENABLE_PROTOBUF True)
                 set(HAVE_PROTOBUF True)
