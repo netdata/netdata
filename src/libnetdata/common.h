@@ -496,6 +496,71 @@ static inline struct tm *localtime_r(const time_t *timep, struct tm *result) {
     return (localtime_s(result, timep) == 0) ? result : NULL;
 }
 
+// UCRT64 has no <sys/resource.h>: no struct rlimit, no getrlimit /
+// setrlimit, no RLIMIT_NOFILE / RLIMIT_CORE / RLIM_INFINITY. Provide a
+// minimal POSIX-shaped shim covering the two resources netdata actually
+// touches:
+//
+//   * RLIMIT_NOFILE -> map to the Windows CRT's per-process stdio cache
+//     limit via _getmaxstdio() / _setmaxstdio(). UCRT documents a
+//     hard ceiling of 8192 on the latter. POSIX RLIMIT_NOFILE governs
+//     a different concept (kernel file-descriptor table) but on
+//     Windows the CRT's cache is the operative limit for code that
+//     uses fopen / open / etc., so the mapping is semantically the
+//     right one for callers that size buffers off rlim_cur / N.
+//   * RLIMIT_CORE -> no-op. Windows produces minidumps through
+//     SetUnhandledExceptionFilter / WER, not POSIX core dumps; there
+//     is nothing rlimit-shaped to set.
+typedef unsigned long rlim_t;
+
+#ifndef RLIM_INFINITY
+#define RLIM_INFINITY ((rlim_t)-1)
+#endif
+#ifndef RLIMIT_CORE
+#define RLIMIT_CORE   4
+#endif
+#ifndef RLIMIT_NOFILE
+#define RLIMIT_NOFILE 7
+#endif
+
+struct rlimit {
+    rlim_t rlim_cur;
+    rlim_t rlim_max;
+};
+
+static inline int getrlimit(int resource, struct rlimit *rl) {
+    if (!rl) return -1;
+    switch (resource) {
+        case RLIMIT_NOFILE: {
+            int n = _getmaxstdio();
+            rl->rlim_cur = (rlim_t)((n > 0) ? n : 512);
+            rl->rlim_max = 8192; // UCRT's documented ceiling for _setmaxstdio
+            return 0;
+        }
+        case RLIMIT_CORE:
+            rl->rlim_cur = 0;
+            rl->rlim_max = RLIM_INFINITY;
+            return 0;
+        default:
+            return -1;
+    }
+}
+
+static inline int setrlimit(int resource, const struct rlimit *rl) {
+    if (!rl) return -1;
+    switch (resource) {
+        case RLIMIT_NOFILE: {
+            rlim_t want = rl->rlim_cur;
+            if (want == RLIM_INFINITY || want > 8192) want = 8192;
+            return (_setmaxstdio((int)want) == (int)want) ? 0 : -1;
+        }
+        case RLIMIT_CORE:
+            return 0; // no-op; see getrlimit() comment above
+        default:
+            return -1;
+    }
+}
+
 #include <evntprov.h>
 #include <wbemidl.h>
 #include <sddl.h>
