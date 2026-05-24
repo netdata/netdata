@@ -160,7 +160,12 @@ mqtt_wss_client mqtt_wss_new(
         goto fail_1;
     }
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(OS_WINDOWS)
+    // macOS has no pipe2(); Windows has no pipe2() either, and our
+    // pipe() macro already routes to UCRT's _pipe(..., _O_BINARY).
+    // The O_CLOEXEC bit on Linux pipe2 is just a convenience -- these
+    // notification pipes are for thread signalling inside the agent,
+    // not handed off to a child process, so close-on-exec is moot here.
     if (pipe(client->write_notif_pipe)) {
 #else
     if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
