@@ -4349,16 +4349,66 @@ install(CODE "
 #
 
 if(OS_WINDOWS)
-        install(FILES /usr/bin/msys-protobuf-32.dll
-                      /usr/bin/msys-yaml-0-2.dll
-                      /usr/bin/msys-uv-1.dll
-                      DESTINATION "${BINDIR}")
+        # Bundle the UCRT64 runtime DLLs our binaries link against.
+        # Master shipped the MSYS-runtime variants (msys-protobuf-32.dll,
+        # msys-yaml-0-2.dll, msys-uv-1.dll) hard-coded by name from
+        # /usr/bin, because the MSYS shell build linked everything
+        # against the Cygwin-style msys-2.0.dll. Under MSYSTEM=UCRT64
+        # we link against native Windows libs from $MINGW_PREFIX/bin,
+        # with different names (libprotobuf-33.X.dll, libyaml-0-2.dll,
+        # libuv-1.dll, plus libabsl_*.dll for the abseil deps that
+        # protobuf 22+ pulls in).
+        #
+        # Glob the patterns rather than hard-listing the abseil files:
+        # there are 40+ libabsl_*.dll files and the set changes with
+        # each upstream release. Plus the gcc/stdc++ runtime, plus the
+        # OpenSSL/libcurl chain. CONFIGURE_DEPENDS makes cmake re-eval
+        # if the MSYS2 package set changes between configure and build.
+        set(_NETDATA_MINGW_BIN "$ENV{MINGW_PREFIX}/bin")
+        file(GLOB _NETDATA_RUNTIME_DLLS CONFIGURE_DEPENDS
+            "${_NETDATA_MINGW_BIN}/libprotobuf-*.dll"
+            "${_NETDATA_MINGW_BIN}/libabsl_*.dll"
+            "${_NETDATA_MINGW_BIN}/libyaml-*.dll"
+            "${_NETDATA_MINGW_BIN}/libuv-*.dll"
+            "${_NETDATA_MINGW_BIN}/libwinpthread-*.dll"
+            "${_NETDATA_MINGW_BIN}/libgcc_s_*.dll"
+            "${_NETDATA_MINGW_BIN}/libstdc++*.dll"
+            "${_NETDATA_MINGW_BIN}/libssl-*.dll"
+            "${_NETDATA_MINGW_BIN}/libcrypto-*.dll"
+            "${_NETDATA_MINGW_BIN}/libcurl-*.dll"
+            "${_NETDATA_MINGW_BIN}/zlib*.dll"
+            "${_NETDATA_MINGW_BIN}/liblz4-*.dll"
+            "${_NETDATA_MINGW_BIN}/libzstd-*.dll"
+            "${_NETDATA_MINGW_BIN}/libbrotli*.dll"
+            "${_NETDATA_MINGW_BIN}/libpcre2-*.dll"
+            "${_NETDATA_MINGW_BIN}/libiconv-*.dll"
+            "${_NETDATA_MINGW_BIN}/libidn2-*.dll"
+            "${_NETDATA_MINGW_BIN}/libssh2-*.dll"
+            "${_NETDATA_MINGW_BIN}/libnghttp*-*.dll"
+            "${_NETDATA_MINGW_BIN}/libpsl-*.dll"
+            "${_NETDATA_MINGW_BIN}/libcares-*.dll"
+            "${_NETDATA_MINGW_BIN}/libgnutls-*.dll"
+            "${_NETDATA_MINGW_BIN}/libnettle-*.dll"
+            "${_NETDATA_MINGW_BIN}/libgmp-*.dll"
+            "${_NETDATA_MINGW_BIN}/libhogweed-*.dll"
+            "${_NETDATA_MINGW_BIN}/libtasn1-*.dll"
+            "${_NETDATA_MINGW_BIN}/libunistring-*.dll"
+            "${_NETDATA_MINGW_BIN}/libp11-kit-*.dll"
+            "${_NETDATA_MINGW_BIN}/libffi-*.dll"
+        )
+        if(_NETDATA_RUNTIME_DLLS)
+            install(FILES ${_NETDATA_RUNTIME_DLLS} DESTINATION "${BINDIR}")
+        endif()
 
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 
-        # Make curl work with ssl
-        install(DIRECTORY /usr/ssl DESTINATION usr)
+        # Make curl work with ssl. The MSYS cmake installed /usr/ssl
+        # (Cygwin-style); under UCRT64 the OpenSSL package lives at
+        # $MINGW_PREFIX/etc/ssl with the same role.
+        if(IS_DIRECTORY "$ENV{MINGW_PREFIX}/etc/ssl")
+            install(DIRECTORY "$ENV{MINGW_PREFIX}/etc/ssl" DESTINATION usr/etc)
+        endif()
 endif()
 
 #
