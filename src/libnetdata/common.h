@@ -514,6 +514,61 @@ static inline int getpwnam_r(const char *name, struct passwd *pwd, char *buf, si
 // and socket/listen-sockets.c get the declaration for free.
 #include <iphlpapi.h>
 
+// getrusage() / struct rusage have no UCRT equivalent. Used in
+// apps.plugin, daemon/pulse, exporting, and unit_test.c -- mostly to
+// report the agent's own user/system CPU consumption to its self-stats
+// charts. Provide the type and function on Windows, with a non-trivial
+// implementation: GetProcessTimes() gives us user and kernel CPU time
+// in FILETIME 100-ns ticks, which we convert to the POSIX timeval
+// shape. Other rusage fields (maxrss, page faults, IO blocks, etc.)
+// stay zero -- those have no direct Win32 equivalent reachable as
+// cheaply, and the charts that read them just show zero on Windows.
+#ifndef RUSAGE_SELF
+#define RUSAGE_SELF    0
+#endif
+#ifndef RUSAGE_THREAD
+#define RUSAGE_THREAD  1
+#endif
+#ifndef RUSAGE_CHILDREN
+#define RUSAGE_CHILDREN (-1)
+#endif
+
+struct rusage {
+    struct timeval ru_utime;   /* user CPU time used */
+    struct timeval ru_stime;   /* system CPU time used */
+    long ru_maxrss;            /* maximum resident set size */
+    long ru_ixrss;             /* integral shared memory size */
+    long ru_idrss;             /* integral unshared data size */
+    long ru_isrss;             /* integral unshared stack size */
+    long ru_minflt;            /* page reclaims (soft page faults) */
+    long ru_majflt;            /* page faults (hard page faults) */
+    long ru_nswap;             /* swaps */
+    long ru_inblock;           /* block input operations */
+    long ru_oublock;           /* block output operations */
+    long ru_msgsnd;            /* IPC messages sent */
+    long ru_msgrcv;            /* IPC messages received */
+    long ru_nsignals;          /* signals received */
+    long ru_nvcsw;             /* voluntary context switches */
+    long ru_nivcsw;            /* involuntary context switches */
+};
+
+static inline int getrusage(int who, struct rusage *r) {
+    (void)who;
+    if (!r) { errno = EFAULT; return -1; }
+    memset(r, 0, sizeof(*r));
+    FILETIME creation, exit_t, kernel, user;
+    if (GetProcessTimes(GetCurrentProcess(), &creation, &exit_t, &kernel, &user)) {
+        // FILETIME is in 100-ns intervals; split into seconds + microseconds.
+        ULARGE_INTEGER k = { .LowPart = kernel.dwLowDateTime, .HighPart = kernel.dwHighDateTime };
+        ULARGE_INTEGER u = { .LowPart = user.dwLowDateTime,   .HighPart = user.dwHighDateTime   };
+        r->ru_stime.tv_sec  = (long)(k.QuadPart / 10000000);
+        r->ru_stime.tv_usec = (long)((k.QuadPart % 10000000) / 10);
+        r->ru_utime.tv_sec  = (long)(u.QuadPart / 10000000);
+        r->ru_utime.tv_usec = (long)((u.QuadPart % 10000000) / 10);
+    }
+    return 0;
+}
+
 // posix_memalign() has no UCRT equivalent. UCRT exposes
 // _aligned_malloc(size, alignment) -- args swapped vs POSIX, returns
 // pointer-or-NULL instead of int-errno, and memory allocated this way
