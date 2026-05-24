@@ -2,6 +2,15 @@
 
 #include "../libnetdata.h"
 
+// POSIX defines PTHREAD_STACK_MIN as a platform-specific minimum
+// thread stack size, but mingw-w64's winpthreads omits the macro
+// (CreateThread accepts any non-zero size). Fall back to glibc's
+// historical value of 16 KiB so the lower-bound check below stays
+// meaningful on Windows and on the few systems that miss the define.
+#ifndef PTHREAD_STACK_MIN
+#define PTHREAD_STACK_MIN 16384
+#endif
+
 #define nd_thread_status_get(nti)           __atomic_load_n(&((nti)->options), __ATOMIC_ACQUIRE)
 #define nd_thread_status_check(nti, flag)   (__atomic_load_n(&((nti)->options), __ATOMIC_ACQUIRE) & (flag))
 #define nd_thread_status_set(nti, flag)     __atomic_or_fetch(&((nti)->options), flag, __ATOMIC_RELEASE)
