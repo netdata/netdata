@@ -3,7 +3,10 @@
 #include "paths.h"
 
 static int is_procfs(const char *path, char **reason) {
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(OS_WINDOWS)
+    // No procfs concept (and no <sys/vfs.h> on UCRT64 anyway) -- treat
+    // the path as valid so verify_netdata_host_prefix() doesn't reject
+    // the configured prefix on these platforms.
     (void)path;
     (void)reason;
 #else
@@ -29,7 +32,8 @@ static int is_procfs(const char *path, char **reason) {
 }
 
 static int is_sysfs(const char *path, char **reason) {
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(OS_WINDOWS)
+    // No sysfs concept here either -- same rationale as is_procfs.
     (void)path;
     (void)reason;
 #else
