@@ -742,6 +742,18 @@ static inline int fchown(int fd, uid_t owner, gid_t group) {
     return 0;
 }
 
+// random() / srandom() are POSIX (XSI). UCRT64 has only rand() /
+// srand(). dbengine-stresstest.c uses random() for chart/dim
+// selection during stress runs -- a stress-test helper, so the
+// reduced randomness range (rand returns up to RAND_MAX = 0x7FFF
+// vs random's 0x7FFFFFFF) is acceptable. Alias the names.
+#ifndef random
+#define random()    rand()
+#endif
+#ifndef srandom
+#define srandom(seed) srand((unsigned)(seed))
+#endif
+
 // unsetenv() is POSIX; UCRT64 has no direct equivalent. _putenv("X=")
 // removes variable X from the process environment (empty value
 // triggers the delete path). Wrap with the POSIX signature.
