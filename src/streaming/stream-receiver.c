@@ -1128,11 +1128,21 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
     __atomic_store_n(&host->stream.rcv.status.replication.backfill_pending, 0, __ATOMIC_RELAXED);
 }
 
-bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
+RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;
 
     rrdhost_receiver_lock(host);
+
+    // If the obsolete-all cleanup is running on this host, refuse the attach.
+    // The cleanup walks all charts marking them obsolete without holding
+    // receiver_lock; attaching mid-pass would let it mark the new receiver's
+    // charts obsolete and call ml_host_disconnected() on a connected host.
+    // The child reconnects via normal backoff; by then the pass is done.
+    if (rrdhost_flag_check(host, RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS)) {
+        rrdhost_receiver_unlock(host);
+        return RRDHOST_SET_RECEIVER_CLEANUP_BUSY;
+    }
 
     if (!host->receiver) {
         object_state_activate_if_not_activated(&host->state_id);
@@ -1188,7 +1198,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     if(set_this)
         ml_host_start(host);
 
-    return set_this;
+    return set_this ? RRDHOST_SET_RECEIVER_OK : RRDHOST_SET_RECEIVER_ALREADY_ATTACHED;
 }
 
 void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason) {

@@ -196,17 +196,30 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         if (rrdhost_is_local(host) || IS_VIRTUAL_HOST_OS(host))
             continue;
 
+        // Two-phase obsolete-all: decide under receiver_lock (short held),
+        // run the O(charts) walk + ml_host_disconnected without the lock,
+        // gated by RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS so a reconnecting
+        // receiver bails out in rrdhost_set_receiver() instead of overlapping.
+        bool obsolete_all = false;
+
         rrdhost_receiver_lock(host);
 
         time_t now = now_realtime_sec();
 
         if (!host->receiver &&
             host->stream.rcv.status.last_connected == 0 &&
-            (host->stream.rcv.status.last_disconnected + rrdset_free_obsolete_time_s < now)) {
-            svc_rrdhost_obsolete_all_charts(host);
+            (host->stream.rcv.status.last_disconnected + rrdset_free_obsolete_time_s < now) &&
+            !rrdhost_flag_check(host, RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS)) {
+            rrdhost_flag_set(host, RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS);
+            obsolete_all = true;
         }
 
         rrdhost_receiver_unlock(host);
+
+        if (obsolete_all) {
+            svc_rrdhost_obsolete_all_charts(host);
+            rrdhost_flag_clear(host, RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS);
+        }
     }
 
     rrd_rdunlock();

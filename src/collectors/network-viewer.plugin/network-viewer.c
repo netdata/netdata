@@ -3,7 +3,6 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 
-#include "libnetdata/required_dummies.h"
 
 static SPAWN_SERVER *spawn_srv = NULL;
 

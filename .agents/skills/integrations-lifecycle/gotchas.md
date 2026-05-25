@@ -64,6 +64,21 @@ before assuming the code does the obvious thing.
 
 ## Dead / broken code in the pipeline
 
+### Metadata links may be `blob/master` or `edit/master`
+
+- File path: `integrations/gen_docs_integrations.py`.
+- `gen_integrations.py` can emit metadata links in GitHub
+  `blob/master` form, while older docs-generation code only
+  stripped `edit/master`.
+- If `build_path()` does not normalize both forms, scoped
+  generation such as
+  `python3 integrations/gen_docs_integrations.py -c go.d.plugin/vsphere`
+  finds the collector in `integrations.js` but writes nothing
+  because the derived local path does not exist.
+- Current contract: `build_path()` must strip both
+  `blob/master/` and `edit/master/` before removing
+  `/metadata.yaml`.
+
 ### `integrations/check_collector_metadata.py` is broken
 
 - File path: `integrations/check_collector_metadata.py`.

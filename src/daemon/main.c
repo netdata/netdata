@@ -264,6 +264,13 @@ int netdata_main(int argc, char **argv) {
     analytics_init();
     nd_log_initialize_mutexes();
 
+    // Register the daemon's per-thread cleanup callback. Each subsystem
+    // should own the registration of its own cleanups; this one lives in
+    // the daemon because service_exits is a daemon-layer concern. The
+    // rest are currently registered together in rrd_init() and should be
+    // moved to their respective subsystems in a follow-up.
+    nd_thread_register_cleanup(service_exits);
+
     netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;

@@ -2,7 +2,6 @@
 
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/local-sockets/local-sockets.h"
-#include "libnetdata/required_dummies.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 

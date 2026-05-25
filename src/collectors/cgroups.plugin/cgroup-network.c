@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 
 SPAWN_SERVER *spawn_server = NULL;
 

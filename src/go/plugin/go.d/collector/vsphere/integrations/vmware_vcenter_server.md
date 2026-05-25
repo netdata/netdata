@@ -21,7 +21,17 @@ Module: vsphere
 
 ## Overview
 
-This collector monitors hosts, VMs, datastores, clusters, and resource pools from `vCenter` servers.
+Monitors vSphere resources from `vCenter` servers.
+
+Includes hosts, VMs, datastores, clusters, resource pools,
+and inventory counts.
+
+Use the `vcsa` collector for vCenter Server Appliance health.
+
+Use the `snmp` collector with the `vmware-esx` profile for
+ESXi hardware, HBA, and environment sensors.
+
+Those surfaces are intentionally not duplicated here by default.
 
 > **Warning**: The `vsphere` collector cannot re-login and continue collecting metrics after a vCenter reboot.
 > go.d.plugin needs to be restarted.
@@ -53,42 +63,16 @@ The default `update_every` is 20 seconds, and it doesn't make sense to decrease 
 
 It is likely that 20 seconds is not enough for big installations and the value should be tuned.
 
-To get a better view we recommend running the collector in debug mode and seeing how much time it will take to collect metrics.
+To size a job, run the collector in debug mode and compare the discovery and collection timing lines. Discovery runs in a separate goroutine, while collection timing must stay comfortably below `update_every`.
 
-<details>
-<summary>Example (all not related debug lines were removed)</summary>
+Useful log lines include:
 
-```
-[ilyam@pc]$ ./go.d.plugin -d -m vsphere
-[ DEBUG ] vsphere[vsphere] discover.go:94 discovering : starting resource discovering process
-[ DEBUG ] vsphere[vsphere] discover.go:102 discovering : found 3 dcs, process took 49.329656ms
-[ DEBUG ] vsphere[vsphere] discover.go:109 discovering : found 12 folders, process took 49.538688ms
-[ DEBUG ] vsphere[vsphere] discover.go:116 discovering : found 3 clusters, process took 47.722692ms
-[ DEBUG ] vsphere[vsphere] discover.go:123 discovering : found 2 hosts, process took 52.966995ms
-[ DEBUG ] vsphere[vsphere] discover.go:130 discovering : found 2 vms, process took 49.832979ms
-[ INFO  ] vsphere[vsphere] discover.go:140 discovering : found 3 dcs, 12 folders, 3 clusters (2 dummy), 2 hosts, 3 vms, process took 249.655993ms
-[ DEBUG ] vsphere[vsphere] build.go:12 discovering : building : starting building resources process
-[ INFO  ] vsphere[vsphere] build.go:23 discovering : building : built 3/3 dcs, 12/12 folders, 3/3 clusters, 2/2 hosts, 3/3 vms, process took 63.3µs
-[ DEBUG ] vsphere[vsphere] hierarchy.go:10 discovering : hierarchy : start setting resources hierarchy process
-[ INFO  ] vsphere[vsphere] hierarchy.go:18 discovering : hierarchy : set 3/3 clusters, 2/2 hosts, 3/3 vms, process took 6.522µs
-[ DEBUG ] vsphere[vsphere] filter.go:24 discovering : filtering : starting filtering resources process
-[ DEBUG ] vsphere[vsphere] filter.go:45 discovering : filtering : removed 0 unmatched hosts
-[ DEBUG ] vsphere[vsphere] filter.go:56 discovering : filtering : removed 0 unmatched vms
-[ INFO  ] vsphere[vsphere] filter.go:29 discovering : filtering : filtered 0/2 hosts, 0/3 vms, process took 42.973µs
-[ DEBUG ] vsphere[vsphere] metric_lists.go:14 discovering : metric lists : starting resources metric lists collection process
-[ INFO  ] vsphere[vsphere] metric_lists.go:30 discovering : metric lists : collected metric lists for 2/2 hosts, 3/3 vms, process took 275.60764ms
-[ INFO  ] vsphere[vsphere] discover.go:74 discovering : discovered 2/2 hosts, 3/3 vms, the whole process took 525.614041ms
-[ INFO  ] vsphere[vsphere] discover.go:11 starting discovery process, will do discovery every 5m0s
-[ DEBUG ] vsphere[vsphere] collect.go:11 starting collection process
-[ DEBUG ] vsphere[vsphere] scrape.go:48 scraping : scraped metrics for 2/2 hosts, process took 96.257374ms
-[ DEBUG ] vsphere[vsphere] scrape.go:60 scraping : scraped metrics for 3/3 vms, process took 57.879697ms
-[ DEBUG ] vsphere[vsphere] collect.go:23 metrics collected, process took 154.77997ms
-```
+- `discovering : discovered ... the whole process took ...`
+- `scraping : scraped metrics for ... hosts, process took ...`
+- `scraping : scraped metrics for ... vms, process took ...`
+- `metrics collected, process took ...`
 
-</details>
-
-There you can see that discovering took `525.614041ms`, and collecting metrics took `154.77997ms`. Discovering is a separate thread, it doesn't affect collecting.
-`update_every` and `timeout` parameters should be adjusted based on these numbers.
+Adjust `update_every` and `timeout` based on those timings and on the number of enabled optional surfaces.
 
 
 ## Setup
@@ -110,7 +94,21 @@ UI configuration requires paid Netdata Cloud plan.
 
 ### Prerequisites
 
-No action required.
+#### vCenter read-only access
+
+Configure a vCenter account that can read inventory objects, properties, and performance counters for the datacenters, clusters, ESXi hosts, VMs, datastores, and resource pools selected by the include filters.
+
+
+#### Optional vSphere metadata permissions
+
+`tag_categories` requires access to the vSphere Automation/CIS tagging APIs for the selected categories. `custom_attributes` requires access to custom field definitions and values for the selected inventory objects.
+
+
+#### Optional datastore cluster, vSAN, and network data
+
+`collect_datastore_clusters` requires read access to StoragePod objects. `collect_vsan` requires vSAN Management API access and the vSAN Performance Service on the target clusters. `collect_network_topology` requires read access to Network and Distributed Virtual Port Group inventory objects.
+
+
 
 ### Configuration
 
@@ -126,30 +124,164 @@ The following options can be defined globally: update_every, autodetection_retry
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). | 20 | no |
-|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). | 60 | no |
 | **Target** | url | Target endpoint URL. | https://vcenter.local | yes |
 |  | timeout | HTTP request timeout (seconds). | 20 | no |
 | **Discovery** | discovery_interval | Hosts, VMs, datastores, clusters, and resource pools discovery interval (seconds). | 300 | no |
+| **Labels** | [tag_categories](#option-labels-tag-categories) | vSphere tag category allowlist. |  | no |
+|  | [custom_attributes](#option-labels-custom-attributes) | vSphere custom attribute allowlist. |  | no |
+| **High Cardinality** | [collect_datastore_clusters](#option-high-cardinality-collect-datastore-clusters) | Collect datastore cluster capacity and Storage DRS status. | no | no |
+|  | [datastore_cluster_include](#option-high-cardinality-datastore-cluster-include) | Datastore cluster selector. | /* | no |
+|  | [collect_vsan](#option-high-cardinality-collect-vsan) | Collect vSAN metrics. | no | no |
+|  | [vsan_cluster_include](#option-high-cardinality-vsan-cluster-include) | vSAN cluster selector. | /* | no |
+|  | [vsan_host_include](#option-high-cardinality-vsan-host-include) | vSAN host selector. | /* | no |
+|  | [vsan_vm_include](#option-high-cardinality-vsan-vm-include) | vSAN VM selector. | /* | no |
+| **Collection** | [collect_network_topology](#option-collection-collect-network-topology) | Discover networks for the vSphere Topology function. | no | no |
 | **Filters** | [host_include](#option-filters-host-include) | Hosts selector (filter). | /* | no |
 |  | [vm_include](#option-filters-vm-include) | VM selector (filter). | /* | no |
 |  | [datastore_include](#option-filters-datastore-include) | Datastore selector (filter). | /* | no |
 |  | [cluster_include](#option-filters-cluster-include) | Cluster selector (filter). Resource pools follow their owning cluster. | /* | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | yes |
 |  | password | Password for Basic HTTP authentication. |  | yes |
-|  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
 | **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
 |  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
 |  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
 |  | tls_key | Path to client TLS private key (for mTLS). |  | no |
-| **Proxy** | proxy_url | HTTP proxy URL. |  | no |
-|  | proxy_username | Username for proxy Basic HTTP authentication. |  | no |
-|  | proxy_password | Password for proxy Basic HTTP authentication. |  | no |
-| **Request** | method | HTTP method to use. | GET | no |
-|  | body | Request body (e.g., for POST/PUT). |  | no |
-|  | headers | Additional HTTP headers (one per line as key: value). |  | no |
-|  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
-|  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+<a id="option-labels-tag-categories"></a>
+##### tag_categories
+
+Disabled by default because vSphere tags are user-defined metadata
+and can expose internal names, ownership, business unit, or
+environment details. Each list item is one glob pattern matching
+vSphere tag category names, so names with spaces are supported.
+Use `*` only when every tag category is intentional.
+
+Matching categories are exposed as labels named
+`vsphere_tag_<sanitized_category>`. When a resource has multiple
+tags in the same category, values are sorted and joined with the
+pipe character.
+
+```yaml
+tag_categories:
+  - "Environment"
+  - "Business Unit"
+```
+
+
+<a id="option-labels-custom-attributes"></a>
+##### custom_attributes
+
+Disabled by default because vSphere custom attributes are
+user-defined metadata and can expose internal names, ownership,
+business unit, operational data, or secrets stored by administrators.
+Custom attribute values are sent verbatim as labels. Each list
+item is one glob pattern matching custom attribute names, so names
+with spaces are supported. Use `*` only when every custom attribute
+is intentional and none of the matched values contain secrets.
+
+Matching attributes are exposed as labels named
+`vsphere_custom_attribute_<sanitized_name>`.
+
+```yaml
+custom_attributes:
+  - "Owner"
+  - "Cost Center"
+```
+
+
+<a id="option-high-cardinality-collect-datastore-clusters"></a>
+##### collect_datastore_clusters
+
+Disabled by default because it adds a separate vSphere resource
+class (`StoragePod`) to the collector output. When enabled, the
+collector emits aggregate datastore-cluster capacity, utilization,
+and Storage DRS status.
+
+
+<a id="option-high-cardinality-datastore-cluster-include"></a>
+##### datastore_cluster_include
+
+Applies only when `collect_datastore_clusters` is enabled. Values
+use Netdata simple patterns and match
+`/Datacenter/DatastoreCluster`, the datastore-cluster name, or
+the vSphere managed object ID. Matching datastore clusters are
+included in metrics, labels, cached discovery state, and topology
+function output.
+
+```yaml
+datastore_cluster_include:
+  - "/*"
+```
+
+
+<a id="option-high-cardinality-collect-vsan"></a>
+##### collect_vsan
+
+Disabled by default because it uses the vSAN Management API and
+vSAN Performance Service, and adds extra vCenter queries. When
+enabled, it emits vSAN cluster capacity, vSAN cluster health, and
+vSAN cluster, host, and VM performance metrics for discovered
+vSAN-enabled clusters. Use the vSAN selectors below to choose the
+concrete vSAN performance entity refs queried. vSAN events are
+not collected by this option.
+
+
+<a id="option-high-cardinality-vsan-cluster-include"></a>
+##### vsan_cluster_include
+
+Applies only when `collect_vsan` is enabled. Values use Netdata
+simple patterns and match `/Datacenter/Cluster`, the cluster
+name, the vSphere managed object ID, or `vsan_uuid:<uuid>`.
+
+```yaml
+vsan_cluster_include:
+  - "/*"
+  - "vsan_uuid:52b..."
+```
+
+
+<a id="option-high-cardinality-vsan-host-include"></a>
+##### vsan_host_include
+
+Applies only when `collect_vsan` is enabled. Values use Netdata
+simple patterns and match `/Datacenter/Cluster/Host`, the host
+name, the vSphere managed object ID, or
+`vsan_node_uuid:<uuid>`.
+
+```yaml
+vsan_host_include:
+  - "/*"
+  - "vsan_node_uuid:52b..."
+```
+
+
+<a id="option-high-cardinality-vsan-vm-include"></a>
+##### vsan_vm_include
+
+Applies only when `collect_vsan` is enabled. Values use Netdata
+simple patterns and match `/Datacenter/Cluster/Host/VM`, the VM
+name, the vSphere managed object ID, or
+`instance_uuid:<uuid>`.
+
+```yaml
+vsan_vm_include:
+  - "/*"
+  - "instance_uuid:52b..."
+```
+
+
+<a id="option-collection-collect-network-topology"></a>
+##### collect_network_topology
+
+Disabled by default to avoid extra vCenter discovery calls for
+existing users. When enabled, the collector discovers vSphere
+Network and Distributed Virtual Port Group objects and includes
+their cached accessibility/status and host/VM relationships in
+the vSphere Topology function. It does not create charts or
+metrics.
+
 
 <a id="option-filters-host-include"></a>
 ##### host_include
@@ -304,7 +436,9 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ vsphere_vm_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_cpu_utilization | Virtual Machine CPU utilization |
-| [ vsphere_vm_mem_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_mem_utilization | Virtual Machine memory utilization |
+| [ vsphere_vm_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_mem_utilization | Virtual Machine memory utilization |
+| [ vsphere_vm_snapshot_chain_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_chain_depth | Virtual Machine snapshot maximum chain depth |
+| [ vsphere_vm_snapshot_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_age | Virtual Machine oldest snapshot age |
 | [ vsphere_host_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_cpu_utilization | ESXi Host CPU utilization |
 | [ vsphere_host_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_mem_utilization | ESXi Host memory utilization |
 
@@ -317,6 +451,22 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
+### Per inventory
+
+These metrics refer to the discovered vSphere inventory for this collector job.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| id | Static inventory instance ID |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.inventory_objects | datacenters, folders, clusters, hosts, vms, datastores, resource_pools | objects |
+
 ### Per virtual machine
 
 These metrics refer to the Virtual Machine.
@@ -325,10 +475,13 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| id | vSphere managed object reference ID |
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | host | Host name |
 | vm | Virtual Machine name |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -343,9 +496,119 @@ Metrics:
 | vsphere.vm_disk_max_latency | latency | milliseconds |
 | vsphere.vm_net_traffic | received, sent | KiB/s |
 | vsphere.vm_net_packets | received, sent | packets |
-| vsphere.vm_net_drops | received, sent | packets |
+| vsphere.vm_net_drops | received, sent | drops |
 | vsphere.vm_overall_status | green, red, yellow, gray | status |
+| vsphere.vm_power_state | powered_on, powered_off, suspended | status |
+| vsphere.vm_connection_state | connected, disconnected, orphaned, inaccessible, invalid | status |
+| vsphere.vm_tools_running_status | running, not_running, executing_scripts, unknown | status |
+| vsphere.vm_tools_version_status | current, need_upgrade, not_installed, unmanaged, too_old, supported_old, supported_new, too_new, blacklisted, unknown | status |
+| vsphere.vm_consolidation_needed | needed, not_needed | status |
 | vsphere.vm_system_uptime | uptime | seconds |
+| vsphere.vm_config_cpu | vcpus | vCPUs |
+| vsphere.vm_config_memory | memory | MiB |
+| vsphere.vm_config_devices | disks, nics | devices |
+| vsphere.vm_storage_usage | committed, uncommitted, unshared | bytes |
+| vsphere.vm_snapshot_count | count | snapshots |
+| vsphere.vm_snapshot_max_age | age | seconds |
+| vsphere.vm_snapshot_max_chain_depth | depth | snapshots |
+
+### Per virtual machine power
+
+These aggregate metrics refer to VM power and energy and are collected for discovered powered-on VMs when vSphere exposes the corresponding power counters.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| id | vSphere managed object reference ID of the VM |
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+| host | Host name |
+| vm | Virtual Machine name |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.vm_power_usage | power | watts |
+| vsphere.vm_energy_usage | energy | joules |
+
+### Per vSAN virtual machine
+
+These optional metrics refer to VM vSAN performance and are collected only when `collect_vsan` is enabled.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| id | vSphere managed object reference ID of the VM |
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+| host | Host name |
+| vm | Virtual Machine name |
+| vm_instance_uuid | VM instance UUID used by vSAN performance entity references |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.vsan_vm_operations | read, write | operations/s |
+| vsphere.vsan_vm_throughput | read, write | bytes/s |
+| vsphere.vsan_vm_latency | read, write | microseconds |
+
+### Per host power
+
+These aggregate metrics refer to ESXi host power, energy, and power capacity and are collected for discovered powered-on hosts when vSphere exposes the corresponding power counters.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| id | vSphere managed object reference ID of the host |
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+| host | Host name |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.host_power_usage | power, cap | watts |
+| vsphere.host_power_capacity_usage | used, usable, idle, system, vm | watts |
+| vsphere.host_power_capacity_utilization | used | percentage |
+| vsphere.host_energy_usage | energy | joules |
+
+### Per vSAN host
+
+These optional metrics refer to ESXi host vSAN performance and are collected only when `collect_vsan` is enabled.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| id | vSphere managed object reference ID of the host |
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+| host | Host name |
+| vsan_node_uuid | vSAN host node UUID used by vSAN performance entity references |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.vsan_host_operations | read, write | operations/s |
+| vsphere.vsan_host_throughput | read, write | bytes/s |
+| vsphere.vsan_host_latency | read, write | microseconds |
+| vsphere.vsan_host_congestions | congestions | congestions/s |
+| vsphere.vsan_host_cache_hit_rate | hit_rate | percentage |
 
 ### Per host
 
@@ -355,9 +618,12 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| id | vSphere managed object reference ID |
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | host | Host name |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -371,9 +637,12 @@ Metrics:
 | vsphere.host_disk_max_latency | latency | milliseconds |
 | vsphere.host_net_traffic | received, sent | KiB/s |
 | vsphere.host_net_packets | received, sent | packets |
-| vsphere.host_net_drops | received, sent | packets |
+| vsphere.host_net_drops | received, sent | drops |
 | vsphere.host_net_errors | received, sent | errors |
 | vsphere.host_overall_status | green, red, yellow, gray | status |
+| vsphere.host_power_state | powered_on, powered_off, standby, unknown | status |
+| vsphere.host_connection_state | connected, not_responding, disconnected | status |
+| vsphere.host_maintenance_status | normal, in_maintenance | status |
 | vsphere.host_system_uptime | uptime | seconds |
 
 ### Per datastore
@@ -384,9 +653,12 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| id | vSphere managed object reference ID |
 | datacenter | Datacenter name |
 | datastore | Datastore name |
 | type | Datastore type (VMFS, NFS, NFS41, vsan, VVOL, PMEM) |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -396,8 +668,61 @@ Metrics:
 | vsphere.datastore_disk_iops | reads, writes | operations/s |
 | vsphere.datastore_disk_latency | read, write | milliseconds |
 | vsphere.datastore_space_utilization | used | percentage |
-| vsphere.datastore_space_usage | capacity, free, used | bytes |
+| vsphere.datastore_space_usage | capacity, free, used, uncommitted | bytes |
 | vsphere.datastore_overall_status | green, red, yellow, gray | status |
+| vsphere.datastore_accessibility_status | accessible, inaccessible | status |
+| vsphere.datastore_maintenance_status | normal, entering_maintenance, in_maintenance, unknown | status |
+| vsphere.datastore_multiple_host_access | enabled, disabled, unknown | status |
+
+### Per datastore cluster
+
+These optional metrics refer to datastore clusters (StoragePod objects) and are collected only when `collect_datastore_clusters` is enabled.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| id | vSphere managed object reference ID |
+| datacenter | Datacenter name |
+| datastore_cluster | Datastore cluster name |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.datastore_cluster_space_utilization | used | percentage |
+| vsphere.datastore_cluster_space_usage | capacity, free, used | bytes |
+| vsphere.datastore_cluster_storage_drs_status | enabled, disabled | status |
+| vsphere.datastore_cluster_overall_status | green, red, yellow, gray | status |
+
+### Per vSAN cluster
+
+These optional metrics refer to vSAN cluster capacity, health, and performance and are collected only when `collect_vsan` is enabled.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| id | vSphere managed object reference ID of the cluster |
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+| vsan_uuid | vSAN cluster UUID used by vSAN performance entity references |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.vsan_cluster_space_usage | used, free, total | bytes |
+| vsphere.vsan_cluster_space_utilization | used | percentage |
+| vsphere.vsan_cluster_health_status | green, yellow, red, unknown | status |
+| vsphere.vsan_cluster_operations | read, write | operations/s |
+| vsphere.vsan_cluster_throughput | read, write | bytes/s |
+| vsphere.vsan_cluster_latency | read, write | microseconds |
+| vsphere.vsan_cluster_congestions | congestions | congestions/s |
 
 ### Per cluster
 
@@ -407,8 +732,11 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| id | vSphere managed object reference ID |
 | datacenter | Datacenter name |
 | cluster | Cluster name |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -419,7 +747,12 @@ Metrics:
 | vsphere.cluster_mem_capacity | total, effective | bytes |
 | vsphere.cluster_cpu_topology | cores, threads | count |
 | vsphere.cluster_drs_config | enabled | status |
+| vsphere.cluster_drs_mode | manual, partially_automated, fully_automated, unknown | status |
+| vsphere.cluster_drs_vmotion_rate | rate | level |
 | vsphere.cluster_ha_config | enabled, admission_control | status |
+| vsphere.cluster_ha_host_monitoring | enabled, disabled, unknown | status |
+| vsphere.cluster_ha_vm_monitoring | disabled, vm_monitoring_only, vm_and_app_monitoring, unknown | status |
+| vsphere.cluster_ha_vm_component_protection | enabled, disabled, unknown | status |
 | vsphere.cluster_overall_status | green, red, yellow, gray | status |
 | vsphere.cluster_vmotions | vmotions | migrations |
 | vsphere.cluster_drs_score | score | percentage |
@@ -449,9 +782,12 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
+| id | vSphere managed object reference ID |
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | resource_pool | Resource Pool name |
+| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -467,6 +803,97 @@ Metrics:
 | vsphere.resource_pool_cpu_config | reservation, limit | MHz |
 | vsphere.resource_pool_mem_config | reservation, limit | MB |
 | vsphere.resource_pool_overall_status | green, red, yellow, gray | status |
+
+
+
+## Live Data
+
+This collector exposes read-only readiness and topology functions for interactive troubleshooting in the Live tab. Both functions require selecting a configured vSphere collector job.
+
+
+### vSphere Readiness
+
+Reports the collector's current readiness from cached local state:
+
+- the selected vSphere collector job
+- whether the target URL and credentials are configured
+- whether the vSphere client, discovery cache, and performance-counter lists are initialized
+- discovered inventory counts
+- enabled or disabled optional metric, label, and vSAN groups
+- cached vSAN result counts when `collect_vsan` is enabled
+
+The function does not expose the configured vCenter URL or credentials, and it does not issue extra vCenter API calls.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Vsphere:readiness` |
+| Require Cloud | yes |
+| Performance | Uses cached collector state only:<br/>• No additional vCenter or ESXi API requests are triggered<br/>• Response size is bounded by the number of configured optional groups and cached inventory summary rows |
+| Security | Does not expose the configured vCenter URL, username, password, or per-object inventory names:<br/>• Shows only configuration presence, resource counts, enabled feature flags, include pattern counts, and cached vSAN result counts<br/>• Access should still be restricted to authorized operators because it reveals enabled collection surfaces |
+| Availability | Available when:<br/>• The vSphere collector job is running<br/>• Returns not_ready rows while the collector is not initialized or discovery has not completed<br/>• Uses the last cached discovery and vSAN scrape state |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Job | select | Select which configured vSphere collector job to inspect. | yes |  |  |
+
+#### Returns
+
+Collector readiness checks from cached local state. Each row represents one target, discovery, label, scope, metric, or vSAN readiness check.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| check | string |  |  | Stable readiness check identifier. |
+| scope | string |  |  | Area covered by the check, such as target, discovery, labels, scope, or metrics. |
+| status | string |  |  | Readiness status. Possible values are ok, warning, disabled, and not_ready. |
+| details | string |  |  | Human-readable explanation of the current cached state for the check. |
+
+### vSphere Topology
+
+Reports cached vSphere inventory topology for datacenters, clusters, ESXi hosts, VMs, datastores, networks, datastore clusters, and resource pools.
+
+The public topology function is `topology:vsphere`. The function builds actors and links from the selected job's cached discovery state. It does not issue extra vCenter API calls. vSphere Network and Distributed Virtual Port Group actors are included only when `collect_network_topology` is enabled.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Vsphere:topology:vsphere` |
+| Require Cloud | yes |
+| Performance | Uses cached collector state only:<br/>• No additional vCenter or ESXi API requests are triggered by the function<br/>• Response size grows with discovered inventory object count<br/>• `collect_network_topology` adds Network discovery during normal collector discovery cycles when enabled |
+| Security | Exposes discovered inventory object names and status attributes already visible through vSphere chart labels and metrics:<br/>• Does not expose the configured vCenter URL, username, or password |
+| Availability | Available when:<br/>• The vSphere collector job is running<br/>• Initial discovery has completed successfully<br/>• Returns HTTP 503 while topology data is not cached yet |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Job | select | Select which configured vSphere collector job provides the cached topology. | yes |  |  |
+
+#### Returns
+
+Cached vSphere inventory topology payload. Actors represent discovered inventory objects and links represent parent-child, host-runs-VM, or host/VM-connects-network relationships.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| schema_version | string |  |  | Topology payload schema version. |
+| source | string |  |  | Topology source identifier. |
+| layer | string |  |  | Topology layer identifier. |
+| agent_id | string |  |  | Netdata Agent identifier for the node serving the function. |
+| collected_at | datetime |  |  | Time when the cached topology response was built. |
+| view | string |  |  | Topology view identifier. |
+| actors | array |  |  | vSphere inventory actors, including datacenters, clusters, ESXi hosts, VMs, datastores, optional networks, datastore clusters, and resource pools. |
+| links | array |  |  | Topology links between vSphere inventory actors. |
+| stats | object |  |  | Counts of discovered inventory objects, actors, and links included in the response. |
 
 
 
@@ -536,5 +963,20 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep vsphere
 ```
+
+### Missing performance samples
+
+If the logs show `vsphere:host-no-perf-samples` or `vsphere:vm-no-perf-samples`, verify that the configured account can read vCenter performance counters for the selected hosts and VMs, and that the entities are powered on when performance metrics are expected.
+
+
+### Periodic discovery errors
+
+If the logs show `vsphere:periodic-discovery-error`, check vCenter reachability, account permissions for the enabled optional surfaces, and whether the configured `timeout` is large enough for the inventory size.
+
+
+### vCenter reboot recovery
+
+The collector cannot always recover an existing session after a vCenter reboot. Restart `go.d.plugin` if collection does not resume after vCenter becomes available again.
+
 
 
