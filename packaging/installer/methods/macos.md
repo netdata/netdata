@@ -81,6 +81,60 @@ Homebrew will place your Netdata configuration directory at `/opt/homebrew/etc/n
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/opt/homebrew/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
 
+### Connect a Homebrew-installed Agent to Netdata Cloud
+
+:::caution
+
+Do **not** use the `netdata-claim.sh` script. It is deprecated and will be unsupported in the near future. Use the `claim.conf` method described below instead.
+
+:::
+
+To connect a Homebrew-installed Netdata Agent to Netdata Cloud, create a `claim.conf` file in your Netdata configuration directory using the [configuration file method](/src/claim/README.md#method-2-via-configuration-file).
+
+**Configuration directory paths:**
+
+| Architecture | Path |
+|:--|:--|
+| Intel | `/usr/local/etc/netdata/claim.conf` |
+| Apple Silicon | `/opt/homebrew/etc/netdata/claim.conf` |
+
+Create the file with the following content, replacing the placeholder values with your Space token and Room keys:
+
+```bash
+[global]
+   url = https://app.netdata.cloud
+   token = YOUR_SPACE_TOKEN
+   rooms = ROOM1,ROOM2
+```
+
+Then set ownership to your own user and restrict permissions:
+
+```bash
+# Intel
+chown $(whoami):staff /usr/local/etc/netdata/claim.conf
+chmod 0640 /usr/local/etc/netdata/claim.conf
+
+# Apple Silicon
+chown $(whoami):staff /opt/homebrew/etc/netdata/claim.conf
+chmod 0640 /opt/homebrew/etc/netdata/claim.conf
+```
+
+:::note
+
+On macOS, Homebrew installs run under your user account and the `netdata` group does not exist. Use your own user and the `staff` group for file ownership instead.
+
+:::
+
+Apply the configuration by [restarting the Agent](/docs/netdata-agent/start-stop-restart.md) or running:
+
+```bash
+netdatacli reload-claiming-state
+```
+
+Verify the connection with `netdatacli aclk-state`. A successful claim shows `Claimed: Yes`.
+
+For the full list of configuration options and troubleshooting, see the [Connect Agent to Cloud](/src/claim/README.md) documentation.
+
 ## Install Netdata from source
 
 We don't recommend installing Netdata from source on macOS, as it can be difficult to configure and install dependencies manually.
