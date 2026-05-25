@@ -56,29 +56,36 @@ void apps_ebpf_accumulate_cachestat(void)
         int64_t apcl = apps_ebpf_diff_counters(w->cachestat_totals.add_to_page_cache_lru, w->cachestat_totals_prev.add_to_page_cache_lru);
         int64_t apd = apps_ebpf_diff_counters(w->cachestat_totals.account_page_dirtied, w->cachestat_totals_prev.account_page_dirtied);
 
-        w->cachestat.dirty = mbd;
+        w->cachestat.dirty = w->cachestat_totals.mark_buffer_dirty;
 
+        // hit and miss use kernel accumulated totals as monotonic counters (incremental dimension)
+        int64_t tot_total = (int64_t)w->cachestat_totals.mark_page_accessed - (int64_t)w->cachestat_totals.mark_buffer_dirty;
+        if (tot_total < 0)
+            tot_total = 0;
+        int64_t tot_misses = (int64_t)w->cachestat_totals.add_to_page_cache_lru - (int64_t)w->cachestat_totals.account_page_dirtied;
+        if (tot_misses < 0)
+            tot_misses = 0;
+        int64_t tot_hits = tot_total - tot_misses;
+        if (tot_hits < 0) {
+            tot_misses = tot_total;
+            tot_hits = 0;
+        }
+        w->cachestat.hit  = tot_hits;
+        w->cachestat.miss = tot_misses;
+
+        // ratio uses per-interval deltas for current-interval accuracy
         int64_t total = mpa - mbd;
         if (total < 0)
             total = 0;
-
         int64_t misses = apcl - apd;
         if (misses < 0)
             misses = 0;
-
         int64_t hits = total - misses;
         if (hits < 0) {
             misses = total;
             hits = 0;
         }
-
-        if (total > 0)
-            w->cachestat.ratio = (hits * 100) / total;
-        else
-            w->cachestat.ratio = 100;
-
-        w->cachestat.hit = hits;
-        w->cachestat.miss = misses;
+        w->cachestat.ratio = (total > 0) ? (hits * 100) / total : 100;
     }
 }
 
