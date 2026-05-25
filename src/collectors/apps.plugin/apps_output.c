@@ -316,7 +316,7 @@ static void send_cachestat_charts_to_netdata(struct target *w, const char *type,
             "CHART %s.%s_ebpf_cachestat_dirty_pages '' 'Number of dirty pages' 'page/s' page_cache %s.ebpf_cachestat_dirty_pages stacked 20261 %d\n",
             type, string2str(w->clean_name), type, update_every);
     send_CLABEL_COMMIT(lbl_name, string2str(w->name));
-    fprintf(stdout, "DIMENSION pages '' incremental 1 1\n");
+    fprintf(stdout, "DIMENSION pages '' absolute 1 1\n");
 
     fprintf(stdout,
             "CHART %s.%s_ebpf_cachestat_access '' 'Number of accessed files' 'hits/s' page_cache %s.ebpf_cachestat_access stacked 20262 %d\n",
