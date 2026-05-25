@@ -307,6 +307,11 @@ void function_network_protocols(
     const char *source __maybe_unused, void *data __maybe_unused)
 {
     static __thread bool initialized = false;
+    bool have_tcp_ipv4 = false;
+    bool have_tcp_ipv6 = false;
+    bool have_udp_ipv4 = false;
+    bool have_udp_ipv6 = false;
+
     if(unlikely(!initialized)) {
         initialize_tcp_keys(&tcp_ipv4);
         initialize_tcp_keys(&tcp_ipv6);
@@ -317,38 +322,38 @@ void function_network_protocols(
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
-        return;
+        goto cleanup;
     }
 
-    bool have_tcp_ipv4 = tcp_collect_family(&tcp_ipv4);
+    have_tcp_ipv4 = tcp_collect_family(&tcp_ipv4);
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
-        return;
+        goto cleanup;
     }
 
-    bool have_tcp_ipv6 = tcp_collect_family(&tcp_ipv6);
+    have_tcp_ipv6 = tcp_collect_family(&tcp_ipv6);
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
-        return;
+        goto cleanup;
     }
 
-    bool have_udp_ipv4 = udp_collect_family(&udp_ipv4);
+    have_udp_ipv4 = udp_collect_family(&udp_ipv4);
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
-        return;
+        goto cleanup;
     }
 
-    bool have_udp_ipv6 = udp_collect_family(&udp_ipv6);
+    have_udp_ipv6 = udp_collect_family(&udp_ipv6);
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
-        return;
+        goto cleanup;
     }
 
     if(unlikely(!have_tcp_ipv4 && !have_tcp_ipv6 && !have_udp_ipv4 && !have_udp_ipv6)) {
         nv_send_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
                       "failed to collect Windows TCP/UDP stack statistics");
-        return;
+        goto cleanup;
     }
 
     time_t now_s = now_realtime_sec();
@@ -427,6 +432,11 @@ void function_network_protocols(
     buffer_json_object_close(wb); // group_by
 
     nv_send_result(transaction, wb, now_s);
+
+cleanup:
+    // Release the thread-local perflib buffer once per request to avoid retaining
+    // the largest query size for the lifetime of the worker thread.
+    perflibFreePerformanceData();
 }
 
 // ============================================================
