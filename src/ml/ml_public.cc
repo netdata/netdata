@@ -108,13 +108,15 @@ void ml_host_new(RRDHOST *rh)
 
 void ml_host_delete(RRDHOST *rh)
 {
-    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
+    // Atomically detach `rh->ml_host` and obtain the previous pointer in a
+    // single RMW. Using exchange (rather than separate load + store) keeps
+    // the unpublish and the freeing on this thread strictly ordered: no
+    // store/operation that follows can be reordered before the unpublish,
+    // so concurrent readers observe either the live host or NULL -- never
+    // the freed host memory.
+    ml_host_t *host = (ml_host_t *) __atomic_exchange_n(&rh->ml_host, (rrd_ml_host_t *)NULL, __ATOMIC_ACQ_REL);
     if (!host)
         return;
-
-    // Unpublish BEFORE freeing so a concurrent reader that loads rh->ml_host
-    // observes either the live host or NULL -- never the freed host memory.
-    __atomic_store_n(&rh->ml_host, (rrd_ml_host_t *)NULL, __ATOMIC_RELEASE);
 
     ml_host_clear_context_anomaly_rate(host);
     netdata_mutex_destroy(&host->mutex);
@@ -335,12 +337,13 @@ void ml_chart_delete(RRDSET *rs)
     if (!host)
         return;
 
-    ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rs->ml_chart, __ATOMIC_ACQUIRE);
-
-    // Unpublish BEFORE freeing so a concurrent reader that loads rs->ml_chart
-    // observes either the live chart (with chart->rs set) or NULL -- never
-    // the freed chart memory.
-    __atomic_store_n(&rs->ml_chart, (rrd_ml_chart_t *)NULL, __ATOMIC_RELEASE);
+    // Atomically detach `rs->ml_chart` and obtain the previous pointer in a
+    // single RMW. Using exchange (rather than separate load + store) keeps
+    // the unpublish and the freeing on this thread strictly ordered: no
+    // store/operation that follows can be reordered before the unpublish,
+    // so concurrent readers observe either the live chart (with chart->rs
+    // set) or NULL -- never the freed chart memory.
+    ml_chart_t *chart = (ml_chart_t *) __atomic_exchange_n(&rs->ml_chart, (rrd_ml_chart_t *)NULL, __ATOMIC_ACQ_REL);
     delete chart;
 }
 
