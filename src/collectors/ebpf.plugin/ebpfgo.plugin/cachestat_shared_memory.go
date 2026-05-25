@@ -151,7 +151,7 @@ func runCachestatSharedMemoryCollector(handle *CachestatLegacyHandle, stop <-cha
 		case <-ticker.C:
 		}
 
-		apps, err := handle.Runtime.SnapshotApps(true)
+		apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
 		if err != nil {
 			continue
 		}

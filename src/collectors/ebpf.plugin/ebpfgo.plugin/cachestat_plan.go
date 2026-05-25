@@ -38,6 +38,7 @@ type CachestatLegacyHandle struct {
 	UpdateEvery    int
 	ConfigFound    bool
 	PidTableSize   uint32
+	MapsPerCore    bool
 	AppsEnabled    bool
 	CgroupsEnabled bool
 }

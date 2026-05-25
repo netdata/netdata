@@ -226,7 +226,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 	state := &cachestatGlobalState{}
 	lastCollection := time.Now()
 	collectAndPublish := func(usecSince int) {
-		snapshot, err := handle.Runtime.Snapshot(true)
+		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat snapshot failed: %v\n", err)
 			return

@@ -51,6 +51,7 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 		UpdateEvery:    cfg.UpdateEvery,
 		ConfigFound:    cfg.ConfigFound,
 		PidTableSize:   cfg.PidTableSize,
+		MapsPerCore:    cfg.MapsPerCore,
 		AppsEnabled:    cfg.AppsEnabled,
 		CgroupsEnabled: cfg.CgroupsEnabled,
 	}, nil
