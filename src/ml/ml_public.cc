@@ -22,7 +22,7 @@ static void ml_host_clear_context_anomaly_rate(ml_host_t *host)
 
 static void ml_dimension_enqueue_create_model(RRDHOST *rh, RRDDIM *rd)
 {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if (!host)
         return;
 
@@ -95,24 +95,35 @@ void ml_host_new(RRDHOST *rh)
     spinlock_init(&host->context_anomaly_rate_spinlock);
 
     host->ml_running = false;
-    rh->ml_host = (rrd_ml_host_t *) host;
+
+    // Publish with release semantics so readers that load rh->ml_host with
+    // acquire semantics observe the host's `rh`, `ml_running`, `mutex`,
+    // `queue`, etc. as fully initialized. Without this, the C++ compiler
+    // may reorder field stores after the publish store of rh->ml_host, and
+    // a concurrent reader would see host != NULL with partially-initialized
+    // fields, producing SIGSEGV faults inside ml_dimension_is_anomalous and
+    // similar readers.
+    __atomic_store_n(&rh->ml_host, (rrd_ml_host_t *)host, __ATOMIC_RELEASE);
 }
 
 void ml_host_delete(RRDHOST *rh)
 {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if (!host)
         return;
+
+    // Unpublish BEFORE freeing so a concurrent reader that loads rh->ml_host
+    // observes either the live host or NULL -- never the freed host memory.
+    __atomic_store_n(&rh->ml_host, (rrd_ml_host_t *)NULL, __ATOMIC_RELEASE);
 
     ml_host_clear_context_anomaly_rate(host);
     netdata_mutex_destroy(&host->mutex);
 
     delete host;
-    rh->ml_host = NULL;
 }
 
 void ml_host_start(RRDHOST *rh) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if (!host)
         return;
 
@@ -146,7 +157,7 @@ void ml_host_start(RRDHOST *rh) {
 }
 
 void ml_host_stop(RRDHOST *rh) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if (!host || !host->ml_running)
         return;
 
@@ -210,7 +221,7 @@ void ml_host_stop(RRDHOST *rh) {
 
 void ml_host_get_info(RRDHOST *rh, BUFFER *wb)
 {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if (!host) {
         buffer_json_member_add_boolean(wb, "enabled", false);
         return;
@@ -243,7 +254,7 @@ void ml_host_get_info(RRDHOST *rh, BUFFER *wb)
 
 void ml_host_get_detection_info(RRDHOST *rh, BUFFER *wb)
 {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if (!host)
         return;
 
@@ -261,7 +272,7 @@ void ml_host_get_detection_info(RRDHOST *rh, BUFFER *wb)
 }
 
 bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if (!host) {
         memset(mlm, 0, sizeof(*mlm));
         return false;
@@ -281,7 +292,7 @@ bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm) {
 }
 
 bool ml_host_running(RRDHOST *rh) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if(!host)
         return false;
 
@@ -299,7 +310,7 @@ void ml_host_get_models(RRDHOST *rh, BUFFER *wb)
 
 void ml_chart_new(RRDSET *rs)
 {
-    ml_host_t *host = (ml_host_t *) rs->rrdhost->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rs->rrdhost->ml_host, __ATOMIC_ACQUIRE);
     if (!host)
         return;
 
@@ -320,7 +331,7 @@ void ml_chart_new(RRDSET *rs)
 
 void ml_chart_delete(RRDSET *rs)
 {
-    ml_host_t *host = (ml_host_t *) rs->rrdhost->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rs->rrdhost->ml_host, __ATOMIC_ACQUIRE);
     if (!host)
         return;
 
@@ -389,7 +400,7 @@ void ml_dimension_new(RRDDIM *rd)
     // will sweep all untrained dimensions and enqueue them when it runs.
     // This avoids double-enqueueing the same dim from both paths.
     RRDHOST *rh = rd->rrdset->rrdhost;
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if (host && host->ml_running)
         ml_dimension_enqueue_create_model(rh, rd);
 }
@@ -431,8 +442,8 @@ ALWAYS_INLINE_ONLY void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomal
     if (!dim)
         return;
 
-    ml_host_t *host = (ml_host_t *) rd->rrdset->rrdhost->ml_host;
-    if (!host->ml_running)
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rd->rrdset->rrdhost->ml_host, __ATOMIC_ACQUIRE);
+    if (!host || !host->ml_running)
         return;
 
     ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rd->rrdset->ml_chart, __ATOMIC_ACQUIRE);
@@ -450,8 +461,8 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
     if (!dim)
         return false;
 
-    ml_host_t *host = (ml_host_t *) rd->rrdset->rrdhost->ml_host;
-    if (!host->ml_running)
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rd->rrdset->rrdhost->ml_host, __ATOMIC_ACQUIRE);
+    if (!host || !host->ml_running)
         return false;
 
     ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rd->rrdset->ml_chart, __ATOMIC_ACQUIRE);
@@ -622,7 +633,7 @@ bool ml_model_received_from_child(RRDHOST *host, const char *json)
 }
 
 void ml_host_disconnected(RRDHOST *rh) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
     if (!host)
         return;
 

@@ -723,7 +723,7 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
 
     spinlock_lock(&dim->slock);
 
-    ml_host_t *host = (ml_host_t *) dim->rd->rrdset->rrdhost->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&dim->rd->rrdset->rrdhost->ml_host, __ATOMIC_ACQUIRE);
     if (!ml_should_publish_model_update(host && host->ml_running,
                                         dim->reset_generation,
                                         expected_generation,
@@ -1174,13 +1174,14 @@ void ml_detect_main(void *arg)
         RRDHOST *rh;
         rrd_rdlock();
         rrdhost_foreach_read(rh) {
-            if (!rh->ml_host)
+            ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
+            if (!host)
                 continue;
 
             if (!service_running(SERVICE_COLLECTORS))
                 break;
 
-            ml_host_detect_once((ml_host_t *) rh->ml_host, detect_owa);
+            ml_host_detect_once(host, detect_owa);
         }
         rrd_rdunlock();
 
@@ -1282,7 +1283,7 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         return ML_WORKER_RESULT_OK;
     }
 
-    ml_host_t *host = (ml_host_t *) Dim->rd->rrdset->rrdhost->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&Dim->rd->rrdset->rrdhost->ml_host, __ATOMIC_ACQUIRE);
     if (!host || !host->ml_running) {
         pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;

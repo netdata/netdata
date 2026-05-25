@@ -134,7 +134,7 @@ public:
     ml_host_t *host() const {
         assert(acquired());
         RRDHOST *RH = rrdhost_acquired_to_rrdhost(AcqRH);
-        return reinterpret_cast<ml_host_t *>(RH->ml_host);
+        return reinterpret_cast<ml_host_t *>(__atomic_load_n(&RH->ml_host, __ATOMIC_ACQUIRE));
     }
 
     ml_queue_t *queue() const {
