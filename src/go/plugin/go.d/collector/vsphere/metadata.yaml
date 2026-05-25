@@ -315,7 +315,7 @@ modules:
               description: |
                 Add the `vnode` option to an existing job to associate it with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
 
-                Requires first defining the vnode in `/etc/netdata/vnodes/vnodes.conf`.
+                Requires first defining the vnode in your Netdata config dir under `vnodes/vnodes.conf` (for example, `/etc/netdata/vnodes/vnodes.conf`).
               config: |
                 jobs:
                   - name     : vcenter1
