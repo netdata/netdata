@@ -358,7 +358,7 @@ A trap that survives OID resolution becomes a single Telegraf metric:
 
 The v2c README example (`README.md:142-143`) shows the line-protocol shape:
 ```
-snmp_trap,mib=SNMPv2-MIB,name=coldStart,oid=.1.3.6.1.6.3.1.1.5.1,source=192.168.122.102,version=2c,community=public snmpTrapEnterprise.0="linux",sysUpTimeInstance=1i 1574109187723429814
+snmp_trap,mib=SNMPv2-MIB,name=coldStart,oid=.1.3.6.1.6.3.1.1.5.1,source=192.168.122.102,version=2c,community=example snmpTrapEnterprise.0="linux",sysUpTimeInstance=1i 1574109187723429814
 ```
 
 This shape maps cleanly onto:
@@ -670,7 +670,7 @@ None. Telegraf has no concept of user identity for trap operations.
 | Function | LOC range | Coverage |
 |---|---|---|
 | `TestReceiveTrapV1` | `:21-205` | Two v1 sub-tests: `"trap enterprise"` (enterpriseSpecific, OID synthesised from Enterprise + SpecificTrap) and `"trap generic"` (coldStart, OID synthesised from GenericTrap). Hex-encoded non-UTF8 OctetString is exercised. Asserts on the full metric shape: measurement, all tags, all fields. |
-| `TestReceiveTrapV2c` | `:206-329` | One v2c sub-test: `"v2c coldStart"`. Asserts on tag/field shape with `community="public"`, `version="2c"`. |
+| `TestReceiveTrapV2c` | `:206-329` | One v2c sub-test: `"v2c coldStart"`. Asserts on tag/field shape with `community="example"`, `version="2c"`. |
 | `TestReceiveTrapV3` | `:330-1302` | Largest function — exercises a curated subset of v3 auth/priv combinations, NOT a full cross-product. `authNoPriv` covers `{MD5, SHA, SHA224, SHA256, SHA384, SHA512}`. `authPriv` covers SHA paired with each priv ∈ `{DES, AES, AES192, AES192C, AES256, AES256C}` plus a long-password SHA/AES case (see `snmp_trap_test.go:788` for the explicit sub-test list). Asserts the trap is received with `context_name` and `engine_id` tags. |
 | `TestOidLookupFail` | `:1303-1387` | Sends a well-formed v2c coldStart trap, but the mocked translator returns "unexpected oid" for the trap-OID lookup. Coordinates three goroutines (trap sender, listener handler, `testLogger` monitor). Asserts `acc.GetTelegrafMetrics()` is empty AND that the `testLogger` channel fires for an error log line matching `"unexpected oid"`. This is the test that pins the drop-on-translation-failure behaviour. |
 | `TestInvalidAuth` | `:1389-1554` | Four v3 USM failure sub-tests (no auth, wrong username, wrong password, wrong auth protocol). Asserts the listener does NOT emit a metric AND a gosnmp log line `"incoming packet is not authentic"` appears (asserted via the `testLogger` mechanism). |

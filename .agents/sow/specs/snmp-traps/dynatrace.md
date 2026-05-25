@@ -343,9 +343,7 @@ Comparison: Datadog's `oid_resolver.go` implements an automatic "climb up the OI
 The data source:
 
 1. Receives UDP packet.
-2. CIDR-filters the source IP against the configured `ip` field. Quoted requirement:
-   > "The network that sends packets with traps provided in the CIDR notation. To configure a single interface address, add the `32` subnet mask after the IP address, for example `172.10.11.0/32`."
-   > — same page
+2. CIDR-filters the source IP against the configured `ip` field. The vendor documentation states that a single interface address is configured by adding a `/32` subnet mask to the address.
 3. Verifies authentication: community string (v1/v2c) or USM credentials (v3).
 4. BER-decodes the PDU and extracts variable bindings.
 5. Resolves OIDs against the loaded MIB set.
@@ -871,10 +869,7 @@ Source: SNMP traps data source page. Demonstrates: even the minimal config produ
 
 ### 18.3 Source filter (CIDR)
 
-> "172.10.11.0/32"
-> — SNMP traps data source page
-
-Demonstrates: single-host filter is expressed with an explicit `/32` mask, applied to a host IP. (The example in the docs uses `172.10.11.0/32`, which is technically the `.0` host of that subnet; reviewers should treat the example as illustrative of the `/32` mask convention, not as a recommendation to listen on the `.0` host specifically.)
+Vendor docs demonstrate that a single-host filter is expressed with an explicit `/32` mask applied to a host IP. The exact vendor example is intentionally not copied here; the design point is the `/32` mask convention, not the specific address.
 
 ### 18.4 SELinux pitfall
 
@@ -982,7 +977,7 @@ Consensus blockers and majors mapped to fixes (all applied in this iteration):
 - **AES variants framing (kimi)** — §11.1 reclassified AES-192 / AES-256 / -C variants as "Reeder-style" vendor-popularized extensions, not Dynatrace-proprietary.
 - **`setcap` pattern not vendor-documented (qwen)** — §3.4 labelled as community guidance rather than vendor-stated.
 - **Marketing language in §16 and §15.2 (codex)** — softened: "tight integration" → "post-ingest query surface"; "flagship strength" → "primary product focus"; "short path" → "configured route".
-- **`172.10.11.0/32` is technically a host (qwen)** — §18.3 clarification added.
+- **Vendor `/32` example is technically a host (qwen)** — §18.3 clarification added without preserving the exact address.
 - **§1.3 C++ inference (minimax)** — removed; replaced with explicit "language and libraries not disclosed".
 - **§1.2 ActiveGate timeline inference (kimi)** — replaced with reference to per-sprint release notes index.
 

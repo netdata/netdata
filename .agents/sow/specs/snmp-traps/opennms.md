@@ -1180,7 +1180,7 @@ Reviewers launched in parallel: `codex`, `glm`, `kimi`, `mimo`, `minimax`, `qwen
 12. **`JaegerTracingIT` distributed-tracing smoke test missed** (glm). Confirmed file exists. Added to §12 smoke tests and §16 strength #13.
 13. **Wrong UEI in §18.2 Cisco code example** (mimo). The code block was the resolution event (`ccmGatewayFailedClear`) but the text said `ccmGatewayRecovered`. Fixed: now shows the actual UEI and clarifies the paired problem/resolution lifecycle with line citations.
 14. **`TrapdInformIT` tests SNMPv3 informs only, not v2c** (kimi). Fixed in §12 unit/IT tests.
-15. **Reviewer pass: accepted set prematurely in §0 metadata** (kimi). Fixed to `iteration-2-in-progress` in §0.
+15. **Reviewer round: accepted set prematurely in §0 metadata** (kimi). Fixed to `iteration-2-in-progress` in §0.
 
 **Minor / nit findings (all addressed in revision):**
 

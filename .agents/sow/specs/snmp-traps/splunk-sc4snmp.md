@@ -547,7 +547,7 @@ splunk:
   enabled: true
   protocol: https
   host: <splunk-host>
-  token: 00000000-0000-0000-0000-000000000000
+  token: example-token
   insecureSSL: "false"
   port: "8088"
 traps:
@@ -1164,7 +1164,7 @@ splunk:
   enabled: true
   protocol: https
   host: i-0d903f60788be4c68.ec2.splunkit.io
-  token: 00000000-0000-0000-0000-000000000000
+  token: example-token
   insecureSSL: "false"
   port: "8088"
 traps:

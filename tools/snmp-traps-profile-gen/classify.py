@@ -7,9 +7,11 @@ to the LLM gateway with a 4-field classification prompt, validates the
 response, and writes one JSON file per OID under output/enriched/.
 
 Strict rules:
-  * No authentication header (endpoint is open).
-  * Single model: minimax-m2.7 served by sglang at 10.20.4.21:8357.
-  * 100 concurrent in-flight slots (saturate the 64-slot scheduler).
+  * Endpoint-neutral: pass OpenAI-compatible endpoints explicitly with
+    --endpoint, or set the SNMP_TRAP_PROFILE_GEN_* environment defaults.
+  * No authentication header is managed by this helper; use an endpoint or
+    gateway whose auth policy is handled outside committed defaults.
+  * Concurrent in-flight slots are configurable per endpoint.
   * Schema-validated output; up to 3 LLM attempts with feedback in the
     retry prompt; mechanical regex fallback only if all 3 attempts fail.
   * Atomic per-OID file writes; resumable runs.
@@ -40,9 +42,9 @@ import httpx
 # --------------------------------------------------------------------------
 
 
-LLM_BASE_URL = "http://10.20.4.21:8357/v1"
-MODEL = "minimax-m2.7"
-DEFAULT_CONCURRENCY = 100
+LLM_BASE_URL = os.environ.get("SNMP_TRAP_PROFILE_GEN_LLM_BASE_URL", "http://127.0.0.1:8000/v1")
+MODEL = os.environ.get("SNMP_TRAP_PROFILE_GEN_MODEL", "local-model")
+DEFAULT_CONCURRENCY = int(os.environ.get("SNMP_TRAP_PROFILE_GEN_CONCURRENCY", "8"))
 MAX_LLM_ATTEMPTS = 3
 DESCRIPTION_MAX_BYTES = 1024
 
@@ -490,7 +492,11 @@ async def call_llm(
     cfg: LLMConfig,
     user_prompt: str,
 ) -> str:
-    """Single LLM call. NO authentication header (open endpoint).
+    """Single LLM call.
+
+    This helper intentionally does not inject authentication headers. Point it
+    at an OpenAI-compatible endpoint or gateway whose auth policy is handled
+    outside committed defaults.
 
     Returns the model's text response, or raises on persistent HTTP failure.
     """
@@ -832,7 +838,7 @@ def main() -> int:
     parser.add_argument("--endpoint", action="append", default=None,
                         help=("Add an LLM endpoint to the dispatch pool. Repeatable. "
                               "Format: base_url|model|concurrency|max_tokens "
-                              "e.g. 'http://10.20.4.21:8357/v1|minimax-m2.7|150|800'. "
+                              "e.g. 'http://127.0.0.1:8000/v1|local-model|8|800'. "
                               "When --endpoint is given, --base-url/--model/--concurrency are ignored."))
     parser.add_argument("--force", action="store_true",
                         help="Re-process even OIDs that already have output files.")

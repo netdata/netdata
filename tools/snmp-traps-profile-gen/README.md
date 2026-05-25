@@ -48,14 +48,20 @@ output/
 
 ## Setup
 
-Use the existing trial venv at
-`/home/costa/src/PRs/snmptraps/.local/snmp-extract-trial/venv/` (already
-has `pysmi 2.0.0`, `httpx`, `PyYAML`).  Or create a new venv from
-`requirements.txt`.
+Create a local virtual environment from `requirements.txt`:
 
-The classifier reads the LLM API key from
-`~/.local/share/opencode/auth.json` (JSON key `llm-netdata-cloud.key`).
-The key is **never** written to logs or output files.
+```sh
+python3 -m venv .local/snmp-traps-profile-gen-venv
+. .local/snmp-traps-profile-gen-venv/bin/activate
+python3 -m pip install -r tools/snmp-traps-profile-gen/requirements.txt
+```
+
+The classifier talks to OpenAI-compatible chat-completions endpoints. Pass
+endpoints explicitly with `--endpoint`, or set the neutral single-endpoint
+defaults with `SNMP_TRAP_PROFILE_GEN_LLM_BASE_URL`,
+`SNMP_TRAP_PROFILE_GEN_MODEL`, and `SNMP_TRAP_PROFILE_GEN_CONCURRENCY`.
+The helper does not write API keys, endpoint credentials, or response headers
+to output files.
 
 ## Phase 1 - extract MIBs
 
@@ -84,13 +90,11 @@ MIB names are skipped.
 # 200-trap stratified sample.  Stop and review output/sample-review.md
 # before running the full batch.
 ./classify.py --sample 200 --out-dir output \
-  --endpoint 'http://10.20.4.21:8357/v1|minimax-m2.7|150|800' \
-  --endpoint 'http://10.20.4.205:8356/v1|qwen3.6-35b-a3b|150|800'
+  --endpoint 'http://127.0.0.1:8000/v1|local-model|8|800'
 
 # After review, full batch (same --endpoint flags).
 ./classify.py --out-dir output \
-  --endpoint 'http://10.20.4.21:8357/v1|minimax-m2.7|150|800' \
-  --endpoint 'http://10.20.4.205:8356/v1|qwen3.6-35b-a3b|150|800'
+  --endpoint 'http://127.0.0.1:8000/v1|local-model|8|800'
 ```
 
 `classify.py` is async + concurrent. Dispatches across one or more LLM

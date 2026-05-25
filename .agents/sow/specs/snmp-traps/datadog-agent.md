@@ -967,7 +967,7 @@ The listener tests actually **send real SNMP traps over real UDP sockets** to lo
 
 ```go
 params, err := trapConfig.BuildSNMPParams(nil)
-params.Community = community
+params.Community = "example"
 params.Timeout = 1 * time.Second
 params.Retries = 1
 params.Version = gosnmp.Version1
@@ -1556,5 +1556,4 @@ Final convergence summary:
 - 0 surviving majors or blockers at the iter-2 cut-off.
 - The only structurally-not-addressed reviewer is qwen, which has failed for content-emitting on every attempt in iter-2 and iter-3 (banner-only iter-2 first pass, timeout-mid-exploration iter-2 second pass, 0 bytes iter-3) — qwen's opencode endpoint is consistently unreliable for prompts of this size.
 - The spec's evidence base, line counts, claim/source consistency, and reviewer-pass log are now coherent with the source tree at `datadog/datadog-agent @ 2c813592` and `datadog/integrations-core @ 411c31db`.
-
 

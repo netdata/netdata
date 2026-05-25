@@ -22,7 +22,7 @@ User-stated direction: "We extract mechanically everything that the MIBs provide
 
 Facts:
 
-- The mirror at `/opt/baddisk/monitoring/repos/snmp/` contains ~28,200 raw MIB files across 8 collections (pysnmp/mibs canonical, cisco/cisco-mibs vendor-canonical, Poil/MIBs, kcsinclair/mibs, hsnodgrass/snmp_mib_archive, kmalinich/snmp-mibs, plus librenms/mibs and netdisco-mibs already mirrored). Deduped estimate: 8,000-12,000 unique MIB modules.
+- The local SNMP MIB mirror contains ~28,200 raw MIB files across 8 collections (pysnmp/mibs canonical, cisco/cisco-mibs vendor-canonical, Poil/MIBs, kcsinclair/mibs, hsnodgrass/snmp_mib_archive, kmalinich/snmp-mibs, plus librenms/mibs and netdisco-mibs already mirrored). Deduped estimate: 8,000-12,000 unique MIB modules.
 - The mirror also contains the full Python SNMP toolchain: `pysmi`, `pysnmp`, `pyasn1`, `pyasn1-modules`, `pysnmpcrypto`, `asn1ate` (BSD-2-Clause / Apache-2.0).
 - `pysmi` is the canonical MIB compiler. Datadog's `ddev meta snmp generate-traps-db` uses it to produce `dd_traps_db.json.gz` (a verified copy of which lives at `.local/dd_traps_db.json.gz` and demonstrates a leaner compiled schema: 3,652 MIBs, 67,680 traps, 40,617 vars).
 - Datadog's reference compiler source is at `datadog/integrations-core :: datadog_checks_dev/datadog_checks/dev/tooling/commands/meta/snmp/generate_traps_db.py` (Apache-2.0).
@@ -57,7 +57,7 @@ Sources checked:
 - `~/src/PRs/snmptraps/.agents/sow/specs/snmp-traps/netdata.md` §7 (profile YAML schema), §8 (OOB catalog strategy)
 - `~/src/PRs/snmptraps/.local/dd_traps_db.json.gz` (reference schema, leaner than what we need)
 - `datadog/integrations-core :: datadog_checks_dev/.../generate_traps_db.py` (reference implementation)
-- `/opt/baddisk/monitoring/repos/snmp/` (MIB corpus + toolchain)
+- Local SNMP MIB mirror (MIB corpus + toolchain)
 
 Current state:
 
@@ -91,7 +91,7 @@ Affected contracts and surfaces:
 
 - Profile YAML schema (consumer at runtime — defined in netdata.md §7).
 - LLM enrichment pipeline (consumer — to be defined in SOW-0034).
-- Mirror layout (read-only consumer of `/opt/baddisk/monitoring/repos/snmp/`).
+- Mirror layout (read-only consumer of the local SNMP MIB mirror).
 
 Existing patterns to reuse:
 
@@ -303,8 +303,8 @@ Follow-up mapping:
 - `~/src/PRs/snmptraps/.agents/sow/pending/SOW-0034-20260523-snmp-profile-llm-enrichment.md` (downstream consumer)
 - `datadog/integrations-core :: datadog_checks_dev/datadog_checks/dev/tooling/commands/meta/snmp/generate_traps_db.py` (reference implementation)
 - `~/src/PRs/snmptraps/.local/dd_traps_db.json.gz` (reference output)
-- `/opt/baddisk/monitoring/repos/snmp/` (input MIB corpus)
-- `/opt/baddisk/monitoring/repos/snmp/pysmi/` (compiler library)
+- Local SNMP MIB mirror (input MIB corpus)
+- Local pysmi mirror (compiler library)
 
 End of SOW.
 
@@ -312,13 +312,13 @@ End of SOW.
 
 ### What broke
 
-The post-commit external-reviewer round (codex, glm, mimo, minimax, qwen — kimi infra-failed) flagged that `DEFAULT_SOURCE_DIRS` in `extract.py` omits the canonical `pysnmp/mibs/src` mirror present at `/opt/baddisk/monitoring/repos/snmp/mibs/src/` (5,923 MIB files). `netdata.md §8` already lists pysnmp/mibs as the first canonical source in the verified-local-mirror table; the omission was a silent miss in the extraction-driver source list.
+The post-commit external-reviewer round (codex, glm, mimo, minimax, qwen — kimi infra-failed) flagged that `DEFAULT_SOURCE_DIRS` in `extract.py` omits the canonical `pysnmp/mibs/src` mirror present in the local SNMP MIB mirror (5,923 MIB files). `netdata.md §8` already lists pysnmp/mibs as the first canonical source in the verified-local-mirror table; the omission was a silent miss in the extraction-driver source list.
 
 ### Evidence
 
-- `tools/snmp-traps-profile-gen/extract.py` `DEFAULT_SOURCE_DIRS`: 10 entries, none of them `/opt/baddisk/monitoring/repos/snmp/mibs/src`.
-- `/opt/baddisk/monitoring/repos/snmp/mibs/` exists with `src/` subdir containing 5,923 files (6,011 total including charts/rendered/scripts).
-- codex review (post-commit, full evidence): "DEFAULT_SOURCE_DIRS covers Netdisco, Cisco, Poil, kcsinclair, kmalinich, hsnodgrass, LibreNMS, but it omits /opt/baddisk/monitoring/repos/snmp/mibs/src, whose remote is github.com:pysnmp/mibs. That local source contains 5,923 files and 744 module basenames not present in the configured source set, including A10-AX-CGN-NOTIFICATIONS-V2C, A10-AX-TRAPS, ACMEPACKET-ENVMON-MIB, and many ACOS-* modules."
+- `tools/snmp-traps-profile-gen/extract.py` `DEFAULT_SOURCE_DIRS`: 10 entries, none of them the canonical `pysnmp/mibs/src` mirror path.
+- The local `pysnmp/mibs/src` mirror exists with 5,923 files (6,011 total including charts/rendered/scripts).
+- codex review (post-commit, full evidence): "DEFAULT_SOURCE_DIRS covers Netdisco, Cisco, Poil, kcsinclair, kmalinich, hsnodgrass, LibreNMS, but it omits the local `pysnmp/mibs/src` mirror. That local source contains 5,923 files and 744 module basenames not present in the configured source set, including A10-AX-CGN-NOTIFICATIONS-V2C, A10-AX-TRAPS, ACMEPACKET-ENVMON-MIB, and many ACOS-* modules."
 - Reviewer audit dir: `.local/audits/snmp-traps-pr/post-commit-review/`.
 
 ### Why previous validation missed it
@@ -327,7 +327,7 @@ The original Validation gate spot-checked extraction output against `linkDown` a
 
 ### Repair plan
 
-1. Add `/opt/baddisk/monitoring/repos/snmp/mibs/src` to `DEFAULT_SOURCE_DIRS` in canonical-first position (right after the IETF/RFC standard tree, before the per-vendor archives).
+1. Add the local `pysnmp/mibs/src` mirror to `DEFAULT_SOURCE_DIRS` in canonical-first position (right after the IETF/RFC standard tree, before the per-vendor archives).
 2. Re-run `extract.py` against the expanded source list. Resumable behaviour means already-extracted MIBs are skipped; new ones are appended.
 3. Compare the new `extracted.jsonl` to the prior one: count of new MIB modules compiled, count of new traps extracted, any new compile failures.
 4. Feed the diff into SOW-0034 for incremental LLM enrichment (only new OIDs hit the model; existing per-OID JSON files are reused).
@@ -352,7 +352,7 @@ Once re-extraction + re-enrichment + re-emit complete and the reviewer round ret
 
 ### Regression resolution (2026-05-24)
 
-- `tools/snmp-traps-profile-gen/extract.py` `DEFAULT_SOURCE_DIRS` now includes `/opt/baddisk/monitoring/repos/snmp/mibs/src` in priority position 2 (after netdisco/rfc, before cisco/v2). Full re-extraction completed in 1h 41m wall-clock.
+- `tools/snmp-traps-profile-gen/extract.py` `DEFAULT_SOURCE_DIRS` now includes the local `pysnmp/mibs/src` mirror in priority position 2 (after netdisco/rfc, before cisco/v2). Full re-extraction completed in 1h 41m wall-clock.
 - Final run statistics: 14,324 MIB modules discovered (was 13,580 — `+744` new from pysnmp/mibs/src), 8,265 compiled successfully (was 7,535 — `+730` more useful), 6,777 failures, 1,433 cross-MIB OID conflicts. 50,198 traps extracted (was 40,409 — `+9,789`, `+24%`).
 - Spot-checked newly-extracted traps from A10-AX-* (vendor/a10/), ACMEPACKET-* (vendor/oracle/), ACOS-* (vendor/a10/) — all have full varbind metadata.
 - Additional fix shipped in the same cycle: `extract.py` now strips pysmi's `_pysmi_` keyword-prefix from trap symbols AND varbind references (`demangle_pysmi_name()` at extract.py). Found and fixed one affected shipped trap: `1.3.6.1.4.1.1918.2.14.20.700` was `RpsSc300Mib::_pysmi_global`, now correctly `RpsSc300Mib::global` (the source MIB defines `global NOTIFICATION-TYPE`; pysmi mangled it to avoid Python keyword collision in its generated code).

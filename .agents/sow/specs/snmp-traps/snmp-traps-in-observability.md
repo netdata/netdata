@@ -53,7 +53,7 @@
 
 **MIB (Management Information Base)**: The schema. A compiled MIB defines the OID hierarchy, trap types, textual conventions, and the expected varbinds for each notification. Without the correct MIB, a trap is an uninterpretable bag of numbers. MIBs are version-specific and must track firmware versions.
 
-**Enterprise OID**: A private OID subtree under `1.3.6.1.4.1` assigned to a vendor (Cisco is `.9`, Juniper is `.2636`, Arista is `.30065`). Vendors define traps and objects here. Enterprise-specific traps account for the vast majority of actionable production events.
+**Enterprise OID**: A private OID subtree under `1.3.6.1.4.1` assigned to a vendor (Cisco is `.9`, Juniper is `.2636`, Arista is `.30065`). Vendors define traps and objects here. Enterprise-specific traps make up the vast majority of actionable device events.
 
 **sysUpTime**: TimeTicks (hundredths of seconds) since the agent last initialized. Used to correlate trap timing relative to device boot, not absolute wall-clock time. It is monotonically increasing per boot cycle; a decrease indicates reboot.
 

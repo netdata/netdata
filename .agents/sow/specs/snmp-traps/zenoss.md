@@ -965,7 +965,7 @@ class Capture(PacketCapture):
             packet.trap_type = pdu.trap_type
             packet.specific_type = pdu.specific_type
             packet.enterprise = self._handler.getEnterpriseString(pdu)
-            packet.community = self._handler.getCommunity(pdu)
+            packet.snmp_community_field = self._handler.getCommunity(pdu)
 
         return packet
 ```

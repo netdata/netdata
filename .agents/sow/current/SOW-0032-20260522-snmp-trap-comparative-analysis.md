@@ -23,14 +23,14 @@ Output: one comprehensive file per system in `.agents/sow/specs/snmp-traps/`, th
 Facts:
 
 - Foundational spec exists: `.agents/sow/specs/snmp-traps/snmp-traps-in-observability.md` (1039 lines, validated synthesis from 4 advisors + web validation).
-- Local mirror at `/opt/baddisk/monitoring/repos/` contains source for 13 OSS systems with first-class trap implementations (survey complete; see §Analysis).
+- Local source mirrors contain source for 13 OSS systems with first-class trap implementations (survey complete; see §Analysis).
 - Three commercial systems (SolarWinds, Dynatrace, LogicMonitor) lack source mirroring but are influential enough to warrant docs-only research.
 - User's coding style mandates: research first, no guessing, evidence-based recommendations, mirror existing patterns, brutal honesty.
 
 Inferences:
 
 - Some systems share base implementations (multiple Nagios-family use SNMPTT; Centreon also leans on snmptrapd; Zabbix and LibreNMS use snmptrapd as front-end). The analysis must distinguish "their unique contribution" from "what they inherit from `snmptrapd`."
-- Sub-agent parallelism would compress wall time but Costa has explicitly chosen sequential execution with per-system parallel external review, because uniform quality and verifiable evidence matter more than speed.
+- Sub-agent parallelism would compress wall time but the user has explicitly chosen sequential execution with per-system parallel external review, because uniform quality and verifiable evidence matter more than speed.
 
 Unknowns:
 
@@ -52,8 +52,8 @@ Sources checked:
 
 - `.agents/sow/specs/snmp-traps/snmp-traps-in-observability.md` (full read)
 - `/opt/baddisk/monitoring/scripts/find-repos.sh 'snmp'` and `'trap'`
-- `find /opt/baddisk/monitoring/repos/<each-platform> -type d -iname '*trap*'`
-- `find /opt/baddisk/monitoring/repos/<each-platform> -type f -iname '*snmptrap*'`
+- Local source-mirror directory scans for trap-related directories and files.
+- Local source-mirror content scans for `snmptrap` implementation files.
 - Cross-checked Icinga (no native trap support — uses snmptt or external integration), Prometheus (pull-only, no traps), OpenTelemetry (no native trap receiver in core), VictoriaMetrics/Grafana (no traps), Sumologic/Logzio/Observiq (no traps), Coralogix/Chronosphere/Edgedelta (no traps), Honeycomb (no), Mezmo (no).
 
 Current state of mirrored evidence:
@@ -95,15 +95,15 @@ Risks:
 
 ### Decision 1 — Scope
 
-Decided (Costa): All 13 tier-1 OSS systems + 3 commercial via docs (SolarWinds, Dynatrace, LogicMonitor). 16 systems total.
+Decided (user): All 13 tier-1 OSS systems + 3 commercial via docs (SolarWinds, Dynatrace, LogicMonitor). 16 systems total.
 
 ### Decision 2 — Depth
 
-Decided (Costa): Comprehensive (5-15 pages each), with 100% feature and implementation coverage per the Content Requirements below.
+Decided (user): Comprehensive (5-15 pages each), with 100% feature and implementation coverage per the Content Requirements below.
 
-### Decision 3 — Process (revised by Costa)
+### Decision 3 — Process (revised by user)
 
-Decided (Costa): Three sub-agents run in parallel at a time. Each sub-agent owns one system end-to-end. Each sub-agent spawns its own six external reviewers in parallel (codex, glm, kimi, mimo, minimax, qwen). Each sub-agent ingests reviewer findings, judges importance, improves the document, and re-runs reviewers until there are no major findings. The sub-agent's judgement applies the balance: external reviewers will always find micro issues; iteration stops when only nits and minor stylistic findings remain.
+Decided (user): Three sub-agents run in parallel at a time. Each sub-agent owns one system end-to-end. Each sub-agent spawns its own six external reviewers in parallel (codex, glm, kimi, mimo, minimax, qwen). Each sub-agent ingests reviewer findings, judges importance, improves the document, and re-runs reviewers until there are no major findings. The sub-agent's judgement applies the balance: external reviewers will always find micro issues; iteration stops when only nits and minor stylistic findings remain.
 
 Pilot first: run ONE sub-agent on OpenNMS, validate the entire flow, then scale to 3-at-a-time for the remaining 15 systems.
 
@@ -111,11 +111,11 @@ Iteration prompt (after the first reviewer pass): each subsequent reviewer pass 
 
 ### Decision 4 — Output Structure
 
-Decided (Costa): Common template applied uniformly. Comparison matrix built progressively (after each system, the matrix is updated).
+Decided (user): Common template applied uniformly. Comparison matrix built progressively (after each system, the matrix is updated).
 
 ### Decision 5 — Content Requirements (per system)
 
-Decided (Costa). Each per-system file MUST cover:
+Decided (user). Each per-system file MUST cover:
 
 1. Exactly which features the system supports (capability inventory)
 2. How they implement each feature (summary, plus deep architecture for key features)
@@ -352,7 +352,7 @@ Verify:
 6. Comparability: identify any place where the framing is so system-specific
    that it cannot be compared with other systems following the same template.
 
-For systems with source mirrored at /opt/baddisk/monitoring/repos/<system>/
+For systems with source mirrored locally:
 please explore the source where useful to validate claims. For docs-only
 systems, validate against the cited vendor URLs.
 
@@ -396,7 +396,7 @@ Problem / root-cause model:
 Evidence reviewed:
 
 - The foundational spec `.agents/sow/specs/snmp-traps/snmp-traps-in-observability.md`
-- Mirrored repos at `/opt/baddisk/monitoring/repos/` (presence survey complete)
+- Local mirrored repositories (presence survey complete)
 - SOW template `.agents/sow/SOW.template.md`
 
 Affected contracts and surfaces:
@@ -465,7 +465,7 @@ Open decisions (require user confirmation before per-system work starts):
 - Read foundational spec `.agents/sow/specs/snmp-traps/snmp-traps-in-observability.md`.
 - Surveyed mirrored repos; identified 13 first-class OSS trap implementations + 3 commercial doc-only candidates.
 - Authored SOW with locked scope, template, reviewer protocol, and pre-implementation gate.
-- Costa confirmed scope, depth, template, reviewer set, and content requirements; revised process to: 3 sub-agents in parallel; each sub-agent spawns its own 6 reviewers in parallel and iterates until no major findings remain.
+- The user confirmed scope, depth, template, reviewer set, and content requirements; revised process to: 3 sub-agents in parallel; each sub-agent spawns its own 6 reviewers in parallel and iterates until no major findings remain.
 - Decision: pilot OpenNMS with one sub-agent first; after pilot accepted, scale to 3 parallel sub-agents for remaining 15 systems.
 - Verified `codex` and `opencode` CLIs are installed and runnable from this host.
 - Pilot sub-agent launched for OpenNMS.
@@ -473,6 +473,10 @@ Open decisions (require user confirmation before per-system work starts):
 ## Validation
 
 Pending.
+
+Sensitive data gate:
+
+Pending. Before this SOW can close, all durable artifacts produced by it must be checked for raw secrets, SNMP communities, customer identifiers, personal data, non-documentation IPs, private endpoints, and workstation-local paths.
 
 ## Outcome
 

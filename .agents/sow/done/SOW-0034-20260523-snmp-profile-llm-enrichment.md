@@ -20,7 +20,7 @@ The output is per-vendor profile YAML files matching the schema in netdata.md §
 
 ### User Request
 
-User-stated direction: "We have 2 models here that are free for us: minimax-m2.7 at 130tps (nova:3537, 64 concurrent) and qwen3.6-35b-a3b at 180tps (localhost:3536, 8 concurrent). I recommend to create a small prompt for the classification required (3 fields), provide to it the information extracted from the MIBs, and ask it to do the classification and the description we need."
+User-stated direction: use two available local OpenAI-compatible LLM endpoints to classify each extracted trap into the small profile schema fields and generate the operator-facing description.
 
 User clarification on throughput: minimax aggregate at 64 concurrent is ~1,000 tps (not single-stream-times-concurrency). Qwen aggregate at 8 concurrent is comparably batched (single-stream 180 tps; aggregate TBD by measurement).
 
@@ -28,9 +28,9 @@ User clarification on throughput: minimax aggregate at 64 concurrent is ~1,000 t
 
 Facts:
 
-- Two local LLM endpoints available, free, with batched aggregate throughput:
-  - `minimax-m2.7-coder` at nova:3537 — ~1,000 tps aggregate at 64 concurrent
-  - `qwen3.6-35b-a3b` at localhost:3536 — single-stream 180 tps, 8 concurrent slots, aggregate TBD
+- Two local OpenAI-compatible LLM endpoints were available, free for this workload, with batched aggregate throughput:
+  - Primary model endpoint — ~1,000 tps aggregate at 64 concurrent
+  - Fallback model endpoint — single-stream 180 tps, 8 concurrent slots, aggregate TBD
 - Combined estimate: ~1,600-1,900 tps aggregate (qwen contribution conservative).
 - Expected workload: 40,000-120,000 per-trap classifications (range from SOW-0033).
 - Per-request size estimate: 700-1,500 tokens input (MIB-extracted context) + 100-200 tokens output (JSON with 3 fields).
@@ -262,7 +262,7 @@ Closure requires:
 Resolution of the six open decisions at the Pre-Implementation Gate:
 
 1. **Sample-gate reviewer** → user personally; iterated through ~4 prompt revisions on stratified 200-trap samples before unlocking the full batch.
-2. **Routing strategy** → primary `minimax-m2.7` at the unauthenticated sglang endpoint `10.20.4.21:8357/v1` (100 concurrent slots, exact concurrency to keep sglang's batched-decode queues saturated). Fallback `qwen3.6-35b-a3b-nothinker` at `localhost:8356/v1` used surgically for the rare cases where minimax's decoder mutated unusual MIB prefixes (e.g., `ngev*` → `negev*` / `nggev*`); qwen tokenizes those correctly.
+2. **Routing strategy** → primary local OpenAI-compatible endpoint (100 concurrent slots, exact concurrency to keep the batched-decode queues saturated). Fallback local endpoint used surgically for the rare cases where the primary model's decoder mutated unusual MIB prefixes (e.g., `ngev*` → `negev*` / `nggev*`); the fallback model tokenizes those correctly.
 3. **Banned-phrase list** → finalized inside `classify.py`'s `SYSTEM_PROMPT` (marketing language, severity-inflation phrases, "fixing" odd varbind prefixes). Survives the schema validator's retry loop.
 4. **Per-vendor file partitioning** → vendor (not MIB), via IANA enterprise-PEN lookup. `ENTERPRISE_VENDORS` table in `emit.py` covers ~100 named vendors; unknown PENs bucket as `enterprise-<N>.yaml` so nothing is silently dropped. IETF standard MIBs → `standard.yaml`; IEEE LLDP (`1.0.8802.*`) → `ieee-lldp.yaml`.
 5. **Manual override mechanism** → operator overrides live under `/etc/netdata/go.d/snmp.trap-profiles/`, documented in `profile-format.md` § "Operator overrides". The pipeline does **not** maintain an in-tree overrides file — overrides are an operator-side concern, profiles ship as the vendor-curated layer.
@@ -374,8 +374,8 @@ Follow-up mapping:
 - `~/src/PRs/snmptraps/.agents/sow/pending/SOW-0033-20260523-snmp-mib-mechanical-extraction.md` (upstream producer)
 - `~/src/PRs/snmptraps/.local/dd_traps_db.json.gz` (reference compiled output — leaner than ours)
 - LLM endpoints:
-  - `minimax-m2.7-coder` at `nova:3537` (~1,000 tps aggregate at 64 concurrent)
-  - `qwen3.6-35b-a3b` at `localhost:3536` (single-stream 180 tps, 8 concurrent; aggregate TBD by measurement)
+  - Primary local endpoint (~1,000 tps aggregate at 64 concurrent)
+  - Fallback local endpoint (single-stream 180 tps, 8 concurrent; aggregate TBD by measurement)
 
 End of SOW.
 

@@ -1148,7 +1148,7 @@ Verbatim from `nagioscore @ 8d1d276 :: contrib/eventhandlers/submit_check_result
 #!/bin/sh
 
 # SUBMIT_CHECK_RESULT
-# Written by Ethan Galstad (egalstad@nagios.org)
+# Written by Ethan Galstad ([REDACTED_EMAIL])
 # Last Modified: 02-18-2002
 #
 # This script will write a command to the Nagios command
@@ -1254,7 +1254,7 @@ def dump_trap(loop):
     import MySQLdb
     import sys
 
-    db = MySQLdb.connect("localhost" , user = "root" , passwd = "password" , db = "snmptt" )
+    db = MySQLdb.connect("localhost" , user = "root" , passwd = "[REDACTED_SECRET]" , db = "snmptt" )
     c  = db.cursor()
     ente = [ '2021' , '9996' , '2343' , '5675' , '6879' ]
     suff = [ '.13.990.0.17' , '.2.993.1.17' , '.13.991.3.4' , '.45.33.5.6' ]

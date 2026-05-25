@@ -208,7 +208,7 @@ Stock config (`src/go/plugin/go.d/config/go.d/snmp.conf`) is minimal — a comme
 #  - name: switch
 #    update_every: 10
 #    hostname: "192.0.2.1"
-#    community: public
+#    community: example
 #    options:
 #      version: 2
 ```
@@ -426,7 +426,7 @@ What we would have to BUILD fresh:
 
 ## 15. Open design questions for the eventual Netdata trap-support discussion
 
-(These are NOT decided. They are the shape of the questions Costa will need to answer once the comparative-analysis is in hand.)
+(These are NOT decided. They are the shape of the questions the user will need to answer once the comparative-analysis is in hand.)
 
 1. **One trap listener for the whole agent, or one per SNMP job?** Industry pattern is one listener. Netdata's collector model favours per-job. Mixing creates a singleton problem.
 2. **Profile-driven trap OID mapping, or MIB compilation?** Profile-driven is consistent with the rest of the codebase. MIB compilation handles long-tail vendors but introduces a heavy dependency.

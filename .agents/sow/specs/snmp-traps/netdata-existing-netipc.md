@@ -440,7 +440,7 @@ A trap listener has useful state for other plugins. Reusable patterns:
 
 ## 12. Open Questions For Trap Design
 
-(Decisions for Costa, surfaced by this inventory; not decided here.)
+(Decisions for the user, surfaced by this inventory; not decided here.)
 
 1. **Data path to the agent**: confirm stdio pipes (PLUGINSD-style, as NetFlow does) is the path for the trap listener to push records to `netdata`. netipc is not on this path. The only real question here is the framing (Rust crate `rt::PluginRuntime` line protocol, or something else).
 
@@ -453,7 +453,7 @@ A trap listener has useful state for other plugins. Reusable patterns:
 3. **Cross-plugin publish surface — netipc SERVER role**: should the trap listener publish anything back via netipc? Concretely useful candidates:
    - "Recent traps in the last N seconds, filterable by source / trapOID" — lets the topology plugin react to fresh state changes without polling the listener.
    - "Cumulative trap counters per device" — lets a dashboard plugin render trap-rate alongside polled metrics.
-   - **Costa's example**: a Rust trap listener publishing live trap data that a Go-based topology plugin can query with small overhead — practical because the C/Rust/Go bindings are wire-compatible, and SHM batched response can carry hundreds of records per poll without a per-trap roundtrip. Not a recommendation, but a real practical possibility we should evaluate against the alternatives.
+   - **User example**: a Rust trap listener publishing live trap data that a Go-based topology plugin can query with small overhead — practical because the C/Rust/Go bindings are wire-compatible, and SHM batched response can carry hundreds of records per poll without a per-trap roundtrip. Not a recommendation, but a real practical possibility we should evaluate against the alternatives.
 
 4. **Cross-language interop, concrete**: the trap listener is best-fit in Rust (per the foundational spec and per the NetFlow precedent). Consumers across snmp / snmp_topology are Go. The cross-language netipc bindings are explicitly designed for this — a Rust server + Go client(s) is a supported, tested topology (full benchmark matrix). Nothing in the language pairing argues against it.
 
