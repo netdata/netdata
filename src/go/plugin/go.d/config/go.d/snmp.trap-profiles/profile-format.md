@@ -79,7 +79,7 @@ traps:
     category: state_change
     severity: warning
     description: |
-      OSPF configuration mismatch on {SNMP_DEVICE_HOSTNAME}
+      OSPF configuration mismatch on {_HOSTNAME}
         local router ID: {ospfRouterId}
         interface IP: {ospfIfIpAddress}
         source of mismatched packet: {cospfPacketSrc}
@@ -114,9 +114,33 @@ entry is the slim shipping form of a single MIB object:
 > TEXTUAL-CONVENTION definitions; the field is reserved.
 
 Plugin behaviour: varbinds that the plugin sees on a trap but cannot resolve
-via the file table fall back to MIB-index lookup, then to raw OID-keyed
-rendering. The varbind still lands in the `SNMP_TRAP_JSON` journal field with
-its OID, ASN.1-decoded type, and value.
+via the file table fall back to raw OID-keyed rendering — there is **no
+runtime MIB compilation** in the plugin (operators convert custom MIBs to
+profile YAMLs offline using `tools/snmp-traps-profile-gen/` and drop them
+under `/etc/netdata/go.d/snmp.trap-profiles/`). The varbind still lands in
+the `TRAP_JSON` journal field with its OID, ASN.1-decoded type, and
+value.
+
+### Duplicate symbolic name handling in `TRAP_JSON`
+
+`TRAP_JSON` is an object keyed by varbind symbolic name. In the rare case
+where two varbinds in a single trap share the same symbolic name (e.g.
+two vendor MIBs each import a varbind that resolved to the same display
+name), the duplicates fall back to OID-keyed entries within the same
+JSON object to avoid key collision. Example:
+
+```json
+{
+  "ifDescr":            {"oid": "1.3.6.1.2.1.31.1.1.1.1",     "type": "OctetString", "value": "Gi0/1"},
+  "1.3.6.1.4.1.99.1.1": {"oid": "1.3.6.1.4.1.99.1.1",          "type": "OctetString", "value": "Gi0/2"}
+}
+```
+
+The first occurrence wins the symbolic name; subsequent duplicates use
+the numeric OID as the key. Profile authors should avoid this by giving
+the conflicting varbinds distinct symbolic names in the file-scoped
+`varbinds:` table; the OID-keyed fallback exists only for cases where
+no such authoring control is possible at extraction time.
 
 Generator rule: a varbind record produced by the MIB extractor that does
 NOT have both a resolvable `oid` AND a `type` (MIB syntax) is dropped at
@@ -132,13 +156,13 @@ Each list entry defines one trap notification.
 | Field         | Required | Type    | Notes |
 |---------------|----------|---------|-------|
 | `oid`         | yes      | string  | Numeric OID of the trap |
-| `name`        | yes      | string  | **MIB-qualified canonical form** `<MIB-MODULE>::<symbol>` (e.g. `IF-MIB::linkDown`, `CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged`). Globally unique — different OIDs MUST have different names. Mirrors the canonical SMI form produced by `snmptranslate`/`snmptrapd`/MIB browsers. The plugin writes this exact string to the `SNMP_TRAP_NAME` journal field. |
+| `name`        | yes      | string  | **MIB-qualified canonical form** `<MIB-MODULE>::<symbol>` (e.g. `IF-MIB::linkDown`, `CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged`). Globally unique — different OIDs MUST have different names. Mirrors the canonical SMI form produced by `snmptranslate`/`snmptrapd`/MIB browsers. The plugin writes this exact string to the `TRAP_NAME` journal field. |
 | `category`    | yes      | string  | One of the 8 canonical categories — see below |
 | `severity`    | yes      | string  | One of the 8 syslog severities — see below |
 | `description` | rec.     | string  | Template rendered into the journal `MESSAGE` field |
 | `status`      | no       | string  | MIB status: `current`, `deprecated`, `obsolete` |
 | `varbinds`    | no       | list    | Names referencing the file-level table, or inline dicts (see below) |
-| `labels`      | no       | map     | Operator-overridable: key → template producing a `TRAP_<KEY>` journal field |
+| `labels`      | no       | map     | Operator-overridable: key → template producing a `TRAP_TAG_<KEY>` journal field |
 | `dedup_key_varbinds` | no | list | Names of varbinds that participate in the deduplication fingerprint |
 
 > Note: the `name:` field encodes the source MIB module already. There is no
@@ -174,12 +198,12 @@ placeholders:
 | `{<varbind_name>}`              | Varbind value, formatted per its enum (and future `display_hint`) |
 | `{<varbind_name>.raw}`          | Varbind raw value (numeric for enums, undecoded bytes for OctetString) |
 | `{<numeric_oid>}`               | Varbind value by OID when no symbolic name is available |
-| `{SNMP_DEVICE_HOSTNAME}`        | Resolved device hostname (sysName or DNS) |
-| `{SNMP_SOURCE_IP}`              | UDP source address of the trap PDU |
-| `{SNMP_TRAP_NAME}`              | The trap's symbolic name |
-| `{SNMP_DEVICE_VENDOR}`          | Inferred device vendor slug |
-| `{ND_TOPOLOGY_INTERFACE}`       | Topology-resolved interface, when topology is co-located |
-| `{ND_TOPOLOGY_NEIGHBORS}`       | Topology-resolved upstream neighbours, when co-located |
+| `{_HOSTNAME}`        | Resolved device hostname (sysName or DNS) |
+| `{TRAP_SOURCE_IP}`              | UDP source address of the trap PDU |
+| `{TRAP_NAME}`              | The trap's symbolic name |
+| `{TRAP_DEVICE_VENDOR}`          | Inferred device vendor slug |
+| `{TRAP_INTERFACE}`       | Topology-resolved interface, when topology is co-located |
+| `{TRAP_NEIGHBORS}`       | Topology-resolved upstream neighbours, when co-located |
 
 Unresolved references render as `<missing>` for absent varbinds, or
 `<unresolved:varname>` for unknown placeholder names. The latter also
@@ -187,7 +211,7 @@ increments the `snmp.trap.errors.template_unresolved` plugin metric so
 operators notice and can correct the profile.
 
 If `description:` is absent the plugin renders the default template
-`"{SNMP_TRAP_NAME} from {SNMP_DEVICE_HOSTNAME} ({SNMP_SOURCE_IP})"`.
+`"{TRAP_NAME} from {_HOSTNAME} ({TRAP_SOURCE_IP})"`.
 
 The rendered `MESSAGE` is capped at 512 bytes (longer values are truncated
 with a marker). Multi-line MESSAGE values are written using systemd-journal's
@@ -238,18 +262,44 @@ In profile terms:
 
 - `description:` and `varbinds:` references — **no restriction**. Free use of
   any varbind including high-cardinality data (MAC, IP, username, packet
-  content). These land in MESSAGE / SNMP_TRAP_JSON.
+  content). These land in MESSAGE / TRAP_JSON.
 - `labels:` — **bounded-cardinality only**. Templates that reference
   unbounded varbinds (MAC, IP, username) are rejected at profile load with
-  a clear error. Labels become `TRAP_<KEY>=<VALUE>` journal fields and
+  a clear error. Labels become `TRAP_TAG_<KEY>=<VALUE>` journal fields and
   propagate to metric labels.
 
 ## Operator overrides
 
 Operators do not copy entire stock profiles to make changes. Instead they
-place small override files under `/etc/netdata/go.d/snmp.trap-profiles/` that
-add or change entries by OID. The plugin merges overrides on top of stock
-profiles; the operator file always wins for any field it specifies.
+place small override files under `/etc/netdata/go.d/snmp.trap-profiles/`.
+The plugin loader mirrors the SNMP polling plugin's multipath pattern
+(`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`):
+
+1. **Same filename in higher-priority directory replaces the lower-priority
+   one entirely.** Operator `cisco.yaml` fully replaces stock `cisco.yaml`
+   — copy + edit the whole file to customize one vendor.
+2. **Different filename adds entries.** Operator `site-additions.yaml`
+   (different filename) merges its `traps:` into the loaded set without
+   touching stock files.
+3. **`extends:` chain field-merge** (when an override profile lists
+   `extends: [_base.yaml, other-base.yaml]`): the loader merges trap
+   entries by OID; fields specified in the override file win over fields
+   from the extended bases; later entries in `extends:` override earlier
+   ones for the same field. This mirrors `load.go:174-186`.
+
+### `TRAP_TAG_*` label namespace and collision-free design
+
+Operator labels — `labels: { tenant: acme, interface: "{ifDescr}" }` —
+always emit as `TRAP_TAG_<KEY_UPPERCASE>` journal fields (e.g.
+`TRAP_TAG_TENANT=acme`, `TRAP_TAG_INTERFACE=GigabitEthernet0/1`). The
+dedicated `TRAP_TAG_*` namespace structurally prevents collisions with
+plugin-controlled `TRAP_*` fields, even when an operator label key
+happens to match a plugin field name. For example, a profile with
+`labels: { interface: "{ifDescr}" }` and a co-located topology plugin
+both populate journal fields, but in different namespaces: the operator
+label becomes `TRAP_TAG_INTERFACE`, the topology field becomes
+`TRAP_INTERFACE`. Both can co-exist on the same trap entry without
+conflict.
 
 ```yaml
 # /etc/netdata/go.d/snmp.trap-profiles/site-additions.yaml

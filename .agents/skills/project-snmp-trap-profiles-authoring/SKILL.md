@@ -25,7 +25,7 @@ that keeps repository edits aligned with both.
    Vendors reuse bare symbolic names across product-line MIB modules; the
    bare symbol is NOT globally unique. The qualified form matches what
    `snmptranslate` / `snmptrapd` / MIB browsers produce and is what the
-   plugin writes to the `SNMP_TRAP_NAME` journal field. Rule: if the OID
+   plugin writes to the `TRAP_NAME` journal field. Rule: if the OID
    changes, the `name:` slug MUST change.
 
 2. **Resolve every varbind reference.** A name in a trap entry's `varbinds:`
@@ -35,7 +35,7 @@ that keeps repository edits aligned with both.
 
 3. **Identify the source MIB object for every varbind.** Check the object's
    `MAX-ACCESS`. `not-accessible` index objects must still be declared in the
-   table (they ship inside `SNMP_TRAP_JSON`), but never as a `description:`
+   table (they ship inside `TRAP_JSON`), but never as a `description:`
    template variable on its own — varbinds an SNMP entity will not send in a
    trap PDU never resolve at runtime.
 
@@ -65,14 +65,16 @@ that keeps repository edits aligned with both.
    bounded-cardinality varbinds only. Reject (do not commit) labels that
    reference MAC addresses, source IPs, usernames, packet contents, RAID
    slot IDs, or any per-event identifier. High-cardinality content belongs
-   in `description:` (rendered into MESSAGE) and in `SNMP_TRAP_JSON`, not in
+   in `description:` (rendered into MESSAGE) and in `TRAP_JSON`, not in
    metric-propagating labels.
 
-8. **Reserved field-name prefixes.** Operator label keys are rejected at
-   profile load if uppercasing them would produce a journal field starting
-   with `SNMP_`, `ND_`, `_`, or any standard systemd field name (`MESSAGE`,
-   `PRIORITY`, `SYSLOG_IDENTIFIER`, …). Pick keys that uppercase to
-   `TRAP_<KEY>` and that won't collide.
+8. **Label keys use a structurally-safe namespace.** All labels (from
+   profile `labels:` AND operator config `labels:`) emit as
+   `TRAP_TAG_<KEY_UPPERCASE>` journal fields. The dedicated `TRAP_TAG_*`
+   namespace removes any risk of collision with the plugin-controlled
+   `TRAP_*` field set (`TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, etc. — see
+   spec §11). The only remaining validation is the lowercase-key syntax
+   rule (`[a-z][a-z0-9_]*`). Pick label keys that read clearly.
 
 9. **Stock vs operator separation.** Files under
    `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/` are stock
@@ -87,7 +89,7 @@ that keeps repository edits aligned with both.
     editable in plugin config.
 
 11. **No `journal_fields:` list in profiles.** The plugin always captures
-    all varbinds into the fixed `SNMP_TRAP_JSON` field. There is no profile
+    all varbinds into the fixed `TRAP_JSON` field. There is no profile
     knob to add per-OID journal field names.
 
 12. **`display_hint` is reserved, not yet emitted.** `profile-format.md`
