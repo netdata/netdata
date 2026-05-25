@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "../rrd.h"
 #include "mrg-internals.h"
 
 DEFINE_JUDYL_TYPED(METRIC, METRIC *);

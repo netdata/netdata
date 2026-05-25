@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "../rrd.h"
 #include "rrdengine.h"
 #include "pdc.h"
 #include "dbengine-compression.h"

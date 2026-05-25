@@ -84,6 +84,8 @@ extern const char *netdata_configured_host_prefix;
 #include "simple_pattern/simple_pattern.h"
 #include "libnetdata/log/nd_log.h"
 
+#include "protected-access/protected-access.h"
+
 #include "socket/security.h"    // must be before windows.h
 
 // this may include windows.h

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "../rrd.h"
 #include "cache.h"
 
 /* STATES AND TRANSITIONS

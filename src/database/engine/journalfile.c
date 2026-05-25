@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "../rrd.h"
 #include "rrdengine.h"
 
 // the default value is set in ND_PROFILE, not here
