@@ -45,7 +45,7 @@ This **distributed yet centralized** approach gives you the benefits of both dec
 
 :::tip
 
-If you want the full Netdata Cloud experience within your own infrastructure, consider [Netdata Cloud Enterprise On-Prem](/docs/netdata-cloud/versions.md) — a self-hosted version that deploys the complete Cloud control plane in your environment.
+If you want the full Netdata Cloud experience within your own infrastructure, consider [Netdata Cloud Enterprise On-Prem](/docs/netdata-cloud/versions.md) — a self-hosted version that deploys the complete Cloud control plane in your environment. For the complete On-Prem documentation, see [Netdata Cloud On-Prem](https://learn.netdata.cloud/docs/netdata-cloud-on-prem).
 
 :::
 
