@@ -10,7 +10,6 @@
 #include "ebpf_socket.h"
 #include "ebpf_unittest.h"
 #include "libbpf_api/ebpf_library.h"
-#include "libnetdata/required_dummies.h"
 #include "libnetdata/libjudy/judy-malloc.h"
 
 /*****************************************************************

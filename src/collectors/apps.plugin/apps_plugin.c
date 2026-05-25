@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "apps_plugin.h"
-#include "libnetdata/required_dummies.h"
 #include "libnetdata/parsers/duration.h"
 
 #define APPS_PLUGIN_FUNCTIONS() do { \

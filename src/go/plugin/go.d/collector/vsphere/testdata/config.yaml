@@ -20,6 +20,26 @@ tls_key: "ok"
 tls_skip_verify: yes
 force_http2: yes
 discovery_interval: 123.123
+tag_categories:
+  - "Environment"
+  - "Business*"
+custom_attributes:
+  - "Owner"
+  - "Cost Center"
+collect_datastore_clusters: yes
+datastore_cluster_include:
+  - "/*"
+collect_vsan: yes
+vsan_cluster_include:
+  - "/DC1/Cluster*"
+  - "vsan_uuid:cluster-uuid"
+vsan_host_include:
+  - "/DC1/Cluster*/Host*"
+  - "vsan_node_uuid:host-uuid"
+vsan_vm_include:
+  - "/DC1/Cluster*/Host*/VM*"
+  - "instance_uuid:vm-uuid"
+collect_network_topology: yes
 host_include:
   - "ok"
 vm_include:

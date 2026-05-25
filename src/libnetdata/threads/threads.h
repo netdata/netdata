@@ -82,6 +82,15 @@ void nd_thread_register_canceller(nd_thread_canceller cb, void *data);
 void nd_thread_signal_cancel(ND_THREAD *nti);
 bool nd_thread_signaled_to_cancel(void);
 
+// Register a process-wide cleanup callback that runs once per thread
+// at thread-exit time. Callbacks run in registration order, after the
+// libnetdata-internal lock-leak assertions and before
+// thread_cache_destroy / worker_unregister. Registration is intended
+// to be done once at process startup; the registry has a small fixed
+// capacity.
+typedef void (*nd_thread_cleanup_fn)(void);
+void nd_thread_register_cleanup(nd_thread_cleanup_fn fn);
+
 #define ND_THREAD_TAG_MAX 15
 void uv_thread_set_name_np(const char* name);
 void webrtc_set_thread_name(void);

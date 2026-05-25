@@ -1,5 +1,4 @@
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 
 #define ENV_VAR_KEY "SPAWN_TESTER"
 #define ENV_VAR_VALUE "1234567890"

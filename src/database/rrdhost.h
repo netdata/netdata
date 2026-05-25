@@ -96,6 +96,11 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
     RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 28), // set when the host has updated global functions
     RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION       = (1 << 29), // set when rrdcontext needs to update the retention of the host
+
+    RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS       = (1 << 30), // svc_rrdhost_obsolete_all_charts() is running on this host;
+                                                             // gates rrdhost_set_receiver() so a reconnect cannot attach
+                                                             // mid-pass. Set under receiver_lock; the heavy work runs
+                                                             // without holding receiver_lock so readers stay unblocked.
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_get(host)                         atomic_flags_get(&((host)->flags))
@@ -341,6 +346,18 @@ struct rrdhost {
 
 extern RRDHOST *localhost;
 
+// receiver_lock protects host->receiver and the host->stream.rcv.status fields.
+//
+// Hold time must stay short-bounded: no caller may hold receiver_lock across
+// O(charts), I/O, sends, ML stop/start, or any wait on other subsystems. The
+// obsolete-all cleanup pass (service.c) used to violate this; it now sets
+// RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS under the lock and runs the heavy
+// work without holding it. rrdhost_set_receiver() checks that flag under
+// the lock and returns RRDHOST_SET_RECEIVER_CLEANUP_BUSY when the cleanup
+// pass is in progress; the caller answers the child with BUSY_TRY_LATER and
+// the child reconnects via normal backoff. With cleanup off the lock, all
+// other readers (status, ACLK, capabilities, paths, event-driven sends)
+// keep blocking-lock semantics and stay truthful.
 #define rrdhost_receiver_lock(host) spinlock_lock(&(host)->receiver_lock)
 #define rrdhost_receiver_unlock(host) spinlock_unlock(&(host)->receiver_lock)
 
