@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 #include "libnetdata/os/windows-api/windows_api.h"
 #include "libnetdata/os/windows-perflib/perflib.h"
 
