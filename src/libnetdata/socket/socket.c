@@ -370,9 +370,13 @@ inline int wait_on_socket_or_cancel_with_timeout(
         HANDLE h = (HANDLE)_get_osfhandle(fd);
         if(h != INVALID_HANDLE_VALUE && GetFileType(h) == FILE_TYPE_PIPE) {
             bool forever = (timeout_ms <= 0);
+            if(revents)
+                *revents = 0;
             while(timeout_ms > 0 || forever) {
                 if(nd_thread_signaled_to_cancel()) {
                     errno = ECANCELED;
+                    if(revents)
+                        *revents = 0;
                     return -1;
                 }
 
@@ -397,6 +401,8 @@ inline int wait_on_socket_or_cancel_with_timeout(
                     timeout_ms -= (int)wait_ms;
             }
             errno = ETIMEDOUT;
+            if(revents)
+                *revents = 0;
             return 1;
         }
     }
