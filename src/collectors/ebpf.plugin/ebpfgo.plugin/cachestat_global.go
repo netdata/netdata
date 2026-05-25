@@ -283,29 +283,7 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 	handle.UpdateEvery = updateEvery
 	api := netdataapi.New(os.Stdout)
 
-	var service *SharedSnapshotService
-	if handle.CgroupsEnabled {
-		service = NewSharedSnapshotService(
-			"/var/run/netdata",
-			defaultSharedSnapshotServiceName,
-			defaultSharedSnapshotServerConfig(),
-			nil,
-		)
-		if service == nil {
-			return
-		}
-	}
-
 	stop := make(chan struct{})
-
-	var doneService chan struct{}
-	if service != nil {
-		doneService = make(chan struct{})
-		go func() {
-			defer close(doneService)
-			_ = service.Run()
-		}()
-	}
 
 	var wg sync.WaitGroup
 	if handle.AppsEnabled {
@@ -324,16 +302,10 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 		signal.Stop(sigCh)
 
 		close(stop)
-		if service != nil {
-			service.Stop()
-		}
 	}()
 
 	runCachestatGlobalCollector(api, handle, stop, updateEvery)
 
 	wg.Wait()
 	handle.Close()
-	if doneService != nil {
-		<-doneService
-	}
 }
