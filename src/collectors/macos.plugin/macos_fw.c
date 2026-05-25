@@ -118,7 +118,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
             properties = 0;
             statistics = 0;
             number = 0;
-            bzero(&diskstat, sizeof(diskstat));
+            memset(&diskstat, 0, sizeof(diskstat));
 
             /* Get drive media object. */
             status = IORegistryEntryGetChildEntry(drive, kIOServicePlane, &drive_media);
