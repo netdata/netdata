@@ -33,7 +33,7 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 		return nil, err
 	}
 
-	if err := rt.UpdateController(true); err != nil {
+	if err := rt.UpdateController(cfg.AppsEnabled); err != nil {
 		rt.Close()
 		return nil, err
 	}
