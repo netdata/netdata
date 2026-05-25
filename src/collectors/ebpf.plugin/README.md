@@ -162,7 +162,7 @@ will only enable these threads integrated with other collectors when the kernel 
 #### Collection period
 
 The plugin uses the option `update every` to define the number of seconds used for eBPF to send data when Netdata does
-not provide a pluginsd interval. The default value is 5 seconds.
+not provide a pluginsd interval. The default value is 10 seconds.
 
 #### PID table size
 
