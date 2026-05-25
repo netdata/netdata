@@ -90,6 +90,33 @@ See [VM Templates](/docs/learn/vm-templates.md) for how to avoid this when cloni
 
 :::
 
+## Hostname Override
+
+By default, Netdata auto-detects the system hostname. When hostname resolution fails or returns an IP address, the node appears in Dashboards and Netdata Cloud with that raw IP instead of a readable name.
+
+You can override the auto-detected hostname by setting the `hostname` option in `netdata.conf`:
+
+```ini
+[global]
+    hostname = my-desired-name
+```
+
+To edit `netdata.conf`, use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from your Netdata config directory (typically `/etc/netdata`):
+
+```bash
+sudo ./edit-config netdata.conf
+```
+
+The custom hostname determines how the node appears in local Dashboards, Netdata Cloud, alert Notifications, and streaming Parent nodes.
+
+:::note
+
+A [restart](/docs/netdata-agent/start-stop-restart.md) is required for the change to take effect.
+
+:::
+
+This is especially useful for home servers or nodes behind dynamic IPs, where the system hostname may resolve to a local IP address (for example `192.168.1.100`) that is not meaningful outside the local network.
+
 ## Parent: Children Identities
 
 When a Netdata Agent operates as a **Parent** (receiving metrics from Children), it stores metadata about all nodes it has seen.
