@@ -75,6 +75,14 @@ From the Alerts tab, you can create new alerts or tune existing ones:
 - **[Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md)** — Visual UI wizard for manual alert creation and fine-tuning
 - **[Manual configuration](/src/health/REFERENCE.md)** — Edit `health.d/*.conf` files directly for full control
 
+:::note
+
+**Alerts Automation** and the **Alerts Configuration Manager** require a Netdata Cloud paid plan.
+See [Netdata OSS limitations and feature availability](/docs/netdata-oss-limitations.md) to confirm plan requirements.
+Community plan users can still create and tune alerts using [manual configuration](/src/health/REFERENCE.md).
+
+:::
+
 ## Alert Configurations Tab
 
 The **Alert Configurations** tab shows the configuration of all running alerts in your Room.
