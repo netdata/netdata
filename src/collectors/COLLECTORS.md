@@ -181,7 +181,6 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Applications](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/integrations/applications.md) | Monitor Applications for optimal software performance and resource usage. |
 | [CPU performance](https://github.com/netdata/netdata/blob/master/src/collectors/perf.plugin/integrations/cpu_performance.md) | This collector monitors CPU performance metrics about cycles, instructions, migrations, cache operations and more. |
 | [dev.cpu.0.freq](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/dev.cpu.0.freq.md) | Read current CPU Scaling frequency. |
-| [eBPF Cachestat](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_cachestat.md) | Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files. |
 | [eBPF DCstat](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_dcstat.md) | Monitor directory cache events per application given an overall vision about files on memory or storage device. |
 | [eBPF Filedescriptor](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_filedescriptor.md) | Monitor calls for functions responsible to open or close a file descriptor and possible errors. |
 | [eBPF Hardirq](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_hardirq.md) | Monitor latency for each HardIRQ available. |
