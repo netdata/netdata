@@ -122,6 +122,8 @@ Job lifecycle mirrors the established go.d pattern (`src/go/plugin/framework/job
 
 Creation success is all-or-nothing: partial resources created during a failed preflight are cleaned up, and users see the error during DynCfg apply rather than discovering a runtime-only log failure later.
 
+Trap job names are path and journal identifiers. The trap plugin applies an additional validator after the shared DynCfg `JobNameRuleStrict`: `^[a-zA-Z0-9][a-zA-Z0-9_-]*$`, maximum 64 characters, no dots, no path separators, and no control characters. Violations fail job creation with HTTP-422 before any bind or journal directory creation.
+
 **Stock default job: `local`** — disabled, UDP port 162 endpoint, no community whitelist, no v3 USM users (must be configured before enabling). Operators enable explicitly via DynCfg; the stock conf does not run a listener out of the box. Per spec §6, the job binds the configured endpoint(s) or fails (no automatic high-port fallback) — operators either grant `CAP_NET_BIND_SERVICE` to the binary or reconfigure the endpoint port explicitly.
 
 **Per-job filesystem layout:**
@@ -135,11 +137,17 @@ Creation success is all-or-nothing: partial resources created during a failed pr
 
 The implementation language is **Go** (user decision recorded on 2026-05-25). This keeps the listener/job lifecycle aligned with the existing go.d framework and avoids making all `go.d.plugin` users pay SNMP trap profile memory unless they create trap jobs.
 
-SOW-0035 M1 still records the remaining process/writer decision: standard in-process go.d module code with a Go journal writer/port vs any justified process boundary or bridge for the journal writer path. The selected design must preserve the creation-time failure contract above.
+**Process model** (accepted by SOW-0035 M1 ADR-0001): The trap plugin is a **standard in-process go.d collector V2 module** at `src/go/plugin/go.d/collector/snmp_traps/`, registered as `snmp_traps`. No separate process, no CGo, no subprocess bridge.
+
+**Journal writer backend**: A new **Go-native write-only systemd journal file writer** (package-internal to the trap collector, ~4K-5.5K lines estimated) produces binary journal files at `/var/cache/netdata/traps/{job_name}/` that are queryable via `journalctl --directory=...`. This is a write-only subset of the systemd Journal File Format — no reader and no cursor, but DATA/FIELD hash tables and ENTRY_ARRAY chains are maintained incrementally so the active file is queryable before rotation. The existing Rust journal crates (~10.4K source lines across `journal-core` + `journal-registry` + `journal-log-writer` + `journal-common`) are reference implementations for format details but are not ported wholesale; the Go implementation covers only the write path needed for trap journal files.
+
+**Rationale**: In-process module code means no IPC for cross-plugin enrichment (SOW-0037), trivially shared profile cache (Go package-level state + refcount), and the well-understood go.d job lifecycle. A CGo bridge to libsystemd cannot set `_HOSTNAME` (journald owns trusted fields); a subprocess Rust bridge adds process management complexity. The Go-native journal writer is the minimal backend that preserves the creation-time failure contract and `journalctl` compatibility.
+
+**Reference**: `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`
 
 ### Concurrency model
 
-- **Hot path** (per-packet decode + enrich + counter increment): one receive loop per endpoint with reusable buffers; no per-packet heap allocation target; shared per-listener decoder/resolver/writer pipeline. One job = one listener = one or more endpoints = one writer.
+- **Hot path** (per-packet decode + enrich + counter increment): one receive loop per endpoint with reusable buffers; no per-packet heap allocation target; shared per-listener decoder/resolver/writer pipeline. One job = one listener = one or more endpoints = one writer. Multiple endpoint receive loops in the same job fan into one concurrency-safe bounded writer queue; one worker drains that queue and writes journal entries sequentially.
 - **Journal write**: per-job writer thread, one journal file family per job (under `/var/cache/netdata/traps/{job_name}/`). Cap is ~30k rows/sec per writer. To exceed that for a single high-volume listener, operators add more jobs for scaling/isolation. Multi-writer partitioning **within a single listener** is out of scope for SOW-0035–SOW-0038; if it becomes necessary it joins a future SOW.
 
 ### Process model
@@ -153,7 +161,7 @@ SOW-0035 M1 finalizes the exact process/writer boundary for the Go implementatio
 3. BER decode in place, within bounded limits (see §18) — drop and increment counter on limit violation.
 4. Community / USM auth check.
 5. Per-job rate-limit (token bucket). Drop or sample if over budget (operator chooses).
-6. Identify source: PDU-based first (v1 `agent-addr`; v2c/v3 `snmpTrapAddress.0` varbind per RFC 3584); fall back to UDP peer.
+6. Identify source: PDU-based first (v1 `agent-addr`; v2c/v3 `snmpTrapAddress.0` varbind per RFC 3584); fall back to UDP peer. Candidate source addresses are accepted only after IP parsing/normalization. Malformed or non-IP `snmpTrapAddress.0` values are ignored for source identity and `_HOSTNAME` fallback; the kernel-provided UDP peer remains the final safe fallback.
 7. OID lookup against the prebuilt OID index (perfect-hash or radix-trie at scale). If the OID has no matching profile entry, set `category: unknown`, `severity: notice`, `name: ""`, increment `snmp.trap.errors.unknown_oid`, and continue — the trap still emits to journal with the raw OID + varbinds.
 8. Apply profile entry (or unknown defaults from step 7): category tag, severity default, symbolic name.
 9. Enrich: device identity (sysName, vendor); topology position if co-located; recent polling state if available. Go in-process access is preferred; any alternate boundary must be justified by SOW-0035 M1.
@@ -304,7 +312,7 @@ If `description` is absent, default template is:
 {TRAP_NAME} from {_HOSTNAME} ({TRAP_SOURCE_IP})
 ```
 
-Templates are compiled at profile-load (tokenize → segment list). Hot-path substitution is bounded-size buffer fill. MESSAGE capped at 512 bytes (post-substitution); truncated with `…` marker if exceeded. Full forensic data remains in `TRAP_JSON`.
+Templates are compiled at profile-load (tokenize → segment list). Hot-path substitution is bounded-size buffer fill. MESSAGE capped at 512 bytes (post-substitution); truncated with ASCII `...` marker if exceeded. The 512-byte cap includes the marker bytes. Full forensic data remains in `TRAP_JSON`.
 
 ### No `journal_fields:` list, no `metric:` block
 
@@ -519,7 +527,7 @@ When enabled, dedup operates per-job: each listener has its own in-memory dedup 
 
 ### Mechanism — hot path (only when `dedup.enabled: true` on the job)
 
-1. Compute fingerprint per trap: `hash(source_device, trap_OID, key_varbinds)`. **Default key varbinds = `[]` meaning the fingerprint uses only `(source_device, trap_OID)`.** Profiles can override per-OID via `dedup_key_varbinds:` (e.g., port-security trap fingerprints by `[macAddress, vlan]` so different MAC/VLAN combinations are NOT collapsed). The "all non-timestamp varbinds" default was rejected by Phase B because volatile counter varbinds (`ifInErrors`, BGP counters) trivially differ per event, bypassing dedup entirely.
+1. Compute fingerprint per trap: `hash(source_device, trap_OID, key_varbinds)`. **Default key varbinds = `[]` meaning the fingerprint uses only `(source_device, trap_OID)`.** Profiles can override per-OID via `dedup_key_varbinds:` (e.g., port-security trap fingerprints by `[macAddress, vlan]` so different MAC/VLAN combinations are NOT collapsed). If a configured key varbind is absent from a received PDU, the canonical fingerprint uses a missing-value sentinel distinct from the empty string. Operators should list only varbinds that the trap normally emits. The "all non-timestamp varbinds" default was rejected by Phase B because volatile counter varbinds (`ifInErrors`, BGP counters) trivially differ per event, bypassing dedup entirely.
 2. Check the per-job in-memory dedup cache (LRU-bounded, default 100k entries, configurable):
    - **Fingerprint NOT present** → write journal entry immediately, increment metric counters, insert fingerprint into cache with TTL = dedup window. **Real-time, no buffering, no delay.**
    - **Fingerprint present** → suppress: no journal write, no per-event metric increment. Increment the in-memory per-period suppression counter (broken down by trap-OID).
@@ -596,7 +604,13 @@ Per-job retention policy mirrors the retention semantics used by the NetFlow plu
 | `retention.rotation_size` | auto (`max_size / 20`, clamped 5MB-200MB) | Per-file rotation size. |
 | `retention.rotation_duration` | `1h` | Per-file rotation duration. |
 
-**Retention rules apply independently and inclusively** — either threshold being exceeded triggers cleanup of the oldest file. Both `null` is allowed (manual cleanup only).
+**Retention rules apply independently and inclusively** — either threshold being exceeded triggers cleanup of the oldest file. Both `null` is allowed only as an explicit manual-cleanup configuration; the default is size-capped. When both are `null`, the periodic retention sweep is a no-op and no file is deleted by the plugin.
+
+`retention.rotation_size: null` auto-calculates as `retention.max_size / 20` and clamps to 5MB-200MB. If `retention.max_size` is `null`, the auto rotation size uses the 200MB upper clamp. Rotation still happens when size-based retention is disabled; files accumulate until age-based retention or external cleanup removes them. Time-based retention requires a periodic retention sweep in addition to rotation-time cleanup, so `retention.max_duration` is honored even during low-volume periods.
+
+The active journal file must be queryable by `journalctl --directory=...`; waiting until rotation/close to build indexes is not acceptable for the MVP. The writer maintains DATA/FIELD hash tables and ENTRY_ARRAY chains while appending entries.
+
+The journal-direct backend is Linux-only in SOW-0035. On non-Linux platforms, trap job creation must fail with a coded unsupported-backend error instead of starting and failing at runtime. Future SOWs may add a non-journal backend such as OTLP for platforms without `journalctl`.
 
 When dedup is enabled (§10), summary entries land in the same per-job journal directory and obey the same retention.
 
@@ -610,16 +624,17 @@ When dedup is opt-in enabled for a job (§10), the forensic-store guarantee narr
 
 The trap plugin acts as the journal **writer** for its trap entries (think of it as a journald-style infrastructure component, not as an application logging). The "application" emitting the log is the **source device** that sent the trap. Standard systemd-journal fields are set on the entry on behalf of that source device, so that when trap entries are multiplexed with other logs in the Logs UI, the common fields describe the device the trap is about — not the trap plugin.
 
-Journal field names conform to `^[A-Z][A-Z0-9_]*$` per systemd-journal requirements. Standard fields always emitted:
+Journal field names conform to `^[A-Z][A-Z0-9_]*$` per systemd-journal requirements. Standard fields always emitted or exposed by the journal file:
 
 ```
 MESSAGE=<rendered description template; free-form, high-cardinality content welcome>
 PRIORITY=<numeric 0-7 from the canonical 8-severity table below>
 SYSLOG_IDENTIFIER=<the per-job listener name (e.g., "local") — the operator-meaningful identity of the collection daemon producing the entry>
-_HOSTNAME=<the source device hostname (falls back to source IP when no hostname resolves) — the "host" the trap is about>
+_HOSTNAME=<the source device hostname from enrichment, or source IP when enrichment has no hostname — the "host" the trap is about>
+_MACHINE_ID=<the agent/system machine-id from the writer's journal file header>
 ```
 
-`_HOSTNAME` is normally a systemd "trusted field" set by journald; the trap plugin's journal writer writes directly to journal files through the Go-compatible backend selected in SOW-0035 M1 (bypassing journald) and controls every field, including `_HOSTNAME`. Operators querying `journalctl _HOSTNAME=core-sw-01` see every log line about that device — including traps the device emitted, polled-metric alerts on it, and topology updates — in one cohesive view.
+`_HOSTNAME` is normally a systemd "trusted field" set by journald; the trap plugin's journal writer writes directly to journal files through the Go-compatible backend selected in SOW-0035 M1 (bypassing journald) and controls every field, including `_HOSTNAME`. The serializer sets `_HOSTNAME` to `DeviceHostname` when the enrichment layer provides a non-empty value; otherwise it falls back to `SourceIP`. No DNS lookup is attempted in the writer. Operators querying `journalctl _HOSTNAME=core-sw-01` see every log line about that device — including traps the device emitted, polled-metric alerts on it, and topology updates — in one cohesive view.
 
 **Operator UX caveats** (documented in the plugin README — SOW-0039 M2):
 
@@ -653,7 +668,7 @@ enforced in `classify.py` + `profile-format.md`):
 
 | Prefix | Used for | Source |
 |---|---|---|
-| Standard systemd fields (`MESSAGE`, `PRIORITY`, `SYSLOG_IDENTIFIER`, `_HOSTNAME`) | Per-entry standard fields; `_HOSTNAME` carries the source device | Plugin (writing on behalf of the source device) |
+| Standard systemd fields (`MESSAGE`, `PRIORITY`, `SYSLOG_IDENTIFIER`, `_HOSTNAME`, `_MACHINE_ID`) | Per-entry standard fields plus file-header machine identity exposed by `journalctl`; `_HOSTNAME` carries the source device | Plugin (writing on behalf of the source device) |
 | `ND_LOG_SOURCE`, `ND_NIDL_NODE` | Existing Netdata fields the plugin populates for correlation with metrics + logs | Plugin via Netdata state |
 | `TRAP_*` (closed reserved set) | Plugin-controlled trap-content fields (OID, name, category, severity, …) present on every entry | Plugin |
 | `TRAP_TAG_*` | Labels — from profile `labels:` (vendor-curated) AND from operator per-job `labels:` config | Profile or operator config (rendered by the plugin from templates) |
@@ -680,6 +695,8 @@ TRAP_SUPPRESSED_COUNT     Dedup summary entries only
 TRAP_SUPPRESSED_FINGERPRINTS  Dedup summary entries only
 TRAP_REPORT_PERIOD_SEC    Dedup summary entries only
 ```
+
+`decode_error_summary` is reserved in the enum for forward compatibility; SOW-0035 does not emit that report type. Real trap entries use `trap`; deduplication summary entries are owned by the later deduplication SOW.
 
 ### Real trap entry (full example)
 
@@ -738,7 +755,7 @@ Filterable: `journalctl TRAP_REPORT_TYPE=trap` (real traps only), `journalctl TR
 
 ### `TRAP_JSON` content
 
-The full structured varbind payload as a single-line JSON object. Keyed by varbind symbolic name when known (profile inline `varbinds:` resolved it, or MIB index has it), by OID otherwise. Each value carries `{oid, type, value}` and optionally `enum`/`display_hint` rendering applied.
+The full structured varbind payload as a single-line JSON object. Keyed by varbind symbolic name when known (profile inline `varbinds:` resolved it, or MIB index has it), by OID otherwise. Each value carries `{oid, type, value}` and optionally `enum`/`display_hint` rendering applied. If malformed input creates duplicate JSON keys after symbolic-name and OID fallback, the first occurrence keeps the base key and later occurrences use deterministic suffixed keys (`<key>#2`, `<key>#3`, ...), preserving every received varbind without introducing duplicate JSON object keys.
 
 This guarantees forensic completeness: even with zero profile coverage and no MIB loaded, the journal contains everything needed to reconstruct what arrived on the wire. The fixed field name avoids the per-OID field-name explosion of older designs.
 
@@ -908,7 +925,7 @@ In addition to the two plugin-self contexts, operator-selected OIDs (via §7.5) 
 
 Phase B resolved most of the original questions. What remains:
 
-1. **Go process / writer backend**: language is resolved to Go by user decision. SOW-0035 M1 still resolves the exact process boundary and journal-writer backend while preserving creation-time failure detection.
+1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001)**: Standard in-process go.d collector V2 module with a Go-native write-only journal file writer. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
 
 2. **Profile YAML hot-reload mechanism**: the plugin needs to detect operator-added/edited YAML files under `/etc/netdata/go.d/snmp.trap-profiles/` and refresh the in-memory profile index. Two options: inotify on the directory, or explicit `dyncfg`-triggered reload. Phase B recommended inotify is overkill for the new-profile cadence; explicit reload via DynCfg is simpler and matches the per-job lifecycle. SOW-0037 M3 resolves.
 
@@ -1022,22 +1039,33 @@ These limits apply per-job (each job has its own decoder thread per §5) with th
 
 The `TrapWriter` interface is the contract between the trap pipeline and the storage/transport backends. It must accommodate both the journal-direct path (§11) and the opt-in OTLP path (§11b) without retrofit.
 
-### Minimal contract
+**Status: Accepted (SOW-0035 M1, ADR-0001, reviewer round 5 findings folded in).** The Go interface definition and `TrapEntry` struct are recorded in `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md` §3-4. Key design decisions:
+
+- The interface is `Write(entry *TrapEntry) error`, `Flush() error`, `Close() error` — fast accept into backend-owned bounded queues, backend-internal batching
+- CWE-117 encoding is owned by the journal writer backend, not the interface
+- The journal-direct backend implements this interface by calling the Go-native `JournalWriter.WriteEntry()` method
+- The OTLP backend (SOW-0038) implements the same interface with protobuf serialization
+- `TrapEntry` is the language-neutral semantic representation; field names are semantic (not journal/OTLP); the writer applies its backend's naming convention at serialization time
+
+### Minimal contract (Go)
 
 ```
 TrapWriter:
-  Write(entry *TrapEntry) error    # synchronous; returns error for permanent failures
-  Flush() error                    # blocks until pending writes are durable
+  Write(entry *TrapEntry) error    # fast accept into backend-owned queue or return drop-worthy error
+  Flush() error                    # drains pending writes and fsyncs/syncs backend state
   Close() error                    # closes the writer; idempotent
 ```
 
 Semantics:
 
-- **Blocking `Write`** (returns when the backend has accepted the entry, not necessarily when it is durable; `Flush()` is the durability boundary) — the journal-direct writer serializes the entry directly into the per-job journal files via the Go-compatible backend selected in SOW-0035 M1 (bypassing journald so the writer controls `_HOSTNAME` and other "trusted" fields). The OTLP writer batches internally (default 200ms flush window) and `Write` returns as soon as the entry is enqueued into the batch buffer.
+- **Fast `Write`** (returns when the backend has accepted ownership of the immutable entry into a bounded queue, not when it is durable; `Flush()` is the durability boundary) — the journal-direct backend serializes queued entries into the per-job journal files via the Go-compatible backend selected in SOW-0035 M1 (bypassing journald so the writer controls `_HOSTNAME` and other "trusted" fields). The OTLP writer batches internally (default 200ms flush window) and `Write` returns as soon as the entry is enqueued into the batch buffer.
+- **Hot-path non-blocking behavior** — `Write` must not perform blocking disk or network I/O on the decode hot path. If the backend queue is full or the writer is in a permanent failed state, `Write` returns an error; the caller increments `journal_write_failed` and drops the trap while the hot path continues.
+- **Ownership** — on successful `Write`, the caller transfers ownership of the `TrapEntry` to the writer and must not mutate maps, slices, or strings reachable from it. Reusing a `TrapEntry`, `Labels` map, `SummaryCounts.ByTrap` map, or `Varbinds` backing array after successful `Write` is a correctness bug unless the implementation deep-copies the reused data first. On failed `Write`, ownership does not transfer, but the caller still discards the entry and uses a fresh entry for the next trap. The writer must not retain references on an error return.
+- **Default queue / flush policy** — journal-direct writer queue defaults to 10,000 entries per job; queue-full and permanent writer failure are both drop-and-continue errors. The journal-direct writer flushes every 1s or 1,000 accepted entries, whichever comes first, and on `Flush()` / `Close()`.
 - **Backend-internal batching** — the interface does not expose batching. Each writer decides its own batching strategy.
-- **Error handling** — `Write` returns error only for permanent failures (e.g., journal directory unwritable, OTLP receiver unreachable AND batch buffer full). Transient failures (e.g., temporary network blip for OTLP) are absorbed by the writer's internal retry logic without propagating to the caller.
+- **Error handling** — `Write` returns error only for drop-worthy conditions (for example, journal writer permanently failed, internal queue full, or OTLP receiver unreachable and retry buffer full). Transient backend failures are absorbed by the writer's internal retry/buffering policy until the bounded buffer is exhausted.
 - **CWE-117 ownership** — the **journal writer** owns CWE-117 binary-field encoding (§11); the OTLP writer relies on protobuf field encoding for wire safety (§11b). `TrapEntry` carries raw values; the writer applies whatever encoding its backend needs.
-- **`Close` idempotence** — calling `Close` multiple times is safe.
+- **`Flush` / `Close` concurrency** — `Flush` creates a barrier and waits for entries accepted before that barrier to be written and synced; entries accepted after the barrier may flush later. `Close` stops new acceptance, drains, finalizes, syncs, and closes. Calling `Close` multiple times is safe; later calls return nil after a successful first close or the stored terminal error after a failed first close.
 
 ### `TrapEntry` shape
 
@@ -1046,23 +1074,25 @@ Semantics:
 | Field | Type | Notes |
 |---|---|---|
 | `JobName` | string | Which job produced this entry. |
-| `ReportType` | enum {`trap`, `deduplication_summary`, `decode_error_summary`} | §11 |
+| `ReportType` | enum {`trap`, `deduplication_summary`, `decode_error_summary`} | §11. `decode_error_summary` is reserved and not emitted in SOW-0035. |
+| `ReceivedRealtimeUsec` | int64 | Wall-clock receive timestamp captured on the recv path; journal realtime and OTLP `time_unix_nano` derive from this |
+| `ReceivedMonotonicUsec` | int64 | `CLOCK_MONOTONIC` receive timestamp captured with `ReceivedRealtimeUsec`; journal monotonic timestamp derives from this |
 | `TrapOID` | string | Numeric OID |
 | `TrapName` | string | MIB-qualified `<MIB>::<symbol>` |
 | `Category` | enum (8 slugs) | §3 |
 | `Severity` | enum (8 slugs) | §11/§11b syslog scale |
 | `Message` | string | Rendered description template; CWE-117 raw bytes |
-| `SourceIP` | string | Identified source (§5 step 6) |
+| `SourceIP` | string | Validated and normalized identified source (§5 step 6) |
 | `SourceUDPPeer` | string | Transport peer |
-| `DeviceHostname`, `DeviceVendor` | string, string | Enrichment (may be empty) |
+| `DeviceHostname`, `DeviceVendor` | string, string | Enrichment. Empty `DeviceHostname` makes `_HOSTNAME` fall back to `SourceIP`; empty `DeviceVendor` is omitted. |
 | `PduType` | enum {`trap`, `inform`} | |
 | `SnmpVersion` | enum {`v1`, `v2c`, `v3`} | |
-| `Node` | string | Source device's Netdata vnode identity. Journal serializer maps to `ND_NIDL_NODE`; OTLP serializer maps to `netdata.nidl.node`. Empty when SNMP polling has no state for the device. |
-| `TopologyInterface`, `TopologyNeighbors` | string, string | Enrichment (may be empty) |
-| `Labels` | map<string, string> | Profile + operator labels. Lowercase keys → `TRAP_TAG_<KEY>` in journal, `trap.<key>` in OTLP |
-| `Varbinds` | ordered list of `{Name, OID, Type, Value, Enum?, DisplayHint?}` | Structured; writer serializes to `TRAP_JSON` or `snmp.varbinds` |
-| `SummaryCounts` | optional `{TotalSuppressed, Fingerprints, PeriodSec, ByTrap}` | Only when `ReportType=deduplication_summary` |
+| `SourceVnodeID` | string | Source device's Netdata vnode identity. Journal serializer maps to `ND_NIDL_NODE`; OTLP serializer maps to `netdata.nidl.node`. Empty when SNMP polling has no state for the device. |
+| `TopologyInterface`, `TopologyNeighbors` | string, string | Enrichment; omitted from journal and OTLP output when empty |
+| `Labels` | map<string, string> | Profile + operator labels. Nil means no labels. Lowercase keys → `TRAP_TAG_<KEY>` in journal, `trap.<key>` in OTLP |
+| `Varbinds` | ordered list of `{Name, OID, Type, Value, Enum?}` | Structured; writer serializes to `TRAP_JSON` or `snmp.varbinds`; `display_hint` is reserved and not emitted initially |
+| `SummaryCounts` | optional `{TotalSuppressed, Fingerprints, PeriodSec, ByTrap}` | Only when `ReportType=deduplication_summary`; `ByTrap` is keyed by numeric OID and the MESSAGE renderer resolves names from the profile index when available |
 
-The interface is defined formally in SOW-0035 M1's ADR; the SOW-0038 M3 OTLP exporter implements the same interface as the SOW-0035 M4 journal writer.
+The interface contract is defined formally in `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md` §3-4 (SOW-0035 M1, ADR-0001). The SOW-0038 M3 OTLP exporter implements the same interface as the SOW-0035 M4 journal writer.
 
 End of design proposal.

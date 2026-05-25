@@ -35,12 +35,13 @@ The plugin loads stock profiles from `<stock>/go.d/snmp.trap-profiles/default/`
 operator overrides from `<user>/go.d/snmp.trap-profiles/`
 (typically `/etc/netdata/go.d/snmp.trap-profiles/`).
 
-Profiles are loaded **only when the SNMP trap plugin is enabled** — Netdata
-agents that do not receive traps never pay the memory footprint.
+Profiles are loaded **only when the first runnable SNMP trap job is created** —
+Netdata agents that do not receive traps never pay the memory footprint.
 
-When the plugin is enabled, profile loading is lazy where practical: the
-plugin pre-indexes trap OIDs at startup but defers full varbind materialisation
-to first-use per vendor.
+Profile loading is shared across trap jobs: the first runnable job builds the
+profile index, later jobs reuse it, and the last job release lets the Agent
+reclaim it. Failed profile loads are creation-time job failures surfaced to
+DynCfg; they do not leave a permanently poisoned cache.
 
 ## File layout
 
@@ -127,7 +128,9 @@ value.
 where two varbinds in a single trap share the same symbolic name (e.g.
 two vendor MIBs each import a varbind that resolved to the same display
 name), the duplicates fall back to OID-keyed entries within the same
-JSON object to avoid key collision. Example:
+JSON object to avoid key collision. If malformed input still creates a
+duplicate key after OID fallback, later entries use deterministic suffixes
+(`#2`, `#3`, ...). Example:
 
 ```json
 {
@@ -137,10 +140,11 @@ JSON object to avoid key collision. Example:
 ```
 
 The first occurrence wins the symbolic name; subsequent duplicates use
-the numeric OID as the key. Profile authors should avoid this by giving
-the conflicting varbinds distinct symbolic names in the file-scoped
-`varbinds:` table; the OID-keyed fallback exists only for cases where
-no such authoring control is possible at extraction time.
+the numeric OID as the key, then suffixed keys if the OID also repeats.
+Profile authors should avoid this by giving the conflicting varbinds
+distinct symbolic names in the file-scoped `varbinds:` table; the fallback
+exists only for cases where no such authoring control is possible at
+extraction time or where malformed senders repeat OIDs.
 
 Generator rule: a varbind record produced by the MIB extractor that does
 NOT have both a resolvable `oid` AND a `type` (MIB syntax) is dropped at
@@ -160,13 +164,18 @@ Each list entry defines one trap notification.
 | `category`    | yes      | string  | One of the 8 canonical categories — see below |
 | `severity`    | yes      | string  | One of the 8 syslog severities — see below |
 | `description` | rec.     | string  | Template rendered into the journal `MESSAGE` field |
-| `status`      | no       | string  | MIB status: `current`, `deprecated`, `obsolete` |
+| `status`      | no       | string  | MIB status: `current`, `deprecated`, `obsolete`; unknown values are profile validation errors |
 | `varbinds`    | no       | list    | Names referencing the file-level table, or inline dicts (see below) |
 | `labels`      | no       | map     | Operator-overridable: key → template producing a `TRAP_TAG_<KEY>` journal field |
-| `dedup_key_varbinds` | no | list | Names of varbinds that participate in the deduplication fingerprint |
+| `dedup_key_varbinds` | no | list | Names of varbinds that participate in the deduplication fingerprint; every name must resolve to the file-scoped `varbinds:` table |
 
 > Note: the `name:` field encodes the source MIB module already. There is no
 > separate `mib:` field on a trap entry — that would be redundant.
+
+When deduplication is enabled in a later SOW and a configured
+`dedup_key_varbinds` varbind is absent from a received PDU, the fingerprint
+uses a missing-value sentinel distinct from the empty string. Profile authors
+should list only varbinds normally present on every PDU for that trap OID.
 
 #### Varbind references
 
@@ -198,7 +207,7 @@ placeholders:
 | `{<varbind_name>}`              | Varbind value, formatted per its enum (and future `display_hint`) |
 | `{<varbind_name>.raw}`          | Varbind raw value (numeric for enums, undecoded bytes for OctetString) |
 | `{<numeric_oid>}`               | Varbind value by OID when no symbolic name is available |
-| `{_HOSTNAME}`        | Resolved device hostname (sysName or DNS) |
+| `{_HOSTNAME}`        | Resolved device hostname from enrichment, or source IP fallback; the writer does not perform DNS lookup |
 | `{TRAP_SOURCE_IP}`              | UDP source address of the trap PDU |
 | `{TRAP_NAME}`              | The trap's symbolic name |
 | `{TRAP_DEVICE_VENDOR}`          | Inferred device vendor slug |
@@ -213,9 +222,16 @@ operators notice and can correct the profile.
 If `description:` is absent the plugin renders the default template
 `"{TRAP_NAME} from {_HOSTNAME} ({TRAP_SOURCE_IP})"`.
 
-The rendered `MESSAGE` is capped at 512 bytes (longer values are truncated
-with a marker). Multi-line MESSAGE values are written using systemd-journal's
-binary field encoding so embedded newlines never inject other journal fields.
+The rendered `MESSAGE` is capped at 512 bytes, including the ASCII `...`
+truncation marker when truncation is needed. Multi-line MESSAGE values are
+written using systemd-journal's binary field encoding so embedded newlines never
+inject other journal fields.
+
+The `status` field is informational in the MVP. The plugin does not filter,
+drop, or warn on `deprecated` / `obsolete` traps in SOW-0035; future UI or
+validation work may surface it.
+Known `status` values are still validated so typos fail at profile load instead
+of silently entering the shipped pack.
 
 ### Categories — closed set
 
