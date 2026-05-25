@@ -294,6 +294,30 @@ Changes apply immediately. Ephemerality is stored as a host label and propagates
 </details>
 
 <details>
+<summary>How do I rename a node?</summary>
+
+A node's display name is determined by the `hostname` setting in `netdata.conf` under the `[global]` section. To rename a node, edit `netdata.conf` and set:
+
+```ini
+[global]
+    hostname = my-new-node-name
+```
+
+Use the [`edit-config` script](/docs/netdata-agent/configuration/README.md#edit-configuration-files) to safely edit configuration files, then [restart Netdata](/docs/netdata-agent/start-stop-restart.md).
+
+:::note
+
+Changing the hostname does **not** change the Machine GUID, Node ID, or Claimed ID. The node remains the same entity in Netdata Cloud and on Parent nodes. Historical metrics are preserved because they are keyed by Machine GUID, not hostname.
+
+:::
+
+The updated hostname propagates to Parent nodes and Netdata Cloud on the next connection.
+
+For virtual nodes, see [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity).
+
+</details>
+
+<details>
 <summary>Does renaming a virtual node change its identity?</summary>
 
 A virtual node's identity is determined by its **`guid`** field — not its `hostname` or `name`. The fields behave as follows:
