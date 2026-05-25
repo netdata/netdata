@@ -239,7 +239,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
 
     ml_stop_threads();
-    ml_fini();
+    // ml_fini() (which closes ml_db) is deferred until after
+    // metadata_sync_shutdown() drains the metasync workers below. Those
+    // workers call ml_dimension_load_models() which uses ml_db; closing it
+    // here exposes the metasync worker to a use-after-free on the SQLite
+    // handle and triggers SIGSEGV inside sqlite3_prepare_v2 -> findElementWithHash.
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS);
 
     service_wait_exit(SERVICE_CONTEXT, 5 * USEC_PER_SEC);
@@ -307,6 +311,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 #endif
 
         metadata_sync_shutdown();
+        ml_fini();
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
