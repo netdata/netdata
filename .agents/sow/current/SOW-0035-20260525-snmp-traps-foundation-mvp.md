@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: open
+Status: in-progress
 
-Sub-state: queued in `.agents/sow/pending/`. The user has fixed the implementation language to Go and clarified the listener/profile lifecycle contract. Activation still requires the remaining M1 architecture decisions (process model, journal-writer backend, TrapWriter interface contract) to be made and reviewed; the full Pre-Implementation Gate is filled at activation so it reflects the freshest code/spec state.
+Sub-state: activated on 2026-05-25. The user has fixed the implementation language to Go and clarified the listener/profile lifecycle contract. Implementation is delegated primarily to `deepseek/deepseek-v4-pro`; reviews are delegated to `glm`, `kimi`, `mimo`, `minimax`, and `qwen`. The coordinating assistant remains responsible for architecture, direct edits, unblocking, integration, validation, and final quality.
 
 ## Requirements
 
@@ -32,6 +32,13 @@ User clarification recorded on 2026-05-25:
 - Profiles load on first runnable trap job creation, not at permanent `go.d.plugin` startup, so agents that do not use traps do not pay the memory cost.
 - Profiles are shared across listeners, not loaded once per listener.
 - Implementation language is Go, not Rust.
+
+User implementation workflow decision recorded on 2026-05-25:
+
+- `deepseek/deepseek-v4-pro` is the primary implementation worker.
+- DeepSeek must not be run with `--agent code-reviewer`; it needs write access for implementation tasks.
+- Reviews use `glm`, `kimi`, `mimo`, `minimax`, and `qwen`.
+- The coordinating assistant may make direct edits, perform reviews, and unblock external workers when that improves quality or progress. External models are helpers, not autopilot.
 
 ### Assistant Understanding
 
@@ -81,7 +88,7 @@ Spec updates applied at M1 close:
 
 Output: ADR document at `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
 
-Reviewers: all 7 (glm, mimo, kimi, qwen, minimax, deepseek, codex) — consensus-critical.
+Reviewers: `glm`, `kimi`, `mimo`, `minimax`, and `qwen` — consensus-critical. The coordinating assistant also performs its own review and may make direct edits before/after external review.
 
 ### M2 — Per-job UDP listener + SNMPv1/v2c decode + source identification + test corpus
 
@@ -108,7 +115,7 @@ Reviewers: all 7 (glm, mimo, kimi, qwen, minimax, deepseek, codex) — consensus
 
 Cohort reference: `splunk-sc4snmp.md` §3.4 (listener), `logicmonitor.md` §3.4 (source-ID), `logstash.md` §3 (SNMP4j); gosnmp upstream; `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` (job lifecycle).
 
-Reviewers: 3 rotating (group A: kimi/qwen/minimax).
+Reviewers: 3 rotating from `glm`, `kimi`, `mimo`, `minimax`, and `qwen`.
 
 ### M3 — Profile loader + OID index + 2-tier varbind resolution + template rendering
 
@@ -135,7 +142,7 @@ Reviewers: 3 rotating (group A: kimi/qwen/minimax).
 
 Cohort reference: `src/go/plugin/go.d/collector/snmp/ddsnmp/load.go` (multipath + filename-dedup + extends-chain merge — the pattern this SOW mirrors); `datadog-agent.md` `dd_traps_db` (file-scoped table pattern); spec §7.
 
-Reviewers: 3 rotating (group B: glm/mimo/deepseek).
+Reviewers: 3 rotating from `glm`, `kimi`, `mimo`, `minimax`, and `qwen`.
 
 ### M4 — TrapEntry + TrapWriter + journal writer + CWE-117 + per-job retention
 
@@ -154,25 +161,97 @@ Reviewers: 3 rotating (group B: glm/mimo/deepseek).
 
 Cohort reference: existing Netdata systemd-journal writer behavior used by netflow-plugin; spec §11 + §11b + §19.
 
-Reviewers: all 7 — CWE-117 + field universe are security-critical.
+Reviewers: `glm`, `kimi`, `mimo`, `minimax`, and `qwen` — CWE-117 + field universe are security-critical. The coordinating assistant also performs direct security and integration review.
 
 ## Reviewer Protocol
 
-- M1 + M4: all 7 reviewers (consensus / security-critical).
-- M2 + M3: 3 rotating reviewers per round (groups A/B).
+- M1 + M4: `glm`, `kimi`, `mimo`, `minimax`, and `qwen` (consensus / security-critical).
+- M2 + M3: 3 rotating reviewers per round drawn from `glm`, `kimi`, `mimo`, `minimax`, and `qwen`.
 - Fix-cycle: same reviewers as the round being fixed; iterate until clean per AGENTS.md rerun rule.
+- Implementation worker: `deepseek/deepseek-v4-pro` through `opencode run -m deepseek/deepseek-v4-pro --dangerously-skip-permissions --dir .`, without `--agent code-reviewer`.
+- Coordination rule: the coordinating assistant owns the final outcome and may directly edit, review, validate, or replace external-agent work when needed.
 
 ## Pre-Implementation Gate
 
-Status: pending-activation
+Status: passed for activation; M1 begins now.
 
-This SOW remains in `pending/` until M1 is approved by reviewer consensus on process model, journal-writer backend, shared profile cache lifecycle details, and TrapWriter interface. The user has already decided the implementation language is Go. The full gate is filled at activation — deferred deliberately so the gate captures the freshest code/spec state at start-of-work rather than at SOW authoring.
+Problem/root-cause model:
 
-Open decisions for M1:
+- Netdata needs SNMP traps resolved through the new trap profile pack, but `go.d.plugin` is installed broadly and must not load the large trap profile index for agents that never create trap jobs.
+- The user-facing failure boundary must be DynCfg apply/job creation. If a listener cannot bind, profiles cannot load, a journal directory cannot be created/opened, or a writer cannot initialize, reporting the job as started is a product bug.
+- The existing go.d DynCfg start path currently risks surfacing some `AutoDetection()` failures as uncoded errors. The SOW must make job-init failures HTTP-422 so the dashboard sees an apply failure.
+- The old one-port-per-listener wording was too restrictive. A listener is a policy/writer unit and may own multiple endpoints; multiple listeners are scaling/isolation.
 
-1. **Process model / writer backend** — standard in-process go.d module code with a Go journal writer/port vs any justified process boundary or bridge.
-2. **Cross-plugin state access** — in-process struct sharing if the Go implementation stays in `go.d.plugin`; otherwise a justified IPC mechanism.
-3. **TrapWriter contract** — method signatures, `TrapEntry` fields, batching, flush, close, and error semantics.
+Evidence reviewed:
+
+- `.agents/sow/specs/snmp-traps/netdata.md` §5, §6, §7, §11, §13, §17, §19.
+- `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go` `Start()` and `Update()` paths: `AutoDetection()` errors are returned without a coded HTTP status today.
+- `src/go/plugin/framework/dyncfg/handler.go` enable path: it uses a coded error when available, otherwise falls back to the handler default.
+- `src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`: existing SNMP polling profile loader pattern for global cached load, multipath, filename dedup, and profile walking.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md` and shipped `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/` pack.
+- `src/crates/journal-log-writer/` and NetFlow journal retention config as the reference behavior for direct journal files, rotation, retention, and error surfaces.
+
+Affected contracts and surfaces:
+
+- DynCfg job Add/Enable/Update error semantics for go.d collectors.
+- New Go collector/module package for SNMP traps.
+- Trap profile loading semantics and validation.
+- Per-job endpoint configuration and job-name validation.
+- Per-job journal directory/writer contract.
+- SNMPv1/v2c decode and RFC 3584 source identity behavior.
+- Spec §5, §6, §11, §13, §17, and §19 plus M1 ADR.
+
+Existing patterns to reuse:
+
+- go.d collector registration and job lifecycle patterns.
+- `ddsnmp` profile loader multipath and filename-dedup behavior.
+- go.d table-driven tests keyed by map names.
+- Direct journal writer behavior and retention semantics from the NetFlow journal path, adapted to Go.
+- `dyncfg` coded-error pattern for HTTP-422 user-visible apply failures.
+
+Risk and blast radius:
+
+- Framework error-code change can affect other go.d DynCfg-managed jobs; tests must prove only job-init failure status changes and successful starts are unchanged.
+- Direct journal writing in Go is high risk for correctness and CWE-117. M1 must either define a very narrow Go-compatible backend or split journal writer work into a safe, testable layer.
+- Loading 50,198 trap definitions can consume meaningful memory; profile cache must remain lazy and shared.
+- Multi-endpoint binding needs all-or-nothing cleanup to avoid leaked sockets or partially-started jobs.
+- SNMP BER parsing is untrusted input; strict decode limits and malformed-PDU tests are required.
+
+Sensitive data handling plan:
+
+- No SNMP communities, v3 auth/priv keys, real customer trap payloads, private endpoints, or production IPs may be written to SOWs, specs, docs, tests, fixtures, prompts, or code comments.
+- Test fixtures must be public, synthetic, or sanitized. Any real pcap must have attribution and redaction before becoming durable.
+- External-agent prompts must include only repository paths, public spec excerpts, and sanitized requirements.
+
+Implementation plan:
+
+1. M1 ADR: decide Go process/writer backend, shared profile cache lifecycle details, and TrapWriter/TrapEntry contract; update spec §5/§13/§19.
+2. M2 code: DynCfg/job preflight, strict job-name validation, multi-endpoint listener binding, SNMPv1/v2c decode, RFC 3584 conversion, source identification, and replay fixtures.
+3. M3 code: shared lazy trap profile loader, OID index, validation, varbind resolver, template renderer.
+4. M4 code: TrapEntry, TrapWriter, Go-compatible journal writer/backend, CWE-117 encoding, retention semantics, mock writer, and end-to-end replay-to-journal validation.
+
+Validation plan:
+
+- `go test` for affected Go packages, including new trap collector packages and changed DynCfg job manager packages.
+- Unit tests for job-name validation, endpoint validation, all-or-nothing bind cleanup, profile cache load/share/release, profile validation failures, OID lookup, template rendering, RFC 3584 v1 conversion, BER limits, source identification, and CWE-117 field encoding.
+- End-to-end test: replay pcap or packet fixture through the full pipeline and query the test journal directory with `journalctl --directory=...`.
+- Same-failure searches for uncoded job-init failures and unsafe job-name-to-path usage.
+- External implementation/review loop: DeepSeek implementation, requested reviewer pool, coordinating assistant review, fixes, repeat until clean.
+
+Artifact impact plan:
+
+- `AGENTS.md`: no expected change unless this SOW discovers a reusable workflow rule gap.
+- Runtime project skills: update `.agents/skills/project-snmp-trap-profiles-authoring/` only if profile-loader/profile-format workflow changes.
+- Specs: update `.agents/sow/specs/snmp-traps/netdata.md` and M1 ADR as decisions are finalized.
+- End-user/operator docs: deferred to SOW-0039 unless implementation exposes a behavior that must be documented earlier to keep specs accurate.
+- End-user/operator skills: deferred to SOW-0039 unless public operator workflow changes before then.
+- SOW lifecycle: moved from `pending/` to `current/`, status changed to `in-progress`, external-agent workflow recorded, follow-ups must be mapped before close.
+
+Open decisions:
+
+- M1 must still choose the Go-compatible journal writer/backend approach and exact TrapWriter/TrapEntry contract.
+- M1 must decide whether standard in-process go.d module code is enough or whether a justified process boundary/bridge is needed for journal writing.
+- M2/M4 must prove all creation-time failures are caught before DynCfg apply success.
 
 ## Plan
 
@@ -196,7 +275,10 @@ Tests or equivalent validation: pending.
 Real-use evidence: pending (M4 end-to-end pcap replay is the primary real-use signal).
 Reviewer findings: pending.
 Same-failure scan: pending.
-Sensitive data gate: pending — no SNMP communities, USM keys, or operator-secret data in any committed artifact.
+Sensitive data gate:
+
+Pending — no SNMP communities, USM keys, or operator-secret data in any committed artifact. External-agent prompts and generated artifacts must stay sanitized.
+
 Artifact maintenance gate: pending.
 
 ## Outcome
