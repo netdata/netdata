@@ -489,6 +489,7 @@ int main(int argc, char **argv)
         PerflibNamesRegistryUpdate();
     }
 
+    functions_evloop_cancel_threads(wg);
     PerflibNamesRegistryCleanup();
 
     return 0;
