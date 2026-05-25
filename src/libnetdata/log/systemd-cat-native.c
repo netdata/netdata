@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "systemd-cat-native.h"
-#include "../required_dummies.h"
 
 #ifdef __FreeBSD__
 #include <sys/endian.h>
