@@ -140,7 +140,7 @@ modules:
                     match: '!* *.css'
                 ```
 
-                Pattern values use the [matcher library](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) syntax:
+                Pattern values use the [matcher library](/src/go/pkg/matcher/README.md#supported-format) syntax:
 
                 - `=` — string (exact match)
                 - `*` — glob patterns
@@ -155,7 +155,7 @@ modules:
               required: true
               group: Customization
             - name: url_patterns.match
-              description: Used to match against full original request URI. Match syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
+              description: Used to match against full original request URI. Match syntax in [matcher](/src/go/pkg/matcher/README.md#supported-format).
               default_value: ""
               required: true
               group: Customization
