@@ -283,28 +283,33 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 	handle.UpdateEvery = updateEvery
 	api := netdataapi.New(os.Stdout)
 
-	collectApps := true
-	store := NewCachestatSharedMemoryStore()
-	service := NewSharedSnapshotService(
-		"/var/run/netdata",
-		defaultSharedSnapshotServiceName,
-		defaultSharedSnapshotServerConfig(),
-		nil,
-	)
-
-	if service == nil {
-		return
+	var service *SharedSnapshotService
+	if handle.CgroupsEnabled {
+		service = NewSharedSnapshotService(
+			"/var/run/netdata",
+			defaultSharedSnapshotServiceName,
+			defaultSharedSnapshotServerConfig(),
+			nil,
+		)
+		if service == nil {
+			return
+		}
 	}
 
 	stop := make(chan struct{})
-	doneService := make(chan struct{})
-	go func() {
-		defer close(doneService)
-		_ = service.Run()
-	}()
+
+	var doneService chan struct{}
+	if service != nil {
+		doneService = make(chan struct{})
+		go func() {
+			defer close(doneService)
+			_ = service.Run()
+		}()
+	}
 
 	var wg sync.WaitGroup
-	if collectApps {
+	if handle.AppsEnabled {
+		store := NewCachestatSharedMemoryStore()
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -319,12 +324,16 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 		signal.Stop(sigCh)
 
 		close(stop)
-		service.Stop()
+		if service != nil {
+			service.Stop()
+		}
 	}()
 
 	runCachestatGlobalCollector(api, handle, stop, updateEvery)
 
 	wg.Wait()
 	handle.Close()
-	<-doneService
+	if doneService != nil {
+		<-doneService
+	}
 }
