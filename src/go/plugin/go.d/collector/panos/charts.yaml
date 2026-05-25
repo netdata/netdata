@@ -1,0 +1,623 @@
+version: v1
+context_namespace: panos
+groups:
+  - family: system
+    metrics:
+      - system_uptime_uptime
+      - system_device_certificate_status_valid
+      - system_device_certificate_status_invalid
+      - system_operational_mode_normal
+      - system_operational_mode_other
+    charts:
+      - id: system_uptime
+        title: System Uptime
+        context: system.uptime
+        units: seconds
+        priority: 70010
+        label_promotion: [hostname, model, serial, sw_version]
+        dimensions:
+          - selector: system_uptime_uptime
+            name: uptime
+      - id: system_device_certificate_status
+        title: Device Certificate Status
+        context: system.device_certificate_status
+        units: status
+        type: stacked
+        priority: 70011
+        label_promotion: [hostname, model, serial, sw_version]
+        dimensions:
+          - selector: system_device_certificate_status_valid
+            name: valid
+          - selector: system_device_certificate_status_invalid
+            name: invalid
+      - id: system_operational_mode
+        title: Operational Mode
+        context: system.operational_mode
+        units: mode
+        type: stacked
+        priority: 70012
+        label_promotion: [hostname, model, serial, sw_version]
+        dimensions:
+          - selector: system_operational_mode_normal
+            name: normal
+          - selector: system_operational_mode_other
+            name: other
+
+  - family: ha
+    metrics:
+      - ha_enabled_enabled
+      - ha_local_state_active
+      - ha_local_state_passive
+      - ha_local_state_non_functional
+      - ha_local_state_suspended
+      - ha_local_state_unknown
+      - ha_peer_state_active
+      - ha_peer_state_passive
+      - ha_peer_state_non_functional
+      - ha_peer_state_suspended
+      - ha_peer_state_unknown
+      - ha_peer_connection_status_up
+      - ha_state_sync_synchronized
+      - ha_links_status_ha1
+      - ha_links_status_ha1_backup
+      - ha_links_status_ha2
+      - ha_links_status_ha2_backup
+      - ha_priority_local
+      - ha_priority_peer
+    charts:
+      - id: ha_enabled
+        title: HA Enabled
+        context: ha.enabled
+        units: status
+        priority: 70013
+        dimensions:
+          - selector: ha_enabled_enabled
+            name: enabled
+      - id: ha_local_state
+        title: Local HA State
+        context: ha.local.state
+        units: state
+        type: stacked
+        priority: 70014
+        dimensions:
+          - selector: ha_local_state_active
+            name: active
+          - selector: ha_local_state_passive
+            name: passive
+          - selector: ha_local_state_non_functional
+            name: non_functional
+          - selector: ha_local_state_suspended
+            name: suspended
+          - selector: ha_local_state_unknown
+            name: unknown
+      - id: ha_peer_state
+        title: Peer HA State
+        context: ha.peer.state
+        units: state
+        type: stacked
+        priority: 70015
+        dimensions:
+          - selector: ha_peer_state_active
+            name: active
+          - selector: ha_peer_state_passive
+            name: passive
+          - selector: ha_peer_state_non_functional
+            name: non_functional
+          - selector: ha_peer_state_suspended
+            name: suspended
+          - selector: ha_peer_state_unknown
+            name: unknown
+      - id: ha_peer_connection_status
+        title: HA Peer Connection Status
+        context: ha.peer.connection_status
+        units: status
+        priority: 70016
+        dimensions:
+          - selector: ha_peer_connection_status_up
+            name: up
+      - id: ha_state_sync
+        title: HA State Synchronization
+        context: ha.state_sync
+        units: status
+        priority: 70017
+        dimensions:
+          - selector: ha_state_sync_synchronized
+            name: synchronized
+      - id: ha_links_status
+        title: HA Links Status
+        context: ha.links_status
+        units: status
+        priority: 70018
+        dimensions:
+          - selector: ha_links_status_ha1
+            name: ha1
+          - selector: ha_links_status_ha1_backup
+            name: ha1_backup
+          - selector: ha_links_status_ha2
+            name: ha2
+          - selector: ha_links_status_ha2_backup
+            name: ha2_backup
+      - id: ha_priority
+        title: HA Priority
+        context: ha.priority
+        units: priority
+        priority: 70019
+        dimensions:
+          - selector: ha_priority_local
+            name: local
+          - selector: ha_priority_peer
+            name: peer
+
+  - family: environment temperature
+    metrics:
+      - environment_temperature_temperature
+    charts:
+      - id: environment_temperature
+        title: Environment Temperature
+        context: environment.temperature
+        units: Celsius
+        priority: 70020
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: environment_temperature_temperature
+            name: temperature
+            options:
+              divisor: 1000
+
+  - family: environment fans
+    metrics:
+      - environment_fan_speed_speed
+    charts:
+      - id: environment_fan_speed
+        title: Environment Fan Speed
+        context: environment.fan_speed
+        units: RPM
+        priority: 70021
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: environment_fan_speed_speed
+            name: speed
+
+  - family: environment voltage
+    metrics:
+      - environment_voltage_voltage
+    charts:
+      - id: environment_voltage
+        title: Environment Voltage
+        context: environment.voltage
+        units: Volts
+        priority: 70022
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: environment_voltage_voltage
+            name: voltage
+            options:
+              divisor: 1000
+
+  - family: environment sensors
+    metrics:
+      - environment_sensor_alarm_alarm
+      - environment_power_supply_status_inserted
+      - environment_power_supply_status_alarm
+      - environment_sensors_collection_discovered
+      - environment_sensors_collection_monitored
+      - environment_sensors_collection_omitted_by_selector
+      - environment_sensors_collection_omitted_by_limit
+    charts:
+      - id: environment_sensor_alarm
+        title: Environment Sensor Alarm
+        context: environment.sensor_alarm
+        units: status
+        priority: 70023
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: environment_sensor_alarm_alarm
+            name: alarm
+      - id: environment_power_supply_status
+        title: Power Supply Status
+        context: environment.power_supply_status
+        units: status
+        priority: 70024
+        instances:
+          by_labels: [sensor_type, slot, sensor]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: environment_power_supply_status_inserted
+            name: inserted
+          - selector: environment_power_supply_status_alarm
+            name: alarm
+      - id: environment_sensors_collection
+        title: Environment Sensor Collection
+        context: environment.sensors.collection
+        units: sensors
+        priority: 70033
+        dimensions:
+          - selector: environment_sensors_collection_discovered
+            name: discovered
+          - selector: environment_sensors_collection_monitored
+            name: monitored
+          - selector: environment_sensors_collection_omitted_by_selector
+            name: omitted_by_selector
+          - selector: environment_sensors_collection_omitted_by_limit
+            name: omitted_by_limit
+
+  - family: licenses
+    metrics:
+      - license_count_total
+      - license_count_expired
+      - license_collection_discovered
+      - license_collection_monitored
+      - license_collection_omitted_by_selector
+      - license_collection_omitted_by_limit
+      - license_status_valid
+      - license_status_expired
+      - license_time_until_expiration_time_until_expiration
+    charts:
+      - id: license_count
+        title: Licenses
+        context: license.count
+        units: licenses
+        algorithm: absolute
+        priority: 70025
+        dimensions:
+          - selector: license_count_total
+            name: total
+          - selector: license_count_expired
+            name: expired
+      - id: license_collection
+        title: License Collection
+        context: license.collection
+        units: licenses
+        priority: 70034
+        dimensions:
+          - selector: license_collection_discovered
+            name: discovered
+          - selector: license_collection_monitored
+            name: monitored
+          - selector: license_collection_omitted_by_selector
+            name: omitted_by_selector
+          - selector: license_collection_omitted_by_limit
+            name: omitted_by_limit
+      - id: license_status
+        title: License Status
+        context: license.status
+        units: status
+        type: stacked
+        priority: 70026
+        label_promotion: [description]
+        instances:
+          by_labels: [feature]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: license_status_valid
+            name: valid
+          - selector: license_status_expired
+            name: expired
+      - id: license_time_until_expiration
+        title: License Time Until Expiration
+        context: license.time_until_expiration
+        units: days
+        priority: 70027
+        label_promotion: [description]
+        instances:
+          by_labels: [feature]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: license_time_until_expiration_time_until_expiration
+            name: time_until_expiration
+
+  - family: ipsec
+    metrics:
+      - ipsec_tunnels_active
+      - ipsec_tunnels_collection_discovered
+      - ipsec_tunnels_collection_monitored
+      - ipsec_tunnels_collection_omitted_by_selector
+      - ipsec_tunnels_collection_omitted_by_limit
+      - ipsec_tunnel_sa_lifetime_time_until_expiration
+    charts:
+      - id: ipsec_tunnels
+        title: IPsec Tunnels
+        context: ipsec.tunnels
+        units: tunnels
+        priority: 70028
+        dimensions:
+          - selector: ipsec_tunnels_active
+            name: active
+      - id: ipsec_tunnels_collection
+        title: IPsec Tunnel Collection
+        context: ipsec.tunnels.collection
+        units: tunnels
+        priority: 70035
+        dimensions:
+          - selector: ipsec_tunnels_collection_discovered
+            name: discovered
+          - selector: ipsec_tunnels_collection_monitored
+            name: monitored
+          - selector: ipsec_tunnels_collection_omitted_by_selector
+            name: omitted_by_selector
+          - selector: ipsec_tunnels_collection_omitted_by_limit
+            name: omitted_by_limit
+      - id: ipsec_tunnel_sa_lifetime
+        title: IPsec Tunnel SA Lifetime
+        context: ipsec.tunnel.sa_lifetime
+        units: seconds
+        priority: 70029
+        label_promotion: [protocol, encryption]
+        instances:
+          by_labels: [tunnel, gateway, remote, tunnel_id]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: ipsec_tunnel_sa_lifetime_time_until_expiration
+            name: time_until_expiration
+
+  - family: bgp peers
+    metrics:
+      - bgp_peers_collection_discovered
+      - bgp_peers_collection_monitored
+      - bgp_peers_collection_omitted_by_selector
+      - bgp_peers_collection_omitted_by_limit
+      - bgp_peer_state_idle
+      - bgp_peer_state_connect
+      - bgp_peer_state_active
+      - bgp_peer_state_opensent
+      - bgp_peer_state_openconfirm
+      - bgp_peer_state_established
+      - bgp_peer_uptime_uptime
+      - bgp_peer_messages_in
+      - bgp_peer_messages_out
+      - bgp_peer_updates_in
+      - bgp_peer_updates_out
+      - bgp_peer_flaps_flaps
+      - bgp_peer_established_transitions_established
+    charts:
+      - id: bgp_peers_collection
+        title: BGP Peer Collection
+        context: bgp.peers.collection
+        units: peers
+        priority: 70030
+        dimensions:
+          - selector: bgp_peers_collection_discovered
+            name: discovered
+          - selector: bgp_peers_collection_monitored
+            name: monitored
+          - selector: bgp_peers_collection_omitted_by_selector
+            name: omitted_by_selector
+          - selector: bgp_peers_collection_omitted_by_limit
+            name: omitted_by_limit
+      - id: bgp_peer_state
+        title: BGP Peer State
+        context: bgp.peer.state
+        units: state
+        type: stacked
+        priority: 70000
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_peer_state_idle
+            name: idle
+          - selector: bgp_peer_state_connect
+            name: connect
+          - selector: bgp_peer_state_active
+            name: active
+          - selector: bgp_peer_state_opensent
+            name: opensent
+          - selector: bgp_peer_state_openconfirm
+            name: openconfirm
+          - selector: bgp_peer_state_established
+            name: established
+      - id: bgp_peer_uptime
+        title: BGP Peer Uptime
+        context: bgp.peer.uptime
+        units: seconds
+        priority: 70001
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_peer_uptime_uptime
+            name: uptime
+      - id: bgp_peer_messages
+        title: BGP Peer Messages
+        context: bgp.peer.messages
+        units: messages/s
+        algorithm: incremental
+        priority: 70002
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_peer_messages_in
+            name: in
+          - selector: bgp_peer_messages_out
+            name: out
+      - id: bgp_peer_updates
+        title: BGP Peer Updates
+        context: bgp.peer.updates
+        units: messages/s
+        algorithm: incremental
+        priority: 70003
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_peer_updates_in
+            name: in
+          - selector: bgp_peer_updates_out
+            name: out
+      - id: bgp_peer_flaps
+        title: BGP Peer Flaps
+        context: bgp.peer.flaps
+        units: flaps/s
+        algorithm: incremental
+        priority: 70004
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_peer_flaps_flaps
+            name: flaps
+      - id: bgp_peer_established_transitions
+        title: BGP Peer Established Transitions
+        context: bgp.peer.established_transitions
+        units: transitions/s
+        algorithm: incremental
+        priority: 70005
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_peer_established_transitions_established
+            name: established
+
+  - family: bgp prefixes
+    metrics:
+      - bgp_prefix_families_collection_discovered
+      - bgp_prefix_families_collection_monitored
+      - bgp_prefix_families_collection_omitted_by_selector
+      - bgp_prefix_families_collection_omitted_by_limit
+      - bgp_peer_prefixes_received_total
+      - bgp_peer_prefixes_received_accepted
+      - bgp_peer_prefixes_received_rejected
+      - bgp_peer_prefixes_advertised_advertised
+    charts:
+      - id: bgp_prefix_families_collection
+        title: BGP Prefix Family Collection
+        context: bgp.prefix_families.collection
+        units: families
+        priority: 70031
+        dimensions:
+          - selector: bgp_prefix_families_collection_discovered
+            name: discovered
+          - selector: bgp_prefix_families_collection_monitored
+            name: monitored
+          - selector: bgp_prefix_families_collection_omitted_by_selector
+            name: omitted_by_selector
+          - selector: bgp_prefix_families_collection_omitted_by_limit
+            name: omitted_by_limit
+      - id: bgp_peer_prefixes_received
+        title: BGP Peer Received Prefixes
+        context: bgp.peer.prefixes_received
+        units: prefixes
+        algorithm: absolute
+        priority: 70006
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address, afi, safi]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_peer_prefixes_received_total
+            name: total
+          - selector: bgp_peer_prefixes_received_accepted
+            name: accepted
+          - selector: bgp_peer_prefixes_received_rejected
+            name: rejected
+      - id: bgp_peer_prefixes_advertised
+        title: BGP Peer Advertised Prefixes
+        context: bgp.peer.prefixes_advertised
+        units: prefixes
+        priority: 70007
+        label_promotion: [local_address, remote_as, peer_group]
+        instances:
+          by_labels: [vr, peer_address, afi, safi]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_peer_prefixes_advertised_advertised
+            name: advertised
+
+  - family: bgp virtual routers
+    metrics:
+      - bgp_virtual_routers_collection_discovered
+      - bgp_virtual_routers_collection_monitored
+      - bgp_virtual_routers_collection_omitted_by_selector
+      - bgp_virtual_routers_collection_omitted_by_limit
+      - bgp_vr_peers_by_state_idle
+      - bgp_vr_peers_by_state_connect
+      - bgp_vr_peers_by_state_active
+      - bgp_vr_peers_by_state_opensent
+      - bgp_vr_peers_by_state_openconfirm
+      - bgp_vr_peers_by_state_established
+      - bgp_vr_peers_total_configured
+      - bgp_vr_peers_total_established
+    charts:
+      - id: bgp_virtual_routers_collection
+        title: BGP Virtual Router Collection
+        context: bgp.virtual_routers.collection
+        units: virtual routers
+        priority: 70032
+        dimensions:
+          - selector: bgp_virtual_routers_collection_discovered
+            name: discovered
+          - selector: bgp_virtual_routers_collection_monitored
+            name: monitored
+          - selector: bgp_virtual_routers_collection_omitted_by_selector
+            name: omitted_by_selector
+          - selector: bgp_virtual_routers_collection_omitted_by_limit
+            name: omitted_by_limit
+      - id: bgp_vr_peers_by_state
+        title: BGP Peers by State
+        context: bgp.vr.peers_by_state
+        units: peers
+        type: stacked
+        priority: 70008
+        instances:
+          by_labels: [vr]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_vr_peers_by_state_idle
+            name: idle
+          - selector: bgp_vr_peers_by_state_connect
+            name: connect
+          - selector: bgp_vr_peers_by_state_active
+            name: active
+          - selector: bgp_vr_peers_by_state_opensent
+            name: opensent
+          - selector: bgp_vr_peers_by_state_openconfirm
+            name: openconfirm
+          - selector: bgp_vr_peers_by_state_established
+            name: established
+      - id: bgp_vr_peers_total
+        title: BGP Peers Total
+        context: bgp.vr.peers_total
+        units: peers
+        priority: 70009
+        instances:
+          by_labels: [vr]
+        lifecycle:
+          expire_after_cycles: 3
+        dimensions:
+          - selector: bgp_vr_peers_total_configured
+            name: configured
+          - selector: bgp_vr_peers_total_established
+            name: established

@@ -1,0 +1,686 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-panos
+      plugin_name: go.d.plugin
+      module_name: panos
+      monitored_instance:
+        name: Palo Alto Networks PAN-OS
+        link: https://www.paloaltonetworks.com/network-security
+        categories:
+          - data-collection.networking
+        icon_filename: paloalto.svg
+      related_resources:
+        integrations:
+          list: []
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - palo alto
+        - pan-os
+        - panos
+        - firewall
+        - bgp
+        - ha
+        - ipsec
+        - licenses
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Palo Alto Networks PAN-OS firewalls.
+          It collects read-only XML API telemetry for BGP, system status, HA, environment sensors, licenses, and IPsec SAs.
+        method_description: |
+          It gathers metrics by periodically running PAN-OS XML API operational commands through the pango SDK.
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector does not auto-detect PAN-OS firewalls. A job must be configured with the firewall management URL and credentials.
+        limits:
+          description: |
+            The default collection interval is 60 seconds to keep polling load conservative on the PAN-OS management plane.
+        performance_impact:
+          description: |
+            Each collection runs PAN-OS XML API operational requests for enabled metricsets. The collector uses serial requests and caps the SDK transport to 2 connections per firewall job.
+      additional_permissions:
+        description: |
+          The configured PAN-OS account must be allowed to use the XML API and run read-only operational requests for the enabled metricsets.
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: PAN-OS XML API access
+            description: |
+              Enable XML API access and provide either an API key or username/password credentials that can generate one.
+              The account needs permission to run operational commands.
+      configuration:
+        file:
+          name: go.d/panos.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds).
+              default_value: 60
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: url
+              description: PAN-OS management interface URL. The path must be empty, `/`, or `/api`.
+              default_value: https://127.0.0.1
+              required: true
+              group: Target
+            - name: timeout
+              description: PAN-OS XML API request timeout (seconds).
+              default_value: 10
+              required: false
+              group: Target
+            - name: vsys
+              description: Optional PAN-OS virtual system scope for operational commands.
+              default_value: ""
+              required: false
+              group: Target
+            - name: collect_bgp
+              description: Collect BGP peer metrics.
+              default_value: yes
+              required: false
+              group: Metricsets
+            - name: collect_system
+              description: Collect system information metrics.
+              default_value: yes
+              required: false
+              group: Metricsets
+            - name: collect_ha
+              description: Collect high availability state metrics.
+              default_value: yes
+              required: false
+              group: Metricsets
+            - name: collect_environment
+              description: Collect environment sensor metrics.
+              default_value: yes
+              required: false
+              group: Metricsets
+            - name: collect_licenses
+              description: Collect license status and expiration metrics.
+              default_value: yes
+              required: false
+              group: Metricsets
+            - name: collect_ipsec
+              description: Collect active IPsec SA metrics.
+              default_value: yes
+              required: false
+              group: Metricsets
+            - name: max_bgp_peers
+              description: Maximum number of BGP peers monitored with per-peer charts.
+              default_value: 512
+              required: false
+              group: Limits
+            - name: max_bgp_prefix_families_per_peer
+              description: Maximum number of BGP prefix-counter address families monitored per BGP peer.
+              default_value: 4
+              required: false
+              group: Limits
+            - name: max_bgp_virtual_routers
+              description: Maximum number of BGP virtual routers or logical routers monitored with per-VR charts.
+              default_value: 256
+              required: false
+              group: Limits
+            - name: max_environment_sensors
+              description: Maximum number of environment sensors monitored with per-sensor charts.
+              default_value: 512
+              required: false
+              group: Limits
+            - name: max_licenses
+              description: Maximum number of licenses monitored with per-license charts.
+              default_value: 64
+              required: false
+              group: Limits
+            - name: max_ipsec_tunnels
+              description: Maximum number of IPsec tunnels monitored with per-tunnel charts.
+              default_value: 1024
+              required: false
+              group: Limits
+            - name: bgp_peers
+              description: Include/exclude BGP peers by `vr/peer_address`.
+              default_value: ""
+              required: false
+              group: Selectors
+            - name: bgp_prefix_families
+              description: Include/exclude BGP prefix-counter families by `vr/peer_address/afi/safi`.
+              default_value: ""
+              required: false
+              group: Selectors
+            - name: bgp_virtual_routers
+              description: Include/exclude BGP virtual routers or logical routers by name.
+              default_value: ""
+              required: false
+              group: Selectors
+            - name: environment_sensors
+              description: Include/exclude environment sensors by `sensor_type/slot/sensor`.
+              default_value: ""
+              required: false
+              group: Selectors
+            - name: licenses
+              description: Include/exclude licenses by feature name.
+              default_value: ""
+              required: false
+              group: Selectors
+            - name: ipsec_tunnels
+              description: Include/exclude IPsec tunnels by `name/gateway/remote/tunnel_id`.
+              default_value: ""
+              required: false
+              group: Selectors
+            - name: api_key
+              description: PAN-OS XML API key. Takes priority over username/password key generation.
+              default_value: ""
+              required: false
+              group: Auth
+            - name: username
+              description: PAN-OS username used for API key generation.
+              default_value: ""
+              required: false
+              group: Auth
+            - name: password
+              description: PAN-OS password used for API key generation.
+              default_value: ""
+              required: false
+              group: Auth
+            - name: tls_skip_verify
+              description: Skip TLS certificate and hostname verification.
+              default_value: no
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: Path to CA bundle used to validate the server certificate.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Path to client TLS certificate.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Path to client TLS private key.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: proxy_url
+              description: HTTP proxy URL. Include proxy credentials in the URL if needed.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: headers
+              description: Additional HTTP headers.
+              default_value: ""
+              required: false
+              group: Request
+            - name: vnode
+              description: Associates this data collection job with a Virtual Node.
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: API key
+              description: Collecting PAN-OS metrics with an existing XML API key.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: firewall
+                    url: https://192.0.2.1
+                    api_key: YOUR_PANOS_XML_API_KEY
+                    update_every: 60
+                    timeout: 10
+                    max_bgp_peers: 512
+                    max_ipsec_tunnels: 1024
+            - name: Username/password key generation
+              description: Letting the collector generate and reuse an API key through PAN-OS.
+              config: |
+                jobs:
+                  - name: firewall
+                    url: https://192.0.2.1
+                    username: netdata
+                    password: YOUR_PASSWORD
+                    update_every: 60
+                    timeout: 10
+    troubleshooting:
+      problems:
+        list:
+          - name: No BGP charts are created
+            description: |
+              Verify that BGP is configured and that the account can run PAN-OS XML API operational requests.
+              The collector logs the detected routing engine and reports a clear "no PAN-OS BGP peers found" error when no legacy or Advanced Routing Engine BGP peer command returns peers.
+          - name: A metricset fails but other charts work
+            description: |
+              The collector keeps successful metricsets running and logs the failing metricset name and XML command context.
+              Disable unsupported metricsets with collect_bgp, collect_system, collect_ha, collect_environment, collect_licenses, or collect_ipsec.
+          - name: PAN-OS accepted a command but no telemetry appears
+            description: |
+              A "success response has no recognized telemetry payload" error means PAN-OS accepted the operational command, but the XML result did not contain the expected section for that metricset.
+              Verify the account permissions and platform support for the metricset, then disable unsupported metricsets or provide a sanitized XML sample so the parser can be updated.
+          - name: A PAN-OS value cannot be parsed
+            description: |
+              The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec tunnel-count values with the metricset, field, entity name, and raw value when present.
+              It does not silently convert missing or malformed values to zero, report fake valid status, or treat unrecognized license dates as never-expiring licenses.
+          - name: Some discovered entities are not charted
+            description: |
+              The collector caps per-entity charts and exposes collection metrics with discovered, monitored, omitted_by_selector, and omitted_by_limit dimensions.
+              If omitted_by_limit is non-zero, raise the matching max_* option or use the matching selector to choose the entities that should be monitored.
+    alerts:
+      - name: panos_bgp_peer_not_established
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
+        metric: panos.bgp.peer.state
+        info: Critical when a BGP peer has not been established for 5 minutes.
+      - name: panos_device_certificate_invalid
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
+        metric: panos.system.device_certificate_status
+        info: Critical when PAN-OS reports the device certificate as invalid.
+      - name: panos_ha_peer_connection_down
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
+        metric: panos.ha.peer.connection_status
+        info: Critical when the HA peer connection has not been up for 5 minutes.
+      - name: panos_environment_sensor_alarm
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
+        metric: panos.environment.sensor_alarm
+        info: Critical when PAN-OS reports an environment sensor alarm.
+      - name: panos_license_expired
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
+        metric: panos.license.status
+        info: Critical when PAN-OS reports a license as expired.
+      - name: panos_license_expires_soon
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
+        metric: panos.license.time_until_expiration
+        info: Warning under 30 days before expiration, critical under 7 days.
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: System
+          description: These metrics refer to the PAN-OS device.
+          labels:
+            - name: hostname
+              description: PAN-OS hostname.
+            - name: model
+              description: PAN-OS model.
+            - name: serial
+              description: Device serial number.
+            - name: sw_version
+              description: PAN-OS software version.
+          metrics:
+            - name: panos.system.uptime
+              description: System Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: panos.system.device_certificate_status
+              description: Device Certificate Status
+              unit: status
+              chart_type: stacked
+              dimensions:
+                - name: valid
+                - name: invalid
+            - name: panos.system.operational_mode
+              description: Operational Mode
+              unit: mode
+              chart_type: stacked
+              dimensions:
+                - name: normal
+                - name: other
+        - name: High availability
+          description: These metrics refer to the PAN-OS HA pair state reported by the local firewall.
+          labels: []
+          metrics:
+            - name: panos.ha.enabled
+              description: HA Enabled
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: enabled
+            - name: panos.ha.local.state
+              description: Local HA State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: passive
+                - name: non_functional
+                - name: suspended
+                - name: unknown
+            - name: panos.ha.peer.state
+              description: Peer HA State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: passive
+                - name: non_functional
+                - name: suspended
+                - name: unknown
+            - name: panos.ha.peer.connection_status
+              description: HA Peer Connection Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: up
+            - name: panos.ha.state_sync
+              description: HA State Synchronization
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: synchronized
+            - name: panos.ha.links_status
+              description: HA Links Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ha1
+                - name: ha1_backup
+                - name: ha2
+                - name: ha2_backup
+            - name: panos.ha.priority
+              description: HA Priority
+              unit: priority
+              chart_type: line
+              dimensions:
+                - name: local
+                - name: peer
+        - name: Environment collection
+          description: These metrics summarize environment sensor discovery and cardinality limiting.
+          labels: []
+          metrics:
+            - name: panos.environment.sensors.collection
+              description: Environment Sensor Collection
+              unit: sensors
+              chart_type: line
+              dimensions:
+                - name: discovered
+                - name: monitored
+                - name: omitted_by_selector
+                - name: omitted_by_limit
+        - name: Environment sensor
+          description: These metrics refer to a single PAN-OS environment sensor.
+          labels:
+            - name: slot
+              description: Hardware slot.
+            - name: sensor
+              description: Sensor description.
+            - name: sensor_type
+              description: Sensor type.
+          metrics:
+            - name: panos.environment.temperature
+              description: Environment Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: panos.environment.fan_speed
+              description: Environment Fan Speed
+              unit: RPM
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: panos.environment.voltage
+              description: Environment Voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: panos.environment.sensor_alarm
+              description: Environment Sensor Alarm
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: alarm
+            - name: panos.environment.power_supply_status
+              description: Power Supply Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: inserted
+                - name: alarm
+        - name: License summary
+          description: These metrics summarize PAN-OS licenses.
+          labels: []
+          metrics:
+            - name: panos.license.count
+              description: Licenses
+              unit: licenses
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: expired
+            - name: panos.license.collection
+              description: License Collection
+              unit: licenses
+              chart_type: line
+              dimensions:
+                - name: discovered
+                - name: monitored
+                - name: omitted_by_selector
+                - name: omitted_by_limit
+        - name: License
+          description: These metrics refer to one PAN-OS license.
+          labels:
+            - name: feature
+              description: License feature name.
+            - name: description
+              description: License description.
+          metrics:
+            - name: panos.license.status
+              description: License Status
+              unit: status
+              chart_type: stacked
+              dimensions:
+                - name: valid
+                - name: expired
+            - name: panos.license.time_until_expiration
+              description: License Time Until Expiration
+              unit: days
+              chart_type: line
+              dimensions:
+                - name: time_until_expiration
+        - name: IPsec summary
+          description: These metrics summarize active PAN-OS IPsec security associations.
+          labels: []
+          metrics:
+            - name: panos.ipsec.tunnels
+              description: IPsec Tunnels
+              unit: tunnels
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: panos.ipsec.tunnels.collection
+              description: IPsec Tunnel Collection
+              unit: tunnels
+              chart_type: line
+              dimensions:
+                - name: discovered
+                - name: monitored
+                - name: omitted_by_selector
+                - name: omitted_by_limit
+        - name: IPsec tunnel
+          description: These metrics refer to one active PAN-OS IPsec security association.
+          labels:
+            - name: tunnel
+              description: Tunnel name.
+            - name: gateway
+              description: Gateway name.
+            - name: remote
+              description: Remote peer.
+            - name: tunnel_id
+              description: PAN-OS tunnel identifier.
+            - name: protocol
+              description: Tunnel protocol.
+            - name: encryption
+              description: Encryption algorithm.
+          metrics:
+            - name: panos.ipsec.tunnel.sa_lifetime
+              description: IPsec Tunnel SA Lifetime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time_until_expiration
+        - name: BGP collection
+          description: These metrics summarize BGP entity discovery and cardinality limiting.
+          labels: []
+          metrics:
+            - name: panos.bgp.peers.collection
+              description: BGP Peer Collection
+              unit: peers
+              chart_type: line
+              dimensions:
+                - name: discovered
+                - name: monitored
+                - name: omitted_by_selector
+                - name: omitted_by_limit
+            - name: panos.bgp.prefix_families.collection
+              description: BGP Prefix Family Collection
+              unit: families
+              chart_type: line
+              dimensions:
+                - name: discovered
+                - name: monitored
+                - name: omitted_by_selector
+                - name: omitted_by_limit
+            - name: panos.bgp.virtual_routers.collection
+              description: BGP Virtual Router Collection
+              unit: virtual routers
+              chart_type: line
+              dimensions:
+                - name: discovered
+                - name: monitored
+                - name: omitted_by_selector
+                - name: omitted_by_limit
+        - name: BGP peer
+          description: These metrics refer to a single BGP peer on a PAN-OS virtual router or logical router.
+          labels:
+            - name: vr
+              description: PAN-OS virtual router or logical router.
+            - name: peer_address
+              description: BGP peer address.
+            - name: local_address
+              description: Local BGP address.
+            - name: remote_as
+              description: Remote autonomous system.
+            - name: peer_group
+              description: PAN-OS peer group.
+          metrics:
+            - name: panos.bgp.peer.state
+              description: BGP Peer State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: idle
+                - name: connect
+                - name: active
+                - name: opensent
+                - name: openconfirm
+                - name: established
+            - name: panos.bgp.peer.uptime
+              description: BGP Peer Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: panos.bgp.peer.messages
+              description: BGP Peer Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: panos.bgp.peer.updates
+              description: BGP Peer Updates
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: panos.bgp.peer.flaps
+              description: BGP Peer Flaps
+              unit: flaps/s
+              chart_type: line
+              dimensions:
+                - name: flaps
+            - name: panos.bgp.peer.established_transitions
+              description: BGP Peer Established Transitions
+              unit: transitions/s
+              chart_type: line
+              dimensions:
+                - name: established
+        - name: BGP peer address family
+          description: These metrics refer to one AFI/SAFI family for a BGP peer.
+          labels:
+            - name: vr
+              description: PAN-OS virtual router or logical router.
+            - name: peer_address
+              description: BGP peer address.
+            - name: local_address
+              description: Local BGP address.
+            - name: remote_as
+              description: Remote autonomous system.
+            - name: peer_group
+              description: PAN-OS peer group.
+            - name: afi
+              description: Address family.
+            - name: safi
+              description: Subsequent address family.
+          metrics:
+            - name: panos.bgp.peer.prefixes_received
+              description: BGP Peer Received Prefixes
+              unit: prefixes
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: accepted
+                - name: rejected
+            - name: panos.bgp.peer.prefixes_advertised
+              description: BGP Peer Advertised Prefixes
+              unit: prefixes
+              chart_type: line
+              dimensions:
+                - name: advertised
+        - name: BGP virtual router
+          description: These metrics refer to one PAN-OS virtual router or logical router.
+          labels:
+            - name: vr
+              description: PAN-OS virtual router or logical router.
+          metrics:
+            - name: panos.bgp.vr.peers_by_state
+              description: BGP Peers by State
+              unit: peers
+              chart_type: stacked
+              dimensions:
+                - name: idle
+                - name: connect
+                - name: active
+                - name: opensent
+                - name: openconfirm
+                - name: established
+            - name: panos.bgp.vr.peers_total
+              description: BGP Peers Total
+              unit: peers
+              chart_type: line
+              dimensions:
+                - name: configured
+                - name: established

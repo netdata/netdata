@@ -1,0 +1,514 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Palo Alto Networks PAN-OS collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "url": {
+        "title": "URL",
+        "description": "The base URL of the PAN-OS firewall management interface.",
+        "type": "string",
+        "default": "https://127.0.0.1",
+        "format": "uri"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "PAN-OS XML API request timeout, measured in seconds.",
+        "type": "number",
+        "minimum": 1,
+        "default": 10
+      },
+      "api_key": {
+        "title": "API key",
+        "description": "PAN-OS XML API key. Takes priority over username/password key generation.",
+        "type": "string",
+        "sensitive": true
+      },
+      "username": {
+        "title": "Username",
+        "description": "PAN-OS administrator username used to generate an API key.",
+        "type": "string",
+        "sensitive": true
+      },
+      "password": {
+        "title": "Password",
+        "description": "PAN-OS administrator password used to generate an API key.",
+        "type": "string",
+        "sensitive": true
+      },
+      "vsys": {
+        "title": "VSYS",
+        "description": "Optional PAN-OS virtual system scope for operational commands.",
+        "type": "string"
+      },
+      "collect_bgp": {
+        "title": "Collect BGP",
+        "description": "Collect BGP peer metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_system": {
+        "title": "Collect system",
+        "description": "Collect system information metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_ha": {
+        "title": "Collect HA",
+        "description": "Collect high availability state metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_environment": {
+        "title": "Collect environment",
+        "description": "Collect environment sensor metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_licenses": {
+        "title": "Collect licenses",
+        "description": "Collect license status and expiration metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_ipsec": {
+        "title": "Collect IPsec",
+        "description": "Collect active IPsec SA metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "max_bgp_peers": {
+        "title": "Max BGP peers",
+        "description": "Maximum number of BGP peers monitored with per-peer charts.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 512
+      },
+      "max_bgp_prefix_families_per_peer": {
+        "title": "Max BGP prefix families per peer",
+        "description": "Maximum number of BGP prefix-counter address families monitored per BGP peer.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 4
+      },
+      "max_bgp_virtual_routers": {
+        "title": "Max BGP virtual routers",
+        "description": "Maximum number of BGP virtual routers or logical routers monitored with per-VR charts.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 256
+      },
+      "max_environment_sensors": {
+        "title": "Max environment sensors",
+        "description": "Maximum number of environment sensors monitored with per-sensor charts.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 512
+      },
+      "max_licenses": {
+        "title": "Max licenses",
+        "description": "Maximum number of licenses monitored with per-license charts.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 64
+      },
+      "max_ipsec_tunnels": {
+        "title": "Max IPsec tunnels",
+        "description": "Maximum number of IPsec tunnels monitored with per-tunnel charts.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1024
+      },
+      "bgp_peers": {
+        "title": "BGP peer selector",
+        "description": "Include or exclude BGP peers. Matching is performed against `vr/peer_address`, for example `default/192.0.2.1`.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "includes": {
+            "title": "Include",
+            "description": "Include BGP peers that match any of the specified include patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "excludes": {
+            "title": "Exclude",
+            "description": "Exclude BGP peers that match any of the specified exclude patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "bgp_prefix_families": {
+        "title": "BGP prefix family selector",
+        "description": "Include or exclude BGP peer prefix-counter families. Matching is performed against `vr/peer_address/afi/safi`, for example `default/192.0.2.1/ipv4/unicast`.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "includes": {
+            "title": "Include",
+            "description": "Include BGP prefix families that match any of the specified include patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "excludes": {
+            "title": "Exclude",
+            "description": "Exclude BGP prefix families that match any of the specified exclude patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "bgp_virtual_routers": {
+        "title": "BGP virtual router selector",
+        "description": "Include or exclude BGP virtual routers or logical routers. Matching is performed against the PAN-OS virtual router/logical router name.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "includes": {
+            "title": "Include",
+            "description": "Include BGP virtual routers that match any of the specified include patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "excludes": {
+            "title": "Exclude",
+            "description": "Exclude BGP virtual routers that match any of the specified exclude patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "environment_sensors": {
+        "title": "Environment sensor selector",
+        "description": "Include or exclude environment sensors. Matching is performed against `sensor_type/slot/sensor`, for example `temperature/1/Temperature Inlet`.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "includes": {
+            "title": "Include",
+            "description": "Include environment sensors that match any of the specified include patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "excludes": {
+            "title": "Exclude",
+            "description": "Exclude environment sensors that match any of the specified exclude patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "licenses": {
+        "title": "License selector",
+        "description": "Include or exclude licenses. Matching is performed against the PAN-OS license feature name.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "includes": {
+            "title": "Include",
+            "description": "Include licenses that match any of the specified include patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "excludes": {
+            "title": "Exclude",
+            "description": "Exclude licenses that match any of the specified exclude patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "ipsec_tunnels": {
+        "title": "IPsec tunnel selector",
+        "description": "Include or exclude IPsec tunnels. Matching is performed against `name/gateway/remote/tunnel_id`.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "includes": {
+            "title": "Include",
+            "description": "Include IPsec tunnels that match any of the specified include patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "excludes": {
+            "title": "Exclude",
+            "description": "Exclude IPsec tunnels that match any of the specified exclude patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a Virtual Node.",
+        "type": "string"
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "If set, TLS certificate verification will be skipped.",
+        "type": "boolean"
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "The path to the CA certificate file for TLS verification.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "The path to the client certificate file for TLS authentication.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "The path to the client key file for TLS authentication.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "The URL of the proxy server.",
+        "type": "string"
+      },
+      "headers": {
+        "title": "Headers",
+        "description": "Additional HTTP headers to include in PAN-OS XML API requests.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "url"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "url",
+            "timeout",
+            "vsys",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "api_key",
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "Metricsets",
+          "fields": [
+            "collect_bgp",
+            "collect_system",
+            "collect_ha",
+            "collect_environment",
+            "collect_licenses",
+            "collect_ipsec"
+          ]
+        },
+        {
+          "title": "Limits",
+          "fields": [
+            "max_bgp_peers",
+            "max_bgp_prefix_families_per_peer",
+            "max_bgp_virtual_routers",
+            "max_environment_sensors",
+            "max_licenses",
+            "max_ipsec_tunnels"
+          ]
+        },
+        {
+          "title": "Selectors",
+          "fields": [
+            "bgp_peers",
+            "bgp_prefix_families",
+            "bgp_virtual_routers",
+            "environment_sensors",
+            "licenses",
+            "ipsec_tunnels"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        },
+        {
+          "title": "Proxy",
+          "fields": [
+            "proxy_url"
+          ]
+        },
+        {
+          "title": "Headers",
+          "fields": [
+            "headers"
+          ]
+        }
+      ]
+    },
+    "api_key": {
+      "ui:widget": "password"
+    },
+    "username": {
+      "ui:widget": "password"
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
+    "bgp_peers": {
+      "ui:help": "The logic for inclusion and exclusion is `(include1 OR include2) AND !(exclude1 OR exclude2)`. Pattern examples: `* default/*`, `= default/192.0.2.1`, `~ ^default/192\\.0\\.2\\.`."
+    },
+    "bgp_prefix_families": {
+      "ui:help": "The logic for inclusion and exclusion is `(include1 OR include2) AND !(exclude1 OR exclude2)`. Match value format: `vr/peer_address/afi/safi`."
+    },
+    "bgp_virtual_routers": {
+      "ui:help": "The logic for inclusion and exclusion is `(include1 OR include2) AND !(exclude1 OR exclude2)`."
+    },
+    "environment_sensors": {
+      "ui:help": "The logic for inclusion and exclusion is `(include1 OR include2) AND !(exclude1 OR exclude2)`. Match value format: `sensor_type/slot/sensor`."
+    },
+    "licenses": {
+      "ui:help": "The logic for inclusion and exclusion is `(include1 OR include2) AND !(exclude1 OR exclude2)`."
+    },
+    "ipsec_tunnels": {
+      "ui:help": "The logic for inclusion and exclusion is `(include1 OR include2) AND !(exclude1 OR exclude2)`. Match value format: `name/gateway/remote/tunnel_id`."
+    }
+  }
+}

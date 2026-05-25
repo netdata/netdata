@@ -102,6 +102,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [openldap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openldap)                     |           OpenLDAP            |
 | [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openvpn)                       |            OpenVPN            |
 | [openvpn_status_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openvpn_status_log) |            OpenVPN            |
+| [panos](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/panos)                           | Palo Alto Networks PAN-OS     |
 | [pgbouncer](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/pgbouncer)                   |           PgBouncer           |
 | [oracledb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/oracledb)                     |           Oracle DB           |
 | [phpdaemon](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/phpdaemon)                   |           phpDaemon           |

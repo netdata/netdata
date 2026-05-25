@@ -1,0 +1,86 @@
+{
+  "vnode": "firewall-a",
+  "update_every": 60,
+  "autodetection_retry": 0,
+  "url": "https://192.0.2.1",
+  "body": "",
+  "method": "",
+  "timeout": 10,
+  "not_follow_redirects": false,
+  "api_key": "test-api-key",
+  "username": "netdata",
+  "password": "secret",
+  "bearer_token_file": "",
+  "vsys": "vsys1",
+  "collect_bgp": true,
+  "collect_system": true,
+  "collect_ha": true,
+  "collect_environment": true,
+  "collect_licenses": true,
+  "collect_ipsec": true,
+  "max_bgp_peers": 512,
+  "max_bgp_prefix_families_per_peer": 4,
+  "max_bgp_virtual_routers": 256,
+  "max_environment_sensors": 512,
+  "max_licenses": 64,
+  "max_ipsec_tunnels": 1024,
+  "bgp_peers": {
+    "includes": [
+      "* default/*"
+    ],
+    "excludes": [
+      "* default/203.0.113.*"
+    ]
+  },
+  "bgp_prefix_families": {
+    "includes": [
+      "* */ipv4/unicast"
+    ],
+    "excludes": [
+      "* */ipv6/*"
+    ]
+  },
+  "bgp_virtual_routers": {
+    "includes": [
+      "* default"
+    ],
+    "excludes": [
+      "* lab-*"
+    ]
+  },
+  "environment_sensors": {
+    "includes": [
+      "* temperature/*"
+    ],
+    "excludes": [
+      "* */lab-*"
+    ]
+  },
+  "licenses": {
+    "includes": [
+      "* Threat Prevention"
+    ],
+    "excludes": [
+      "* Lab License"
+    ]
+  },
+  "ipsec_tunnels": {
+    "includes": [
+      "* branch-*"
+    ],
+    "excludes": [
+      "* lab-*"
+    ]
+  },
+  "tls_skip_verify": true,
+  "tls_ca": "/tmp/ca.pem",
+  "tls_cert": "/tmp/cert.pem",
+  "tls_key": "/tmp/key.pem",
+  "force_http2": false,
+  "proxy_url": "http://proxy.local:8080",
+  "proxy_username": "",
+  "proxy_password": "",
+  "headers": {
+    "X-Test": "test"
+  }
+}
