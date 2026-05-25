@@ -13,7 +13,7 @@
 #define TASK_COMM_LEN 16
 #endif
 
-#define NETDATA_EBPFGO_INTEGRATION_NAME "netdata_shm_integration_ebpfgo"
+#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo"
 #define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo"
 
 struct ebpf_cachestat {
