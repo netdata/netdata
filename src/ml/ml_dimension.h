@@ -137,11 +137,6 @@ public:
         return reinterpret_cast<ml_host_t *>(__atomic_load_n(&RH->ml_host, __ATOMIC_ACQUIRE));
     }
 
-    ml_queue_t *queue() const {
-        assert(acquired());
-        return host()->queue;
-    }
-
     ml_dimension_t *dimension() const {
         assert(acquired());
         return Dim;

@@ -633,12 +633,21 @@ ml_dimension_deserialize_kmeans(const char *json_str)
         return true;
     }
 
+    // ml_host may have been unpublished by ml_host_delete() concurrently;
+    // the acquired RRDHOST keeps RH alive but not RH->ml_host.
+    ml_host_t *host = AcqDim.host();
+    if (!host) {
+        pulse_ml_models_ignored();
+        json_object_put(root);
+        return true;
+    }
+
     ml_queue_item_t item;
     item.type = ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL;
     item.add_existing_model = {
         DLI, inlined_km
     };
-    ml_queue_push(AcqDim.queue(), item);
+    ml_queue_push(host->queue, item);
 
     json_object_put(root);
     return true;
