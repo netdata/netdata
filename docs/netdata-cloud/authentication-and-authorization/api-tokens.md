@@ -65,7 +65,7 @@ These endpoints are available only on local Netdata Agent instances and cannot b
 
 :::note
 
-v1 and v2 APIs are deprecated and maintained for backwards compatibility only. New integrations should use v3 exclusively. For Cloud metric queries, the POST endpoint `/api/v3/spaces/{spaceID}/rooms/{roomID}/data` is recommended.
+v1 and v2 endpoints remain available for backwards compatibility. For new Cloud metric integrations, prefer the POST endpoint `/api/v3/spaces/{spaceID}/rooms/{roomID}/data`.
 
 :::
 
