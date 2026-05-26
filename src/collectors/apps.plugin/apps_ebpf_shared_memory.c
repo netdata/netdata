@@ -21,14 +21,12 @@ static inline int64_t apps_ebpf_diff_counters(uint64_t current, uint64_t previou
 
 void apps_ebpf_accumulate_cachestat(void)
 {
+    // dirty/hit/miss are monotonic accumulators that only grow; do not zero them.
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
         w->cachestat_totals_prev = w->cachestat_totals;
         memset(&w->cachestat_totals, 0, sizeof(w->cachestat_totals));
         w->cachestat.ct = 0;
         w->cachestat.ratio = 0;
-        w->cachestat.dirty = 0;
-        w->cachestat.hit = 0;
-        w->cachestat.miss = 0;
     }
 
     for (struct pid_stat *p = root_of_pids(); p; p = p->next) {
@@ -48,32 +46,25 @@ void apps_ebpf_accumulate_cachestat(void)
 
         if (p->ebpf.cachestat.ct > w->cachestat.ct)
             w->cachestat.ct = p->ebpf.cachestat.ct;
+
+        // Only add this PID's Go-computed delta when the Go plugin has published
+        // fresh data (ct advanced).  This keeps dirty/hit/miss strictly
+        // monotonic even when PIDs exit or are reclassified between cycles.
+        if (p->ebpf.cachestat.ct > p->ebpf_cachestat_ct) {
+            w->cachestat.dirty += p->ebpf.cachestat.dirty;
+            w->cachestat.hit   += p->ebpf.cachestat.hit;
+            w->cachestat.miss  += p->ebpf.cachestat.miss;
+            p->ebpf_cachestat_ct = p->ebpf.cachestat.ct;
+        }
     }
 
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
+        // ratio uses per-interval deltas for current-interval accuracy
         int64_t mpa = apps_ebpf_diff_counters(w->cachestat_totals.mark_page_accessed, w->cachestat_totals_prev.mark_page_accessed);
         int64_t mbd = apps_ebpf_diff_counters(w->cachestat_totals.mark_buffer_dirty, w->cachestat_totals_prev.mark_buffer_dirty);
         int64_t apcl = apps_ebpf_diff_counters(w->cachestat_totals.add_to_page_cache_lru, w->cachestat_totals_prev.add_to_page_cache_lru);
         int64_t apd = apps_ebpf_diff_counters(w->cachestat_totals.account_page_dirtied, w->cachestat_totals_prev.account_page_dirtied);
 
-        w->cachestat.dirty = w->cachestat_totals.mark_buffer_dirty;
-
-        // hit and miss use kernel accumulated totals as monotonic counters (incremental dimension)
-        int64_t tot_total = (int64_t)w->cachestat_totals.mark_page_accessed - (int64_t)w->cachestat_totals.mark_buffer_dirty;
-        if (tot_total < 0)
-            tot_total = 0;
-        int64_t tot_misses = (int64_t)w->cachestat_totals.add_to_page_cache_lru - (int64_t)w->cachestat_totals.account_page_dirtied;
-        if (tot_misses < 0)
-            tot_misses = 0;
-        int64_t tot_hits = tot_total - tot_misses;
-        if (tot_hits < 0) {
-            tot_misses = tot_total;
-            tot_hits = 0;
-        }
-        w->cachestat.hit  = tot_hits;
-        w->cachestat.miss = tot_misses;
-
-        // ratio uses per-interval deltas for current-interval accuracy
         int64_t total = mpa - mbd;
         if (total < 0)
             total = 0;

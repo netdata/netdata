@@ -640,6 +640,8 @@ struct pid_stat {
 #endif
 
     struct ebpf_pid_stat ebpf;
+    // last cachestat ct we consumed; gates per-PID delta accumulation
+    uint64_t ebpf_cachestat_ct;
     bool has_ebpf:1;
 #endif
 };
