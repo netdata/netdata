@@ -49,7 +49,7 @@ The `claim.conf` file contains sensitive claiming tokens and must be properly se
 - **Required permissions (service installs):** `0640` (owner read/write, group read, no world access)
 - **Required ownership:** `root:netdata` (owner root, group netdata)
 
-The claiming script automatically sets these permissions when creating or updating `claim.conf`. If you create the file manually, ensure it follows these same security standards to prevent unauthorized access to your claiming tokens.
+The Netdata Cloud-generated claiming command automatically sets these permissions when creating or updating `claim.conf`. If you create the file manually, ensure it follows these same security standards to prevent unauthorized access to your claiming tokens.
 
 :::
 

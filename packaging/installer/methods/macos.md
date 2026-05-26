@@ -113,7 +113,7 @@ On macOS, Homebrew installs run under your user account and the `netdata` group 
 
 :::caution
 
-Do **not** use the `netdata-claim.sh` script. It is deprecated and will be unsupported in the near future.
+Do **not** run the `netdata-claim.sh` script manually. It is deprecated and will be unsupported in the near future. Instead, use one of the supported claiming methods described above: the Cloud UI, kickstart claiming flags during install/reinstall, or a `claim.conf` file.
 
 :::
 
