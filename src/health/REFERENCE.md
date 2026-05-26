@@ -202,7 +202,7 @@ In the `netdata.conf` `[health]` section, use [pattern](/src/libnetdata/simple_p
 
 To exclude multiple specific alerts, list all exclusions before the wildcard and restart the Agent to apply the `netdata.conf` change:
 
-```conf    
+```conf
 [health]
     enabled alarms = !oom_kill !disk_space_usage *
 ```
