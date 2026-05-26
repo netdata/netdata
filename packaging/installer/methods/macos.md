@@ -95,7 +95,7 @@ The easiest way to connect a Homebrew-installed Netdata Agent to Netdata Cloud i
 
 For automated setups or headless machines where the UI is not accessible, you can use one of these alternatives:
 
-- **Kickstart script claiming flags** — reinstall with `--claim-token` and `--claim-rooms`. See the [kickstart claiming section](#automatically-connect-to-netdata-cloud-during-installation) above or the full [kickstart documentation](/packaging/installer/methods/kickstart.md).
+- **Kickstart script claiming flags** — this requires installing/reinstalling with kickstart (it installs under `/usr/local/netdata`) rather than adding flags to an existing Homebrew install. If you want to keep the Homebrew install, use the **Configuration file** method below. See the [kickstart claiming section](#automatically-connect-to-netdata-cloud-during-installation) above or the full [kickstart documentation](/packaging/installer/methods/kickstart.md).
 - **Configuration file** — create a `claim.conf` file in your Netdata configuration directory using the [configuration file method](/src/claim/README.md#method-2-via-configuration-file).
 
 **Configuration directory paths for `claim.conf`:**
