@@ -50,8 +50,9 @@ func TestCachestatGlobalStateUpdate(t *testing.T) {
 			want: cachestatGlobalPublish{
 				Ratio: 75,
 				Dirty: 30,
-				Hit:   15,
-				Miss:  5,
+				// cumulative: tick1 hits=10 misses=70, tick2 delta hits=15 misses=5
+				Hit:  25,
+				Miss: 75,
 			},
 		},
 		"clamps dirty when the raw counter drops": {
@@ -73,8 +74,9 @@ func TestCachestatGlobalStateUpdate(t *testing.T) {
 			want: cachestatGlobalPublish{
 				Ratio: 83,
 				Dirty: 40,
-				Hit:   25,
-				Miss:  5,
+				// cumulative: tick1 hits=0 misses=60, tick2 delta hits=25 misses=5
+				Hit:  25,
+				Miss: 65,
 			},
 		},
 	}

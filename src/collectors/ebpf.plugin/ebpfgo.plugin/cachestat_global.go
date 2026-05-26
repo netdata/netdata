@@ -36,6 +36,8 @@ type cachestatGlobalState struct {
 	initialized bool
 	prev        cachestatGlobalCounters
 	lastDirty   uint64
+	cumHits     int64
+	cumMisses   int64
 }
 
 type cachestatGlobalChart struct {
@@ -74,7 +76,7 @@ var cachestatGlobalCharts = []cachestatGlobalChart{
 		context:   "mem.cachestat_hits",
 		order:     21102,
 		dimension: "hit",
-		algorithm: "absolute",
+		algorithm: "incremental",
 	},
 	{
 		id:        "cachestat_misses",
@@ -83,7 +85,7 @@ var cachestatGlobalCharts = []cachestatGlobalChart{
 		context:   "mem.cachestat_misses",
 		order:     21103,
 		dimension: "miss",
-		algorithm: "absolute",
+		algorithm: "incremental",
 	},
 }
 
@@ -122,8 +124,11 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 		publish.Ratio = 100
 	}
 
-	publish.Hit = hits
-	publish.Miss = misses
+	s.cumHits += hits
+	s.cumMisses += misses
+
+	publish.Hit = s.cumHits
+	publish.Miss = s.cumMisses
 	s.prev = current
 	s.lastDirty = monotonicCounter(current.MarkBufferDirty, s.lastDirty)
 	s.initialized = true
