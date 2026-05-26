@@ -208,18 +208,37 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
     RRDSET *st;
 
-    if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
-    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    bool host_pending_init    = rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    bool host_pending_recheck = rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
+
+    if (!host_pending_init && !host_pending_recheck) return;
+
+    if (host_pending_init)
+        rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    if (host_pending_recheck)
+        rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
     rrdset_foreach_reentrant(st, host) {
-        if (!rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION))
+        bool needs_init    = rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        bool needs_recheck = host_pending_recheck || rrdset_flag_check(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+
+        if (!needs_init && !needs_recheck)
             continue;
 
-        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        if (needs_init)
+            rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        if (needs_recheck)
+            rrdset_flag_clear(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
 
-        health_prototype_alerts_for_rrdset_incrementally(st);
+        // recheck path subsumes init: reset detaches all current alerts on the
+        // chart and reattaches by re-evaluating every prototype against the
+        // current labels, which also picks up first-attach matches.
+        if (needs_recheck)
+            health_prototype_reset_alerts_for_rrdset(st);
+        else
+            health_prototype_alerts_for_rrdset_incrementally(st);
 
         if (!service_running(SERVICE_HEALTH))
             break;

@@ -101,6 +101,10 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
                                                              // gates rrdhost_set_receiver() so a reconnect cannot attach
                                                              // mid-pass. Set under receiver_lock; the heavy work runs
                                                              // without holding receiver_lock so readers stay unblocked.
+
+    RRDHOST_FLAG_PENDING_LABEL_RECHECK          = (1U << 31), // host labels changed since the last health prototype
+                                                              // evaluation; the health thread must fan out by setting
+                                                              // RRDSET_FLAG_PENDING_LABEL_RECHECK on every chart.
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_get(host)                         atomic_flags_get(&((host)->flags))

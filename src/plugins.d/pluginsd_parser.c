@@ -183,7 +183,8 @@ static inline PARSER_RC pluginsd_host_labels(char **words, size_t num_words, PAR
                                     PLUGINSD_KEYWORD_HOST_LABEL);
 }
 
-static inline void pluginsd_update_host_ephemerality(RRDHOST *host) {
+// returns true when the _is_ephemeral label was added or its value changed.
+static inline bool pluginsd_update_host_ephemerality(RRDHOST *host) {
     char value[64];
     rrdlabels_get_value_strcpyz(host->rrdlabels, value, sizeof(value), HOST_LABEL_IS_EPHEMERAL);
     if(value[0] && inicfg_test_boolean_value(value)) {
@@ -196,7 +197,7 @@ static inline void pluginsd_update_host_ephemerality(RRDHOST *host) {
     }
 
     // Set or replace current label as needed
-    rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
+    return rrdlabels_add_changed(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
 }
 
 #define VNODE_BASE_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
@@ -241,21 +242,26 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     ml_host_start(host);
     pulse_host_status(host, 0, 0); // this will detect the receiver status
 
+    bool labels_changed;
     if(host->rrdlabels) {
-        rrdlabels_migrate_to_these(host->rrdlabels, parser->user.host_define.rrdlabels);
+        labels_changed = rrdlabels_migrate_to_these(host->rrdlabels, parser->user.host_define.rrdlabels);
     }
     else {
         host->rrdlabels = parser->user.host_define.rrdlabels;
         parser->user.host_define.rrdlabels = NULL;
+        labels_changed = true;
     }
 
     if(SERVING_PLUGINSD(parser)) {
-        rrdlabels_add(host->rrdlabels, "_collector_machine_guid",
+        labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_collector_machine_guid",
                       localhost->machine_guid, RRDLABEL_SRC_AUTO);
     }
 
-    pluginsd_update_host_ephemerality(host);
+    labels_changed |= pluginsd_update_host_ephemerality(host);
     pluginsd_host_define_cleanup(parser);
+
+    if(labels_changed)
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
     parser->user.host = host;
     pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, NULL);
@@ -725,16 +731,18 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     if(unlikely(!host->rrdlabels))
         host->rrdlabels = rrdlabels_create();
 
-    rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
-    pluginsd_update_host_ephemerality(host);
+    bool labels_changed = rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
+    labels_changed |= pluginsd_update_host_ephemerality(host);
 
     if(!rrdlabels_exist(host->rrdlabels, "_os"))
-        rrdlabels_add(host->rrdlabels, "_os", string2str(host->os), RRDLABEL_SRC_AUTO);
+        labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_os", string2str(host->os), RRDLABEL_SRC_AUTO);
 
     if(!rrdlabels_exist(host->rrdlabels, "_hostname"))
-        rrdlabels_add(host->rrdlabels, "_hostname", string2str(host->hostname), RRDLABEL_SRC_AUTO);
+        labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_hostname", string2str(host->hostname), RRDLABEL_SRC_AUTO);
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+    if(labels_changed)
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
     rrdlabels_destroy(parser->user.new_host_labels);
     parser->user.new_host_labels = NULL;
@@ -776,11 +784,16 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
 
-    rrdlabels_remove_all_unmarked(st->rrdlabels);
+    bool labels_changed = rrdlabels_remove_all_unmarked_and_changed(st->rrdlabels);
 
     rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
     rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     rrdset_metadata_updated(st);
+
+    if(labels_changed) {
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
 
     parser->user.clabel_count = 0;
 
