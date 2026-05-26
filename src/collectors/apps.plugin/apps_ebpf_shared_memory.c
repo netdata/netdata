@@ -81,10 +81,8 @@ void apps_ebpf_accumulate_cachestat(void)
         if (misses < 0)
             misses = 0;
         int64_t hits = total - misses;
-        if (hits < 0) {
-            misses = total;
+        if (hits < 0)
             hits = 0;
-        }
         w->cachestat.ratio = (total > 0) ? (hits * 100) / total : 100;
     }
 }
