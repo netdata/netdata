@@ -46,13 +46,28 @@ Create `/INSTALL_PREFIX/etc/netdata/claim.conf`:
 
 The `claim.conf` file contains sensitive claiming tokens and must be properly secured:
 
-- **Required permissions:** `0640` (owner read/write, group read, no world access)
-- **Required ownership:** `root:netdata` (owner root, group netdata)
+- **Required permissions (service installs):** `0640` (owner read/write, group read, no world access)
+- **Required ownership (service installs):** `root:netdata` (owner root, group netdata)
 
-The claiming script automatically sets these permissions when creating or updating `claim.conf`. If you create the file manually, ensure it follows these same security standards to prevent unauthorized access to your claiming tokens.
+The Netdata Cloud-generated claiming command automatically sets these permissions when creating or updating `claim.conf`. If you create the file manually, ensure it follows these same security standards to prevent unauthorized access to your claiming tokens.
 
 :::
 
+:::note
+
+On macOS with Homebrew installs, the `netdata` group does not exist. Set ownership to your own user and the `staff` group instead:
+
+```bash
+chown $(whoami):staff /usr/local/etc/netdata/claim.conf        # Intel
+chown $(whoami):staff /opt/homebrew/etc/netdata/claim.conf     # Apple Silicon
+chmod 0600 /usr/local/etc/netdata/claim.conf                    # Intel
+chmod 0600 /opt/homebrew/etc/netdata/claim.conf                 # Apple Silicon
+```
+
+This prevents the `chown: netdata: illegal group name` error.
+Using `0600` is acceptable for Homebrew installs because the Netdata Agent runs under the same user that owns the file.
+
+:::
 
 **Configuration Options:**
 
