@@ -46,6 +46,12 @@ void rrdlabels_get_value_strcpyz(RRDLABELS *labels, char *dst, size_t dst_len, c
 void rrdlabels_unmark_all(RRDLABELS *labels);
 void rrdlabels_remove_all_unmarked(RRDLABELS *labels);
 
+// OR RRDLABEL_FLAG_OLD onto every entry whose source bits intersect src_match.
+// Used after a best-effort loader (e.g. the kubernetes labels script) fails,
+// so labels from that source survive the next rrdlabels_remove_all_unmarked()
+// prune even though the loader did not re-add them this round.
+void rrdlabels_mark_source_as_old(RRDLABELS *labels, RRDLABEL_SRC src_match);
+
 int rrdlabels_walkthrough_read(RRDLABELS *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
 int rrdlabels_walkthrough_read_string(RRDLABELS *labels, int (*callback)(STRING *name, STRING *value, RRDLABEL_SRC ls, void *data), void *data);
 void rrdlabels_log_to_buffer(RRDLABELS *labels, BUFFER *wb);

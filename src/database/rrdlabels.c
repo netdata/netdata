@@ -581,6 +581,24 @@ void rrdlabels_remove_all_unmarked(RRDLABELS *labels)
     spinlock_unlock(&labels->spinlock);
 }
 
+void rrdlabels_mark_source_as_old(RRDLABELS *labels, RRDLABEL_SRC src_match)
+{
+    if (!labels) return;
+
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+    bool first_then_next = true;
+
+    spinlock_lock(&labels->spinlock);
+
+    while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
+        if ((*((RRDLABEL_SRC *)PValue)) & src_match)
+            *((RRDLABEL_SRC *)PValue) |= RRDLABEL_FLAG_OLD;
+    }
+
+    spinlock_unlock(&labels->spinlock);
+}
+
 // ----------------------------------------------------------------------------
 // rrdlabels_walkthrough_read()
 

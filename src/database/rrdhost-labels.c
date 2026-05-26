@@ -111,7 +111,11 @@ static void rrdhost_load_config_labels(void) {
     inicfg_foreach_value_in_section(&netdata_config, CONFIG_SECTION_HOST_LABEL, config_label_cb, NULL);
 }
 
-static void rrdhost_load_kubernetes_labels(void) {
+// Returns true if the kubernetes labels script ran to a clean exit. A false
+// return tells the caller the refresh was best-effort: callers must preserve
+// the previously-loaded k8s labels (see reload_host_labels()) so a transient
+// script failure does not silently delete them.
+static bool rrdhost_load_kubernetes_labels(void) {
     char label_script[sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2)];
     sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
 
@@ -120,11 +124,11 @@ static void rrdhost_load_kubernetes_labels(void) {
                "Kubernetes pod label fetching script %s not found.",
                label_script);
 
-        return;
+        return false;
     }
 
     POPEN_INSTANCE *instance = spawn_popen_run(label_script);
-    if(!instance) return;
+    if(!instance) return false;
 
     char buffer[1000 + 1];
     while (fgets(buffer, 1000, spawn_popen_stdout(instance)) != NULL)
@@ -133,10 +137,14 @@ static void rrdhost_load_kubernetes_labels(void) {
     // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
     // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
     int rc = spawn_popen_wait(instance);
-    if(rc)
+    if(rc) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "%s exited abnormally. Failed to get kubernetes labels.",
                label_script);
+        return false;
+    }
+
+    return true;
 }
 
 static void rrdhost_load_auto_labels(void) {
@@ -178,8 +186,16 @@ void reload_host_labels(void) {
 
     // priority is important here
     rrdhost_load_config_labels();
-    rrdhost_load_kubernetes_labels();
+    bool k8s_loaded = rrdhost_load_kubernetes_labels();
     rrdhost_load_auto_labels();
+
+    // If the kubernetes loader did not run cleanly (script missing, spawn
+    // failure, or non-zero exit), the previously-loaded k8s labels were not
+    // refreshed and must survive the prune below -- otherwise a transient
+    // script failure would silently delete them. Re-mark them so the next
+    // step keeps them.
+    if (!k8s_loaded)
+        rrdlabels_mark_source_as_old(localhost->rrdlabels, RRDLABEL_SRC_K8S);
 
     // drop entries that the loaders did not re-add (e.g. a label removed from
     // netdata.conf, or no longer returned by get-kubernetes-labels.sh).
