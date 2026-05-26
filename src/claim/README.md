@@ -58,8 +58,8 @@ The claiming script automatically sets these permissions when creating or updati
 On macOS with Homebrew installs, the `netdata` group does not exist. Set ownership to your own user and the `staff` group instead:
 
 ```bash
-chown $(whoami):staff claim.conf
-chmod 0640 claim.conf
+chown $(whoami):staff /INSTALL_PREFIX/etc/netdata/claim.conf
+chmod 0600 /INSTALL_PREFIX/etc/netdata/claim.conf
 ```
 
 This prevents the `chown: netdata: illegal group name` error.
