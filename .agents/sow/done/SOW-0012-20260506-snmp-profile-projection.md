@@ -109,9 +109,9 @@ Risks:
 - Validation churn from adding `topology:` and consumer fields to the profile schema.
 - Documentation drift if profile-format docs and project SNMP authoring skill are not updated with the new contract.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
 Problem / root-cause model:
 

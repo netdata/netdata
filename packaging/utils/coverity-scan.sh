@@ -129,7 +129,13 @@ scanit() {
   ENABLE_GO=0
   prepare_cmake_options
 
-  run cmake ${NETDATA_CMAKE_OPTIONS}
+  # shellcheck disable=SC2086
+  case "${NETDATA_CMAKE_INSTALL_PREFIX_OPTION:+I}${NETDATA_WINDOWS_PATH_PREFIX_OPTION:+W}" in
+    "IW") run cmake ${NETDATA_CMAKE_OPTIONS} "${NETDATA_CMAKE_INSTALL_PREFIX_OPTION}" "${NETDATA_WINDOWS_PATH_PREFIX_OPTION}" ;;
+    "I")  run cmake ${NETDATA_CMAKE_OPTIONS} "${NETDATA_CMAKE_INSTALL_PREFIX_OPTION}" ;;
+    "W")  run cmake ${NETDATA_CMAKE_OPTIONS} "${NETDATA_WINDOWS_PATH_PREFIX_OPTION}" ;;
+    *)    run cmake ${NETDATA_CMAKE_OPTIONS} ;;
+  esac
 
   progress "Analyzing netdata..."
   run "${covbuild}" --dir cov-int cmake --build "${NETDATA_BUILD_DIR}" --parallel ${JOBS} -- ${BUILD_OPTS}

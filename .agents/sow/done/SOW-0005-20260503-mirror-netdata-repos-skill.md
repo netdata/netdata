@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: completed 2026-05-05. Vendored, parameterized COPY of the battle-tested `~/src/netdata/sync-all.sh` shipped at `.agents/skills/mirror-netdata-repos/scripts/sync-netdata-repos.sh` with surgical changes: env-driven mirror dir (`NETDATA_REPOS_DIR`), `--repo NAME` repeatable scoping (skips Phase 2), sanitization for missing env / git / jq / `gh` (graceful Phase 2 skip when `gh` is missing or unauthed), early `--help` that works without env. Single-file SKILL.md covers why / when / semantics / safety / scoping / setup / sanitization / limitations. Reset-to-default-branch documented as the intended safety feature (prevents stale-feature-branch "black hole" repos).
+Sub-state: completed 2026-05-05. Vendored, parameterized COPY of the battle-tested `<local-netdata-repos>/sync-all.sh` shipped at `.agents/skills/mirror-netdata-repos/scripts/sync-netdata-repos.sh` with surgical changes: env-driven mirror dir (`NETDATA_REPOS_DIR`), `--repo NAME` repeatable scoping (skips Phase 2), sanitization for missing env / git / jq / `gh` (graceful Phase 2 skip when `gh` is missing or unauthed), early `--help` that works without env. Single-file SKILL.md covers why / when / semantics / safety / scoping / setup / sanitization / limitations. Reset-to-default-branch documented as the intended safety feature (prevents stale-feature-branch "black hole" repos).
 
 ## Requirements
 
@@ -105,7 +105,7 @@ Risks:
   the script could overwrite uncommitted changes. The skill
   must call this out clearly.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status: filled-2026-05-05
 
@@ -141,7 +141,7 @@ The corollary problem: a local mirror that drifts (stale feature branches, dirty
 - Submodule `--init --force --recursive` is intended (cross-repo review and builds depend on accurate submodule state). Skill notes this.
 - Phase 2 calls `gh` with the user's `gh auth` credentials. If `gh` is missing or unauthed, sanitization warns and skips Phase 2 (Phase 1 still runs).
 
-### Decisions recorded (Costa, 2026-05-05)
+### Decisions recorded (the user, 2026-05-05)
 
 D1. **ORG hardcoded** to `netdata` (skill is netdata-specific; hardcoding matches the name `mirror-netdata-repos`).
 
@@ -164,7 +164,7 @@ D8. **No `run()` transparency wrapper**. Keep the existing colored "→ Fetching
 The existing `${NETDATA_REPOS_DIR}/sync-all.sh` is battle-tested. The vendored script is a COPY with surgical changes ONLY:
 
 1. **Anchor on env**: replace `SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); cd "$SCRIPT_DIR"` with env-driven `cd "${NETDATA_REPOS_DIR}"`.
-2. **Replace fallback paths**: every `cd /home/costa/src/netdata` becomes `cd "${NETDATA_REPOS_DIR}"` (with the env var validated up-front).
+2. **Replace fallback paths**: every `cd <local-netdata-repos>` becomes `cd "${NETDATA_REPOS_DIR}"` (with the env var validated up-front).
 3. **Add CLI parsing**: `--repo NAME` repeatable; default = all. When `--repo` is specified, Phase 2 is skipped.
 4. **Add sanitization at top**:
    - `NETDATA_REPOS_DIR` set + dir exists -- hard error if not.
@@ -193,7 +193,7 @@ No rewrite. Preserving the diff to the original is intentional so future audits 
 
 ### Open decisions
 
-None. All 8 resolved with Costa.
+None. All 8 resolved with the user.
 
 ### Followup items (NOT to be left as deferred)
 
@@ -254,12 +254,12 @@ No user decisions required at this stub stage.
 ### Path discipline
 
 - `grep -rnE '~/|/home/|/opt/baddisk' .agents/skills/mirror-netdata-repos/`: zero hits.
-- `grep -nE '/home|costa|/opt/' .agents/skills/mirror-netdata-repos/scripts/sync-netdata-repos.sh`: zero hits.
+- `grep -nE '/home|user-name|/opt/' .agents/skills/mirror-netdata-repos/scripts/sync-netdata-repos.sh`: zero hits.
 - All references to the mirror dir in skill content go through `${NETDATA_REPOS_DIR}`.
 
 ### Surgical-edit audit
 
-vs. the source `~/src/netdata/sync-all.sh`, the diff is:
+vs. the source `<local-netdata-repos>/sync-all.sh`, the diff is:
 
 1. Removed `SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); cd "$SCRIPT_DIR"`.
 2. Added `usage()` function.
@@ -267,7 +267,7 @@ vs. the source `~/src/netdata/sync-all.sh`, the diff is:
 4. Added sanitization block: `NETDATA_REPOS_DIR` set + dir exists, `git`/`jq` required, `gh` optional with `GH_AVAILABLE` flag.
 5. Added `cd "$MIRROR_DIR"` after sanitization.
 6. Added `declare -a SCOPE_REPOS=()` global.
-7. Replaced every `cd "$SCRIPT_DIR" 2>/dev/null || cd /home/costa/src/netdata` (4 occurrences) with `cd "$MIRROR_DIR" 2>/dev/null || true`.
+7. Replaced every `cd "$SCRIPT_DIR" 2>/dev/null || cd <local-netdata-repos>` (4 occurrences) with `cd "$MIRROR_DIR" 2>/dev/null || true`.
 8. In `main()`: added CLI parsing for `--repo` (repeatable) and `-h|--help`; added a "scoped vs full" branch building `sorted_repos`; added Phase 2 skip-when-scoped and skip-when-`gh`-unavailable; changed `main` to `main "$@"`.
 
 All other code paths preserved verbatim (skip-on-staged-or-modified, switch-to-default, submodule force-recursive, activity cache, colored output, summary, dedupe, etc.).
@@ -282,7 +282,7 @@ All other code paths preserved verbatim (skip-on-staged-or-modified, switch-to-d
 
 ## Outcome
 
-The `mirror-netdata-repos` private skill ships a self-contained, env-driven, sanitized sync tool. AI assistants and developers working on this project can now bring up a local Netdata-org repos mirror at `${NETDATA_REPOS_DIR}` without depending on the user's personal `~/src/netdata/sync-all.sh`. Cross-repo grep / code review runs locally; GitHub API round-trips and rate limits are eliminated for the day-to-day workflow.
+The `mirror-netdata-repos` private skill ships a self-contained, env-driven, sanitized sync tool. AI assistants and developers working on this project can now bring up a local Netdata-org repos mirror at `${NETDATA_REPOS_DIR}` without depending on the user's personal `<local-netdata-repos>/sync-all.sh`. Cross-repo grep / code review runs locally; GitHub API round-trips and rate limits are eliminated for the day-to-day workflow.
 
 The reset-to-default-branch behavior is documented as the intended safety mechanism: stale-feature-branch repos in a mirror are "black holes" that mislead cross-repo reasoning, and the only viable fix is to always reset clean repos to default. Skip conditions (staged or modified files) preserve user work; the branch ref preserves any unpushed commits.
 
@@ -302,7 +302,7 @@ The reset-to-default-branch behavior is documented as the intended safety mechan
 
 These items were exposed during implementation but are NOT part of this SOW. Tracked separately:
 
-- F-0005-A: the user's local `~/src/netdata/sync-all.sh` will diverge over time from this vendored copy. Decide later whether the user replaces his local copy with a symlink to `<repo>/.agents/skills/mirror-netdata-repos/scripts/sync-netdata-repos.sh` (then both stay in sync).
+- F-0005-A: the user's local `<local-netdata-repos>/sync-all.sh` will diverge over time from this vendored copy. Decide later whether the user replaces his local copy with a symlink to `<repo>/.agents/skills/mirror-netdata-repos/scripts/sync-netdata-repos.sh` (then both stay in sync).
 - F-0005-B: shellcheck inherits ~10 info-level warnings from the original script (SC2155 declare-and-assign, SC2086 quoting). Could be cleaned up but the script is battle-tested; touching unrelated code risks regression. Defer until a refactor pass that's intentionally about quality, not feature work.
 
 ## Regression Log

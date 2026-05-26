@@ -633,12 +633,21 @@ ml_dimension_deserialize_kmeans(const char *json_str)
         return true;
     }
 
+    // ml_host may have been unpublished by ml_host_delete() concurrently;
+    // the acquired RRDHOST keeps RH alive but not RH->ml_host.
+    ml_host_t *host = AcqDim.host();
+    if (!host) {
+        pulse_ml_models_ignored();
+        json_object_put(root);
+        return true;
+    }
+
     ml_queue_item_t item;
     item.type = ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL;
     item.add_existing_model = {
         DLI, inlined_km
     };
-    ml_queue_push(AcqDim.queue(), item);
+    ml_queue_push(host->queue, item);
 
     json_object_put(root);
     return true;
@@ -723,7 +732,7 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
 
     spinlock_lock(&dim->slock);
 
-    ml_host_t *host = (ml_host_t *) dim->rd->rrdset->rrdhost->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&dim->rd->rrdset->rrdhost->ml_host, __ATOMIC_ACQUIRE);
     if (!ml_should_publish_model_update(host && host->ml_running,
                                         dim->reset_generation,
                                         expected_generation,
@@ -1080,7 +1089,7 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         rrdset_foreach_read(rsp, host->rh) {
             RRDSET *rs = static_cast<RRDSET *>(rsp);
 
-            ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
+            ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rs->ml_chart, __ATOMIC_ACQUIRE);
             if (!chart)
                 continue;
 
@@ -1174,13 +1183,14 @@ void ml_detect_main(void *arg)
         RRDHOST *rh;
         rrd_rdlock();
         rrdhost_foreach_read(rh) {
-            if (!rh->ml_host)
+            ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
+            if (!host)
                 continue;
 
             if (!service_running(SERVICE_COLLECTORS))
                 break;
 
-            ml_host_detect_once((ml_host_t *) rh->ml_host, detect_owa);
+            ml_host_detect_once(host, detect_owa);
         }
         rrd_rdunlock();
 
@@ -1282,7 +1292,7 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         return ML_WORKER_RESULT_OK;
     }
 
-    ml_host_t *host = (ml_host_t *) Dim->rd->rrdset->rrdhost->ml_host;
+    ml_host_t *host = (ml_host_t *) __atomic_load_n(&Dim->rd->rrdset->rrdhost->ml_host, __ATOMIC_ACQUIRE);
     if (!host || !host->ml_running) {
         pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;

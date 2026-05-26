@@ -203,7 +203,7 @@ Netdata provides several benefits over other observability solutions:
 | **Resilience & Reliability**      | Built-in replication                       | Observability continues even if a Parent fails                        |
 | **Optimized Cost & Performance**  | Distributed workloads                      | Prevents bottlenecks and improves resource efficiency                 |
 | **Ease of Use**                   | Minimal setup and maintenance              | Reduces complexity and operational overhead                           |
-| **On-Prem Control**               | Data remains within your infrastructure    | Enhanced security and compliance, even when using Netdata Cloud       |
+| **On-Prem Control**               | Data remains within your infrastructure    | Enhanced security and compliance, even when using Netdata Cloud. For a fully self-hosted control plane, see [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)       |
 | **Comprehensive Observability**   | Segmented infrastructure with unified view | Deep visibility with tailored retention, alerts, and machine learning |
 | **Predictable Capacity Planning** | Published per-metric storage cost          | Allows accurate disk and hardware sizing for Parents                  |
 

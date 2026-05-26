@@ -126,9 +126,9 @@ If the type has hand-authored content alongside the catalogue entries (like the 
 
 Three downstream repos may need touching, in roughly decreasing likelihood:
 
-- **`netdata/website`** (`~/src/netdata/website`): the daily `update-integrations.yml` workflow renders marketing cards from `integrations.json`. Cards usually appear automatically. But pages that reference the type explicitly (FAQ entries, solution pages) may need rewriting if the new type changes the story (e.g., "we don't do flows" → "we do flows natively").
-- **`netdata/learn`** (`~/src/netdata/learn`): no PR usually needed. Learn ingest reads `map.yaml` + the `<!--startmeta-->` markers in the generated `.md` files. Sidebar regenerates automatically. ~3 hours after netdata-repo merge.
-- **`netdata/dashboard/cloud-frontend`** (`~/src/dashboard/cloud-frontend`): cards/categories are mostly data-driven, but content tabs and validation scripts still assume rendered markdown strings for standard section keys. Before merging a new type, inspect the generated `integrations.js` shape against `src/domains/integrations/components/content/integration/tabs.js`, `src/components/markdown/useRenderableTree.js`, and `scripts/checkIntegrations.js`. Special UI (a dedicated tab elsewhere in the dashboard) is a separate concern.
+- **`netdata/website`** (`<website-repo>`): the daily `update-integrations.yml` workflow renders marketing cards from `integrations.json`. Cards usually appear automatically. But pages that reference the type explicitly (FAQ entries, solution pages) may need rewriting if the new type changes the story (e.g., "we don't do flows" → "we do flows natively").
+- **`netdata/learn`** (`<learn-repo>`): no PR usually needed. Learn ingest reads `map.yaml` + the `<!--startmeta-->` markers in the generated `.md` files. Sidebar regenerates automatically. ~3 hours after netdata-repo merge.
+- **`netdata/dashboard/cloud-frontend`** (`<cloud-frontend-repo>`): cards/categories are mostly data-driven, but content tabs and validation scripts still assume rendered markdown strings for standard section keys. Before merging a new type, inspect the generated `integrations.js` shape against `src/domains/integrations/components/content/integration/tabs.js`, `src/components/markdown/useRenderableTree.js`, and `scripts/checkIntegrations.js`. Special UI (a dedicated tab elsewhere in the dashboard) is a separate concern.
 
 ## Verification checklist
 

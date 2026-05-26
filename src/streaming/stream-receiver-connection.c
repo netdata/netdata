@@ -229,7 +229,17 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
 //            return false;
 //        }
 
-        if(!rrdhost_set_receiver(host, rpt)) {
+        RRDHOST_SET_RECEIVER_RESULT result = rrdhost_set_receiver(host, rpt);
+        if (result == RRDHOST_SET_RECEIVER_CLEANUP_BUSY) {
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; internal cleanup is in progress for this node, please retry shortly",
+                STREAM_HANDSHAKE_PARENT_BUSY_TRY_LATER, NDLP_INFO);
+
+            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_BUSY_TRY_LATER);
+            return false;
+        }
+        if (result == RRDHOST_SET_RECEIVER_ALREADY_ATTACHED) {
             stream_receiver_log_status(
                 rpt,
                 "rejecting streaming connection; host is already served by another receiver",

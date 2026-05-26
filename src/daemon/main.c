@@ -264,6 +264,13 @@ int netdata_main(int argc, char **argv) {
     analytics_init();
     nd_log_initialize_mutexes();
 
+    // Register the daemon's per-thread cleanup callback. Each subsystem
+    // should own the registration of its own cleanups; this one lives in
+    // the daemon because service_exits is a daemon-layer concern. The
+    // rest are currently registered together in rrd_init() and should be
+    // moved to their respective subsystems in a follow-up.
+    nd_thread_register_cleanup(service_exits);
+
     netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
@@ -607,9 +614,18 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
-                            if(unittest_prepare_rrd(&user))
+                            if(sqlite_library_init())
                                 return 1;
-                            return dyncfg_unittest();
+                            rrdlabels_aral_init(false);
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if (!rc)
+                                rc = dyncfg_unittest();
+
+                            sqlite_close_databases();
+                            sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
+                            return rc;
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -1092,10 +1108,10 @@ int netdata_main(int argc, char **argv) {
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
     struct passwd *pw = getpwuid(getuid());
     if (inicfg_exists(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
     }
     else
-        netdata_configured_home_dir = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
+        netdata_configured_home_dir = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
 
     nd_setenv("HOME", netdata_configured_home_dir, 1);
 

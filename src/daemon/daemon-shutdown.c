@@ -239,7 +239,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
 
     ml_stop_threads();
-    ml_fini();
+    // ml_fini() (which closes ml_db) is deferred until after
+    // metadata_sync_shutdown() drains the metasync workers below. Those
+    // workers call ml_dimension_load_models() which uses ml_db; closing it
+    // here exposes the metasync worker to a use-after-free on the SQLite
+    // handle and triggers SIGSEGV inside sqlite3_prepare_v2 -> findElementWithHash.
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS);
 
     service_wait_exit(SERVICE_CONTEXT, 5 * USEC_PER_SEC);
@@ -307,6 +311,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 #endif
 
         metadata_sync_shutdown();
+        ml_fini();
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
@@ -326,8 +331,12 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
 
     // unlink the pipe
+    // During the commands_exit() signal-handler path, libuv may already
+    // have unlinked the pipe on close. For other exit paths the command
+    // thread keeps running and we must clean it up here. ENOENT just means
+    // libuv beat us to removing it.
     const char *pipe = daemon_pipename();
-    if(pipe && *pipe && unlink(pipe) != 0)
+    if(pipe && *pipe && unlink(pipe) != 0 && errno != ENOENT)
         netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
 
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);

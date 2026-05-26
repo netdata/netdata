@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: in-progress
+Status: completed
 
-Sub-state: reopened for final review-feedback fixes before merge; user decisions 1-23 resolved; all BGP-bearing stock profiles migrated to typed `bgp:` rows; legacy `bgp_public*` runtime deleted; metadata and generated SNMP integration docs regenerated; local `mibs/` reference files removed.
+Sub-state: completed after final review-feedback fixes; user decisions 1-23 resolved; all BGP-bearing stock profiles migrated to typed `bgp:` rows; legacy `bgp_public*` runtime deleted; metadata and generated SNMP integration docs regenerated; local `mibs/` reference files removed.
 
 ## Requirements
 
@@ -124,9 +124,9 @@ Risks:
 - Integration artifacts can drift unless metadata, generated docs, health alerts, config, and docs are closed together.
 - Raw local MIBs and fixture provenance must not leak into committed artifacts.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
-Status: ready
+Status at implementation start: ready (historical snapshot; final closure evidence is in the Validation and Outcome sections).
 
 Problem / root-cause model:
 

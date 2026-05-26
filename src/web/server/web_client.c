@@ -444,7 +444,15 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
 }
 
 static int web_server_static_file(struct web_client *w, char *filename) {
-    netdata_log_debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
+    char web_path[FILENAME_MAX];
+    snprintfz(web_path, sizeof(web_path), "%s/%s", netdata_configured_web_dir, filename);
+#if defined(OS_WINDOWS)
+    char display_path[FILENAME_MAX];
+    netdata_log_debug(D_WEB_CLIENT, "%llu: Looking for file '%s'", w->id,
+                      os_translate_path(display_path, web_path, sizeof(display_path)));
+#else
+    netdata_log_debug(D_WEB_CLIENT, "%llu: Looking for file '%s'", w->id, web_path);
+#endif
 
     if(!http_can_access_dashboard(w))
         return web_client_permission_denied_acl(w);

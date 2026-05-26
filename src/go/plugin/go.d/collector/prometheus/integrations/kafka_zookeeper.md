@@ -375,4 +375,9 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep prometheus
 ```
 
+### Disappearing or sparse metrics not clearing alerts
+
+When a metric disappears from the Prometheus endpoint response (for example, a gauge that is only exposed when its value is greater than 0), Netdata does not require any special value to stop tracking it. The Prometheus collector automatically detects metrics that are no longer present in the scrape response. After 10 consecutive collection cycles where the metric is absent, the associated chart is automatically removed and any alerts on that chart will clear. You do not need to send a special value (such as 0, NaN, or StaleNaN) — simply omitting the metric from the response is sufficient. Note that during the 10-cycle grace period, the last known value remains and alerts may not clear immediately.
+
+
 

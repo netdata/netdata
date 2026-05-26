@@ -9,8 +9,10 @@ error = { path = "../error" }
 window_manager = { path = "../window_manager" }
 memmap2 = { workspace = true }
 ruzstd = { workspace = true }
+lz4_flex = { workspace = true }
+lzma-rust2 = { workspace = true }
 siphasher = { workspace = true }
-twox-hash = { workspace = true }
+hashers = { workspace = true }
 zerocopy = { workspace =  true }
 hex = { workspace = true }
 rand = { workspace = true }

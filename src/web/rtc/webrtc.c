@@ -697,7 +697,7 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
             logged = true;
             internal_error(true, "WEBRTC[%d]: Waiting for gathering to complete", conn->pc);
         }
-        usleep(1000);
+        sleep_usec(1000);
     }
 
     if(logged)

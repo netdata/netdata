@@ -165,6 +165,8 @@ To prevent removed nodes from reappearing:
 
 **"Permission denied"**: You need **Admin** role in the Space to remove nodes.
 
+**"Node '\<name>' (machine guid: \<guid>) is our localhost - not changing it"**: The machine GUID you provided belongs to the agent where you are running `netdatacli`—in this procedure, that should be the Parent Agent—not the stale child node you want to remove. This usually happens when you accidentally copy the Parent's own machine GUID instead of the stale child's. Verify you are using the correct machine GUID by checking the stale child's node info in Netdata Cloud — the GUID must belong to the disconnected child, not the Parent Agent you are logged into.
+
 **Node reappears after removal**: The agent may still be running and configured to reconnect. Stop the agent and clear claim configuration.
 
 ## Additional Resources

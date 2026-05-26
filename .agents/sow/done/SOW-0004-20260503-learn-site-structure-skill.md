@@ -106,7 +106,7 @@ Risks:
   rather than in this repo. Make the boundary explicit so
   maintainers know where to edit a given page.
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate (Historical Snapshot at Implementation Start)
 
 Status: filled-2026-05-05
 
