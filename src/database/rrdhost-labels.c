@@ -181,6 +181,11 @@ void reload_host_labels(void) {
     rrdhost_load_kubernetes_labels();
     rrdhost_load_auto_labels();
 
+    // drop entries that the loaders did not re-add (e.g. a label removed from
+    // netdata.conf, or no longer returned by get-kubernetes-labels.sh).
+    // RRDLABEL_FLAG_DONT_DELETE entries are preserved.
+    rrdlabels_remove_all_unmarked(localhost->rrdlabels);
+
     rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
     stream_send_host_labels(localhost);
