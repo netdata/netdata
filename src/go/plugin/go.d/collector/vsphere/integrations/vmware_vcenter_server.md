@@ -480,8 +480,8 @@ Labels:
 | cluster | Cluster name |
 | host | Host name |
 | vm | Virtual Machine name |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -525,8 +525,8 @@ Labels:
 | cluster | Cluster name |
 | host | Host name |
 | vm | Virtual Machine name |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -549,8 +549,8 @@ Labels:
 | host | Host name |
 | vm | Virtual Machine name |
 | vm_instance_uuid | VM instance UUID used by vSAN performance entity references |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -572,8 +572,8 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | host | Host name |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -597,8 +597,8 @@ Labels:
 | cluster | Cluster name |
 | host | Host name |
 | vsan_node_uuid | vSAN host node UUID used by vSAN performance entity references |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -622,8 +622,8 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | host | Host name |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -657,8 +657,8 @@ Labels:
 | datacenter | Datacenter name |
 | datastore | Datastore name |
 | type | Datastore type (VMFS, NFS, NFS41, vsan, VVOL, PMEM) |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -685,8 +685,8 @@ Labels:
 | id | vSphere managed object reference ID |
 | datacenter | Datacenter name |
 | datastore_cluster | Datastore cluster name |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -709,8 +709,8 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | vsan_uuid | vSAN cluster UUID used by vSAN performance entity references |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -735,8 +735,8 @@ Labels:
 | id | vSphere managed object reference ID |
 | datacenter | Datacenter name |
 | cluster | Cluster name |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
@@ -786,8 +786,8 @@ Labels:
 | datacenter | Datacenter name |
 | cluster | Cluster name |
 | resource_pool | Resource Pool name |
-| vsphere_tag_<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
-| vsphere_custom_attribute_<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
+| vsphere_tag_\<category> | vSphere tag label; present only for categories matched by `tag_categories`; category names are sanitized for label keys and multiple tags in one category are sorted and joined with the pipe character |
+| vsphere_custom_attribute_\<name> | vSphere custom attribute label; present only for attributes matched by `custom_attributes`; attribute names are sanitized for label keys |
 
 Metrics:
 
