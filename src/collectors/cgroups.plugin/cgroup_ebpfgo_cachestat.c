@@ -161,8 +161,6 @@ static inline void cgroup_ebpfgo_cachestat_calculate(struct cgroup *cg)
     uint64_t misses = (apcl > apd) ? (apcl - apd) : 0;
 
     uint64_t hits = (total > misses) ? (total - misses) : 0;
-    if (hits == 0 && misses > total)
-        misses = total;
 
     NETDATA_DOUBLE ratio = (total > 0) ? ((NETDATA_DOUBLE)hits / (NETDATA_DOUBLE)total) : 1;
 
