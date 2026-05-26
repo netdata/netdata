@@ -118,7 +118,7 @@ Notes:
 |  | exclude_path | Path to exclude. | *.gz | no |
 | **Customization** | [url_patterns](#option-customization-url-patterns) | List of URL patterns. | [] | no |
 |  | url_patterns.name | Used as a dimension name. |  | yes |
-|  | url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format). |  | yes |
+|  | url_patterns.match | Used to match against full original request URI. Match syntax in [matcher](https://github.com/netdata/netdata/blob/master/src/go/pkg/matcher/README.md#supported-format). |  | yes |
 | **Parser** | [log_type](#option-parser-log-type) | Log parser type. | auto | no |
 |  | csv_config | CSV log parser config. |  | no |
 |  | csv_config.delimiter | CSV field delimiter. | , | no |
@@ -142,10 +142,34 @@ Option syntax:
 ```yaml
 url_patterns:
   - name: name1
-    pattern: pattern1
+    match: pattern1
   - name: name2
-    pattern: pattern2
+    match: pattern2
 ```
+
+Examples:
+
+```yaml
+url_patterns:
+  - name: api
+    match: '* /api/*'
+  - name: api_versioned
+    match: '~ ^/api/v[0-9]+/.*'
+  - name: health_endpoint
+    match: '= /health'
+  - name: not_static_css
+    match: '!* *.css'
+```
+
+Pattern values use the [matcher library](https://github.com/netdata/netdata/blob/master/src/go/pkg/matcher/README.md#supported-format) syntax:
+
+- `=` — string (exact match)
+- `*` — glob patterns
+- `~` — regular expressions
+- `!` — negates either short syntax (`!* ...`) or long syntax (`!simple_patterns:...`)
+- `simple_patterns` — simple patterns (long syntax only)
+
+Patterns are matched against the full original request URI (`$request_uri`).
 
 
 <a id="option-parser-log-type"></a>
