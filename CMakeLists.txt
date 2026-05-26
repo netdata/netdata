@@ -3106,6 +3106,7 @@ if(ENABLE_PLUGIN_EBPF)
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.c"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum"
             "${CMAKE_SOURCE_DIR}/go.work"
             "${CMAKE_SOURCE_DIR}/src/go/go.mod"
             "${CMAKE_SOURCE_DIR}/src/go/go.sum"
