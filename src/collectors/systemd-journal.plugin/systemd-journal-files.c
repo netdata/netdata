@@ -866,12 +866,12 @@ void nd_journal_init_files_and_directories(void)
         journal_directories[d++].path = string_strdupz(path);
     }
 
-    const char *netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
-    if (netdata_configured_log_dir != NULL) {
+    const char *log_dir = getenv("NETDATA_LOG_DIR");
+    if (log_dir && *log_dir) {
         char path[PATH_MAX];
-        snprintfz(path, sizeof(path), "%s/otel", netdata_configured_host_prefix);
+        snprintfz(path, sizeof(path), "%s/otel", log_dir);
         journal_directories[d++].path = string_strdupz(path);
-    };
+    }
 
     // terminate the list
     journal_directories[d].path = NULL;
