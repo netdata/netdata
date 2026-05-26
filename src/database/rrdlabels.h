@@ -76,8 +76,13 @@ int rrdlabels_to_buffer(RRDLABELS *labels, BUFFER *wb, const char *before_each, 
                         void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
 void rrdlabels_to_buffer_json_members(RRDLABELS *labels, BUFFER *wb);
 
-// returns true when dst was modified (at least one label added or removed),
-// false when dst already matched src and no labels changed.
+// migrate dst toward src by key/value: labels present in src but missing from
+// dst are added, labels present in dst but missing from src are removed
+// (entries flagged RRDLABEL_FLAG_DONT_DELETE are preserved). The RRDLABEL_SRC
+// bits on entries that are already present in both are NOT reconciled to src.
+// Returns true when at least one label was added or removed, false otherwise.
+// A false return does not imply dst equals src bit-for-bit (preserved
+// DONT_DELETE entries and unchanged RRDLABEL_SRC bits can still differ).
 bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src);
 
 // finalize a CLABEL stream commit: remove unmarked entries and report whether
