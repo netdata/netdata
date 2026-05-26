@@ -209,8 +209,7 @@ Restart your Netdata Agent after changing `netdata.conf` (`netdatacli reload-hea
 
 :::warning
 
-Do **not** place `*` between exclusions (`!alert1 * !alert2 *` is incorrect — `*` matches everything immediately, preventing later exclusions from taking effect). All `!` patterns must come first, followed by a single `*`.
-
+Do **not** place `*` between exclusions (`!alert1 * !alert2 *` is incorrect — patterns are evaluated in order and the first match wins). When using exclusions, put all `!` patterns first, followed by a single trailing `*`.
 :::
 
 You can also [edit the file where the alert is defined](#how-to-edit-health-configuration-files), comment out its definition, and [reload Netdata's health configuration](#how-to-reload-health-configuration).
