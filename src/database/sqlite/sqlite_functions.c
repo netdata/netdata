@@ -55,7 +55,7 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
             case SQLITE_BUSY:
             case SQLITE_LOCKED:
                 pulse_sqlite3_query_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
-                usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+                sleep_usec(SQLITE_INSERT_DELAY * USEC_PER_MS);
                 continue;
             default:
                 break;
@@ -347,7 +347,7 @@ int db_execute(sqlite3 *db, const char *cmd, int *sqlite_rc)
         }
 
         if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
-            usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+            sleep_usec(SQLITE_INSERT_DELAY * USEC_PER_MS);
             continue;
         }
 

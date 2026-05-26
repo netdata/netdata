@@ -217,6 +217,14 @@
 - Go.d/vsphere: migrate to framework v2 and expand coverage ([#22458](https://github.com/netdata/netdata/issues/22458))
 - Regenerate integrations docs ([#22549](https://github.com/netdata/netdata/issues/22549))
 - Improve ML chart access ([#22530](https://github.com/netdata/netdata/issues/22530))
+- Prevent host status stalls during obsolete-chart cleanup ([#22539](https://github.com/netdata/netdata/issues/22539))
+- Docs: don't limit plan details only to business ([#22315](https://github.com/netdata/netdata/issues/22315))
+- Build(deps): bump golang.org/x/net from 0.54.0 to 0.55.0 in /src/go ([#22557](https://github.com/netdata/netdata/issues/22557))
+- Libnetdata: make standalone-linkable ([#22528](https://github.com/netdata/netdata/issues/22528))
+- Fix stack buffer overflow in macOS mach_smi collector ([#22553](https://github.com/netdata/netdata/issues/22553))
+- Docs: update docs/netdata-on-prem-deployment-architecture-multiple-nodes ([#22476](https://github.com/netdata/netdata/issues/22476))
+- Docs: update docs/web-log-url-patterns-field-fix ([#22443](https://github.com/netdata/netdata/issues/22443))
+- Close ML database after metasync workers finish ([#22562](https://github.com/netdata/netdata/issues/22562))
 
 ## [2.10.0] - 2026-04-09
 

@@ -67,6 +67,14 @@ In the **Raised Alerts** tab:
     - Create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notification-silencing-rules).
     - Ask AI to troubleshoot the alert.
 
+:::note
+
+Cloud alert silencing rules are available on Netdata Cloud for Community and Paid plans (anonymous access cannot create rules).
+
+Users can also silence or disable alerts at the Agent level by editing alert configuration. For example, set `to: silent` in the alert's `health.d/*.conf` file and run `sudo netdatacli reload-health` to stop notifications, or use `enabled alarms = !alert_name *` in `netdata.conf` to exclude specific alerts entirely (requires restarting the Agent). See [manual configuration](/src/health/REFERENCE.md) for step-by-step instructions.
+
+:::
+
 ## Creating and Tuning Alerts
 
 From the Alerts tab, you can create new alerts or tune existing ones:

@@ -191,7 +191,7 @@ Configure alerts to reach you through:
 **Quick Silence Options:**
 
 - **Individual alerts** - Change `to: silent` in alert configuration
-- **Specific alerts** - Edit `netdata.conf` with `enabled alarms = !alert_name *`
+- **Specific alerts** - Edit `netdata.conf` with `enabled alarms = !alert_name *` (single) or `enabled alarms = !alert1 !alert2 *` (multiple — all exclusions before the wildcard), then restart the Agent
 - **All alerts** - Set `enabled = no` in `[health]` section
 
 **Temporary Control:** Use the Health Management API for dynamic control without config changes - perfect for maintenance windows.
