@@ -40,6 +40,25 @@ func renderLabels(entry *TrapEntry, td *TrapDef) map[string]string {
 	return labels
 }
 
+func trapEntryHasUnresolvedTemplate(entry *TrapEntry) bool {
+	if entry == nil {
+		return false
+	}
+	if hasUnresolvedTemplateMarker(entry.Message) {
+		return true
+	}
+	for _, v := range entry.Labels {
+		if hasUnresolvedTemplateMarker(v) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUnresolvedTemplateMarker(s string) bool {
+	return strings.Contains(s, "<unresolved:") || strings.Contains(s, "<missing>")
+}
+
 // renderTemplate substitutes {var} references in a template string.
 func renderTemplate(tmpl string, entry *TrapEntry, td *TrapDef) string {
 	var buf strings.Builder
@@ -97,7 +116,10 @@ func resolveSpecialVar(ref string, entry *TrapEntry) string {
 		if entry.DeviceHostname != "" {
 			return entry.DeviceHostname
 		}
-		return entry.SourceIP
+		if entry.SourceIP != "" {
+			return entry.SourceIP
+		}
+		return entry.SourceUDPPeer
 	case "TRAP_SOURCE_IP":
 		return entry.SourceIP
 	case "TRAP_NAME":

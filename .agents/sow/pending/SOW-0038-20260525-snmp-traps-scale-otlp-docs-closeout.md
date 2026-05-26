@@ -30,7 +30,7 @@ Facts:
 - OTLP `severity_number` mapping follows OTel Logs Data Model Appendix B (verified: emerg=21, alert=19, crit=18, err=17, warning=13, notice=10, info=9, debug=5).
 - Spec §11b documents both `network.peer.address` and `snmp.source.ip` are always emitted (consistent with §11 journal path).
 - Netdata's OTEL plugin (`src/crates/netdata-otel/otel-plugin/src/logs_service.rs`) accepts OTLP/gRPC logs and flattens them to systemd-journal entries. The exporter must work against it AND against arbitrary OTLP receivers (e.g., `opentelemetry-collector-contrib`).
-- Per spec §5, SNMPv3 dynamic engineID discovery is opt-in due to spoofing surface and `snmpEngineBoots` persistence concerns. Statically-configured engines persist their boot counter (SOW-0036 M1); dynamically-discovered engines do NOT persist — documented limitation.
+- Per spec §5, SNMPv3 dynamic sender engineID discovery for v3 Trap PDUs is opt-in due to spoofing surface and operator-visibility concerns. v3 INFORM is separate: the receiver is authoritative, so SOW-0038 must also add the optional RFC 3414 Report responder that lets senders discover Netdata's receiver-local engine ID generated/configured by SOW-0036.
 - Spec §17 confirms multi-writer partitioning is out of scope (operators scale by adding jobs).
 
 Inferences:
@@ -44,7 +44,7 @@ Unknowns:
 ### Acceptance Criteria
 
 - M1: synthetic trap generator validates spec §9 throughput targets (>30k rows/sec per per-job writer) and spec §18 BER decode budget; reports CPU/memory per trap.
-- M2: SNMPv3 dynamic engineID discovery available as opt-in flag (default off, per spec §5); operator warning surfaced in docs and at runtime when an unknown engineID is hot-registered; documented limitation that `snmpEngineBoots` is not persisted for dynamically-discovered engines.
+- M2: SNMPv3 discovery available as opt-in behavior where appropriate: v3 Trap sender engineID hot-registration available behind a default-off flag; v3 INFORM receiver-local engine ID Report response implemented so senders can discover the job's local engine ID. Operator warnings surfaced in docs and at runtime when an unknown sender engineID is hot-registered.
 - M3: OTLP gRPC exporter ships as opt-in second backend, configured via per-job `otlp:` config block; runs against any OTLP-compliant receiver; verified against Netdata's OTEL plugin (existing flatten path) AND at least one external OTLP receiver (e.g., `opentelemetry-collector-contrib` binary in test fixture); severity mapping per OTel Logs Data Model Appendix B verified.
 
 ## Milestones
@@ -61,15 +61,15 @@ Cohort reference: spec §9; spec §18.
 
 Reviewers: 3 rotating (group A: kimi/qwen/minimax).
 
-### M2 — SNMPv3 dynamic engineID discovery (opt-in)
+### M2 — SNMPv3 discovery (Trap sender engine IDs + INFORM receiver engine ID)
 
-- Subclass the SNMP transport per `splunk-sc4snmp.md` §3.5 / `traps.py:229-258` pattern: peek at raw bytes pre-parse, ASN.1-decode the SNMPv3 header, extract `engineID + username`, hot-register the pair, retry parse.
-- Explicit per-job opt-in flag (defaults off per spec §5).
-- Runtime: on first trap from a previously unknown `(engineID, username)` pair, log WARNING with engineID + username + spoofing advisory + `snmp.trap.errors.unknown_engine_id` increment, then accept the trap.
-- Documented limitation: dynamically-registered engines do NOT have their `snmpEngineBoots` persisted (statically-configured engines via SOW-0036 M1 do). Documented in plugin README (SOW-0039) + at runtime log warning.
-- Spec §5 lists this as opt-in due to spoofing surface + boot-counter persistence concerns; the SOW must surface both clearly.
+- v3 Trap sender engine IDs: subclass the SNMP transport per `splunk-sc4snmp.md` §3.5 / `traps.py:229-258` pattern: peek at raw bytes pre-parse, ASN.1-decode the SNMPv3 header, extract `engineID + username`, hot-register the pair, retry parse.
+- v3 Trap sender engine IDs: explicit per-job opt-in flag (defaults off per spec §5).
+- v3 Trap sender engine IDs: on first trap from a previously unknown `(engineID, username)` pair, log WARNING with engineID + username + spoofing advisory + `snmp.trap.errors.unknown_engine_id` increment, then accept the trap.
+- v3 INFORM receiver-local engine ID: implement the RFC 3414 discovery Report path for empty/unknown authoritative engine ID probes, using the SOW-0036 persisted `local_engine_id` and `snmpEngineBoots` state. This is required for operators who do not want to manually configure Netdata's generated receiver engine ID into INFORM senders.
+- Spec §5 lists v3 Trap sender discovery as opt-in due to spoofing surface; the SOW must surface that clearly. The v3 INFORM Report responder is not a sender hot-registration path and must not weaken the Trap sender allowlist.
 
-Cohort reference: `splunk-sc4snmp.md` §3.5; spec §5 v3 USM section.
+Cohort reference: `splunk-sc4snmp.md` §3.5; `opennms/opennms` INFORM discovery test pattern; spec §5 v3 USM section.
 
 Reviewers: all 7 — security-sensitive.
 

@@ -112,11 +112,11 @@ Plugin enforces this structurally: label templates with unbounded-cardinality va
 
 ### Listener-as-Job architecture (load-bearing)
 
-The plugin is a **DynCfg-managed jobs orchestrator**. Each **job is one listener** with one or more configured protocol/address/port endpoints, one auth context, one allowlist, one rate limit, one dedup cache, one writer, one journal directory, one retention policy, and (for SNMPv3) one `snmpEngineBoots` counter. Operators add multiple listeners only for scaling, isolation, or materially different auth/rate-limit/retention policy; multiple jobs are not required just to accept multiple ports or protocols.
+The plugin is a **DynCfg-managed jobs orchestrator**. Each **job is one listener** with one or more configured protocol/address/port endpoints, one auth context, one allowlist, one rate limit, one dedup cache, one writer, one journal directory, one retention policy, and (for SNMPv3) one receiver-local engine ID plus one `snmpEngineBoots` counter. Operators add multiple listeners only for scaling, isolation, or materially different auth/rate-limit/retention policy; multiple jobs are not required just to accept multiple ports or protocols.
 
 Job lifecycle mirrors the established go.d pattern (`src/go/plugin/framework/jobruntime/job_v1.go`; orchestration in `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`):
 
-- **Add / Enable** — create job and synchronously preflight every required resource. Endpoint bind failures (EACCES for privileged port, EADDRINUSE for port collision, etc.), unsupported endpoint protocol, invalid job name, profile-load failure, journal directory create/open failure, writer initialization failure, and retention configuration failure all return coded errors (HTTP 422) surfaced in the DynCfg UI. The job is not reported as started when creation fails.
+- **Add / Enable** — create job and synchronously preflight every required resource. Endpoint bind failures (EACCES for privileged port, EADDRINUSE for port collision, etc.), unsupported endpoint protocol, invalid job name, invalid v3 USM passphrases, profile-load failure, journal directory create/open failure, writer initialization failure, and retention configuration failure all return coded errors (HTTP 422) surfaced in the DynCfg UI. The job is not reported as started when creation fails.
 - **Update** — stop the running job, recreate from new config, and preflight every required resource. Atomic restart, no plugin-wide restart.
 - **Disable / Remove** — stop the job, close all sockets, retain the journal directory (for forensics) but stop writing.
 
@@ -132,6 +132,7 @@ Trap job names are path and journal identifiers. The trap plugin applies an addi
 |---|---|
 | `/var/cache/netdata/traps/{job_name}/` | Per-job journal directory (one journal file family per job) |
 | `/var/lib/netdata/snmp-trap/{job_name}/engine-boots` | Per-job `snmpEngineBoots` counter for SNMPv3 INFORM correctness (see §6) |
+| `/var/lib/netdata/snmp-trap/{job_name}/local-engine-id` | Per-job receiver-local SNMPv3 engine ID used for INFORM authentication/Responses when `local_engine_id` is omitted |
 
 ### Language and process model
 
@@ -180,14 +181,16 @@ This decoupling means the hot path is not blocked by stdout back-pressure; if th
 
 ### v3 USM engine-ID discovery (opt-in, SOW-0038)
 
-Dynamic discovery pattern from Splunk SC4SNMP (`splunk-sc4snmp.md` §3.5; `traps.py:229-258`). Subclass the SNMP transport to peek at the raw bytes pre-parse, ASN.1-decode the SNMPv3 header to extract `engineID`+`username`, hot-register the pair, retry parse.
+Dynamic discovery for v3 Trap sender engine IDs follows the Splunk SC4SNMP pattern (`splunk-sc4snmp.md` §3.5; `traps.py:229-258`). Subclass the SNMP transport to peek at the raw bytes pre-parse, ASN.1-decode the SNMPv3 header to extract `engineID`+`username`, hot-register the pair, retry parse.
 
-**This feature is opt-in (disabled by default)** because hot-registering arbitrary `(engineID, username)` pairs at runtime has two security/correctness concerns:
+**This feature is opt-in (disabled by default)** because hot-registering arbitrary `(engineID, username)` pairs at runtime has security/correctness concerns:
 
-1. **Spoofing surface**: a malicious source can present arbitrary `engineID` values to the listener; without operator-curated whitelist, the listener will hot-register and trust the pair on subsequent traps.
-2. **`snmpEngineBoots` persistence**: SNMPv3 requires `snmpEngineBoots` to be monotonically increasing across restarts for replay-protection and INFORM acknowledgement integrity. Hot-registered engines without persistent boot-counter state break INFORM handshakes and weaken replay protection. Statically-configured engines persist their boot counter at `/var/lib/netdata/snmp-trap/{job_name}/engine-boots`; dynamically discovered engines do not, which is a documented limitation of the opt-in dynamic mode.
+1. **Spoofing surface**: a malicious source can present arbitrary `engineID` values to the listener; without operator-curated whitelist, the listener will hot-register and trust the pair on subsequent v3 Trap PDUs.
+2. **Operator visibility**: every first-seen dynamic engine ID must be logged and counted so operators can detect unexpected senders.
 
-Operators who genuinely need dynamic discovery enable it explicitly in plugin config; operators with a known set of devices enumerate engineIDs in plugin config (the safer default).
+Operators who genuinely need dynamic v3 Trap discovery enable it explicitly in plugin config; operators with a known set of devices enumerate sender engine IDs in plugin config (the safer default).
+
+This is separate from v3 INFORM receiver-local engine ID discovery. For confirmed-class INFORM messages, the receiver is authoritative; the sender authenticates against the receiver's local engine ID. SOW-0036 implements a configured-or-generated persisted `local_engine_id`. SOW-0038 owns the optional RFC 3414 Report responder that lets senders discover that local engine ID automatically.
 
 ## 6. Reception Surface
 
@@ -221,7 +224,9 @@ Reception is **per-job** (§5). Each listener (job) opens all configured endpoin
 - **Same UDP socket as receive** — guarantees correct source-port and source-IP, including under NAT. Required per RFC 3414 §3.
 - **Retransmits handled by idempotency** — if the sender retransmits the same InformRequest (same `request-id`), the receiver re-emits the same Response. The plugin does not track in-flight informs.
 - **Response send failure** is logged + `snmp.trap.errors.inform_response_failed` counter increment; the trap itself is still processed (the sender's retransmit per RFC 3414 will eventually succeed or the operator's monitoring will catch the persistent failure).
-- **`snmpEngineBoots` persistence for v3 INFORM** — per §5, the boot counter for each statically-configured v3 engine is persisted at `/var/lib/netdata/snmp-trap/{job_name}/engine-boots`. Without persistence, devices that cached the old boot counter reject our INFORM Response PDUs as replay attacks after every Netdata restart.
+- **Receiver-local engine identity for v3 INFORM** — per RFC 3414 confirmed-class message semantics, the receiver is authoritative for INFORM authentication and Response PDUs. The job uses `local_engine_id` when configured; when omitted, Netdata generates a stable per-job value at job creation and persists it at `/var/lib/netdata/snmp-trap/{job_name}/local-engine-id`. Remote sender engine IDs in `engine_id_whitelist` remain the v3 Trap allowlist and are not used as the receiver-local INFORM engine ID.
+- **`snmpEngineBoots` persistence for v3 INFORM** — per §5, the receiver-local boot counter is persisted at `/var/lib/netdata/snmp-trap/{job_name}/engine-boots`. Without persistence, devices that cached the old boot counter reject our INFORM Response PDUs as replay attacks after every Netdata restart.
+- **Creation-time failure semantics** — failure to create, read, validate, write, fsync, or rename either `local-engine-id` or `engine-boots` fails job creation/DynCfg apply. The job is not reported as started and does not rely on runtime-only log errors for these state files.
 
 ### Out of scope (deliberate, this design pass)
 
@@ -376,12 +381,15 @@ jobs:
           address: "0.0.0.0"
           port: 162                       # job fails to start if any endpoint cannot bind — no automatic fallback
     versions: [v1, v2c, v3]               # which SNMP versions this listener accepts
-    communities: []                       # v1/v2c allowlist; empty = accept all until SOW-0036 auth policy
-    usm_users: []                         # v3 USM users (each refs Netdata Secrets)
-    engine_id_whitelist: []               # v3 static engine IDs (hex)
-    dynamic_engine_id_discovery: false    # v3 dynamic (opt-in, SOW-0038; see §5)
+    communities: []                       # v1/v2c allowlist; empty = accept all
+    usm_users: []                         # v3 USM users (each refs Netdata Secrets; passphrases min 8 chars)
+    engine_id_whitelist: []               # v3 Trap sender engine IDs (hex)
+    # local_engine_id: "0123456789abcdef01234567"  # optional v3 INFORM receiver engine ID; omitted = generated/persisted per job
+    dynamic_engine_id_discovery: false    # v3 Trap sender engine ID discovery (opt-in, SOW-0038; see §5)
+    reverse_dns:
+      enabled: false                       # reverse DNS enrichment (opt-in); cached/non-blocking only
     allowlist:
-      source_cidrs: ["0.0.0.0/0"]         # source IP allowlist (pre-decode)
+      source_cidrs: ["0.0.0.0/0", "::/0"] # source IP allowlist (pre-decode)
     rate_limit:
       enabled: false                      # off by default
       per_source_pps: 1000                # token-bucket per source IP
@@ -654,10 +662,17 @@ MESSAGE=<rendered description template; free-form, high-cardinality content welc
 PRIORITY=<numeric 0-7 from the canonical 8-severity table below>
 SYSLOG_IDENTIFIER=<the per-job listener name (e.g., "local") — the operator-meaningful identity of the collection daemon producing the entry>
 _HOSTNAME=<the source device hostname from enrichment, or source IP when enrichment has no hostname — the "host" the trap is about>
-_MACHINE_ID=<the agent/system machine-id from the writer's journal file header>
 ```
 
-`_HOSTNAME` is normally a systemd "trusted field" set by journald; the trap plugin's journal writer writes directly to journal files through the Go-compatible backend selected in SOW-0035 M1 (bypassing journald) and controls every field, including `_HOSTNAME`. The serializer sets `_HOSTNAME` to `DeviceHostname` when the enrichment layer provides a non-empty value; otherwise it falls back to `SourceIP`. No DNS lookup is attempted in the writer. Operators querying `journalctl _HOSTNAME=core-sw-01` see every log line about that device — including traps the device emitted, polled-metric alerts on it, and topology updates — in one cohesive view.
+`_HOSTNAME` is normally a systemd "trusted field" set by journald; the trap plugin's journal writer writes directly to journal files through the Go-compatible backend selected in SOW-0035 M1 (bypassing journald) and controls every field, including `_HOSTNAME`. The hostname resolution priority is:
+
+1. **Vnode hostname** — when the SNMP polling job has an explicit `vnode.hostname` configured for the source device (available in the in-process `DeviceRegistry` as `VnodeHostname`).
+2. **SNMP sysName** — the device's self-reported `sysName` from polling state, unless empty or equal to literal `"unknown"` (case-insensitive).
+3. **SNMP/topology sysName** — the source device `sysName` from the topology cache when the trap source IP matches topology-managed IP state and the direct SNMP registry lookup missed, for example when the SNMP collector target was configured by DNS name but traps arrive from an IP.
+4. **Reverse DNS** — non-blocking cached PTR lookup for the source IP, only when `reverse_dns.enabled: true` is set in the trap job configuration (disabled by default). Cached lookups never block the packet path; async resolution warms the cache in the background.
+5. **Source IP** — the string form of the validated trap source IP (from RFC 3584 cascade). `_HOSTNAME` is always emitted; the source IP is the mandatory fallback when no enrichment identity exists.
+
+The serializer sets `_HOSTNAME` to `DeviceHostname` when the enrichment layer provides a non-empty value; otherwise it falls back to `SourceIP`. No synchronous DNS lookup is performed in the writer or on the hot path. Operators querying `journalctl _HOSTNAME=core-sw-01` see every log line about that device — including traps the device emitted, polled-metric alerts on it, and topology updates — in one cohesive view.
 
 **Operator UX caveats** (documented in the plugin README — SOW-0039 M2):
 
@@ -750,6 +765,8 @@ TRAP_JSON={"cpsIfViolationMacAddress":{"oid":"1.3.6.1.4.1.9.9.315.1.2.1.1.1","ty
 ```
 
 Note `SYSLOG_IDENTIFIER=local` (the job name — operator-meaningful) and `_HOSTNAME=core-sw-01` (the source device — the host the trap is about). The plugin-controlled topology fields `TRAP_INTERFACE` / `TRAP_NEIGHBORS` (from co-located topology enrichment) and the operator-defined labels `TRAP_TAG_INTERFACE` / `TRAP_TAG_VLAN` / `TRAP_TAG_COMPLIANCE` / `TRAP_TAG_TENANT` live in distinct namespaces — labels are always under `TRAP_TAG_*` and cannot collide with plugin field names.
+
+`TRAP_INTERFACE` is the topology interface that owns the trap source IP in the co-located topology cache. `TRAP_NEIGHBORS` is the sorted, de-duplicated set of known LLDP/CDP neighbor sysNames for that source device cache; it is device-level topology context, not a claim that every listed neighbor is involved in the specific trap event. When the source IP matches the topology cache's local device management IP but has no interface-IP mapping, `TRAP_NEIGHBORS` can still be emitted while `TRAP_INTERFACE` is omitted.
 
 **Cardinality contract** is visible: the MAC (`aa:bb:cc:dd:ee:ff`) appears in **MESSAGE** (templated, free-form) and in **TRAP_JSON** (full structured form). It does **NOT** appear in any `TRAP_TAG_*` operator label. The MAC is fully searchable in the journal (Logs UI substring search, `journalctl -g aa:bb:cc` for MESSAGE substring match, or `jq` against `TRAP_JSON`) without polluting metric label cardinality.
 
@@ -885,7 +902,7 @@ OTLP is protobuf-encoded — attribute values are length-prefixed and cannot esc
 
 ## 12. Plugin-Self Metrics (NIDL contexts) — always emitted
 
-Three NIDL contexts. Contexts 1 and 2 (`snmp.trap.events`, `snmp.trap.errors`) are **always emitted**. Context 3 (`snmp.trap.dedup_suppressed`) is **conditionally emitted** — only when at least one job has opt-in dedup enabled (see §10). All contexts carry `job_name` as a label so operators can split per listener.
+Three NIDL contexts. Contexts 1 and 2 (`snmp.trap.events`, `snmp.trap.errors`) are **always emitted**. Context 3 (`snmp.trap.dedup_suppressed`) is **conditionally emitted** — only when at least one job has opt-in dedup enabled (see §10). The SOW-0036 implementation emits contexts 1 and 2 with `job_name` only. The richer per-device labels below are the target contract for the SOW-0037/SOW-0039 enrichment/collector-consistency closeout, where device vnode identity is available.
 
 ### Context 1: `snmp.trap.events`
 
@@ -920,7 +937,7 @@ Operators alert on these for pipeline health:
 - `unknown_oid > 0 sustained` → profile coverage gap; consider adding a profile YAML to `/etc/netdata/go.d/snmp.trap-profiles/` (operators convert MIBs offline — see §7).
 - `decode_failed > 0` or `malformed_pdu > 0` → investigate sending device.
 - `template_unresolved > 0` → profile template references a varbind not present in incoming traps; fix profile or sender.
-- `dropped_allowlist > 0` sustained → unconfigured sender attempting to reach this listener.
+- `dropped_allowlist > 0` sustained → policy drop before journaling: source CIDR miss, community miss, or SNMP version disabled for this listener.
 - `rate_limited > 0` → trap storm signal; investigate source.
 - `auth_failures` / `usm_failures` / `unknown_engine_id` > 0 → SNMPv3 misconfiguration on sender or whitelist on receiver.
 - `inform_response_failed > 0` → INFORM Response send failures; investigate UDP socket health.
@@ -978,7 +995,8 @@ Phase B resolved most of the original questions. What remains:
 - **Spec example varbind layout** — file-scoped table (matches the shipped `profile-format.md` schema).
 - **Collector consistency bundle** — owned by SOW-0039 (the final SOW); SOW-0035–0038 are not independently mergeable (single PR sequence ending at SOW-0039 M6).
 - **OTel severity mapping** — corrected to OTel Logs Data Model Appendix B values (§11b).
-- **snmpEngineBoots persistence** — per-job at `/var/lib/netdata/snmp-trap/{job_name}/engine-boots` (SOW-0036 M1).
+- **SNMPv3 receiver-local engine ID** — `local_engine_id` is optional; when omitted, Netdata generates and persists a stable per-job value at `/var/lib/netdata/snmp-trap/{job_name}/local-engine-id`. This state is used for v3 INFORM authentication/Responses and is separate from the v3 Trap sender `engine_id_whitelist`.
+- **snmpEngineBoots persistence** — per-job receiver-local counter at `/var/lib/netdata/snmp-trap/{job_name}/engine-boots` (SOW-0036 M1).
 - **CWE-117 scope** — applies to the journal writer path; OTLP path is wire-safe via protobuf encoding. Downstream OTLP receivers' encoding choices are out of scope.
 
 ## 14. Non-Goals (deliberately not building)
@@ -1107,7 +1125,7 @@ Semantics:
 | `Message` | string | Rendered description template; CWE-117 raw bytes |
 | `SourceIP` | string | Validated and normalized identified source (§5 step 6) |
 | `SourceUDPPeer` | string | Transport peer |
-| `DeviceHostname`, `DeviceVendor` | string, string | Enrichment. Empty `DeviceHostname` makes `_HOSTNAME` fall back to `SourceIP`; empty `DeviceVendor` is omitted. |
+| `DeviceHostname`, `DeviceVendor` | string, string | Enrichment. Empty `DeviceHostname` makes `_HOSTNAME` fall back to `SourceIP`; empty `DeviceVendor` is omitted. Hostname priority: SNMP registry `VnodeHostname` > SNMP registry `SysName` (excluding literal `"unknown"`) > topology-matched `SysName` > reverse DNS cached name (only when `reverse_dns.enabled: true`) > `SourceIP`. |
 | `PduType` | enum {`trap`, `inform`} | |
 | `SnmpVersion` | enum {`v1`, `v2c`, `v3`} | |
 | `SourceVnodeID` | string | Source device's Netdata vnode identity. Journal serializer maps to `ND_NIDL_NODE`; OTLP serializer maps to `netdata.nidl.node`. Empty when SNMP polling has no state for the device. |

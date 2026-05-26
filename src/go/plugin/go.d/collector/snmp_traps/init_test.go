@@ -5,11 +5,17 @@ package snmp_traps
 import (
 	"context"
 	"net"
+	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCollectorChartTemplateYAML(t *testing.T) {
+	collecttest.AssertChartTemplateSchema(t, New().ChartTemplateYAML())
+}
 
 func TestValidateJobName(t *testing.T) {
 	tests := map[string]struct {
@@ -135,8 +141,9 @@ func TestValidateVersions(t *testing.T) {
 		"empty": {
 			versions: nil, wantErr: true, errMsg: "at least one SNMP version",
 		},
-		"unsupported v3": {
-			versions: []string{"v3"}, wantErr: true, errMsg: "unsupported SNMP version",
+		"valid v3": {
+			versions: []string{"v3"},
+			want:     []string{"v3"},
 		},
 		"duplicate normalized": {
 			versions: []string{"v2c", "V2C"}, wantErr: true, errMsg: "duplicate SNMP version",
@@ -269,7 +276,7 @@ func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
 	c := New()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: 162}}
-	c.Versions = []string{"v3"}
+	c.Versions = []string{"v5"}
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
@@ -319,6 +326,34 @@ func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
 	firstConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: firstPort})
 	require.NoError(t, err, "first endpoint should have been closed after partial bind failure")
 	require.NoError(t, firstConn.Close())
+}
+
+func TestCollectorInit_CleansCreatedV3StateOnEngineBootsFailure(t *testing.T) {
+	setMinimalProfileDir(t)
+	withEngineStateDir(t)
+
+	const jobName = "cleanup-v3-state"
+	require.NoError(t, os.MkdirAll(engineBootsPath(jobName), 0750))
+
+	c := New()
+	c.SetJobName(jobName)
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.Versions = []string{"v3"}
+	c.USMUsers = []USMUserConfig{{
+		Username:  "testuser",
+		EngineID:  testEngineIDHex,
+		AuthProto: "sha256",
+		AuthKey:   "authpassword",
+		PrivProto: "aes",
+		PrivKey:   "privpassword",
+	}}
+	c.EngineIDWhitelist = []string{testEngineIDHex}
+
+	err := c.Init(context.Background())
+	require.Error(t, err)
+	assert.NoFileExists(t, localEngineIDPath(jobName))
+	assert.DirExists(t, engineBootsPath(jobName), "pre-existing state path must not be removed")
+	assert.Nil(t, c.listener)
 }
 
 func TestCollectorCleanupIsIdempotent(t *testing.T) {

@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: in-progress
+Status: paused
 
-Sub-state: activated on 2026-05-25. The user has fixed the implementation language to Go and clarified the listener/profile lifecycle contract. Implementation is delegated primarily to `deepseek/deepseek-v4-pro`; remaining reviews are delegated to `glm`, `kimi`, `minimax`, and `qwen` after `mimo` was removed from the reviewer pool due to quota exhaustion. The coordinating assistant remains responsible for architecture, direct edits, unblocking, integration, validation, and final quality.
+Sub-state: activated on 2026-05-25. Implementation and validation for the SOW-0035 feature-branch slice are complete and pushed in commit `38964171435f`. Terminal completion is intentionally deferred to SOW-0039 because SOW-0035 through SOW-0039 are not independently mergeable and close together at the final collector-consistency and merge gate. The user has fixed the implementation language to Go and clarified the listener/profile lifecycle contract. Implementation is delegated primarily to `deepseek/deepseek-v4-pro`; remaining reviews are delegated to `glm`, `kimi`, `minimax`, and `qwen` after `mimo` was removed from the reviewer pool due to quota exhaustion. The coordinating assistant remains responsible for architecture, direct edits, unblocking, integration, validation, and final quality.
 
 ## Requirements
 
@@ -852,15 +852,24 @@ Sensitive data gate:
 
 - No SNMP communities, USM keys, or operator-secret data in any committed artifact.
 - All test fixtures use public/well-known communities ("public", "c") only.
-Artifact maintenance gate: pending (SOW-0035 not yet completed).
+Artifact maintenance gate:
+
+- `AGENTS.md`: no project-wide workflow or responsibility change needed for this SOW.
+- Runtime project skills: `.agents/skills/project-snmp-trap-profiles-authoring/SKILL.md` updated for the SMIv1 / SMIv2 `.0.` trap-OID tolerance.
+- Specs: `.agents/sow/specs/snmp-traps/netdata.md` and ADR-0001 updated for Go process model, TrapWriter contract, SDK-backed journal adapter, and `.0.` tolerance.
+- End-user/operator docs: trap profile-format documentation and generator README updated for `.0.` tolerance. Full plugin docs, stock config consistency, health alerts, and taxonomy are owned by SOW-0039.
+- End-user/operator skills: no public operator skill changed in this SOW. `query-snmp-traps` is owned by SOW-0039.
+- SOW lifecycle: SOW-0041 was folded into SOW-0035 and closed. SOW-0035 remains in `current/` as `paused` until SOW-0039 performs the final merge-gate closeout for SOW-0035 through SOW-0039.
 
 ## Outcome
 
-Pending.
+Implementation slice complete on the feature branch, including creation-time preflight, multi-endpoint listener, shared lazy profile cache, SMIv1 / SMIv2 `.0.` trap-OID lookup tolerance, SDK-backed journal adapter, and targeted validation. The SOW is paused, not terminal-completed, because final collector consistency and merge readiness are owned by SOW-0039.
 
 ## Lessons Extracted
 
-Pending.
+- Creation-time failure surfacing is a cross-cutting contract: trap job failures needed both collector-side coded errors and DynCfg/jobmgr propagation fixes.
+- The SDK-backed writer is the right ownership boundary, but current append/drain throughput remains a real merge-gate risk until the SDK optimization SOW is complete and SOW-0039 re-benchmarks it.
+- The profile index is the correct place for SMIv1 / SMIv2 trap-OID `.0.` tolerance because it keeps decoder output canonical and avoids changing varbind lookup semantics.
 
 ## Followup
 

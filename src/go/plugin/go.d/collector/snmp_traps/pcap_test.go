@@ -60,10 +60,11 @@ func TestDecodeTrapFromPcapCorpus(t *testing.T) {
 				t.Fatalf("expected one UDP packet in %s, got %d", tc.fixture, len(packets))
 			}
 			packet := packets[0]
-			pdu, err := DecodeTrap(packet.payload, packet.peer)
+			ctx, err := DecodeTrap(packet.payload, packet.peer, nil)
 			if err != nil {
 				t.Fatalf("DecodeTrap failed: %v", err)
 			}
+			pdu := ctx.PDU
 			golden, ok := goldens[tc.fixture]
 			if !ok {
 				t.Fatalf("missing golden for %s", tc.fixture)

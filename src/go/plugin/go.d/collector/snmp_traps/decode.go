@@ -3,6 +3,7 @@
 package snmp_traps
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -32,16 +33,16 @@ const (
 	snmpTrapAddressOID    = "1.3.6.1.6.3.18.1.3.0"
 	snmpTrapCommunityOID  = "1.3.6.1.6.3.18.1.4.0"
 	snmpTrapEnterpriseOID = "1.3.6.1.6.3.1.1.4.3.0"
-	decodeBudgetTarget    = 1 * time.Millisecond // SOW-0035 hot-path budget.
-	maxVarbinds           = 256                  // Bound per-packet work.
-	maxNestingDepth       = 8                    // Reject pathological BER nesting.
-	maxOIDEncodedLen      = 128                  // Encoded bytes, not dotted text length.
-	maxOctetStringLen     = 1024                 // Bound per-varbind payload cost.
-	maxBERLengthOctets    = 4                    // Enough for the accepted datagram size.
+	maxVarbinds           = 256
+	maxNestingDepth       = 8
+	maxOIDEncodedLen      = 128
+	maxOctetStringLen     = 1024
+	maxBERLengthOctets    = 4
 	maxSNMPv1SpecificTrap = 2147483647
 )
 
 var (
+	decodeBudgetTarget      = 1 * time.Millisecond
 	errDecodeBudgetExceeded = errors.New("decode budget exceeded")
 	trapDecodeLogger        = gosnmp.NewLogger(log.New(io.Discard, "", 0))
 )
@@ -54,17 +55,32 @@ type TrapPDU struct {
 	Version   SnmpVersion
 	PduType   PduType
 	Varbinds  []VarbindValue
+	RequestID uint32
 }
 
-func DecodeTrap(data []byte, udpPeer net.IP) (*TrapPDU, error) {
-	pkt, err := decodeWithBudget(data, decodeBudgetTarget)
+type TrapPacketContext struct {
+	Packet *gosnmp.SnmpPacket
+	PDU    *TrapPDU
+}
+
+func DecodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable) (*TrapPacketContext, error) {
+	start := time.Now()
+
+	pkt, err := decodePacket(data, secTable)
 	if err != nil {
 		return nil, err
+	}
+
+	if time.Since(start) > decodeBudgetTarget {
+		return nil, errDecodeBudgetExceeded
 	}
 
 	varbinds, err := packetVarbinds(pkt)
 	if err != nil {
 		return nil, err
+	}
+	if time.Since(start) > decodeBudgetTarget {
+		return nil, errDecodeBudgetExceeded
 	}
 
 	version, err := snmpVersion(pkt.Version)
@@ -87,7 +103,7 @@ func DecodeTrap(data []byte, udpPeer net.IP) (*TrapPDU, error) {
 		peerIP = udpPeer.String()
 	}
 
-	return &TrapPDU{
+	tpdu := &TrapPDU{
 		OID:       trapOID,
 		SourceIP:  identifySource(varbinds, udpPeer),
 		PeerIP:    peerIP,
@@ -95,43 +111,212 @@ func DecodeTrap(data []byte, udpPeer net.IP) (*TrapPDU, error) {
 		Version:   version,
 		PduType:   pduType,
 		Varbinds:  varbinds,
+		RequestID: pkt.RequestID,
+	}
+
+	return &TrapPacketContext{
+		Packet: pkt,
+		PDU:    tpdu,
 	}, nil
 }
 
-func decodeWithBudget(data []byte, budget time.Duration) (*gosnmp.SnmpPacket, error) {
-	start := time.Now()
+func ClassifyDecodeError(err error) string {
+	if err == nil {
+		return ""
+	}
 
-	pkt, err := decodePacket(data)
-	if err != nil {
-		return nil, err
+	// GoSNMP returns plain errors for several v3 USM decode failures. Keep the
+	// text mapping narrow and covered by tests until the fork exposes typed
+	// errors for authentication, decryption, and engine-ID failures.
+	s := err.Error()
+	switch {
+	case errors.Is(err, errDecodeBudgetExceeded):
+		return "malformed_pdu"
+	case strings.Contains(s, "BER:"):
+		return "malformed_pdu"
+	case strings.Contains(s, "datagram too large"):
+		return "malformed_pdu"
+	case strings.Contains(s, "too many varbinds"):
+		return "malformed_pdu"
+	case strings.Contains(s, "OctetString too long"):
+		return "malformed_pdu"
+	case strings.Contains(s, "missing snmpTrapOID.0"):
+		return "malformed_pdu"
+	case strings.Contains(s, "invalid SNMPv1"):
+		return "malformed_pdu"
+	case strings.Contains(s, "authentication"):
+		return "auth_failures"
+	case strings.Contains(s, "decrypt"):
+		return "auth_failures"
+	case strings.Contains(s, "USM"):
+		return "usm_failures"
+	case strings.Contains(s, "no security parameters"):
+		return "usm_failures"
+	case strings.Contains(s, "no credentials"):
+		return "usm_failures"
+	case strings.Contains(s, "unknown engine"):
+		return "unknown_engine_id"
+	case strings.Contains(s, "engine ID"):
+		return "unknown_engine_id"
+	default:
+		return "decode_failed"
 	}
-	if time.Since(start) > budget {
-		return nil, errDecodeBudgetExceeded
-	}
-	return pkt, nil
 }
 
-func decodePacket(data []byte) (pkt *gosnmp.SnmpPacket, err error) {
+func sniffSNMPVersion(data []byte) (SnmpVersion, bool) {
+	tag, valueStart, valueEnd, _, err := readBERElement(data, 0)
+	if err != nil || tag != tagSequence {
+		return "", false
+	}
+
+	tag, intStart, intEnd, _, err := readBERElement(data[:valueEnd], valueStart)
+	if err != nil || tag != tagInteger {
+		return "", false
+	}
+
+	version, ok := parseBERVersion(data[intStart:intEnd])
+	if !ok {
+		return "", false
+	}
+	v, err := snmpVersion(gosnmp.SnmpVersion(version))
+	if err != nil {
+		return "", false
+	}
+	return v, true
+}
+
+func extractSNMPv3EngineIDHex(data []byte) (string, bool, error) {
+	tag, valueStart, valueEnd, _, err := readBERElement(data, 0)
+	if err != nil {
+		return "", false, err
+	}
+	if tag != tagSequence {
+		return "", false, nil
+	}
+
+	pos := valueStart
+	tag, intStart, intEnd, next, err := readBERElement(data[:valueEnd], pos)
+	if err != nil {
+		return "", false, err
+	}
+	if tag != tagInteger {
+		return "", false, nil
+	}
+	version, ok := parseBERVersion(data[intStart:intEnd])
+	if !ok || version != int(gosnmp.Version3) {
+		return "", false, nil
+	}
+
+	pos = next
+	tag, _, _, next, err = readBERElement(data[:valueEnd], pos)
+	if err != nil {
+		return "", false, err
+	}
+	if tag != tagSequence {
+		return "", false, fmt.Errorf("SNMPv3 header data is not a sequence")
+	}
+
+	pos = next
+	tag, secStart, secEnd, _, err := readBERElement(data[:valueEnd], pos)
+	if err != nil {
+		return "", false, err
+	}
+	if tag != tagOctetStr {
+		return "", false, fmt.Errorf("SNMPv3 security parameters are not an octet string")
+	}
+
+	secData := data[secStart:secEnd]
+	tag, usmStart, usmEnd, _, err := readBERElement(secData, 0)
+	if err != nil {
+		return "", false, err
+	}
+	if tag != tagSequence {
+		return "", false, fmt.Errorf("SNMPv3 USM parameters are not a sequence")
+	}
+
+	tag, engineStart, engineEnd, _, err := readBERElement(secData[:usmEnd], usmStart)
+	if err != nil {
+		return "", false, err
+	}
+	if tag != tagOctetStr {
+		return "", false, fmt.Errorf("SNMPv3 authoritative engine ID is not an octet string")
+	}
+
+	return hex.EncodeToString(secData[engineStart:engineEnd]), true, nil
+}
+
+func readBERElement(data []byte, pos int) (tag byte, valueStart, valueEnd, next int, err error) {
+	if pos < 0 || pos+2 > len(data) {
+		return 0, 0, 0, 0, fmt.Errorf("BER: truncated element at offset %d", pos)
+	}
+
+	tag = data[pos]
+	pos++
+
+	lengthByte := data[pos]
+	pos++
+
+	length := 0
+	if lengthByte&0x80 == 0 {
+		length = int(lengthByte)
+	} else {
+		n := int(lengthByte & 0x7f)
+		if n == 0 {
+			return 0, 0, 0, 0, errors.New("BER: indefinite length is not allowed")
+		}
+		if n > maxBERLengthOctets {
+			return 0, 0, 0, 0, fmt.Errorf("BER: length uses %d octets, max %d", n, maxBERLengthOctets)
+		}
+		if pos+n > len(data) {
+			return 0, 0, 0, 0, fmt.Errorf("BER: truncated length at offset %d", pos)
+		}
+		for i := 0; i < n; i++ {
+			length = (length << 8) | int(data[pos+i])
+		}
+		pos += n
+	}
+
+	valueStart = pos
+	valueEnd = pos + length
+	if valueEnd > len(data) {
+		return 0, 0, 0, 0, fmt.Errorf("BER: value length %d exceeds remaining bytes %d", length, len(data)-pos)
+	}
+	return tag, valueStart, valueEnd, valueEnd, nil
+}
+
+func parseBERVersion(data []byte) (int, bool) {
+	if len(data) == 0 || len(data) > 4 {
+		return 0, false
+	}
+	v := 0
+	for _, b := range data {
+		v = (v << 8) | int(b)
+	}
+	return v, true
+}
+
+func decodePacket(data []byte, secTable *gosnmp.SnmpV3SecurityParametersTable) (pkt *gosnmp.SnmpPacket, err error) {
 	if len(data) > maxDatagramSize {
 		return nil, fmt.Errorf("datagram too large: %d > %d", len(data), maxDatagramSize)
 	}
 	if err := validateBERLimits(data); err != nil {
 		return nil, err
 	}
-	if err := validateSNMPVersion(data); err != nil {
-		return nil, err
-	}
 
 	defer func() {
 		if v := recover(); v != nil {
-			// Defense-in-depth around the third-party parser; Netdata-owned
-			// BER bounds checks above are expected to return errors, not panic.
 			pkt = nil
 			err = fmt.Errorf("panic decoding SNMP trap: %v", v)
 		}
 	}()
 
-	decoder := &gosnmp.GoSNMP{Logger: trapDecodeLogger}
+	decoder := &gosnmp.GoSNMP{
+		Logger:                      trapDecodeLogger,
+		TrapSecurityParametersTable: secTable,
+	}
+	if version, ok := sniffSNMPVersion(data); ok && version == SnmpVersionV3 {
+		decoder.Version = gosnmp.Version3
+	}
 	pkt, err = decoder.UnmarshalTrap(data, false)
 	if err != nil {
 		return nil, err
@@ -320,7 +505,7 @@ func snmpVersion(v gosnmp.SnmpVersion) (SnmpVersion, error) {
 	case gosnmp.Version2c:
 		return SnmpVersionV2c, nil
 	case gosnmp.Version3:
-		return SnmpVersionV3, errors.New("SNMPv3 not supported in M2")
+		return SnmpVersionV3, nil
 	default:
 		return "", fmt.Errorf("unknown SNMP version: %d", v)
 	}
@@ -380,52 +565,6 @@ func validateBERLimits(data []byte) error {
 		return fmt.Errorf("BER: trailing data: %d bytes", len(data)-consumed)
 	}
 	return nil
-}
-
-func validateSNMPVersion(data []byte) error {
-	tag, content, _, err := readTLV(data)
-	if err != nil {
-		return err
-	}
-	if tag != tagSequence {
-		return fmt.Errorf("BER: expected SNMP message sequence, got 0x%02x", tag)
-	}
-	tag, content, _, err = readTLV(content)
-	if err != nil {
-		return err
-	}
-	if tag != tagInteger {
-		return fmt.Errorf("BER: expected SNMP version integer, got 0x%02x", tag)
-	}
-	version, err := parseBERInteger(content)
-	if err != nil {
-		return err
-	}
-	switch version {
-	case int64(gosnmp.Version1), int64(gosnmp.Version2c):
-		return nil
-	case int64(gosnmp.Version3):
-		return errors.New("SNMPv3 not supported in M2")
-	default:
-		return fmt.Errorf("unknown SNMP version: %d", version)
-	}
-}
-
-func parseBERInteger(data []byte) (int64, error) {
-	if len(data) == 0 {
-		return 0, errors.New("BER: zero-length integer")
-	}
-	if len(data) > 8 {
-		return 0, fmt.Errorf("BER: integer too long: %d", len(data))
-	}
-	var val int64
-	if data[0]&0x80 != 0 {
-		val = -1
-	}
-	for _, b := range data {
-		val = (val << 8) | int64(b)
-	}
-	return val, nil
 }
 
 func walkBER(data []byte, depth int) (int, error) {

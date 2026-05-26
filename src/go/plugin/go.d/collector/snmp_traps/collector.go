@@ -7,9 +7,11 @@ import (
 	_ "embed"
 	"errors"
 	"net"
+	"net/netip"
 	"runtime"
 	"time"
 
+	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"golang.org/x/sys/unix"
@@ -17,6 +19,9 @@ import (
 
 //go:embed "config_schema.json"
 var configSchema string
+
+//go:embed "charts.yaml"
+var chartTemplateYAML string
 
 func init() {
 	collectorapi.Register("snmp_traps", collectorapi.Creator{
@@ -44,16 +49,25 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	listener     *Listener
-	trapWriter   TrapWriter
-	journalDir   string
-	store        metrix.CollectorStore
-	jobName      string
-	vnode        string
-	profileGen   uint64
-	profileIndex *ProfileIndex
-	versions     map[SnmpVersion]struct{}
-	communities  map[string]struct{}
+	listener          *Listener
+	trapWriter        TrapWriter
+	journalDir        string
+	store             metrix.CollectorStore
+	jobName           string
+	vnode             string
+	profileGen        uint64
+	profileIndex      *ProfileIndex
+	versions          map[SnmpVersion]struct{}
+	allowlist         *Allowlist
+	rateLimiter       *rateLimiter
+	engineBoots       *EngineBoots
+	localEngineID     *LocalEngineID
+	v3SecTable        *gosnmp.SnmpV3SecurityParametersTable
+	engineIDs         map[string]struct{}
+	overrides         map[string]*OverrideConfig
+	metrics           *perJobMetrics
+	reverseDNS        *reverseDNSResolver
+	reverseDNSEnabled bool
 }
 
 func (c *Collector) Configuration() any {
@@ -81,14 +95,49 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
 	}
+	v3Enabled := versionListContains(versions, "v3")
+
+	if err := validateUSMUsers(c.USMUsers); err != nil {
+		return &dyncfgCodedError{err: err, code: 422}
+	}
+
+	if err := validateEngineIDWhitelist(c.EngineIDWhitelist); err != nil {
+		return &dyncfgCodedError{err: err, code: 422}
+	}
+
+	if err := validateLocalEngineID(c.LocalEngineID); err != nil {
+		return &dyncfgCodedError{err: err, code: 422}
+	}
+
+	allowlistPrefixes, err := validateAllowlist(c.Allowlist)
+	if err != nil {
+		return &dyncfgCodedError{err: err, code: 422}
+	}
+
+	if err := validateRateLimit(c.RateLimit); err != nil {
+		return &dyncfgCodedError{err: err, code: 422}
+	}
+
+	if err := validateOverrides(c.Overrides); err != nil {
+		return &dyncfgCodedError{err: err, code: 422}
+	}
+	if err := validateDeferredConfig(c.Config); err != nil {
+		return &dyncfgCodedError{err: err, code: 422}
+	}
+	if v3Enabled {
+		if len(c.USMUsers) == 0 {
+			return &dyncfgCodedError{err: errors.New("SNMPv3 requires at least one usm_users entry"), code: 422}
+		}
+		if len(c.EngineIDWhitelist) == 0 {
+			return &dyncfgCodedError{err: errors.New("SNMPv3 requires engine_id_whitelist"), code: 422}
+		}
+	}
 
 	retCfg, err := parseRetentionConfig(c.Retention)
 	if err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
 	}
 
-	// The go.d framework calls Init sequentially per job; this guard keeps
-	// repeated Init calls idempotent in tests and defensive call paths.
 	if c.listener != nil {
 		return nil
 	}
@@ -112,7 +161,58 @@ func (c *Collector) Init(ctx context.Context) error {
 		journalWriter.Close()
 		return &dyncfgCodedError{err: err, code: 422}
 	}
+	cleanupPreflight := func() {
+		ReleaseProfileCache(gen)
+		journalWriter.Close()
+		listener.close()
+	}
 
+	var eb *EngineBoots
+	var lid *LocalEngineID
+	var v3Table *gosnmp.SnmpV3SecurityParametersTable
+	var engineIDWhitelist map[string]struct{}
+	if v3Enabled {
+		engineBootsExisted := engineStatePathExists(engineBootsPath(c.jobName))
+		localEngineIDExisted := engineStatePathExists(localEngineIDPath(c.jobName))
+		engineStateDirExisted := engineStatePathExists(engineBootsDir(c.jobName))
+		cleanupCreatedState := func() {
+			cleanupCreatedEngineState(c.jobName, !engineBootsExisted, !localEngineIDExisted, !engineStateDirExisted)
+		}
+
+		v3Table, err = buildSnmpV3SecurityTable(c.USMUsers)
+		if err != nil {
+			cleanupCreatedState()
+			cleanupPreflight()
+			return &dyncfgCodedError{err: err, code: 422}
+		}
+		engineIDWhitelist, err = buildEngineIDWhitelist(c.EngineIDWhitelist)
+		if err != nil {
+			cleanupCreatedState()
+			cleanupPreflight()
+			return &dyncfgCodedError{err: err, code: 422}
+		}
+
+		lid, err = NewLocalEngineID(c.jobName, c.LocalEngineID)
+		if err != nil {
+			cleanupCreatedState()
+			cleanupPreflight()
+			return &dyncfgCodedError{err: err, code: 422}
+		}
+		if err := registerUSMUsersWithLocalEngineID(v3Table, c.USMUsers, lid.Bytes()); err != nil {
+			cleanupCreatedState()
+			cleanupPreflight()
+			return &dyncfgCodedError{err: err, code: 422}
+		}
+
+		eb, err = NewEngineBoots(c.jobName)
+		if err != nil {
+			cleanupCreatedState()
+			cleanupPreflight()
+			return &dyncfgCodedError{err: err, code: 422}
+		}
+	}
+
+	overrides := buildOverrideMap(c.Overrides)
 	tw := newJournalTrapWriter(journalWriter, defaultQueueCapacity)
 
 	c.profileIndex = idx
@@ -120,10 +220,21 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.Versions = versions
 	c.vnode = c.Vnode
 	c.versions = versionSet(versions)
-	c.communities = communitySet(c.Communities)
+	c.allowlist = NewAllowlist(allowlistPrefixes, c.Communities)
+	c.rateLimiter = newRateLimiter(c.RateLimit.Enabled, c.RateLimit.PerSourcePPS, c.RateLimit.Mode)
+	c.engineBoots = eb
+	c.localEngineID = lid
+	c.v3SecTable = v3Table
+	c.engineIDs = engineIDWhitelist
+	c.overrides = overrides
+	c.metrics = getJobMetrics(c.jobName)
 	c.listener = listener
 	c.trapWriter = tw
 	c.journalDir = journalWriter.JournalDirectory()
+	c.reverseDNSEnabled = c.ReverseDNS.Enabled
+	if c.reverseDNSEnabled {
+		c.reverseDNS = newReverseDNSResolver()
+	}
 
 	c.listener.start(c.handlePacket)
 
@@ -147,37 +258,230 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.trapWriter.Close()
 		c.trapWriter = nil
 	}
+	if c.reverseDNS != nil {
+		c.reverseDNS.Close()
+		c.reverseDNS = nil
+		c.reverseDNSEnabled = false
+	}
 	if c.profileIndex != nil {
 		ReleaseProfileCache(c.profileGen)
 		c.profileIndex = nil
 	}
+	removeJobMetrics(c.jobName)
+	c.metrics = nil
 }
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) ChartTemplateYAML() string { return "" }
+func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }
 
 func (c *Collector) collect(ctx context.Context) error {
 	if c.listener == nil {
 		return errors.New("listener not started")
 	}
+	now := time.Now()
+	if c.rateLimiter != nil {
+		c.rateLimiter.maybeSweep(now)
+	}
+	if c.reverseDNS != nil {
+		c.reverseDNS.maybeSweep(now)
+	}
+	if c.metrics != nil {
+		if w, ok := c.trapWriter.(interface{ SanitizedFields() uint64 }); ok {
+			c.metrics.setSanitized(w.SanitizedFields())
+		}
+	}
+	collectMetrics(c.store, c.jobName)
 	return nil
 }
 
-func (c *Collector) handlePacket(data []byte, peerIP net.IP) {
-	pdu, err := DecodeTrap(data, peerIP)
-	if err != nil {
-		return
+func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
+	decodePeerIP := peerIP
+	if peer != nil {
+		srcAddr, ok := udpPeerAddr(peer)
+		if ok {
+			decodePeerIP = net.IP(srcAddr.AsSlice())
+			if c.allowlist != nil && !c.allowlist.AllowedSource(srcAddr) {
+				c.incTrapError("dropped_allowlist")
+				return
+			}
+		}
 	}
-	if !c.versionAllowed(pdu.Version) || !c.communityAllowed(pdu.Community) {
+
+	if version, ok := sniffSNMPVersion(data); ok && !c.versionAllowed(version) {
+		c.incTrapError("dropped_allowlist")
 		return
 	}
 
-	td := c.profileIndex.Lookup(pdu.OID)
-	entry := trapEntryFromPDU(c.jobName, c.vnode, pdu, td, time.Now().UnixMicro(), monotonicUsec())
-	if err := c.trapWriter.Write(entry); err != nil {
+	pktCtx, err := DecodeTrap(data, decodePeerIP, c.v3SecTable)
+	if err != nil {
+		dim := ClassifyDecodeError(err)
+		if shouldExtractEngineIDOnDecodeError(dim) {
+			engineIDHex, ok, extractErr := extractSNMPv3EngineIDHex(data)
+			if extractErr == nil && ok && !engineIDHexAllowed(engineIDHex, c.engineIDs) {
+				dim = "unknown_engine_id"
+			}
+		}
+		c.incTrapError(dim)
 		return
 	}
+
+	pdu := pktCtx.PDU
+
+	if !c.versionAllowed(pdu.Version) {
+		c.incTrapError("dropped_allowlist")
+		return
+	}
+
+	if pdu.Version != SnmpVersionV3 && !c.communityAllowed(pdu.Community) {
+		c.incTrapError("dropped_allowlist")
+		return
+	}
+
+	if pktCtx.Packet != nil && pdu.Version == SnmpVersionV3 {
+		if pdu.PduType == PduTypeInform {
+			if !c.localEngineIDMatches(pktCtx.Packet.SecurityParameters) {
+				c.incTrapError("unknown_engine_id")
+				return
+			}
+		} else {
+			if !isEngineIDAllowed(pktCtx.Packet.SecurityParameters, c.engineIDs) {
+				c.incTrapError("unknown_engine_id")
+				return
+			}
+		}
+	}
+
+	if pdu.PduType == PduTypeInform {
+		if pktCtx.Packet != nil && conn != nil && peer != nil {
+			var localEID []byte
+			if c.localEngineID != nil {
+				localEID = c.localEngineID.Bytes()
+			}
+			if sendErr := sendInformResponse(conn, peer, pktCtx.Packet, c.engineBoots, localEID); sendErr != nil {
+				c.warnf("SNMP trap INFORM response failed: %v", sendErr)
+				c.incTrapError("inform_response_failed")
+			}
+		}
+	}
+
+	if c.rateLimiter != nil && peer != nil {
+		srcAddr, ok := udpPeerAddr(peer)
+		if ok {
+			allowed, mode := c.rateLimiter.Allow(srcAddr)
+			if !allowed {
+				c.incTrapError("rate_limited")
+				if mode == rateLimitModeDrop {
+					return
+				}
+			}
+		}
+	}
+
+	td := c.profileIndex.Lookup(pdu.OID)
+	if td == nil {
+		c.incTrapError("unknown_oid")
+	} else {
+		td = c.applyOverrides(td)
+	}
+
+	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), monotonicUsec())
+	enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
+	renderTrapEntryTemplates(entry, td)
+	if trapEntryHasUnresolvedTemplate(entry) {
+		c.incTrapError("template_unresolved")
+	}
+	if err := c.trapWriter.Write(entry); err != nil {
+		c.incTrapError("journal_write_failed")
+		return
+	}
+
+	cat := Category("unknown")
+	if td != nil {
+		cat = Category(td.Category)
+	}
+	c.incTrapEvents(cat)
+}
+
+func udpPeerAddr(peer *net.UDPAddr) (netip.Addr, bool) {
+	if peer == nil {
+		return netip.Addr{}, false
+	}
+	addr, ok := netip.AddrFromSlice(peer.IP)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	return addr.Unmap(), true
+}
+
+func shouldExtractEngineIDOnDecodeError(dim string) bool {
+	switch dim {
+	case "auth_failures", "usm_failures", "unknown_engine_id":
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Collector) localEngineIDMatches(sp gosnmp.SnmpV3SecurityParameters) bool {
+	if c.localEngineID == nil || sp == nil {
+		return false
+	}
+	usp, ok := sp.(*gosnmp.UsmSecurityParameters)
+	if !ok {
+		return false
+	}
+	return c.localEngineID.EqualRaw(usp.AuthoritativeEngineID)
+}
+
+func (c *Collector) warnf(format string, args ...any) {
+	if c.Logger != nil {
+		c.Warningf(format, args...)
+	}
+}
+
+func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {
+	if td == nil || len(c.overrides) == 0 {
+		return td
+	}
+	ov, ok := c.overrides[td.OID]
+	if !ok {
+		return td
+	}
+	cp := *td
+	if td.Labels != nil {
+		cp.Labels = make(map[string]string, len(td.Labels)+len(ov.Labels))
+		for k, v := range td.Labels {
+			cp.Labels[k] = v
+		}
+	}
+	if ov.Category != "" {
+		cp.Category = ov.Category
+	}
+	if ov.Severity != "" {
+		cp.Severity = ov.Severity
+	}
+	if ov.Labels != nil {
+		if cp.Labels == nil {
+			cp.Labels = make(map[string]string, len(ov.Labels))
+		}
+		for k, v := range ov.Labels {
+			cp.Labels[k] = v
+		}
+	}
+	return &cp
+}
+
+func buildOverrideMap(overrides []OverrideConfig) map[string]*OverrideConfig {
+	if len(overrides) == 0 {
+		return nil
+	}
+	m := make(map[string]*OverrideConfig, len(overrides))
+	for i := range overrides {
+		ov := overrides[i]
+		m[ov.OID] = &ov
+	}
+	return m
 }
 
 func (c *Collector) versionAllowed(version SnmpVersion) bool {
@@ -189,11 +493,10 @@ func (c *Collector) versionAllowed(version SnmpVersion) bool {
 }
 
 func (c *Collector) communityAllowed(community string) bool {
-	if len(c.communities) == 0 {
-		return true
+	if c.allowlist != nil && !c.allowlist.AllowedCommunity(community) {
+		return false
 	}
-	_, ok := c.communities[community]
-	return ok
+	return true
 }
 
 func versionSet(versions []string) map[SnmpVersion]struct{} {
@@ -204,12 +507,13 @@ func versionSet(versions []string) map[SnmpVersion]struct{} {
 	return set
 }
 
-func communitySet(communities []string) map[string]struct{} {
-	set := make(map[string]struct{}, len(communities))
-	for _, community := range communities {
-		set[community] = struct{}{}
+func versionListContains(versions []string, version string) bool {
+	for _, v := range versions {
+		if v == version {
+			return true
+		}
 	}
-	return set
+	return false
 }
 
 func monotonicUsec() int64 {
@@ -220,7 +524,6 @@ func monotonicUsec() int64 {
 	return ts.Sec*1_000_000 + ts.Nsec/1_000
 }
 
-// dyncfgCodedError implements the CodedError contract for DynCfg surfacing.
 type dyncfgCodedError struct {
 	err  error
 	code int

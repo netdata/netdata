@@ -3,10 +3,11 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "SNMP trap collector configuration.",
     "type": "object",
+    "additionalProperties": false,
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Framework collection interval for future self-metrics. Trap packet reception is event-driven and does not depend on this interval.",
+        "description": "Framework collection interval for self-metrics. Trap packet reception is event-driven and does not depend on this interval.",
         "type": "integer",
         "minimum": 1,
         "default": 1
@@ -20,6 +21,7 @@
         "title": "Listen",
         "description": "Network endpoints this listener binds during job creation.",
         "type": "object",
+        "additionalProperties": false,
         "properties": {
           "endpoints": {
             "title": "Endpoints",
@@ -27,14 +29,13 @@
             "minItems": 1,
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "properties": {
                 "protocol": {
                   "title": "Protocol",
                   "description": "Transport protocol.",
                   "type": "string",
-                  "enum": [
-                    "udp"
-                  ],
+                  "enum": ["udp"],
                   "default": "udp"
                 },
                 "address": {
@@ -52,39 +53,196 @@
                   "default": 162
                 }
               },
-              "required": [
-                "protocol",
-                "address",
-                "port"
-              ]
+              "required": ["protocol", "address", "port"]
             }
           }
         },
-        "required": [
-          "endpoints"
-        ]
+        "required": ["endpoints"]
       },
       "versions": {
         "title": "SNMP versions",
         "description": "Accepted trap protocol versions.",
         "type": "array",
-        "default": [
-          "v1",
-          "v2c"
-        ],
+        "default": ["v1", "v2c"],
         "items": {
           "type": "string",
-          "enum": [
-            "v1",
-            "v2c"
-          ]
+          "enum": ["v1", "v2c", "v3"]
         },
         "uniqueItems": true
+      },
+      "communities": {
+        "title": "Communities",
+        "description": "SNMPv1/v2c community allowlist. Empty accepts all communities.",
+        "type": ["array", "null"],
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true
+      },
+      "usm_users": {
+        "title": "USM Users",
+        "description": "SNMPv3 USM users with auth and privacy protocols. Auth and privacy keys use Netdata secret references.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "username": {
+              "title": "Username",
+              "description": "SNMPv3 USM security name (user).",
+              "type": "string"
+            },
+            "engine_id": {
+              "title": "Engine ID",
+              "description": "SNMPv3 authoritative engine ID in hex (e.g. 80001f8880e5a5c0d6c7b8a9).",
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]{10,64}$"
+            },
+            "auth_proto": {
+              "title": "Authentication protocol",
+              "description": "SNMPv3 authentication protocol.",
+              "type": "string",
+              "enum": ["none", "md5", "sha", "sha224", "sha256", "sha384", "sha512"]
+            },
+            "auth_key": {
+              "title": "Authentication key",
+              "description": "SNMPv3 authentication passphrase (use a Netdata secret reference). Required when auth_proto is not none; minimum 8 characters.",
+              "type": "string"
+            },
+            "priv_proto": {
+              "title": "Privacy protocol",
+              "description": "SNMPv3 privacy (encryption) protocol.",
+              "type": "string",
+              "enum": ["none", "des", "aes", "aes192", "aes256", "aes192c", "aes256c"]
+            },
+            "priv_key": {
+              "title": "Privacy key",
+              "description": "SNMPv3 privacy passphrase (use a Netdata secret reference). Required when priv_proto is not none; minimum 8 characters.",
+              "type": "string"
+            }
+          },
+          "required": ["username", "engine_id"]
+        }
+      },
+      "engine_id_whitelist": {
+        "title": "Engine ID Whitelist",
+        "description": "Static SNMPv3 engine IDs accepted by this listener for v3 Trap PDUs (hex strings). Required when v3 is enabled. Dynamic discovery is not part of this implementation.",
+        "type": ["array", "null"],
+        "items": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f]{10,64}$"
+        },
+        "uniqueItems": true
+      },
+      "local_engine_id": {
+        "title": "Local engine ID",
+        "description": "Receiver-local SNMPv3 engine ID for v3 INFORM authentication (hex string, 5-32 bytes). When omitted or empty, Netdata generates and persists a stable per-job engine ID at /var/lib/netdata/snmp-trap/{job_name}/local-engine-id.",
+        "type": "string",
+        "pattern": "^(|[0-9A-Fa-f]{10,64})$"
+      },
+      "dynamic_engine_id_discovery": {
+        "title": "Dynamic engine ID discovery",
+        "description": "Reserved for a later implementation. Enabling it fails job creation.",
+        "type": "boolean",
+        "default": false
+      },
+      "reverse_dns": {
+        "title": "Reverse DNS",
+        "description": "Optional source-IP PTR enrichment for _HOSTNAME. Disabled by default; when enabled, trap packet handling uses cached non-blocking lookups and falls back to source IP until a name is available.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "Enable best-effort reverse DNS enrichment for trap source IPs.",
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "allowlist": {
+        "title": "Allowlist",
+        "description": "Pre-decode source-IP CIDR allowlist.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source_cidrs": {
+            "title": "Source CIDRs",
+            "description": "Source IP CIDR allowlist matched before BER decode. Empty accepts IPv4 and IPv6 from all sources.",
+            "type": "array",
+            "default": ["0.0.0.0/0", "::/0"],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "rate_limit": {
+        "title": "Rate Limit",
+        "description": "Per-source token-bucket rate limiting. Default off.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "Enable per-source rate limiting.",
+            "type": "boolean",
+            "default": false
+          },
+          "per_source_pps": {
+            "title": "Per-source PPS",
+            "description": "Maximum traps per second from a single source IP. Set 0 to use the default.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 1000
+          },
+          "mode": {
+            "title": "Mode",
+            "description": "Action when rate limit is exceeded: drop (discard trap) or sample (allow but count).",
+            "type": "string",
+            "enum": ["drop", "sample"],
+            "default": "drop"
+          }
+        }
+      },
+      "dedup": {
+        "title": "Deduplication",
+        "description": "Reserved for a later implementation. Leave disabled; enabling it fails job creation.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean",
+            "default": false
+          },
+          "window_sec": {
+            "title": "Window seconds",
+            "type": "integer",
+            "minimum": 1,
+            "default": 5
+          },
+          "cache_max_entries": {
+            "title": "Cache maximum entries",
+            "type": "integer",
+            "minimum": 1,
+            "default": 100000
+          },
+          "key_varbinds": {
+            "title": "Key varbinds",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        }
       },
       "retention": {
         "title": "Retention",
         "description": "Per-job journal retention and rotation policy.",
         "type": "object",
+        "additionalProperties": false,
         "properties": {
           "max_size": {
             "title": "Maximum total size",
@@ -112,22 +270,72 @@
           }
         }
       },
-      "communities": {
-        "title": "Communities",
-        "description": "SNMPv1/v2c community allowlist. Empty allows all communities until authentication enforcement is added.",
-        "type": [
-          "array",
-          "null"
-        ],
+      "overrides": {
+        "title": "Per-OID overrides",
+        "description": "Per-OID category, severity, and label overrides on top of profile defaults.",
+        "type": "array",
         "items": {
-          "type": "string"
-        },
-        "uniqueItems": true
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "oid": {
+              "title": "OID",
+              "description": "Numeric trap OID to override.",
+              "type": "string"
+            },
+            "category": {
+              "title": "Category",
+              "description": "Override profile category.",
+              "type": "string",
+              "enum": ["state_change", "config_change", "security", "auth", "license", "mobility", "diagnostic", "unknown"]
+            },
+            "severity": {
+              "title": "Severity",
+              "description": "Override profile severity.",
+              "type": "string",
+              "enum": ["emerg", "alert", "crit", "err", "warning", "notice", "info", "debug"]
+            },
+            "labels": {
+              "title": "Labels",
+              "description": "Additional labels for this OID.",
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["oid"]
+        }
+      },
+      "metrics": {
+        "title": "Per-OID metric opt-in",
+        "description": "Reserved for a later implementation. Any non-empty list fails job creation in this implementation.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "oid": {
+              "title": "OID",
+              "description": "Numeric trap OID to emit as a metric.",
+              "type": "string"
+            },
+            "context": {
+              "title": "Context",
+              "description": "Metric context name (e.g. snmp.trap.cisco_config_changes).",
+              "type": "string"
+            },
+            "dimension_from_varbind": {
+              "title": "Dimension from varbind",
+              "description": "Varbind name used as dimension value. Must reference a bounded-cardinality varbind.",
+              "type": "string"
+            }
+          },
+          "required": ["oid", "context"]
+        }
       }
     },
-    "required": [
-      "listen"
-    ]
+    "required": ["listen"]
   },
   "uiSchema": {
     "uiOptions": {
@@ -137,6 +345,20 @@
       "endpoints": {
         "ui:listFlavour": "list"
       }
+    },
+    "usm_users": {
+      "ui:listFlavour": "list"
+    },
+    "dedup": {
+      "key_varbinds": {
+        "ui:listFlavour": "list"
+      }
+    },
+    "overrides": {
+      "ui:listFlavour": "list"
+    },
+    "metrics": {
+      "ui:listFlavour": "list"
     }
   }
 }

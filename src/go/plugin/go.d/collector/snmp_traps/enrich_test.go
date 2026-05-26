@@ -1,0 +1,576 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package snmp_traps
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+)
+
+func TestEnrichTrapEntryHostnamePriority(t *testing.T) {
+	regKey := "key:10.1.2.3:162"
+	ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
+		Hostname:      "10.1.2.3",
+		SysName:       "core-sw-01",
+		VnodeHostname: "core-sw.mydc.example.com",
+		Vendor:        "cisco",
+		VnodeGUID:     "8f72c1e2-3a4b-5c6d-7e8f-9a0b1c2d3e4f",
+	})
+	defer ddsnmp.DeviceRegistry.Unregister(regKey)
+
+	dns := newReverseDNSResolver()
+
+	tests := map[string]struct {
+		sourceIP      string
+		useReverseDNS bool
+		wantHostname  string
+		wantVendor    string
+		wantVnodeID   string
+		dnsCache      map[string]string
+	}{
+		"vnode_hostname_wins_over_sysname": {
+			sourceIP: "10.1.2.3", wantHostname: "core-sw.mydc.example.com",
+			wantVendor: "cisco", wantVnodeID: "8f72c1e2-3a4b-5c6d-7e8f-9a0b1c2d3e4f",
+		},
+		"vnode_hostname_without_sysname": {
+			sourceIP: "10.2.3.4", wantHostname: "",
+		},
+		"empty_source_ip": {
+			sourceIP: "", wantHostname: "",
+		},
+	}
+
+	for tcName, tc := range tests {
+		t.Run(tcName, func(t *testing.T) {
+			entry := &TrapEntry{
+				SourceIP: tc.sourceIP,
+			}
+			enrichTrapEntry(entry, tc.useReverseDNS, dns)
+
+			if entry.DeviceHostname != tc.wantHostname {
+				t.Errorf("DeviceHostname = %q, want %q", entry.DeviceHostname, tc.wantHostname)
+			}
+			if tc.wantVendor != "" && entry.DeviceVendor != tc.wantVendor {
+				t.Errorf("DeviceVendor = %q, want %q", entry.DeviceVendor, tc.wantVendor)
+			}
+			if tc.wantVnodeID != "" && entry.SourceVnodeID != tc.wantVnodeID {
+				t.Errorf("SourceVnodeID = %q, want %q", entry.SourceVnodeID, tc.wantVnodeID)
+			}
+		})
+	}
+}
+
+func TestEnrichTrapEntryRegistryHostnameWinsOverTopologyAndReverseDNS(t *testing.T) {
+	tests := map[string]struct {
+		info         ddsnmp.DeviceConnectionInfo
+		wantHost     string
+		wantVendor   string
+		wantVnodeID  string
+		wantIface    string
+		wantNeighbor string
+	}{
+		"vnode_hostname_wins": {
+			info: ddsnmp.DeviceConnectionInfo{
+				Hostname:      "10.1.2.6",
+				SysName:       "registry-sysname",
+				VnodeHostname: "registry-vnode-name",
+				Vendor:        "registry-vendor",
+				VnodeGUID:     "registry-vnode-id",
+			},
+			wantHost:     "registry-vnode-name",
+			wantVendor:   "registry-vendor",
+			wantVnodeID:  "registry-vnode-id",
+			wantIface:    "Gi0/1",
+			wantNeighbor: "topo-neighbor",
+		},
+		"sysname_wins_when_vnode_hostname_unknown": {
+			info: ddsnmp.DeviceConnectionInfo{
+				Hostname:      "10.1.2.7",
+				SysName:       "registry-sysname",
+				VnodeHostname: "unknown",
+			},
+			wantHost:     "registry-sysname",
+			wantVendor:   "topology-vendor",
+			wantVnodeID:  "topology-vnode-id",
+			wantIface:    "Gi0/1",
+			wantNeighbor: "topo-neighbor",
+		},
+	}
+
+	prev := trapTopologyEnrichmentForIP
+	trapTopologyEnrichmentForIP = func(string) *snmptopology.TrapTopologyEnrichment {
+		return &snmptopology.TrapTopologyEnrichment{
+			DeviceHostname: "topology-sysname",
+			DeviceVendor:   "topology-vendor",
+			SourceVnodeID:  "topology-vnode-id",
+			Interface:      "Gi0/1",
+			Neighbors:      []string{"topo-neighbor"},
+		}
+	}
+	t.Cleanup(func() { trapTopologyEnrichmentForIP = prev })
+
+	for tcName, tc := range tests {
+		t.Run(tcName, func(t *testing.T) {
+			regKey := "key:" + tc.info.Hostname + ":162"
+			ddsnmp.DeviceRegistry.Register(regKey, tc.info)
+			defer ddsnmp.DeviceRegistry.Unregister(regKey)
+
+			dns := newReverseDNSResolver()
+			dns.cache[tc.info.Hostname] = reverseDNSCacheEntry{
+				name:      "reverse.example.com",
+				expiresAt: farFuture(),
+			}
+			defer dns.Close()
+
+			entry := &TrapEntry{SourceIP: tc.info.Hostname}
+			enrichTrapEntry(entry, true, dns)
+
+			if entry.DeviceHostname != tc.wantHost {
+				t.Errorf("DeviceHostname = %q, want %q", entry.DeviceHostname, tc.wantHost)
+			}
+			if entry.DeviceVendor != tc.wantVendor {
+				t.Errorf("DeviceVendor = %q, want %q", entry.DeviceVendor, tc.wantVendor)
+			}
+			if entry.SourceVnodeID != tc.wantVnodeID {
+				t.Errorf("SourceVnodeID = %q, want %q", entry.SourceVnodeID, tc.wantVnodeID)
+			}
+			if entry.TopologyInterface != tc.wantIface {
+				t.Errorf("TopologyInterface = %q, want %q", entry.TopologyInterface, tc.wantIface)
+			}
+			if entry.TopologyNeighbors != tc.wantNeighbor {
+				t.Errorf("TopologyNeighbors = %q, want %q", entry.TopologyNeighbors, tc.wantNeighbor)
+			}
+		})
+	}
+}
+
+func TestEnrichTrapEntrySysNameOverVnodeUnknown(t *testing.T) {
+	regKey := "key:10.1.2.4:162"
+	ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
+		Hostname:      "10.1.2.4",
+		SysName:       "real-switch",
+		VnodeHostname: "unknown",
+	})
+	defer ddsnmp.DeviceRegistry.Unregister(regKey)
+
+	entry := &TrapEntry{SourceIP: "10.1.2.4"}
+	enrichTrapEntry(entry, false, nil)
+
+	if entry.DeviceHostname != "real-switch" {
+		t.Errorf("DeviceHostname = %q, want real-switch (unknown vnode hostname treated as unresolved)", entry.DeviceHostname)
+	}
+}
+
+func TestEnrichTrapEntryEmptySysNameSkipped(t *testing.T) {
+	regKey := "key:10.1.2.5:162"
+	ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
+		Hostname: "10.1.2.5",
+		SysName:  "",
+	})
+	defer ddsnmp.DeviceRegistry.Unregister(regKey)
+
+	entry := &TrapEntry{SourceIP: "10.1.2.5"}
+	enrichTrapEntry(entry, false, nil)
+
+	if entry.DeviceHostname != "" {
+		t.Errorf("DeviceHostname = %q, want empty (empty sysName treated as unresolved)", entry.DeviceHostname)
+	}
+}
+
+func TestEnrichTrapEntryNoDeviceRegistryMatch(t *testing.T) {
+	entry := &TrapEntry{SourceIP: "172.16.0.99"}
+	enrichTrapEntry(entry, false, nil)
+
+	if entry.DeviceHostname != "" {
+		t.Errorf("DeviceHostname = %q, want empty for unknown device", entry.DeviceHostname)
+	}
+	if entry.DeviceVendor != "" {
+		t.Errorf("DeviceVendor = %q, want empty", entry.DeviceVendor)
+	}
+	if entry.SourceVnodeID != "" {
+		t.Errorf("SourceVnodeID = %q, want empty", entry.SourceVnodeID)
+	}
+}
+
+func TestEnrichTrapEntrySourceUDPPeerFallback(t *testing.T) {
+	entry := &TrapEntry{SourceUDPPeer: "192.168.1.1"}
+	enrichTrapEntry(entry, false, nil)
+
+	if entry.DeviceHostname != "" {
+		t.Errorf("DeviceHostname = %q, want empty (no device match)", entry.DeviceHostname)
+	}
+}
+
+func TestEnrichTrapEntryNilEntry(t *testing.T) {
+	enrichTrapEntry(nil, false, nil)
+}
+
+func TestEnrichTrapEntryNoSource(t *testing.T) {
+	entry := &TrapEntry{}
+	enrichTrapEntry(entry, false, nil)
+
+	if entry.DeviceHostname != "" {
+		t.Errorf("DeviceHostname = %q, want empty", entry.DeviceHostname)
+	}
+}
+
+func TestEnrichTrapEntryReverseDNSDefaultOff(t *testing.T) {
+	regKey := "key:10.5.5.1:162"
+	ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
+		Hostname: "10.5.5.1",
+	})
+	defer ddsnmp.DeviceRegistry.Unregister(regKey)
+
+	dns := newReverseDNSResolver()
+	dns.cache["10.5.5.1"] = reverseDNSCacheEntry{
+		name:      "core-sw.mydc.example.com",
+		expiresAt: farFuture(),
+	}
+
+	entry := &TrapEntry{SourceIP: "10.5.5.1"}
+	enrichTrapEntry(entry, false, dns)
+
+	if entry.DeviceHostname != "" {
+		t.Errorf("DeviceHostname = %q, want empty (reverse DNS disabled, no vnode/sysName)", entry.DeviceHostname)
+	}
+}
+
+func TestEnrichTrapEntryReverseDNSEnabledNoSNMPState(t *testing.T) {
+	dns := newReverseDNSResolver()
+	dns.cache["10.6.6.1"] = reverseDNSCacheEntry{
+		name:      "peer.mydc.example.com",
+		expiresAt: farFuture(),
+	}
+
+	entry := &TrapEntry{SourceIP: "10.6.6.1"}
+	enrichTrapEntry(entry, true, dns)
+
+	if entry.DeviceHostname != "peer.mydc.example.com" {
+		t.Errorf("DeviceHostname = %q, want peer.mydc.example.com (reverse DNS enabled, cached)", entry.DeviceHostname)
+	}
+}
+
+func TestEnrichTrapEntryReverseDNSDisabledNoCacheUse(t *testing.T) {
+	regKey := "key:10.7.7.1:162"
+	ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
+		Hostname: "10.7.7.1",
+	})
+	defer ddsnmp.DeviceRegistry.Unregister(regKey)
+
+	dns := newReverseDNSResolver()
+	dns.cache["10.7.7.1"] = reverseDNSCacheEntry{
+		name:      "cached.example.com",
+		expiresAt: farFuture(),
+	}
+
+	entry := &TrapEntry{SourceIP: "10.7.7.1"}
+	enrichTrapEntry(entry, false, dns)
+
+	if entry.DeviceHostname != "" {
+		t.Errorf("DeviceHostname = %q, want empty (reverse DNS disabled, no SNMP state)", entry.DeviceHostname)
+	}
+}
+
+func TestEnrichTrapEntryReverseDNSDoesNotResolveWhenHostnameKnown(t *testing.T) {
+	regKey := "key:10.7.7.2:162"
+	ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
+		Hostname: "10.7.7.2",
+		SysName:  "known-switch",
+	})
+	defer ddsnmp.DeviceRegistry.Unregister(regKey)
+
+	dns := newReverseDNSResolver()
+	entry := &TrapEntry{SourceIP: "10.7.7.2"}
+	enrichTrapEntry(entry, true, dns)
+
+	if entry.DeviceHostname != "known-switch" {
+		t.Errorf("DeviceHostname = %q, want known-switch", entry.DeviceHostname)
+	}
+	dns.mu.RLock()
+	_, pending := dns.pending["10.7.7.2"]
+	dns.mu.RUnlock()
+	if pending {
+		t.Fatal("reverse DNS lookup was scheduled despite known SNMP hostname")
+	}
+}
+
+func TestEnrichTrapEntryReverseDNSEnabledSchedulesAsyncLookup(t *testing.T) {
+	dns := newReverseDNSResolver()
+	defer dns.Close()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	dns.lookupAddr = func(ctx context.Context, ip string) ([]string, error) {
+		close(started)
+		select {
+		case <-release:
+			return []string{"peer.mydc.example.com."}, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	entry := &TrapEntry{SourceIP: "203.0.113.10"}
+	enrichTrapEntry(entry, true, dns)
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("reverse DNS lookup was not started")
+	}
+
+	dns.mu.RLock()
+	_, pending := dns.pending["203.0.113.10"]
+	dns.mu.RUnlock()
+	if !pending {
+		t.Fatal("reverse DNS lookup was not marked pending")
+	}
+
+	close(release)
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if got := dns.lookupCached("203.0.113.10"); got == "peer.mydc.example.com" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("reverse DNS cache was not populated, got %q", dns.lookupCached("203.0.113.10"))
+}
+
+func TestEnrichTrapEntryVendorAndVnodeEnrichment(t *testing.T) {
+	tests := map[string]struct {
+		hostname    string
+		sysName     string
+		vendor      string
+		vnodeGUID   string
+		wantVendor  string
+		wantVnodeID string
+	}{
+		"vendor_and_vnode_set": {
+			hostname: "10.8.8.1", sysName: "switch1",
+			vendor: "juniper", vnodeGUID: "abcd-1234",
+			wantVendor: "juniper", wantVnodeID: "abcd-1234",
+		},
+		"vendor_empty_omitted": {
+			hostname: "10.8.8.2", sysName: "switch2",
+			vendor: "", vnodeGUID: "efgh-5678",
+			wantVendor: "", wantVnodeID: "efgh-5678",
+		},
+		"vnode_empty_omitted": {
+			hostname: "10.8.8.3", sysName: "switch3",
+			vendor: "arista", vnodeGUID: "",
+			wantVendor: "arista", wantVnodeID: "",
+		},
+		"both_empty": {
+			hostname: "10.8.8.4", sysName: "switch4",
+			vendor: "", vnodeGUID: "",
+			wantVendor: "", wantVnodeID: "",
+		},
+	}
+
+	for tcName, tc := range tests {
+		t.Run(tcName, func(t *testing.T) {
+			regKey := "key:" + tc.hostname + ":162"
+			ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
+				Hostname:  tc.hostname,
+				SysName:   tc.sysName,
+				Vendor:    tc.vendor,
+				VnodeGUID: tc.vnodeGUID,
+			})
+			defer ddsnmp.DeviceRegistry.Unregister(regKey)
+
+			entry := &TrapEntry{SourceIP: tc.hostname}
+			enrichTrapEntry(entry, false, nil)
+
+			if entry.DeviceVendor != tc.wantVendor {
+				t.Errorf("DeviceVendor = %q, want %q", entry.DeviceVendor, tc.wantVendor)
+			}
+			if entry.SourceVnodeID != tc.wantVnodeID {
+				t.Errorf("SourceVnodeID = %q, want %q", entry.SourceVnodeID, tc.wantVnodeID)
+			}
+		})
+	}
+}
+
+func TestIsUnresolvedSysName(t *testing.T) {
+	tests := map[string]struct {
+		name string
+		want bool
+	}{
+		"empty_string":       {name: "", want: true},
+		"literal_unknown":    {name: "unknown", want: true},
+		"upper_unknown":      {name: "UNKNOWN", want: true},
+		"mixed_case_unknown": {name: "Unknown", want: true},
+		"whitespace_unknown": {name: "  unknown  ", want: true},
+		"valid_name":         {name: "core-sw-01", want: false},
+		"single_char":        {name: "x", want: false},
+	}
+
+	for tcName, tc := range tests {
+		t.Run(tcName, func(t *testing.T) {
+			if got := isUnresolvedSysName(tc.name); got != tc.want {
+				t.Errorf("isUnresolvedSysName(%q) = %v, want %v", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestReverseDNSLookupCached(t *testing.T) {
+	dns := newReverseDNSResolver()
+
+	if got := dns.lookupCached("10.1.2.3"); got != "" {
+		t.Errorf("empty cache returned %q, want empty", got)
+	}
+
+	dns.cache["10.1.2.3"] = reverseDNSCacheEntry{
+		name:      "core-sw.example.com",
+		expiresAt: farFuture(),
+	}
+	if got := dns.lookupCached("10.1.2.3"); got != "core-sw.example.com" {
+		t.Errorf("lookupCached = %q, want core-sw.example.com", got)
+	}
+}
+
+func TestReverseDNSLookupCachedNilResolver(t *testing.T) {
+	var dns *reverseDNSResolver
+	if got := dns.lookupCached("10.1.2.3"); got != "" {
+		t.Errorf("nil resolver returned %q, want empty", got)
+	}
+}
+
+func TestReverseDNSLookupCachedInvalidIP(t *testing.T) {
+	dns := newReverseDNSResolver()
+	dns.cache["not-an-ip"] = reverseDNSCacheEntry{
+		name:      "should-not-return",
+		expiresAt: farFuture(),
+	}
+	if got := dns.lookupCached("not-an-ip"); got != "" {
+		t.Errorf("invalid IP returned %q, want empty", got)
+	}
+}
+
+func TestReverseDNSResolveAsyncSkipsExisting(t *testing.T) {
+	dns := newReverseDNSResolver()
+	dns.cache["10.1.2.3"] = reverseDNSCacheEntry{
+		name:      "existing.example.com",
+		expiresAt: farFuture(),
+	}
+	dns.resolveAsync("10.1.2.3")
+
+	if got := dns.lookupCached("10.1.2.3"); got != "existing.example.com" {
+		t.Errorf("existing entry was overwritten, got %q, want existing.example.com", got)
+	}
+}
+
+func TestReverseDNSResolveAsyncSkipsPending(t *testing.T) {
+	dns := newReverseDNSResolver()
+	dns.pending["10.1.2.3"] = struct{}{}
+
+	dns.resolveAsync("10.1.2.3")
+
+	dns.mu.RLock()
+	_, stillPending := dns.pending["10.1.2.3"]
+	dns.mu.RUnlock()
+	if !stillPending {
+		t.Fatal("pending entry was unexpectedly removed")
+	}
+}
+
+func TestReverseDNSResolveAsyncNilResolver(t *testing.T) {
+	var dns *reverseDNSResolver
+	dns.resolveAsync("10.1.2.3")
+}
+
+func TestReverseDNSMaybeSweepExpiredAndCapsCache(t *testing.T) {
+	now := time.Now()
+	dns := newReverseDNSResolver()
+	dns.maxEntries = 2
+	dns.cache["10.1.2.1"] = reverseDNSCacheEntry{
+		name:      "expired.example.com",
+		expiresAt: now.Add(-time.Second),
+	}
+	dns.cache["10.1.2.2"] = reverseDNSCacheEntry{
+		name:      "valid-a.example.com",
+		expiresAt: now.Add(time.Hour),
+	}
+	dns.cache["10.1.2.3"] = reverseDNSCacheEntry{
+		name:      "valid-b.example.com",
+		expiresAt: now.Add(time.Hour),
+	}
+	dns.cache["10.1.2.4"] = reverseDNSCacheEntry{
+		name:      "valid-c.example.com",
+		expiresAt: now.Add(time.Hour),
+	}
+
+	dns.maybeSweep(now)
+
+	if _, ok := dns.cache["10.1.2.1"]; ok {
+		t.Fatal("expired reverse DNS cache entry was not swept")
+	}
+	if len(dns.cache) > dns.maxEntries {
+		t.Fatalf("cache length = %d, want at most %d", len(dns.cache), dns.maxEntries)
+	}
+}
+
+func TestReverseDNSTrimCachePrefersNegativeThenOldest(t *testing.T) {
+	now := time.Now()
+	dns := newReverseDNSResolver()
+	dns.maxEntries = 2
+	dns.cache["10.1.2.1"] = reverseDNSCacheEntry{
+		name:      "newer.example.com",
+		expiresAt: now.Add(10 * time.Minute),
+	}
+	dns.cache["10.1.2.2"] = reverseDNSCacheEntry{
+		name:      "",
+		expiresAt: now.Add(30 * time.Second),
+	}
+	dns.cache["10.1.2.3"] = reverseDNSCacheEntry{
+		name:      "older.example.com",
+		expiresAt: now.Add(time.Minute),
+	}
+	dns.cache["10.1.2.4"] = reverseDNSCacheEntry{
+		name:      "middle.example.com",
+		expiresAt: now.Add(5 * time.Minute),
+	}
+
+	dns.maybeSweep(now)
+
+	if _, ok := dns.cache["10.1.2.2"]; ok {
+		t.Fatal("negative reverse DNS cache entry was not evicted first")
+	}
+	if _, ok := dns.cache["10.1.2.3"]; ok {
+		t.Fatal("oldest positive reverse DNS cache entry was not evicted second")
+	}
+	if _, ok := dns.cache["10.1.2.1"]; !ok {
+		t.Fatal("newest positive reverse DNS cache entry was unexpectedly evicted")
+	}
+	if _, ok := dns.cache["10.1.2.4"]; !ok {
+		t.Fatal("middle positive reverse DNS cache entry was unexpectedly evicted")
+	}
+}
+
+func TestReverseDNSClosePreventsResolveAsync(t *testing.T) {
+	dns := newReverseDNSResolver()
+	dns.Close()
+
+	dns.resolveAsync("10.1.2.3")
+
+	dns.mu.RLock()
+	_, pending := dns.pending["10.1.2.3"]
+	dns.mu.RUnlock()
+	if pending {
+		t.Fatal("reverse DNS lookup was scheduled after resolver close")
+	}
+	if got := dns.lookupCached("10.1.2.3"); got != "" {
+		t.Errorf("lookupCached after close = %q, want empty", got)
+	}
+}
+
+func farFuture() time.Time {
+	return time.Now().Add(24 * time.Hour)
+}

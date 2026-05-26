@@ -1,0 +1,86 @@
+version: v1
+context_namespace: snmp
+groups:
+  - family: traps
+    context_namespace: trap
+    metrics:
+      - snmp_trap_events_state_change
+      - snmp_trap_events_config_change
+      - snmp_trap_events_security
+      - snmp_trap_events_auth
+      - snmp_trap_events_license
+      - snmp_trap_events_mobility
+      - snmp_trap_events_diagnostic
+      - snmp_trap_events_unknown
+      - snmp_trap_errors_unknown_oid
+      - snmp_trap_errors_decode_failed
+      - snmp_trap_errors_template_unresolved
+      - snmp_trap_errors_malformed_pdu
+      - snmp_trap_errors_dropped_allowlist
+      - snmp_trap_errors_rate_limited
+      - snmp_trap_errors_auth_failures
+      - snmp_trap_errors_usm_failures
+      - snmp_trap_errors_unknown_engine_id
+      - snmp_trap_errors_inform_response_failed
+      - snmp_trap_errors_sanitized
+      - snmp_trap_errors_profile_load_failed
+      - snmp_trap_errors_journal_write_failed
+    charts:
+      - id: events
+        title: SNMP trap events
+        context: events
+        units: events/s
+        type: stacked
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_events_state_change
+            name: state_change
+          - selector: snmp_trap_events_config_change
+            name: config_change
+          - selector: snmp_trap_events_security
+            name: security
+          - selector: snmp_trap_events_auth
+            name: auth
+          - selector: snmp_trap_events_license
+            name: license
+          - selector: snmp_trap_events_mobility
+            name: mobility
+          - selector: snmp_trap_events_diagnostic
+            name: diagnostic
+          - selector: snmp_trap_events_unknown
+            name: unknown
+      - id: errors
+        title: SNMP trap processing errors
+        context: errors
+        units: errors/s
+        type: stacked
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_errors_unknown_oid
+            name: unknown_oid
+          - selector: snmp_trap_errors_decode_failed
+            name: decode_failed
+          - selector: snmp_trap_errors_template_unresolved
+            name: template_unresolved
+          - selector: snmp_trap_errors_malformed_pdu
+            name: malformed_pdu
+          - selector: snmp_trap_errors_dropped_allowlist
+            name: dropped_allowlist
+          - selector: snmp_trap_errors_rate_limited
+            name: rate_limited
+          - selector: snmp_trap_errors_auth_failures
+            name: auth_failures
+          - selector: snmp_trap_errors_usm_failures
+            name: usm_failures
+          - selector: snmp_trap_errors_unknown_engine_id
+            name: unknown_engine_id
+          - selector: snmp_trap_errors_inform_response_failed
+            name: inform_response_failed
+          - selector: snmp_trap_errors_sanitized
+            name: sanitized
+          - selector: snmp_trap_errors_profile_load_failed
+            name: profile_load_failed
+          - selector: snmp_trap_errors_journal_write_failed
+            name: journal_write_failed

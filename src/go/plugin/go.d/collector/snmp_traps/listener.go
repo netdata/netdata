@@ -56,7 +56,7 @@ func newListener(jobName string, endpoints []EndpointConfig) (*Listener, error) 
 	return l, nil
 }
 
-func (l *Listener) start(handler func([]byte, net.IP)) {
+func (l *Listener) start(handler func([]byte, net.IP, *net.UDPConn, *net.UDPAddr)) {
 	for i := range l.endpoints {
 		ep := l.endpoints[i]
 		l.wg.Add(1)
@@ -64,10 +64,11 @@ func (l *Listener) start(handler func([]byte, net.IP)) {
 	}
 }
 
-func (l *Listener) readLoop(ep listenerEndpoint, handler func([]byte, net.IP)) {
+func (l *Listener) readLoop(ep listenerEndpoint, handler func([]byte, net.IP, *net.UDPConn, *net.UDPAddr)) {
 	defer l.wg.Done()
 
-	buf := make([]byte, maxDatagramSize)
+	// Keep one extra byte so oversized datagrams are classified by DecodeTrap.
+	buf := make([]byte, maxDatagramSize+1)
 	for {
 		n, peer, err := ep.conn.ReadFromUDP(buf)
 		if err != nil {
@@ -81,7 +82,7 @@ func (l *Listener) readLoop(ep listenerEndpoint, handler func([]byte, net.IP)) {
 		if peer != nil {
 			peerIP = peer.IP
 		}
-		handler(buf[:n], peerIP)
+		handler(buf[:n], peerIP, ep.conn, peer)
 	}
 }
 

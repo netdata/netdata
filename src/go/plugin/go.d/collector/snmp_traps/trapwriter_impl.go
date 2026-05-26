@@ -265,6 +265,13 @@ func (tw *journalTrapWriter) Write(entry *TrapEntry) error {
 	}
 }
 
+func (tw *journalTrapWriter) SanitizedFields() uint64 {
+	if tw.journal == nil {
+		return 0
+	}
+	return tw.journal.SanitizedFields()
+}
+
 func (tw *journalTrapWriter) Flush() error {
 	if atomic.LoadInt32(&tw.closed) != 0 {
 		return errWriterClosed

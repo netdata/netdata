@@ -7,11 +7,12 @@ import "sync"
 var _ TrapWriter = (*mockTrapWriter)(nil)
 
 type mockTrapWriter struct {
-	mu      sync.Mutex
-	entries []*TrapEntry
-	flushes int
-	closed  bool
-	err     error
+	mu              sync.Mutex
+	entries         []*TrapEntry
+	flushes         int
+	closed          bool
+	err             error
+	sanitizedFields uint64
 }
 
 func (m *mockTrapWriter) Write(entry *TrapEntry) error {
@@ -32,6 +33,12 @@ func (m *mockTrapWriter) Flush() error {
 	}
 	m.flushes++
 	return nil
+}
+
+func (m *mockTrapWriter) SanitizedFields() uint64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.sanitizedFields
 }
 
 func (m *mockTrapWriter) Close() error {

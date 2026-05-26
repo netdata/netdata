@@ -4,7 +4,7 @@ package snmp_traps
 
 import "fmt"
 
-func trapEntryFromPDU(jobName, vnode string, pdu *TrapPDU, td *TrapDef, realtimeUsec, monotonicUsec int64) *TrapEntry {
+func trapEntryFromPDU(jobName string, pdu *TrapPDU, td *TrapDef, realtimeUsec, monotonicUsec int64) *TrapEntry {
 	entry := &TrapEntry{
 		JobName:               jobName,
 		ReportType:            ReportTypeTrap,
@@ -17,7 +17,6 @@ func trapEntryFromPDU(jobName, vnode string, pdu *TrapPDU, td *TrapDef, realtime
 		SourceUDPPeer:         pdu.PeerIP,
 		PduType:               pdu.PduType,
 		SnmpVersion:           pdu.Version,
-		SourceVnodeID:         vnode,
 		Varbinds:              make([]VarbindValue, 0, len(pdu.Varbinds)),
 	}
 
@@ -31,16 +30,22 @@ func trapEntryFromPDU(jobName, vnode string, pdu *TrapPDU, td *TrapDef, realtime
 		entry.Varbinds = append(entry.Varbinds, resolve2TierVarbind(vb.OID, vb, td))
 	}
 
+	return entry
+}
+
+func renderTrapEntryTemplates(entry *TrapEntry, td *TrapDef) {
+	if entry == nil {
+		return
+	}
 	if td != nil {
 		entry.Message = renderMessage(entry, td)
 		entry.Labels = renderLabels(entry, td)
-	} else {
-		source := entry.SourceIP
-		if source == "" {
-			source = entry.SourceUDPPeer
-		}
-		entry.Message = fmt.Sprintf("SNMP trap %s from %s", entry.TrapOID, source)
+		return
 	}
 
-	return entry
+	source := entry.SourceIP
+	if source == "" {
+		source = entry.SourceUDPPeer
+	}
+	entry.Message = fmt.Sprintf("SNMP trap %s from %s", entry.TrapOID, source)
 }

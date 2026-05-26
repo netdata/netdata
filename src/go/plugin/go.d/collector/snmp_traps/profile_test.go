@@ -1234,16 +1234,35 @@ func TestRenderMessageSpecialVars(t *testing.T) {
 }
 
 func TestRenderMessageHostnameFallback(t *testing.T) {
-	entry := &TrapEntry{
-		TrapName: "IF-MIB::linkDown",
-		SourceIP: "10.0.0.1",
+	tests := map[string]struct {
+		entry *TrapEntry
+		want  string
+	}{
+		"source_ip": {
+			entry: &TrapEntry{
+				TrapName: "IF-MIB::linkDown",
+				SourceIP: "10.0.0.1",
+			},
+			want: "10.0.0.1",
+		},
+		"udp_peer": {
+			entry: &TrapEntry{
+				TrapName:      "IF-MIB::linkDown",
+				SourceUDPPeer: "10.0.0.2",
+			},
+			want: "10.0.0.2",
+		},
 	}
 	td := &TrapDef{
 		Description: "Host: {_HOSTNAME}",
 	}
 
-	msg := renderMessage(entry, td)
-	assert.Contains(t, msg, "10.0.0.1")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			msg := renderMessage(tc.entry, td)
+			assert.Contains(t, msg, tc.want)
+		})
+	}
 }
 
 // =============================================================================
