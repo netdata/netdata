@@ -205,7 +205,7 @@ To exclude multiple specific alerts, list all exclusions before the wildcard and
     [health]
         enabled alarms = !oom_kill !disk_space_usage *
 
-Restart your Netdata Agent after changing `netdata.conf` (reload-health only reloads `health.d/*.conf`).
+Restart your Netdata Agent after changing `netdata.conf` (`netdatacli reload-health` reloads health configuration files, but does not reload `netdata.conf`).
 
 :::warning
 
