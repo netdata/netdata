@@ -206,6 +206,7 @@ To exclude multiple specific alerts, list all exclusions before the wildcard and
         enabled alarms = !oom_kill !disk_space_usage *
 
 Restart your Netdata Agent after changing `netdata.conf` (reload-health only reloads `health.d/*.conf`).
+
 :::warning
 
 Do **not** place `*` between exclusions (`!alert1 * !alert2 *` is incorrect — `*` matches everything immediately, preventing later exclusions from taking effect). All `!` patterns must come first, followed by a single `*`.
