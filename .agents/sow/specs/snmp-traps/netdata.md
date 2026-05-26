@@ -552,11 +552,13 @@ When enabled, dedup operates per-job: each listener has its own in-memory dedup 
 
 ### Mechanism — hot path (only when `dedup.enabled: true` on the job)
 
-1. Compute fingerprint per trap: `hash(source_device, trap_OID, key_varbinds)`. **Default key varbinds = `[]` meaning the fingerprint uses only `(source_device, trap_OID)`.** Profiles can override per-OID via `dedup_key_varbinds:` (e.g., port-security trap fingerprints by `[macAddress, vlan]` so different MAC/VLAN combinations are NOT collapsed). If a configured key varbind is absent from a received PDU, the canonical fingerprint uses a missing-value sentinel distinct from the empty string. Operators should list only varbinds that the trap normally emits. The "all non-timestamp varbinds" default was rejected by Phase B because volatile counter varbinds (`ifInErrors`, BGP counters) trivially differ per event, bypassing dedup entirely.
+1. Compute fingerprint per trap after enrichment: `hash(source_device, trap_OID, key_varbinds)`. **Default key varbinds = `[]` meaning the fingerprint uses only `(source_device, trap_OID)`.** Profiles can override per-OID via `dedup_key_varbinds:` (e.g., port-security trap fingerprints by `[macAddress, vlan]` so different MAC/VLAN combinations are NOT collapsed). If a configured key varbind is absent from a received PDU, the canonical fingerprint uses a missing-value sentinel distinct from the empty string and from legitimate literal varbind values. Operators should list only varbinds that the trap normally emits. The "all non-timestamp varbinds" default was rejected by Phase B because volatile counter varbinds (`ifInErrors`, BGP counters) trivially differ per event, bypassing dedup entirely.
 2. Check the per-job in-memory dedup cache (LRU-bounded, default 100k entries, configurable):
-   - **Fingerprint NOT present** → write journal entry immediately, increment metric counters, insert fingerprint into cache with TTL = dedup window. **Real-time, no buffering, no delay.**
-   - **Fingerprint present** → suppress: no journal write, no per-event metric increment. Increment the in-memory per-period suppression counter (broken down by trap-OID).
+   - **Fingerprint NOT present** → write journal entry immediately, increment per-event counters, insert fingerprint into cache with TTL = dedup window. **Real-time, no buffering, no delay.**
+   - **Fingerprint present** → suppress: no journal write, no per-event metric increment. Increment the in-memory per-period suppression counter (broken down by trap-OID). Pipeline-health/error counters such as `unknown_oid` and `template_unresolved` are incremented before the dedup gate, so operators still see profile/template coverage gaps at received-PDU volume even when duplicates are suppressed.
 3. Cache entries expire after the dedup window (default 5 seconds; configurable per-job).
+
+`source_device` is based on the enriched identity available at the time the packet is handled. If enrichment appears between two identical traps inside the dedup window, the fingerprint can shift from source IP to vnode/sysName identity and admit an extra first occurrence. This is the preferred failure mode: it may write one extra journal row, but it does not suppress an unrelated trap.
 
 ### Periodic summary entry — for operator transparency
 
@@ -952,7 +954,7 @@ Operators alert on these for pipeline health:
 | Instance | Per job (only jobs with `dedup.enabled: true`) |
 | Dimensions | Single dimension: `suppressed` |
 | Unit | events/s (incremental counter) |
-| Labels | `job_name`, `hub` |
+| Labels | `job_name` in the SOW-0037 M2 implementation. A `hub` label remains a SOW-0039 collector-consistency target if a stable hub identity is available in the go.d metric path. |
 | Title | "SNMP Trap Deduplication Suppressed" |
 
 Operators alert on `dedup_suppressed > X/sec sustained` as a flap-storm signal. When dedup is disabled (the default), this metric is not emitted.

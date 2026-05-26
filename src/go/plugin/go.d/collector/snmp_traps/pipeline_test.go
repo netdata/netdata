@@ -4,6 +4,7 @@ package snmp_traps
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/netip"
 	"os"
@@ -190,6 +191,201 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 	}
 	if entry.SourceVnodeID != "topo-vnode-id" {
 		t.Fatalf("SourceVnodeID = %q, want topology vnode", entry.SourceVnodeID)
+	}
+}
+
+func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
+	const jobName = "test-dedup-packet"
+	removeJobMetrics(jobName)
+	defer removeJobMetrics(jobName)
+
+	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
+	if len(packets) != 1 {
+		t.Fatalf("expected one packet, got %d", len(packets))
+	}
+
+	trap := &TrapDef{
+		OID:         "1.3.6.1.6.3.1.1.5.1",
+		Name:        "TEST-MIB::coldStartSecurity",
+		Category:    "security",
+		Severity:    "warning",
+		Description: "coldStart from {TRAP_SOURCE_IP}",
+	}
+	writer := &mockTrapWriter{}
+	metrics := getJobMetrics(jobName)
+	metrics.setDedupEnabled(true)
+	c := &Collector{
+		Config:       Config{Dedup: DedupConfig{Enabled: true}},
+		jobName:      jobName,
+		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
+		trapWriter:   writer,
+		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:    NewAllowlist(nil, []string{"public"}),
+		metrics:      metrics,
+	}
+	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, c.profileIndex)
+	c.deduper.start()
+	defer c.deduper.Close()
+
+	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+
+	if len(writer.entries) != 1 {
+		t.Fatalf("written entries = %d, want 1", len(writer.entries))
+	}
+	if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 1 {
+		t.Fatalf("dedup suppressed = %d, want 1", got)
+	}
+	if got := atomic.LoadUint64(&metrics.events.security); got != 1 {
+		t.Fatalf("security events = %d, want 1", got)
+	}
+	if got := atomic.LoadUint64(&metrics.errors.unknownOID); got != 0 {
+		t.Fatalf("unknown OID errors = %d, want 0", got)
+	}
+	if got := atomic.LoadUint64(&metrics.errors.templateUnresolved); got != 0 {
+		t.Fatalf("template unresolved errors = %d, want 0", got)
+	}
+	if got := atomic.LoadUint64(&metrics.errors.journalWriteFailed); got != 0 {
+		t.Fatalf("journal write failures = %d, want 0", got)
+	}
+}
+
+func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
+	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
+	if len(packets) != 1 {
+		t.Fatalf("expected one packet, got %d", len(packets))
+	}
+
+	t.Run("unknown OID", func(t *testing.T) {
+		const jobName = "test-dedup-unknown-oid"
+		removeJobMetrics(jobName)
+		defer removeJobMetrics(jobName)
+
+		writer := &mockTrapWriter{}
+		metrics := getJobMetrics(jobName)
+		metrics.setDedupEnabled(true)
+		c := &Collector{
+			Config:       Config{Dedup: DedupConfig{Enabled: true}},
+			jobName:      jobName,
+			profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{}},
+			trapWriter:   writer,
+			versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+			allowlist:    NewAllowlist(nil, []string{"public"}),
+			metrics:      metrics,
+		}
+		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, c.profileIndex)
+
+		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+
+		if len(writer.entries) != 1 {
+			t.Fatalf("written entries = %d, want 1", len(writer.entries))
+		}
+		if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 1 {
+			t.Fatalf("dedup suppressed = %d, want 1", got)
+		}
+		if got := atomic.LoadUint64(&metrics.errors.unknownOID); got != 2 {
+			t.Fatalf("unknown OID errors = %d, want 2", got)
+		}
+		if got := atomic.LoadUint64(&metrics.events.unknown); got != 1 {
+			t.Fatalf("unknown events = %d, want 1", got)
+		}
+	})
+
+	t.Run("template unresolved", func(t *testing.T) {
+		const jobName = "test-dedup-template-unresolved"
+		removeJobMetrics(jobName)
+		defer removeJobMetrics(jobName)
+
+		trap := &TrapDef{
+			OID:         "1.3.6.1.6.3.1.1.5.1",
+			Name:        "TEST-MIB::coldStartTemplate",
+			Category:    "security",
+			Severity:    "warning",
+			Description: "coldStart from {DOES_NOT_EXIST}",
+		}
+		writer := &mockTrapWriter{}
+		metrics := getJobMetrics(jobName)
+		metrics.setDedupEnabled(true)
+		c := &Collector{
+			Config:       Config{Dedup: DedupConfig{Enabled: true}},
+			jobName:      jobName,
+			profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
+			trapWriter:   writer,
+			versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+			allowlist:    NewAllowlist(nil, []string{"public"}),
+			metrics:      metrics,
+		}
+		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, c.profileIndex)
+
+		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+
+		if len(writer.entries) != 1 {
+			t.Fatalf("written entries = %d, want 1", len(writer.entries))
+		}
+		if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 1 {
+			t.Fatalf("dedup suppressed = %d, want 1", got)
+		}
+		if got := atomic.LoadUint64(&metrics.errors.templateUnresolved); got != 2 {
+			t.Fatalf("template unresolved errors = %d, want 2", got)
+		}
+		if got := atomic.LoadUint64(&metrics.events.security); got != 1 {
+			t.Fatalf("security events = %d, want 1", got)
+		}
+	})
+}
+
+func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *testing.T) {
+	const jobName = "test-dedup-write-rollback"
+	removeJobMetrics(jobName)
+	defer removeJobMetrics(jobName)
+
+	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
+	if len(packets) != 1 {
+		t.Fatalf("expected one packet, got %d", len(packets))
+	}
+
+	trap := &TrapDef{
+		OID:         "1.3.6.1.6.3.1.1.5.1",
+		Name:        "TEST-MIB::coldStartSecurity",
+		Category:    "security",
+		Severity:    "warning",
+		Description: "coldStart from {TRAP_SOURCE_IP}",
+	}
+	writer := &mockTrapWriter{err: errors.New("write failed")}
+	metrics := getJobMetrics(jobName)
+	metrics.setDedupEnabled(true)
+	c := &Collector{
+		Config:       Config{Dedup: DedupConfig{Enabled: true}},
+		jobName:      jobName,
+		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
+		trapWriter:   writer,
+		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:    NewAllowlist(nil, []string{"public"}),
+		metrics:      metrics,
+	}
+	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, c.profileIndex)
+
+	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	if got := atomic.LoadUint64(&metrics.errors.journalWriteFailed); got != 1 {
+		t.Fatalf("journal write failures = %d, want 1", got)
+	}
+	if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 0 {
+		t.Fatalf("dedup suppressed after failed first write = %d, want 0", got)
+	}
+
+	writer.err = nil
+	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+
+	if len(writer.entries) != 1 {
+		t.Fatalf("written entries after rollback = %d, want 1", len(writer.entries))
+	}
+	if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 0 {
+		t.Fatalf("dedup suppressed after rollback retry = %d, want 0", got)
+	}
+	if got := atomic.LoadUint64(&metrics.events.security); got != 1 {
+		t.Fatalf("security events = %d, want 1", got)
 	}
 }
 
@@ -971,10 +1167,10 @@ listen:
 		}
 	})
 
-	t.Run("deferred dedup", func(t *testing.T) {
+	t.Run("implemented dedup", func(t *testing.T) {
 		err := validateDeferredConfig(Config{Dedup: DedupConfig{Enabled: true}})
-		if err == nil {
-			t.Fatal("expected error for enabled dedup")
+		if err != nil {
+			t.Fatalf("dedup should no longer be rejected as deferred: %v", err)
 		}
 	})
 

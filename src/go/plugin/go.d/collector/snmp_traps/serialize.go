@@ -40,8 +40,9 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 
 	isDedupSummary := entry.ReportType == ReportTypeDedupSummary
 	isDecodeSummary := entry.ReportType == ReportTypeDecodeErrorSummary
+	isSummary := isDedupSummary || isDecodeSummary
 
-	if !isDedupSummary && !isDecodeSummary {
+	if !isSummary {
 		if entry.TrapOID == "" {
 			return nil, errMissingTrapOID
 		}
@@ -65,13 +66,13 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 	fields = append(fields, JournalField{Name: "PRIORITY", Value: []byte(severityPriority(entry.Severity))})
 	fields = append(fields, JournalField{Name: "SYSLOG_IDENTIFIER", Value: []byte(entry.JobName)})
 
-	if hostname != "" {
+	if !isSummary && hostname != "" {
 		fields = append(fields, JournalField{Name: "_HOSTNAME", Value: []byte(hostname)})
 	}
 
 	fields = append(fields, JournalField{Name: "ND_LOG_SOURCE", Value: []byte("snmp-trap")})
 
-	if entry.SourceVnodeID != "" {
+	if !isSummary && entry.SourceVnodeID != "" {
 		fields = append(fields, JournalField{Name: "ND_NIDL_NODE", Value: []byte(entry.SourceVnodeID)})
 	}
 
@@ -81,7 +82,7 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 	}
 	fields = append(fields, JournalField{Name: "TRAP_REPORT_TYPE", Value: []byte(reportType)})
 
-	if !isDedupSummary && !isDecodeSummary {
+	if !isSummary {
 		fields = append(fields, JournalField{Name: "TRAP_OID", Value: []byte(entry.TrapOID)})
 		if entry.TrapName != "" {
 			fields = append(fields, JournalField{Name: "TRAP_NAME", Value: []byte(entry.TrapName)})

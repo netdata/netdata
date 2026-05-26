@@ -68,6 +68,7 @@ type Collector struct {
 	metrics           *perJobMetrics
 	reverseDNS        *reverseDNSResolver
 	reverseDNSEnabled bool
+	deduper           *trapDeduper
 }
 
 func (c *Collector) Configuration() any {
@@ -115,6 +116,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	if err := validateRateLimit(c.RateLimit); err != nil {
+		return &dyncfgCodedError{err: err, code: 422}
+	}
+	if err := validateDedupConfig(c.Dedup); err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
 	}
 
@@ -214,6 +218,12 @@ func (c *Collector) Init(ctx context.Context) error {
 
 	overrides := buildOverrideMap(c.Overrides)
 	tw := newJournalTrapWriter(journalWriter, defaultQueueCapacity)
+	metrics := getJobMetrics(c.jobName)
+	metrics.setDedupEnabled(c.Dedup.Enabled)
+	deduper := newTrapDeduper(c.jobName, c.Dedup, tw, metrics, idx)
+	if deduper != nil {
+		deduper.start()
+	}
 
 	c.profileIndex = idx
 	c.profileGen = gen
@@ -227,10 +237,11 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.v3SecTable = v3Table
 	c.engineIDs = engineIDWhitelist
 	c.overrides = overrides
-	c.metrics = getJobMetrics(c.jobName)
+	c.metrics = metrics
 	c.listener = listener
 	c.trapWriter = tw
 	c.journalDir = journalWriter.JournalDirectory()
+	c.deduper = deduper
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
 	if c.reverseDNSEnabled {
 		c.reverseDNS = newReverseDNSResolver()
@@ -253,6 +264,10 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.listener != nil {
 		c.listener.close()
 		c.listener = nil
+	}
+	if c.deduper != nil {
+		c.deduper.Close()
+		c.deduper = nil
 	}
 	if c.trapWriter != nil {
 		c.trapWriter.Close()
@@ -379,19 +394,26 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	}
 
 	td := c.profileIndex.Lookup(pdu.OID)
-	if td == nil {
-		c.incTrapError("unknown_oid")
-	} else {
+	unknownOID := td == nil
+	if td != nil {
 		td = c.applyOverrides(td)
 	}
 
 	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), monotonicUsec())
 	enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
 	renderTrapEntryTemplates(entry, td)
+	if unknownOID {
+		c.incTrapError("unknown_oid")
+	}
 	if trapEntryHasUnresolvedTemplate(entry) {
 		c.incTrapError("template_unresolved")
 	}
+	admission, suppressed := c.deduper.Admit(entry, td, c.Dedup.KeyVarbinds)
+	if suppressed {
+		return
+	}
 	if err := c.trapWriter.Write(entry); err != nil {
+		c.deduper.Rollback(admission)
 		c.incTrapError("journal_write_failed")
 		return
 	}

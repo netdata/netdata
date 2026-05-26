@@ -313,13 +313,33 @@ Implementation completed (first meaningful M1 batch). Changes:
 
 - `DeviceVendor` / `SourceVnodeID` / `TopologyInterface` / `TopologyNeighbors` are populated only when state exists; fields are omitted from journal output when empty (serializer already handles this).
 - Reverse DNS lookups use a 50ms timeout, one in-flight lookup per IP, and collector cleanup cancellation. Cache memory is bounded by TTL sweep plus 10k-entry hard cap.
-- Dedup (M2), profile reload (M3), and per-OID operator metrics (M4) remain unimplemented — `validateDeferredConfig()` still rejects `dedup.enabled` and `metrics:`.
+- Profile reload (M3) and per-OID operator metrics (M4) remain unimplemented — `validateDeferredConfig()` still rejects `metrics:`.
+
+### 2026-05-26 — M2 batch 1: opt-in per-job deduplication
+
+Implementation completed (first M2 batch). Changes:
+
+1. `src/go/plugin/go.d/collector/snmp_traps/dedup.go` (NEW) — Added `trapDeduper`, enabled only when `dedup.enabled: true`. It computes SHA-256 fingerprints from source-device identity, trap OID, and optional key varbinds; default key varbinds are empty so the default fingerprint is `(source_device, trap_OID)`. Source-device identity priority is source vnode ID, source IP, UDP peer, then hostname. Profile `dedup_key_varbinds` override job-level `dedup.key_varbinds`; missing key varbinds use a sentinel distinct from empty string.
+2. `dedup.go` — Added TTL expiry with default 5s window, bounded cache with default 100k entries, oldest-entry eviction at cap, and per-period suppression accounting by trap OID and unique fingerprint.
+3. `dedup.go` / `collector.go` — Added a per-job timer that emits one `TRAP_REPORT_TYPE=deduplication_summary` journal entry per period only when suppressions occurred. `Collector.Cleanup()` closes the listener first, flushes any pending dedup summary while the writer is still open, then closes the writer.
+4. `collector.go` — Wired dedup after enrichment/template rendering and before journal write/event metrics. Pipeline-health counters (`unknown_oid`, `template_unresolved`) increment before the dedup gate so coverage/template failures remain visible at received-PDU volume. First occurrence writes normally; duplicate occurrence returns before journal write and before per-event metric increments. If the first occurrence write fails, the inserted fingerprint is rolled back so later traps are not suppressed behind a failed write.
+5. `metrics.go` / `charts.yaml` — Added conditional `snmp_trap_dedup_suppressed` metric with `job_name` label. The metric is emitted only for jobs with dedup enabled; richer hub/source labels remain a SOW-0039 collector-consistency target if a stable identity is available.
+6. `init.go`, `config_schema.json`, `snmp_traps.conf` — Added creation-time validation for dedup config, removed `dedup.enabled` from deferred-feature rejection, updated the schema description, and documented the opt-in stock-config block.
+7. `src/go/plugin/go.d/collector/snmp_traps/dedup_test.go` (NEW) — 12 focused tests covering validation, default fingerprint suppression, source-device priority, profile and numeric-OID key-varbind narrowing, missing-varbind sentinel behavior including literal `<missing>`, TTL expiry, cache cap eviction, summary entry shape/omission of `_HOSTNAME` and `ND_NIDL_NODE`, cleanup flush/timer stop, periodic timer summary emission, and conditional metric emission.
+8. `src/go/plugin/go.d/collector/snmp_traps/pipeline_test.go` — Added packet-path coverage proving dedup suppresses duplicate accepted traps, writes only the first occurrence, increments `snmp_trap_dedup_suppressed`, preserves health/error counters for suppressed duplicates, rolls back fingerprints after first-write failure, and increments the event counter only for journaled first occurrences.
+9. `.agents/sow/specs/snmp-traps/netdata.md` — Updated Context 3 label contract to match the implemented SOW-0037 M2 metric surface (`job_name` only), with the richer `hub` label explicitly left to SOW-0039 if available.
+
+Initial validation:
+
+- `go test ./plugin/go.d/collector/snmp_traps/... ./plugin/go.d/collector/snmp_topology/... ./plugin/go.d/collector/snmp/...` — PASS
+- `go vet ./plugin/go.d/collector/snmp_traps/... ./plugin/go.d/collector/snmp_topology/... ./plugin/go.d/collector/snmp/...` — PASS
+- `python3 -m json.tool plugin/go.d/collector/snmp_traps/config_schema.json >/dev/null` — PASS
 
 ## Validation
 
-Acceptance criteria evidence: M1 enrichment implemented and tested. `_HOSTNAME` always emitted with source-IP fallback. SNMP registry VnodeHostname > SNMP registry SysName > topology-matched SysName > optional reverse DNS priority enforced. Empty/unknown sysName treated as unresolved. Reverse DNS disabled by default, non-blocking when enabled. ND_NIDL_NODE, TRAP_DEVICE_VENDOR, TRAP_INTERFACE, TRAP_NEIGHBORS omitted when no state. Dedup summary entries still omit _HOSTNAME/ND_NIDL_NODE (unchanged serializer logic).
+Acceptance criteria evidence: M1 enrichment implemented and tested. `_HOSTNAME` always emitted with source-IP fallback. SNMP registry VnodeHostname > SNMP registry SysName > topology-matched SysName > optional reverse DNS priority enforced. Empty/unknown sysName treated as unresolved. Reverse DNS disabled by default, non-blocking when enabled. ND_NIDL_NODE, TRAP_DEVICE_VENDOR, TRAP_INTERFACE, TRAP_NEIGHBORS omitted when no state. M2 opt-in dedup implemented and tested: default disabled; enabled jobs write first occurrence immediately; duplicates inside the window are suppressed; profile `dedup_key_varbinds` narrow the fingerprint; periodic summary entries emit `TRAP_REPORT_TYPE=deduplication_summary` and omit `_HOSTNAME`/`ND_NIDL_NODE`; `snmp_trap_dedup_suppressed` emits only for dedup-enabled jobs.
 
-Tests or equivalent validation: 24 focused trap enrichment tests, 4 device-registry tests, 5 topology trap-enrichment tests, enriched packet-template rendering coverage, SNMP-over-topology-over-reverse-DNS priority coverage, topology-before-reverse-DNS packet-path coverage, listener-vnode omission coverage, and template `_HOSTNAME` SourceUDPPeer fallback coverage pass; full snmp_traps, snmp_topology, snmp, and ddsnmp suites pass. Race detector clean on snmp_traps and snmp_topology. go vet clean. go build clean. git diff --check clean. SOW audit clean except pre-existing skill-classification warnings.
+Tests or equivalent validation: 24 focused trap enrichment tests, 12 focused dedup tests, 4 device-registry tests, 5 topology trap-enrichment tests, enriched packet-template rendering coverage, SNMP-over-topology-over-reverse-DNS priority coverage, topology-before-reverse-DNS packet-path coverage, listener-vnode omission coverage, dedup packet-path suppression/health-counter/write-rollback coverage, and template `_HOSTNAME` SourceUDPPeer fallback coverage pass. Full snmp_traps, snmp_topology, snmp, and ddsnmp suites pass. Race detector clean on snmp_traps and snmp_topology. go vet clean. go build clean. git diff --check clean. SOW audit clean except pre-existing skill-classification warnings.
 
 Real-use evidence: pending (requires co-located SNMP polling collector to populate DeviceRegistry).
 
@@ -349,6 +369,9 @@ Reviewer findings:
 - glm: no blocking issues; noted only residual design observations around lock count, GoSNMP error-message classification, bounded rate-limiter allocation, and global registry use in tests. Reviewed as non-blocking because the hot path uses existing registry/topology read locks, decode-error classification is covered by current tests, rate-limiter memory is capped, and tests do not use `t.Parallel()`.
 - minimax: no blocking issues; requested explicit coverage that SNMP registry hostname wins when topology and reverse DNS also have identities. Accepted and fixed with `TestEnrichTrapEntryRegistryHostnameWinsOverTopologyAndReverseDNS`.
 - minimax residual risks reviewed and not treated as blockers: unbounded `TRAP_NEIGHBORS` and rendered label value length are journal fields, not metric dimensions, and the spec deliberately allows high-cardinality/free-form journal content while enforcing bounded-cardinality label templates at profile/config load. Reverse DNS negative-entry churn is bounded behind an opt-in feature by one in-flight lookup per IP, short timeout, negative TTL, and hard cache cap.
+- M2 review round 1 received from minimax, glm, and kimi. Qwen's first session detached before final output. Accepted and fixed: summary `_HOSTNAME`/`ND_NIDL_NODE` omission is now enforced explicitly by serializer summary gating; periodic timer summary path is tested; packet-path dedup test starts/stops the deduper; config schema documents and accepts the Go `0 means default` convention; `unknown_oid` and `template_unresolved` increment before the dedup gate; fingerprinting uses typed length-prefixed hash parts instead of JSON marshaling; missing-varbind tests cover empty string, missing, and literal `<missing>`.
+- M2 review round 2 received from glm, kimi, and minimax. Qwen read files and ran local tests but produced no final review after more than 10 minutes without new output, so the exact qwen `timeout`/`opencode` PIDs were stopped. Accepted and fixed: schema indentation; stale SOW validation wording; write-failure rollback test; numeric-OID key-varbind test; source-device priority test.
+- M2 residual risks reviewed and not treated as blockers: dedup source identity can become richer between two traps inside one window, causing a false-negative dedup and one extra journal row rather than false-positive suppression; summary write failure resets the best-effort period counters but increments `journal_write_failed`; spoofed-source cache churn can evict old entries but only reduces dedup effectiveness and remains bounded by cache size/rate-limit policy.
 
 Same-failure scan: no suspicious failures.
 
@@ -358,10 +381,10 @@ No raw trap payloads, SNMP communities, USM keys, private IPs from real environm
 Artifact maintenance gate:
 - AGENTS.md: no workflow changes needed.
 - Runtime project skills: no durable rules discovered.
-- Specs/config artifacts: updated `.agents/sow/specs/snmp-traps/netdata.md`, `config_schema.json`, and `snmp_traps.conf` with hostname priority and reverse DNS semantics (§11 `_HOSTNAME`, §7.5 plugin config, TrapEntry shape table).
+- Specs/config artifacts: updated `.agents/sow/specs/snmp-traps/netdata.md`, `config_schema.json`, and `snmp_traps.conf` with hostname priority, reverse DNS semantics, and opt-in dedup metric/config semantics.
 - End-user/operator docs: owned by SOW-0039; recorded implementation facts in this SOW log.
 - End-user/operator skills: no update expected until SOW-0039.
-- SOW lifecycle: M1 batch 1 complete; M2 (dedup), M3 (profile reload), M4 (per-OID metrics) remain pending.
+- SOW lifecycle: M1 enrichment and M2 dedup complete on the feature branch; M3 (profile reload) and M4 (per-OID metrics) remain pending.
 
 ## Outcome
 

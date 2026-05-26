@@ -36,6 +36,11 @@ type trapEvents struct {
 	unknown      uint64
 }
 
+type trapDedupMetrics struct {
+	enabled    atomic.Bool
+	suppressed uint64
+}
+
 type trapMetrics struct {
 	mu   sync.Mutex
 	jobs map[string]*perJobMetrics
@@ -44,6 +49,7 @@ type trapMetrics struct {
 type perJobMetrics struct {
 	events trapEvents
 	errors trapErrors
+	dedup  trapDedupMetrics
 }
 
 var globalMetrics = &trapMetrics{
@@ -147,6 +153,14 @@ func (m *perJobMetrics) setSanitized(v uint64) {
 	atomic.StoreUint64(&m.errors.sanitized, v)
 }
 
+func (m *perJobMetrics) setDedupEnabled(enabled bool) {
+	m.dedup.enabled.Store(enabled)
+}
+
+func (m *perJobMetrics) incDedupSuppressed() {
+	atomic.AddUint64(&m.dedup.suppressed, 1)
+}
+
 func collectMetrics(store metrix.CollectorStore, jobName string) {
 	globalMetrics.mu.Lock()
 	m, ok := globalMetrics.jobs[jobName]
@@ -156,6 +170,7 @@ func collectMetrics(store metrix.CollectorStore, jobName string) {
 	}
 	collectEvents(store, jobName, m)
 	collectErrors(store, jobName, m)
+	collectDedup(store, jobName, m)
 }
 
 func collectEvents(store metrix.CollectorStore, jobName string, m *perJobMetrics) {
@@ -187,4 +202,12 @@ func collectErrors(store metrix.CollectorStore, jobName string, m *perJobMetrics
 	meter.Counter("snmp_trap_errors_sanitized").ObserveTotal(float64(atomic.LoadUint64(&m.errors.sanitized)))
 	meter.Counter("snmp_trap_errors_profile_load_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.profileLoadFailed)))
 	meter.Counter("snmp_trap_errors_journal_write_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.journalWriteFailed)))
+}
+
+func collectDedup(store metrix.CollectorStore, jobName string, m *perJobMetrics) {
+	if !m.dedup.enabled.Load() {
+		return
+	}
+	meter := store.Write().SnapshotMeter("").WithLabels(metrix.Label{Key: "job_name", Value: jobName})
+	meter.Counter("snmp_trap_dedup_suppressed").ObserveTotal(float64(atomic.LoadUint64(&m.dedup.suppressed)))
 }

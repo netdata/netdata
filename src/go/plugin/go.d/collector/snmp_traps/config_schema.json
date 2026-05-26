@@ -207,7 +207,7 @@
       },
       "dedup": {
         "title": "Deduplication",
-        "description": "Reserved for a later implementation. Leave disabled; enabling it fails job creation.",
+        "description": "Optional per-job trap deduplication. Disabled by default; when enabled, repeated matching traps inside the window are summarized instead of journaled individually.",
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -218,14 +218,16 @@
           },
           "window_sec": {
             "title": "Window seconds",
+            "description": "Deduplication window in seconds. Set to 0 or omit to use the default.",
             "type": "integer",
-            "minimum": 1,
+            "minimum": 0,
             "default": 5
           },
           "cache_max_entries": {
             "title": "Cache maximum entries",
+            "description": "Maximum fingerprints kept in memory. Set to 0 or omit to use the default.",
             "type": "integer",
-            "minimum": 1,
+            "minimum": 0,
             "default": 100000
           },
           "key_varbinds": {

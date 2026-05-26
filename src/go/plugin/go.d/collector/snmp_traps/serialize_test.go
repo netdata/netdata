@@ -94,6 +94,9 @@ func TestSerializeToJournalFieldsDedupSummary(t *testing.T) {
 		ReceivedRealtimeUsec:  1000000,
 		ReceivedMonotonicUsec: 1000,
 		Message:               "DEDUPLICATED TRAPS: 5 suppressed",
+		SourceIP:              "10.0.0.1",
+		DeviceHostname:        "core-sw-01",
+		SourceVnodeID:         "source-vnode-id",
 		SummaryCounts: &DedupSummary{
 			TotalSuppressed: 5,
 			PeriodSec:       10,
@@ -112,6 +115,8 @@ func TestSerializeToJournalFieldsDedupSummary(t *testing.T) {
 	assertField(t, fieldMap, "TRAP_SUPPRESSED_COUNT", "5")
 	assertField(t, fieldMap, "TRAP_SUPPRESSED_FINGERPRINTS", "3")
 	assertField(t, fieldMap, "TRAP_REPORT_PERIOD_SEC", "10")
+	assertFieldAbsent(t, fieldMap, "_HOSTNAME")
+	assertFieldAbsent(t, fieldMap, "ND_NIDL_NODE")
 
 	var summaryMap map[string]any
 	if err := json.Unmarshal([]byte(fieldMap["TRAP_JSON"]), &summaryMap); err != nil {
@@ -336,6 +341,13 @@ func assertField(t *testing.T, fieldMap map[string]string, name, expected string
 		t.Fatalf("missing field %q", name)
 	} else if got != expected {
 		t.Fatalf("field %q: expected %q, got %q", name, expected, got)
+	}
+}
+
+func assertFieldAbsent(t *testing.T, fieldMap map[string]string, name string) {
+	t.Helper()
+	if got, ok := fieldMap[name]; ok {
+		t.Fatalf("field %q unexpectedly present with value %q", name, got)
 	}
 }
 
