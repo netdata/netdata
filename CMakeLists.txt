@@ -2368,6 +2368,13 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build netipc (standalone IPC library, no Netdata deps)
 #
 
+# clock_gettime / shm_open / sem_* live in librt on old glibc (< 2.34) and on
+# FreeBSD, but in libc on musl (Alpine) and modern glibc (>= 2.34).  Probe
+# once here; all targets below (netipc, libnetdata, netdata, CGO_LDFLAGS) use
+# HAVE_LIBRT so we never unconditionally link a library that may not exist.
+include(CheckLibraryExists)
+check_library_exists(rt clock_gettime "" HAVE_LIBRT)
+
 if(OS_LINUX)
     set(NETIPC_FILES
             src/libnetdata/netipc/src/protocol/netipc_protocol.c
@@ -2378,7 +2385,13 @@ if(OS_LINUX)
 
     add_library(netipc STATIC ${NETIPC_FILES})
     target_include_directories(netipc PUBLIC ${CMAKE_SOURCE_DIR}/src/libnetdata/netipc/include)
-    target_link_libraries(netipc PUBLIC pthread rt)
+
+    if(HAVE_LIBRT)
+        target_link_libraries(netipc PUBLIC pthread rt)
+    else()
+        target_link_libraries(netipc PUBLIC pthread)
+    endif()
+
     set_target_properties(netipc PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
 elseif(OS_WINDOWS)
     set(NETIPC_FILES
@@ -2414,7 +2427,8 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${ENABLE_MIMALLOC}>:mimalloc-static>"
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
-        "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
+        "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread>"
+        "$<$<BOOL:${HAVE_LIBRT}>:rt>"
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi;iphlpapi>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
@@ -3111,7 +3125,10 @@ if(ENABLE_PLUGIN_EBPF)
     string(APPEND EBPF_GO_CGO_CFLAGS " -I${ebpf-co-re_SOURCE_DIR}")
     string(STRIP "${EBPF_GO_CGO_CFLAGS}" EBPF_GO_CGO_CFLAGS)
     set(EBPF_GO_CGO_LDFLAGS
-            "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz -lrt")
+            "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz")
+    if(HAVE_LIBRT)
+        string(APPEND EBPF_GO_CGO_LDFLAGS " -lrt")
+    endif()
 
     if(OS_LINUX AND ENABLE_PLUGIN_EBPF_GO)
         add_custom_command(
@@ -3376,7 +3393,7 @@ target_include_directories(netdata PRIVATE
 target_link_libraries(netdata PRIVATE
         m
         libnetdata
-        "$<$<BOOL:${OS_LINUX}>:rt>"
+        "$<$<BOOL:${HAVE_LIBRT}>:rt>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
