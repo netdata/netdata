@@ -161,6 +161,14 @@ func (m *perJobMetrics) incDedupSuppressed() {
 	atomic.AddUint64(&m.dedup.suppressed, 1)
 }
 
+func incAllJobsProfileLoadFailed() {
+	globalMetrics.mu.Lock()
+	defer globalMetrics.mu.Unlock()
+	for _, m := range globalMetrics.jobs {
+		atomic.AddUint64(&m.errors.profileLoadFailed, 1)
+	}
+}
+
 func collectMetrics(store metrix.CollectorStore, jobName string) {
 	globalMetrics.mu.Lock()
 	m, ok := globalMetrics.jobs[jobName]

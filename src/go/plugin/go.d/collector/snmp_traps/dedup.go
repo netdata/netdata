@@ -42,12 +42,11 @@ type dedupPeriodState struct {
 }
 
 type trapDeduper struct {
-	jobName      string
-	window       time.Duration
-	maxEntries   int
-	writer       TrapWriter
-	metrics      *perJobMetrics
-	profileIndex *ProfileIndex
+	jobName    string
+	window     time.Duration
+	maxEntries int
+	writer     TrapWriter
+	metrics    *perJobMetrics
 
 	mu      sync.Mutex
 	entries map[dedupKey]*list.Element
@@ -79,7 +78,7 @@ func validateDedupConfig(cfg DedupConfig) error {
 	return nil
 }
 
-func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics *perJobMetrics, profileIndex *ProfileIndex) *trapDeduper {
+func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics *perJobMetrics) *trapDeduper {
 	if !cfg.Enabled {
 		return nil
 	}
@@ -92,14 +91,13 @@ func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics 
 		maxEntries = defaultDedupCacheMaxEntries
 	}
 	return &trapDeduper{
-		jobName:      jobName,
-		window:       window,
-		maxEntries:   maxEntries,
-		writer:       writer,
-		metrics:      metrics,
-		profileIndex: profileIndex,
-		entries:      make(map[dedupKey]*list.Element),
-		order:        list.New(),
+		jobName:    jobName,
+		window:     window,
+		maxEntries: maxEntries,
+		writer:     writer,
+		metrics:    metrics,
+		entries:    make(map[dedupKey]*list.Element),
+		order:      list.New(),
 		period: dedupPeriodState{
 			byTrap:       make(map[string]int64),
 			fingerprints: make(map[dedupKey]struct{}),
@@ -287,8 +285,8 @@ func (d *trapDeduper) renderSummaryMessage(summary *DedupSummary) string {
 }
 
 func (d *trapDeduper) trapSummaryName(oid string) string {
-	if d.profileIndex != nil {
-		if td := d.profileIndex.Lookup(oid); td != nil && td.Name != "" {
+	if idx := CurrentProfileIndex(); idx != nil {
+		if td := idx.Lookup(oid); td != nil && td.Name != "" {
 			return td.Name
 		}
 	}

@@ -29,8 +29,10 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
 		},
-		CreateV2: func() collectorapi.CollectorV2 { return New() },
-		Config:   func() any { return &Config{} },
+		CreateV2:      func() collectorapi.CollectorV2 { return New() },
+		Config:        func() any { return &Config{} },
+		Methods:       snmpTrapsMethods,
+		MethodHandler: snmpTrapsMethodHandler,
 	})
 }
 
@@ -55,8 +57,6 @@ type Collector struct {
 	store             metrix.CollectorStore
 	jobName           string
 	vnode             string
-	profileGen        uint64
-	profileIndex      *ProfileIndex
 	versions          map[SnmpVersion]struct{}
 	allowlist         *Allowlist
 	rateLimiter       *rateLimiter
@@ -69,6 +69,7 @@ type Collector struct {
 	reverseDNS        *reverseDNSResolver
 	reverseDNSEnabled bool
 	deduper           *trapDeduper
+	profileCacheHeld  bool
 }
 
 func (c *Collector) Configuration() any {
@@ -146,27 +147,33 @@ func (c *Collector) Init(ctx context.Context) error {
 		return nil
 	}
 
-	idx, gen, err := AcquireProfileCache()
-	if err != nil {
+	if _, err := AcquireProfileCache(); err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
+	}
+	releaseProfileCache := true
+	releaseProfiles := func() {
+		if releaseProfileCache {
+			ReleaseProfileCache()
+			releaseProfileCache = false
+		}
 	}
 
 	dir := journalRoot(c.jobName)
 	journalCfg := retCfg.makeJournalConfig()
 	journalWriter, err := NewJournalWriter(dir, journalCfg)
 	if err != nil {
-		ReleaseProfileCache(gen)
+		releaseProfiles()
 		return &dyncfgCodedError{err: err, code: 422}
 	}
 
 	listener, err := newListener(c.jobName, c.Listen.Endpoints)
 	if err != nil {
-		ReleaseProfileCache(gen)
+		releaseProfiles()
 		journalWriter.Close()
 		return &dyncfgCodedError{err: err, code: 422}
 	}
 	cleanupPreflight := func() {
-		ReleaseProfileCache(gen)
+		releaseProfiles()
 		journalWriter.Close()
 		listener.close()
 	}
@@ -220,13 +227,11 @@ func (c *Collector) Init(ctx context.Context) error {
 	tw := newJournalTrapWriter(journalWriter, defaultQueueCapacity)
 	metrics := getJobMetrics(c.jobName)
 	metrics.setDedupEnabled(c.Dedup.Enabled)
-	deduper := newTrapDeduper(c.jobName, c.Dedup, tw, metrics, idx)
+	deduper := newTrapDeduper(c.jobName, c.Dedup, tw, metrics)
 	if deduper != nil {
 		deduper.start()
 	}
 
-	c.profileIndex = idx
-	c.profileGen = gen
 	c.Versions = versions
 	c.vnode = c.Vnode
 	c.versions = versionSet(versions)
@@ -242,6 +247,8 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.trapWriter = tw
 	c.journalDir = journalWriter.JournalDirectory()
 	c.deduper = deduper
+	c.profileCacheHeld = true
+	releaseProfileCache = false
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
 	if c.reverseDNSEnabled {
 		c.reverseDNS = newReverseDNSResolver()
@@ -278,9 +285,9 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.reverseDNS = nil
 		c.reverseDNSEnabled = false
 	}
-	if c.profileIndex != nil {
-		ReleaseProfileCache(c.profileGen)
-		c.profileIndex = nil
+	if c.profileCacheHeld {
+		ReleaseProfileCache()
+		c.profileCacheHeld = false
 	}
 	removeJobMetrics(c.jobName)
 	c.metrics = nil
@@ -393,7 +400,11 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		}
 	}
 
-	td := c.profileIndex.Lookup(pdu.OID)
+	idx := CurrentProfileIndex()
+	var td *TrapDef
+	if idx != nil {
+		td = idx.Lookup(pdu.OID)
+	}
 	unknownOID := td == nil
 	if td != nil {
 		td = c.applyOverrides(td)

@@ -3,10 +3,12 @@
 package snmp_traps
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 var validCategories = map[string]bool{
@@ -209,70 +211,109 @@ func alternateTrapOID(oid string) string {
 }
 
 // profileCache holds the plugin-wide shared profile state.
-// SOW-0035 has no hot reload, so a single active generation is sufficient.
-// SOW-0037 hot reload must replace this with per-generation holder accounting.
+// Uses an atomic pointer for lock-free reads on the hot path.
+// On reload, a new index is built and atomically swapped in;
+// the old index becomes unreachable and is garbage-collected.
 type profileCache struct {
 	mu         sync.Mutex
+	current    atomic.Pointer[ProfileIndex]
 	loaded     bool
-	index      *ProfileIndex
 	activeRefs int
-	generation uint64
-	loadErr    error
 }
 
 var globalProfileCache profileCache
 
-// AcquireProfileCache loads profiles on first call and increments the refcount.
-// Returns the profile index, its cache generation, and any load error.
-func AcquireProfileCache() (*ProfileIndex, uint64, error) {
+var errNoActiveProfileJobs = errors.New("snmp_traps profile reload requires at least one active job")
+
+// AcquireProfileCache lazily loads profiles on first call.
+// Returns the current profile index and any load error.
+func AcquireProfileCache() (*ProfileIndex, error) {
 	globalProfileCache.mu.Lock()
 	defer globalProfileCache.mu.Unlock()
 
 	if !globalProfileCache.loaded {
 		idx, err := loadProfileCache()
 		if err != nil {
-			globalProfileCache.loadErr = err
-			return nil, 0, err
+			return nil, err
 		}
-		globalProfileCache.index = idx
+		globalProfileCache.current.Store(idx)
 		globalProfileCache.loaded = true
-		globalProfileCache.generation++
-		globalProfileCache.loadErr = nil
 	}
 
-	if globalProfileCache.index == nil {
-		return nil, 0, globalProfileCache.loadErr
+	if idx := globalProfileCache.current.Load(); idx != nil {
+		globalProfileCache.activeRefs++
+		return idx, nil
 	}
-
-	globalProfileCache.activeRefs++
-	return globalProfileCache.index, globalProfileCache.generation, nil
+	return nil, errors.New("snmp_traps profile cache is empty after load")
 }
 
-// ReleaseProfileCache decrements the refcount. When refs reach 0, the index is released.
-func ReleaseProfileCache(generation uint64) {
+// CurrentProfileIndex returns the current profile index without locking.
+// Safe for concurrent use; may return nil if the cache was never loaded.
+func CurrentProfileIndex() *ProfileIndex {
+	return globalProfileCache.current.Load()
+}
+
+// ReleaseProfileCache drops one active job reference. When the last job stops,
+// profile memory is released so users without an active trap listener do not pay
+// the stock profile memory cost.
+func ReleaseProfileCache() {
 	globalProfileCache.mu.Lock()
 	defer globalProfileCache.mu.Unlock()
 
-	if globalProfileCache.activeRefs <= 0 || generation != globalProfileCache.generation {
+	if globalProfileCache.activeRefs <= 0 {
 		return
 	}
 	globalProfileCache.activeRefs--
 	if globalProfileCache.activeRefs == 0 {
-		globalProfileCache.index = nil
+		globalProfileCache.current.Store(nil)
 		globalProfileCache.loaded = false
-		globalProfileCache.loadErr = nil
 	}
+}
+
+// ReloadProfileCache re-parses all profile directories and atomically swaps
+// the current index. On failure the previous index stays active and an error
+// is returned.
+func ReloadProfileCache() error {
+	return reloadProfileCache(loadProfileCache)
+}
+
+func reloadProfileCache(load func() (*ProfileIndex, error)) error {
+	globalProfileCache.mu.Lock()
+	if globalProfileCache.activeRefs == 0 {
+		globalProfileCache.mu.Unlock()
+		return errNoActiveProfileJobs
+	}
+	globalProfileCache.mu.Unlock()
+
+	idx, err := load()
+	if err != nil {
+		globalProfileCache.mu.Lock()
+		active := globalProfileCache.activeRefs > 0
+		globalProfileCache.mu.Unlock()
+		if !active {
+			return errNoActiveProfileJobs
+		}
+		incAllJobsProfileLoadFailed()
+		return err
+	}
+
+	globalProfileCache.mu.Lock()
+	defer globalProfileCache.mu.Unlock()
+	if globalProfileCache.activeRefs == 0 {
+		return errNoActiveProfileJobs
+	}
+	globalProfileCache.current.Store(idx)
+	globalProfileCache.loaded = true
+	return nil
 }
 
 // resetProfileCacheForTest clears the shared cache for test isolation.
 func resetProfileCacheForTest() {
 	globalProfileCache.mu.Lock()
 	defer globalProfileCache.mu.Unlock()
+	globalProfileCache.current.Store(nil)
 	globalProfileCache.loaded = false
-	globalProfileCache.index = nil
 	globalProfileCache.activeRefs = 0
-	globalProfileCache.generation = 0
-	globalProfileCache.loadErr = nil
 }
 
 func validateFileVarbinds(fileVarbinds map[string]VarbindDef, src string) error {

@@ -384,7 +384,75 @@ Artifact maintenance gate:
 - Specs/config artifacts: updated `.agents/sow/specs/snmp-traps/netdata.md`, `config_schema.json`, and `snmp_traps.conf` with hostname priority, reverse DNS semantics, and opt-in dedup metric/config semantics.
 - End-user/operator docs: owned by SOW-0039; recorded implementation facts in this SOW log.
 - End-user/operator skills: no update expected until SOW-0039.
-- SOW lifecycle: M1 enrichment and M2 dedup complete on the feature branch; M3 (profile reload) and M4 (per-OID metrics) remain pending.
+- SOW lifecycle: M1 enrichment and M2 dedup complete on the feature branch; M3 (profile reload) complete; M4 (per-OID metrics) remains pending.
+
+### 2026-05-26 — M3 batch 1: Profile YAML hot-reload via DynCfg
+
+Implementation completed and corrected for the original memory requirement. Changes:
+
+**Core changes:**
+
+1. `src/go/plugin/go.d/collector/snmp_traps/profile.go` — Replaced the single-generation cache pointer with a shared cache that keeps active-job refcounting and exposes the current immutable `ProfileIndex` through `atomic.Pointer`. `AcquireProfileCache()` lazily loads on first job creation and increments the active reference count. `ReleaseProfileCache()` decrements the count and unloads the shared pointer when the last listener stops, so users without active SNMP trap jobs do not retain profile memory. `ReloadProfileCache()` refuses to load without an active job, parses/validates/builds a full replacement index before swapping, preserves the previous index on failure, and increments `profile_load_failed` for active jobs on load/validation failure.
+
+2. `src/go/plugin/go.d/collector/snmp_traps/collector.go` — Removed per-collector `profileIndex`/generation storage. `Init()` still detects profile load failures at job creation time, releases the profile reference on journal/listener/V3 preflight failures, and records a held reference only after successful setup. `Cleanup()` releases the reference after stopping packet and dedup work. `handlePacket()` reads `CurrentProfileIndex()` for each packet so running listeners see a successful reload without restart.
+
+3. `src/go/plugin/go.d/collector/snmp_traps/dedup.go` — Removed the deduper's cached profile pointer. Dedup summary name rendering reads `CurrentProfileIndex()`, so summaries also use the reloaded profile names.
+
+4. `src/go/plugin/go.d/collector/snmp_traps/metrics.go` — Added `incAllJobsProfileLoadFailed()` to increment the reload failure counter across registered active jobs.
+
+**Function surface:**
+
+5. `src/go/plugin/go.d/collector/snmp_traps/reload.go` (NEW) — Registered the agent-wide `reload-profiles` Function through `collectorapi.Creator.Methods` + `MethodHandler`. Success returns status `200`. Profile parse/validation failures return `422`, retain the previous index, increment `profile_load_failed`, and log the loader error through the dispatching collector; the loader error includes the profile file path and validation/parse detail. Reload without an active job returns `503`.
+
+6. `src/go/plugin/go.d/collector/snmp_traps/collector.go` — Updated collector registration to publish `snmpTrapsMethods` and `snmpTrapsMethodHandler`.
+
+**Tests:**
+
+7. `src/go/plugin/go.d/collector/snmp_traps/reload_test.go` (NEW) — 19 focused tests cover successful reload, broken YAML retain-old-index behavior, duplicate OID retain-old-index behavior, empty directory failure, unknown category handling for newly added OIDs, error metric increment for active jobs, concurrent reload/lookups under the race detector, nil current index before first load, refusal to reload without an active job, last-job-exits-during-reload success/failure races, packet-path use of a reloaded profile by an already-created collector, dedup summary use of a reloaded profile name, handler success/failure/unavailable/unknown-method behavior, method params, and method registration shape.
+
+8. `src/go/plugin/go.d/collector/snmp_traps/profile_test.go` — Updated cache tests for the new two-value `AcquireProfileCache()` signature and no-arg `ReleaseProfileCache()`. Tests now prove last-release unloading, idempotent release, shared cache retention while another collector is active, last-collector cleanup unloading, and bind-failure release.
+
+9. `src/go/plugin/go.d/collector/snmp_traps/pipeline_test.go` — Updated direct packet-path tests to use a test helper that stores an immutable profile index in the shared atomic pointer. Updated dedup test constructor calls for the new `newTrapDeduper()` signature.
+
+10. `src/go/plugin/go.d/collector/snmp_traps/dedup_test.go` — Updated `newTrapDeduper()` calls and the summary test to resolve profile names through the shared current index.
+
+**Spec update:**
+
+- `.agents/sow/specs/snmp-traps/netdata.md` now records the accepted `reload-profiles` Function contract, failure behavior, active-job requirement, lazy memory model, and no-runtime-MIB-compilation constraint.
+
+**Validation:**
+
+- `go test -count=1 ./plugin/go.d/collector/snmp_traps/...` — PASS
+- `go test -count=1 ./plugin/go.d/collector/snmp/... ./plugin/go.d/collector/snmp_topology/...` — PASS
+- `go test -race -count=1 ./plugin/go.d/collector/snmp_traps/...` — PASS
+- `go test -race -count=1 ./plugin/go.d/collector/snmp_topology/...` — PASS
+- `go vet ./plugin/go.d/collector/snmp_traps/... ./plugin/go.d/collector/snmp/... ./plugin/go.d/collector/snmp_topology/...` — PASS
+- `go build ./plugin/go.d/collector/snmp_traps/...` — PASS
+- `git diff --check` — PASS
+- `.agents/sow/audit.sh` — PASS with the existing skill-classification warning for 10 non-project skill directories.
+
+**Residual risks:**
+- A successful reload temporarily keeps the old immutable index reachable until any in-flight packet handling or dedup summary render drops its local pointer; Go GC then collects it.
+- The `reload-profiles` Function is agent-wide but still dispatches through a running `snmp_traps` job because that is the current function framework contract.
+- M4 (per-OID operator metrics) remains pending; `validateDeferredConfig` still rejects `metrics:`.
+
+**Review round 1:**
+- External reviewers: glm, kimi, minimax, qwen. No blocker found. All reviewers reported the implementation satisfies M3 and preserves M1/M2 behavior.
+- Accepted and fixed from glm/qwen: reload failure after the last active job exits now returns `errNoActiveProfileJobs` without updating stale failure metrics; new deterministic tests cover successful and failed mid-load last-release races.
+- Accepted and fixed from glm/qwen: concurrent lookup test now asserts successful lookups instead of only exercising the race detector.
+- Accepted and fixed from glm: test helpers that seed `globalProfileCache.current` directly now document that this is a test-only shortcut for packet-path tests that do not run `Collector.Init()`.
+- Accepted and fixed from kimi: removed the effectively unreachable `profileCache.loadErr` field.
+- Reviewed and not changed: concurrent reload calls are not serialized; latest completed reload wins. This wastes work if an operator triggers duplicate reloads, but it does not corrupt state and is outside the hot path.
+- Reviewed and rejected: storing a successfully parsed index when all trap jobs have stopped during reload would violate the explicit memory requirement that profile data is released when no trap jobs are active.
+
+**Review round 2:**
+- External reviewers completed: glm, kimi, minimax, qwen.
+- No blocker found by completed reviewers. Re-run reviewer validation included `go test -race -count=1 ./plugin/go.d/collector/snmp_traps/...`, focused `snmp_traps` tests, and `go vet ./plugin/go.d/collector/snmp_traps/...`.
+- Accepted documentation clarification from glm/kimi: `.agents/sow/specs/snmp-traps/netdata.md` now records that reload without an active `snmp_traps` job returns unavailable and that current agent-wide Function dispatch still routes through one running job instance while the reload itself applies to the shared cache.
+- Reviewed and not changed: test-only direct `globalProfileCache.current` seeding remains limited to packet-path tests that intentionally do not run `Collector.Init()`; the tests now explain this local invariant.
+- Reviewed and rejected as false positive: failed jobs do not leave reload-incremented metrics in this M3 path because `getJobMetrics(c.jobName)` is reached after all fallible preflight setup, and `profileCacheHeld` is only marked true after successful setup.
+- Reviewed and rejected as false positive: first lazy profile load and reload cannot race on an unloaded cache in a way that corrupts state. `AcquireProfileCache()` holds the shared mutex while loading the first index, while `ReloadProfileCache()` refuses to load with `activeRefs == 0` and rechecks active refs before storing.
+- Reviewed and rejected as false positive: `incAllJobsProfileLoadFailed()` cannot increment metrics for unrelated go.d collectors because `globalMetrics` is package-local to `collector/snmp_traps`; it only contains SNMP trap listener jobs.
 
 ## Outcome
 

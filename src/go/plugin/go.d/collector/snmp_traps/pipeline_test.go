@@ -19,6 +19,14 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+func setTestProfileIndex(t *testing.T, traps map[string]*TrapDef) {
+	t.Helper()
+	// Test-only shortcut: direct packet-path tests do not run Collector.Init(),
+	// so they seed the immutable shared index without touching refcounts.
+	globalProfileCache.current.Store(&ProfileIndex{trapsByOID: traps})
+	t.Cleanup(func() { globalProfileCache.current.Store(nil) })
+}
+
 func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
 	if len(packets) != 1 {
@@ -32,13 +40,13 @@ func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 		Severity:    "warning",
 		Description: "security coldStart from {TRAP_SOURCE_IP}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:      "test",
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
+		jobName:    "test",
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
 	}
 
 	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
@@ -79,13 +87,13 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 		Severity:    "warning",
 		Description: "security coldStart on {_HOSTNAME} from {TRAP_DEVICE_VENDOR}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:      "test",
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
+		jobName:    "test",
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
 	}
 
 	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
@@ -111,14 +119,14 @@ func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) 
 		Severity:    "warning",
 		Description: "coldStart from {TRAP_SOURCE_IP}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:      "test",
-		vnode:        "listener-vnode-id",
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
+		jobName:    "test",
+		vnode:      "listener-vnode-id",
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
 	}
 
 	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
@@ -166,10 +174,10 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 		Severity:    "warning",
 		Description: "trap on {_HOSTNAME} vendor {TRAP_DEVICE_VENDOR} iface {TRAP_INTERFACE} neighbors {TRAP_NEIGHBORS}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{}
 	c := &Collector{
 		jobName:           "test",
-		profileIndex:      &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
 		trapWriter:        writer,
 		versions:          map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
 		allowlist:         NewAllowlist(nil, []string{"public"}),
@@ -211,19 +219,19 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 		Severity:    "warning",
 		Description: "coldStart from {TRAP_SOURCE_IP}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{}
 	metrics := getJobMetrics(jobName)
 	metrics.setDedupEnabled(true)
 	c := &Collector{
-		Config:       Config{Dedup: DedupConfig{Enabled: true}},
-		jobName:      jobName,
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
-		metrics:      metrics,
+		Config:     Config{Dedup: DedupConfig{Enabled: true}},
+		jobName:    jobName,
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
+		metrics:    metrics,
 	}
-	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, c.profileIndex)
+	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
 	c.deduper.start()
 	defer c.deduper.Close()
 
@@ -261,19 +269,19 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		removeJobMetrics(jobName)
 		defer removeJobMetrics(jobName)
 
+		setTestProfileIndex(t, map[string]*TrapDef{})
 		writer := &mockTrapWriter{}
 		metrics := getJobMetrics(jobName)
 		metrics.setDedupEnabled(true)
 		c := &Collector{
-			Config:       Config{Dedup: DedupConfig{Enabled: true}},
-			jobName:      jobName,
-			profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{}},
-			trapWriter:   writer,
-			versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-			allowlist:    NewAllowlist(nil, []string{"public"}),
-			metrics:      metrics,
+			Config:     Config{Dedup: DedupConfig{Enabled: true}},
+			jobName:    jobName,
+			trapWriter: writer,
+			versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+			allowlist:  NewAllowlist(nil, []string{"public"}),
+			metrics:    metrics,
 		}
-		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, c.profileIndex)
+		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
 
 		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
 		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
@@ -304,19 +312,19 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 			Severity:    "warning",
 			Description: "coldStart from {DOES_NOT_EXIST}",
 		}
+		setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 		writer := &mockTrapWriter{}
 		metrics := getJobMetrics(jobName)
 		metrics.setDedupEnabled(true)
 		c := &Collector{
-			Config:       Config{Dedup: DedupConfig{Enabled: true}},
-			jobName:      jobName,
-			profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-			trapWriter:   writer,
-			versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-			allowlist:    NewAllowlist(nil, []string{"public"}),
-			metrics:      metrics,
+			Config:     Config{Dedup: DedupConfig{Enabled: true}},
+			jobName:    jobName,
+			trapWriter: writer,
+			versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+			allowlist:  NewAllowlist(nil, []string{"public"}),
+			metrics:    metrics,
 		}
-		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, c.profileIndex)
+		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
 
 		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
 		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
@@ -353,19 +361,19 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 		Severity:    "warning",
 		Description: "coldStart from {TRAP_SOURCE_IP}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{err: errors.New("write failed")}
 	metrics := getJobMetrics(jobName)
 	metrics.setDedupEnabled(true)
 	c := &Collector{
-		Config:       Config{Dedup: DedupConfig{Enabled: true}},
-		jobName:      jobName,
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
-		metrics:      metrics,
+		Config:     Config{Dedup: DedupConfig{Enabled: true}},
+		jobName:    jobName,
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
+		metrics:    metrics,
 	}
-	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, c.profileIndex)
+	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
 
 	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
 	if got := atomic.LoadUint64(&metrics.errors.journalWriteFailed); got != 1 {
@@ -481,13 +489,13 @@ func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 		Severity:    "warning",
 		Description: "coldStart from {TRAP_SOURCE_IP}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:      "test",
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
+		jobName:    "test",
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
 	}
 
 	removeJobMetrics("test")
@@ -514,13 +522,13 @@ func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
 		Severity:    "warning",
 		Description: "security coldStart from {missing_var}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:      "test",
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
+		jobName:    "test",
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
 	}
 
 	removeJobMetrics("test")
@@ -656,13 +664,13 @@ func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
 		Severity:    "warning",
 		Description: "coldStart from {TRAP_SOURCE_IP}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:      "test",
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist([]netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"}),
+		jobName:    "test",
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist([]netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"}),
 	}
 	peer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
 
@@ -689,13 +697,13 @@ func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 		Severity:    "warning",
 		Description: "coldStart from {TRAP_SOURCE_IP}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:      "test",
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist([]netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, []string{"public"}),
+		jobName:    "test",
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist([]netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, []string{"public"}),
 	}
 	peer := &net.UDPAddr{IP: net.ParseIP("2001:db8::1"), Port: 9162}
 
@@ -723,6 +731,7 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 		Severity:    "warning",
 		Description: "coldStart from {TRAP_SOURCE_IP}",
 	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 	rl := newRateLimiter(true, 1, "sample")
 	srcAddr, ok := udpPeerAddr(peer)
@@ -735,12 +744,11 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 
 	writer := &mockTrapWriter{}
 	c := &Collector{
-		jobName:      jobName,
-		profileIndex: &ProfileIndex{trapsByOID: map[string]*TrapDef{trap.OID: trap}},
-		trapWriter:   writer,
-		versions:     map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:    NewAllowlist(nil, []string{"public"}),
-		rateLimiter:  rl,
+		jobName:     jobName,
+		trapWriter:  writer,
+		versions:    map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:   NewAllowlist(nil, []string{"public"}),
+		rateLimiter: rl,
 	}
 
 	c.handlePacket(packets[0].payload, peer.IP, nil, peer)

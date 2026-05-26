@@ -22,74 +22,60 @@ import (
 func TestProfileCacheLazyLoad(t *testing.T) {
 	setMinimalProfileDir(t)
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-
 	assert.NotNil(t, idx)
-	assert.NotZero(t, gen)
 
-	// Verify a known IETF trap is present
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.1")
 	if td != nil {
 		assert.Equal(t, "state_change", td.Category)
 	}
 
-	ReleaseProfileCache(gen)
+	ReleaseProfileCache()
+	assert.Nil(t, CurrentProfileIndex(), "profile cache should unload after last release")
 
-	// Verify cache is empty after release
-	idx2, gen2, _ := AcquireProfileCache()
-	require.NotNil(t, idx2)
-	ReleaseProfileCache(gen2)
+	idx2, err := AcquireProfileCache()
+	require.NoError(t, err)
+	assert.NotNil(t, idx2)
+	assert.NotNil(t, CurrentProfileIndex())
+	ReleaseProfileCache()
+	assert.Nil(t, CurrentProfileIndex())
 }
 
 func TestProfileCacheSharedAcrossCollectors(t *testing.T) {
 	setMinimalProfileDir(t)
 
-	idx1, gen1, err1 := AcquireProfileCache()
+	idx1, err1 := AcquireProfileCache()
 	require.NoError(t, err1)
 
-	idx2, gen2, err2 := AcquireProfileCache()
+	idx2, err2 := AcquireProfileCache()
 	require.NoError(t, err2)
 
 	assert.Same(t, idx1, idx2, "second acquire should return the same index")
-	assert.Equal(t, gen1, gen2)
 
-	ReleaseProfileCache(gen2)
+	ReleaseProfileCache()
+	assert.NotNil(t, CurrentProfileIndex(), "cache should stay loaded while one reference remains")
 
-	// After first release, re-acquire should still be live
-	idx3, gen3, err3 := AcquireProfileCache()
+	idx3, err3 := AcquireProfileCache()
 	require.NoError(t, err3)
 	assert.Same(t, idx1, idx3)
 
-	ReleaseProfileCache(gen1) // last ref
-	ReleaseProfileCache(gen3) // after last ref was dropped, re-acquired
-}
-
-func TestProfileCacheReleaseAndReacquire(t *testing.T) {
-	setMinimalProfileDir(t)
-
-	_, gen1, err := AcquireProfileCache()
-	require.NoError(t, err)
-	ReleaseProfileCache(gen1)
-
-	idx2, gen2, err := AcquireProfileCache()
-	require.NoError(t, err)
-	assert.NotNil(t, idx2)
-	assert.NotEqual(t, gen1, gen2)
-
-	ReleaseProfileCache(gen2)
+	ReleaseProfileCache()
+	assert.NotNil(t, CurrentProfileIndex(), "cache should stay loaded while one reference remains")
+	ReleaseProfileCache()
+	assert.Nil(t, CurrentProfileIndex(), "cache should unload after last reference")
 }
 
 func TestProfileCacheReleaseIdempotent(t *testing.T) {
 	setMinimalProfileDir(t)
 
-	idx, gen, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.NoError(t, err)
 
-	ReleaseProfileCache(gen)
-	ReleaseProfileCache(gen) // should not panic
-	ReleaseProfileCache(gen)
-	_ = idx
+	ReleaseProfileCache()
+	ReleaseProfileCache()
+	ReleaseProfileCache()
+	assert.Nil(t, CurrentProfileIndex())
 }
 
 func TestCollectorInitAcquiresProfileCache(t *testing.T) {
@@ -103,10 +89,10 @@ func TestCollectorInitAcquiresProfileCache(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.NoError(t, err)
-	assert.NotNil(t, c.profileIndex)
+	assert.NotNil(t, CurrentProfileIndex())
 
 	c.Cleanup(context.Background())
-	assert.Nil(t, c.profileIndex)
+	assert.Nil(t, CurrentProfileIndex())
 }
 
 func TestMultipleCollectorsShareSameCache(t *testing.T) {
@@ -129,13 +115,15 @@ func TestMultipleCollectorsShareSameCache(t *testing.T) {
 	err = c2.Init(context.Background())
 	require.NoError(t, err)
 
-	assert.Same(t, c1.profileIndex, c2.profileIndex, "both collectors must share the same profile index")
+	sharedIndex := CurrentProfileIndex()
+	require.NotNil(t, sharedIndex)
 
 	c2.Cleanup(context.Background())
-	assert.NotNil(t, c1.profileIndex, "cache should still be alive after second collector cleans up")
+	assert.Same(t, sharedIndex, CurrentProfileIndex(), "cache should still use the shared index after one collector cleans up")
+	assert.NotNil(t, CurrentProfileIndex(), "cache should still be alive after second collector cleans up")
 
 	c1.Cleanup(context.Background())
-	assert.Nil(t, c1.profileIndex)
+	assert.Nil(t, CurrentProfileIndex(), "cache should unload after all collectors clean up")
 }
 
 func TestInitBindFailureReleasesProfileRef(t *testing.T) {
@@ -151,12 +139,13 @@ func TestInitBindFailureReleasesProfileRef(t *testing.T) {
 
 	err = c.Init(context.Background())
 	require.Error(t, err)
-	assert.Nil(t, c.profileIndex, "profile ref should be released on bind failure")
+	assert.Nil(t, CurrentProfileIndex(), "profile ref should be released on bind failure")
 
-	// Verify cache was released and can be re-acquired
-	idx, gen, err := AcquireProfileCache()
+	// Verify cache can still be acquired after bind failure
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	ReleaseProfileCache(gen)
+	ReleaseProfileCache()
+	assert.Nil(t, CurrentProfileIndex())
 	_ = idx
 }
 
@@ -214,9 +203,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -358,7 +347,7 @@ func TestProfileLoadEmptyDirFails(t *testing.T) {
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no trap profiles found")
 }
@@ -375,7 +364,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required field 'name'")
 }
@@ -393,7 +382,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not MIB-qualified")
 }
@@ -411,7 +400,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid category")
 }
@@ -429,7 +418,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid severity")
 }
@@ -448,7 +437,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid status")
 }
@@ -467,7 +456,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found in file-scoped varbinds table")
 }
@@ -491,7 +480,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid oid")
 }
@@ -513,9 +502,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -538,7 +527,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required field 'type'")
 }
@@ -557,7 +546,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dedup_key_varbind")
 }
@@ -577,7 +566,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "label key")
 }
@@ -602,7 +591,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate trap OID")
 }
@@ -627,7 +616,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate trap name")
 }
@@ -655,9 +644,9 @@ traps:
 	setTestDirs(t, userDir, stockDir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -692,9 +681,9 @@ traps:
 	setTestDirs(t, userDir, stockDir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	assert.NotNil(t, idx.Lookup("1.3.6.1.6.3.1.1.5.2"))
 	assert.NotNil(t, idx.Lookup("1.3.6.1.6.3.1.1.5.3"))
@@ -736,9 +725,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -771,9 +760,9 @@ extends: [_base1.yaml, _base2.yaml]
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -809,9 +798,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -831,7 +820,7 @@ extends: [../../outside.yaml]
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid extends entry")
 }
@@ -874,9 +863,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -916,9 +905,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1012,9 +1001,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1055,9 +1044,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1097,9 +1086,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1165,9 +1154,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1206,7 +1195,7 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	_, _, err := AcquireProfileCache()
+	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unbounded varbind")
 }
@@ -1288,9 +1277,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1348,9 +1337,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	require.NoError(t, err)
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
 	require.NotNil(t, td)
@@ -1367,11 +1356,11 @@ traps:
 func TestStockProfileIndexLoads(t *testing.T) {
 	resetProfileCacheForTest()
 
-	idx, gen, err := AcquireProfileCache()
+	idx, err := AcquireProfileCache()
 	if err != nil {
 		t.Skipf("no stock profiles available: %v", err)
 	}
-	defer ReleaseProfileCache(gen)
+	defer ReleaseProfileCache()
 
 	assert.NotNil(t, idx)
 	assert.GreaterOrEqual(t, len(idx.trapsByOID), 50000)

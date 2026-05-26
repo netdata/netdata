@@ -47,7 +47,7 @@ func TestValidateDedupConfig(t *testing.T) {
 }
 
 func TestTrapDeduperDefaultFingerprintSuppressesSameSourceAndTrap(t *testing.T) {
-	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, nil)
+	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil)
 
 	first := &TrapEntry{SourceIP: "198.51.100.10", TrapOID: "1.3.6.1.6.3.1.1.5.3"}
 	_, suppressed := d.Admit(first, nil, nil)
@@ -70,7 +70,7 @@ func TestTrapDeduperDefaultFingerprintSuppressesSameSourceAndTrap(t *testing.T) 
 
 func TestTrapDeduperSourceDevicePriority(t *testing.T) {
 	t.Run("vnode wins over source IP", func(t *testing.T) {
-		d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, nil)
+		d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil)
 
 		first := &TrapEntry{SourceVnodeID: "vnode-1", SourceIP: "198.51.100.10", TrapOID: "1.3.6.1.6.3.1.1.5.3"}
 		_, suppressed := d.Admit(first, nil, nil)
@@ -92,7 +92,7 @@ func TestTrapDeduperSourceDevicePriority(t *testing.T) {
 	})
 
 	t.Run("source IP wins over hostname", func(t *testing.T) {
-		d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, nil)
+		d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil)
 
 		first := &TrapEntry{SourceIP: "198.51.100.10", DeviceHostname: "core-sw-01", TrapOID: "1.3.6.1.6.3.1.1.5.3"}
 		_, suppressed := d.Admit(first, nil, nil)
@@ -109,7 +109,7 @@ func TestTrapDeduperSourceDevicePriority(t *testing.T) {
 }
 
 func TestTrapDeduperProfileKeyVarbindsNarrowFingerprint(t *testing.T) {
-	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, nil)
+	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil)
 	td := &TrapDef{DedupKeyVarbinds: []string{"ifIndex"}}
 
 	first := dedupTestEntry("198.51.100.10", "1")
@@ -132,7 +132,7 @@ func TestTrapDeduperProfileKeyVarbindsNarrowFingerprint(t *testing.T) {
 }
 
 func TestTrapDeduperNumericOIDKeyVarbindNarrowFingerprint(t *testing.T) {
-	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, nil)
+	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil)
 	td := &TrapDef{DedupKeyVarbinds: []string{"1.3.6.1.2.1.2.2.1.1.1"}}
 
 	first := dedupTestEntry("198.51.100.10", "1")
@@ -155,7 +155,7 @@ func TestTrapDeduperNumericOIDKeyVarbindNarrowFingerprint(t *testing.T) {
 }
 
 func TestTrapDeduperMissingKeyVarbindSentinelDiffersFromEmptyString(t *testing.T) {
-	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, nil)
+	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil)
 	td := &TrapDef{DedupKeyVarbinds: []string{"ifAlias"}}
 
 	empty := &TrapEntry{
@@ -190,7 +190,7 @@ func TestTrapDeduperMissingKeyVarbindSentinelDiffersFromEmptyString(t *testing.T
 }
 
 func TestTrapDeduperTTLExpiryAllowsNewFirstOccurrence(t *testing.T) {
-	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, nil)
+	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil)
 	d.window = time.Nanosecond
 
 	entry := &TrapEntry{SourceIP: "198.51.100.10", TrapOID: "1.3.6.1.6.3.1.1.5.3"}
@@ -207,7 +207,7 @@ func TestTrapDeduperTTLExpiryAllowsNewFirstOccurrence(t *testing.T) {
 }
 
 func TestTrapDeduperCacheCapEvictsOldestEntry(t *testing.T) {
-	d := newTrapDeduper("test", DedupConfig{Enabled: true, CacheMaxEntries: 2}, nil, nil, nil)
+	d := newTrapDeduper("test", DedupConfig{Enabled: true, CacheMaxEntries: 2}, nil, nil)
 
 	for _, source := range []string{"198.51.100.10", "198.51.100.11", "198.51.100.12"} {
 		_, suppressed := d.Admit(&TrapEntry{SourceIP: source, TrapOID: "1.3.6.1.6.3.1.1.5.3"}, nil, nil)
@@ -227,11 +227,14 @@ func TestTrapDeduperCacheCapEvictsOldestEntry(t *testing.T) {
 
 func TestTrapDeduperSummaryEntry(t *testing.T) {
 	writer := &mockTrapWriter{}
-	idx := &ProfileIndex{trapsByOID: map[string]*TrapDef{
+	// Test-only shortcut: the deduper summary test does not run Collector.Init(),
+	// so it seeds the immutable shared index without touching refcounts.
+	globalProfileCache.current.Store(&ProfileIndex{trapsByOID: map[string]*TrapDef{
 		"1.3.6.1.6.3.1.1.5.3": {Name: "SNMPv2-MIB::linkDown"},
-	}}
+	}})
+	t.Cleanup(func() { globalProfileCache.current.Store(nil) })
 	metrics := &perJobMetrics{}
-	d := newTrapDeduper("local", DedupConfig{Enabled: true}, writer, metrics, idx)
+	d := newTrapDeduper("local", DedupConfig{Enabled: true}, writer, metrics)
 
 	entry := &TrapEntry{
 		SourceIP:       "198.51.100.10",
@@ -289,7 +292,7 @@ func TestTrapDeduperSummaryEntry(t *testing.T) {
 
 func TestTrapDeduperCloseFlushesPendingSummaryAndStopsTimer(t *testing.T) {
 	writer := &mockTrapWriter{}
-	d := newTrapDeduper("local", DedupConfig{Enabled: true}, writer, nil, nil)
+	d := newTrapDeduper("local", DedupConfig{Enabled: true}, writer, nil)
 	d.window = time.Hour
 	d.start()
 
@@ -311,7 +314,7 @@ func TestTrapDeduperCloseFlushesPendingSummaryAndStopsTimer(t *testing.T) {
 
 func TestTrapDeduperTimerEmitsSummary(t *testing.T) {
 	writer := &mockTrapWriter{}
-	d := newTrapDeduper("local", DedupConfig{Enabled: true}, writer, nil, nil)
+	d := newTrapDeduper("local", DedupConfig{Enabled: true}, writer, nil)
 	d.window = 10 * time.Millisecond
 	d.start()
 	defer d.Close()
