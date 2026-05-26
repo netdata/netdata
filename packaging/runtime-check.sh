@@ -58,6 +58,7 @@ plugins.d/debugfs.plugin
 plugins.d/ebpf.plugin
 plugins.d/freeipmi.plugin
 plugins.d/go.d.plugin
+plugins.d/snmp-trap-profile-gen
 plugins.d/ioping.plugin
 plugins.d/local-listeners
 plugins.d/ndsudo

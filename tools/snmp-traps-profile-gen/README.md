@@ -1,10 +1,17 @@
 # snmp-traps-profile-gen
 
-Three-stage pipeline that turns the locally mirrored MIB corpus into
-per-vendor SNMP trap profile YAML files, ready to ship as the stock
-out-of-the-box catalogue for the Netdata SNMP trap subsystem.
+Legacy Python pipeline that turned the locally mirrored MIB corpus into
+per-vendor SNMP trap profile YAML files for the stock out-of-the-box catalogue
+for the Netdata SNMP trap subsystem.
 
-The pipeline is driven by the two SOWs at
+The current shipped helper is the Go command in
+`src/go/cmd/snmptrapprofilegen/`. CMake installs it as
+`/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` together with Netdata.
+Use that helper for new stock regenerations and for operator MIB conversion.
+The Python scripts in this directory are retained as historical/reference
+tooling and for the bundled IANA PEN snapshot.
+
+The legacy pipeline was driven by the two SOWs at
 `.agents/sow/done/SOW-0033-*` (mechanical MIB extraction) and
 `.agents/sow/done/SOW-0034-*` (LLM classification + description
 generation).  Read those first for the design rationale.
@@ -30,6 +37,53 @@ tools/snmp-traps-profile-gen/
   output/                       # all generated artefacts (gitignored)
 ```
 
+The active helper lives outside this directory:
+
+```
+src/go/cmd/snmptrapprofilegen/
+  main.go                       # extract, classify, emit, generate
+  main_test.go                  # focused helper tests
+```
+
+## Current shipped helper
+
+Operator conversion of local MIBs:
+
+```sh
+/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen generate \
+  --source-dir ./mibs \
+  --all \
+  --out-dir ./snmp-trap-profile-gen-output
+```
+
+The generated per-vendor YAML files land under
+`./snmp-trap-profile-gen-output/profiles/`. Copy the needed files into
+`/etc/netdata/go.d/snmp.trap-profiles/`.
+The helper also writes review artifacts under `--out-dir`: `traps.jsonl`,
+`extraction-report.json`, `conflicts.json` for duplicate trap OIDs, and
+`source-conflicts.json` when multiple MIB files define the same module name.
+
+Stock regeneration from the source tree:
+
+```sh
+cd src/go
+go run ./cmd/snmptrapprofilegen generate \
+  --source-dir /path/to/mibs \
+  --all \
+  --classify \
+  --require-llm \
+  --concurrency 20 \
+  --out-dir /tmp/snmp-trap-profile-gen-output \
+  --profiles-out-dir ../../src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default \
+  --catalogue ../../src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
+```
+
+The helper uses the bundled IANA PEN snapshot by default. In installed Netdata
+that file is
+`/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt`.
+Pass `--refresh-pen` when the run should fetch the current IANA registry before
+emission.
+
 The expected output sub-tree under `output/`:
 
 ```
@@ -46,7 +100,7 @@ output/
   profile-emit-report.json  # vendor -> entry-count map
 ```
 
-## Setup
+## Legacy Python setup
 
 Create a local virtual environment from `requirements.txt`:
 
@@ -63,7 +117,7 @@ defaults with `SNMP_TRAP_PROFILE_GEN_LLM_BASE_URL`,
 The helper does not write API keys, endpoint credentials, or response headers
 to output files.
 
-## Phase 1 - extract MIBs
+## Legacy Phase 1 - extract MIBs
 
 ```sh
 # Test on a few MIBs first.
@@ -84,7 +138,7 @@ compiled MIBs (cross-module varbind resolution).
 Resumability: re-run with `--resume` to append-only; already-extracted
 MIB names are skipped.
 
-## Phase 2 - classify (sample gate first)
+## Legacy Phase 2 - classify (sample gate first)
 
 ```sh
 # 200-trap stratified sample.  Stop and review output/sample-review.md
@@ -117,7 +171,7 @@ the retry prompt. If all 3 attempts fail validation the trap is filled
 in via a deterministic regex-based fallback (`enrichment_source:
 fallback:mechanical`).
 
-## Phase 3 - emit per-vendor YAML
+## Legacy Phase 3 - emit per-vendor YAML
 
 ```sh
 ./emit.py \

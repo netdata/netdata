@@ -3561,6 +3561,18 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/libexec/netdata/plugins.d)
 
+    if (OS_WINDOWS)
+        set(SNMP_TRAP_PROFILE_GEN_BIN snmp-trap-profile-gen.exe)
+    else()
+        set(SNMP_TRAP_PROFILE_GEN_BIN snmp-trap-profile-gen)
+    endif()
+
+    add_go_target(snmp_trap_profile_gen ${SNMP_TRAP_PROFILE_GEN_BIN} src/go cmd/snmptrapprofilegen)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/${SNMP_TRAP_PROFILE_GEN_BIN}
+            COMPONENT plugin-go
+            DESTINATION usr/libexec/netdata/plugins.d)
+
     # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
     if(ENABLE_ND_MCP)
         if (OS_WINDOWS)
@@ -4379,6 +4391,9 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
     install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+    install(FILES tools/snmp-traps-profile-gen/iana-enterprise-numbers.txt
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
 

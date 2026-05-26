@@ -27,6 +27,7 @@ require (
 	github.com/gofrs/flock v0.13.0
 	github.com/gohugoio/hashstructure v0.6.0
 	github.com/golang/mock v1.6.0
+	github.com/golangsnmp/gomib v0.11.0
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.42.1
@@ -84,6 +85,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.10.0
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	golang.org/x/sys v0.44.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

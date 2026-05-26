@@ -25,14 +25,16 @@ emission in plugin configuration, not in profiles).
 
 A profile is a single YAML file. One file per vendor by convention; stock
 profiles ship under `default/` and are organized by inferred enterprise-PEN
-vendor (`cisco.yaml`, `huawei.yaml`, `juniper.yaml`, …) plus the IETF-standard
-file (`standard.yaml`) and the IEEE LLDP file (`ieee-lldp.yaml`).
+vendor (`ciscosystems.yaml`, `huawei-technology-co-ltd.yaml`,
+`juniper-networks-inc.yaml`, …) plus the IETF-standard file (`standard.yaml`)
+and the IEEE LLDP file (`ieee-lldp.yaml`).
 
 ### How profiles are loaded
 
-The plugin loads stock profiles from `<stock>/go.d/snmp.trap-profiles/default/`
-(typically `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/`) and
-operator overrides from `<user>/go.d/snmp.trap-profiles/`
+The plugin loads stock profiles from the go.d stock config directory
+`snmp.trap-profiles/default/` subdirectory (typically
+`/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/`) and operator
+overrides from the go.d user config directory `snmp.trap-profiles/` subdirectory
 (typically `/etc/netdata/go.d/snmp.trap-profiles/`).
 
 Profiles are loaded **only when the first runnable SNMP trap job is created** —
@@ -41,7 +43,9 @@ Netdata agents that do not receive traps never pay the memory footprint.
 Profile loading is shared across trap jobs: the first runnable job builds the
 profile index, later jobs reuse it, and the last job release lets the Agent
 reclaim it. Failed profile loads are creation-time job failures surfaced to
-DynCfg; they do not leave a permanently poisoned cache.
+DynCfg; they do not leave a permanently poisoned cache. If all trap jobs are
+removed, the cache is released and the next trap job creation loads profiles
+again.
 
 ## File layout
 
@@ -111,15 +115,18 @@ entry is the slim shipping form of a single MIB object:
 
 > **Future field**: a `display_hint` member (render hint such as `1x:` for MAC
 > or `1d.1d.1d.1d` for IPv4) will be added when the plugin's renderer needs
-> it. The current generator does not extract DISPLAY-HINT from
-> TEXTUAL-CONVENTION definitions; the field is reserved.
+> it. The current extractor keeps DISPLAY-HINT data in intermediate JSONL when
+> `gomib` exposes it, but the stock profile emitter does not write
+> `display_hint`; the field is reserved for the renderer work that will consume
+> it.
 
 Plugin behaviour: varbinds that the plugin sees on a trap but cannot resolve
 via the file table fall back to raw OID-keyed rendering — there is **no
-runtime MIB compilation** in the plugin (operators convert custom MIBs to
-profile YAMLs offline using `tools/snmp-traps-profile-gen/` and drop them
-under `/etc/netdata/go.d/snmp.trap-profiles/`). The varbind still lands in
-the `TRAP_JSON` journal field with its OID, ASN.1-decoded type, and
+runtime MIB compilation** in the plugin. Operators convert custom MIBs to
+profile YAMLs offline with the installed helper
+`/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the generated
+YAML files under `/etc/netdata/go.d/snmp.trap-profiles/`. The varbind still
+lands in the `TRAP_JSON` journal field with its OID, ASN.1-decoded type, and
 value.
 
 ### Duplicate symbolic name handling in `TRAP_JSON`
@@ -164,9 +171,9 @@ Each list entry defines one trap notification.
 | `category`    | yes      | string  | One of the 8 canonical categories — see below |
 | `severity`    | yes      | string  | One of the 8 syslog severities — see below |
 | `description` | rec.     | string  | Template rendered into the journal `MESSAGE` field |
-| `status`      | no       | string  | MIB status: `current`, `deprecated`, `obsolete`; unknown values are profile validation errors |
+| `status`      | no       | string  | MIB status: `current`, `deprecated`, `mandatory`, `obsolete`, or `optional`; unknown values are profile validation errors |
 | `varbinds`    | no       | list    | Names referencing the file-level table, or inline dicts (see below) |
-| `labels`      | no       | map     | Operator-overridable: key → template producing a `TRAP_TAG_<KEY>` journal field |
+| `labels`      | no       | map     | Operator-overridable: key → template producing a `TRAP_TAG_<KEY>` journal field. Dynamic references must be bounded-cardinality. |
 | `dedup_key_varbinds` | no | list | Names of varbinds that participate in the deduplication fingerprint; every name must resolve to the file-scoped `varbinds:` table |
 
 > Note: the `name:` field encodes the source MIB module already. There is no
@@ -220,7 +227,7 @@ increments the `snmp.trap.errors.template_unresolved` plugin metric so
 operators notice and can correct the profile.
 
 If `description:` is absent the plugin renders the default template
-`"{TRAP_NAME} from {_HOSTNAME} ({TRAP_SOURCE_IP})"`.
+`"{TRAP_NAME} on {_HOSTNAME}."`.
 
 The rendered `MESSAGE` is capped at 512 bytes, including the ASCII `...`
 truncation marker when truncation is needed. Multi-line MESSAGE values are
@@ -228,8 +235,8 @@ written using systemd-journal's binary field encoding so embedded newlines never
 inject other journal fields.
 
 The `status` field is informational in the MVP. The plugin does not filter,
-drop, or warn on `deprecated` / `obsolete` traps in SOW-0035; future UI or
-validation work may surface it.
+drop, or warn on `deprecated` / `mandatory` / `obsolete` / `optional` traps in
+SOW-0035; future UI or validation work may surface it.
 Known `status` values are still validated so typos fail at profile load instead
 of silently entering the shipped pack.
 
@@ -292,30 +299,37 @@ The plugin loader mirrors the SNMP polling plugin's multipath pattern
 (`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`):
 
 1. **Same filename in higher-priority directory replaces the lower-priority
-   one entirely.** Operator `cisco.yaml` fully replaces stock `cisco.yaml`
-   — copy + edit the whole file to customize one vendor.
+   one entirely.** Operator `ciscosystems.yaml` fully replaces stock
+   `ciscosystems.yaml` — copy + edit the whole file to customize one vendor.
 2. **Different filename adds entries.** Operator `site-additions.yaml`
    (different filename) merges its `traps:` into the loaded set without
    touching stock files.
 3. **`extends:` chain field-merge** (when an override profile lists
-   `extends: [_base.yaml, other-base.yaml]`): the loader merges trap
+   `extends: [_base.yaml, other-base.yaml]`): entries must be YAML filenames
+   only, not paths. The loader merges trap
    entries by OID; fields specified in the override file win over fields
    from the extended bases; later entries in `extends:` override earlier
-   ones for the same field. This mirrors `load.go:174-186`.
+   ones for the same field.
 
 ### `TRAP_TAG_*` label namespace and collision-free design
 
-Operator labels — `labels: { tenant: acme, interface: "{ifDescr}" }` —
+Operator labels — `labels: { tenant: acme, oper_status: "{ifOperStatus}" }` —
 always emit as `TRAP_TAG_<KEY_UPPERCASE>` journal fields (e.g.
-`TRAP_TAG_TENANT=acme`, `TRAP_TAG_INTERFACE=GigabitEthernet0/1`). The
+`TRAP_TAG_TENANT=acme`, `TRAP_TAG_OPER_STATUS=down`). The
 dedicated `TRAP_TAG_*` namespace structurally prevents collisions with
 plugin-controlled `TRAP_*` fields, even when an operator label key
 happens to match a plugin field name. For example, a profile with
-`labels: { interface: "{ifDescr}" }` and a co-located topology plugin
+`labels: { interface_state: "{ifOperStatus}" }` and a co-located topology plugin
 both populate journal fields, but in different namespaces: the operator
-label becomes `TRAP_TAG_INTERFACE`, the topology field becomes
+label becomes `TRAP_TAG_INTERFACE_STATE`, the topology field becomes
 `TRAP_INTERFACE`. Both can co-exist on the same trap entry without
 conflict.
+
+Dynamic label references must be bounded-cardinality at profile-load time. The
+MVP accepts static strings, `TRAP_NAME`, `TRAP_DEVICE_VENDOR`, enum-backed
+varbinds, booleans, and small numeric ranges. It rejects unbounded values such
+as hostnames, source IPs, interface descriptions, MAC addresses, usernames,
+packet contents, and raw numeric OID references without profile metadata.
 
 ```yaml
 # /etc/netdata/go.d/snmp.trap-profiles/site-additions.yaml
@@ -333,10 +347,25 @@ This keeps profiles vendor-curated and installation-agnostic.
 
 ## Generated stock profiles
 
-Stock profiles under `default/` are generated by `tools/snmp-traps-profile-gen/`
-from public MIB sources and an LLM classification step. The same tools can
-re-emit the pack when new MIBs are mirrored or the taxonomy changes. See
-`tools/snmp-traps-profile-gen/README.md` for the regeneration recipe.
+Stock profiles under `default/` are generated by
+`src/go/cmd/snmptrapprofilegen`, shipped as
+`/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen`, from public MIB sources
+and an LLM classification step. The helper can also convert operator MIBs
+offline:
+
+```sh
+/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen generate \
+  --source-dir ./mibs \
+  --all \
+  --out-dir ./snmp-trap-profile-gen-output
+```
+
+By default the helper reads the bundled IANA PEN snapshot from
+`/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt`.
+Pass `--refresh-pen` to fetch the current IANA registry before emission.
+The run also writes review artifacts under `--out-dir`: `traps.jsonl`,
+`extraction-report.json`, `conflicts.json` for duplicate trap OIDs, and
+`source-conflicts.json` when multiple MIB files define the same module name.
 
 Edits to files under `default/` are overwritten on regeneration; operator
 modifications belong in the user override directory, not in stock files.

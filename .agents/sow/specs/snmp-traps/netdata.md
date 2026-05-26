@@ -158,7 +158,7 @@ SOW-0035 M1 finalizes the exact process/writer boundary for the Go implementatio
 
 1. Receive from a configured endpoint into a reusable buffer.
 2. Pre-decode allowlist (source IP, CIDR match). Drop if disallowed (no decode cost).
-3. BER decode in place, within bounded limits (see §18) — drop and increment counter on limit violation.
+3. BER limit pre-scan, then SNMP trap decode with the chosen parser, within bounded limits (see §18) — drop and increment counter on limit violation.
 4. Community / USM auth check.
 5. Per-job rate-limit (token bucket). Drop or sample if over budget (operator chooses).
 6. Identify source: PDU-based first (v1 `agent-addr`; v2c/v3 `snmpTrapAddress.0` varbind per RFC 3584); fall back to UDP peer. Candidate source addresses are accepted only after IP parsing/normalization. Malformed or non-IP `snmpTrapAddress.0` values are ignored for source identity and `_HOSTNAME` fallback; the kernel-provided UDP peer remains the final safe fallback.
@@ -279,16 +279,16 @@ traps:
     dedup_key_varbinds: [cpsIfViolationMacAddress, cpsIfViolationVlan]
 ```
 
-**Required per trap entry**: `oid`, `name` (MIB-qualified `<MIB-MODULE>::<symbol>` — vendors reuse bare symbolic names across product-line MIBs; the bare symbol is not globally unique), `category`, `severity`. `description` is optional (defaults to `"{TRAP_NAME} from {_HOSTNAME} ({TRAP_SOURCE_IP})"`). `labels`, `varbinds`, and `dedup_key_varbinds` are optional. The plugin loader rejects entries missing required fields at startup with a clear error naming the file + offending entry.
+**Required per trap entry**: `oid`, `name` (MIB-qualified `<MIB-MODULE>::<symbol>` — vendors reuse bare symbolic names across product-line MIBs; the bare symbol is not globally unique), `category`, `severity`. `description` is optional (defaults to `"{TRAP_NAME} on {_HOSTNAME}."`). `labels`, `varbinds`, and `dedup_key_varbinds` are optional. The plugin loader rejects entries missing required fields at startup with a clear error naming the file + offending entry.
 
 ### Varbind resolution — 2-tier
 
 The plugin resolves each varbind in the PDU in this order:
 
-1. **Profile file-scoped `varbinds:` table** — if the profile defines this varbind by OID, use its declared name, type, and (future) `display_hint` directly. The shipped OOB pack covers 351 vendor PENs / 50,198 traps with full inline varbind metadata — operators get rich decoding for top vendors without installing any MIB file.
+1. **Profile file-scoped `varbinds:` table** — if the profile defines this varbind by OID, use its declared name, type, and (future) `display_hint` directly. The shipped OOB pack covers 437 vendor PENs / 71,787 traps with file-scoped varbind metadata — operators get rich decoding for top vendors without installing any MIB file.
 2. **Raw fallback** — varbind not in any loaded profile. Render as OID-keyed entry with the ASN.1-decoded type only. The varbind still lands in `TRAP_JSON` (§11) with its OID and value; just without a symbolic name.
 
-There is **no runtime MIB compilation tier**. The plugin does not parse SMIv1/v2 MIB files at runtime; there is no `pysmi`/`gosmi`/Rust-MIB-crate dependency. Operators who need coverage for a vendor MIB not in the shipped OOB pack convert their MIB files to profile YAMLs **offline** using `tools/snmp-traps-profile-gen/` and drop the resulting YAML into `/etc/netdata/go.d/snmp.trap-profiles/` (per the SNMP polling plugin pattern — see §15 and the user-facing documentation shipped with the plugin).
+There is **no runtime MIB compilation tier**. The plugin does not parse SMIv1/v2 MIB files at runtime; there is no `pysmi`/`gosmi`/Rust-MIB-crate dependency. Operators who need coverage for a vendor MIB not in the shipped OOB pack convert their MIB files to profile YAMLs **offline** using the shipped helper `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the resulting YAML into `/etc/netdata/go.d/snmp.trap-profiles/` (per the SNMP polling plugin pattern — see §15 and the user-facing documentation shipped with the plugin).
 
 ### Description template syntax
 
@@ -309,7 +309,7 @@ If a reference cannot be resolved (varbind absent, MIB not loaded, etc.):
 
 If `description` is absent, default template is:
 ```
-{TRAP_NAME} from {_HOSTNAME} ({TRAP_SOURCE_IP})
+{TRAP_NAME} on {_HOSTNAME}.
 ```
 
 Templates are compiled at profile-load (tokenize → segment list). Hot-path substitution is bounded-size buffer fill. MESSAGE capped at 512 bytes (post-substitution); truncated with ASCII `...` marker if exceeded. The 512-byte cap includes the marker bytes. Full forensic data remains in `TRAP_JSON`.
@@ -325,7 +325,7 @@ The loader is plugin-wide shared state, not per-listener state. It loads on firs
 The loader mirrors the established SNMP polling pattern (`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`):
 
 1. **Multipath load** — operator overrides first, then stock: `/etc/netdata/go.d/snmp.trap-profiles/` → `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/`.
-2. **Filename dedup** — same filename in a higher-priority directory replaces the lower-priority one entirely. Operator override file `cisco.yaml` fully replaces stock `cisco.yaml`; operators copy + edit to customize a single vendor file.
+2. **Filename dedup** — same filename in a higher-priority directory replaces the lower-priority one entirely. Operator override file `ciscosystems.yaml` fully replaces stock `ciscosystems.yaml`; operators copy + edit to customize a single vendor file.
 3. **Field-level merge via `extends:` chain** — when a profile YAML lists `extends: [_base1.yaml, _base2.yaml]`, the loader merges trap entries; later `extends` entries override earlier ones on a per-OID basis. Within a single profile entry, field-level (the override file's fields win for the fields it specifies; unspecified fields inherit from the extended base).
 4. **Directory ordering** — within a single directory, files are loaded in `filepath.WalkDir()` lexical order (Go contract). If two files in the same directory define the same OID via `extends`, the alphabetically-later file wins.
 
@@ -334,11 +334,11 @@ The loader mirrors the established SNMP polling pattern (`src/go/plugin/go.d/col
 Operators who need coverage for a vendor MIB not in the shipped OOB pack:
 
 1. Place MIB files under `~/mibs/` (or any working directory).
-2. Run `tools/snmp-traps-profile-gen/extract.py` + `classify.py` + `emit.py` to produce a profile YAML.
-3. Drop the resulting `.yaml` file into `/etc/netdata/go.d/snmp.trap-profiles/`.
+2. Run `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen generate --source-dir ~/mibs --all --out-dir ./snmp-trap-profile-gen-output` to produce profile YAMLs. The helper uses default category/severity/description values unless LLM classification is explicitly enabled for stock regeneration. It also writes review artifacts under `--out-dir`, including `conflicts.json` for duplicate trap OIDs and `source-conflicts.json` when multiple MIB files define the same module name.
+3. Drop the generated `.yaml` files from `./snmp-trap-profile-gen-output/profiles/` into `/etc/netdata/go.d/snmp.trap-profiles/`.
 4. The plugin picks it up on profile YAML hot-reload (or next plugin restart) — see §13.
 
-This mirrors the SNMP polling plugin's model: stock + operator-override YAMLs only, no runtime MIB compilation. The conversion tools and operator workflow are documented in the plugin's `README.md` and in the public skill `docs/netdata-ai/skills/query-snmp-traps/` (shipped in SOW-0039).
+This mirrors the SNMP polling plugin's model: stock + operator-override YAMLs only, no runtime MIB compilation. The conversion helper is shipped with Netdata in `plugins.d` and uses the bundled IANA PEN snapshot at `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt` unless `--refresh-pen` is passed.
 
 Newly added profile entries with `category: unknown` (operator-authored or auto-generated for uncovered OIDs) get the default `unknown` category until the operator sets it in plugin config or in the YAML directly.
 
@@ -414,7 +414,7 @@ Operators can apply per-OID overrides on top of profile baseline. The `overrides
 
 ### Label naming rules
 
-Labels are free-form key-value pairs. Keys must match `[a-z][a-z0-9_]*` (lowercase plugin convention; uppercased and prefixed with `TRAP_TAG_` when written to journal as `TRAP_TAG_<KEY>=<VALUE>`, emitted as OTLP attribute `trap.<key>`). Values are arbitrary strings. Labels are slicing metadata on the journal and on the metric-instance, not metric dimensions — they don't expand the chart dimension count.
+Labels are free-form key-value pairs. Keys must match `[a-z][a-z0-9_]*` (lowercase plugin convention; uppercased and prefixed with `TRAP_TAG_` when written to journal as `TRAP_TAG_<KEY>=<VALUE>`, emitted as OTLP attribute `trap.<key>`). Static values are arbitrary strings. Dynamic template references must be bounded-cardinality at profile/config load time; the MVP accepts static strings, `TRAP_NAME`, `TRAP_DEVICE_VENDOR`, enum-backed varbinds, booleans, and small numeric ranges, and rejects unbounded values such as hostnames, source IPs, interface descriptions, MAC addresses, usernames, packet contents, and raw numeric OID references without profile metadata. Labels are slicing metadata on the journal and on the metric-instance, not metric dimensions — they don't expand the chart dimension count.
 
 **Why the `TRAP_TAG_*` namespace?** Labels come from two sources — profile YAMLs (vendor-curated) and operator per-job config. Rejecting labels at config-load would lose vendor data (in the case of profile labels) or annoy operators (in the case of operator labels). Putting all labels in a dedicated `TRAP_TAG_*` sub-namespace means they cannot collide with any current or future plugin-controlled `TRAP_*` field, no rejection logic needed.
 
@@ -602,13 +602,15 @@ Per-job retention policy mirrors the retention semantics used by the NetFlow plu
 | `retention.max_size` | `10GB` | Total bytes of journal files for this job; oldest files are deleted when exceeded. Set to `null` to disable size-based eviction. |
 | `retention.max_duration` | `null` (disabled) | Maximum age of the oldest journal file; older files are deleted. Set to a duration (e.g., `7d`, `30d`) to enable. |
 | `retention.rotation_size` | auto (`max_size / 20`, clamped 5MB-200MB) | Per-file rotation size. |
-| `retention.rotation_duration` | `1h` | Per-file rotation duration. |
+| `retention.rotation_duration` | `1h` | Per-file rotation duration. `0`/`null` disables time-based rotation. |
 
 **Retention rules apply independently and inclusively** — either threshold being exceeded triggers cleanup of the oldest file. Both `null` is allowed only as an explicit manual-cleanup configuration; the default is size-capped. When both are `null`, the periodic retention sweep is a no-op and no file is deleted by the plugin.
 
 `retention.rotation_size: null` auto-calculates as `retention.max_size / 20` and clamps to 5MB-200MB. If `retention.max_size` is `null`, the auto rotation size uses the 200MB upper clamp. Rotation still happens when size-based retention is disabled; files accumulate until age-based retention or external cleanup removes them. Time-based retention requires a periodic retention sweep in addition to rotation-time cleanup, so `retention.max_duration` is honored even during low-volume periods.
 
 The active journal file must be queryable by `journalctl --directory=...`; waiting until rotation/close to build indexes is not acceptable for the MVP. The writer maintains DATA/FIELD hash tables and ENTRY_ARRAY chains while appending entries.
+
+At writer creation, the journal directory is scanned for interrupted prior `.journal` files. Repairable files are truncated to the last valid object, have DATA/FIELD hash tables and ENTRY_ARRAY chains rebuilt from valid entries, are marked archived, and remain queryable. Structurally corrupt files that cannot be repaired are quarantined under a non-`.journal` suffix before the new writer starts, so a stale corrupt file does not poison `journalctl --directory=...` for the job.
 
 The journal-direct backend is Linux-only in SOW-0035. On non-Linux platforms, trap job creation must fail with a coded unsupported-backend error instead of starting and failing at runtime. Future SOWs may add a non-journal backend such as OTLP for platforms without `journalctl`.
 
@@ -929,7 +931,7 @@ Phase B resolved most of the original questions. What remains:
 
 2. **Profile YAML hot-reload mechanism**: the plugin needs to detect operator-added/edited YAML files under `/etc/netdata/go.d/snmp.trap-profiles/` and refresh the in-memory profile index. Two options: inotify on the directory, or explicit `dyncfg`-triggered reload. Phase B recommended inotify is overkill for the new-profile cadence; explicit reload via DynCfg is simpler and matches the per-job lifecycle. SOW-0037 M3 resolves.
 
-3. **MIB upload via API**: out of scope for first release. Operators convert MIBs offline using `tools/snmp-traps-profile-gen/` and drop the resulting YAML; this is documented user workflow (see §7 and the public skill shipped in SOW-0039). UI-driven upload via DynCfg is a future enhancement.
+3. **MIB upload via API**: out of scope for first release. Operators convert MIBs offline using `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the resulting YAML; this is documented user workflow (see §7 and the profile-format documentation). UI-driven upload via DynCfg is a future enhancement.
 
 4. **Topology integration when topology is NOT co-located**: omit `TRAP_INTERFACE` / `TRAP_NEIGHBORS` journal fields entirely when topology state is unavailable. Same rule for the corresponding OTLP attributes (`netdata.topology.interface`, `netdata.topology.neighbors`) — omit, do not emit empty strings.
 
@@ -949,7 +951,7 @@ Phase B resolved most of the original questions. What remains:
 - **Dedup default state** — disabled; opt-in per-job (§10).
 - **DynCfg lifecycle** — job-level restart on config change; plugin process does not restart.
 - **Per-job retention** — 10GB default, configurable max-size and/or max-duration, mirrored from NetFlow plugin pattern.
-- **MIB compilation** — none at runtime; operators convert offline via the conversion tools, drop YAML.
+- **MIB compilation** — none at runtime; operators convert offline via the shipped helper, drop YAML.
 - **Profile override merge** — multipath + filename-dedup + extends-chain field-merge, mirrored from SNMP polling plugin (`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`).
 - **Trap `name` field** — required, MIB-qualified.
 - **Spec example varbind layout** — file-scoped table (matches the shipped `profile-format.md` schema).
@@ -968,7 +970,7 @@ Phase B resolved most of the original questions. What remains:
 - Automatic device profiling (Rule 4 — operator drops a profile YAML; everything else decodes automatically).
 - Profile YAML controlling journal field names (the journal always captures all varbinds; no profile knob needed).
 - Profile YAML controlling metric emission (metric emission is operator choice in plugin config).
-- **Runtime MIB compilation** — no `pysmi`/`gosmi`/Rust-MIB-crate dependency at runtime. Operators convert MIBs to profile YAMLs offline using `tools/snmp-traps-profile-gen/` (see §7 and the public skill in SOW-0039). This mirrors the SNMP polling plugin's pattern.
+- **Runtime MIB compilation** — no `pysmi`/`gosmi`/Rust-MIB-crate dependency at runtime. Operators convert MIBs to profile YAMLs offline using `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` (see §7). This mirrors the SNMP polling plugin's pattern.
 - **DTLS / TLS-TM** — Phase A finding: zero cohort systems support this (universal gap). Defer until production demand surfaces and mature libraries exist.
 - **Intra-listener multi-writer sharding** — operators scale by adding more jobs when one listener's writer ceiling is exceeded or when they need isolation. A single listener can already own multiple endpoints; the documented operational threshold for splitting is throughput or materially different policy, not the need for another port alone.
 - **Northbound trap re-emit (trap forwarding)** — design enables it cleanly via the journal, but not in scope for SOW-0035–0039. Future SOW if operator demand surfaces.
@@ -1001,7 +1003,7 @@ Pipeline reuses (not rebuilds) these existing pieces:
 | 1. No cohort system does listener-layer per-source rate-limit | We ship per-job, default-off `rate_limit:` (token-bucket per source IP, §7.5) for operators who need to shield the plugin from misbehaving senders flooding with **unique** traps, plus first-wins opt-in plugin-level dedup with periodic summary entries (§10) for **identical** repeats. The two solve different problems and can be enabled independently per job. |
 | 2. No cohort system supports DTLS/TLS-TM | Deferred — universal cohort gap. Out of scope for SOW-0035–0039; revisited when production demand surfaces AND mature Rust/Go libraries exist (§14 Non-Goals). |
 | 3. No cohort system does topology-aware suppression | **Hub-local enrichment makes this cheap.** Journal carries upstream-device identity; alert engine can suppress downstream alerts when upstream is in alarm. |
-| 4. MIB management divergence is extreme | **Ship comprehensive vendor packs derived from public MIBs (351 vendor PENs / 50,198 traps in the OOB pack) + offline conversion tooling for operator MIBs (no runtime compilation) + profile YAML hot-reload via DynCfg.** Targets the LibreNMS-to-Datadog coverage band with the SNMP polling plugin's stock+override pattern. |
+| 4. MIB management divergence is extreme | **Ship comprehensive vendor packs derived from public MIBs (437 vendor PENs / 71,787 traps in the OOB pack) + offline conversion tooling for operator MIBs (no runtime compilation) + profile YAML hot-reload via DynCfg.** Targets the LibreNMS-to-Datadog coverage band with the SNMP polling plugin's stock+override pattern. |
 | 5. NSTI shipped-defects cautionary tale | Acknowledged. First-release quality bar enforced via the same per-system review protocol that produced the cohort specs. |
 
 ## 17. Implementation Sequencing — 5-SOW Plan
@@ -1011,7 +1013,7 @@ The implementation is tracked through five sequential SOWs under `.agents/sow/pe
 | SOW | Scope | Acceptance |
 |---|---|---|
 | **SOW-0035** | Go implementation architecture decision (process model, journal-writer backend, TrapWriter interface contract); multi-endpoint listener (per-job DynCfg orchestration; every configured endpoint binds or job creation fails with HTTP-422 surfaced in DynCfg — no automatic high-port fallback) + SNMPv1/v2c decode + source identification + replayable pcap test corpus; shared lazy profile YAML loader loaded on first runnable job creation (multipath, filename-dedup, extends-chain merge — mirroring the SNMP polling plugin) + OID index + 2-tier varbind resolution + template rendering; journal writer per-job (one journal directory per job at `/var/cache/netdata/traps/{job_name}/`, retention config with intentional deviation on the `max_duration` default) with creation-time directory/writer preflight and CWE-117 binary-field encoding | Operator sees decoded trap from a replayed pcap in a per-job journal directory |
-| **SOW-0036** | SNMPv3 USM (static engineID whitelist, per-job) + INFORM acknowledgement + `snmpEngineBoots` persistence per job; per-job allowlist + rate limiting + BER decode limits (§18); plugin configuration schema + DynCfg per-job orchestration refinement; plugin-self NIDL metrics (per-job dimensions, full error universe per §12) | Production-grade per-job auth + rate limiting + telemetry |
+| **SOW-0036** | SNMPv3 USM (static engineID whitelist, per-job) + INFORM acknowledgement + `snmpEngineBoots` persistence per job; per-job allowlist + rate limiting; plugin configuration schema + DynCfg per-job orchestration refinement; plugin-self NIDL metrics (per-job dimensions, full error universe per §12, including BER limit violations from §18) | Production-grade per-job auth + rate limiting + telemetry |
 | **SOW-0037** | Cross-plugin enrichment (sysName/vendor/topology); **opt-in** deduplication (per-job, disabled by default — see §10) with periodic summary entries; profile YAML hot-reload via DynCfg (no runtime MIB compilation per §14); operator per-OID metric opt-in | Operational depth: enriched, optionally deduped, hot-reloadable |
 | **SOW-0038** | Throughput benchmark harness; SNMPv3 dynamic engineID discovery (opt-in); standards-compliant OTLP exporter (§11b — optional, vendor-neutral; works with Netdata's OTEL plugin and any OTLP-compliant receiver) | Scale + interop |
 | **SOW-0039** | **Collector consistency bundle**: `metadata.yaml` + `config_schema.json` + stock `.conf` + `health.d/snmp_trap.conf` + `README.md` + `taxonomy.yaml` (passes `check-markdown.yml` + `check_collector_taxonomy.py` CI gates). **systemd-journal default-facet registration** in `src/collectors/systemd-journal.plugin/systemd-journal.c` `SYSTEMD_KEYS_INCLUDED_IN_FACETS` for the plugin-controlled `TRAP_*` field names (operators pick `TRAP_TAG_*` labels via the UI's facet selector — macro is defaults only). **End-user AI skill `query-snmp-traps`** (`docs/netdata-ai/skills/query-snmp-traps/`) + how-tos catalog. **User documentation** for the offline MIB-to-YAML conversion workflow (per §7). **SOW-0032 comparative-analysis.md closeout**. **Final merge gate** — single PR sequence ending here. | Mergeable, CI-passing, documented |
@@ -1028,7 +1030,7 @@ The hot path (§5) decodes untrusted UDP-delivered ASN.1 BER. Malformed or hosti
 |---|---|---|
 | Max UDP datagram bytes | 8192 (8 KiB) | RFC 3417 §3 recommends 484-byte minimum receive capability; 8 KiB covers practical real-world traps (including verbose Cisco/Juniper varbinds) with margin. |
 | Max varbinds per PDU | 256 | Cohort survey: largest legitimate trap observed in `splunk-sc4snmp` fixture corpus uses ~80 varbinds. 256 is a 3x safety margin. |
-| Max BER nesting depth | 8 | SNMPv3 message structure tops out at ~6 levels; 8 covers all standard PDU shapes. |
+| Max constructed BER nesting depth | 8 | SNMPv3 message structure tops out at ~6 constructed levels; 8 covers all standard PDU shapes. |
 | Max OID encoded length | 128 bytes | RFC 2578 OID encoding cap. |
 | Max OctetString varbind value | 1024 bytes | Long enough for real-world MIB strings, short enough to bound memory per trap. |
 | Per-PDU decode budget | 1 ms | Wall-clock budget per PDU on the hot path. Exceeding triggers drop. |
