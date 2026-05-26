@@ -54,6 +54,10 @@ type jobFactory struct {
 	ctx            context.Context
 }
 
+type jobNameSetter interface {
+	SetJobName(string)
+}
+
 func newJobFactory(m *Manager) *jobFactory {
 	return &jobFactory{
 		logger: m.Logger,
@@ -125,6 +129,9 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 	if mod == nil {
 		return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
 	}
+	if named, ok := mod.(jobNameSetter); ok {
+		named.SetJobName(cfg.Name())
+	}
 	storeSnapshot := f.secretStoreSvc.Capture()
 	resolveCtx := collectorSecretResolveContext(f.ctx, f.logger, cfg)
 	if err := applyConfig(resolveCtx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
@@ -165,6 +172,9 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 	}
 
 	mod := creator.Create()
+	if named, ok := mod.(jobNameSetter); ok {
+		named.SetJobName(cfg.Name())
+	}
 	storeSnapshot := f.secretStoreSvc.Capture()
 	resolveCtx := collectorSecretResolveContext(f.ctx, f.logger, cfg)
 	if err := applyConfig(resolveCtx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {

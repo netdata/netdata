@@ -680,7 +680,12 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 		if isConversion {
 			h.NotifyJobCreate(newCfg, StatusFailed)
 		}
-		h.api.SendCodef(fn, 200, "%v", err)
+		code := 200
+		var ce CodedError
+		if errors.As(err, &ce) {
+			code = ce.Code()
+		}
+		h.api.SendCodef(fn, code, "%v", err)
 		h.NotifyJobStatus(newCfg, StatusFailed)
 		h.cb.OnStatusChange(newEntry, oldStatus, fn)
 		return

@@ -119,9 +119,14 @@ func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
 }
 
 func newTestHandlerWithWaitTimeout(cb *mockCallbacks, waitTimeout time.Duration) *Handler[testConfig] {
+	h, _ := newTestHandlerWithOutput(cb, waitTimeout)
+	return h
+}
+
+func newTestHandlerWithOutput(cb *mockCallbacks, waitTimeout time.Duration) (*Handler[testConfig], *bytes.Buffer) {
 	var buf bytes.Buffer
 	api := NewResponder(netdataapi.New(safewriter.New(&buf)))
-	return NewHandler(HandlerOpts[testConfig]{
+	h := NewHandler(HandlerOpts[testConfig]{
 		Logger:    logger.New(),
 		API:       api,
 		Seen:      NewSeenCache[testConfig](),
@@ -146,6 +151,7 @@ func newTestHandlerWithWaitTimeout(cb *mockCallbacks, waitTimeout time.Duration)
 			CommandUserconfig,
 		},
 	})
+	return h, &buf
 }
 
 func newTestFn(id, cmd, name string, payload []byte) Function {
@@ -1031,6 +1037,58 @@ func TestCmdUpdate_Conversion_Disabled(t *testing.T) {
 
 	entry, _ := h.exposed.LookupByKey("job1")
 	assert.Equal(t, StatusDisabled, entry.Status)
+}
+
+func TestCmdUpdate_NonConversion_StartFails_CodedError(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.updateFn = func(_, _ testConfig) error {
+		return &codedErr{err: errors.New("bind failed"), code: 422}
+	}
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+
+	oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+
+	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200}, nil
+	}
+
+	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+	h.CmdUpdate(fn)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Contains(t, out.String(), `"status":422`)
+	assert.Contains(t, out.String(), "bind failed")
+}
+
+func TestCmdUpdate_Conversion_StartFails_CodedError(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.startFn = func(_ testConfig) error {
+		return &codedErr{err: errors.New("bind failed"), code: 422}
+	}
+	h, out := newTestHandlerWithOutput(cb, 5*time.Second)
+
+	oldCfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock", hash: 100}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+
+	cb.parseAndValidateFn = func(_ Function, name string) (testConfig, error) {
+		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200, source: "test"}, nil
+	}
+
+	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+	h.CmdUpdate(fn)
+
+	assert.Len(t, cb.stopCalls, 1)
+	assert.Len(t, cb.startCalls, 1)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Equal(t, "dyncfg", entry.Cfg.SourceType())
+	assert.Contains(t, out.String(), `"status":422`)
+	assert.Contains(t, out.String(), "bind failed")
 }
 
 // --- CmdRestart Tests ---

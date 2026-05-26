@@ -166,7 +166,7 @@ Each list entry defines one trap notification.
 
 | Field         | Required | Type    | Notes |
 |---------------|----------|---------|-------|
-| `oid`         | yes      | string  | Numeric OID of the trap |
+| `oid`         | yes      | string  | Numeric OID of the trap. Use the canonical OID form produced by the source MIB/tooling; the receiver tolerates the SMIv1 / SMIv2 `.0.` trap-OID ambiguity described below. |
 | `name`        | yes      | string  | **MIB-qualified canonical form** `<MIB-MODULE>::<symbol>` (e.g. `IF-MIB::linkDown`, `CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged`). Globally unique — different OIDs MUST have different names. Mirrors the canonical SMI form produced by `snmptranslate`/`snmptrapd`/MIB browsers. The plugin writes this exact string to the `TRAP_NAME` journal field. |
 | `category`    | yes      | string  | One of the 8 canonical categories — see below |
 | `severity`    | yes      | string  | One of the 8 syslog severities — see below |
@@ -178,6 +178,23 @@ Each list entry defines one trap notification.
 
 > Note: the `name:` field encodes the source MIB module already. There is no
 > separate `mib:` field on a trap entry — that would be redundant.
+
+#### Trap OID `.0.` tolerance
+
+SMIv1 `TRAP-TYPE` notifications use the RFC 3584 `enterprise.0.specific`
+notification OID form. SMIv2 `NOTIFICATION-TYPE` notifications often use
+`parent.specific` without the inserted `.0.` segment. Some MIB conversion
+tools can emit either form for the same trap family.
+
+The plugin matches trap profile entries exact-first. If exact lookup misses, it
+tries one alternate trap OID by adding or removing a single `.0.` immediately
+before the final OID arc. For example, a received
+`1.3.6.1.4.1.14179.2.6.3.0.24` can match a profile `oid:` of
+`1.3.6.1.4.1.14179.2.6.3.24`, and the reverse is also true. If both forms are
+present as separate profile entries, the exact match wins.
+
+This tolerance applies only to trap OID lookup. Varbind OIDs are matched
+exactly.
 
 When deduplication is enabled in a later SOW and a configured
 `dedup_key_varbinds` varbind is absent from a received PDU, the fingerprint

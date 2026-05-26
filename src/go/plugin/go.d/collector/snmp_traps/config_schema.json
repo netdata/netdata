@@ -1,0 +1,142 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SNMP trap collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Framework collection interval for future self-metrics. Trap packet reception is event-driven and does not depend on this interval.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this trap listener job with a Virtual Node.",
+        "type": "string"
+      },
+      "listen": {
+        "title": "Listen",
+        "description": "Network endpoints this listener binds during job creation.",
+        "type": "object",
+        "properties": {
+          "endpoints": {
+            "title": "Endpoints",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "protocol": {
+                  "title": "Protocol",
+                  "description": "Transport protocol.",
+                  "type": "string",
+                  "enum": [
+                    "udp"
+                  ],
+                  "default": "udp"
+                },
+                "address": {
+                  "title": "Address",
+                  "description": "Local IP address to bind.",
+                  "type": "string",
+                  "default": "0.0.0.0"
+                },
+                "port": {
+                  "title": "Port",
+                  "description": "UDP port number. Port 162 requires root or CAP_NET_BIND_SERVICE.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "default": 162
+                }
+              },
+              "required": [
+                "protocol",
+                "address",
+                "port"
+              ]
+            }
+          }
+        },
+        "required": [
+          "endpoints"
+        ]
+      },
+      "versions": {
+        "title": "SNMP versions",
+        "description": "Accepted trap protocol versions.",
+        "type": "array",
+        "default": [
+          "v1",
+          "v2c"
+        ],
+        "items": {
+          "type": "string",
+          "enum": [
+            "v1",
+            "v2c"
+          ]
+        },
+        "uniqueItems": true
+      },
+      "retention": {
+        "title": "Retention",
+        "description": "Per-job journal retention and rotation policy.",
+        "type": "object",
+        "properties": {
+          "max_size": {
+            "title": "Maximum total size",
+            "description": "Maximum total bytes across all journal files for this job. Set to null to disable size-based eviction.",
+            "type": ["string", "null"],
+            "default": "10GB"
+          },
+          "max_duration": {
+            "title": "Maximum age",
+            "description": "Maximum age of the oldest journal file before deletion. Set to null to disable age-based eviction.",
+            "type": ["string", "null"],
+            "default": null
+          },
+          "rotation_size": {
+            "title": "Per-file rotation size",
+            "description": "Maximum size of a single journal file before rotation. Set to null for automatic calculation (max_size / 20, clamped 5MB-200MB).",
+            "type": ["string", "null"],
+            "default": null
+          },
+          "rotation_duration": {
+            "title": "Per-file rotation duration",
+            "description": "Maximum age of a single journal file before rotation. Set to null or 0 to disable time-based rotation.",
+            "type": ["string", "null"],
+            "default": "1h"
+          }
+        }
+      },
+      "communities": {
+        "title": "Communities",
+        "description": "SNMPv1/v2c community allowlist. Empty allows all communities until authentication enforcement is added.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "listen"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "listen": {
+      "endpoints": {
+        "ui:listFlavour": "list"
+      }
+    }
+  }
+}

@@ -26,6 +26,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
+type externalCodedError struct {
+	err  error
+	code int
+}
+
+func (e *externalCodedError) Error() string { return e.err.Error() }
+func (e *externalCodedError) Code() int     { return e.code }
+
 func TestDyncfgConfigUserconfig_InvalidPayload_Returns400Only(t *testing.T) {
 	tests := map[string]struct {
 		contentType string
@@ -472,6 +480,191 @@ func TestCollectorCallbacks_Start(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollectorCallbacks_Start_AutodetectionCodedError_PreservedNoRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("codedcheck", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				CheckFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 422}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	cfg := prepareDyncfgCfg("codedcheck", "job")
+	err := cb.Start(cfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.Code())
+
+	_, retryPending := mgr.retryingTasks.lookup(cfg)
+	assert.False(t, retryPending, "coded autodetection failure should not schedule retry")
+}
+
+func TestCollectorCallbacks_Start_InitCodedError_PreservedNoRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("codedinit", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 422}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	cfg := prepareDyncfgCfg("codedinit", "job")
+	err := cb.Start(cfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.Code())
+
+	_, retryPending := mgr.retryingTasks.lookup(cfg)
+	assert.False(t, retryPending, "coded init failure should not schedule retry")
+}
+
+func TestCollectorCallbacks_Update_CreateCollectorJobPlainErrorPreserved(t *testing.T) {
+	tests := map[string]struct {
+		oldCfg   confgroup.Config
+		newCfg   confgroup.Config
+		wantErr  string
+		wantCode int
+	}{
+		"invalid config returns plain error in update path": {
+			oldCfg:   prepareDyncfgCfg("success", "job"),
+			newCfg:   prepareDyncfgCfg("missing", "job"),
+			wantErr:  "job update failed",
+			wantCode: 0,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := newCollectorTestManager()
+			cb := &collectorCallbacks{mgr: mgr}
+			oldJob := &collectorProbeJob{
+				fullName:   tc.oldCfg.FullName(),
+				moduleName: tc.oldCfg.Module(),
+				name:       tc.oldCfg.Name(),
+			}
+
+			mgr.runningJobs.lock()
+			mgr.runningJobs.add(oldJob.FullName(), oldJob)
+			mgr.runningJobs.unlock()
+			mgr.fileStatus.add(tc.oldCfg, dyncfg.StatusRunning.String())
+
+			err := cb.Update(tc.oldCfg, tc.newCfg)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+			if tc.wantCode != 0 {
+				var coded interface{ Code() int }
+				require.ErrorAs(t, err, &coded)
+				assert.Equal(t, tc.wantCode, coded.Code())
+			}
+
+			assert.True(t, oldJob.stopped)
+			if tc.wantCode == 0 {
+				// Plain error - old retry/status cleanup still happens
+				_, oldRetryPending := mgr.retryingTasks.lookup(tc.oldCfg)
+				assert.False(t, oldRetryPending)
+				_, oldFileStatus := mgr.fileStatus.lookup(tc.oldCfg)
+				assert.False(t, oldFileStatus)
+			}
+		})
+	}
+}
+
+func TestCollectorCallbacks_Update_AutodetectionCodedError_PreservedNoRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("codedcheck", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				CheckFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 422}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	oldCfg := prepareDyncfgCfg("success", "job")
+	newCfg := prepareDyncfgCfg("codedcheck", "job")
+	oldJob := &collectorProbeJob{
+		fullName:   oldCfg.FullName(),
+		moduleName: oldCfg.Module(),
+		name:       oldCfg.Name(),
+	}
+
+	mgr.runningJobs.lock()
+	mgr.runningJobs.add(oldJob.FullName(), oldJob)
+	mgr.runningJobs.unlock()
+	mgr.fileStatus.add(oldCfg, dyncfg.StatusRunning.String())
+
+	err := cb.Update(oldCfg, newCfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.Code())
+
+	_, retryPending := mgr.retryingTasks.lookup(newCfg)
+	assert.False(t, retryPending, "coded autodetection failure should not schedule retry")
+	assert.True(t, oldJob.stopped)
+}
+
+func TestCollectorCallbacks_Update_InitCodedError_PreservedNoRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("codedinit", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 422}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	oldCfg := prepareDyncfgCfg("success", "job")
+	newCfg := prepareDyncfgCfg("codedinit", "job")
+	oldJob := &collectorProbeJob{
+		fullName:   oldCfg.FullName(),
+		moduleName: oldCfg.Module(),
+		name:       oldCfg.Name(),
+	}
+
+	mgr.runningJobs.lock()
+	mgr.runningJobs.add(oldJob.FullName(), oldJob)
+	mgr.runningJobs.unlock()
+	mgr.fileStatus.add(oldCfg, dyncfg.StatusRunning.String())
+
+	err := cb.Update(oldCfg, newCfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.Code())
+
+	_, retryPending := mgr.retryingTasks.lookup(newCfg)
+	assert.False(t, retryPending, "coded init failure should not schedule retry")
+	assert.True(t, oldJob.stopped)
 }
 
 func TestCollectorCallbacks_Update(t *testing.T) {

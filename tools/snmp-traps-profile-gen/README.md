@@ -21,6 +21,12 @@ The schema authority for the YAML it produces is
 The trap subsystem design referencing it is
 `.agents/sow/specs/snmp-traps/netdata.md`.
 
+Trap profile `oid:` values should keep the canonical numeric OID form produced
+by the source MIB/tooling. The receiver lookup is exact-match-first and then
+tolerates the SMIv1 / SMIv2 trap-OID `.0.` ambiguity by adding or removing a
+single `.0.` segment immediately before the final OID arc on primary miss. This
+fallback applies only to trap OIDs, not to varbind OIDs.
+
 ## Layout
 
 ```

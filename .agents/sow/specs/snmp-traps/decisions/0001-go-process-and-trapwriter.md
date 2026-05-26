@@ -1,6 +1,6 @@
 # ADR-0001: Go Process Model, Journal Writer Backend, and TrapWriter Contract
 
-**Status**: Accepted for SOW-0035 implementation after reviewer round 5; four reviewers completed, one stalled and produced no final findings
+**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`
 **Date**: 2026-05-25
 **SOW**: SOW-0035 M1
 
@@ -25,13 +25,13 @@ The implementation language is **Go** (user decision, 2026-05-25). The journal w
 
 ## Options Considered
 
-### Option A: Standard in-process go.d module + Go-native write-only journal file writer (SELECTED)
+### Option A: Standard in-process go.d module + SDK-backed Go journal writer (SELECTED)
 
 - Trap plugin lives as a standard go.d collector module at `src/go/plugin/go.d/collector/snmp_traps/`
 - Registered through the standard `collectorapi.Register(...)` path in the existing `collector/init.go` import registry as `snmp_traps`, mirroring the existing `snmp_topology` naming style. A scan found no existing go.d collector registration name containing a dot, so the module name must not use `snmp.traps`.
 - Uses V2 collector interface (`collectorapi.CollectorV2`), mirroring the `ping/` collector pattern
 - Job lifecycle managed by the existing go.d framework (`src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`)
-- Journal writing via a **new Go-native minimal write-only journal file writer** implementing the systemd journal binary format subset needed for writing. It has no reader or cursor support, but it must maintain the write-side DATA/FIELD hash tables and ENTRY_ARRAY chains incrementally so the active file remains queryable by `journalctl`.
+- Journal writing via a thin adapter around `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.1.0`, keeping the local `TrapWriter` abstraction and delegating journal file format, active-file indexing, rotation, retention, and writer locking to the SDK.
 - Shared profile cache: in-process Go package-level state, loaded on first runnable job creation
 
 ### Option B: Separate Go process (external plugin) via PLUGINSD
@@ -91,6 +91,11 @@ A **write-only** Go implementation needs only a fraction of this:
 
 Reference write-path evidence from the existing Rust implementation is roughly 5,000 lines across `journal-core/src/file/{writer.rs,object.rs,file.rs,hash.rs,offset_array.rs}` and `journal-log-writer/src/log/{mod.rs,chain.rs}` before Go simplification. A realistic Go-native write-only backend estimate is therefore **~4,000-5,500 lines**, not the earlier optimistic 1,500-2,000. This remains testable and reviewable, but M4 must treat the writer as the highest-risk component.
 
+Historical note (2026-05-26): this sizing drove the original M1 risk decision.
+It is superseded for implementation by the SDK dependency recorded above; the
+trap package now owns only the adapter, field mapping, queueing, and validation
+around the SDK, not the journal binary format itself.
+
 ### Why not CGo / subprocess
 
 1. **CGo** adds a C toolchain dependency to `go.d.plugin`, which currently builds pure Go (no CGo). Cross-compilation becomes harder. The Rust crate's FFI surface would need C-compatible wrappers.
@@ -99,7 +104,7 @@ Reference write-path evidence from the existing Rust implementation is roughly 5
 
 ## Decision
 
-**Option A is selected**: standard in-process go.d module + Go-native write-only journal file writer.
+**Option A is selected**: standard in-process go.d module + SDK-backed Go journal writer.
 
 ### 1. Process Model
 
@@ -110,15 +115,17 @@ src/go/plugin/go.d/collector/snmp_traps/
     collector.go         # Main struct, init() registration, Config, New(), lifecycle
     init.go              # validateConfig(), one-shot initialization
     collect.go           # collect() — per-cycle metric emission
-    listener.go          # Per-job UDP listener + BER decode + RFC 3584 (M2)
+    listener.go          # Per-job UDP listener binding (M2)
+    decode.go            # BER limit pre-scan + gosnmp trap parse + RFC 3584 (M2)
     profile.go           # Profile type + shared lazy loader (M3)
     resolver.go          # 2-tier varbind resolution + template rendering (M3)
-    journal.go           # Go-native journal file writer + retention (M4)
-    trapwriter.go        # TrapEntry type + TrapWriter interface definition
+    journal_writer.go    # SDK-backed journal adapter + retention mapping (M4)
+    trapentry.go         # TrapEntry type definitions
+    trapwriter.go        # TrapWriter interface definition
     *.go_test.go         # Table-driven tests
 ```
 
-Collector consistency artifacts (`metadata.yaml`, `config_schema.json`, stock config, health, README, taxonomy) remain owned by SOW-0039 unless an earlier SOW needs a minimal internal test fixture. Any earlier artifact must still be consistent with the final SOW-0039 bundle plan.
+Collector consistency artifacts (`metadata.yaml`, health, README, taxonomy) remain owned by SOW-0039 unless an earlier SOW needs a minimal internal test fixture. SOW-0035 M2 ships the minimal `config_schema.json` and disabled stock config needed for DynCfg creation-time preflight and manual opt-in; SOW-0039 remains responsible for the full user-facing documentation and integration metadata bundle.
 
 Registration in `src/go/plugin/go.d/collector/init.go`:
 
@@ -128,28 +135,34 @@ _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
 
 ### 2. Journal Writer Backend
 
-A new Go package `src/go/plugin/go.d/collector/snmp_traps/journal.go` implements a **write-only** systemd journal binary-format writer. The public API:
+The local package provides a small `JournalWriter` adapter in
+`src/go/plugin/go.d/collector/snmp_traps/journal_writer.go`. It does **not**
+implement the systemd journal binary format locally. The adapter delegates file
+format, active-file indexing, writer locks, rotation, retention, and chain
+validation/reopen behavior to `github.com/netdata/systemd-journal-sdk/go/journal`
+`go/v0.1.0`.
+
+The public local API remains:
 
 ```go
-// JournalWriter produces write-only journal files in a directory.
-// Files are readable by journalctl --directory=<path>.
-// file_id, seqnum_id, per-entry seqnum, and crash-recovery state are internal.
+// JournalWriter is a thin adapter over journal.Log.
+// Files are readable by journalctl --directory=<JournalDirectory()>.
 type JournalWriter struct { ... }
 
 // NewJournalWriter creates a writer for the given directory.
-// On creation, it validates the directory exists and is writable.
+// On creation, it eagerly opens the SDK log and validates the directory,
+// writer lock, active file, machine ID, boot ID, rotation policy, and
+// retention policy.
 func NewJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error)
 
 type JournalField struct {
     Name  string // Validated journal field name.
-    Value []byte // Raw value bytes; writer applies binary encoding when needed.
+    Value []byte // Raw value bytes passed to the SDK journal writer.
 }
 
 // WriteEntry writes one journal entry. It is synchronous and is called only by
 // the journal TrapWriter's single queue worker goroutine, not by the decode hot
 // path. WriteEntry is not concurrency-safe.
-// Entry sequence numbers are managed internally, starting at 1 per new file and
-// incrementing by 1 per successful entry write.
 func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotonicUsec int64) error
 
 // Sync flushes pending writes to disk.
@@ -168,39 +181,24 @@ type JournalConfig struct {
 }
 ```
 
-**Format compliance**: the writer produces files conforming to the systemd Journal File Format specification (https://systemd.io/JOURNAL_FILE_FORMAT/). Each file contains:
+**SDK configuration**:
 
-- A valid file header with magic bytes, compatible/incompatible feature flags, `header_size`, and tail object offsets
-- Sequentially appended DATA objects (field key=value pairs, uncompressed in the first implementation; compression flags remain off unless M4 validation proves compression is needed for practical trap payload sizes)
-- Sequentially appended FIELD objects (field names)
-- Sequentially appended ENTRY objects (arrays of entry items referencing DATA objects)
-- Incrementally maintained DATA and FIELD hash tables, plus ENTRY_ARRAY chains, so both active and rotated files are queryable by `journalctl --directory=...`
-- Boot ID read once at writer creation from `/proc/sys/kernel/random/boot_id`, cached, stored in entry headers/tail metadata, and exposed as `_BOOT_ID` on every journal entry
-- Machine ID read once at writer creation from `/etc/machine-id`, validated as a 128-bit machine identifier, stored in the file header, and exposed to `journalctl` as `_MACHINE_ID` for the entries in that file
-- Timestamp guards (`ReceivedRealtimeUsec` never decreases per writer; `ReceivedMonotonicUsec` is captured by the recv hot path via `CLOCK_MONOTONIC`, not re-sourced by the writer). Before writing journal binary timestamp fields, `JournalWriter` validates both timestamp inputs are non-negative and casts them to the journal format's unsigned representation; negative timestamps are structural serialization errors.
-- DATA hash table floor: 4096 buckets; FIELD hash table floor: 512 buckets. New files may implement the Rust writer's `with_optimized_buckets` behavior by deriving larger initial DATA buckets from `RotateSize` and previous utilization; otherwise the floor values are acceptable for MVP if M4 benchmarks pass. Crash recovery must read actual hash table sizes from the file header instead of assuming defaults.
-- Keyed DATA/FIELD hash-table lookups use SipHash-2-4 with the file's 16-byte `file_id` when `HEADER_INCOMPATIBLE_KEYED_HASH` is set in the file header. The `file_id` is generated as a random UUID for new files and read from the header during recovery.
-- Non-keyed DATA/FIELD hash-table lookups use Jenkins lookup3/hash64. The implementation must replicate the systemd/Rust 32-bit half ordering in `journal-core/src/file/hash.rs`; a generic non-systemd hash is invalid.
-- ENTRY `xor_hash` always uses Jenkins lookup3/hash64 regardless of the keyed-hash flag, matching `journal-core/src/file/writer.rs`.
-- Header state starts `online`, transitions to `archived` on rotation/close, and tracks `seqnum_id`, `tail_entry_boot_id`, tail object offset, tail entry offset, entry count, and arena size consistently after appends
-- `seqnum_id` is generated per journal file as a random UUID. `entry_seqnum` is the separate per-entry incrementing integer: it starts at 1 for new files and increments by 1 per entry; `head_entry_seqnum` and `tail_entry_seqnum` must stay consistent with the first and last written entries.
-- `_BOOT_ID` and `tail_entry_boot_id` use the current boot ID for the entries written in that file
-- The implementation uses regular Linux file I/O (`write` plus positioned writes/reads via `golang.org/x/sys/unix` or equivalent, and `fdatasync`) rather than mmap. This keeps all random-access header/hash/entry-array updates as explicit offset writes, avoids mmap lifetime and page-fault failure modes in `go.d.plugin`, and keeps the first implementation free of CGo.
-- Header/tail updates must leave the file recoverable after unclean shutdown. M4 tests must include `journalctl --directory=...` against an active file before `Close()` and after an intentionally interrupted writer process.
-- First implementation writes uncompressed DATA objects and leaves compression flags unset. Compression is a future optimization gate, not an implicit file-format behavior.
-
-If boot ID or machine ID cannot be read or parsed at writer creation, `NewJournalWriter()` fails with a coded creation-time error. The job must not enter the running state with placeholder IDs.
-
-The Go implementation is a regular-I/O rewrite, not a mechanical port of the Rust mmap writer. ENTRY_ARRAY management must use explicit `pread`/`pwrite` offset updates. Initial ENTRY_ARRAY capacity is 4096 entries per array node, doubling on overflow, matching the Rust writer's strategy. The writer should also include a bounded recent-DATA cache (the Rust writer uses 4096 slots) so repeated field/value pairs do not perform full hash-table work on every entry.
-
-Crash recovery algorithm for existing active files:
-
-1. Read and validate magic bytes plus enough fixed header bytes to obtain `header_size`.
-2. Reject/rename corrupt files whose header size, arena size, offsets, or object bounds are impossible, then start a fresh file.
-3. Scan objects from the first arena offset through the last fully valid object, validating object type and size bounds.
-4. Truncate any partially-written tail object.
-5. Rebuild DATA/FIELD hash tables and ENTRY_ARRAY chains from valid objects, recalculate counts/tail offsets/arena size, and write a consistent `online` header before appending.
-6. M4 must test this by interrupting the writer mid-stream and validating with both `journalctl --directory=...` and `journalctl --verify`.
+- `journal.NewLog(dir, journal.LogConfig{...})` receives the configured
+  per-job root `/var/cache/netdata/traps/{job_name}/`.
+- The SDK appends `<machine-id>/`; `JournalWriter.JournalDirectory()` returns
+  the effective query directory for `journalctl --directory`.
+- `LogOpenEager` is mandatory so active journal file creation/open and writer
+  lock acquisition fail during job creation.
+- `LogIdentityStrict` is mandatory. The adapter reads `/etc/machine-id` and
+  `/proc/sys/kernel/random/boot_id`; missing or malformed values are
+  creation-time failures.
+- `RotationPolicy` maps from parsed `retention.rotation_size` and
+  `retention.rotation_duration`.
+- `RetentionPolicy` maps from parsed `retention.max_size` and
+  `retention.max_duration`.
+- The SDK owns journal format compliance and retention deletion behavior. The
+  trap package validates this through SDK-backed `journalctl --directory`
+  tests, not by maintaining local DATA/FIELD hash-table code.
 
 The journal-direct TrapWriter owns the concurrency boundary: multiple endpoint receive loops may call `TrapWriter.Write()` concurrently, but they fan into one concurrency-safe bounded queue per job. A single worker goroutine drains that queue and is the only caller of `JournalWriter.WriteEntry()`.
 
@@ -217,7 +215,7 @@ This function is called only by the journal TrapWriter's single queue worker gor
 
 **Rotation**: triggered by file size reaching `RotateSize` or file age reaching `RotateDur`. `RotateSize=0` means auto-calculate from `MaxSize / 20` and clamp to 5MB-200MB; if `MaxSize=0`, use the 200MB upper clamp as the default rotation size. Oversized single entries are written to the current file and can make that file exceed `RotateSize`; the next append opens a new file. `RotateDur=0` disables time-based rotation; the user-facing default remains `1h`. On rotation, the current file is finalized (archived) and a new file is opened. If `MaxSize=0`, size-based retention is disabled but rotation still occurs; files accumulate until an age cap or external cleanup removes them.
 
-**Retention**: after each rotation and on a periodic retention sweep, the writer scans the directory for journal files and deletes the oldest files until total size ≤ `MaxSize` and oldest file age ≤ `MaxDuration` (both independent, inclusive thresholds). The periodic sweep is required so `MaxDuration` is honored even during low-volume periods with no rotations.
+**Retention**: the adapter calls `Log.EnforceRetention()` on periodic sweeps so SDK retention is honored even during low-volume periods with no rotations.
 
 The default writer queue capacity is 10,000 entries per job unless implementation tests prove a different default is safer. Queue-full and permanent-writer-failed errors are both drop-and-continue conditions for the caller: increment the per-job `journal_write_failed` dimension, discard that entry, and continue receiving traps. There is no disk spillover in the MVP.
 
@@ -424,13 +422,13 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 | Risk | Mitigation |
 |---|---|
 | Go journal writer has format bugs undetected by `journalctl` | M4 end-to-end test replays a pcap through the full pipeline and queries with `journalctl --directory=...`; write tests against the journal file format spec |
-| Go journal writer is larger than estimated (4K lines → 5.5K+ lines) | The backend is behind the `TrapWriter` interface; if Go-native exceeds the M4 midpoint budget, reopen the backend decision before adding a subprocess bridge |
-| Active journal file is not queryable until rotation | Not acceptable for the MVP; maintain DATA/FIELD hash tables and ENTRY_ARRAY chains incrementally and test `journalctl --directory=...` before `Close()` |
+| SDK-backed adapter fails creation-time preflight | Use `LogOpenEager` + `LogIdentityStrict` and wrap errors as coded DynCfg job-creation failures |
+| Active journal file is not queryable until rotation | Not acceptable for the MVP; validate SDK-backed active files with `journalctl --directory=...` before `Close()` |
 | Shared profile cache refcount leak leaves memory allocated | `ReleaseProfileCache()` is called in `Cleanup()` which the framework guarantees on shutdown; add refcount-leak and underflow detection tests |
 | Framework coded-error change breaks other collectors | Preserve existing behavior for plain errors; only `CodedError` suppresses retry and controls HTTP code; add Start and Update tests |
-| Direct journal writer cannot sustain target trap volume | M4 must include `go test -benchmem` / throughput benchmarks for `TrapWriter.Write()`, queue drain, and journal `WriteEntry()`; if allocation or pwrite throughput misses the tens-of-thousands/sec target, reopen batching or backend design before accepting M4 |
-| Journal hash/header assumptions drift from the Rust implementation | Port the keyed SipHash/Jenkins behavior and header-size handling from `journal-core`; validate active, rotated, and crash-interrupted files with `journalctl --directory=...` |
-| Crash recovery corrupts active file after interrupted write | Implement the recovery scan/truncate/rebuild algorithm above; validate with `journalctl --directory=...` and `journalctl --verify` after an interrupted writer |
+| Direct journal writer cannot sustain target trap volume | M4 must include `go test -benchmem` / throughput benchmarks for `TrapWriter.Write()`, queue drain, and SDK-backed journal `WriteEntry()`; if allocation or throughput misses the tens-of-thousands/sec target, reopen batching or backend design before accepting M4 |
+| SDK dependency API drifts | Pin to `github.com/netdata/systemd-journal-sdk/go v0.1.0`; re-vendor through the module tag and review API changes before updating |
+| SDK chain handling has an upstream defect | Keep `TrapWriter` and local adapter boundaries narrow so the SDK can be updated or replaced without changing ingestion semantics |
 
 ## Validation Requirements
 
@@ -448,13 +446,13 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 - Single process, no IPC, no CGo, no child process management
 - Shared profile cache is trivial (Go package-level state + refcount)
 - Job lifecycle is the well-understood go.d pattern operators and maintainers already know
-- TrapWriter interface isolates the journal format concern; backend is swappable
+- TrapWriter interface isolates the journal backend concern; backend is swappable
 - All creation-time failures surface as coded DynCfg errors
 
 ### Negative
 
-- Go journal writer must be written from scratch (~4K-5.5K lines estimate) rather than reusing the proven Rust crate
-- The journal binary format has edge cases (optional compression flags, hash table sizing, tag/type byte semantics) that must be tested thoroughly
+- The trap module now depends on the external `github.com/netdata/systemd-journal-sdk/go` module and its transitive compression libraries
+- SDK API or behavior changes need explicit re-vendoring/review before dependency updates
 - Framework coded-error change touches shared go.d infrastructure (small edit, needs cross-module test validation)
 - Regular I/O means `journalctl` may observe new low-volume entries up to the 1s flush cadence later. This is acceptable for the MVP; `Flush()` and `Close()` remain explicit durability/visibility boundaries.
 

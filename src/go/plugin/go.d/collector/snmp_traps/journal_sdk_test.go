@@ -1,0 +1,145 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package snmp_traps
+
+import (
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestNewJournalWriterEagerOpenCreatesSDKJournalDirectory(t *testing.T) {
+	requireLinuxJournalBackend(t)
+
+	dir := t.TempDir()
+	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	require.NoError(t, err)
+	defer w.Close()
+
+	assert.NotEmpty(t, w.JournalDirectory())
+	assert.NotEqual(t, filepath.Clean(dir), filepath.Clean(w.JournalDirectory()))
+	assert.DirExists(t, w.JournalDirectory())
+	assert.NotEmpty(t, w.ActivePath())
+	assert.FileExists(t, w.ActivePath())
+}
+
+func TestJournalWriterWriteAndQueryWithJournalctl(t *testing.T) {
+	requireJournalctl(t)
+
+	dir := t.TempDir()
+	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	require.NoError(t, err)
+
+	fields := []JournalField{
+		{Name: "MESSAGE", Value: []byte("sdk trap entry")},
+		{Name: "PRIORITY", Value: []byte("4")},
+		{Name: "SYSLOG_IDENTIFIER", Value: []byte("sdk-test")},
+		{Name: "TRAP_REPORT_TYPE", Value: []byte("trap")},
+		{Name: "TRAP_OID", Value: []byte("1.3.6.1.6.3.1.1.5.1")},
+		{Name: "TRAP_CATEGORY", Value: []byte("security")},
+	}
+	now := time.Now().UnixMicro()
+	require.NoError(t, w.WriteEntry(fields, now, now))
+	require.NoError(t, w.Sync())
+
+	out := runJournalctl(t, w.JournalDirectory(), "TRAP_CATEGORY=security")
+	assert.Contains(t, out, "sdk trap entry")
+	assert.Contains(t, out, "TRAP_CATEGORY")
+
+	require.NoError(t, w.Close())
+}
+
+func TestJournalWriterCWE117InjectionNotQueryableAsField(t *testing.T) {
+	requireJournalctl(t)
+
+	dir := t.TempDir()
+	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	require.NoError(t, err)
+
+	fields := []JournalField{
+		{Name: "MESSAGE", Value: []byte("real_value\nFAKE_FIELD=spoofed")},
+		{Name: "PRIORITY", Value: []byte("4")},
+		{Name: "SYSLOG_IDENTIFIER", Value: []byte("sdk-test")},
+		{Name: "TRAP_CATEGORY", Value: []byte("security")},
+	}
+	now := time.Now().UnixMicro()
+	require.NoError(t, w.WriteEntry(fields, now, now))
+	journalDir := w.JournalDirectory()
+	require.NoError(t, w.Close())
+
+	out := runJournalctlAllowEmpty(t, journalDir, "FAKE_FIELD=spoofed")
+	assert.Empty(t, strings.TrimSpace(out))
+}
+
+func TestJournalWriterCountsSanitizedFields(t *testing.T) {
+	requireLinuxJournalBackend(t)
+
+	dir := t.TempDir()
+	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	require.NoError(t, err)
+	defer w.Close()
+
+	fields := []JournalField{
+		{Name: "MESSAGE", Value: []byte("hello\nworld")},
+		{Name: "PRIORITY", Value: []byte("4")},
+	}
+	require.NoError(t, w.WriteEntry(fields, 1000, 1000))
+	assert.Equal(t, uint64(1), w.SanitizedFields())
+}
+
+func TestJournalTrapWriterCloseReturnsWorkerFailure(t *testing.T) {
+	requireLinuxJournalBackend(t)
+
+	dir := t.TempDir()
+	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	require.NoError(t, err)
+
+	tw := newJournalTrapWriter(w, 10)
+	require.NoError(t, tw.Write(nil))
+
+	firstErr := tw.Close()
+	require.ErrorIs(t, firstErr, errNilEntry)
+
+	secondErr := tw.Close()
+	require.ErrorIs(t, secondErr, errNilEntry)
+}
+
+func requireJournalctl(t *testing.T) {
+	t.Helper()
+	requireLinuxJournalBackend(t)
+	if _, err := exec.LookPath("journalctl"); err != nil {
+		t.Skip("journalctl not found")
+	}
+}
+
+func requireLinuxJournalBackend(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "linux" {
+		t.Skip("SNMP trap journal backend requires Linux")
+	}
+}
+
+func runJournalctl(t *testing.T, dir, match string) string {
+	t.Helper()
+	out := runJournalctlAllowEmpty(t, dir, match)
+	if strings.TrimSpace(out) == "" {
+		t.Fatalf("journalctl returned empty output for %s in %s", match, dir)
+	}
+	return out
+}
+
+func runJournalctlAllowEmpty(t *testing.T, dir, match string) string {
+	t.Helper()
+	cmd := exec.Command("journalctl", "--directory="+dir, match, "-o", "json", "--no-pager")
+	out, err := cmd.CombinedOutput()
+	if err != nil && strings.TrimSpace(string(out)) != "" {
+		t.Fatalf("journalctl failed: %v\n%s", err, string(out))
+	}
+	return string(out)
+}

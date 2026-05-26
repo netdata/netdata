@@ -18,6 +18,14 @@ authoritative subsystem design is
 `.agents/sow/specs/snmp-traps/netdata.md`. This skill is the working checklist
 that keeps repository edits aligned with both.
 
+## Trap OID `.0.` tolerance
+
+Profile authors should use the canonical trap OID form produced by the source
+MIB/tooling. The receiver lookup is exact-match-first and then tolerates the
+SMIv1 / SMIv2 trap-OID ambiguity by adding or removing a single `.0.` segment
+immediately before the final OID arc on primary miss. This tolerance is
+trap-OID-only: do not normalize or alternate-match varbind OIDs.
+
 ## Required checks before changing a profile
 
 1. **Trap `name:` must be MIB-qualified.** Every trap entry's `name:`

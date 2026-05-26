@@ -139,9 +139,11 @@ The implementation language is **Go** (user decision recorded on 2026-05-25). Th
 
 **Process model** (accepted by SOW-0035 M1 ADR-0001): The trap plugin is a **standard in-process go.d collector V2 module** at `src/go/plugin/go.d/collector/snmp_traps/`, registered as `snmp_traps`. No separate process, no CGo, no subprocess bridge.
 
-**Journal writer backend**: A new **Go-native write-only systemd journal file writer** (package-internal to the trap collector, ~4K-5.5K lines estimated) produces binary journal files at `/var/cache/netdata/traps/{job_name}/` that are queryable via `journalctl --directory=...`. This is a write-only subset of the systemd Journal File Format — no reader and no cursor, but DATA/FIELD hash tables and ENTRY_ARRAY chains are maintained incrementally so the active file is queryable before rotation. The existing Rust journal crates (~10.4K source lines across `journal-core` + `journal-registry` + `journal-log-writer` + `journal-common`) are reference implementations for format details but are not ported wholesale; the Go implementation covers only the write path needed for trap journal files.
+**Journal writer backend**: The trap collector uses the Go systemd journal SDK module `github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.1.0` behind the local `TrapWriter` abstraction. `NewJournalWriter()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation policy validation, and retention policy validation are proven during job creation before DynCfg apply succeeds.
 
-**Rationale**: In-process module code means no IPC for cross-plugin enrichment (SOW-0037), trivially shared profile cache (Go package-level state + refcount), and the well-understood go.d job lifecycle. A CGo bridge to libsystemd cannot set `_HOSTNAME` (journald owns trusted fields); a subprocess Rust bridge adds process management complexity. The Go-native journal writer is the minimal backend that preserves the creation-time failure contract and `journalctl` compatibility.
+The configured per-job root remains `/var/cache/netdata/traps/{job_name}/`. The SDK appends the machine-id child directory, so the effective query directory is `/var/cache/netdata/traps/{job_name}/{machine_id}/`. Use the SDK-backed writer's effective `JournalDirectory()` for `journalctl --directory` validation.
+
+**Rationale**: In-process module code means no IPC for cross-plugin enrichment (SOW-0037), trivially shared profile cache (Go package-level state + refcount), and the well-understood go.d job lifecycle. A CGo bridge to libsystemd cannot set `_HOSTNAME` (journald owns trusted fields); a subprocess Rust bridge adds process management complexity. The SDK-backed writer preserves direct journal file control, creation-time failure detection, and `journalctl` compatibility without maintaining a package-local copy of the journal binary format.
 
 **Reference**: `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`
 
@@ -162,12 +164,12 @@ SOW-0035 M1 finalizes the exact process/writer boundary for the Go implementatio
 4. Community / USM auth check.
 5. Per-job rate-limit (token bucket). Drop or sample if over budget (operator chooses).
 6. Identify source: PDU-based first (v1 `agent-addr`; v2c/v3 `snmpTrapAddress.0` varbind per RFC 3584); fall back to UDP peer. Candidate source addresses are accepted only after IP parsing/normalization. Malformed or non-IP `snmpTrapAddress.0` values are ignored for source identity and `_HOSTNAME` fallback; the kernel-provided UDP peer remains the final safe fallback.
-7. OID lookup against the prebuilt OID index (perfect-hash or radix-trie at scale). If the OID has no matching profile entry, set `category: unknown`, `severity: notice`, `name: ""`, increment `snmp.trap.errors.unknown_oid`, and continue — the trap still emits to journal with the raw OID + varbinds.
+7. OID lookup against the prebuilt OID index (perfect-hash or radix-trie at scale). Lookup is exact-match-first; on primary miss, the receiver tries one SMIv1 / SMIv2 `.0.` alternate trap-OID key by adding or removing a single `.0.` segment immediately before the final OID arc. If neither key matches a profile entry, set `category: unknown`, `severity: notice`, `name: ""`, increment `snmp.trap.errors.unknown_oid`, and continue — the trap still emits to journal with the raw OID + varbinds.
 8. Apply profile entry (or unknown defaults from step 7): category tag, severity default, symbolic name.
 9. Enrich: device identity (sysName, vendor); topology position if co-located; recent polling state if available. Go in-process access is preferred; any alternate boundary must be justified by SOW-0035 M1.
 10. **(Opt-in dedup, default off — see §10)** If dedup is enabled for this job: check `(source_device, trap_OID, key_varbinds)` fingerprint. If hit, increment in-memory suppression counter and skip steps 11-12. If miss or dedup disabled, continue.
 11. Atomic increment of in-memory counters for `snmp.trap.events` (per device, per category, per severity), with `job_name` as a label.
-12. Build journal entry; one `TrapWriter.Write()` call (see §19). The journal-direct writer serializes the entry directly into the per-job journal files (NOT via `sd_journal_send()` — journald is bypassed so the writer can set `_HOSTNAME` to the source device, see §11). SOW-0035 M1 decides whether this is a Go port/reuse of the existing journal writer semantics or another justified Go-compatible backend.
+12. Build journal entry; one `TrapWriter.Write()` call (see §19). The journal-direct writer serializes the entry directly into SDK-managed per-job journal files (NOT via `sd_journal_send()` — journald is bypassed so the writer can set `_HOSTNAME` to the source device, see §11).
 13. Return.
 
 ### Cold path (per Netdata collection tick, default 1Hz)
@@ -281,6 +283,21 @@ traps:
 
 **Required per trap entry**: `oid`, `name` (MIB-qualified `<MIB-MODULE>::<symbol>` — vendors reuse bare symbolic names across product-line MIBs; the bare symbol is not globally unique), `category`, `severity`. `description` is optional (defaults to `"{TRAP_NAME} on {_HOSTNAME}."`). `labels`, `varbinds`, and `dedup_key_varbinds` are optional. The plugin loader rejects entries missing required fields at startup with a clear error naming the file + offending entry.
 
+### Trap OID lookup — SMIv1 / SMIv2 `.0.` tolerance
+
+SMIv1 `TRAP-TYPE` notifications map to SMIv2 notification OIDs with the RFC 3584 form `enterprise.0.specific`. SMIv2 `NOTIFICATION-TYPE` notifications commonly use `parent.specific` without the inserted `.0.` segment. MIB tooling can emit either form for the same trap family, so the receiver is tolerant at ingestion time.
+
+The lookup contract is:
+
+1. Exact profile `oid:` match wins.
+2. If exact lookup misses, the receiver tries one alternate trap-OID key:
+   - `enterprise.0.specific` -> `enterprise.specific`
+   - `enterprise.specific` -> `enterprise.0.specific`
+3. Degenerate or too-short OIDs do not produce alternate matches.
+4. The tolerance applies only to trap-OID lookup. Varbind OID resolution is exact because varbind OIDs do not have this SMIv1 trap encoding ambiguity.
+
+Operators and generated profiles may therefore use the canonical OID form produced by their MIB tooling. The receiver still matches traps sent by devices that use the alternate SMI form. Exact-match precedence prevents the fallback from overriding an explicitly-authored profile entry when both forms exist.
+
 ### Varbind resolution — 2-tier
 
 The plugin resolves each varbind in the PDU in this order:
@@ -359,7 +376,7 @@ jobs:
           address: "0.0.0.0"
           port: 162                       # job fails to start if any endpoint cannot bind — no automatic fallback
     versions: [v1, v2c, v3]               # which SNMP versions this listener accepts
-    communities: []                       # v1/v2c allowlist; empty = reject all v1/v2c
+    communities: []                       # v1/v2c allowlist; empty = accept all until SOW-0036 auth policy
     usm_users: []                         # v3 USM users (each refs Netdata Secrets)
     engine_id_whitelist: []               # v3 static engine IDs (hex)
     dynamic_engine_id_discovery: false    # v3 dynamic (opt-in, SOW-0038; see §5)
@@ -589,13 +606,19 @@ Dedup collapses **identical** repeated traps. Per-source rate-limiting (§7.5 `r
 
 ### Per-job journal directories + retention
 
-Each listener job (§5) owns its own journal directory:
+Each listener job (§5) owns its own configured journal root:
 
 ```
-/var/cache/netdata/traps/{job_name}/   ← per-job journal files (one writer thread per job)
+/var/cache/netdata/traps/{job_name}/   ← configured per-job root (one writer thread per job)
 ```
 
-Per-job retention policy mirrors the retention semantics used by the NetFlow plugin (`src/crates/netflow-plugin/src/plugin_config/types/journal.rs`), with intentional deviation on defaults — the trap plugin ships with size-only eviction by default (no time-based cap). Time-based retention is operator opt-in. The Go implementation must preserve these semantics through the backend selected in SOW-0035 M1. Rationale: traps are operator-relevant forensic data with low per-event rates in typical deployments; aging entries out by time discards forensic value before the operator's investigation window closes. A follow-up will align NetFlow's default to match. The trap plugin's per-job knobs:
+The SDK-backed writer stores files under the machine-id child directory:
+
+```
+/var/cache/netdata/traps/{job_name}/{machine_id}/   ← effective journalctl --directory path
+```
+
+Per-job retention policy mirrors the retention semantics used by the NetFlow plugin (`src/crates/netflow-plugin/src/plugin_config/types/journal.rs`), with intentional deviation on defaults — the trap plugin ships with size-only eviction by default (no time-based cap). Time-based retention is operator opt-in. The Go implementation maps these knobs to the SDK `RotationPolicy` and `RetentionPolicy`. Rationale: traps are operator-relevant forensic data with low per-event rates in typical deployments; aging entries out by time discards forensic value before the operator's investigation window closes. A follow-up will align NetFlow's default to match. The trap plugin's per-job knobs:
 
 | Knob | Default | Semantics |
 |---|---|---|
@@ -608,9 +631,7 @@ Per-job retention policy mirrors the retention semantics used by the NetFlow plu
 
 `retention.rotation_size: null` auto-calculates as `retention.max_size / 20` and clamps to 5MB-200MB. If `retention.max_size` is `null`, the auto rotation size uses the 200MB upper clamp. Rotation still happens when size-based retention is disabled; files accumulate until age-based retention or external cleanup removes them. Time-based retention requires a periodic retention sweep in addition to rotation-time cleanup, so `retention.max_duration` is honored even during low-volume periods.
 
-The active journal file must be queryable by `journalctl --directory=...`; waiting until rotation/close to build indexes is not acceptable for the MVP. The writer maintains DATA/FIELD hash tables and ENTRY_ARRAY chains while appending entries.
-
-At writer creation, the journal directory is scanned for interrupted prior `.journal` files. Repairable files are truncated to the last valid object, have DATA/FIELD hash tables and ENTRY_ARRAY chains rebuilt from valid entries, are marked archived, and remain queryable. Structurally corrupt files that cannot be repaired are quarantined under a non-`.journal` suffix before the new writer starts, so a stale corrupt file does not poison `journalctl --directory=...` for the job.
+The active journal file must be queryable by `journalctl --directory=...`; waiting until rotation/close to build indexes is not acceptable for the MVP. The SDK writer owns the journal file format details, active-file indexes, rotation, retention, and existing-chain validation/reopen behavior.
 
 The journal-direct backend is Linux-only in SOW-0035. On non-Linux platforms, trap job creation must fail with a coded unsupported-backend error instead of starting and failing at runtime. Future SOWs may add a non-journal backend such as OTLP for platforms without `journalctl`.
 
@@ -927,7 +948,7 @@ In addition to the two plugin-self contexts, operator-selected OIDs (via §7.5) 
 
 Phase B resolved most of the original questions. What remains:
 
-1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001)**: Standard in-process go.d collector V2 module with a Go-native write-only journal file writer. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
+1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.1.0`. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
 
 2. **Profile YAML hot-reload mechanism**: the plugin needs to detect operator-added/edited YAML files under `/etc/netdata/go.d/snmp.trap-profiles/` and refresh the in-memory profile index. Two options: inotify on the directory, or explicit `dyncfg`-triggered reload. Phase B recommended inotify is overkill for the new-profile cadence; explicit reload via DynCfg is simpler and matches the per-job lifecycle. SOW-0037 M3 resolves.
 
