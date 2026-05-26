@@ -208,27 +208,31 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
     RRDSET *st;
 
-    bool host_pending_init    = rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-    bool host_pending_recheck = rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
+    // Atomically snapshot + clear the host pending flags. A separate check-then-clear
+    // would race with concurrent setters (e.g. label updaters in plugins/streaming),
+    // and a flag set between check and clear would be lost.
+    RRDHOST_FLAGS old_host_flags = rrdhost_flag_set_and_clear(
+        host, 0,
+        RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION | RRDHOST_FLAG_PENDING_LABEL_RECHECK);
+
+    bool host_pending_init    = old_host_flags & RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION;
+    bool host_pending_recheck = old_host_flags & RRDHOST_FLAG_PENDING_LABEL_RECHECK;
 
     if (!host_pending_init && !host_pending_recheck) return;
 
-    if (host_pending_init)
-        rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-    if (host_pending_recheck)
-        rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
-
     rrdset_foreach_reentrant(st, host) {
-        bool needs_init    = rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-        bool needs_recheck = host_pending_recheck || rrdset_flag_check(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+        // Same race applies per-chart: snapshot + clear atomically so a concurrent
+        // CLABEL stream commit or rrdset_update_rrdlabels() cannot have its
+        // pending-recheck request swallowed by a separate clear.
+        RRDSET_FLAGS old_st_flags = rrdset_flag_set_and_clear(
+            st, 0,
+            RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION | RRDSET_FLAG_PENDING_LABEL_RECHECK);
+
+        bool needs_init    = old_st_flags & RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION;
+        bool needs_recheck = host_pending_recheck || (old_st_flags & RRDSET_FLAG_PENDING_LABEL_RECHECK);
 
         if (!needs_init && !needs_recheck)
             continue;
-
-        if (needs_init)
-            rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-        if (needs_recheck)
-            rrdset_flag_clear(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
 

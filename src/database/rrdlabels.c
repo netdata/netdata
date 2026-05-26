@@ -1580,6 +1580,122 @@ static int rrdlabels_unittest_mark_source_as_old(void) {
     return errors;
 }
 
+#define UT_EXPECT(_cond, _msg) do {                                            \
+    if (!(_cond)) {                                                            \
+        fprintf(stderr, "  FAIL: %s\n", (_msg));                               \
+        errors++;                                                              \
+    }                                                                          \
+} while (0)
+
+static int rrdlabels_unittest_change_detection(void) {
+    fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
+    int errors = 0;
+
+    // ---- rrdlabels_add_changed: new vs same vs value-change ----
+    RRDLABELS *l = rrdlabels_create();
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v1", RRDLABEL_SRC_CONFIG) == true,
+              "add of new label should return true");
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v1", RRDLABEL_SRC_CONFIG) == false,
+              "re-add of identical key+value should return false");
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v2", RRDLABEL_SRC_CONFIG) == true,
+              "value change for an existing key should return true");
+    UT_EXPECT(rrdlabels_add_changed(l, "k2", "v2", RRDLABEL_SRC_CONFIG) == true,
+              "add of a different new key should return true");
+    rrdlabels_destroy(l);
+
+    // ---- rrdlabels_migrate_to_these: empty/identical/diff/DONT_DELETE ----
+    RRDLABELS *dst = rrdlabels_create();
+    RRDLABELS *src = rrdlabels_create();
+
+    // empty dst, empty src => no add, no remove => false
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == false,
+              "migrate of two empty label sets should return false");
+
+    // populate src; dst empty => added > 0 => true
+    rrdlabels_add(src, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(src, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate to empty dst should return true when src has labels");
+
+    // identical content now (dst was populated from src) => false
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == false,
+              "migrate with identical key/value sets should return false");
+
+    // src adds one => true
+    rrdlabels_add(src, "k3", "v3", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate that adds a label should return true");
+
+    // src drops one => true (removed > 0)
+    {
+        RRDLABELS *trimmed = rrdlabels_create();
+        rrdlabels_add(trimmed, "k1", "v1", RRDLABEL_SRC_CONFIG);
+        rrdlabels_add(trimmed, "k2", "v2", RRDLABEL_SRC_CONFIG);
+        UT_EXPECT(rrdlabels_migrate_to_these(dst, trimmed) == true,
+                  "migrate that removes a label should return true");
+        rrdlabels_destroy(trimmed);
+    }
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // DONT_DELETE: a label that is not in src remains in dst; nothing added or
+    // removed, so the function returns false even though dst != src.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == false,
+              "migrate where the only diff is a DONT_DELETE label should return false");
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "DONT_DELETE label should be preserved after migrate");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // ---- rrdlabels_remove_all_unmarked_and_changed: CLABEL-commit semantics ----
+    // (1) unmark + re-add identical set => no change => false
+    l = rrdlabels_create();
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(l, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_unmark_all(l);
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(l, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_remove_all_unmarked_and_changed(l) == false,
+              "remove_all_unmarked_and_changed: identical re-commit should return false");
+    rrdlabels_destroy(l);
+
+    // (2) unmark + add a new label => added > 0 => true
+    l = rrdlabels_create();
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_unmark_all(l);
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(l, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_remove_all_unmarked_and_changed(l) == true,
+              "remove_all_unmarked_and_changed: adding a label should return true");
+    rrdlabels_destroy(l);
+
+    // (3) unmark + commit a subset => removed > 0 => true
+    l = rrdlabels_create();
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(l, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_unmark_all(l);
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_remove_all_unmarked_and_changed(l) == true,
+              "remove_all_unmarked_and_changed: dropping a label should return true");
+    rrdlabels_destroy(l);
+
+    // (4) unmark + change a value => true (the changed entry is NEW)
+    l = rrdlabels_create();
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_unmark_all(l);
+    rrdlabels_add(l, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_remove_all_unmarked_and_changed(l) == true,
+              "remove_all_unmarked_and_changed: value change should return true");
+    rrdlabels_destroy(l);
+
+    return errors;
+}
+
+#undef UT_EXPECT
+
 struct pattern_array *trim_and_add_key_to_values(struct pattern_array *pa, const char *key, STRING *input);
 static int rrdlabels_unittest_check_pattern_list(RRDLABELS *labels, const char *pattern, bool expected) {
     fprintf(stderr, "rrdlabels_match_simple_pattern(labels, \"%s\") ... ", pattern);
@@ -1763,6 +1879,7 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_double_check();
     errors += rrdlabels_unittest_migrate_check();
     errors += rrdlabels_unittest_mark_source_as_old();
+    errors += rrdlabels_unittest_change_detection();
     errors += rrdlabels_unittest_pattern_check();
 
     fprintf(stderr, "%d errors found\n", errors);
