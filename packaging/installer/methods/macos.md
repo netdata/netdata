@@ -98,9 +98,9 @@ For automated setups or headless machines where the UI is not accessible, you ca
 
 **Configuration directory paths for `claim.conf`:**
 
-| Architecture | Path |
-|:--|:--|
-| Intel | `/usr/local/etc/netdata/claim.conf` |
+| Architecture  | Path                                   |
+|:--------------|:---------------------------------------|
+| Intel         | `/usr/local/etc/netdata/claim.conf`    |
 | Apple Silicon | `/opt/homebrew/etc/netdata/claim.conf` |
 
 :::note
