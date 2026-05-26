@@ -4,7 +4,7 @@
 
 Status: in-progress
 
-Sub-state: activated on 2026-05-26 after SOW-0036 reached implementation-complete / paused state. Reverse-DNS decision resolved on 2026-05-26: disabled by default, enabled explicitly in job configuration, never a mandatory hot-path dependency. NOT independently mergeable - merge gate is SOW-0039.
+Sub-state: activated on 2026-05-26 after SOW-0036 reached implementation-complete / paused state. Reverse-DNS decision resolved on 2026-05-26: disabled by default, enabled explicitly in job configuration, never a mandatory hot-path dependency. M1-M4 implementation is complete on the feature branch as of 2026-05-26. NOT independently mergeable - merge gate is SOW-0039.
 
 ## Requirements
 
@@ -434,7 +434,7 @@ Implementation completed and corrected for the original memory requirement. Chan
 **Residual risks:**
 - A successful reload temporarily keeps the old immutable index reachable until any in-flight packet handling or dedup summary render drops its local pointer; Go GC then collects it.
 - The `reload-profiles` Function is agent-wide but still dispatches through a running `snmp_traps` job because that is the current function framework contract.
-- M4 (per-OID operator metrics) remains pending; `validateDeferredConfig` still rejects `metrics:`.
+- M4 (per-OID operator metrics) was still pending at M3 close; the following M4 batch removes the `metrics:` deferred rejection.
 
 **Review round 1:**
 - External reviewers: glm, kimi, minimax, qwen. No blocker found. All reviewers reported the implementation satisfies M3 and preserves M1/M2 behavior.
@@ -454,17 +454,118 @@ Implementation completed and corrected for the original memory requirement. Chan
 - Reviewed and rejected as false positive: first lazy profile load and reload cannot race on an unloaded cache in a way that corrupts state. `AcquireProfileCache()` holds the shared mutex while loading the first index, while `ReloadProfileCache()` refuses to load with `activeRefs == 0` and rechecks active refs before storing.
 - Reviewed and rejected as false positive: `incAllJobsProfileLoadFailed()` cannot increment metrics for unrelated go.d collectors because `globalMetrics` is package-local to `collector/snmp_traps`; it only contains SNMP trap listener jobs.
 
+### 2026-05-26 — M4 batch 1: Per-OID operator metric opt-in
+
+Implementation completed. Changes:
+
+**New files:**
+
+1. `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go` — Validation, chart template generation, and runtime counter tracking:
+   - `validateMetrics(metrics, profileIndex)`: validates each metric config at job creation time (after profiles loaded, before writer/listener setup). Validates oid required/numeric/in-profile-index (with SMIv1/v2 alternate lookup), rejects duplicate raw or alternate-resolved OIDs, validates context required/starts-with-snmp.trap./sane-suffix/no empty dot segments/no duplicates/no normalized selector collisions, and validates dimension_from_varbind references a known trap varbind by symbolic name and passes bounded-cardinality check. Raw numeric OIDs, unknown names, oversized enums, and unbounded types fail with clear errors naming the metric index, trap OID, and varbind.
+   - `operatorMetrics`: thread-safe runtime counters. Single-dimension metrics use `atomic.Uint64`. Dimension-from-varbind metrics use `sync.Mutex`-protected `map[string]*atomic.Uint64`. `inc()` is safe to call from the hot path (nil-safe, OID-lookup via map, lock held only for map insert/lookup on dimension counters) and requires the current packet path to have a known trap definition from the current profile index. `collect()` snapshots dimension counts and observes cumulative values through `metrix.SnapshotCounter.ObserveTotal` with `varbind_value` label for `name_from_label` dimension resolution.
+   - Runtime dimension values remain bounded even for malformed sender values or profile-reload metadata drift. Each metric stores a job-creation-time bound, including frozen enum key-to-label mappings. Unknown enum values collapse to `unknown`, numeric values outside the job-creation-time bounded range collapse to `out_of_range`, missing configured varbinds collapse to `<missing>`, and a reloaded varbind definition that no longer matches a bounded type collapses to `unknown`.
+   - `buildChartTemplateYAML(metrics)`: decodes the embedded base `charts.yaml` through `charttpl.DecodeYAML`, appends operator metric charts with official `charttpl` types, validates, and marshals to YAML. Each operator metric becomes a chart in the `traps` group with `context` set to the configured suffix after `snmp.trap.`. Single-dim charts use `name: events`; dim-from-varbind charts use `name_from_label: varbind_value`. All charts have `instances.by_labels: [job_name]` for per-job isolation. Passes `collecttest.AssertChartTemplateSchema`.
+
+**Modified files:**
+
+2. `src/go/plugin/go.d/collector/snmp_traps/init.go` — Removed `metrics` rejection from `validateDeferredConfig`. The `dynamic_engine_id_discovery` rejection is preserved.
+
+3. `src/go/plugin/go.d/collector/snmp_traps/collector.go`:
+   - Added `operatorMetrics *operatorMetrics` and `dynamicChartYAML string` fields.
+   - `Init()`: calls `validateMetrics(c.Metrics, idx)` after profile acquisition. On validation pass with configured metrics, builds chart template YAML via `buildChartTemplateYAML` and stores it. On validation failure, returns 422 before any writer/listener setup.
+   - `ChartTemplateYAML()`: returns dynamic template when operator metrics are configured, falls back to embedded static `charts.yaml` otherwise.
+   - `handlePacket()`: after successful journal write (not for dedup-suppressed or write-failed traps), increments operator metric counters via `c.operatorMetrics.inc(entry.TrapOID, entry, td)`.
+   - `collect()`: calls `c.operatorMetrics.collect(c.store, c.jobName)` after self-metrics.
+   - `Init()` and `Cleanup()` reset `operatorMetrics` and dynamic chart YAML so Collector reuse cannot leak stale metric configuration.
+
+4. `src/go/plugin/go.d/collector/snmp_traps/config_schema.json` — Updated `metrics` description from "reserved for later implementation" to describe the active feature and documents the exact 64-value `dimension_from_varbind` cap.
+
+5. `src/go/plugin/go.d/config/go.d/snmp_traps.conf` — Added commented-out `metrics:` example block.
+
+6. `src/go/plugin/go.d/collector/snmp_traps/pipeline_test.go` — Updated `TestConfigValidation` subtest from "deferred per-OID metrics" (expected error) to "implemented per-OID metrics" (expected no error).
+
+**New test file:**
+
+7. `src/go/plugin/go.d/collector/snmp_traps/operator_metric_test.go` — focused tests:
+   - `TestValidateMetricsSuccess`: single-dim, enum-backed dim, numeric-range dim, integer-range dim, multiple metrics
+   - `TestValidateMetricsFailures`: missing oid, invalid oid, oid not in profiles, missing context, context prefix/suffix/empty validation, duplicate raw/alternate-resolved OIDs, duplicate context, duplicate generated selector, raw numeric OID dim, unknown dim name, oversized enum dim, unbounded octet string dim, unbounded mac address dim
+   - `TestValidateMetricsErrorsIncludeIndex`: multi-metric validation error includes correct index
+   - `TestValidateMetricsNilIndex`: nil index validation fails
+   - `TestBuildChartTemplateYAML*`: no metrics, single-dim, dim-from-varbind, multiple metrics — all pass `collecttest.AssertChartTemplateSchema`
+   - `TestOperatorMetricsIncSingleDimension`: increments, no counter for unconfigured OID
+   - `TestOperatorMetricsIncMatchesAlternateOIDSpelling`: config using an alternate OID spelling still counts packets using the profile's canonical spelling
+   - `TestOperatorMetricsIncRequiresCurrentTrapDefinition`: profile reload removal/unknown OID state does not keep counting solely from stale config
+   - `TestOperatorMetricsIncDimensionFromVarbind`: enum resolution, cumulative counting
+   - `TestOperatorMetricsDimensionValuesStayBoundedAtRuntime`: malformed enum/range values, enum expansion after reload, numeric range expansion after reload, enum label rename after reload, missing reload varbind definitions, and unbounded reload metadata collapse to bounded sentinel dimensions
+   - `TestMetricBoolValue` and `TestMetricIntValueRejectsUint64Overflow`: boolean/truthvalue and integer conversion edge cases
+   - `TestOperatorMetricsCollectSingleDimension`: store observes correct cumulative value
+   - `TestOperatorMetricsCollectDimensionFromVarbind`: store observes per-dimension values with labels
+   - `TestOperatorMetricsNilSafe`: nil receiver doesn't panic
+   - `TestCollectorHandlePacketIncrementsOperatorMetric`: packet path increments counter
+   - `TestCollectorHandlePacketNoOperatorMetricForDroppedTraps`: no counter on write failure
+   - `TestCollectorHandlePacketNoOperatorMetricForUnconfiguredOID`: no counter for non-matching OID
+   - `TestCollectorHandlePacketNoOperatorMetricWhenNil`: nil operatorMetrics safe
+   - `TestCollectorCollectsOperatorMetrics`: cold path pushes to store
+   - `TestCollectorHandlePacketOperatorMetricWithDimFromVarbind`: dim-from-varbind resolution on packet path
+   - `TestCollectorNoOperatorMetricOnDedupSuppression`: dedup-suppressed duplicates don't increment
+
+**Validation:**
+
+- `go test -count=1 ./plugin/go.d/collector/snmp_traps/...` — PASS
+- `go test -count=1 ./plugin/go.d/collector/snmp/... ./plugin/go.d/collector/snmp_topology/...` — PASS
+- `go test -race -count=1 ./plugin/go.d/collector/snmp_traps/...` — PASS
+- `go test -race -count=1 ./plugin/go.d/collector/snmp_topology/...` — PASS
+- `go vet ./plugin/go.d/collector/snmp_traps/... ./plugin/go.d/collector/snmp/... ./plugin/go.d/collector/snmp_topology/...` — PASS
+- `go build ./plugin/go.d/collector/snmp_traps/...` — PASS
+- `python3 -m json.tool plugin/go.d/collector/snmp_traps/config_schema.json >/dev/null` — PASS
+- `git diff --check` — PASS
+- `.agents/sow/audit.sh` — PASS with the existing skill-classification warning for 10 non-project skill directories.
+
+**Review round 1:**
+
+- External reviewers: glm, kimi, minimax, qwen.
+- Accepted and fixed:
+  - Reloaded profile metadata could weaken the runtime cardinality guarantee if a previously bounded `dimension_from_varbind` became unbounded. Runtime now collapses such values to `unknown`.
+  - Missing configured varbind definitions after reload returned the symbolic varbind name. Runtime now consistently emits `<missing>`.
+  - Enum-backed dimension varbinds had no explicit cardinality cap. `isBoundedLabelVarbind` now caps enums at 64 values, matching numeric-range cardinality.
+  - Contexts that differ textually but normalize to the same metric selector now fail job creation with a clear duplicate-selector error.
+  - The collector's dynamic chart-template field was renamed to avoid shadowing the embedded base chart template.
+- Accepted and added test coverage:
+  - Boolean/truthvalue dimension validation and runtime conversion.
+  - Unsigned integer overflow handling for numeric dimensions.
+  - Profile-reload dimension fallback cases for missing definitions and unbounded metadata drift.
+- Reviewed and rejected as false positives:
+  - Profile-cache lifecycle race causing premature release: active jobs hold profile-cache references until cleanup, and listener cleanup waits for read goroutines before clearing collector state.
+  - Nil `operatorMetrics.collect` guard as a correctness issue: caller and callee nil guards are intentionally harmless; no functional risk.
+  - Varbind ownership ambiguity: `dimension_from_varbind` resolves against the trap definition returned for the configured OID, so validation does not cross trap scopes.
+
+**Review rounds 2 and 3:**
+
+- External reviewers: glm, kimi, minimax, qwen.
+- Accepted and fixed from kimi: profile reload enum/range expansion could have expanded runtime dimension cardinality. Operator metrics now freeze the job-creation-time bound and tests cover enum expansion and range expansion after reload.
+- Accepted and fixed from glm: profile reload enum label renames could have created new stale dimension buckets. Operator metrics now freeze enum key-to-label mappings at job creation and a test verifies label rename does not create a new dimension.
+- Accepted and fixed from kimi/minimax: schema/spec/stock config now explicitly document the 64-value cardinality limit for `dimension_from_varbind`.
+- Reviewed and rejected as non-blocking:
+  - `dimCounts` pruning or hard caps: current runtime cardinality is bounded by job-creation-time enum/range values plus the three sentinel buckets. Counters are cumulative and clearing/pruning buckets in `collect()` would be more dangerous than leaving bounded buckets resident until job cleanup.
+  - `c.operatorMetrics` cleanup/read race: go.d lifecycle follows the existing collector pattern where cleanup is not concurrent with collection for a live job; the same pattern is used by listener, writer, deduper, and resolver fields.
+  - Inline varbind numeric constraints: current profile authoring pattern uses file-scoped varbinds for reusable bounded metadata; inline numeric constraints are not required for this M4 operator config path.
+  - No explicit limit on total configured `metrics:` entries: operator-controlled configuration, not packet-controlled cardinality. The M4 hard requirement is packet/runtime dimension bounding; aggregate per-job metric-count policy can be revisited if SOW-0039 docs/collector consistency work needs a UX cap.
+  - Context dots vs underscores: dots are intentionally allowed in the suffix but generated selectors normalize dots to underscores and duplicate normalized selectors are rejected at job creation.
+
 ## Outcome
 
-Pending.
+M1-M4 implementation is complete on the feature branch. SOW-0037 remains current/in-progress instead of moved to `done/` because the branch is explicitly not independently mergeable until SOW-0039 finishes the collector consistency bundle.
 
 ## Lessons Extracted
 
-Pending.
+- Per-OID metrics need a frozen job-creation-time contract, not only job-creation-time validation. Profile reloads can otherwise alter runtime cardinality after DynCfg apply succeeded.
+- Enum labels are metric identity too. Freezing only enum keys prevents value expansion, but freezing key-to-label mappings also prevents label rename reloads from creating stale parallel buckets.
+- Cumulative counters should not prune dimension buckets opportunistically; bounded retention until job cleanup is simpler and safer than trying to delete or reset counters during collection.
 
 ## Followup
 
-None yet.
+- SOW-0039 owns collector consistency, end-user/operator docs, metadata, README, taxonomy, and health alert templates before merge.
+- SOW-0038 owns OTLP export behavior.
 
 ## Regression Log
 

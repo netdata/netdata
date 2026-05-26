@@ -451,7 +451,7 @@ Labels are free-form key-value pairs. Keys must match `[a-z][a-z0-9_]*` (lowerca
 
 Operators do NOT copy entire profiles to enable metrics or add labels. The profile remains the vendor's curated knowledge; per-installation choices are surgical edits in plugin config.
 
-If `dimension_from_varbind` references a varbind that can take unbounded values (MAC, IP, username, packet content), the plugin REJECTS the config at load with a clear error. Cardinality discipline is structurally enforced.
+If `dimension_from_varbind` references a varbind that can take unbounded values (MAC, IP, username, packet content), the plugin REJECTS the config at load with a clear error. The value must be a symbolic varbind name referenced by that trap definition, not a raw OID or an arbitrary file-scoped varbind. Cardinality discipline is structurally enforced: accepted dimension varbinds must be enum-backed with at most 64 values, boolean/truthvalue, or a numeric range with at most 64 values. At runtime, invalid values from otherwise bounded varbinds stay bounded too: unknown enum values collapse to `unknown`, numeric values outside the job-creation-time bounded range collapse to `out_of_range`, missing configured varbinds collapse to `<missing>`, and profile-reload metadata drift that would otherwise become unbounded collapses to `unknown`.
 
 ## 8. OOB Catalog Strategy
 

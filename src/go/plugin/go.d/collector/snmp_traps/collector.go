@@ -70,6 +70,8 @@ type Collector struct {
 	reverseDNSEnabled bool
 	deduper           *trapDeduper
 	profileCacheHeld  bool
+	operatorMetrics   *operatorMetrics
+	dynamicChartYAML  string
 }
 
 func (c *Collector) Configuration() any {
@@ -146,6 +148,8 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.listener != nil {
 		return nil
 	}
+	c.operatorMetrics = nil
+	c.dynamicChartYAML = ""
 
 	if _, err := AcquireProfileCache(); err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
@@ -156,6 +160,24 @@ func (c *Collector) Init(ctx context.Context) error {
 			ReleaseProfileCache()
 			releaseProfileCache = false
 		}
+	}
+
+	idx := CurrentProfileIndex()
+	if idx == nil {
+		releaseProfiles()
+		return &dyncfgCodedError{err: errors.New("profile index not available"), code: 422}
+	}
+	if err := validateMetrics(c.Metrics, idx); err != nil {
+		releaseProfiles()
+		return &dyncfgCodedError{err: err, code: 422}
+	}
+	if len(c.Metrics) > 0 {
+		tmpl, err := buildChartTemplateYAML(c.Metrics)
+		if err != nil {
+			releaseProfiles()
+			return &dyncfgCodedError{err: err, code: 422}
+		}
+		c.dynamicChartYAML = tmpl
 	}
 
 	dir := journalRoot(c.jobName)
@@ -249,6 +271,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.deduper = deduper
 	c.profileCacheHeld = true
 	releaseProfileCache = false
+	if len(c.Metrics) > 0 {
+		c.operatorMetrics = newOperatorMetrics(c.Metrics, idx)
+	}
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
 	if c.reverseDNSEnabled {
 		c.reverseDNS = newReverseDNSResolver()
@@ -291,11 +316,18 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	}
 	removeJobMetrics(c.jobName)
 	c.metrics = nil
+	c.operatorMetrics = nil
+	c.dynamicChartYAML = ""
 }
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }
+func (c *Collector) ChartTemplateYAML() string {
+	if c.dynamicChartYAML != "" {
+		return c.dynamicChartYAML
+	}
+	return chartTemplateYAML
+}
 
 func (c *Collector) collect(ctx context.Context) error {
 	if c.listener == nil {
@@ -314,6 +346,9 @@ func (c *Collector) collect(ctx context.Context) error {
 		}
 	}
 	collectMetrics(c.store, c.jobName)
+	if c.operatorMetrics != nil {
+		c.operatorMetrics.collect(c.store, c.jobName)
+	}
 	return nil
 }
 
@@ -427,6 +462,10 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		c.deduper.Rollback(admission)
 		c.incTrapError("journal_write_failed")
 		return
+	}
+
+	if c.operatorMetrics != nil {
+		c.operatorMetrics.inc(entry.TrapOID, entry, td)
 	}
 
 	cat := Category("unknown")

@@ -255,9 +255,6 @@ func validateDeferredConfig(cfg Config) error {
 	if cfg.DynamicEngineID {
 		return errors.New("dynamic_engine_id_discovery is not implemented yet")
 	}
-	if len(cfg.Metrics) > 0 {
-		return errors.New("metrics per-OID opt-in is not implemented yet")
-	}
 	return nil
 }
 

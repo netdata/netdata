@@ -1182,10 +1182,10 @@ listen:
 		}
 	})
 
-	t.Run("deferred per-OID metrics", func(t *testing.T) {
+	t.Run("implemented per-OID metrics", func(t *testing.T) {
 		err := validateDeferredConfig(Config{Metrics: []MetricConfig{{OID: "1.3.6.1.4.1.9.0.1", Context: "snmp.trap.test"}}})
-		if err == nil {
-			t.Fatal("expected error for per-OID metrics")
+		if err != nil {
+			t.Fatalf("metrics should no longer be rejected as deferred: %v", err)
 		}
 	})
 }

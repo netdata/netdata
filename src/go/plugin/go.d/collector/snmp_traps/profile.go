@@ -41,6 +41,8 @@ var validStatuses = map[string]bool{
 	"optional":   true,
 }
 
+const maxBoundedVarbindValues = 64
+
 var knownSpecialVars = map[string]bool{
 	"_HOSTNAME":          true,
 	"TRAP_SOURCE_IP":     true,
@@ -453,36 +455,44 @@ func templateRefs(tmpl string) []string {
 
 func isBoundedLabelVarbind(vb VarbindDef) bool {
 	if len(vb.Enum) > 0 {
-		return true
+		return len(vb.Enum) <= maxBoundedVarbindValues
 	}
 	switch strings.ToLower(vb.Type) {
 	case "boolean", "truthvalue":
 		return true
 	}
 	if n, ok := numericRangeCardinality(vb.Constraints); ok {
-		return n > 0 && n <= 64
+		return n > 0 && n <= maxBoundedVarbindValues
 	}
 	return false
 }
 
 func numericRangeCardinality(constraints string) (int64, bool) {
-	s := strings.TrimSpace(constraints)
-	if !strings.HasPrefix(s, "(") || !strings.HasSuffix(s, ")") || !strings.Contains(s, "..") {
-		return 0, false
-	}
-	parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(s, "("), ")"), "..")
-	if len(parts) != 2 {
-		return 0, false
-	}
-	minVal, err := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 64)
-	if err != nil {
-		return 0, false
-	}
-	maxVal, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
-	if err != nil || maxVal < minVal {
+	minVal, maxVal, ok := numericRangeBounds(constraints)
+	if !ok {
 		return 0, false
 	}
 	return maxVal - minVal + 1, true
+}
+
+func numericRangeBounds(constraints string) (int64, int64, bool) {
+	s := strings.TrimSpace(constraints)
+	if !strings.HasPrefix(s, "(") || !strings.HasSuffix(s, ")") || !strings.Contains(s, "..") {
+		return 0, 0, false
+	}
+	parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(s, "("), ")"), "..")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	minVal, err := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 64)
+	if err != nil {
+		return 0, 0, false
+	}
+	maxVal, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
+	if err != nil || maxVal < minVal {
+		return 0, 0, false
+	}
+	return minVal, maxVal, true
 }
 
 // buildSharedVarbinds merges file-scoped varbinds with per-trap inline definitions.

@@ -311,7 +311,7 @@
       },
       "metrics": {
         "title": "Per-OID metric opt-in",
-        "description": "Reserved for a later implementation. Any non-empty list fails job creation in this implementation.",
+        "description": "Promote selected trap OIDs to dedicated metric charts for finer-grained alerting. Each entry defines an OID, a context name (must start with \"snmp.trap.\"), and an optional bounded-cardinality varbind for multi-dimensional counting.",
         "type": "array",
         "items": {
           "type": "object",
@@ -329,7 +329,7 @@
             },
             "dimension_from_varbind": {
               "title": "Dimension from varbind",
-              "description": "Varbind name used as dimension value. Must reference a bounded-cardinality varbind.",
+              "description": "Symbolic varbind name used as dimension value. Must reference an enum-backed varbind with <= 64 values, a boolean/truthvalue, or a numeric range with <= 64 values.",
               "type": "string"
             }
           },
