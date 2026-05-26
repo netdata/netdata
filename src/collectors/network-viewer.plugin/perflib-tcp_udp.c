@@ -445,16 +445,9 @@ int main(int argc, char **argv)
     udp_collect_family(&udp_ipv6);
     perflibFreePerformanceData();
 
-    int timeout = 1;
-    if (argc >= 2) {
-        timeout = atoi(argv[1]);
-        if (timeout < 1)
-            timeout = 1;
-    }
-
     fprintf(stdout,
             PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
-            NV_WIN_FUNCTION_PROTO, timeout, NV_WIN_FUNCTION_PROTO_HELP,
+            NV_WIN_FUNCTION_PROTO, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NV_WIN_FUNCTION_PROTO_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
             NV_WIN_FUNCTION_PRIORITY);
     fflush(stdout);
