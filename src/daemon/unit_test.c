@@ -1460,6 +1460,8 @@ static int test_incremental_sum_lookup_respects_update_every(void) {
     const time_t update_every = 10;
     const collected_number increment = 100;
     const size_t samples = 6;
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    time_t old_update_every = nd_profile.update_every;
 
     default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
     nd_profile.update_every = update_every;
@@ -1501,16 +1503,19 @@ static int test_incremental_sum_lookup_respects_update_every(void) {
     onewayalloc_destroy(owa);
 
     NETDATA_DOUBLE expected = (NETDATA_DOUBLE)(samples * increment);
+    int rc = 0;
     if(ret != HTTP_RESP_OK || value_is_null || fabsndd(value - expected) > 0.000001) {
         fprintf(
             stderr,
             "incremental sum lookup failed: ret=%d, null=%d, expected " NETDATA_DOUBLE_FORMAT
             ", got " NETDATA_DOUBLE_FORMAT "\n",
             ret, value_is_null, expected, value);
-        return 1;
+        rc = 1;
     }
 
-    return 0;
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    nd_profile.update_every = old_update_every;
+    return rc;
 }
 
 int run_all_mockup_tests(void)
