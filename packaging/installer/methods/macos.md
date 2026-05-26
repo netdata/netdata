@@ -57,6 +57,8 @@ If you experience issues while connecting your node, follow the steps in our [Tr
 
 ## Install Netdata via Homebrew
 
+To connect this Agent to Netdata Cloud, see [Connect a Homebrew-installed Agent to Netdata Cloud](#connect-a-homebrew-installed-agent-to-netdata-cloud) below.
+
 ### For macOS Intel
 
 To install Netdata and all its dependencies, run Homebrew using the following command:
@@ -69,8 +71,6 @@ Homebrew will place your Netdata configuration directory at `/usr/local/etc/netd
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/usr/local/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
 
-To connect this Agent to Netdata Cloud, see [Connect a Homebrew-installed Agent to Netdata Cloud](#connect-a-homebrew-installed-agent-to-netdata-cloud) below.
-
 ### For Apple Silicon
 
 To install Netdata and all its dependencies, run Homebrew using the following command:
@@ -82,8 +82,6 @@ brew install netdata
 Homebrew will place your Netdata configuration directory at `/opt/homebrew/etc/netdata/`.
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/opt/homebrew/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
-
-To connect this Agent to Netdata Cloud, see [Connect a Homebrew-installed Agent to Netdata Cloud](#connect-a-homebrew-installed-agent-to-netdata-cloud) below.
 
 ### Connect a Homebrew-installed Agent to Netdata Cloud
 
