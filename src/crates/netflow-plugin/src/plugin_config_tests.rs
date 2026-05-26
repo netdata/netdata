@@ -1,4 +1,5 @@
 use super::*;
+use clap::Parser;
 use tempfile::tempdir;
 
 #[test]
@@ -55,6 +56,58 @@ fn validate_accepts_enabled_bioris_with_instance() {
     );
 
     cfg.validate().expect("configuration should be valid");
+}
+
+#[test]
+fn validate_rejects_bioris_instance_without_port_or_scheme() {
+    let mut cfg = PluginConfig::default();
+    cfg.enrichment.routing_dynamic.bioris.enabled = true;
+    cfg.enrichment.routing_dynamic.bioris.ris_instances.push(
+        RoutingDynamicBiorisRisInstanceConfig {
+            grpc_addr: "ris.example.internal".to_string(),
+            grpc_secure: false,
+            vrf_id: 0,
+            vrf: String::new(),
+        },
+    );
+
+    let err = cfg.validate().expect_err("expected validation error");
+    assert!(
+        err.to_string()
+            .contains("grpc_addr must include host:port or an explicit URI scheme")
+    );
+}
+
+#[test]
+fn validate_rejects_zero_bioris_timeouts_when_enabled() {
+    for field in ["timeout", "refresh", "refresh_timeout"] {
+        let mut cfg = PluginConfig::default();
+        cfg.enrichment.routing_dynamic.bioris.enabled = true;
+        cfg.enrichment.routing_dynamic.bioris.ris_instances.push(
+            RoutingDynamicBiorisRisInstanceConfig {
+                grpc_addr: "127.0.0.1:50051".to_string(),
+                grpc_secure: false,
+                vrf_id: 0,
+                vrf: String::new(),
+            },
+        );
+        match field {
+            "timeout" => cfg.enrichment.routing_dynamic.bioris.timeout = Duration::ZERO,
+            "refresh" => cfg.enrichment.routing_dynamic.bioris.refresh = Duration::ZERO,
+            "refresh_timeout" => {
+                cfg.enrichment.routing_dynamic.bioris.refresh_timeout = Duration::ZERO;
+            }
+            _ => unreachable!(),
+        }
+
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(
+            err.to_string().contains(&format!(
+                "enrichment.routing_dynamic.bioris.{field} must be greater than 0"
+            )),
+            "unexpected error for {field}: {err:#}"
+        );
+    }
 }
 
 #[test]
@@ -188,18 +241,6 @@ fn validate_rejects_zero_query_max_groups() {
 }
 
 #[test]
-fn validate_rejects_zero_query_facet_max_values_per_field() {
-    let mut cfg = PluginConfig::default();
-    cfg.journal.query_facet_max_values_per_field = 0;
-
-    let err = cfg.validate().expect_err("expected validation error");
-    assert!(
-        err.to_string()
-            .contains("journal.query_facet_max_values_per_field must be greater than 0")
-    );
-}
-
-#[test]
 fn plugin_enabled_defaults_to_true() {
     let cfg = PluginConfig::default();
     assert!(cfg.enabled);
@@ -242,12 +283,7 @@ protocols:
   timestamp_source: input
 journal:
   journal_dir: flows
-  size_of_journal_files: 10GB
-  duration_of_journal_files: 7d
-  query_1m_max_window: 6h
-  query_5m_max_window: 24h
   query_max_groups: 50000
-  query_facet_max_values_per_field: 5000
 "#;
 
     let cfg: PluginConfig = serde_yaml::from_str(yaml).expect("yaml should parse");
@@ -255,10 +291,16 @@ journal:
 }
 
 #[test]
-fn journal_tier_retention_inherits_global_defaults_when_no_overrides_exist() {
-    let mut cfg = PluginConfig::default();
-    cfg.journal.size_of_journal_files = Some(ByteSize::gb(11));
-    cfg.journal.duration_of_journal_files = Some(Duration::from_secs(11 * 24 * 60 * 60));
+fn stock_netflow_yaml_parses_and_validates() {
+    let yaml = include_str!("../configs/netflow.yaml");
+    let cfg: PluginConfig = serde_yaml::from_str(yaml).expect("stock netflow.yaml should parse");
+
+    cfg.validate().expect("stock netflow.yaml should validate");
+}
+
+#[test]
+fn journal_tier_retention_uses_built_in_tier_defaults() {
+    let cfg = PluginConfig::default();
 
     let raw = cfg.journal.retention_for_tier(TierKind::Raw);
     let minute_1 = cfg.journal.retention_for_tier(TierKind::Minute1);
@@ -268,26 +310,22 @@ fn journal_tier_retention_inherits_global_defaults_when_no_overrides_exist() {
     for retention in [raw, minute_1, minute_5, hour_1] {
         assert_eq!(
             retention.size_of_journal_files.unwrap().as_u64(),
-            ByteSize::gb(11).as_u64()
+            ByteSize::gb(10).as_u64()
         );
         assert_eq!(
             retention.duration_of_journal_files.unwrap(),
-            Duration::from_secs(11 * 24 * 60 * 60)
+            Duration::from_secs(7 * 24 * 60 * 60)
         );
     }
 }
 
 #[test]
-fn journal_tier_retention_uses_tier_override_when_present() {
+fn journal_tier_retention_uses_per_tier_values_when_present() {
     let mut cfg = PluginConfig::default();
-    cfg.journal.size_of_journal_files = Some(ByteSize::gb(11));
-    cfg.journal.duration_of_journal_files = Some(Duration::from_secs(11 * 24 * 60 * 60));
-    cfg.journal.tiers.raw = Some(JournalTierRetentionConfig {
-        size_of_journal_files: RetentionLimitOverride::Value(ByteSize::gb(2)),
-        duration_of_journal_files: RetentionLimitOverride::Value(Duration::from_secs(
-            2 * 24 * 60 * 60,
-        )),
-    });
+    cfg.journal.tiers.raw = JournalTierRetentionConfig {
+        size_of_journal_files: Some(ByteSize::gb(2)),
+        duration_of_journal_files: Some(Duration::from_secs(2 * 24 * 60 * 60)),
+    };
 
     let raw = cfg.journal.retention_for_tier(TierKind::Raw);
     assert_eq!(
@@ -299,34 +337,66 @@ fn journal_tier_retention_uses_tier_override_when_present() {
         Duration::from_secs(2 * 24 * 60 * 60)
     );
 
+    // Other tiers untouched -- still at the built-in defaults.
     let minute_1 = cfg.journal.retention_for_tier(TierKind::Minute1);
     assert_eq!(
         minute_1.size_of_journal_files.unwrap().as_u64(),
-        ByteSize::gb(11).as_u64()
+        ByteSize::gb(10).as_u64()
     );
     assert_eq!(
         minute_1.duration_of_journal_files.unwrap(),
-        Duration::from_secs(11 * 24 * 60 * 60)
+        Duration::from_secs(7 * 24 * 60 * 60)
     );
+}
+
+#[test]
+fn journal_cli_retention_aliases_apply_to_all_tiers() {
+    let cfg = PluginConfig::try_parse_from([
+        "netflow-plugin",
+        "--netflow-retention-size-of-journal-files",
+        "20GB",
+        "--netflow-retention-duration-of-journal-files",
+        "2d",
+    ])
+    .expect("CLI config should parse");
+
+    for tier in [
+        TierKind::Raw,
+        TierKind::Minute1,
+        TierKind::Minute5,
+        TierKind::Hour1,
+    ] {
+        let retention = cfg.journal.retention_for_tier(tier);
+        assert_eq!(
+            retention.size_of_journal_files.unwrap().as_u64(),
+            ByteSize::gb(20).as_u64(),
+            "unexpected size retention for {tier:?}"
+        );
+        assert_eq!(
+            retention.duration_of_journal_files.unwrap(),
+            Duration::from_secs(2 * 24 * 60 * 60),
+            "unexpected duration retention for {tier:?}"
+        );
+    }
 }
 
 #[test]
 fn journal_rotation_size_derives_from_tier_size_budget() {
     let mut cfg = PluginConfig::default();
-    cfg.journal.size_of_journal_files = Some(ByteSize::gb(1));
+    cfg.journal.tiers.raw.size_of_journal_files = Some(ByteSize::gb(1));
 
     assert_eq!(
         cfg.journal.rotation_size_for_tier(TierKind::Raw),
         ByteSize::mb(50).as_u64()
     );
 
-    cfg.journal.size_of_journal_files = Some(ByteSize::gb(4));
+    cfg.journal.tiers.raw.size_of_journal_files = Some(ByteSize::gb(4));
     assert_eq!(
         cfg.journal.rotation_size_for_tier(TierKind::Raw),
         ByteSize::mb(200).as_u64()
     );
 
-    cfg.journal.size_of_journal_files = Some(ByteSize::gb(10));
+    cfg.journal.tiers.raw.size_of_journal_files = Some(ByteSize::gb(10));
     assert_eq!(
         cfg.journal.rotation_size_for_tier(TierKind::Raw),
         ByteSize::mb(200).as_u64()
@@ -336,8 +406,8 @@ fn journal_rotation_size_derives_from_tier_size_budget() {
 #[test]
 fn journal_rotation_size_uses_100mb_for_time_only_retention() {
     let mut cfg = PluginConfig::default();
-    cfg.journal.size_of_journal_files = None;
-    cfg.journal.duration_of_journal_files = Some(Duration::from_secs(7 * 24 * 60 * 60));
+    cfg.journal.tiers.raw.size_of_journal_files = None;
+    cfg.journal.tiers.raw.duration_of_journal_files = Some(Duration::from_secs(7 * 24 * 60 * 60));
 
     assert_eq!(
         cfg.journal.rotation_size_for_tier(TierKind::Raw),
@@ -348,37 +418,41 @@ fn journal_rotation_size_uses_100mb_for_time_only_retention() {
 #[test]
 fn journal_validation_rejects_tier_size_below_100mb() {
     let mut cfg = PluginConfig::default();
-    cfg.journal.size_of_journal_files = Some(ByteSize::mb(99));
+    cfg.journal.tiers.raw.size_of_journal_files = Some(ByteSize::mb(99));
 
     let err = cfg.validate().expect_err("expected validation error");
     assert!(
         err.to_string()
-            .contains("journal.tiers.raw.size_of_journal_files must be at least 100MB")
+            .contains("journal.tiers.raw.size_of_journal_files must be at least 100MB"),
+        "got: {err}"
     );
 }
 
 #[test]
 fn journal_validation_allows_time_only_retention_when_size_is_disabled() {
     let mut cfg = PluginConfig::default();
-    cfg.journal.size_of_journal_files = None;
-    cfg.journal.duration_of_journal_files = Some(Duration::from_secs(7 * 24 * 60 * 60));
+    for tier_cfg in [
+        &mut cfg.journal.tiers.raw,
+        &mut cfg.journal.tiers.minute_1,
+        &mut cfg.journal.tiers.minute_5,
+        &mut cfg.journal.tiers.hour_1,
+    ] {
+        tier_cfg.size_of_journal_files = None;
+        tier_cfg.duration_of_journal_files = Some(Duration::from_secs(7 * 24 * 60 * 60));
+    }
 
     cfg.validate().expect("time-only retention should be valid");
 }
 
 #[test]
-fn journal_tier_retention_null_override_disables_inherited_size_limit() {
+fn journal_tier_retention_null_disables_size_limit_for_that_tier_only() {
     let yaml = r#"
 journal_dir: flows
-size_of_journal_files: 10GB
-duration_of_journal_files: 7d
-query_1m_max_window: 6h
-query_5m_max_window: 24h
 query_max_groups: 50000
-query_facet_max_values_per_field: 5000
 tiers:
   raw:
     size_of_journal_files: null
+    duration_of_journal_files: 24h
 "#;
 
     let cfg: JournalConfig = serde_yaml::from_str(yaml).expect("journal config should parse");
@@ -388,9 +462,14 @@ tiers:
     assert_eq!(raw.size_of_journal_files, None);
     assert_eq!(
         raw.duration_of_journal_files,
+        Some(Duration::from_secs(24 * 60 * 60))
+    );
+    // Other tiers still at the built-in 10GB / 7d defaults.
+    assert_eq!(minute_1.size_of_journal_files, Some(ByteSize::gb(10)));
+    assert_eq!(
+        minute_1.duration_of_journal_files,
         Some(Duration::from_secs(7 * 24 * 60 * 60))
     );
-    assert_eq!(minute_1.size_of_journal_files, Some(ByteSize::gb(10)));
 }
 
 #[test]

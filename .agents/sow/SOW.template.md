@@ -4,6 +4,8 @@
 
 Status: open | in-progress | paused | completed | closed
 
+`completed` is the successful terminal status. `done` is a directory name, not a status value. Do not use `Status: done` or `Status: complete`.
+
 Sub-state: <short current truth>
 
 ## Requirements
@@ -60,6 +62,7 @@ Problem / root-cause model:
 Evidence reviewed:
 
 - <Specs, code, docs, tests, logs, traces, prior SOWs, issues, external references.>
+- <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste `/opt/baddisk/monitoring/repos/...` absolute paths.>
 
 Affected contracts and surfaces:
 
@@ -72,6 +75,10 @@ Existing patterns to reuse:
 Risk and blast radius:
 
 - <Regression, compatibility, performance, security, data loss, migration, rollout, and operational risks.>
+
+Sensitive data handling plan:
+
+- <Whether the work may expose secrets, credentials, bearer tokens, SNMP communities, community/customer data, personal data, non-private customer-identifying IPs, private endpoints, or proprietary incident details; how evidence will be redacted in SOWs, specs, docs, skills, instructions, and code comments.>
 
 Implementation plan:
 
@@ -90,6 +97,10 @@ Artifact impact plan:
 - End-user/operator docs: <expected update or reason likely unaffected>
 - End-user/operator skills: <expected update or reason likely unaffected>
 - SOW lifecycle: <split/merge/status/follow-up/regression handling>
+
+Open-source reference evidence:
+
+- <If local mirrored repositories under `/opt/baddisk/monitoring/repos/` were checked, list each as `owner/repo @ commit` plus repository-relative paths. If none were checked, record why external OSS references were not relevant.>
 
 Open decisions:
 
@@ -132,6 +143,10 @@ Same-failure scan:
 
 - <search and result>
 
+Sensitive data gate:
+
+- <Confirm durable artifacts contain no raw secrets, credentials, bearer tokens, SNMP communities, community member names, customer names, personal data, non-private customer-identifying IPs, private endpoints, or proprietary incident details; note redactions used.>
+
 Artifact maintenance gate:
 
 - AGENTS.md: <updated path or evidence-backed reason no update was needed>
@@ -139,7 +154,7 @@ Artifact maintenance gate:
 - Specs: <updated .agents/sow/specs/ path or evidence-backed reason no update was needed>
 - End-user/operator docs: <updated docs/runbooks/help paths or evidence-backed reason none were affected>
 - End-user/operator skills: <updated output/reference skill paths or evidence-backed reason none were affected>
-- SOW lifecycle: <status/directory checked; split/merge/follow-up/regression handling recorded>
+- SOW lifecycle: <status/directory checked; if successful close, `Status: completed` and move to `.agents/sow/done/` are committed together with the work in one commit unless user explicitly requested a different split; split/merge/follow-up/regression handling recorded>
 
 Specs update:
 
@@ -176,3 +191,9 @@ Pending.
 ## Followup
 
 None yet.
+
+## Regression Log
+
+None yet.
+
+Append regression entries here only after this SOW was completed or closed and later testing or use found broken behavior. Use a dated `## Regression - YYYY-MM-DD` heading at the end of the file. Never prepend regression content above the original SOW narrative.

@@ -58,7 +58,7 @@ func addMetricNames(names map[string]struct{}, metric *ddprofiledefinition.Metri
 		return
 	}
 
-	if name := strings.TrimSpace(FirstNonEmpty(metric.Symbol.Name, metric.Name)); name != "" {
+	if name := strings.TrimSpace(firstNonEmpty(metric.Symbol.Name, metric.Name)); name != "" {
 		names[name] = struct{}{}
 	}
 	for i := range metric.Symbols {
@@ -66,6 +66,15 @@ func addMetricNames(names map[string]struct{}, metric *ddprofiledefinition.Metri
 			names[name] = struct{}{}
 		}
 	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func sourcesAvailable(sources []ddprofiledefinition.VirtualMetricSourceConfig, metricNames map[string]struct{}) bool {

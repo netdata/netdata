@@ -48,6 +48,17 @@ static inline uint32_t apply_default(uint32_t val, uint32_t def)
     return val == 0 ? def : val;
 }
 
+static bool header_payload_len(size_t payload_len, size_t *msg_len_out)
+{
+#if SIZE_MAX <= UINT32_MAX
+    if (payload_len > SIZE_MAX - NIPC_HEADER_LEN)
+        return false;
+#endif
+
+    *msg_len_out = NIPC_HEADER_LEN + payload_len;
+    return true;
+}
+
 static inline uint32_t pipe_buffer_size(uint32_t packet_size)
 {
     /* The protocol packet size controls logical framing and chunk size. The
@@ -927,7 +938,12 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session,
     hdr->header_len = NIPC_HEADER_LEN;
     hdr->payload_len = (uint32_t)payload_len;
 
-    size_t total_msg = NIPC_HEADER_LEN + payload_len;
+    size_t total_msg;
+    if (!header_payload_len(payload_len, &total_msg)) {
+        if (tracked)
+            inflight_remove(session, hdr->message_id);
+        return NIPC_NP_ERR_LIMIT_EXCEEDED;
+    }
 
     /* Single packet? */
     if (total_msg <= session->packet_size) {
@@ -1106,7 +1122,9 @@ nipc_np_error_t nipc_np_receive(nipc_np_session_t *session,
             return NIPC_NP_ERR_UNKNOWN_MSG_ID;
     }
 
-    size_t total_msg = NIPC_HEADER_LEN + hdr_out->payload_len;
+    size_t total_msg;
+    if (!header_payload_len(hdr_out->payload_len, &total_msg))
+        return NIPC_NP_ERR_LIMIT_EXCEEDED;
 
     /* Non-chunked: entire message in one read */
     if (n >= total_msg) {

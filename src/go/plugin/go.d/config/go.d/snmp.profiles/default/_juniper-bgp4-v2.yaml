@@ -1,0 +1,230 @@
+# Vendor-native Juniper BGP visibility from BGP4-V2-MIB-JUNIPER.
+# The peer row uses jnxBgpM2PeerTable and reads augmented per-peer tables
+# through typed cross-table BGP sources. The peer-family row uses
+# jnxBgpM2PrefixCountersTable and resolves peer identity by matching its
+# jnxBgpM2PeerIndex index component against jnxBgpM2PeerTable.
+
+bgp:
+  - id: juniper-bgp-peer
+    MIB: BGP4-V2-MIB-JUNIPER
+    kind: peer
+    table:
+      name: jnxBgpM2PeerTable
+      OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1
+    identity:
+      routing_instance:
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.15, name: jnxBgpM2PeerRoutingInstance }
+      neighbor:
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11, name: jnxBgpM2PeerRemoteAddr, format: ip_address }
+      remote_as:
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.13, name: jnxBgpM2PeerRemoteAs, format: uint32 }
+    descriptors:
+      local_address:
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.7, name: jnxBgpM2PeerLocalAddr, format: ip_address }
+      local_as:
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.9, name: jnxBgpM2PeerLocalAs, format: uint32 }
+      peer_identifier:
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.1, name: jnxBgpM2PeerIdentifier, format: ip_address }
+      peer_type:
+        symbol:
+          OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.10
+          name: jnxBgpM2PeerRemoteAddrType
+          mapping:
+            0: unknown
+            1: ipv4
+            2: ipv6
+            3: ipv4z
+            4: ipv6z
+            16: dns
+            25: l2vpn
+      bgp_version:
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.5, name: jnxBgpM2PeerNegotiatedVersion }
+    admin:
+      enabled:
+        symbol:
+          OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.3
+          name: jnxBgpM2PeerStatus
+          mapping:
+            1: halted
+            2: running
+    state:
+      symbol:
+        OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.2
+        name: jnxBgpM2PeerState
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+    connection:
+      established_uptime:
+        table: jnxBgpM2PeerEventTimesTable
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.4.1.1.1, name: jnxBgpM2PeerFsmEstablishedTime }
+      last_received_update_age:
+        table: jnxBgpM2PeerEventTimesTable
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.4.1.1.2, name: jnxBgpM2PeerInUpdatesElapsedTime }
+    traffic:
+      messages:
+        received:
+          table: jnxBgpM2PeerCountersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.1.1.3, name: jnxBgpM2PeerInTotalMessages }
+        sent:
+          table: jnxBgpM2PeerCountersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.1.1.4, name: jnxBgpM2PeerOutTotalMessages }
+      updates:
+        received:
+          table: jnxBgpM2PeerCountersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.1.1.1, name: jnxBgpM2PeerInUpdates }
+        sent:
+          table: jnxBgpM2PeerCountersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.1.1.2, name: jnxBgpM2PeerOutUpdates }
+    transitions:
+      established:
+        table: jnxBgpM2PeerCountersTable
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.1.1.5, name: jnxBgpM2PeerFsmEstablishedTrans }
+    timers:
+      negotiated:
+        hold_time:
+          table: jnxBgpM2PeerNegotiatedTimersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.4.3.1.1, name: jnxBgpM2PeerHoldTime }
+        keepalive_time:
+          table: jnxBgpM2PeerNegotiatedTimersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.4.3.1.2, name: jnxBgpM2PeerKeepAlive }
+      configured:
+        connect_retry:
+          table: jnxBgpM2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.4.2.1.1, name: jnxBgpM2PeerConnectRetryInterval }
+        hold_time:
+          table: jnxBgpM2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.4.2.1.2, name: jnxBgpM2PeerHoldTimeConfigured }
+        keepalive_time:
+          table: jnxBgpM2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.4.2.1.3, name: jnxBgpM2PeerKeepAliveConfigured }
+        min_as_origination_interval:
+          table: jnxBgpM2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.4.2.1.4, name: jnxBgpM2PeerMinASOrigInterval }
+        min_route_advertisement_interval:
+          table: jnxBgpM2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.4.2.1.5, name: jnxBgpM2PeerMinRouteAdverInterval }
+    last_error:
+      code:
+        table: jnxBgpM2PeerErrorsTable
+        symbol:
+          OID: 1.3.6.1.4.1.2636.5.1.1.2.2.1.1.1
+          name: jnxBgpM2PeerLastErrorReceivedCode
+          format: hex
+          extract_value: '^([0-9a-f]{2})'
+      subcode:
+        table: jnxBgpM2PeerErrorsTable
+        symbol:
+          OID: 1.3.6.1.4.1.2636.5.1.1.2.2.1.1.1
+          name: jnxBgpM2PeerLastErrorReceivedSubcode
+          format: hex
+          extract_value: '^[0-9a-f]{2}([0-9a-f]{2})'
+
+  - id: juniper-bgp-peer-family
+    MIB: BGP4-V2-MIB-JUNIPER
+    kind: peer_family
+    table:
+      name: jnxBgpM2PrefixCountersTable
+      OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2
+    identity:
+      routing_instance:
+        table: jnxBgpM2PeerTable
+        index_transform:
+          - start: 0
+            end: 0
+        lookup_symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14, name: jnxBgpM2PeerIndex }
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.15, name: jnxBgpM2PeerRoutingInstance }
+      neighbor:
+        table: jnxBgpM2PeerTable
+        index_transform:
+          - start: 0
+            end: 0
+        lookup_symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14, name: jnxBgpM2PeerIndex }
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11, name: jnxBgpM2PeerRemoteAddr, format: ip_address }
+      remote_as:
+        table: jnxBgpM2PeerTable
+        index_transform:
+          - start: 0
+            end: 0
+        lookup_symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14, name: jnxBgpM2PeerIndex }
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.13, name: jnxBgpM2PeerRemoteAs, format: uint32 }
+      address_family:
+        index: 2
+        mapping:
+          1: ipv4
+          2: ipv6
+          25: l2vpn
+      subsequent_address_family:
+        index: 3
+        mapping:
+          1: unicast
+          2: multicast
+          4: labeled_unicast
+          5: mvpn
+          65: vpls
+          70: evpn
+          128: vpn
+          132: rtfilter
+          133: flow
+    descriptors:
+      local_address:
+        table: jnxBgpM2PeerTable
+        index_transform:
+          - start: 0
+            end: 0
+        lookup_symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14, name: jnxBgpM2PeerIndex }
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.7, name: jnxBgpM2PeerLocalAddr, format: ip_address }
+      local_as:
+        table: jnxBgpM2PeerTable
+        index_transform:
+          - start: 0
+            end: 0
+        lookup_symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14, name: jnxBgpM2PeerIndex }
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.9, name: jnxBgpM2PeerLocalAs, format: uint32 }
+      peer_identifier:
+        table: jnxBgpM2PeerTable
+        index_transform:
+          - start: 0
+            end: 0
+        lookup_symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14, name: jnxBgpM2PeerIndex }
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.1, name: jnxBgpM2PeerIdentifier, format: ip_address }
+      peer_type:
+        table: jnxBgpM2PeerTable
+        index_transform:
+          - start: 0
+            end: 0
+        lookup_symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14, name: jnxBgpM2PeerIndex }
+        symbol:
+          OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.10
+          name: jnxBgpM2PeerRemoteAddrType
+          mapping:
+            0: unknown
+            1: ipv4
+            2: ipv6
+            3: ipv4z
+            4: ipv6z
+            16: dns
+            25: l2vpn
+      bgp_version:
+        table: jnxBgpM2PeerTable
+        index_transform:
+          - start: 0
+            end: 0
+        lookup_symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14, name: jnxBgpM2PeerIndex }
+        symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.5, name: jnxBgpM2PeerNegotiatedVersion }
+    routes:
+      current:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2.1.7, name: jnxBgpM2PrefixInPrefixes }
+        accepted:
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2.1.8, name: jnxBgpM2PrefixInPrefixesAccepted }
+        rejected:
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2.1.9, name: jnxBgpM2PrefixInPrefixesRejected }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2.1.10, name: jnxBgpM2PrefixOutPrefixes }
+        active:
+          symbol: { OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2.1.11, name: jnxBgpM2PrefixInPrefixesActive }

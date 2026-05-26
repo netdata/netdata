@@ -143,31 +143,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             netdata_log_error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
-    if(rrdset_number_of_dimensions(st) != 0) {
-        RRDDIM *td;
-        dfe_start_write(st->rrddim_root_index, td) {
-            if(td) break;
-        }
-        dfe_done(td);
-
-        if(td && (td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor))) {
-            if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
-                     "present (algorithm is '%s' vs '%s', multiplier is %d vs %d, "
-                     "divisor is %d vs %d).",
-                     rrddim_name(rd),
-                     rrdset_name(st),
-                     rrdhost_hostname(host),
-                     rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
-                     rd->multiplier, td->multiplier,
-                     rd->divisor, td->divisor
-                );
-#endif
-                rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
-            }
-        }
-    }
+    // NOTE: the heterogeneity check has moved to rrddim_react_callback().
+    // Running it here calls dfe_start_*() on st->rrddim_root_index while the
+    // index write-lock of that dict is still held by the inserter — AB-BA
+    // against svc_rrdset_archive_obsolete_dimensions() which holds items-write
+    // and then calls dictionary_del() that wants index-write.
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -298,6 +278,40 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         // the chart needs to be updated to the parent
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    }
+
+    if(ctr->react_action & RRDDIM_REACT_NEW) {
+        // heterogeneity check (in react not insert: insert still holds index-write).
+        // compare and flag-set inside the loop body so td stays referenced via the
+        // dfe iterator (no UAF after dfe_done). rd is in the items list by react
+        // time, so skip td == rd.
+        RRDDIM *td;
+        dfe_start_read(st->rrddim_root_index, td) {
+            if(td == rd)
+                continue;
+
+            if(td->algorithm != rd->algorithm
+               || ABS(td->multiplier) != ABS(rd->multiplier)
+               || ABS(td->divisor)    != ABS(rd->divisor)) {
+                if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+                    netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
+                         "present (algorithm is '%s' vs '%s', multiplier is %d vs %d, "
+                         "divisor is %d vs %d).",
+                         rrddim_name(rd),
+                         rrdset_name(st),
+                         rrdhost_hostname(st->rrdhost),
+                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
+                         rd->multiplier, td->multiplier,
+                         rd->divisor, td->divisor
+                    );
+#endif
+                    rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
+                }
+            }
+            break;
+        }
+        dfe_done(td);
     }
 
     rrddim_metadata_updated(rd);

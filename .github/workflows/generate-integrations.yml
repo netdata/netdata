@@ -9,15 +9,22 @@ on:
       - 'src/collectors/**/metadata.yaml'
       - 'src/crates/**/metadata.yaml'
       - 'src/go/plugin/**/metadata.yaml'
+      - '**/taxonomy.yaml'
       - 'src/exporting/**/metadata.yaml'
       - 'src/health/notifications/**/metadata.yaml'
+      - 'integrations/taxonomy/**'
       - 'integrations/templates/**'
       - 'integrations/schemas/**'
       - 'integrations/categories.yaml'
       - 'integrations/deploy.yaml'
       - 'integrations/cloud-notifications/metadata.yaml'
       - 'integrations/cloud-authentication/metadata.yaml'
+      - 'integrations/_common.py'
       - 'integrations/gen_integrations.py'
+      - 'integrations/gen_taxonomy.py'
+      - 'integrations/gen_taxonomy_seed.py'
+      - 'integrations/check_collector_taxonomy.py'
+      - 'integrations/tests/**'
       - 'integrations/gen_docs_integrations.py'
       - 'integrations/gen_doc_collector_page.py'
       - 'integrations/gen_doc_secrets_page.py'
@@ -49,6 +56,16 @@ jobs:
         run: |
           source ./virtualenv/bin/activate
           python3 integrations/gen_integrations.py
+      - name: Generate Collector Taxonomy
+        id: generate-taxonomy
+        run: |
+          source ./virtualenv/bin/activate
+          python3 integrations/gen_taxonomy.py
+      - name: Test Collector Taxonomy Tooling
+        id: test-taxonomy
+        run: |
+          source ./virtualenv/bin/activate
+          python3 -m unittest integrations.tests.test_taxonomy
       - name: Generate Integrations Documentation
         id: generate-integrations-documentation
         run: |
@@ -63,7 +80,7 @@ jobs:
           python3 integrations/gen_doc_secrets_page.py
       - name: Clean Up Temporary Data
         id: clean
-        run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json
+        run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json integrations/taxonomy.json
       - name: Create PR
         id: create-pr
         uses: peter-evans/create-pull-request@v8
@@ -92,6 +109,8 @@ jobs:
               Checkout Agent: ${{ steps.checkout-agent.outcome }}
               Prep python env and deps: ${{ steps.prep-deps.outcome }}
               Generate Integrations: ${{ steps.generate.outcome }}
+              Generate Collector Taxonomy: ${{ steps.generate-taxonomy.outcome }}
+              Test Collector Taxonomy Tooling: ${{ steps.test-taxonomy.outcome }}
               Generate Integrations Documentation: ${{ steps.generate-integrations-documentation.outcome }}
               Generate src/collectors/COLLECTORS.md: ${{ steps.generate-collectors-md.outcome }}
               Generate src/collectors/SECRETS.md: ${{ steps.generate-secrets-md.outcome }}

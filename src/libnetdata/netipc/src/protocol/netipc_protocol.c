@@ -751,9 +751,11 @@ nipc_error_t nipc_increment_decode(const void *buf, size_t buf_len,
 
 size_t nipc_string_reverse_encode(const char *str, uint32_t str_len,
                                    void *buf, size_t buf_len) {
-    /* Guard against size_t overflow on 32-bit platforms */
-    if (str_len > SIZE_MAX - NIPC_STRING_REVERSE_HDR_SIZE - 1)
+    /* Guard against size_t overflow only where uint32_t can exceed size_t. */
+#if SIZE_MAX <= UINT32_MAX
+    if ((size_t)str_len > SIZE_MAX - (size_t)NIPC_STRING_REVERSE_HDR_SIZE - 1u)
         return 0;
+#endif
 
     size_t total = NIPC_STRING_REVERSE_HDR_SIZE + str_len + 1;
     if (buf_len < total)

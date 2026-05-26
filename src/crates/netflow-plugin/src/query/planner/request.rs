@@ -1,18 +1,33 @@
 use super::*;
 
 pub(crate) fn resolve_time_bounds(request: &FlowsRequest) -> (u32, u32) {
-    let now = Utc::now().timestamp().max(1) as u32;
+    let now = Utc::now().timestamp().max(1);
     let mut before = request.before.unwrap_or(now);
     if before == 0 {
         before = now;
+    } else if before < 0 {
+        before = now.saturating_add(before).max(1);
     }
-    let mut after = request
-        .after
-        .unwrap_or_else(|| before.saturating_sub(DEFAULT_QUERY_WINDOW_SECONDS));
+    let after = match request.after {
+        Some(after) if after < 0 => before.saturating_add(after),
+        Some(after) => after,
+        None => before.saturating_sub(i64::from(DEFAULT_QUERY_WINDOW_SECONDS)),
+    }
+    .max(0);
+    let before = clamp_query_timestamp(before);
+    let mut after = clamp_query_timestamp(after);
     if after >= before {
         after = before.saturating_sub(1);
     }
     (after, before)
+}
+
+fn clamp_query_timestamp(timestamp: i64) -> u32 {
+    if timestamp <= 0 {
+        0
+    } else {
+        timestamp.min(i64::from(u32::MAX)) as u32
+    }
 }
 
 pub(crate) fn sanitize_limit(top_n: TopN) -> usize {

@@ -50,7 +50,7 @@ The default configuration for this integration does not impose any limits on dat
 
 #### Performance Impact
 
-This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
+This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology.
 
 ## Setup
 
@@ -156,12 +156,12 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| ip.inbound_conn | connection_tcp | connections/s |
+| ip.inbound_conn | connected_tcp, connected_udp | connections/s |
 | ip.tcp_outbound_conn | received | connections/s |
 | ip.tcp_functions | received, send, closed | calls/s |
 | ip.total_tcp_bandwidth | received, send | kilobits/s |
 | ip.tcp_error | received, send | calls/s |
-| ip.tcp_retransmit | retransmited | calls/s |
+| ip.tcp_retransmit | retransmitted | calls/s |
 | ip.udp_functions | received, send | calls/s |
 | ip.total_udp_bandwidth | received, send | kilobits/s |
 | ip.udp_error | received, send | calls/s |

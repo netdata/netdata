@@ -208,6 +208,18 @@ func (m MetricTagConfig) Clone() MetricTagConfig {
 	return m2
 }
 
+type GlobalMetricTagConfig struct {
+	MetricTagConfig `yaml:",inline" json:",inline"`
+	Consumers       ConsumerSet `yaml:"consumers,omitempty" json:"consumers,omitempty"`
+}
+
+func (m GlobalMetricTagConfig) Clone() GlobalMetricTagConfig {
+	return GlobalMetricTagConfig{
+		MetricTagConfig: m.MetricTagConfig.Clone(),
+		Consumers:       m.Consumers.Clone(),
+	}
+}
+
 type StaticMetricTagConfig struct {
 	Tag   string `yaml:"tag" json:"tag"`
 	Value string `yaml:"value" json:"value"`

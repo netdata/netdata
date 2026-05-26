@@ -17,3 +17,5 @@ exclude_paths:
   - TODO-netflow-plugin-refactor.md
   - src/go/pkg/topology/engine/parity/README.md
   - src/go/pkg/topology/engine/parity/evidence/**
+  - .agents/**
+  - docs/netdata-ai/skills/**

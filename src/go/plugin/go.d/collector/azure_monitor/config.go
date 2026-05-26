@@ -45,6 +45,7 @@ const (
 
 type Config struct {
 	Vnode              string                      `yaml:"vnode,omitempty" json:"vnode,omitempty"`
+	VirtualNodes       *VirtualNodesConfig         `yaml:"virtual_nodes,omitempty" json:"virtual_nodes,omitempty"`
 	UpdateEvery        int                         `yaml:"update_every,omitempty" json:"update_every,omitempty"`
 	AutoDetectionRetry int                         `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
 	SubscriptionIDs    []string                    `yaml:"subscription_ids" json:"subscription_ids"`
@@ -55,6 +56,10 @@ type Config struct {
 	Timeout            confopt.Duration            `yaml:"timeout,omitempty" json:"timeout"`
 	Limits             LimitsConfig                `yaml:"limits" json:"limits"`
 	Auth               cloudauth.AzureADAuthConfig `yaml:"auth" json:"auth"`
+}
+
+type VirtualNodesConfig struct {
+	ByResourceTag string `yaml:"by_resource_tag,omitempty" json:"by_resource_tag,omitempty"`
 }
 
 type DiscoveryConfig struct {
@@ -129,6 +134,14 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Limits.MaxMetricsPerQuery <= 0 {
 		c.Limits.MaxMetricsPerQuery = defaultMaxMetricsQuery
+	}
+	if c.VirtualNodes != nil {
+		tagKey := stringsLowerTrim(c.VirtualNodes.ByResourceTag)
+		if tagKey == "" {
+			c.VirtualNodes = nil
+		} else {
+			c.VirtualNodes = &VirtualNodesConfig{ByResourceTag: tagKey}
+		}
 	}
 }
 
@@ -410,4 +423,11 @@ func (c Config) subscriptionIDs() []string {
 		}
 	}
 	return out
+}
+
+func (c Config) workloadResourceTagKey() string {
+	if c.VirtualNodes == nil {
+		return ""
+	}
+	return stringsLowerTrim(c.VirtualNodes.ByResourceTag)
 }

@@ -5,6 +5,7 @@ package ddsnmpcollector
 import (
 	"testing"
 
+	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -32,6 +33,130 @@ func TestTableRowProcessor_ProcessIndexTag_DropRightIPAddress(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "neighbor", tagName)
 	assert.Equal(t, "192.0.2.1", tagValue)
+}
+
+func TestTableRowProcessor_ProcessIndexTag_TailMACAddress(t *testing.T) {
+	p := newTableRowProcessor(logger.New())
+
+	tagName, tagValue, err := p.processIndexTag(ddprofiledefinition.MetricTagConfig{
+		Tag: "fdb_mac",
+		Symbol: ddprofiledefinition.SymbolConfigCompat{
+			Name:   "dot1qTpFdbAddress",
+			Format: "mac_address",
+		},
+		IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+			{Start: 1},
+		},
+	}, "7.0.80.86.171.205.239")
+
+	require.NoError(t, err)
+	assert.Equal(t, "fdb_mac", tagName)
+	assert.Equal(t, "00:50:56:ab:cd:ef", tagValue)
+}
+
+func TestTableRowProcessor_ProcessIndexTag_LengthPrefixedMACAddress(t *testing.T) {
+	p := newTableRowProcessor(logger.New())
+
+	_, tagValue, err := p.processIndexTag(ddprofiledefinition.MetricTagConfig{
+		Tag: "fdb_mac",
+		Symbol: ddprofiledefinition.SymbolConfigCompat{
+			Name:   "dot1qTpFdbAddress",
+			Format: "mac_address",
+		},
+		IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+			{Start: 1},
+		},
+	}, "7.6.0.80.86.171.205.239")
+
+	require.NoError(t, err)
+	assert.Equal(t, "00:50:56:ab:cd:ef", tagValue)
+}
+
+func TestTableRowProcessor_ProcessIndexTag_InvalidMACAddress(t *testing.T) {
+	p := newTableRowProcessor(logger.New())
+
+	_, _, err := p.processIndexTag(ddprofiledefinition.MetricTagConfig{
+		Tag: "fdb_mac",
+		Symbol: ddprofiledefinition.SymbolConfigCompat{
+			Name:   "dot1qTpFdbAddress",
+			Format: "mac_address",
+		},
+		IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+			{Start: 1},
+		},
+	}, "7.0.80.86.171.205.999")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot convert transformed index")
+}
+
+func TestFormatMACAddress_ColumnAndIndexParity(t *testing.T) {
+	columnValue, err := convPhysAddressToString(gosnmp.SnmpPDU{
+		Type:  gosnmp.OctetString,
+		Value: []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef},
+	})
+	require.NoError(t, err)
+
+	indexValue, err := formatIndexTagValue("0.80.86.171.205.239", "mac_address")
+	require.NoError(t, err)
+
+	assert.Equal(t, columnValue, indexValue)
+	assert.Equal(t, "00:50:56:ab:cd:ef", indexValue)
+}
+
+func TestTableRowProcessor_ProcessIndexTag_Hex(t *testing.T) {
+	p := newTableRowProcessor(logger.New())
+
+	tagName, tagValue, err := p.processIndexTag(ddprofiledefinition.MetricTagConfig{
+		Tag: "lldp_loc_mgmt_addr",
+		Symbol: ddprofiledefinition.SymbolConfigCompat{
+			Name:   "lldpLocManAddr",
+			Format: "hex",
+		},
+		IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+			{Start: 2},
+		},
+	}, "1.4.10.0.0.1")
+
+	require.NoError(t, err)
+	assert.Equal(t, "lldp_loc_mgmt_addr", tagName)
+	assert.Equal(t, "0a000001", tagValue)
+}
+
+func TestTableRowProcessor_ProcessIndexTag_HexPreservesNonIPLength(t *testing.T) {
+	p := newTableRowProcessor(logger.New())
+
+	_, tagValue, err := p.processIndexTag(ddprofiledefinition.MetricTagConfig{
+		Tag: "lldp_loc_mgmt_addr",
+		Symbol: ddprofiledefinition.SymbolConfigCompat{
+			Name:   "lldpLocManAddr",
+			Format: "hex",
+		},
+		IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+			{Start: 2},
+		},
+	}, "6.6.0.80.86.171.205.239")
+
+	require.NoError(t, err)
+	assert.Equal(t, "005056abcdef", tagValue)
+}
+
+func TestTableRowProcessor_ProcessIndexTag_InvalidHex(t *testing.T) {
+	p := newTableRowProcessor(logger.New())
+
+	_, _, err := p.processIndexTag(ddprofiledefinition.MetricTagConfig{
+		Tag: "lldp_loc_mgmt_addr",
+		Symbol: ddprofiledefinition.SymbolConfigCompat{
+			Name:   "lldpLocManAddr",
+			Format: "hex",
+		},
+		IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+			{Start: 2},
+		},
+	}, "1.4.10.0.0.999")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot convert transformed index")
 }
 
 func TestTableRowProcessor_ProcessIndexTag_RegexMappedFamily(t *testing.T) {

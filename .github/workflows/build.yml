@@ -174,7 +174,7 @@ jobs:
         run: |
           mkdir -p artifacts/
           tar --create --file "artifacts/netdata-$(git describe).tar.gz" \
-              --sort=name --posix --auto-compress --exclude=artifacts/ --exclude=.git \
+              --sort=name --posix --auto-compress --exclude=artifacts --exclude=.git \
               --exclude=.gitignore --exclude=.gitattributes --exclude=.gitmodules \
               --transform "s/^\\.\\//netdata-$(git describe)\\//" --verbose .
           cd artifacts/
@@ -186,6 +186,7 @@ jobs:
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -317,6 +318,7 @@ jobs:
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -366,7 +368,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/setup-go@v6
         with:
-          go-version: "^1.25"
+          go-version: "^1.26"
       - name: Set Up Dependencies
         id: deps
         if: needs.file-check.outputs.run == 'true'
@@ -380,7 +382,7 @@ jobs:
       - name: Sign Agent Code
         id: sign-agent
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v1.2.0
+        uses: azure/artifact-signing-action@v2.0.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -403,7 +405,7 @@ jobs:
       - name: Sign Installer
         id: sign-installer
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v1.2.0
+        uses: azure/artifact-signing-action@v2.0.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -422,6 +424,7 @@ jobs:
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -581,6 +584,7 @@ jobs:
         with:
           name: final-artifacts
           path: artifacts/*
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2

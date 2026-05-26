@@ -323,30 +323,6 @@ func newMetricTransformFuncMap() template.FuncMap {
 
 			return ""
 		},
-		"licenseDateFromTag": func(m *Metric, tagName, kind string) (string, error) {
-			// licenseDateFromTag parses a vendor date string carried in a metric tag,
-			// replaces the metric value with its unix epoch, and stamps the licensing
-			// value kind. It is intentionally limited to timestamp value kinds; other
-			// licensing row kinds can use the generic setTag transform directly.
-			if !isLicenseDateValueKind(kind) {
-				return "", fmt.Errorf("licenseDateFromTag: unsupported value kind %q", kind)
-			}
-			if m.Tags == nil {
-				return "", nil
-			}
-			raw := strings.TrimSpace(m.Tags[tagName])
-			if raw == "" {
-				return "", nil
-			}
-
-			ts, ok := parseTextDate(raw)
-			if !ok {
-				return "", nil
-			}
-			m.Value = ts
-			m.Tags["_license_value_kind"] = kind
-			return "", nil
-		},
 	}
 
 	maps.Copy(fm, extra)
@@ -355,10 +331,10 @@ func newMetricTransformFuncMap() template.FuncMap {
 }
 
 // textDateLayouts is the set of vendor-friendly date formats accepted by
-// text_date and licenseDateFromTag. The list is intentionally generous:
-// vendors that publish operational dates through SNMP rarely agree on a single
-// textual format. Numeric slash-only dates are intentionally excluded because
-// dd/mm/yyyy and mm/dd/yyyy are ambiguous for values like 01/02/2024.
+// text_date. The list is intentionally generous: vendors that publish
+// operational dates through SNMP rarely agree on a single textual format.
+// Numeric slash-only dates are intentionally excluded because dd/mm/yyyy and
+// mm/dd/yyyy are ambiguous for values like 01/02/2024.
 var textDateLayouts = []string{
 	time.RFC3339,
 	"2006-01-02 15:04:05",
@@ -391,15 +367,6 @@ func ParseTextDate(raw string) (int64, bool) {
 // accepted by ParseTextDate.
 func IsTextDateNoValue(raw string) bool {
 	return isTextDateNoValue(raw)
-}
-
-func isLicenseDateValueKind(kind string) bool {
-	switch kind {
-	case "expiry_timestamp", "authorization_timestamp", "certificate_timestamp", "grace_timestamp":
-		return true
-	default:
-		return false
-	}
 }
 
 func parseTextDate(raw string) (int64, bool) {

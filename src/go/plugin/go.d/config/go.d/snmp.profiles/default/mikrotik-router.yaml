@@ -6,6 +6,7 @@ extends:
   - _std-topology-q-bridge-mib.yaml
   - _std-topology-stp-mib.yaml
   - _mikrotik-ipsec.yaml
+  - _mikrotik-routeros-licensing.yaml
 
 selector:
   - sysobjectid:

@@ -3,6 +3,7 @@ extends:
   - _std-if-mib.yaml
   - _std-lldp-mib.yaml
   - _std-cdp-mib.yaml
+  - _std-topology-cdp-mib.yaml
   - _std-topology-fdb-arp-mib.yaml
   - _std-topology-q-bridge-mib.yaml
   - _std-topology-stp-mib.yaml

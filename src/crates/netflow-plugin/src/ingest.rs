@@ -9,6 +9,7 @@ use crate::plugin_config::{
     DecapsulationMode as ConfigDecapsulationMode, PluginConfig,
     TimestampSource as ConfigTimestampSource,
 };
+use crate::query::{scan_journal_files_forward, visit_journal_payloads};
 use crate::routing::DynamicRoutingRuntime;
 use crate::tiering::{
     MATERIALIZED_TIERS, OpenTierState, TierAccumulator, TierFlowIndexStore, TierKind,
@@ -19,7 +20,7 @@ use journal_engine::{
     Facets, FileIndexCacheBuilder, FileIndexKey, IndexingLimits, LogQuery, QueryTimeRange,
     batch_compute_file_indexes,
 };
-use journal_index::{Anchor, Direction, FieldName, Microseconds, Seconds};
+use journal_index::{Anchor, Direction, FieldName, Seconds};
 use journal_log_writer::{Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy};
 use journal_registry::{Monitor, Origin, Registry, Source};
 use std::collections::HashMap;
@@ -27,7 +28,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::net::UdpSocket;
 use tokio::time::MissedTickBehavior;
 use tokio_util::sync::CancellationToken;

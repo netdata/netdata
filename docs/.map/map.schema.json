@@ -106,6 +106,7 @@
             "notifications",
             "authentication",
             "logs",
+            "flows",
             "agent_notifications",
             "cloud_notifications"
           ],

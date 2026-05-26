@@ -183,7 +183,7 @@ static void insert_alert_queue(
 
     int rc;
 
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (!aclk_host_config)
         return;
 
@@ -674,9 +674,9 @@ void sql_health_alarm_log_load(RRDHOST *host)
     foreach_rrdcalc_in_rrdhost_done(rc);
 
     param = 0;
-    rw_spinlock_read_lock(&host->health_log.spinlock);
+    rw_spinlock_write_lock(&host->health_log.spinlock);
 
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+    while (service_running(SERVICE_HEALTH) && sqlite3_step_monitored(res) == SQLITE_ROW) {
         ALARM_ENTRY *ae = NULL;
 
         // check that we have valid ids
@@ -806,7 +806,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         loaded++;
     }
 
-    rw_spinlock_read_unlock(&host->health_log.spinlock);
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
 
     dictionary_destroy(all_rrdcalcs);
     all_rrdcalcs = NULL;

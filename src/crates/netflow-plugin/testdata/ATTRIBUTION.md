@@ -45,6 +45,15 @@ Files (verbatim copies from Akvorado testdata):
 
 These files are used by unit/integration-style tests to validate decoding of real NetFlow/IPFIX/sFlow records.
 
+Source: https://github.com/maxmind/MaxMind-DB
+License: Apache-2.0 or MIT
+
+Files (verbatim copies of MaxMind-DB test databases):
+- test-data/GeoLite2-ASN-Test.mmdb
+- test-data/GeoLite2-City-Test.mmdb
+
+These files are used by unit tests to validate real MMDB lookups for ASN and geolocation enrichment.
+
 Additional stress-test captures downloaded at test time (license per tcpreplay capture page):
 - https://s3.amazonaws.com/tcpreplay-pcap-files/smallFlows.pcap
 - https://s3.amazonaws.com/tcpreplay-pcap-files/bigFlows.pcap

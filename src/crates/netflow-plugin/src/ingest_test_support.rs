@@ -5,6 +5,7 @@ use pcap_file::pcap::PcapReader;
 use std::fs::File;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use tempfile::TempDir;
 
 pub(super) fn new_test_ingest_service(

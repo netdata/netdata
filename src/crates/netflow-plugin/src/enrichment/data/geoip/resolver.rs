@@ -134,7 +134,7 @@ impl GeoIpResolver {
                 if let Some(asn_name) = decode_asn_name(&record) {
                     out.asn_name = asn_name;
                 }
-                if let Some(ip_class) = decode_ip_class(&record) {
+                if let Some(ip_class) = decode_ip_class(&record.netdata) {
                     out.ip_class = ip_class;
                 }
             }

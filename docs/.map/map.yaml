@@ -207,6 +207,18 @@ sidebar:
                   label: Bearer Token Protection
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md
               - meta:
+                  label: Configure Netdata for cybersecurity platforms
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md
+                  description: Configure Netdata behind cybersecurity platforms such as Sophos, reverse proxies, firewalls, and secure-access gateways.
+                  keywords:
+                    - netdata
+                    - cybersecurity
+                    - sophos
+                    - reverse proxy
+                    - firewall
+                    - bearer token
+                    - secure access
+              - meta:
                   label: Running the Agent behind a reverse proxy
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/README.md
                 items:
@@ -464,6 +476,76 @@ sidebar:
       - meta:
           label: Shell Scripts
           edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/README.md
+  # Network Flows
+  - meta:
+      label: Network Flows
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/README.md
+      description: Collect, enrich, and visualize NetFlow, IPFIX, and sFlow data with the Netdata Agent.
+    items:
+      - meta:
+          label: Installation
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/installation.md
+      - meta:
+          label: Quick Start
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/quick-start.md
+          description: Get network flow monitoring running in five minutes.
+      - type: integration_placeholder
+        integration_kind: flows
+      - meta:
+          label: Configuration
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/configuration.md
+          description: Full reference for netflow.yaml configuration options.
+      - meta:
+          label: Enrichment
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/enrichment.md
+          description: Order of evaluation, provider chains, MMDB shared mechanism, and the cross-cutting properties that span every enrichment method.
+      - meta:
+          label: Enrichment Intel Downloader
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/intel-downloader.md
+          description: The bundled tool that fetches IP intelligence data sources and writes MMDB files the netflow plugin reads.
+      - meta:
+          label: Field Reference
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/field-reference.md
+          description: Complete list of flow fields with per-protocol availability.
+      - meta:
+          label: Visualization
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/visualization/overview.md
+          description: How queries work, the controls every panel shares, and where each panel fits.
+        items:
+          - meta:
+              label: Sankey and Table
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/visualization/summary-sankey.md
+          - meta:
+              label: Time-Series
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/visualization/time-series.md
+          - meta:
+              label: Maps and Globe
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/visualization/maps-globe.md
+          - meta:
+              label: Filters and Facets
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/visualization/filters-facets.md
+          - meta:
+              label: Plugin Health Charts
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/visualization/dashboard-cards.md
+      - meta:
+          label: Retention and Tiers
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/retention-querying.md
+      - meta:
+          label: Sizing and Capacity Planning
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/sizing-capacity.md
+          description: Practical scaling guide -- plugin cap, storage, memory, and distributed deployment.
+      - meta:
+          label: Validation and Data Quality
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/validation.md
+      - meta:
+          label: Investigation Playbooks
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/investigation-playbooks.md
+      - meta:
+          label: Anti-patterns
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/anti-patterns.md
+      - meta:
+          label: Troubleshooting
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/troubleshooting.md
   # Logs
   - meta:
       label: Logs

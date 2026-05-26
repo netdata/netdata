@@ -354,6 +354,7 @@ jobs:
         with:
           name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
           path: ${{ github.workspace }}/artifacts/*${{ matrix.format }}
+          compression-level: 0
       - name: Test Packages
         id: test
         if: needs.file-check.outputs.run == 'true'

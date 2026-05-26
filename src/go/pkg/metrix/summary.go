@@ -18,6 +18,7 @@ const initialSummaryReservoirCapacity = 64
 type snapshotSummaryInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
@@ -25,16 +26,20 @@ type snapshotSummaryInstrument struct {
 type statefulSummaryInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
 // stagedSummary holds one in-cycle summary sample for a single series identity.
 type stagedSummary struct {
-	key            string
-	name           string
-	labels         []Label
-	labelsKey      string
-	desc           *instrumentDescriptor
+	key          string
+	name         string
+	hostScopeKey string
+	hostScope    HostScope
+	labels       []Label
+	labelsKey    string
+	desc         *instrumentDescriptor
+
 	count          SampleValue
 	sum            SampleValue
 	quantileValues []SampleValue
@@ -50,6 +55,7 @@ func (m *snapshotMeter) Summary(name string, opts ...InstrumentOption) SnapshotS
 	return &snapshotSummaryInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
@@ -63,22 +69,23 @@ func (m *statefulMeter) Summary(name string, opts ...InstrumentOption) StatefulS
 	return &statefulSummaryInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
 
 // ObservePoint writes one full summary point for this collect cycle.
 func (s *snapshotSummaryInstrument) ObservePoint(p SummaryPoint, labels ...LabelSet) {
-	s.backend.recordSummaryObservePoint(s.desc, p, appendLabelSets(s.base, labels))
+	s.backend.recordSummaryObservePoint(s.desc, s.scope, p, appendLabelSets(s.base, labels))
 }
 
 // Observe adds one sample to a stateful summary for this collect cycle.
 func (s *statefulSummaryInstrument) Observe(v SampleValue, labels ...LabelSet) {
-	s.backend.recordSummaryObserve(s.desc, v, appendLabelSets(s.base, labels))
+	s.backend.recordSummaryObserve(s.desc, s.scope, v, appendLabelSets(s.base, labels))
 }
 
 // recordSummaryObservePoint writes one full summary point into the active frame.
-func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, point SummaryPoint, sets []LabelSet) {
+func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, scope HostScope, point SummaryPoint, sets []LabelSet) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -93,18 +100,24 @@ func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, point 
 	if labelsContainKey(labels, SummaryQuantileLabel) {
 		panic(errSummaryLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
 	count, sum, quantiles := normalizeSummaryPoint(point, desc.summary)
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.summaries[key]
 	if !ok {
 		entry = &stagedSummary{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
 		}
 		c.active.summaries[key] = entry
 	}
@@ -116,7 +129,7 @@ func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, point 
 }
 
 // recordSummaryObserve adds one sample to a stateful summary in the active frame.
-func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, scope HostScope, value SampleValue, sets []LabelSet) {
 	mustFiniteSample(value)
 
 	c.mu.Lock()
@@ -133,16 +146,22 @@ func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, value Sampl
 	if labelsContainKey(labels, SummaryQuantileLabel) {
 		panic(errSummaryLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.summaries[key]
 	if !ok {
 		entry = &stagedSummary{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
 		}
 		if desc.window == WindowCumulative {
 			if existing := c.snapshot.Load().series[key]; existing != nil && existing.desc != nil && existing.desc.kind == kindSummary {

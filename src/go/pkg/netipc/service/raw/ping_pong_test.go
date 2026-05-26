@@ -52,7 +52,7 @@ func TestIncrementPingPong(t *testing.T) {
 	// 10 rounds: send 0 -> get 1 -> send 1 -> get 2 -> ... -> value == 10
 	var val uint64
 	responsesReceived := 0
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		got, err := client.CallIncrement(val)
 		if err != nil {
 			t.Fatalf("round %d: CallIncrement(%d) failed: %v", i, val, err)
@@ -108,7 +108,7 @@ func TestStringReversePingPong(t *testing.T) {
 	// 6 rounds: feed each response back as the next request
 	responsesReceived := 0
 	current := original
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		view, err := client.CallStringReverse(current)
 		if err != nil {
 			t.Fatalf("round %d: CallStringReverse(%q) failed: %v", i+1, current, err)

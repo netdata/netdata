@@ -275,7 +275,7 @@ func TestCacheLargeDataset(t *testing.T) {
 			}
 			builder.SetHeader(1, 100)
 
-			for i := uint32(0); i < N; i++ {
+			for i := range uint32(N) {
 				name := fmt.Sprintf("cgroup-%d", i)
 				path := fmt.Sprintf("/sys/fs/cgroup/test/%d", i)
 				enabled := uint32(1)
@@ -320,7 +320,7 @@ func TestCacheLargeDataset(t *testing.T) {
 	}
 
 	// Verify all lookups
-	for i := uint32(0); i < N; i++ {
+	for i := range uint32(N) {
 		name := fmt.Sprintf("cgroup-%d", i)
 		item, found := cache.Lookup(i+1000, name)
 		if !found {

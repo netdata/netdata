@@ -262,6 +262,9 @@ func TestEnginePreparePlanLifecycleScenarios(t *testing.T) {
 				e.ResetMaterialized()
 
 				require.ErrorIs(t, attempt.Commit(), ErrStalePlanAttempt)
+				nextAttempt, err := e.PreparePlan(store.Read())
+				require.NoError(t, err)
+				nextAttempt.Abort()
 			},
 		},
 		"repeated commit is rejected after successful commit": {

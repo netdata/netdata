@@ -16,7 +16,7 @@ func (c *Collector) collectTopologyVTPVLANContexts(dev ddsnmp.DeviceConnectionIn
 		return
 	}
 
-	profiles, err := loadTopologyVLANContextProfiles()
+	profiles, err := loadTopologyVLANContextProfiles(dev)
 	if err != nil {
 		c.Warningf("device '%s': topology vlan-context polling disabled: failed to load profiles: %v", dev.Hostname, err)
 		return

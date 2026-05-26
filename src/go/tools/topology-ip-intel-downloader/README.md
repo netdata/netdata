@@ -92,6 +92,31 @@ topology-ip-intel-downloader \
   --geo dbip:city-lite
 ```
 
+Use public ASN and country providers:
+
+```bash
+topology-ip-intel-downloader \
+  --asn iptoasn:combined \
+  --geo ip2location:country-lite
+```
+
+Use MaxMind GeoLite2 sources when `MAXMIND_LICENSE_KEY` is available in the
+environment:
+
+```bash
+MAXMIND_LICENSE_KEY="..." topology-ip-intel-downloader \
+  --asn maxmind:geolite2-asn \
+  --geo maxmind:geolite2-country
+```
+
+Use CAIDA RouteViews prefix2as for ASN-only attribution:
+
+```bash
+topology-ip-intel-downloader \
+  --asn caida:prefix2as \
+  --geo dbip:country-lite
+```
+
 Prefer a custom GEO source, then fall back to DB-IP:
 
 ```bash
@@ -125,6 +150,10 @@ The config file uses ordered `sources[]` entries. Each entry is explicit about:
 
 Built-in DB-IP sources can omit `url` and `path`. The downloader resolves the
 current monthly download URL from the official DB-IP landing page.
+
+Built-in MaxMind sources require `MAXMIND_LICENSE_KEY` in the environment.
+The generated metadata redacts URL query strings so license keys are not written
+to `topology-ip-intel.json`.
 
 User-provided databases can point directly to:
 
@@ -170,16 +199,30 @@ Important:
 
 ## Supported built-in sources
 
-- `dbip:asn-lite`
-- `dbip:country-lite`
-- `dbip:city-lite`
-- `iptoasn:combined`
+ASN sources:
+
+- `dbip:asn-lite` (`mmdb`, `csv`)
+- `iptoasn:combined` (`tsv`)
+- `caida:prefix2as` (`tsv`)
+- `maxmind:geolite2-asn` (`mmdb`, requires `MAXMIND_LICENSE_KEY`)
+
+GEO sources:
+
+- `dbip:country-lite` (`mmdb`, `csv`)
+- `dbip:city-lite` (`mmdb`, `csv`)
+- `iptoasn:combined` (`tsv`, country only)
+- `maxmind:geolite2-country` (`csv`, requires `MAXMIND_LICENSE_KEY`, country only)
+- `ip2location:country-lite` (`csv`, country only)
+- `ipdeny:country-zones` (`cidr`, country only)
+- `ipip:country` (`txt`, country only)
 
 Supported formats:
 
 - `mmdb`
 - `csv`
-- `tsv` for `iptoasn:combined`
+- `tsv` for `iptoasn:combined` and `caida:prefix2as`
+- `cidr` for `ipdeny:country-zones`
+- `txt` for `ipip:country`
 
 The downloader accepts direct file/URL config for advanced cases, but the CLI
 source tokens are intentionally focused on built-in source families.

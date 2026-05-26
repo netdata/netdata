@@ -16,8 +16,13 @@ import (
 )
 
 const (
-	providerIPToASN = "iptoasn"
-	providerDBIP    = "dbip"
+	providerIPToASN     = "iptoasn"
+	providerDBIP        = "dbip"
+	providerCAIDA       = "caida"
+	providerMaxMind     = "maxmind"
+	providerIP2Location = "ip2location"
+	providerIPDeny      = "ipdeny"
+	providerIPIP        = "ipip"
 )
 
 const (
@@ -26,10 +31,16 @@ const (
 )
 
 const (
-	artifactIPToASNCombined = "combined"
-	artifactDBIPASNLite     = "asn-lite"
-	artifactDBIPCountryLite = "country-lite"
-	artifactDBIPCityLite    = "city-lite"
+	artifactIPToASNCombined        = "combined"
+	artifactDBIPASNLite            = "asn-lite"
+	artifactDBIPCountryLite        = "country-lite"
+	artifactDBIPCityLite           = "city-lite"
+	artifactCAIDAPrefix2AS         = "prefix2as"
+	artifactMaxMindGeoLite2ASN     = "geolite2-asn"
+	artifactMaxMindGeoLite2Country = "geolite2-country"
+	artifactIP2LocationCountryLite = "country-lite"
+	artifactIPDenyCountryZones     = "country-zones"
+	artifactIPIPCountry            = "country"
 )
 
 const (
@@ -42,6 +53,8 @@ const (
 	formatMMDB = "mmdb"
 	formatCSV  = "csv"
 	formatTSV  = "tsv"
+	formatCIDR = "cidr"
+	formatTXT  = "txt"
 )
 
 type config struct {
@@ -216,6 +229,72 @@ func builtInSource(provider, artifact string) (builtInSourceSpec, bool) {
 			allowedFormat: map[string]struct{}{
 				formatMMDB: {},
 				formatCSV:  {},
+			},
+		}, true
+	case provider == providerCAIDA && artifact == artifactCAIDAPrefix2AS:
+		return builtInSourceSpec{
+			pageURL:       "https://data.caida.org/datasets/routing/routeviews-prefix2as/pfx2as-creation.log",
+			defaultFormat: formatTSV,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyASN: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatTSV: {},
+			},
+		}, true
+	case provider == providerMaxMind && artifact == artifactMaxMindGeoLite2ASN:
+		return builtInSourceSpec{
+			directURL:     "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-ASN&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz",
+			defaultFormat: formatMMDB,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyASN: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatMMDB: {},
+			},
+		}, true
+	case provider == providerMaxMind && artifact == artifactMaxMindGeoLite2Country:
+		return builtInSourceSpec{
+			directURL:     "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country-CSV&license_key=${MAXMIND_LICENSE_KEY}&suffix=zip",
+			defaultFormat: formatCSV,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyGeo: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatCSV: {},
+			},
+		}, true
+	case provider == providerIP2Location && artifact == artifactIP2LocationCountryLite:
+		return builtInSourceSpec{
+			directURL:     "https://download.ip2location.com/lite/IP2LOCATION-LITE-DB1.CSV.ZIP",
+			defaultFormat: formatCSV,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyGeo: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatCSV: {},
+			},
+		}, true
+	case provider == providerIPDeny && artifact == artifactIPDenyCountryZones:
+		return builtInSourceSpec{
+			directURL:     "https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz",
+			defaultFormat: formatCIDR,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyGeo: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatCIDR: {},
+			},
+		}, true
+	case provider == providerIPIP && artifact == artifactIPIPCountry:
+		return builtInSourceSpec{
+			directURL:     "https://cdn.ipip.net/17mon/country.zip",
+			defaultFormat: formatTXT,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyGeo: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatTXT: {},
 			},
 		}, true
 	default:

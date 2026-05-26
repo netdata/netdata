@@ -80,7 +80,7 @@ impl IngestService {
         self.metrics.apply_decode_stats(&batch.stats);
 
         for flow in batch.flows {
-            if self.ingest_decoded_record(receive_time_usec, &flow.record) {
+            if self.ingest_decoded_record(receive_time_usec, &flow) {
                 entries_since_sync += 1;
             }
         }
@@ -92,18 +92,26 @@ impl IngestService {
     fn ingest_decoded_record(
         &mut self,
         receive_time_usec: u64,
-        record: &crate::flow::FlowRecord,
+        flow: &crate::decoder::DecodedFlow,
     ) -> bool {
-        self.ingest_decoded_record_internal(receive_time_usec, record, true)
+        self.ingest_decoded_record_internal(
+            receive_time_usec,
+            flow.source_realtime_usec.unwrap_or(receive_time_usec),
+            &flow.record,
+            true,
+        )
     }
 
     fn ingest_decoded_record_internal(
         &mut self,
         receive_time_usec: u64,
+        source_realtime_usec: u64,
         record: &crate::flow::FlowRecord,
         observe_tiers: bool,
     ) -> bool {
-        let Ok(active_path) = self.write_raw_record_internal(receive_time_usec, record) else {
+        let Ok(active_path) =
+            self.write_raw_record_internal(receive_time_usec, source_realtime_usec, record)
+        else {
             return false;
         };
 
@@ -124,10 +132,11 @@ impl IngestService {
     fn write_raw_record_internal(
         &mut self,
         receive_time_usec: u64,
+        source_realtime_usec: u64,
         record: &crate::flow::FlowRecord,
     ) -> std::result::Result<Option<String>, ()> {
         let timestamps = EntryTimestamps::default()
-            .with_source_realtime_usec(receive_time_usec)
+            .with_source_realtime_usec(source_realtime_usec)
             .with_entry_realtime_usec(receive_time_usec);
 
         if let Err(err) =
@@ -245,7 +254,7 @@ impl IngestService {
         receive_time_usec: u64,
         record: &crate::flow::FlowRecord,
     ) -> bool {
-        self.ingest_decoded_record(receive_time_usec, record)
+        self.ingest_decoded_record_internal(receive_time_usec, receive_time_usec, record, true)
     }
 
     #[cfg(test)]
@@ -295,7 +304,12 @@ impl IngestService {
         run_tier_maintenance: bool,
     ) -> usize {
         for record in records {
-            if self.ingest_decoded_record_internal(receive_time_usec, record, observe_tiers) {
+            if self.ingest_decoded_record_internal(
+                receive_time_usec,
+                receive_time_usec,
+                record,
+                observe_tiers,
+            ) {
                 entries_since_sync += 1;
             }
         }

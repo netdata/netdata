@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -582,7 +583,7 @@ func (c *Collector) readRows(rows *sql.Rows, assign func(column, value string, l
 	}
 
 	values := make([]sql.NullString, len(columns))
-	valuePtrs := make([]interface{}, len(columns))
+	valuePtrs := make([]any, len(columns))
 	for i := range values {
 		valuePtrs[i] = &values[i]
 	}
@@ -1668,13 +1669,7 @@ func (c *Collector) collectFederationMetrics(ctx context.Context) error {
 // contains is a helper function to check if all target strings are present in the slice
 func contains(slice []string, targets ...string) bool {
 	for _, target := range targets {
-		found := false
-		for _, s := range slice {
-			if s == target {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(slice, target)
 		if !found {
 			return false
 		}

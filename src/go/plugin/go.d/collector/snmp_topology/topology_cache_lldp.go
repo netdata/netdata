@@ -2,7 +2,19 @@
 
 package snmptopology
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+)
+
+func init() {
+	registerTopologyMetricHandler(ddsnmp.KindLldpLocPort, (*topologyCache).updateLldpLocPort)
+	registerTopologyMetricHandler(ddsnmp.KindLldpLocManAddr, (*topologyCache).updateLldpLocManAddr)
+	registerTopologyMetricHandler(ddsnmp.KindLldpRem, (*topologyCache).updateLldpRemote)
+	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddr, (*topologyCache).updateLldpRemManAddr)
+	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddrCompat, (*topologyCache).updateLldpRemManAddr)
+}
 
 func (c *topologyCache) updateLldpLocPort(tags map[string]string) {
 	portNum := tags[tagLldpLocPortNum]

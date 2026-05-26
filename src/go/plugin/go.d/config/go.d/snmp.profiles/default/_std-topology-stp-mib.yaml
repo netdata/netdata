@@ -15,15 +15,16 @@ metadata:
           name: dot1dStpDesignatedRoot
           format: hex
 
-metrics:
-  - MIB: BRIDGE-MIB
+topology:
+  - kind: stp_port
+    MIB: BRIDGE-MIB
     table:
       OID: 1.3.6.1.2.1.17.2.15.1
       name: dot1dStpPortTable
     symbols:
       # Numeric anchor to force row emission.
       - OID: 1.3.6.1.2.1.17.2.15.1.3
-        name: _topology_stp_port_entry
+        name: stp_port
     metric_tags:
       - tag: stp_port
         index: 1

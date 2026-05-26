@@ -303,6 +303,9 @@ nipc_win_shm_error_t nipc_win_shm_server_create(
     if (req_capacity > UINT32_MAX - req_off)
         return NIPC_WIN_SHM_ERR_BAD_PARAM;
     uint32_t resp_off = align_cacheline(req_off + req_capacity);
+    if (resp_capacity > UINT32_MAX - resp_off ||
+        (size_t)resp_off > SIZE_MAX - (size_t)resp_capacity)
+        return NIPC_WIN_SHM_ERR_BAD_PARAM;
     size_t region_size = (size_t)resp_off + resp_capacity;
 
     /* Create file mapping backed by page file */

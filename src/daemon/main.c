@@ -226,6 +226,7 @@ int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
+int query_plan_unittest(void);
 #ifdef ENABLE_ML
 int ml_unittest(void);
 #endif
@@ -441,6 +442,7 @@ int netdata_main(int argc, char **argv) {
                             if (rrdlabels_unittest()) return 1;
                             if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
+                            if (query_plan_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
@@ -478,6 +480,15 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "araltest") == 0) {
                             unittest_running = true;
                             return aral_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "aralconcurrency") == 0) {
+                            unittest_running = true;
+#ifdef NETDATA_INTERNAL_CHECKS
+                            return aral_unittest_concurrency();
+#else
+                            fprintf(stderr, "aralconcurrency requires NETDATA_INTERNAL_CHECKS\n");
+                            return 1;
+#endif
                         }
                         else if(strcmp(optarg, "waitqtest") == 0) {
                             unittest_running = true;
@@ -540,6 +551,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "utf8sanitizertest") == 0) {
                             unittest_running = true;
                             return utf8_sanitizer_unittest();
+                        }
+                        else if(strcmp(optarg, "queryplantest") == 0) {
+                            unittest_running = true;
+                            return query_plan_unittest();
                         }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {

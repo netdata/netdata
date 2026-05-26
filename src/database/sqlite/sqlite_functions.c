@@ -455,6 +455,22 @@ void sql_close_database(sqlite3 *database, const char *database_name)
 
 extern sqlite3 *db_context_meta;
 
+// Close a thread-local sqlite3 handle while serializing against sqlite_library_shutdown().
+// If the SQLite library is no longer initialized, the handle is leaked deliberately; the OS
+// will reclaim it at process exit, which is strictly safer than crashing inside pcache1.
+void sql_close_thread_db_safe(sqlite3 **database)
+{
+    if (unlikely(!database || !*database))
+        return;
+
+    spinlock_lock(&sqlite_spinlock);
+    if (sqlite_library_initialized)
+        (void) sqlite3_close_v2(*database);
+    spinlock_unlock(&sqlite_spinlock);
+
+    *database = NULL;
+}
+
 void sqlite_close_databases(void)
 {
     // In case we have statements in the main thread (we should not)

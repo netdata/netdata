@@ -153,20 +153,14 @@ func (c *Client) sessionMaxResponsePayloadBytes() uint32 {
 }
 
 func (c *Client) noteRequestCapacity(payloadLen uint32) {
-	grown := nextPowerOf2U32(payloadLen)
-	if grown > protocol.MaxPayloadCap {
-		grown = protocol.MaxPayloadCap
-	}
+	grown := min(nextPowerOf2U32(payloadLen), protocol.MaxPayloadCap)
 	if grown > c.config.MaxRequestPayloadBytes {
 		c.config.MaxRequestPayloadBytes = grown
 	}
 }
 
 func (c *Client) noteResponseCapacity(payloadLen uint32) {
-	grown := nextPowerOf2U32(payloadLen)
-	if grown > protocol.MaxPayloadCap {
-		grown = protocol.MaxPayloadCap
-	}
+	grown := min(nextPowerOf2U32(payloadLen), protocol.MaxPayloadCap)
 	if grown > c.config.MaxResponsePayloadBytes {
 		c.config.MaxResponsePayloadBytes = grown
 	}
@@ -477,7 +471,7 @@ func (c *Client) CallIncrementBatch(values []uint64) ([]uint64, error) {
 
 		// Extract each response item
 		out := make([]uint64, itemCount)
-		for i := uint32(0); i < itemCount; i++ {
+		for i := range itemCount {
 			itemData, gerr := protocol.BatchItemGet(respPayload, itemCount, i)
 			if gerr != nil {
 				return gerr

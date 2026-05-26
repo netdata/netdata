@@ -4,8 +4,8 @@ use super::super::*;
 pub(crate) struct FlowsRequest {
     pub(crate) mode: RequestMode,
     pub(crate) view: ViewMode,
-    pub(crate) after: Option<u32>,
-    pub(crate) before: Option<u32>,
+    pub(crate) after: Option<i64>,
+    pub(crate) before: Option<i64>,
     pub(crate) query: String,
     pub(crate) selections: HashMap<String, Vec<String>>,
     pub(crate) facets: Option<Vec<String>>,
@@ -23,9 +23,9 @@ pub(crate) struct RawFlowsRequest {
     #[serde(default)]
     pub(crate) view: Option<ViewMode>,
     #[serde(default)]
-    pub(crate) after: Option<u32>,
+    pub(crate) after: Option<i64>,
     #[serde(default)]
-    pub(crate) before: Option<u32>,
+    pub(crate) before: Option<i64>,
     #[serde(default)]
     pub(crate) query: String,
     #[serde(default, deserialize_with = "deserialize_selections")]
@@ -67,18 +67,13 @@ pub(crate) enum ViewMode {
     CityMap,
 }
 
-#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum TopN {
     #[default]
-    #[serde(rename = "25")]
     N25,
-    #[serde(rename = "50")]
     N50,
-    #[serde(rename = "100")]
     N100,
-    #[serde(rename = "200")]
     N200,
-    #[serde(rename = "500")]
     N500,
 }
 
@@ -113,6 +108,21 @@ impl Default for FlowsRequest {
 }
 
 impl TopN {
+    fn from_u64(value: u64) -> Option<Self> {
+        match value {
+            25 => Some(Self::N25),
+            50 => Some(Self::N50),
+            100 => Some(Self::N100),
+            200 => Some(Self::N200),
+            500 => Some(Self::N500),
+            _ => None,
+        }
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        value.trim().parse::<u64>().ok().and_then(Self::from_u64)
+    }
+
     pub(crate) fn as_usize(self) -> usize {
         match self {
             Self::N25 => 25,
@@ -120,6 +130,25 @@ impl TopN {
             Self::N100 => 100,
             Self::N200 => 200,
             Self::N500 => 500,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for TopN {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match Value::deserialize(deserializer)? {
+            Value::String(value) => Self::parse(&value)
+                .ok_or_else(|| D::Error::custom(format!("unsupported top_n `{value}`"))),
+            Value::Number(value) => value
+                .as_u64()
+                .and_then(Self::from_u64)
+                .ok_or_else(|| D::Error::custom(format!("unsupported top_n `{value}`"))),
+            value => Err(D::Error::custom(format!(
+                "top_n must be one of 25, 50, 100, 200, 500, got {value}"
+            ))),
         }
     }
 }

@@ -77,22 +77,22 @@ func emitHostSelection(api *netdataapi.API, env EmitEnv) error {
 		return nil
 	}
 
-	guid := sanitizeWireID(env.HostScope.GUID)
+	guid := strings.TrimSpace(env.HostScope.GUID)
 	if guid == "" {
 		return fmt.Errorf("chartemit: emit env host scope guid is required")
 	}
+	if sanitizeWireID(guid) != guid {
+		return fmt.Errorf("chartemit: emit env host scope guid contains unsupported characters")
+	}
 	if env.HostScope.Define != nil {
-		defineGUID := sanitizeWireID(env.HostScope.Define.GUID)
-		if defineGUID == "" {
-			return fmt.Errorf("chartemit: host define guid is required")
+		define, err := PrepareHostInfo(*env.HostScope.Define)
+		if err != nil {
+			return err
 		}
-		if defineGUID != guid {
+		if define.GUID != guid {
 			return fmt.Errorf("chartemit: host define guid %q does not match host scope guid %q", env.HostScope.Define.GUID, env.HostScope.GUID)
 		}
-		if strings.TrimSpace(env.HostScope.Define.Hostname) == "" {
-			return fmt.Errorf("chartemit: host define hostname is required")
-		}
-		api.HOSTINFO(*env.HostScope.Define)
+		api.HOSTINFO(define)
 	}
 	api.HOST(guid)
 	return nil

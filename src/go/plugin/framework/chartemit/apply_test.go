@@ -538,6 +538,59 @@ func TestApplyPlanRejectsMismatchedHostDefine(t *testing.T) {
 	assert.Equal(t, "", buf.String())
 }
 
+func TestPrepareHostInfoScenarios(t *testing.T) {
+	cases := map[string]struct {
+		info    netdataapi.HostInfo
+		want    netdataapi.HostInfo
+		wantErr string
+	}{
+		"rejects unsafe guid": {
+			info: netdataapi.HostInfo{
+				GUID:     "node'\nguid",
+				Hostname: "node-host",
+			},
+			wantErr: "unsupported characters",
+		},
+		"rejects unsafe hostname": {
+			info: netdataapi.HostInfo{
+				GUID:     "node-guid",
+				Hostname: "node'\nhost",
+			},
+			wantErr: "unsupported characters",
+		},
+		"normalizes labels": {
+			info: netdataapi.HostInfo{
+				GUID:     "node-guid",
+				Hostname: "node-host",
+				Labels: map[string]string{
+					"region'\n": "eu'\n",
+					" ":         "ignored",
+				},
+			},
+			want: netdataapi.HostInfo{
+				GUID:     "node-guid",
+				Hostname: "node-host",
+				Labels: map[string]string{
+					"_hostname": "node-host",
+					"region":    "eu ",
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := PrepareHostInfo(tc.info)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestApplyPlanRemoveOnlyBatchStillSelectsHost(t *testing.T) {
 	var buf bytes.Buffer
 	api := netdataapi.New(&buf)

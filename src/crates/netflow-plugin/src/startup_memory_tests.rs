@@ -1,5 +1,4 @@
 use super::{charts, facet_runtime, ingest, plugin_config, query, tiering};
-use bytesize::ByteSize;
 use rt::PluginRuntime;
 use std::env;
 use std::fs;
@@ -278,8 +277,8 @@ fn profile_config(base_dir: &Path) -> plugin_config::PluginConfig {
     cfg.listener.listen = "127.0.0.1:0".to_string();
     cfg.listener.sync_every_entries = 1024;
     cfg.listener.sync_interval = std::time::Duration::from_secs(1);
-    cfg.journal.size_of_journal_files = Some(ByteSize::gb(10));
-    cfg.journal.duration_of_journal_files = Some(std::time::Duration::from_secs(7 * 24 * 60 * 60));
+    // Per-tier defaults (10GB / 7d) already applied by JournalConfig::default;
+    // this call leaves them at the defaults, matching the original test intent.
     cfg
 }
 

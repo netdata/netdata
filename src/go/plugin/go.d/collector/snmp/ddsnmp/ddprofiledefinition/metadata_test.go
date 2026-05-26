@@ -20,7 +20,8 @@ func makeMetadata() MetadataConfig {
 		"device": MetadataResourceConfig{
 			Fields: map[string]MetadataField{
 				"name": {
-					Value: "hey",
+					Value:     "hey",
+					Consumers: ConsumerSet{ConsumerMetrics, ConsumerTopology},
 					Symbol: SymbolConfig{
 						OID:                  "1.2.3",
 						Name:                 "someSymbol",

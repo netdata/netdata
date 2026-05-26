@@ -2,7 +2,17 @@
 
 package snmptopology
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+)
+
+func init() {
+	registerTopologyMetricHandler(ddsnmp.KindStpPort, (*topologyCache).updateStpPortEntry)
+	registerTopologyMetricHandler(ddsnmp.KindArpEntry, (*topologyCache).updateArpEntry)
+	registerTopologyMetricHandler(ddsnmp.KindArpLegacyEntry, (*topologyCache).updateArpEntry)
+}
 
 func (c *topologyCache) updateStpPortEntry(tags map[string]string) {
 	port := strings.TrimSpace(tags[tagStpPort])

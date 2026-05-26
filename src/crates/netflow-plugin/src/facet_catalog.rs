@@ -12,12 +12,28 @@ pub(crate) enum FacetValueKind {
     IpAddr,
 }
 
+/// How the autocomplete dropdown matches user input against stored values.
+///
+/// This is exclusively about the autocomplete/dropdown UX. Regular facet
+/// matching (selections / `key in [values]`) is always exact equality and
+/// uses indexes — never a substring scan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AutocompleteMatchKind {
+    /// `value.starts_with(term)`. Cheap on FST sidecars (automaton-driven).
+    /// Right for IPs (typing `10.0.` to narrow), short numeric values.
+    Prefix,
+    /// `value.contains(term)`. Linear scan. Right for free-form labels
+    /// (e.g. `AS20940 Akamai International` matching a search for `Akamai`).
+    Substring,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FacetFieldSpec {
     pub(crate) name: &'static str,
     pub(crate) kind: FacetValueKind,
     pub(crate) supports_autocomplete: bool,
     pub(crate) uses_sidecar: bool,
+    pub(crate) autocomplete_match: AutocompleteMatchKind,
 }
 
 const VIRTUAL_FACET_FIELDS: &[FacetFieldSpec] = &[
@@ -26,12 +42,14 @@ const VIRTUAL_FACET_FIELDS: &[FacetFieldSpec] = &[
         kind: FacetValueKind::Text,
         supports_autocomplete: true,
         uses_sidecar: false,
+        autocomplete_match: AutocompleteMatchKind::Substring,
     },
     FacetFieldSpec {
         name: "ICMPV6",
         kind: FacetValueKind::Text,
         supports_autocomplete: true,
         uses_sidecar: false,
+        autocomplete_match: AutocompleteMatchKind::Substring,
     },
 ];
 
@@ -126,6 +144,11 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
         _ => FacetValueKind::Text,
     };
 
+    let autocomplete_match = match kind {
+        FacetValueKind::Text => AutocompleteMatchKind::Substring,
+        _ => AutocompleteMatchKind::Prefix,
+    };
+
     Some(FacetFieldSpec {
         name: field,
         kind,
@@ -138,6 +161,7 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
                 | FacetValueKind::SparseU64
                 | FacetValueKind::DenseU16
         ),
+        autocomplete_match,
     })
 }
 

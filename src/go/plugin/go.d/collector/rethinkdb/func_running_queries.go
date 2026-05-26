@@ -106,7 +106,7 @@ func (f *funcRunningQueries) collectRunningQueries(ctx context.Context, sortColu
 	}
 
 	sortColumn = mapRethinkSortColumn(sortColumn)
-	sortRethinkRows(jobRows, sortColumn)
+	sortRethinkRows(jobRows)
 	if len(jobRows) > limit {
 		jobRows = jobRows[:limit]
 	}
@@ -275,11 +275,6 @@ func mapRethinkSortColumn(input string) string {
 	return ""
 }
 
-func sortRethinkRows(rows []rethinkJobRow, sortColumn string) {
-	switch sortColumn {
-	case "durationMs":
-		sort.Slice(rows, func(i, j int) bool { return rows[i].DurationMs > rows[j].DurationMs })
-	default:
-		sort.Slice(rows, func(i, j int) bool { return rows[i].DurationMs > rows[j].DurationMs })
-	}
+func sortRethinkRows(rows []rethinkJobRow) {
+	sort.Slice(rows, func(i, j int) bool { return rows[i].DurationMs > rows[j].DurationMs })
 }

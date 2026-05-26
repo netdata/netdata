@@ -36,21 +36,33 @@ journal:
   # With the default Netdata cache dir this becomes /var/cache/netdata/flows.
   journal_dir: flows
 
-  # Journal retention limits (applied independently on each tier writer).
-  #
-  # Internal rotation size is derived from size_of_journal_files:
-  # - clamp(size_of_journal_files / 20, 5MB, 200MB)
-  # - minimum supported size_of_journal_files is 100MB
-  # If size_of_journal_files is omitted/null, the plugin uses a fixed 100MB
-  # internal rotation size and retention is controlled only by duration.
-  size_of_journal_files: 10GB
-  duration_of_journal_files: 7d
+  # Per-tier retention. Each tier has its own size_of_journal_files (hard
+  # cap; minimum 100MB; null disables size-based retention) and
+  # duration_of_journal_files (time cap; null disables time-based
+  # retention). Validation requires at least one positive limit per tier.
+  # Internal rotation size derives from size_of_journal_files:
+  # clamp(size_of_journal_files / 20, 5MB, 200MB). When size is null,
+  # internal rotation defaults to 100MB and retention is controlled only
+  # by duration.
+  tiers:
+    raw:
+      size_of_journal_files: 10GB
+      duration_of_journal_files: 7d
+    minute_1:
+      size_of_journal_files: 10GB
+      duration_of_journal_files: 7d
+    minute_5:
+      size_of_journal_files: 10GB
+      duration_of_journal_files: 7d
+    hour_1:
+      size_of_journal_files: 10GB
+      duration_of_journal_files: 7d
 
-  # Query tier selection guardrails.
-  query_1m_max_window: 6h
-  query_5m_max_window: 24h
+  # Cap on the number of distinct group keys a single aggregation query
+  # can build before extra groups are folded into a synthetic
+  # __overflow__ bucket. Protects the worker from accidentally wide
+  # group-by combinations exhausting memory.
   query_max_groups: 50000
-  query_facet_max_values_per_field: 5000
 
 # Optional advanced enrichment modules.
 # Keep disabled unless explicitly configured.

@@ -46,6 +46,8 @@ pub(crate) struct NetdataLookupRecord {
 #[derive(Debug, Deserialize)]
 pub(crate) struct GeoLookupRecord {
     #[serde(default)]
+    pub(crate) netdata: NetdataLookupRecord,
+    #[serde(default)]
     pub(crate) country: Option<CountryValue>,
     #[serde(default)]
     pub(crate) city: Option<CityValue>,

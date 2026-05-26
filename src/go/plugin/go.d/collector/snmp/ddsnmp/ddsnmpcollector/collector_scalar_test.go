@@ -111,18 +111,18 @@ func TestScalarCollector_Collect(t *testing.T) {
 						{
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.2604.5.1.5.1.1.0",
-								Name: "_license_row",
+								Name: "device.license.state",
 								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "1",
 									"4": "2",
 								}),
 							},
 							StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
-								{Tag: "_license_id", Value: "base_firewall"},
+								{Tag: "component", Value: "base_firewall"},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
 								{
-									Tag: "license_state",
+									Tag: "state",
 									Symbol: ddprofiledefinition.SymbolConfigCompat{
 										OID: "1.3.6.1.4.1.2604.5.1.5.1.1.0",
 									},
@@ -132,7 +132,7 @@ func TestScalarCollector_Collect(t *testing.T) {
 									}),
 								},
 								{
-									Tag: "license_expiry",
+									Tag: "expiry",
 									Symbol: ddprofiledefinition.SymbolConfigCompat{
 										OID: "1.3.6.1.4.1.2604.5.1.5.1.2.0",
 									},
@@ -150,16 +150,16 @@ func TestScalarCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []ddsnmp.Metric{
 				{
-					Name:       "_license_row",
+					Name:       "device.license.state",
 					Value:      2,
 					MetricType: "gauge",
 					Tags: map[string]string{
-						"_license_id":    "base_firewall",
-						"license_state":  "expired",
-						"license_expiry": "11 Nov 2031",
+						"component": "base_firewall",
+						"state":     "expired",
+						"expiry":    "11 Nov 2031",
 					},
 					StaticTags: map[string]string{
-						"_license_id": "base_firewall",
+						"component": "base_firewall",
 					},
 				},
 			},
@@ -894,7 +894,7 @@ func TestScalarCollector_IdentifyScalarOIDs_SkipsTagOIDsWhenPrimaryOIDIsKnownMis
 		{
 			Symbol: ddprofiledefinition.SymbolConfig{
 				OID:  "1.3.6.1.4.1.2604.5.1.5.1.1.0",
-				Name: "_license_row",
+				Name: "primary_metric",
 			},
 			MetricTags: []ddprofiledefinition.MetricTagConfig{
 				{

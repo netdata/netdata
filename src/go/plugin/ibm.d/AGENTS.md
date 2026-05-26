@@ -1,5 +1,7 @@
 # IBM.d Plugin Developer Guide
 
+CRITICAL: Never write raw sensitive data to durable artifacts. This includes passwords, API keys, bearer tokens, SNMP communities, private keys, connection strings with embedded credentials, session cookies, community member names, customer names, customer identifiers, personal data, non-private IP addresses that can identify customers, private endpoints, account IDs, and proprietary incident details.
+
 This guide is for developers contributing to the IBM.d plugin. For end-user documentation, see [README.md](./README.md).
 
 ## Architecture Overview

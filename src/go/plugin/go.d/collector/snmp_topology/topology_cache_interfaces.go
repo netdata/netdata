@@ -5,7 +5,17 @@ package snmptopology
 import (
 	"math"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
+
+func init() {
+	registerTopologyMetricHandler(ddsnmp.KindIfName, (*topologyCache).updateIfNameByIndex)
+	registerTopologyMetricHandler(ddsnmp.KindIfStatus, (*topologyCache).updateIfNameByIndex)
+	registerTopologyMetricHandler(ddsnmp.KindIfDuplex, (*topologyCache).updateIfNameByIndex)
+	registerTopologyMetricHandler(ddsnmp.KindIpIfIndex, (*topologyCache).updateIfIndexByIP)
+	registerTopologyMetricHandler(ddsnmp.KindBridgePortIfIndex, (*topologyCache).updateBridgePortMap)
+}
 
 func (c *topologyCache) updateIfNameByIndex(tags map[string]string) {
 	ifIndex := strings.TrimSpace(tags[tagTopoIfIndex])

@@ -42,7 +42,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "Depending of kernel version and frequency that files are open and close, this thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "Depending of kernel version and frequency that files are open and close, this thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -731,7 +731,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -959,7 +959,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -1139,7 +1139,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that `md_flush_request` is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that `md_flush_request` is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -1248,7 +1248,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -1558,7 +1558,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -1661,7 +1661,8 @@ modules:
               unit: "connections/s"
               chart_type: line
               dimensions:
-                - name: connection_tcp
+                - name: connected_tcp
+                - name: connected_udp
             - name: ip.tcp_outbound_conn
               description: TCP outbound connections.
               unit: "connections/s"
@@ -1695,7 +1696,7 @@ modules:
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: retransmited
+                - name: retransmitted
             - name: ip.udp_functions
               description: UDP calls
               unit: "calls/s"
@@ -1914,7 +1915,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -2297,7 +2298,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -2634,7 +2635,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -2763,7 +2764,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:

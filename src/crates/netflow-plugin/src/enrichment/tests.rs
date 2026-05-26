@@ -1,11 +1,14 @@
 use super::*;
+use crate::network_sources::NetworkSourceRecord;
 use crate::plugin_config::{
     AsnProviderConfig, GeoIpConfig, NetProviderConfig, NetworkAttributesConfig,
-    NetworkAttributesValue, RoutingDynamicBmpConfig, RoutingDynamicConfig, StaticExporterConfig,
-    StaticInterfaceConfig, StaticMetadataConfig, StaticRoutingConfig, StaticRoutingEntryConfig,
-    StaticRoutingLargeCommunityConfig,
+    NetworkAttributesValue, RemoteNetworkSourceConfig, RoutingDynamicBmpConfig,
+    RoutingDynamicConfig, StaticExporterConfig, StaticInterfaceConfig, StaticMetadataConfig,
+    StaticRoutingConfig, StaticRoutingEntryConfig, StaticRoutingLargeCommunityConfig,
 };
 use std::io::Write;
+use std::net::Ipv4Addr;
+use std::path::PathBuf;
 use tempfile::tempdir;
 
 #[test]
@@ -1228,6 +1231,152 @@ fn geoip_only_enrichment_keeps_flow_without_static_metadata() {
 }
 
 #[test]
+fn maxmind_geolite2_mmdb_enrichment_populates_asn_and_geo_fields() {
+    let cfg = EnrichmentConfig {
+        geoip: GeoIpConfig {
+            asn_database: vec![mmdb_fixture_path("GeoLite2-ASN-Test.mmdb")],
+            geo_database: vec![mmdb_fixture_path("GeoLite2-City-Test.mmdb")],
+            optional: false,
+        },
+        ..Default::default()
+    };
+    let mut enricher = FlowEnricher::from_config(&cfg)
+        .expect("build enricher")
+        .expect("enricher must be enabled");
+
+    let mut fields = base_fields("192.0.2.10", 10, 20, 1000, 10, 20);
+    fields.insert("SRC_ADDR", Ipv4Addr::new(1, 128, 0, 123).to_string());
+    fields.insert("DST_ADDR", Ipv4Addr::new(81, 2, 69, 142).to_string());
+    fields.insert("SRC_AS", "0".to_string());
+    fields.insert("DST_AS", "0".to_string());
+    fields.insert("SRC_MASK", "24".to_string());
+    fields.insert("DST_MASK", "24".to_string());
+
+    assert!(enricher.enrich_fields(&mut fields));
+    assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("1221"));
+    assert_eq!(
+        fields.get("SRC_AS_NAME").map(String::as_str),
+        Some("AS1221 Telstra Pty Ltd")
+    );
+    assert_eq!(fields.get("DST_COUNTRY").map(String::as_str), Some("GB"));
+    assert_eq!(
+        fields.get("DST_GEO_CITY").map(String::as_str),
+        Some("London")
+    );
+    assert_eq!(fields.get("DST_GEO_STATE").map(String::as_str), Some("ENG"));
+    assert_eq!(
+        fields.get("DST_GEO_LATITUDE").map(String::as_str),
+        Some("51.514200")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_LONGITUDE").map(String::as_str),
+        Some("-0.093100")
+    );
+}
+
+#[test]
+fn netdata_topology_mmdb_enrichment_populates_asn_and_geo_fields() {
+    let cfg = EnrichmentConfig {
+        geoip: GeoIpConfig {
+            asn_database: vec![mmdb_fixture_path("Netdata-Topology-ASN-Test.mmdb")],
+            geo_database: vec![mmdb_fixture_path("Netdata-Topology-GEO-Test.mmdb")],
+            optional: false,
+        },
+        ..Default::default()
+    };
+    let mut enricher = FlowEnricher::from_config(&cfg)
+        .expect("build enricher")
+        .expect("enricher must be enabled");
+
+    let mut fields = base_fields("192.0.2.10", 10, 20, 1000, 10, 20);
+    fields.insert("SRC_ADDR", Ipv4Addr::new(8, 8, 8, 8).to_string());
+    fields.insert("DST_ADDR", Ipv4Addr::new(8, 8, 8, 9).to_string());
+    fields.insert("SRC_AS", "0".to_string());
+    fields.insert("DST_AS", "0".to_string());
+    fields.insert("SRC_MASK", "24".to_string());
+    fields.insert("DST_MASK", "24".to_string());
+
+    assert!(enricher.enrich_fields(&mut fields));
+    assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("15169"));
+    assert_eq!(
+        fields.get("SRC_AS_NAME").map(String::as_str),
+        Some("AS15169 Google LLC")
+    );
+    assert_eq!(fields.get("DST_COUNTRY").map(String::as_str), Some("US"));
+    assert_eq!(
+        fields.get("DST_GEO_CITY").map(String::as_str),
+        Some("Mountain View")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_STATE").map(String::as_str),
+        Some("California")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_LATITUDE").map(String::as_str),
+        Some("37.405600")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_LONGITUDE").map(String::as_str),
+        Some("-122.077500")
+    );
+}
+
+#[test]
+fn actual_provider_mmdb_outputs_are_readable_when_root_is_set() {
+    let Some(root) = std::env::var_os("NETDATA_TOPOLOGY_IP_INTEL_PROVIDER_ROOT") else {
+        return;
+    };
+    let root = PathBuf::from(root);
+    let public_ip = "8.8.9.9".parse().expect("public test address");
+
+    for case in [
+        "dbip_asn_mmdb",
+        "dbip_asn_csv",
+        "iptoasn_asn",
+        "caida_asn",
+        "maxmind_asn",
+    ] {
+        let path = root.join(case).join("topology-ip-asn.mmdb");
+        let resolver = GeoIpResolver::from_config(&GeoIpConfig {
+            asn_database: vec![path.to_string_lossy().into_owned()],
+            geo_database: Vec::new(),
+            optional: false,
+        })
+        .unwrap_or_else(|err| panic!("{case}: failed to load ASN MMDB: {err}"))
+        .unwrap_or_else(|| panic!("{case}: ASN resolver disabled"));
+        let attrs = resolver
+            .lookup(public_ip)
+            .unwrap_or_else(|| panic!("{case}: ASN lookup returned no attributes"));
+        assert_ne!(attrs.asn, 0, "{case}: expected non-zero ASN");
+    }
+
+    for case in [
+        "dbip_geo_country_mmdb",
+        "dbip_geo_country_csv",
+        "dbip_geo_city_mmdb",
+        "dbip_geo_city_csv",
+        "iptoasn_geo",
+        "maxmind_geo",
+        "ip2location_geo",
+        "ipdeny_geo",
+        "ipip_geo",
+    ] {
+        let path = root.join(case).join("topology-ip-geo.mmdb");
+        let resolver = GeoIpResolver::from_config(&GeoIpConfig {
+            asn_database: Vec::new(),
+            geo_database: vec![path.to_string_lossy().into_owned()],
+            optional: false,
+        })
+        .unwrap_or_else(|err| panic!("{case}: failed to load GEO MMDB: {err}"))
+        .unwrap_or_else(|| panic!("{case}: GEO resolver disabled"));
+        let attrs = resolver
+            .lookup(public_ip)
+            .unwrap_or_else(|| panic!("{case}: GEO lookup returned no attributes"));
+        assert!(!attrs.country.is_empty(), "{case}: expected country");
+    }
+}
+
+#[test]
 fn static_metadata_without_sampling_keeps_flow() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_for_192(),
@@ -1813,6 +1962,91 @@ fn network_enrichment_merges_supernet_and_subnet_attributes() {
 }
 
 #[test]
+fn network_sources_runtime_enrichment_merges_with_static_networks() {
+    let cfg = EnrichmentConfig {
+        metadata_static: metadata_config_for_192(),
+        default_sampling_rate: Some(SamplingRateSetting::Single(1000)),
+        network_sources: BTreeMap::from([(
+            "ipam".to_string(),
+            RemoteNetworkSourceConfig {
+                url: "http://127.0.0.1/ipam.json".to_string(),
+                ..Default::default()
+            },
+        )]),
+        networks: BTreeMap::from([(
+            "198.51.100.0/24".to_string(),
+            NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+                name: "static-edge".to_string(),
+                region: "static-region".to_string(),
+                country: "FR".to_string(),
+                ..Default::default()
+            }),
+        )]),
+        ..Default::default()
+    };
+
+    let mut enricher = FlowEnricher::from_config(&cfg)
+        .expect("build enricher")
+        .expect("enricher must be enabled");
+    let runtime = enricher
+        .network_sources_runtime()
+        .expect("network source runtime");
+    runtime.replace_records(vec![NetworkSourceRecord {
+        prefix: "198.51.100.0/24"
+            .parse()
+            .expect("parse network source prefix"),
+        attrs: NetworkAttributes {
+            name: "runtime-edge".to_string(),
+            role: "cloud".to_string(),
+            tenant: "tenant-a".to_string(),
+            asn: 64_500,
+            asn_name: "Example Transit".to_string(),
+            ..Default::default()
+        },
+    }]);
+
+    let mut fields = base_fields("192.0.2.10", 10, 20, 1000, 10, 20);
+    fields.insert("SRC_ADDR", "198.51.100.10".to_string());
+    fields.insert("DST_ADDR", "198.51.100.20".to_string());
+    fields.insert("SRC_AS", "0".to_string());
+    fields.insert("DST_AS", "0".to_string());
+    fields.insert("SRC_MASK", "24".to_string());
+    fields.insert("DST_MASK", "24".to_string());
+
+    assert!(enricher.enrich_fields(&mut fields));
+    assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("64500"));
+    assert_eq!(
+        fields.get("SRC_AS_NAME").map(String::as_str),
+        Some("AS64500 Example Transit")
+    );
+    assert_eq!(
+        fields.get("SRC_NET_NAME").map(String::as_str),
+        Some("static-edge")
+    );
+    assert_eq!(
+        fields.get("SRC_NET_ROLE").map(String::as_str),
+        Some("cloud")
+    );
+    assert_eq!(
+        fields.get("SRC_NET_REGION").map(String::as_str),
+        Some("static-region")
+    );
+    assert_eq!(
+        fields.get("SRC_NET_TENANT").map(String::as_str),
+        Some("tenant-a")
+    );
+    assert_eq!(fields.get("SRC_COUNTRY").map(String::as_str), Some("FR"));
+    assert_eq!(
+        fields.get("DST_NET_NAME").map(String::as_str),
+        Some("static-edge")
+    );
+    assert_eq!(
+        fields.get("DST_NET_ROLE").map(String::as_str),
+        Some("cloud")
+    );
+}
+
+#[test]
 fn network_attributes_asn_override_clears_stale_asn_name() {
     let mut base = NetworkAttributes {
         asn: 64_496,
@@ -1909,13 +2143,14 @@ fn decode_ip_class_returns_non_empty_value() {
         },
     };
 
-    assert_eq!(decode_ip_class(&record).as_deref(), Some("private"));
+    assert_eq!(decode_ip_class(&record.netdata).as_deref(), Some("private"));
 }
 
 #[test]
 fn apply_geo_record_normalizes_coordinates_and_rejects_invalid_values() {
     let mut attrs = NetworkAttributes::default();
     let record = GeoLookupRecord {
+        netdata: NetdataLookupRecord::default(),
         country: None,
         city: None,
         location: Some(LocationValue {
@@ -1932,6 +2167,7 @@ fn apply_geo_record_normalizes_coordinates_and_rejects_invalid_values() {
     assert_eq!(attrs.longitude, "2.352200");
 
     let invalid = GeoLookupRecord {
+        netdata: NetdataLookupRecord::default(),
         country: None,
         city: None,
         location: Some(LocationValue {
@@ -1945,6 +2181,25 @@ fn apply_geo_record_normalizes_coordinates_and_rejects_invalid_values() {
 
     assert_eq!(attrs.latitude, "48.856600");
     assert_eq!(attrs.longitude, "2.352200");
+}
+
+#[test]
+fn apply_geo_record_accepts_netdata_ip_class_metadata() {
+    let mut attrs = NetworkAttributes::default();
+    let record = GeoLookupRecord {
+        netdata: NetdataLookupRecord {
+            ip_class: "private".to_string(),
+        },
+        country: None,
+        city: None,
+        location: None,
+        subdivisions: Vec::new(),
+        region: None,
+    };
+
+    apply_geo_record(&mut attrs, &record);
+
+    assert_eq!(attrs.ip_class, "private");
 }
 
 #[test]
@@ -2139,6 +2394,14 @@ fn base_fields(
         ("DST_VLAN", dst_vlan.to_string()),
         ("EXPORTER_NAME", String::new()),
     ])
+}
+
+fn mmdb_fixture_path(name: &str) -> String {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("testdata/mmdb")
+        .join(name)
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn test_enricher_for_provider_order() -> FlowEnricher {
