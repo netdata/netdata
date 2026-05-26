@@ -319,19 +319,23 @@ void function_network_protocols(
 
     // Serialize access to the shared COUNTER_DATA state so previous/current
     // deltas are consistent regardless of which worker thread handles the request.
+    // Hold the mutex across collection AND data-row emission: proto_emit_*_row
+    // reads previous/current fields from the same shared structs that another
+    // worker would overwrite during its own collection pass.
     netdata_mutex_lock(&nv_collect_mutex);
     have_tcp_ipv4 = tcp_collect_family(&tcp_ipv4);
     have_tcp_ipv6 = tcp_collect_family(&tcp_ipv6);
     have_udp_ipv4 = udp_collect_family(&udp_ipv4);
     have_udp_ipv6 = udp_collect_family(&udp_ipv6);
-    netdata_mutex_unlock(&nv_collect_mutex);
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
+        netdata_mutex_unlock(&nv_collect_mutex);
         nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
         goto cleanup;
     }
 
     if(unlikely(!have_tcp_ipv4 && !have_tcp_ipv6 && !have_udp_ipv4 && !have_udp_ipv6)) {
+        netdata_mutex_unlock(&nv_collect_mutex);
         nv_send_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
                       "failed to collect Windows TCP/UDP stack statistics");
         goto cleanup;
@@ -353,6 +357,7 @@ void function_network_protocols(
             proto_emit_udp_row(wb, &udp_ipv6);
     }
     buffer_json_array_close(wb); // data
+    netdata_mutex_unlock(&nv_collect_mutex);
 
     size_t field_id = 0;
     buffer_json_member_add_object(wb, "columns");
