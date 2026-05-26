@@ -157,12 +157,12 @@ typedef struct {
     COUNTER_DATA segments_sent;
 } TCP_FAMILY;
 
-static __thread TCP_FAMILY tcp_ipv4 = {
+static TCP_FAMILY tcp_ipv4 = {
     .af = "IPv4",
     .object_name = "TCPv4",
 };
 
-static __thread TCP_FAMILY tcp_ipv6 = {
+static TCP_FAMILY tcp_ipv6 = {
     .af = "IPv6",
     .object_name = "TCPv6",
 };
@@ -216,15 +216,17 @@ typedef struct {
     COUNTER_DATA datagrams_sent;
 } UDP_FAMILY;
 
-static __thread UDP_FAMILY udp_ipv4 = {
+static UDP_FAMILY udp_ipv4 = {
     .af = "IPv4",
     .object_name = "UDPv4",
 };
 
-static __thread UDP_FAMILY udp_ipv6 = {
+static UDP_FAMILY udp_ipv6 = {
     .af = "IPv6",
     .object_name = "UDPv6",
 };
+
+static netdata_mutex_t nv_collect_mutex;
 
 static void initialize_udp_keys(UDP_FAMILY *udp)
 {
@@ -305,44 +307,24 @@ void function_network_protocols(
     BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
     const char *source __maybe_unused, void *data __maybe_unused)
 {
-    static __thread bool initialized = false;
     bool have_tcp_ipv4 = false;
     bool have_tcp_ipv6 = false;
     bool have_udp_ipv4 = false;
     bool have_udp_ipv6 = false;
 
-    if(unlikely(!initialized)) {
-        initialize_tcp_keys(&tcp_ipv4);
-        initialize_tcp_keys(&tcp_ipv6);
-        initialize_udp_keys(&udp_ipv4);
-        initialize_udp_keys(&udp_ipv6);
-        initialized = true;
-    }
-
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
         goto cleanup;
     }
 
+    // Serialize access to the shared COUNTER_DATA state so previous/current
+    // deltas are consistent regardless of which worker thread handles the request.
+    netdata_mutex_lock(&nv_collect_mutex);
     have_tcp_ipv4 = tcp_collect_family(&tcp_ipv4);
-    if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
-        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
-        goto cleanup;
-    }
-
     have_tcp_ipv6 = tcp_collect_family(&tcp_ipv6);
-    if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
-        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
-        goto cleanup;
-    }
-
     have_udp_ipv4 = udp_collect_family(&udp_ipv4);
-    if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
-        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
-        goto cleanup;
-    }
-
     have_udp_ipv6 = udp_collect_family(&udp_ipv6);
+    netdata_mutex_unlock(&nv_collect_mutex);
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
@@ -449,6 +431,19 @@ int main(int argc, char **argv)
     netdata_threads_init_for_external_plugins(0);
 
     PerflibNamesRegistryInitialize();
+    netdata_mutex_init(&nv_collect_mutex);
+
+    // Prime each family's COUNTER_DATA so the first real request has a valid
+    // previous baseline and rate counters return non-zero values immediately.
+    initialize_tcp_keys(&tcp_ipv4);
+    initialize_tcp_keys(&tcp_ipv6);
+    initialize_udp_keys(&udp_ipv4);
+    initialize_udp_keys(&udp_ipv6);
+    tcp_collect_family(&tcp_ipv4);
+    tcp_collect_family(&tcp_ipv6);
+    udp_collect_family(&udp_ipv4);
+    udp_collect_family(&udp_ipv6);
+    perflibFreePerformanceData();
 
     int timeout = 1;
     if (argc >= 2) {
