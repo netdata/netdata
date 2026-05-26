@@ -154,8 +154,8 @@ static inline void cgroup_ebpfgo_cachestat_calculate(struct cgroup *cg)
     if (cg->cachestat.current.account_page_dirtied >= cg->cachestat.prev.account_page_dirtied)
         apd = cg->cachestat.current.account_page_dirtied - cg->cachestat.prev.account_page_dirtied;
 
-    cg->cachestat.dirty = (long long)mbd;
-
+    // dirty/hit/miss are accumulated from per-PID Go-side deltas in
+    // cgroup_ebpfgo_cachestat_sum_pids; only ratio is computed here.
     uint64_t total = (mpa > mbd) ? (mpa - mbd) : 0;
 
     uint64_t misses = (apcl > apd) ? (apcl - apd) : 0;
@@ -167,8 +167,6 @@ static inline void cgroup_ebpfgo_cachestat_calculate(struct cgroup *cg)
     NETDATA_DOUBLE ratio = (total > 0) ? ((NETDATA_DOUBLE)hits / (NETDATA_DOUBLE)total) : 1;
 
     cg->cachestat.ratio = (long long)(ratio * 100);
-    cg->cachestat.hit = (long long)hits;
-    cg->cachestat.miss = (long long)misses;
 }
 
 static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
@@ -180,6 +178,9 @@ static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
     uint64_t apcl = 0;
     uint64_t apd = 0;
     uint64_t ct = 0;
+
+    // snapshot ct before reset so per-PID delta gating works correctly
+    uint64_t prev_ct = cg->cachestat.ct;
 
     cg->cachestat.prev = cg->cachestat.current;
     memset(&cg->cachestat.current, 0, sizeof(cg->cachestat.current));
@@ -218,6 +219,13 @@ static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
 
         if (item->cachestat.ct > ct)
             ct = item->cachestat.ct;
+
+        // accumulate Go-side per-interval deltas only when Go published fresh data
+        if (item->cachestat.ct > prev_ct) {
+            cg->cachestat.dirty += item->cachestat.dirty;
+            cg->cachestat.hit   += item->cachestat.hit;
+            cg->cachestat.miss  += item->cachestat.miss;
+        }
     }
 
 calculate:
