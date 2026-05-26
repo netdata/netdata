@@ -200,6 +200,19 @@ In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart you
 
 In the `netdata.conf` `[health]` section, use [pattern](/src/libnetdata/simple_pattern/README.md) exclusion with `enabled alarms = !oom_kill *` to load all alerts except `oom_kill`.
 
+To exclude multiple specific alerts, list all exclusions before the wildcard:
+
+```ini
+[health]
+    enabled alarms = !oom_kill !disk_space_usage *
+```
+
+:::warning
+
+Do **not** place `*` between exclusions (`!alert1 * !alert2 *` is incorrect — `*` matches everything immediately, preventing later exclusions from taking effect). All `!` patterns must come first, followed by a single `*`.
+
+:::
+
 You can also [edit the file where the alert is defined](#how-to-edit-health-configuration-files), comment out its definition, and [reload Netdata's health configuration](#how-to-reload-health-configuration).
 
 #### Silence Individual Alert Notifications
