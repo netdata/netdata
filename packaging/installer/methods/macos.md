@@ -69,6 +69,8 @@ Homebrew will place your Netdata configuration directory at `/usr/local/etc/netd
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/usr/local/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
 
+To connect this Agent to Netdata Cloud, see [Connect a Homebrew-installed Agent to Netdata Cloud](#connect-a-homebrew-installed-agent-to-netdata-cloud) below.
+
 ### For Apple Silicon
 
 To install Netdata and all its dependencies, run Homebrew using the following command:
@@ -81,59 +83,41 @@ Homebrew will place your Netdata configuration directory at `/opt/homebrew/etc/n
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/opt/homebrew/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
 
+To connect this Agent to Netdata Cloud, see [Connect a Homebrew-installed Agent to Netdata Cloud](#connect-a-homebrew-installed-agent-to-netdata-cloud) below.
+
 ### Connect a Homebrew-installed Agent to Netdata Cloud
 
-:::caution
+The easiest way to connect a Homebrew-installed Netdata Agent to Netdata Cloud is via the local dashboard UI, as described in [Method 1: Via UI](/src/claim/README.md#method-1-via-ui-recommended):
 
-Do **not** use the `netdata-claim.sh` script. It is deprecated and will be unsupported in the near future. Use the `claim.conf` method described below instead.
+1. Open the local dashboard in your browser at `http://localhost:19999` (or the Agent's IP address at port 19999).
+2. Sign in to your Netdata Cloud account.
+3. Click the **Connect** button and follow the on-screen instructions.
 
-:::
+For automated setups or headless machines where the UI is not accessible, you can use one of these alternatives:
 
-To connect a Homebrew-installed Netdata Agent to Netdata Cloud, create a `claim.conf` file in your Netdata configuration directory using the [configuration file method](/src/claim/README.md#method-2-via-configuration-file).
+- **Kickstart script claiming flags** — reinstall with `--claim-token` and `--claim-rooms`. See the [kickstart claiming section](#automatically-connect-to-netdata-cloud-during-installation) above or the full [kickstart documentation](/packaging/installer/methods/kickstart.md).
+- **Configuration file** — create a `claim.conf` file in your Netdata configuration directory using the [configuration file method](/src/claim/README.md#method-2-via-configuration-file).
 
-**Configuration directory paths:**
+**Configuration directory paths for `claim.conf`:**
 
 | Architecture | Path |
 |:--|:--|
 | Intel | `/usr/local/etc/netdata/claim.conf` |
 | Apple Silicon | `/opt/homebrew/etc/netdata/claim.conf` |
 
-Create the file with the following content, replacing the placeholder values with your Space token and Room keys:
-
-```bash
-[global]
-   url = https://app.netdata.cloud
-   token = YOUR_SPACE_TOKEN
-   rooms = ROOM1,ROOM2
-```
-
-Then set ownership to your own user and restrict permissions:
-
-```bash
-# Intel
-chown $(whoami):staff /usr/local/etc/netdata/claim.conf
-chmod 0640 /usr/local/etc/netdata/claim.conf
-
-# Apple Silicon
-chown $(whoami):staff /opt/homebrew/etc/netdata/claim.conf
-chmod 0640 /opt/homebrew/etc/netdata/claim.conf
-```
-
 :::note
 
-On macOS, Homebrew installs run under your user account and the `netdata` group does not exist. Use your own user and the `staff` group for file ownership instead.
+On macOS, Homebrew installs run under your user account and the `netdata` group does not exist. Use your own user and the `staff` group for file ownership when creating `claim.conf` manually. For full details on permissions and applying the configuration, see the [configuration file method](/src/claim/README.md#method-2-via-configuration-file).
 
 :::
 
-Apply the configuration by [restarting the Agent](/docs/netdata-agent/start-stop-restart.md) or running:
+:::caution
 
-```bash
-netdatacli reload-claiming-state
-```
+Do **not** use the `netdata-claim.sh` script. It is deprecated and will be unsupported in the near future.
 
-Verify the connection with `netdatacli aclk-state`. A successful claim shows `Claimed: Yes`.
+:::
 
-For the full list of configuration options and troubleshooting, see the [Connect Agent to Cloud](/src/claim/README.md) documentation.
+For the full list of claiming options and troubleshooting, see [Connect Agent to Cloud](/src/claim/README.md).
 
 ## Install Netdata from source
 
