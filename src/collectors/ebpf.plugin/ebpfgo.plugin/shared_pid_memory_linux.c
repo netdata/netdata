@@ -65,6 +65,16 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
     ctx->shm_fd = -1;
     ctx->sem = SEM_FAILED;
 
+    // Unlink both objects before recreating so consumers detect a new inode on the
+    // SHM segment.  The consumer side checks st_dev/st_ino on every refresh cycle;
+    // when the inode changes it closes its old semaphore handle and reopens, which
+    // means it will pick up the new semaphore instead of holding a stale one.
+    // Unlinking just the semaphore (as was done before) left the SHM inode unchanged,
+    // so consumers never knew to reopen and ended up using a different semaphore
+    // than the publisher — breaking mutual exclusion.
+    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
+    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
+
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
     if (ctx->shm_fd < 0)
         goto fail;
@@ -80,9 +90,6 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
         goto fail;
     }
 
-    // Drop any leftover semaphore from a previous (possibly crashed) run so
-    // sem_open honours the initial value instead of reusing stale state.
-    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
     ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
         goto fail;
