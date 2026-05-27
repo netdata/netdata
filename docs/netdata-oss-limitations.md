@@ -120,8 +120,8 @@ Dynamic Configuration requires a paid plan:
 
 The 5-node limit on multi-node dashboards applies to both **Anonymous** and **Community** users. You can:
 
-1. **Upgrade to a paid plan** for unlimited nodes in multi-node views
-2. **Select preferred nodes** in Space settings to choose which 5 nodes appear in multi-node views
+1. **Upgrade to a paid plan** for unlimited nodes in multi-node dashboards
+2. **Select preferred nodes** in Space settings to choose which 5 nodes appear in multi-node dashboards
 
 :::note
 
