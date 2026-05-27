@@ -123,7 +123,7 @@ Free users on standalone Agents have limited functionality — the UI is locked 
 
 ### Step 4: Access the Local Dashboard
 
-Open your browser and go to `http://localhost:19999`.
+See [Access Netdata Dashboard](#access-netdata-dashboard).
 
 :::caution
 
