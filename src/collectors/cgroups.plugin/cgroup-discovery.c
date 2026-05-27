@@ -24,6 +24,7 @@ struct cgroup *discovered_cgroup_root = NULL;
 char cgroup_chart_id_prefix[] = "cgroup_";
 char services_chart_id_prefix[] = "systemd_";
 const char *cgroups_rename_script = NULL;
+static DICTIONARY *discovery_walkdir_open_errors = NULL;
 
 // (legacy SHM globals removed — replaced by netipc in cgroup-netipc.c)
 
@@ -349,6 +350,18 @@ static inline struct cgroup *discovery_cgroup_find(const char *id) {
     return cg;
 }
 
+static inline bool discovery_walkdir_open_error_first(const char *dirpath) {
+    if (unlikely(!discovery_walkdir_open_errors))
+        discovery_walkdir_open_errors = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+
+    if (dictionary_get(discovery_walkdir_open_errors, dirpath))
+        return false;
+
+    uint8_t logged = 1;
+    dictionary_set(discovery_walkdir_open_errors, dirpath, &logged, sizeof(logged));
+    return true;
+}
+
 static int calc_cgroup_depth(const char *id) {
     int depth = 0;
     const char *s;
@@ -407,10 +420,16 @@ static inline int discovery_find_walkdir(const char *base, const char *dirpath) 
 
     DIR *dir = opendir(dirpath);
     if(!dir) {
-        if(errno == EACCES && strcmp(dirpath, base) != 0)
-            nd_log_collector(NDLP_DEBUG, "CGROUP: cannot open directory '%s': %s", dirpath, strerror(errno));
-        else
-            collector_error("CGROUP: cannot open directory '%s': %s", dirpath, strerror(errno));
+        int err = errno;
+        bool first_log_for_path = discovery_walkdir_open_error_first(dirpath);
+
+        if(err == EACCES && strcmp(dirpath, base) != 0) {
+            if (first_log_for_path)
+                nd_log_collector(NDLP_DEBUG, "CGROUP: cannot open directory '%s': %s", dirpath, strerror(err));
+        }
+        else if (first_log_for_path) {
+            collector_error("CGROUP: cannot open directory '%s': %s", dirpath, strerror(err));
+        }
         return ret;
     }
     ret = 1;
