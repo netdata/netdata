@@ -40,9 +40,21 @@ type fakeAPIClient struct {
 	metricsErrSites map[string]error
 	bgpErrSites     map[string]error
 	groupInterfaces []*bool
+	probeErr        error
+	probeCalls      int
+	lookupCalls     int
+	snapshotCalls   int
+	metricsCalls    int
+	bgpCalls        int
+}
+
+func (f *fakeAPIClient) Probe(context.Context, string) error {
+	f.probeCalls++
+	return f.probeErr
 }
 
 func (f *fakeAPIClient) LookupSites(_ context.Context, _ string, _ int64, from int64) (*catosdk.EntityLookup, error) {
+	f.lookupCalls++
 	if f.lookupErr != nil {
 		return nil, f.lookupErr
 	}
@@ -53,6 +65,7 @@ func (f *fakeAPIClient) LookupSites(_ context.Context, _ string, _ int64, from i
 }
 
 func (f *fakeAPIClient) AccountSnapshot(context.Context, string, []string) (*catosdk.AccountSnapshot, error) {
+	f.snapshotCalls++
 	if f.snapshotErr != nil {
 		return nil, f.snapshotErr
 	}
@@ -60,6 +73,7 @@ func (f *fakeAPIClient) AccountSnapshot(context.Context, string, []string) (*cat
 }
 
 func (f *fakeAPIClient) AccountMetrics(_ context.Context, _ string, siteIDs []string, _ string, _ int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error) {
+	f.metricsCalls++
 	if groupInterfaces == nil {
 		f.groupInterfaces = append(f.groupInterfaces, nil)
 	} else {
@@ -75,6 +89,7 @@ func (f *fakeAPIClient) AccountMetrics(_ context.Context, _ string, siteIDs []st
 }
 
 func (f *fakeAPIClient) SiteBgpStatus(_ context.Context, _ string, siteID string) ([]*catosdk.SiteBgpStatusResult, error) {
+	f.bgpCalls++
 	if f.bgpErrSites != nil {
 		if err := f.bgpErrSites[siteID]; err != nil {
 			return nil, err
@@ -376,32 +391,30 @@ func TestGroupInterfacesAutoUsesNilSDKArgument(t *testing.T) {
 	require.False(t, *cfg.groupInterfaces())
 }
 
-func TestCheckDoesNotPublishDryRunHealth(t *testing.T) {
+func TestCheckUsesOnlyCheapProbe(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.BGP.Enabled = "no"
-	c.client = newFixtureAPIClient()
+	fake := newFixtureAPIClient()
+	fake.metricsErrSites = map[string]error{"1001": errors.New("metrics should not be called")}
+	fake.bgpErrSites = map[string]error{"1001": errors.New("BGP should not be called")}
+	c.client = fake
 	c.now = fixedCatoTestNow
 
 	require.NoError(t, c.Init(context.Background()))
-	fake := c.client.(*fakeAPIClient)
-	fake.metricsErrSites = map[string]error{"1001": errors.New("dry-run metrics failed")}
 	require.NoError(t, c.Check(context.Background()))
 
-	fake.metricsErrSites = nil
-	cc := mustCycleController(t, c.store)
-	cc.BeginCycle()
-	require.NoError(t, c.Collect(context.Background()))
-	cc.CommitCycleSuccess()
-
-	reader := c.store.Read()
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationMetrics}, 1)
-	_, ok := reader.Value("collector_operation_failures_total", metrix.Labels{
-		"operation":   operationMetrics,
-		"error_class": "error",
-	})
+	require.Equal(t, 1, fake.probeCalls)
+	require.Zero(t, fake.lookupCalls)
+	require.Zero(t, fake.snapshotCalls)
+	require.Zero(t, fake.metricsCalls)
+	require.Zero(t, fake.bgpCalls)
+	require.Empty(t, c.discovery.siteIDs)
+	require.Empty(t, c.bgp.bySite)
+	_, ok := c.currentTopology()
 	require.False(t, ok)
+	require.Empty(t, c.health.OperationFailures)
+	require.Empty(t, c.health.CollectionFailureTotals)
 }
 
 func TestCheckDoesNotPopulateBGPCache(t *testing.T) {
@@ -417,6 +430,22 @@ func TestCheckDoesNotPopulateBGPCache(t *testing.T) {
 
 	require.Empty(t, c.bgp.bySite)
 	require.True(t, c.bgp.nextRefresh.IsZero())
+}
+
+func TestCheckPreservesProbeErrorCause(t *testing.T) {
+	c := New()
+	c.AccountID = "12345"
+	c.APIKey = "secret"
+	fake := newFixtureAPIClient()
+	fake.probeErr = context.Canceled
+	c.client = fake
+
+	require.NoError(t, c.Init(context.Background()))
+	err := c.Check(context.Background())
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, "canceled", classifyCatoError(err))
+	require.Contains(t, err.Error(), "Cato API probe failed")
 }
 
 func TestCollectorReportsUnknownTimeseriesLabels(t *testing.T) {
@@ -1291,6 +1320,29 @@ func TestSDKClientClassifiesHTTPClientTimeout(t *testing.T) {
 	}, 1)
 }
 
+func TestCollectReturnsContextCancellationWithoutHealthFailure(t *testing.T) {
+	c := New()
+	c.AccountID = "12345"
+	c.APIKey = "secret"
+	fake := newFixtureAPIClient()
+	fake.lookupErr = context.Canceled
+	c.client = fake
+
+	require.NoError(t, c.Init(context.Background()))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cc := mustCycleController(t, c.store)
+	cc.BeginCycle()
+	err := c.Collect(ctx)
+	cc.AbortCycle()
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.Empty(t, c.health.CollectionFailureTotals)
+	reader := c.store.Read()
+	requireMetricMissing(t, reader, "collector_collection_success", nil)
+}
+
 func TestCollectorSanitizesReturnedProviderErrors(t *testing.T) {
 	server := newRawCatoFixtureServerWithResponses(t, map[string]rawCatoResponse{
 		operationDiscovery: {
@@ -1309,12 +1361,13 @@ func TestCollectorSanitizesReturnedProviderErrors(t *testing.T) {
 	require.NoError(t, c.Init(context.Background()))
 	cc := mustCycleController(t, c.store)
 	cc.BeginCycle()
-	err := c.collect(context.Background(), true)
+	err := c.collect(context.Background())
 	cc.CommitCycleSuccess()
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "site discovery failed")
 	require.Contains(t, err.Error(), "error_class=auth")
+	require.Equal(t, "auth", classifyCatoError(err))
 	require.NotContains(t, err.Error(), "secret")
 	require.NotContains(t, err.Error(), "Unauthorized")
 }

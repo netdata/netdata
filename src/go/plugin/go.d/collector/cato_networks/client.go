@@ -19,6 +19,7 @@ import (
 )
 
 type apiClient interface {
+	Probe(ctx context.Context, accountID string) error
 	LookupSites(ctx context.Context, accountID string, limit, from int64) (*catosdk.EntityLookup, error)
 	AccountSnapshot(ctx context.Context, accountID string, siteIDs []string) (*catosdk.AccountSnapshot, error)
 	AccountMetrics(ctx context.Context, accountID string, siteIDs []string, timeFrame string, buckets int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error)
@@ -98,6 +99,16 @@ func hasCatoHeader(headers map[string]string, key string) bool {
 		}
 	}
 	return false
+}
+
+func (c *sdkAPIClient) Probe(ctx context.Context, accountID string) error {
+	limit := int64(1)
+	from := int64(0)
+	_, err := c.client.EntityLookup(ctx, accountID, catomodels.EntityTypeSite, &limit, &from, nil, nil, nil, nil, nil, nil)
+	if err != nil {
+		return fmt.Errorf("entityLookup: %w", err)
+	}
+	return nil
 }
 
 func (c *sdkAPIClient) LookupSites(ctx context.Context, accountID string, limit, from int64) (*catosdk.EntityLookup, error) {

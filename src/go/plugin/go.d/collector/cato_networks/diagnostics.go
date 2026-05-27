@@ -71,6 +71,39 @@ type normalizationIssueKey struct {
 	Issue   string
 }
 
+type errorClasser interface {
+	ErrorClass() string
+}
+
+type classifiedError struct {
+	message string
+	class   string
+	cause   error
+}
+
+func wrapCatoOperationError(message string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return classifiedError{
+		message: message + " failed",
+		class:   classifyCatoError(err),
+		cause:   err,
+	}
+}
+
+func (e classifiedError) Error() string {
+	return e.message + ", error_class=" + e.class
+}
+
+func (e classifiedError) Unwrap() error {
+	return e.cause
+}
+
+func (e classifiedError) ErrorClass() string {
+	return e.class
+}
+
 func (c *Collector) beginHealthCycle() {
 	c.ensureHealth()
 	c.health.CollectionSuccess = false
@@ -164,62 +197,13 @@ func (c *Collector) ensureHealth() {
 	}
 }
 
-func cloneCollectorHealth(src collectorHealth) collectorHealth {
-	dst := src
-	if src.SelectedEntities != nil {
-		dst.SelectedEntities = make(map[string]int64, len(src.SelectedEntities))
-		for k, v := range src.SelectedEntities {
-			dst.SelectedEntities[k] = v
-		}
-	}
-	if src.SkippedEntities != nil {
-		dst.SkippedEntities = make(map[entitySkipKey]int64, len(src.SkippedEntities))
-		for k, v := range src.SkippedEntities {
-			dst.SkippedEntities[k] = v
-		}
-	}
-	if src.CardinalityLimitHits != nil {
-		dst.CardinalityLimitHits = make(map[string]int64, len(src.CardinalityLimitHits))
-		for k, v := range src.CardinalityLimitHits {
-			dst.CardinalityLimitHits[k] = v
-		}
-	}
-	if src.LastOperations != nil {
-		dst.LastOperations = make(map[string]operationHealth, len(src.LastOperations))
-		for k, v := range src.LastOperations {
-			dst.LastOperations[k] = v
-		}
-	}
-	if src.OperationFailures != nil {
-		dst.OperationFailures = make(map[operationFailureKey]int64, len(src.OperationFailures))
-		for k, v := range src.OperationFailures {
-			dst.OperationFailures[k] = v
-		}
-	}
-	if src.OperationAffectedSites != nil {
-		dst.OperationAffectedSites = make(map[operationFailureKey]int64, len(src.OperationAffectedSites))
-		for k, v := range src.OperationAffectedSites {
-			dst.OperationAffectedSites[k] = v
-		}
-	}
-	if src.CollectionFailureTotals != nil {
-		dst.CollectionFailureTotals = make(map[string]int64, len(src.CollectionFailureTotals))
-		for k, v := range src.CollectionFailureTotals {
-			dst.CollectionFailureTotals[k] = v
-		}
-	}
-	if src.NormalizationIssues != nil {
-		dst.NormalizationIssues = make(map[normalizationIssueKey]int64, len(src.NormalizationIssues))
-		for k, v := range src.NormalizationIssues {
-			dst.NormalizationIssues[k] = v
-		}
-	}
-	return dst
-}
-
 func classifyCatoError(err error) string {
 	if err == nil {
 		return "none"
+	}
+	var classified errorClasser
+	if errors.As(err, &classified) {
+		return classified.ErrorClass()
 	}
 	if errors.Is(err, context.Canceled) {
 		return "canceled"

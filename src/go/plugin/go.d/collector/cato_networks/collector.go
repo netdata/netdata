@@ -109,14 +109,6 @@ type Collector struct {
 	now func() time.Time
 }
 
-type dryRunState struct {
-	health    collectorHealth
-	discovery discoveryState
-	bgp       bgpState
-	topology  *topology.Data
-	warnings  map[string]string
-}
-
 type discoveryState struct {
 	siteIDs           []string
 	siteNames         map[string]string
@@ -130,52 +122,6 @@ type bgpState struct {
 	bySite      map[string][]bgpPeerState
 	nextRefresh time.Time
 	nextIndex   int
-}
-
-func (c *Collector) snapshotDryRunState() dryRunState {
-	c.mu.RLock()
-	topo := c.topology
-	c.mu.RUnlock()
-	return dryRunState{
-		health:    cloneCollectorHealth(c.health),
-		discovery: cloneDiscoveryState(c.discovery),
-		bgp:       cloneBGPState(c.bgp),
-		topology:  topo,
-		warnings:  cloneStringMap(c.warningStates),
-	}
-}
-
-func (c *Collector) restoreDryRunState(state dryRunState) {
-	c.health = state.health
-	c.discovery = state.discovery
-	c.bgp = state.bgp
-	c.warningStates = state.warnings
-	c.mu.Lock()
-	c.topology = state.topology
-	c.mu.Unlock()
-}
-
-func cloneDiscoveryState(src discoveryState) discoveryState {
-	dst := src
-	dst.siteIDs = append([]string(nil), src.siteIDs...)
-	if src.siteNames != nil {
-		dst.siteNames = make(map[string]string, len(src.siteNames))
-		for k, v := range src.siteNames {
-			dst.siteNames[k] = v
-		}
-	}
-	return dst
-}
-
-func cloneBGPState(src bgpState) bgpState {
-	dst := src
-	if src.bySite != nil {
-		dst.bySite = make(map[string][]bgpPeerState, len(src.bySite))
-		for siteID, peers := range src.bySite {
-			dst.bySite[siteID] = append([]bgpPeerState(nil), peers...)
-		}
-	}
-	return dst
 }
 
 func (c *Collector) Configuration() any { return c.Config }
@@ -210,11 +156,20 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(ctx context.Context) error {
-	return c.collect(ctx, false)
+	if c.client == nil {
+		return errors.New("Cato client is not initialized")
+	}
+	if err := c.client.Probe(ctx, c.AccountID); err != nil {
+		return wrapCatoOperationError("Cato API probe", err)
+	}
+	return nil
 }
 
 func (c *Collector) Collect(ctx context.Context) error {
-	if err := c.collect(ctx, true); err != nil {
+	if err := c.collect(ctx); err != nil {
+		if ctxErr := contextErr(ctx); ctxErr != nil {
+			return ctxErr
+		}
 		c.warnRecoverable(warningKeyCollection, classifyCatoError(err), "collection failed, error_class=%s: %v", classifyCatoError(err), err)
 	} else {
 		c.clearRecoverableWarning(warningKeyCollection)
@@ -245,31 +200,26 @@ func (c *Collector) currentTopology() (*topology.Data, bool) {
 	return &data, true
 }
 
-func (c *Collector) collect(ctx context.Context, write bool) (err error) {
-	if !write {
-		previousState := c.snapshotDryRunState()
-		defer func() {
-			c.restoreDryRunState(previousState)
-		}()
-	}
+func (c *Collector) collect(ctx context.Context) (err error) {
 	c.beginHealthCycle()
-	if write {
-		defer func() {
-			c.health.CollectionSuccess = err == nil
-			c.updateSiteSelectionHealth()
-			if err != nil {
-				c.markCollectionFailure(err)
-			}
-			c.writeCollectorHealth()
-		}()
-	}
+	defer func() {
+		if contextErr(ctx) != nil {
+			return
+		}
+		c.health.CollectionSuccess = err == nil
+		c.updateSiteSelectionHealth()
+		if err != nil {
+			c.markCollectionFailure(err)
+		}
+		c.writeCollectorHealth()
+	}()
 
 	if c.client == nil {
 		return errors.New("Cato client is not initialized")
 	}
 
 	if err := c.refreshDiscovery(ctx, false); err != nil {
-		return fmt.Errorf("site discovery failed, error_class=%s", classifyCatoError(err))
+		return wrapCatoOperationError("site discovery", err)
 	}
 	if len(c.discovery.siteIDs) == 0 {
 		return errors.New("no Cato sites discovered")
@@ -277,7 +227,7 @@ func (c *Collector) collect(ctx context.Context, write bool) (err error) {
 
 	sites, order, err := c.collectSnapshot(ctx)
 	if err != nil {
-		return fmt.Errorf("account snapshot failed, error_class=%s", classifyCatoError(err))
+		return wrapCatoOperationError("account snapshot", err)
 	}
 	if len(sites) == 0 {
 		return errors.New("no Cato sites returned by account snapshot")
@@ -286,20 +236,16 @@ func (c *Collector) collect(ctx context.Context, write bool) (err error) {
 
 	if c.metricsEnabled() {
 		if err := c.collectMetrics(ctx, sites); err != nil {
-			if write {
-				c.warnRecoverable(warningKeyMetrics, classifyCatoError(err), "account metrics collection incomplete, error_class=%s", classifyCatoError(err))
-			}
-		} else if write {
+			c.warnRecoverable(warningKeyMetrics, classifyCatoError(err), "account metrics collection incomplete, error_class=%s", classifyCatoError(err))
+		} else {
 			c.clearRecoverableWarning(warningKeyMetrics)
 		}
 	}
 
 	if c.bgpEnabled() {
 		if err := c.collectBGP(ctx, sites, order); err != nil {
-			if write {
-				c.warnRecoverable(warningKeyBGP, classifyCatoError(err), "BGP status collection incomplete, error_class=%s", classifyCatoError(err))
-			}
-		} else if write {
+			c.warnRecoverable(warningKeyBGP, classifyCatoError(err), "BGP status collection incomplete, error_class=%s", classifyCatoError(err))
+		} else {
 			c.clearRecoverableWarning(warningKeyBGP)
 		}
 	}
@@ -316,20 +262,14 @@ func (c *Collector) collect(ctx context.Context, write bool) (err error) {
 	c.topology = topo
 	c.mu.Unlock()
 
-	if write {
-		c.writeMetrics(sites, order)
-	}
+	c.writeMetrics(sites, order)
 
 	return nil
 }
 
-func cloneStringMap(src map[string]string) map[string]string {
-	if src == nil {
+func contextErr(ctx context.Context) error {
+	if ctx == nil {
 		return nil
 	}
-	dst := make(map[string]string, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
+	return ctx.Err()
 }
