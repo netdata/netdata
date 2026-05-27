@@ -278,7 +278,7 @@ modules:
 
               After editing `docker.conf`, [restart the Netdata Agent](/docs/netdata-agent/start-stop-restart.md).
 
-              For more details on Docker SD service rules, see the [Service Discovery](#service-discovery) documentation.
+              For more details on Docker SD service rules, see the [Docker discovery documentation](/src/go/plugin/go.d/discovery/sdext/discoverer/dockersd/README.md#service-rules).
     alerts:
       - name: postgres_total_connection_utilization
         metric: postgres.connections_utilization
