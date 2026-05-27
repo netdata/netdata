@@ -344,6 +344,31 @@ Netdata can visualize StatsD collected metrics in two ways:
 
 Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). By default, Netdata creates private charts for all metrics.
 
+#### Private Chart Naming Convention
+
+When querying StatsD metrics via the Netdata API, you must use the chart identifier that Netdata constructs from the metric name — not the raw metric name you sent to StatsD. The chart identifier is built as follows:
+
+- **Chart type** = `statsd_<first_word>` — where `<first_word>` is the portion of the metric name before the first `.` or `_`.
+- **Chart id** = `<remaining>_<metric_type>` — where `<remaining>` is the portion after the first `.` or `_`, and `<metric_type>` is one of: `gauge`, `counter`, `meter`, `timer`, `histogram`, `set`, or `dictionary`. If the metric name has no `.` or `_`, the chart id is just the `<metric_type>`.
+- **Full chart reference** = `<chart_type>.<chart_id>` — use this as the `chart` parameter in API queries.
+
+| Metric sent | Metric type | Chart type | Chart ID | Full chart reference |
+|---|---|---|---|---|
+| `test.metric:100\|c` | counter | `statsd_test` | `metric_counter` | `statsd_test.metric_counter` |
+| `myapp.used_memory:12345\|g` | gauge | `statsd_myapp` | `used_memory_gauge` | `statsd_myapp.used_memory_gauge` |
+| `myapp.requests:50\|ms` | timer | `statsd_myapp` | `requests_timer` | `statsd_myapp.requests_timer` |
+
+> **Tip:** To discover the exact chart names available on your agent, run:
+>
+> ```bash
+> curl http://localhost:19999/api/v1/charts
+> ```
+>
+> Filter the results for IDs starting with `statsd_`. Use the returned chart `id` field (in `type.id` format) as the `chart` parameter in data queries.
+
+> **Troubleshooting "No metrics were matched to query":**
+> This error typically occurs when you use the raw StatsD metric name (e.g., `statsd.test.metric`) as the `chart` parameter instead of the constructed chart reference (e.g., `statsd_test.metric_counter`). To resolve this, verify the correct chart name using `/api/v1/charts` before querying metric data.
+
 Example: To create charts for all `myapp.*` metrics except `myapp.*.badmetric`:
 
 ```
