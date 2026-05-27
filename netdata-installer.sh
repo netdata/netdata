@@ -1006,7 +1006,7 @@ if [ "$(id -u)" -eq 0 ]; then
     capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-      if run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"; then
+      if run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip cap_net_bind_service=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"; then
         capabilities=1
       fi
     fi

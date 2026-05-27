@@ -46,7 +46,7 @@
                 },
                 "port": {
                   "title": "Port",
-                  "description": "UDP port number. Port 162 requires root or CAP_NET_BIND_SERVICE.",
+                  "description": "UDP port number. Port 162 requires CAP_NET_BIND_SERVICE or root. Netdata packages grant this capability to go.d.plugin and allow it in netdata.service.",
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 65535,
