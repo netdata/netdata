@@ -97,6 +97,8 @@ Copy the downloaded `.msi` file to the offline Windows system using a USB drive,
 
 Open a command prompt as Administrator and run a silent install **without** `TOKEN` or `ROOMS` parameters:
 
+```powershell
+msiexec /qn /i netdata-x64.msi
 ```
 
 :::note
