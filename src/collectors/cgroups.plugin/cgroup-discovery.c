@@ -31,6 +31,10 @@ static size_t discovery_walkdir_open_errors_count = 0;
 
 // (legacy SHM globals removed — replaced by netipc in cgroup-netipc.c)
 
+static RRDSET *cgroup_discovery_scans_st = NULL;
+static RRDDIM *cgroup_discovery_scans_natural_rd = NULL;
+static RRDDIM *cgroup_discovery_scans_opportunistic_rd = NULL;
+
 // ----------------------------------------------------------------------------
 
 static inline void free_pressure(struct pressure *res) {
@@ -1201,6 +1205,50 @@ static inline void discovery_find_all_cgroups() {
     netdata_log_debug(D_CGROUP, "done searching for cgroups");
 }
 
+static void discovery_run_all_cgroups(bool opportunistic)
+{
+    if (opportunistic)
+        __atomic_add_fetch(&cgroup_discovery_scans_opportunistic, 1, __ATOMIC_RELAXED);
+    else
+        __atomic_add_fetch(&cgroup_discovery_scans_natural, 1, __ATOMIC_RELAXED);
+
+    discovery_find_all_cgroups();
+}
+
+void cgroup_discovery_update_charts(int update_every)
+{
+    if (unlikely(!cgroup_discovery_scans_st)) {
+        cgroup_discovery_scans_st = rrdset_create_localhost(
+            "netdata",
+            "collector_cgroups_discovery_scans",
+            NULL,
+            "discovery",
+            "netdata.collector.cgroups.discovery.scans",
+            "cgroups Discovery Scans",
+            "scans/s",
+            PLUGIN_CGROUPS_NAME,
+            PLUGIN_CGROUPS_MODULE_CGROUPS_NAME,
+            NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 3002,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        cgroup_discovery_scans_natural_rd = rrddim_add(
+            cgroup_discovery_scans_st, "discovery_scans_natural", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        cgroup_discovery_scans_opportunistic_rd = rrddim_add(
+            cgroup_discovery_scans_st, "discovery_scans_opportunistic", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        cgroup_discovery_scans_st,
+        cgroup_discovery_scans_natural_rd,
+        (collected_number)__atomic_load_n(&cgroup_discovery_scans_natural, __ATOMIC_RELAXED));
+    rrddim_set_by_pointer(
+        cgroup_discovery_scans_st,
+        cgroup_discovery_scans_opportunistic_rd,
+        (collected_number)__atomic_load_n(&cgroup_discovery_scans_opportunistic, __ATOMIC_RELAXED));
+    rrdset_done(cgroup_discovery_scans_st);
+}
+
 void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
@@ -1229,17 +1277,35 @@ void cgroup_discovery_worker(void *ptr)
     cgroup_netipc_init();
     cgroup_netipc_lookup_init();
 
+    bool just_did_bounded_rescan = false;
+
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
         netdata_mutex_lock(&discovery_thread.mutex);
-        netdata_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
+        bool pending_lookup_signal = __atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE);
+        if (just_did_bounded_rescan) {
+            netdata_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
+            just_did_bounded_rescan = false;
+        }
+        else if (!pending_lookup_signal)
+            netdata_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
         netdata_mutex_unlock(&discovery_thread.mutex);
 
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
-        discovery_find_all_cgroups();
+        bool opportunistic = __atomic_exchange_n(&discovery_signal_pending, false, __ATOMIC_ACQUIRE);
+        discovery_run_all_cgroups(opportunistic);
+
+        if (unlikely(!service_running(SERVICE_COLLECTORS)))
+            break;
+
+        if (__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
+            opportunistic = __atomic_exchange_n(&discovery_signal_pending, false, __ATOMIC_ACQUIRE);
+            discovery_run_all_cgroups(opportunistic);
+            just_did_bounded_rescan = true;
+        }
     }
 
     // Stop the netipc server first so its worker threads cannot iterate cgroup_root while we free it.

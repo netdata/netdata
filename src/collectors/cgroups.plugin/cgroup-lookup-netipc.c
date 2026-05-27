@@ -9,6 +9,9 @@
 #define CGROUP_NETIPC_LOOKUP_SERVICE_NAME "cgroups-lookup"
 #define CGROUP_NETIPC_LOOKUP_WORKER_COUNT 2
 
+// Lock ordering invariant: lookup handlers release cgroup_root_mutex before signalling discovery_thread.
+// Never hold cgroup_root_mutex while acquiring discovery_thread.mutex.
+
 struct cgroup_lookup_reaped_entry {
     char *path;
     uint32_t hash;
@@ -49,6 +52,8 @@ static size_t cgroup_lookup_reaped_entries = 0;
 
 static uint64_t cgroup_lookup_requests_responded = 0;
 static uint64_t cgroup_lookup_requests_error = 0;
+static uint64_t cgroup_lookup_miss_signals_sent = 0;
+static uint64_t cgroup_lookup_miss_signals_coalesced = 0;
 static uint64_t cgroup_lookup_duration_le_1ms = 0;
 static uint64_t cgroup_lookup_duration_le_5ms = 0;
 static uint64_t cgroup_lookup_duration_le_10ms = 0;
@@ -61,6 +66,8 @@ static uint64_t cgroup_lookup_duration_gt_1000ms = 0;
 static RRDSET *cgroup_lookup_requests_st = NULL;
 static RRDDIM *cgroup_lookup_requests_responded_rd = NULL;
 static RRDDIM *cgroup_lookup_requests_error_rd = NULL;
+static RRDDIM *cgroup_lookup_miss_signals_sent_rd = NULL;
+static RRDDIM *cgroup_lookup_miss_signals_coalesced_rd = NULL;
 
 static RRDSET *cgroup_lookup_duration_st = NULL;
 static RRDDIM *cgroup_lookup_duration_le_1ms_rd = NULL;
@@ -307,6 +314,27 @@ static void cgroup_lookup_record_request(bool success, usec_t duration_ut)
         __atomic_add_fetch(&cgroup_lookup_duration_gt_1000ms, 1, __ATOMIC_RELAXED);
 }
 
+static void cgroup_lookup_record_signal(bool sent)
+{
+    if (sent)
+        __atomic_add_fetch(&cgroup_lookup_miss_signals_sent, 1, __ATOMIC_RELAXED);
+    else
+        __atomic_add_fetch(&cgroup_lookup_miss_signals_coalesced, 1, __ATOMIC_RELAXED);
+}
+
+bool cgroup_discovery_signal_if_unknown(void)
+{
+    bool was_pending = __atomic_exchange_n(&discovery_signal_pending, true, __ATOMIC_RELEASE);
+    if (was_pending)
+        return false;
+
+    netdata_mutex_lock(&discovery_thread.mutex);
+    netdata_cond_signal(&discovery_thread.cond_var);
+    netdata_mutex_unlock(&discovery_thread.mutex);
+
+    return true;
+}
+
 static void cgroup_lookup_log_overflow_once(uint64_t generation)
 {
     static _Atomic uint64_t last_logged_overflow_generation = 0;
@@ -332,6 +360,7 @@ static bool cgroups_lookup_handler(
     usec_t started_ut = now_monotonic_usec();
     struct cgroup_lookup_response_item *items = NULL;
     uint64_t generation;
+    bool should_signal_lookup_miss = false;
     bool success = false;
 
     if (request->item_count)
@@ -353,6 +382,7 @@ static bool cgroups_lookup_handler(
 
         if (generation == 0) {
             items[i].status = NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER;
+            should_signal_lookup_miss = true;
             continue;
         }
 
@@ -374,6 +404,7 @@ static bool cgroups_lookup_handler(
             items[i].status = NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT;
         } else {
             items[i].status = NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER;
+            should_signal_lookup_miss = true;
         }
     }
 
@@ -400,6 +431,9 @@ cleanup_locked:
         if (err != NIPC_OK)
             goto cleanup;
     }
+
+    if (should_signal_lookup_miss)
+        cgroup_lookup_record_signal(cgroup_discovery_signal_if_unknown());
 
     success = true;
 
@@ -520,6 +554,10 @@ void cgroup_netipc_lookup_update_charts(int update_every)
             cgroup_lookup_requests_st, "requests_responded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         cgroup_lookup_requests_error_rd = rrddim_add(
             cgroup_lookup_requests_st, "requests_error", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        cgroup_lookup_miss_signals_sent_rd = rrddim_add(
+            cgroup_lookup_requests_st, "lookup_miss_signals_sent", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        cgroup_lookup_miss_signals_coalesced_rd = rrddim_add(
+            cgroup_lookup_requests_st, "lookup_miss_signals_coalesced", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -530,6 +568,14 @@ void cgroup_netipc_lookup_update_charts(int update_every)
         cgroup_lookup_requests_st,
         cgroup_lookup_requests_error_rd,
         (collected_number)__atomic_load_n(&cgroup_lookup_requests_error, __ATOMIC_RELAXED));
+    rrddim_set_by_pointer(
+        cgroup_lookup_requests_st,
+        cgroup_lookup_miss_signals_sent_rd,
+        (collected_number)__atomic_load_n(&cgroup_lookup_miss_signals_sent, __ATOMIC_RELAXED));
+    rrddim_set_by_pointer(
+        cgroup_lookup_requests_st,
+        cgroup_lookup_miss_signals_coalesced_rd,
+        (collected_number)__atomic_load_n(&cgroup_lookup_miss_signals_coalesced, __ATOMIC_RELAXED));
     rrdset_done(cgroup_lookup_requests_st);
 
     if (unlikely(!cgroup_lookup_duration_st)) {

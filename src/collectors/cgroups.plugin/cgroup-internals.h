@@ -323,6 +323,8 @@ extern char services_chart_id_prefix[];
 extern netdata_mutex_t cgroup_root_mutex;
 
 void cgroup_discovery_worker(void *ptr);
+void cgroup_discovery_update_charts(int update_every);
+bool cgroup_discovery_signal_if_unknown(void);
 
 extern bool is_inside_k8s;
 extern long system_page_size;
@@ -350,7 +352,10 @@ extern int cgroup_root_count;
 extern int cgroup_root_max;
 extern int cgroup_max_depth;
 extern int cgroup_lookup_reaped_set_size;
+extern _Atomic bool discovery_signal_pending;
 extern _Atomic uint64_t cgroup_discovery_generation;
+extern _Atomic uint64_t cgroup_discovery_scans_natural;
+extern _Atomic uint64_t cgroup_discovery_scans_opportunistic;
 
 extern SIMPLE_PATTERN *enabled_cgroup_paths;
 extern SIMPLE_PATTERN *enabled_cgroup_names;

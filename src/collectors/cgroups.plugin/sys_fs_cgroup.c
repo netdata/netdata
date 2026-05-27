@@ -35,7 +35,10 @@ int cgroup_root_count = 0;
 int cgroup_root_max = 1000;
 int cgroup_max_depth = 0;
 int cgroup_lookup_reaped_set_size = 4096;
+_Atomic bool discovery_signal_pending = false;
 _Atomic uint64_t cgroup_discovery_generation = 0;
+_Atomic uint64_t cgroup_discovery_scans_natural = 0;
+_Atomic uint64_t cgroup_discovery_scans_opportunistic = 0;
 SIMPLE_PATTERN *enabled_cgroup_paths = NULL;
 SIMPLE_PATTERN *enabled_cgroup_names = NULL;
 SIMPLE_PATTERN *search_cgroup_paths = NULL;
@@ -1435,5 +1438,6 @@ void cgroups_main(void *ptr) {
         netdata_mutex_unlock(&cgroup_root_mutex);
 
         cgroup_netipc_lookup_update_charts(cgroup_update_every);
+        cgroup_discovery_update_charts(cgroup_update_every);
     }
 }

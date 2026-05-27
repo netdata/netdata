@@ -8,7 +8,9 @@ SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 RRDHOST *localhost = NULL;
 struct cgroup *cgroup_root = NULL;
 netdata_mutex_t cgroup_root_mutex;
+struct discovery_thread discovery_thread = { 0 };
 int cgroup_lookup_reaped_set_size = 4;
+_Atomic bool discovery_signal_pending = false;
 _Atomic uint64_t cgroup_discovery_generation = 0;
 
 int rrdlabels_walkthrough_read(
@@ -172,6 +174,16 @@ int main(void)
         goto cleanup_dir;
     }
 
+    if (netdata_mutex_init(&discovery_thread.mutex) != 0) {
+        fprintf(stderr, "failed to initialize discovery_thread.mutex\n");
+        goto cleanup_root_mutex;
+    }
+
+    if (netdata_cond_init(&discovery_thread.cond_var) != 0) {
+        fprintf(stderr, "failed to initialize discovery_thread.cond_var\n");
+        goto cleanup_discovery_mutex;
+    }
+
     struct cgroup retry_cgroup = {
         .id = (char *)retry_path,
         .name = (char *)"not-ready",
@@ -237,6 +249,39 @@ int main(void)
         !expect_item(&response, 3, missing_path, NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0))
         goto cleanup_client;
 
+    if (!__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "lookup miss did not arm discovery signal flag\n");
+        goto cleanup_client;
+    }
+
+    __atomic_store_n(&discovery_signal_pending, false, __ATOMIC_RELEASE);
+
+    nipc_str_view_t no_signal_paths[2] = {
+        paths[1],
+        paths[2],
+    };
+    err = nipc_client_call_cgroups_lookup(&client, no_signal_paths, 2, &response);
+    if (err != NIPC_OK) {
+        fprintf(stderr, "retry/reaped lookup call failed: %u\n", (unsigned int)err);
+        goto cleanup_client;
+    }
+
+    if (__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "present-unprocessed or reaped lookup incorrectly armed discovery signal flag\n");
+        goto cleanup_client;
+    }
+
+    err = nipc_client_call_cgroups_lookup(&client, paths, 4, &response);
+    if (err != NIPC_OK) {
+        fprintf(stderr, "second lookup call failed: %u\n", (unsigned int)err);
+        goto cleanup_client;
+    }
+
+    if (!__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "second lookup miss did not re-arm discovery signal flag\n");
+        goto cleanup_client;
+    }
+
     rc = 0;
 
 cleanup_client:
@@ -244,6 +289,10 @@ cleanup_client:
 cleanup_server:
     cgroup_lookup_set_cgroup_root_for_testing(NULL);
     cgroup_netipc_lookup_cleanup();
+    netdata_cond_destroy(&discovery_thread.cond_var);
+cleanup_discovery_mutex:
+    netdata_mutex_destroy(&discovery_thread.mutex);
+cleanup_root_mutex:
     netdata_mutex_destroy(&cgroup_root_mutex);
 cleanup_dir:
     (void)rmdir(temp_dir);
