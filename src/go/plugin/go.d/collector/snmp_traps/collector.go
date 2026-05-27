@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/netip"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -51,27 +52,30 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	listener          *Listener
-	trapWriter        TrapWriter
-	journalDir        string
-	store             metrix.CollectorStore
-	jobName           string
-	vnode             string
-	versions          map[SnmpVersion]struct{}
-	allowlist         *Allowlist
-	rateLimiter       *rateLimiter
-	engineBoots       *EngineBoots
-	localEngineID     *LocalEngineID
-	v3SecTable        *gosnmp.SnmpV3SecurityParametersTable
-	engineIDs         map[string]struct{}
-	overrides         map[string]*OverrideConfig
-	metrics           *perJobMetrics
-	reverseDNS        *reverseDNSResolver
-	reverseDNSEnabled bool
-	deduper           *trapDeduper
-	profileCacheHeld  bool
-	operatorMetrics   *operatorMetrics
-	dynamicChartYAML  string
+	listener           *Listener
+	trapWriter         TrapWriter
+	journalDir         string
+	store              metrix.CollectorStore
+	jobName            string
+	vnode              string
+	versions           map[SnmpVersion]struct{}
+	allowlist          *Allowlist
+	rateLimiter        *rateLimiter
+	engineBoots        *EngineBoots
+	localEngineID      *LocalEngineID
+	v3SecTable         *gosnmp.SnmpV3SecurityParametersTable
+	engineIDs          map[string]struct{}
+	dynamicEngineID    bool
+	dynamicEngineIDMax int
+	dynamicEngineIDReg *dynamicEngineIDRegistry
+	overrides          map[string]*OverrideConfig
+	metrics            *perJobMetrics
+	reverseDNS         *reverseDNSResolver
+	reverseDNSEnabled  bool
+	deduper            *trapDeduper
+	profileCacheHeld   bool
+	operatorMetrics    *operatorMetrics
+	dynamicChartYAML   string
 }
 
 func (c *Collector) Configuration() any {
@@ -101,7 +105,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 	v3Enabled := versionListContains(versions, "v3")
 
-	if err := validateUSMUsers(c.USMUsers); err != nil {
+	if err := validateUSMUsers(c.USMUsers, c.DynamicEngineID); err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
 	}
 
@@ -124,6 +128,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err := validateDedupConfig(c.Dedup); err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
 	}
+	if _, err := validateOTLPConfig(c.OTLP); err != nil {
+		return &dyncfgCodedError{err: err, code: 422}
+	}
 
 	if err := validateOverrides(c.Overrides); err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
@@ -135,8 +142,8 @@ func (c *Collector) Init(ctx context.Context) error {
 		if len(c.USMUsers) == 0 {
 			return &dyncfgCodedError{err: errors.New("SNMPv3 requires at least one usm_users entry"), code: 422}
 		}
-		if len(c.EngineIDWhitelist) == 0 {
-			return &dyncfgCodedError{err: errors.New("SNMPv3 requires engine_id_whitelist"), code: 422}
+		if !c.DynamicEngineID && len(c.EngineIDWhitelist) == 0 {
+			return &dyncfgCodedError{err: errors.New("SNMPv3 requires engine_id_whitelist when dynamic_engine_id_discovery is disabled"), code: 422}
 		}
 	}
 
@@ -204,15 +211,16 @@ func (c *Collector) Init(ctx context.Context) error {
 	var lid *LocalEngineID
 	var v3Table *gosnmp.SnmpV3SecurityParametersTable
 	var engineIDWhitelist map[string]struct{}
+	cleanupCreatedState := func() {}
 	if v3Enabled {
 		engineBootsExisted := engineStatePathExists(engineBootsPath(c.jobName))
 		localEngineIDExisted := engineStatePathExists(localEngineIDPath(c.jobName))
 		engineStateDirExisted := engineStatePathExists(engineBootsDir(c.jobName))
-		cleanupCreatedState := func() {
+		cleanupCreatedState = func() {
 			cleanupCreatedEngineState(c.jobName, !engineBootsExisted, !localEngineIDExisted, !engineStateDirExisted)
 		}
 
-		v3Table, err = buildSnmpV3SecurityTable(c.USMUsers)
+		v3Table, err = buildSnmpV3SecurityTable(c.USMUsers, c.DynamicEngineID)
 		if err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()
@@ -246,10 +254,21 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	overrides := buildOverrideMap(c.Overrides)
-	tw := newJournalTrapWriter(journalWriter, defaultQueueCapacity)
 	metrics := getJobMetrics(c.jobName)
+	var secondaryWriter TrapWriter
+	if c.OTLP.Enabled {
+		secondaryWriter, err = newOTLPTrapWriter(ctx, c.jobName, c.OTLP, metrics)
+		if err != nil {
+			removeJobMetrics(c.jobName)
+			cleanupCreatedState()
+			cleanupPreflight()
+			return &dyncfgCodedError{err: err, code: 422}
+		}
+	}
+	tw := newJournalTrapWriter(journalWriter, defaultQueueCapacity)
+	trapWriter := newFanoutTrapWriter(tw, secondaryWriter, metrics)
 	metrics.setDedupEnabled(c.Dedup.Enabled)
-	deduper := newTrapDeduper(c.jobName, c.Dedup, tw, metrics)
+	deduper := newTrapDeduper(c.jobName, c.Dedup, trapWriter, metrics)
 	if deduper != nil {
 		deduper.start()
 	}
@@ -263,10 +282,28 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.localEngineID = lid
 	c.v3SecTable = v3Table
 	c.engineIDs = engineIDWhitelist
+	c.dynamicEngineID = c.DynamicEngineID
+	c.dynamicEngineIDMax = c.DynamicEngineIDMax
+	if c.dynamicEngineIDMax == 0 {
+		c.dynamicEngineIDMax = defaultDynamicEngineIDMax
+	}
+	c.dynamicEngineIDReg = nil
+	if c.dynamicEngineID && v3Table != nil {
+		known := make(map[dynamicEngineIDKey]struct{})
+		for _, u := range c.USMUsers {
+			if u.EngineID != "" {
+				known[dynamicEngineIDKey{
+					engineIDHex: strings.ToLower(strings.TrimSpace(u.EngineID)),
+					username:    u.Username,
+				}] = struct{}{}
+			}
+		}
+		c.dynamicEngineIDReg = newDynamicEngineIDRegistry(v3Table, c.dynamicEngineIDMax, known, c.USMUsers)
+	}
 	c.overrides = overrides
 	c.metrics = metrics
 	c.listener = listener
-	c.trapWriter = tw
+	c.trapWriter = trapWriter
 	c.journalDir = journalWriter.JournalDirectory()
 	c.deduper = deduper
 	c.profileCacheHeld = true
@@ -354,6 +391,7 @@ func (c *Collector) collect(ctx context.Context) error {
 
 func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
 	decodePeerIP := peerIP
+	rateLimitChecked := false
 	if peer != nil {
 		srcAddr, ok := udpPeerAddr(peer)
 		if ok {
@@ -370,17 +408,37 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		return
 	}
 
-	pktCtx, err := DecodeTrap(data, decodePeerIP, c.v3SecTable)
+	pktCtx, err := c.decodeTrapWithSharedTable(data, decodePeerIP)
 	if err != nil {
 		dim := ClassifyDecodeError(err)
-		if shouldExtractEngineIDOnDecodeError(dim) {
-			engineIDHex, ok, extractErr := extractSNMPv3EngineIDHex(data)
-			if extractErr == nil && ok && !engineIDHexAllowed(engineIDHex, c.engineIDs) {
-				dim = "unknown_engine_id"
+		if c.v3SecTable != nil {
+			rawCtx, rawErr := extractRawV3Context(data)
+			if rawErr == nil && rawCtx != nil {
+				if c.dynamicEngineID && !rawCtx.reportable {
+					retryCtx, checked, dropped := c.tryDynamicRetry(data, decodePeerIP, peer, rawCtx)
+					rateLimitChecked = rateLimitChecked || checked
+					if dropped {
+						return
+					}
+					if retryCtx != nil {
+						pktCtx = retryCtx
+						err = nil
+					}
+				} else if rawCtx.discoveryProbe() && conn != nil && peer != nil {
+					c.sendDiscoveryReport(rawCtx, conn, peer)
+				}
 			}
 		}
-		c.incTrapError(dim)
-		return
+		if err != nil {
+			if shouldExtractEngineIDOnDecodeError(dim) {
+				engineIDHex, ok, extractErr := extractSNMPv3EngineIDHex(data)
+				if extractErr == nil && ok && !engineIDHexAllowed(engineIDHex, c.engineIDs) {
+					dim = "unknown_engine_id"
+				}
+			}
+			c.incTrapError(dim)
+			return
+		}
 	}
 
 	pdu := pktCtx.PDU
@@ -392,6 +450,10 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 
 	if pdu.Version != SnmpVersionV3 && !c.communityAllowed(pdu.Community) {
 		c.incTrapError("dropped_allowlist")
+		return
+	}
+
+	if !c.ensureDynamicEngineIDRegistered(pktCtx) {
 		return
 	}
 
@@ -422,7 +484,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		}
 	}
 
-	if c.rateLimiter != nil && peer != nil {
+	if c.rateLimiter != nil && peer != nil && !rateLimitChecked {
 		srcAddr, ok := udpPeerAddr(peer)
 		if ok {
 			allowed, mode := c.rateLimiter.Allow(srcAddr)
@@ -454,12 +516,18 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	if trapEntryHasUnresolvedTemplate(entry) {
 		c.incTrapError("template_unresolved")
 	}
-	admission, suppressed := c.deduper.Admit(entry, td, c.Dedup.KeyVarbinds)
-	if suppressed {
-		return
+	var admission dedupAdmission
+	if c.deduper != nil {
+		var suppressed bool
+		admission, suppressed = c.deduper.Admit(entry, td, c.Dedup.KeyVarbinds)
+		if suppressed {
+			return
+		}
 	}
 	if err := c.trapWriter.Write(entry); err != nil {
-		c.deduper.Rollback(admission)
+		if c.deduper != nil {
+			c.deduper.Rollback(admission)
+		}
 		c.incTrapError("journal_write_failed")
 		return
 	}

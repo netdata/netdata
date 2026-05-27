@@ -3,6 +3,7 @@
 package snmp_traps
 
 import (
+	"errors"
 	"net"
 	"strings"
 
@@ -49,19 +50,29 @@ func sendInformResponse(conn *net.UDPConn, peer *net.UDPAddr, pkt *gosnmp.SnmpPa
 	return err
 }
 
-func buildSnmpV3SecurityTable(users []USMUserConfig) (*gosnmp.SnmpV3SecurityParametersTable, error) {
+func buildSnmpV3SecurityTable(users []USMUserConfig, dynamicOpt ...bool) (*gosnmp.SnmpV3SecurityParametersTable, error) {
 	if len(users) == 0 {
 		return nil, nil
 	}
+	dynamic := len(dynamicOpt) > 0 && dynamicOpt[0]
 
 	tbl := gosnmp.NewSnmpV3SecurityParametersTable(trapDecodeLogger)
 
 	for _, u := range users {
 		authProto := snmpV3AuthProto(strings.ToLower(u.AuthProto))
 		privProto := snmpV3PrivProto(strings.ToLower(u.PrivProto))
-		engineID, err := parseEngineIDHex(u.EngineID)
-		if err != nil {
-			return nil, err
+
+		var engineID []byte
+		if u.EngineID != "" {
+			var err error
+			engineID, err = parseEngineIDHex(u.EngineID)
+			if err != nil {
+				return nil, err
+			}
+		} else if !dynamic {
+			return nil, errors.New("engine_id is required for static v3 jobs")
+		} else {
+			continue
 		}
 
 		sp := &gosnmp.UsmSecurityParameters{
@@ -148,4 +159,51 @@ func isEngineIDAllowed(sp gosnmp.SnmpV3SecurityParameters, whitelist map[string]
 	}
 	_, ok = whitelist[usp.AuthoritativeEngineID]
 	return ok
+}
+
+func sendDiscoveryReport(conn *net.UDPConn, peer *net.UDPAddr, engineBoots *EngineBoots, localEngineID []byte, msgID uint32) error {
+	if conn == nil || peer == nil {
+		return nil
+	}
+	if len(localEngineID) == 0 {
+		return nil
+	}
+
+	boots, engineTime := int64(0), uint32(0)
+	if engineBoots != nil {
+		boots, engineTime = engineBoots.Snapshot()
+	}
+
+	reportPkt := gosnmp.SnmpPacket{
+		Version:       gosnmp.Version3,
+		MsgFlags:      gosnmp.NoAuthNoPriv,
+		SecurityModel: gosnmp.UserSecurityModel,
+		PDUType:       gosnmp.Report,
+		MsgID:         msgID,
+		Variables: []gosnmp.SnmpPDU{
+			{
+				Name:  ".1.3.6.1.6.3.15.1.1.4.0",
+				Type:  gosnmp.Counter32,
+				Value: uint32(0),
+			},
+		},
+	}
+
+	reportPkt.SecurityParameters = &gosnmp.UsmSecurityParameters{
+		AuthoritativeEngineID: string(localEngineID),
+	}
+	if boots > 0 && boots <= maxSnmpEngineBoots {
+		if usp, ok := reportPkt.SecurityParameters.(*gosnmp.UsmSecurityParameters); ok {
+			usp.AuthoritativeEngineBoots = uint32(boots)
+			usp.AuthoritativeEngineTime = engineTime
+		}
+	}
+
+	data, err := reportPkt.MarshalMsg()
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.WriteToUDP(data, peer)
+	return err
 }

@@ -181,7 +181,7 @@ This decoupling means the hot path is not blocked by stdout back-pressure; if th
 
 ### v3 USM engine-ID discovery (opt-in, SOW-0038)
 
-Dynamic discovery for v3 Trap sender engine IDs follows the Splunk SC4SNMP pattern (`splunk-sc4snmp.md` §3.5; `traps.py:229-258`). Subclass the SNMP transport to peek at the raw bytes pre-parse, ASN.1-decode the SNMPv3 header to extract `engineID`+`username`, hot-register the pair, retry parse.
+Dynamic discovery for v3 Trap sender engine IDs follows the Splunk SC4SNMP pattern (`splunk-sc4snmp.md` §3.5; `traps.py:229-258`). The listener peeks at raw bytes pre-parse, BER-decodes the SNMPv3 header to extract `engineID` + `username` + `msgFlags`, retries parse with a per-packet temporary USM security table, and hot-registers the pair only after the retry authenticates and decodes a v3 Trap PDU.
 
 **This feature is opt-in (disabled by default)** because hot-registering arbitrary `(engineID, username)` pairs at runtime has security/correctness concerns:
 
@@ -190,7 +190,11 @@ Dynamic discovery for v3 Trap sender engine IDs follows the Splunk SC4SNMP patte
 
 Operators who genuinely need dynamic v3 Trap discovery enable it explicitly in plugin config; operators with a known set of devices enumerate sender engine IDs in plugin config (the safer default).
 
-This is separate from v3 INFORM receiver-local engine ID discovery. For confirmed-class INFORM messages, the receiver is authoritative; the sender authenticates against the receiver's local engine ID. SOW-0036 implements a configured-or-generated persisted `local_engine_id`. SOW-0038 owns the optional RFC 3414 Report responder that lets senders discover that local engine ID automatically.
+Dynamic registrations are in-memory per job and are not persisted across Agent restart or job reload. The listener logs and increments `unknown_engine_id` once per first accepted `(engineID, username)` pair during the job lifetime. The bounded registry is controlled by `dynamic_engine_id_max_pairs` (default 4096 when unset or 0); once full, new dynamic pairs are rejected with `unknown_engine_id` while existing pairs continue to work. Dynamic retry is skipped for reportable SNMPv3 messages so confirmed-class traffic, including INFORM discovery, cannot enter the Trap sender-registration path.
+
+When `dynamic_engine_id_discovery` is true, `engine_id_whitelist` must be empty and job creation fails if both are configured. Static whitelisting and dynamic discovery are separate operator modes: static jobs accept only configured sender engine IDs; dynamic jobs accept authenticated Trap sender engine IDs learned at runtime up to the cap. If a dynamic-mode `usm_users[].engine_id` is supplied, it is validated and may be preloaded as a known `(engineID, username)` pair for that user; otherwise the user entry is a credential template for dynamic pairs.
+
+This is separate from v3 INFORM receiver-local engine ID discovery. For confirmed-class INFORM messages, the receiver is authoritative; the sender authenticates against the receiver's local engine ID. SOW-0036 implements a configured-or-generated persisted `local_engine_id`. SOW-0038 owns the RFC 3414 Report responder that lets senders discover that local engine ID automatically for allowed v3 jobs. The Report responder is not separately configurable: after the source allowlist passes, reportable discovery probes with empty or malformed receiver authoritative engine IDs receive a Report PDU containing `usmStatsUnknownEngineIDs` (`1.3.6.1.6.3.15.1.1.4.0`), Netdata's local engine ID, and current `snmpEngineBoots`/time. Valid non-local engine IDs are not treated as discovery probes; they are rejected by the INFORM local-engine validation path.
 
 ## 6. Reception Surface
 
@@ -383,9 +387,10 @@ jobs:
     versions: [v1, v2c, v3]               # which SNMP versions this listener accepts
     communities: []                       # v1/v2c allowlist; empty = accept all
     usm_users: []                         # v3 USM users (each refs Netdata Secrets; passphrases min 8 chars)
-    engine_id_whitelist: []               # v3 Trap sender engine IDs (hex)
+    engine_id_whitelist: []               # v3 Trap sender engine IDs (hex); must be empty when dynamic_engine_id_discovery is true
     # local_engine_id: "0123456789abcdef01234567"  # optional v3 INFORM receiver engine ID; omitted = generated/persisted per job
     dynamic_engine_id_discovery: false    # v3 Trap sender engine ID discovery (opt-in, SOW-0038; see §5)
+    dynamic_engine_id_max_pairs: 4096      # 0/unset = default; maximum in-memory dynamic (engineID, username) pairs
     reverse_dns:
       enabled: false                       # reverse DNS enrichment (opt-in); cached/non-blocking only
     allowlist:
@@ -399,6 +404,14 @@ jobs:
       window_sec: 5
       cache_max_entries: 100000
       # key_varbinds default = [] meaning use (source_device, trap_OID) only
+    otlp:                                 # optional second backend — see §11b
+      enabled: false
+      endpoint: "http://127.0.0.1:4317"   # http/bare host:port = plaintext gRPC; https = TLS
+      headers: {}                         # optional OTLP metadata headers; values may use secret references
+      request_timeout: 5s
+      flush_interval: 200ms
+      batch_size: 512
+      queue_capacity: 10000
     retention:                            # per-job journal retention; see §11
       max_size: 10GB                      # default 10 GB total
       max_duration: null                  # null = no time-based eviction
@@ -452,6 +465,21 @@ Labels are free-form key-value pairs. Keys must match `[a-z][a-z0-9_]*` (lowerca
 Operators do NOT copy entire profiles to enable metrics or add labels. The profile remains the vendor's curated knowledge; per-installation choices are surgical edits in plugin config.
 
 If `dimension_from_varbind` references a varbind that can take unbounded values (MAC, IP, username, packet content), the plugin REJECTS the config at load with a clear error. The value must be a symbolic varbind name referenced by that trap definition, not a raw OID or an arbitrary file-scoped varbind. Cardinality discipline is structurally enforced: accepted dimension varbinds must be enum-backed with at most 64 values, boolean/truthvalue, or a numeric range with at most 64 values. At runtime, invalid values from otherwise bounded varbinds stay bounded too: unknown enum values collapse to `unknown`, numeric values outside the job-creation-time bounded range collapse to `out_of_range`, missing configured varbinds collapse to `<missing>`, and profile-reload metadata drift that would otherwise become unbounded collapses to `unknown`.
+
+### OTLP exporter config
+
+The `otlp:` block is per-job and disabled by default. When enabled, job creation preflights the OTLP gRPC endpoint before DynCfg apply succeeds: the plugin creates the gRPC client, waits for connection readiness within `request_timeout`, and sends an empty OTLP Logs `Export` request with configured headers. Connection failures, TLS/auth failures, missing LogsService support, invalid endpoints, invalid durations, invalid batch/queue sizes, or invalid header names fail job creation with HTTP 422; the listener is not reported as started.
+
+Endpoint syntax:
+
+- `http://host:port` means plaintext OTLP/gRPC.
+- `https://host:port` means TLS OTLP/gRPC using system trust roots.
+- bare `host:port` is accepted as plaintext OTLP/gRPC for local receivers such as Netdata's OTEL plugin and the OpenTelemetry Collector default.
+- Any other scheme or a URL path fails validation.
+
+`headers` is an optional string map converted to gRPC metadata. Header values may be go.d secret references; the existing go.d secret resolver resolves string values before the collector receives the config. Header values are never emitted as trap attributes or logged.
+
+The OTLP writer implements the same `TrapWriter` interface as the journal writer but is a secondary fan-out backend. The journal-direct writer remains authoritative; an OTLP enqueue/export failure increments `snmp.trap.errors.otlp_export_failed` and drops only the OTLP copy. Journal write failures still increment `journal_write_failed` and affect the primary trap persistence path.
 
 ## 8. OOB Catalog Strategy
 
@@ -929,7 +957,7 @@ This is one chart. Operator slices/dices via NIDL controls:
 | Aspect | Value |
 |---|---|
 | Instance | Per job (one instance per listener) |
-| Dimensions | `unknown_oid`, `decode_failed`, `template_unresolved`, `malformed_pdu`, `dropped_allowlist`, `rate_limited`, `auth_failures`, `usm_failures`, `unknown_engine_id`, `inform_response_failed`, `sanitized`, `profile_load_failed`, `journal_write_failed` |
+| Dimensions | `unknown_oid`, `decode_failed`, `template_unresolved`, `malformed_pdu`, `dropped_allowlist`, `rate_limited`, `auth_failures`, `usm_failures`, `unknown_engine_id`, `inform_response_failed`, `sanitized`, `profile_load_failed`, `journal_write_failed`, `otlp_export_failed` |
 | Unit | events/s (incremental counter) |
 | Labels | `job_name`, `hub`, possibly `source_device` where source is identifiable |
 | Node / vnode | Hub vnode |
@@ -941,11 +969,13 @@ Operators alert on these for pipeline health:
 - `template_unresolved > 0` → profile template references a varbind not present in incoming traps; fix profile or sender.
 - `dropped_allowlist > 0` sustained → policy drop before journaling: source CIDR miss, community miss, or SNMP version disabled for this listener.
 - `rate_limited > 0` → trap storm signal; investigate source.
-- `auth_failures` / `usm_failures` / `unknown_engine_id` > 0 → SNMPv3 misconfiguration on sender or whitelist on receiver.
+- `auth_failures` / `usm_failures` > 0 → SNMPv3 authentication, privacy, username, or USM configuration problem.
+- `unknown_engine_id` > 0 → in static mode, sender engine ID is missing from the receiver whitelist or the sender is misconfigured; in dynamic mode, the first increment for a newly accepted `(engineID, username)` pair is expected visibility with a spoofing advisory, while repeated/new rejected increments indicate cap exhaustion, invalid sender state, or an unauthorized/misconfigured sender.
 - `inform_response_failed > 0` → INFORM Response send failures; investigate UDP socket health.
 - `sanitized > 0` sustained → varbind values containing control characters being binary-encoded; investigate sender.
 - `profile_load_failed > 0` → operator-provided profile YAML failed to parse during DynCfg hot-reload (SOW-0037 M3); plugin continues with the previous profile index; operator must fix the bad YAML and reload.
 - `journal_write_failed > 0` → disk-full, permission, or filesystem error while writing to the per-job journal directory; trap is dropped, hot path continues (the writer never blocks).
+- `otlp_export_failed > 0` → the optional OTLP backend could not accept or export one or more trap records after the job had already started; the journal-direct path remains authoritative and continues independently. Investigate the configured OTLP receiver, network path, TLS/auth configuration, or queue sizing.
 
 ### Context 3: `snmp.trap.dedup_suppressed` (only when opt-in dedup is enabled on at least one job)
 
@@ -1102,7 +1132,7 @@ TrapWriter:
 Semantics:
 
 - **Fast `Write`** (returns when the backend has accepted ownership of the immutable entry into a bounded queue, not when it is durable; `Flush()` is the durability boundary) — the journal-direct backend serializes queued entries into the per-job journal files via the Go-compatible backend selected in SOW-0035 M1 (bypassing journald so the writer controls `_HOSTNAME` and other "trusted" fields). The OTLP writer batches internally (default 200ms flush window) and `Write` returns as soon as the entry is enqueued into the batch buffer.
-- **Hot-path non-blocking behavior** — `Write` must not perform blocking disk or network I/O on the decode hot path. If the backend queue is full or the writer is in a permanent failed state, `Write` returns an error; the caller increments `journal_write_failed` and drops the trap while the hot path continues.
+- **Hot-path non-blocking behavior** — `Write` must not perform blocking disk or network I/O on the decode hot path. If the primary journal backend queue is full or the writer is in a permanent failed state, `Write` returns an error; the caller increments `journal_write_failed` and drops the primary trap persistence path while the hot path continues. When the optional OTLP secondary backend cannot accept/export a record after job creation, the fan-out writer increments `otlp_export_failed` and drops only the OTLP copy; the journal copy remains authoritative.
 - **Ownership** — on successful `Write`, the caller transfers ownership of the `TrapEntry` to the writer and must not mutate maps, slices, or strings reachable from it. Reusing a `TrapEntry`, `Labels` map, `SummaryCounts.ByTrap` map, or `Varbinds` backing array after successful `Write` is a correctness bug unless the implementation deep-copies the reused data first. On failed `Write`, ownership does not transfer, but the caller still discards the entry and uses a fresh entry for the next trap. The writer must not retain references on an error return.
 - **Default queue / flush policy** — journal-direct writer queue defaults to 10,000 entries per job; queue-full and permanent writer failure are both drop-and-continue errors. The journal-direct writer flushes every 1s or 1,000 accepted entries, whichever comes first, and on `Flush()` / `Close()`.
 - **Backend-internal batching** — the interface does not expose batching. Each writer decides its own batching strategy.

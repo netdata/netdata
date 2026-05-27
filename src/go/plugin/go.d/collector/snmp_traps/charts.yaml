@@ -25,6 +25,7 @@ groups:
       - snmp_trap_errors_sanitized
       - snmp_trap_errors_profile_load_failed
       - snmp_trap_errors_journal_write_failed
+      - snmp_trap_errors_otlp_export_failed
       - snmp_trap_dedup_suppressed
     charts:
       - id: events
@@ -85,6 +86,8 @@ groups:
             name: profile_load_failed
           - selector: snmp_trap_errors_journal_write_failed
             name: journal_write_failed
+          - selector: snmp_trap_errors_otlp_export_failed
+            name: otlp_export_failed
       - id: dedup_suppressed
         title: SNMP trap dedup suppressed events
         context: dedup_suppressed

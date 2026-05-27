@@ -94,9 +94,9 @@
             },
             "engine_id": {
               "title": "Engine ID",
-              "description": "SNMPv3 authoritative engine ID in hex (e.g. 80001f8880e5a5c0d6c7b8a9).",
+              "description": "SNMPv3 authoritative engine ID in hex (e.g. 80001f8880e5a5c0d6c7b8a9). Required for static v3 jobs. May be omitted when dynamic_engine_id_discovery is enabled; if supplied under dynamic discovery, it is validated and used as a preconfigured known pair for that user.",
               "type": "string",
-              "pattern": "^[0-9A-Fa-f]{10,64}$"
+              "pattern": "^(|[0-9A-Fa-f]{10,64})$"
             },
             "auth_proto": {
               "title": "Authentication protocol",
@@ -121,12 +121,12 @@
               "type": "string"
             }
           },
-          "required": ["username", "engine_id"]
+          "required": ["username"]
         }
       },
       "engine_id_whitelist": {
         "title": "Engine ID Whitelist",
-        "description": "Static SNMPv3 engine IDs accepted by this listener for v3 Trap PDUs (hex strings). Required when v3 is enabled. Dynamic discovery is not part of this implementation.",
+        "description": "Static SNMPv3 engine IDs accepted by this listener for v3 Trap PDUs (hex strings). Required when v3 is enabled and dynamic_engine_id_discovery is disabled. Must be empty when dynamic_engine_id_discovery is enabled.",
         "type": ["array", "null"],
         "items": {
           "type": "string",
@@ -142,9 +142,16 @@
       },
       "dynamic_engine_id_discovery": {
         "title": "Dynamic engine ID discovery",
-        "description": "Reserved for a later implementation. Enabling it fails job creation.",
+        "description": "When enabled, the listener discovers v3 Trap sender engine IDs at runtime from raw SNMPv3 context, and hot-registers new (engineID, username) pairs after the retry authenticates and decodes a v3 Trap. Static engine_id_whitelist must be empty. Dynamic registrations are in-memory, capped by dynamic_engine_id_max_pairs, and not persisted across restarts. Discovery is skipped for reportable SNMPv3 messages so confirmed-class traffic cannot enter the sender-registration path.",
         "type": "boolean",
         "default": false
+      },
+      "dynamic_engine_id_max_pairs": {
+        "title": "Dynamic engine ID maximum pairs",
+        "description": "Maximum in-memory dynamic (engineID, username) pairs per job. When 0 or unset, uses the default of 4096. Once the cap is full, new dynamic pairs are rejected with an unknown_engine_id counter increment while existing pairs continue to work.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 4096
       },
       "reverse_dns": {
         "title": "Reverse DNS",
@@ -237,6 +244,60 @@
               "type": "string"
             },
             "default": []
+          }
+        }
+      },
+      "otlp": {
+        "title": "OTLP exporter",
+        "description": "Optional second backend that exports traps as OTLP/gRPC LogRecords. Disabled by default. When enabled, the collector preflights the receiver at job creation time.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "Enable OTLP/gRPC Logs export in addition to the journal-direct path.",
+            "type": "boolean",
+            "default": false
+          },
+          "endpoint": {
+            "title": "Endpoint",
+            "description": "OTLP/gRPC endpoint. http://host:port and bare host:port use plaintext gRPC; https://host:port uses TLS with system trust roots.",
+            "type": "string",
+            "default": "http://127.0.0.1:4317"
+          },
+          "headers": {
+            "title": "Headers",
+            "description": "Optional OTLP metadata headers. Values may use Netdata secret references. Header values are not emitted as trap attributes.",
+            "type": ["object", "null"],
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "request_timeout": {
+            "title": "Request timeout",
+            "description": "Timeout for OTLP connection preflight and export calls.",
+            "type": "string",
+            "default": "5s"
+          },
+          "flush_interval": {
+            "title": "Flush interval",
+            "description": "Maximum time to buffer OTLP records before an export attempt.",
+            "type": "string",
+            "default": "200ms"
+          },
+          "batch_size": {
+            "title": "Batch size",
+            "description": "Maximum OTLP LogRecords per export request. Set 0 or omit to use the default.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 512
+          },
+          "queue_capacity": {
+            "title": "Queue capacity",
+            "description": "Maximum OTLP records buffered per job. Set 0 or omit to use the default.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 10000
           }
         }
       },
@@ -354,6 +415,11 @@
     "dedup": {
       "key_varbinds": {
         "ui:listFlavour": "list"
+      }
+    },
+    "otlp": {
+      "headers": {
+        "ui:help": "Use secret references for bearer tokens or API keys where possible."
       }
     },
     "overrides": {

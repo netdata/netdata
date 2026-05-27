@@ -23,6 +23,7 @@ type trapErrors struct {
 	sanitized          uint64
 	profileLoadFailed  uint64
 	journalWriteFailed uint64
+	otlpExportFailed   uint64
 }
 
 type trapEvents struct {
@@ -145,6 +146,22 @@ func (m *perJobMetrics) incError(dim string) {
 		atomic.AddUint64(&m.errors.profileLoadFailed, 1)
 	case "journal_write_failed":
 		atomic.AddUint64(&m.errors.journalWriteFailed, 1)
+	case "otlp_export_failed":
+		atomic.AddUint64(&m.errors.otlpExportFailed, 1)
+	}
+}
+
+func (m *perJobMetrics) addError(dim string, n uint64) {
+	if n == 0 {
+		return
+	}
+	switch dim {
+	case "otlp_export_failed":
+		atomic.AddUint64(&m.errors.otlpExportFailed, n)
+	default:
+		for i := uint64(0); i < n; i++ {
+			m.incError(dim)
+		}
 	}
 }
 
@@ -210,6 +227,7 @@ func collectErrors(store metrix.CollectorStore, jobName string, m *perJobMetrics
 	meter.Counter("snmp_trap_errors_sanitized").ObserveTotal(float64(atomic.LoadUint64(&m.errors.sanitized)))
 	meter.Counter("snmp_trap_errors_profile_load_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.profileLoadFailed)))
 	meter.Counter("snmp_trap_errors_journal_write_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.journalWriteFailed)))
+	meter.Counter("snmp_trap_errors_otlp_export_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.otlpExportFailed)))
 }
 
 func collectDedup(store metrix.CollectorStore, jobName string, m *perJobMetrics) {

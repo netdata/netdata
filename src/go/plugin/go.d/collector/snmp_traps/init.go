@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	maxJobNameLen          = 64
-	minSNMPv3PassphraseLen = 8
+	maxJobNameLen             = 64
+	minSNMPv3PassphraseLen    = 8
+	defaultDynamicEngineIDMax = 4096
 )
 
 var defaultAllowlistCIDRs = []string{"0.0.0.0/0", "::/0"}
@@ -122,14 +123,21 @@ type usmUserKey struct {
 	engineID string
 }
 
-func validateUSMUsers(users []USMUserConfig) error {
+func validateUSMUsers(users []USMUserConfig, dynamicOpt ...bool) error {
+	dynamic := len(dynamicOpt) > 0 && dynamicOpt[0]
 	seen := make(map[usmUserKey]bool, len(users))
 	for i, u := range users {
 		if u.Username == "" {
 			return fmt.Errorf("usm_users[%d]: username is required", i)
 		}
-		if _, err := parseEngineIDHex(u.EngineID); err != nil {
-			return fmt.Errorf("usm_users[%d]: engine_id: %w", i, err)
+		if u.EngineID == "" {
+			if !dynamic {
+				return fmt.Errorf("usm_users[%d]: engine_id is required for static v3 jobs", i)
+			}
+		} else {
+			if _, err := parseEngineIDHex(u.EngineID); err != nil {
+				return fmt.Errorf("usm_users[%d]: engine_id: %w", i, err)
+			}
 		}
 		key := usmUserKey{
 			username: u.Username,
@@ -253,7 +261,12 @@ func validateRateLimit(cfg RateLimitConfig) error {
 
 func validateDeferredConfig(cfg Config) error {
 	if cfg.DynamicEngineID {
-		return errors.New("dynamic_engine_id_discovery is not implemented yet")
+		if len(cfg.EngineIDWhitelist) > 0 {
+			return errors.New("dynamic_engine_id_discovery and engine_id_whitelist are mutually exclusive; when dynamic discovery is enabled, engine_id_whitelist must be empty")
+		}
+	}
+	if cfg.DynamicEngineIDMax < 0 {
+		return fmt.Errorf("dynamic_engine_id_max_pairs must be non-negative, got %d", cfg.DynamicEngineIDMax)
 	}
 	return nil
 }

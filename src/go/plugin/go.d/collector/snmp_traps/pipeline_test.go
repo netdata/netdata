@@ -769,6 +769,7 @@ func TestCollectMetricsEmitsCounters(t *testing.T) {
 
 	incTrapEvents(jobName, "security")
 	incTrapError(jobName, "decode_failed")
+	getJobMetrics(jobName).addError("otlp_export_failed", 3)
 
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)
@@ -788,6 +789,9 @@ func TestCollectMetricsEmitsCounters(t *testing.T) {
 	}
 	if v, ok := store.Read().Value("snmp_trap_errors_decode_failed", labels); !ok || v != 1 {
 		t.Fatalf("errors decode_failed value = %v/%v, want 1/true", v, ok)
+	}
+	if v, ok := store.Read().Value("snmp_trap_errors_otlp_export_failed", labels); !ok || v != 3 {
+		t.Fatalf("errors otlp_export_failed value = %v/%v, want 3/true", v, ok)
 	}
 }
 
@@ -1168,10 +1172,38 @@ listen:
 		}
 	})
 
-	t.Run("deferred dynamic engine discovery", func(t *testing.T) {
+	t.Run("implemented dynamic engine discovery", func(t *testing.T) {
 		err := validateDeferredConfig(Config{DynamicEngineID: true})
+		if err != nil {
+			t.Fatalf("dynamic engine ID discovery should no longer be rejected as deferred: %v", err)
+		}
+	})
+
+	t.Run("dynamic engine discovery rejects static whitelist", func(t *testing.T) {
+		err := validateDeferredConfig(Config{DynamicEngineID: true, EngineIDWhitelist: []string{testEngineIDHex}})
 		if err == nil {
-			t.Fatal("expected error for dynamic engine ID discovery")
+			t.Fatal("expected error for dynamic engine ID discovery with engine_id_whitelist")
+		}
+	})
+
+	t.Run("dynamic engine discovery rejects negative max pairs", func(t *testing.T) {
+		err := validateDeferredConfig(Config{DynamicEngineIDMax: -1})
+		if err == nil {
+			t.Fatal("expected error for negative dynamic_engine_id_max_pairs")
+		}
+	})
+
+	t.Run("static USM user requires engine ID", func(t *testing.T) {
+		err := validateUSMUsers([]USMUserConfig{{Username: "testuser"}})
+		if err == nil {
+			t.Fatal("expected error for static USM user without engine_id")
+		}
+	})
+
+	t.Run("dynamic USM user may omit engine ID", func(t *testing.T) {
+		err := validateUSMUsers([]USMUserConfig{{Username: "testuser"}}, true)
+		if err != nil {
+			t.Fatalf("dynamic USM user should allow omitted engine_id: %v", err)
 		}
 	})
 
