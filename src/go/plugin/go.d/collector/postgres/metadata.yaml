@@ -259,19 +259,21 @@ modules:
               docker exec -it <container-name> psql -U <superuser> -c "CREATE USER netdata WITH PASSWORD 'postgres'; GRANT pg_monitor TO netdata;"
               ```
 
-              The password must match the Docker SD default DSN template password (`postgres`). If your PostgreSQL container sets `POSTGRES_PASSWORD` or another custom password for the superuser, use that as the `<superuser>` password when connecting.
+              The password must match the Docker SD default DSN template password (`postgres`). For production deployments, prefer Option B and use a strong, unique password instead of the stock `netdata:postgres` credentials.
+              If your PostgreSQL container sets `POSTGRES_PASSWORD` or another custom password for the superuser, use that as the `<superuser>` password when connecting.
 
               **Option B — Override the DSN template in docker.conf**
 
               Edit `/etc/netdata/go.d/sd/docker.conf` and customize the `postgres` service rule's `config_template` to use the correct credentials. For example, to use a different username and password:
 
               ```yaml
-              - id: "postgres"
-                match: '{{ or (eq .PrivatePort "5432") (match "sp" .Image "postgres postgres:* */postgres */postgres:* */postgresql */postgresql:*") }}'
-                config_template: |
-                  module: postgres
-                  name: docker_{{.Name}}
-                  dsn: postgres://<actual_user>:<actual_password>@{{.Address}}/postgres
+              services:
+                - id: "postgres"
+                  match: '{{ or (eq .PrivatePort "5432") (match "sp" .Image "postgres postgres:* */postgres */postgres:* */postgresql */postgresql:*") }}'
+                  config_template: |
+                    module: postgres
+                    name: docker_{{.Name}}
+                    dsn: postgres://<actual_user>:<actual_password>@{{.Address}}/postgres
               ```
 
               After editing `docker.conf`, [restart the Netdata Agent](/docs/netdata-agent/start-stop-restart.md).
