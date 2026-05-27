@@ -311,6 +311,14 @@ Changing the hostname does **not** change the Machine GUID, Node ID, or Claimed 
 
 :::
 
+:::warning
+
+**Do not use `NETDATA_HOSTNAME` as an environment variable to set the hostname.**
+
+`NETDATA_HOSTNAME` is an output variable set by the Netdata daemon at runtime for use by plugins and scripts — it is not an input configuration. The only supported method for renaming a node is the `hostname` setting in `netdata.conf`.
+
+:::
+
 The updated hostname propagates to Parent nodes and Netdata Cloud on the next connection.
 
 For virtual nodes, see [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity).
