@@ -237,13 +237,11 @@ modules:
         list:
           - name: "Docker: auto-discovered PostgreSQL containers fail with authentication errors"
             description: |
-              When the Netdata Agent runs in Docker, the Docker Service Discovery (SD) discoverer auto-detects PostgreSQL containers and creates collector jobs using the default DSN template `postgres://netdata:postgres@{{.Address}}/postgres`, defined in `/etc/netdata/go.d/sd/docker.conf`. If authentication fails, you will see errors like:
+              When the Netdata Agent runs in a Docker container with Docker Service Discovery enabled, it auto-detects PostgreSQL containers and creates data collection jobs for them. These auto-discovered jobs use a default DSN with the username `netdata` and password `postgres` (the full template is `postgres://netdata:postgres@{{.Address}}/postgres`, defined in `/etc/netdata/go.d/sd/docker.conf`). If the PostgreSQL container uses different credentials, authentication fails and you will see errors like:
 
               ```
               failed SASL auth: FATAL: password authentication failed for user "netdata" (SQLSTATE 28P01)
               ```
-
-              This happens because either the `netdata` user does not exist in the PostgreSQL container, or the password does not match the default `postgres` used in the DSN template.
 
               :::important
 
@@ -251,20 +249,23 @@ modules:
 
               :::
 
-              **Option A — Create the `netdata` user in each PostgreSQL container**
+              **Edit the auto-discovered job's credentials via Dynamic Configuration**
 
-              Run the following command inside each PostgreSQL container, replacing `<container-name>` with the actual container name and `<superuser>` with a PostgreSQL superuser (commonly `postgres`):
+              1. Go to the Netdata dashboard → **Nodes**.
+              2. Select the node running the Netdata container.
+              3. Navigate to **Collectors → Jobs** and locate the failed postgres job (it will show an error status).
+              4. Click on the failed job to open its configuration.
+              5. Update the **DSN** field with the correct username, password, and database for that PostgreSQL container (e.g., `postgres://actual_user:actual_password@172.30.0.2:5432/postgres`).
+              6. Click **Test** to verify the connection works.
+              7. Click **Submit** to save.
 
-              ```bash
-              docker exec -it <container-name> psql -U <superuser> -c "CREATE USER netdata WITH PASSWORD 'postgres'; GRANT pg_monitor TO netdata;"
-              ```
+              Repeat for each discovered PostgreSQL container that uses different credentials.
 
-              The password must match the Docker SD default DSN template password (`postgres`). For production deployments, prefer Option B and use a strong, unique password instead of the stock `netdata:postgres` credentials.
-              If your PostgreSQL container sets `POSTGRES_PASSWORD` or another custom password for the superuser, use that as the `<superuser>` password when connecting.
+              You do not need to create a new PostgreSQL user or modify `docker.conf` — simply updating the DSN in the auto-discovered job via Dynamic Configuration is sufficient.
 
-              **Option B — Override the DSN template in docker.conf**
+              **Alternative — Override the DSN template for all PostgreSQL containers**
 
-              Edit `/etc/netdata/go.d/sd/docker.conf` and customize the `postgres` service rule's `config_template` to use the correct credentials. For example, to use a different username and password:
+              If all your PostgreSQL containers share the same non-default credentials, you can edit `/etc/netdata/go.d/sd/docker.conf` and customize the `postgres` service rule's `config_template`:
 
               ```yaml
               services:
