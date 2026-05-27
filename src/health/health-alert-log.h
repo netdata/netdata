@@ -37,6 +37,16 @@ typedef struct health {
     bool use_summary_for_notifications;             // whether to use the summary field as a subject for notifications
     int32_t pending_transitions;                    // pending alert transitions to store
     uint64_t evloop_iteration;                      // the last health iteration that evaluated this host
+
+    // Per-host scheduling for parallel health processing
+    time_t next_run;                                // when this host should next be processed
+    bool processing;                                // true while health work is queued/running for this host
+
+    // Host registration with the health event loop. Set/cleared on the
+    // health loop thread by the ENABLE/DISABLE opcode handlers. Read by
+    // the main thread while building each tick's batch, so reads use
+    // acquire/release ordering.
+    bool evloop_registered;
 } HEALTH;
 
 #endif //NETDATA_HEALTH_ALERT_LOG_H

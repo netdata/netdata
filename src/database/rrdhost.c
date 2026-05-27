@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrd.h"
+#include "health/health_event_loop_uv.h"
 
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
@@ -508,6 +509,12 @@ RRDHOST *rrdhost_create(
             store_host_info_and_metadata(host);
         rrdhost_load_rrdcontext_data(host);
         ml_host_new(host);
+
+        // Register the host with the health event loop ready list. If the
+        // loop hasn't started yet (localhost is created early), the opcode
+        // will be dropped; the loop performs a one-time bootstrap scan on
+        // startup to pick up hosts created before it was ready.
+        health_enable_host_processing(host);
     } else
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
 
@@ -644,6 +651,12 @@ static void rrdhost_update(RRDHOST *host
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "Host %s is not in archived mode anymore",
                rrdhost_hostname(host));
+
+        // Host transitioned from archived to live — register it with the
+        // health event loop. rrdhost_create() only posts ENABLE for hosts
+        // that were non-archived at creation time, so every unarchive path
+        // must also post here.
+        health_enable_host_processing(host);
     }
 
     spinlock_unlock(&host->rrdhost_update_lock);
@@ -778,6 +791,27 @@ bool rrdhost_should_run_health(RRDHOST *host) {
 
 void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_SND_DISCONNECT_HOST_CLEANUP);
+
+    // Unregister from the health event loop ready list. This posts a DISABLE
+    // opcode; the handler unlinks from the list and clears evloop_registered
+    // so that any in-flight worker will not re-link the host in after_work_cb.
+    health_disable_host_processing(host);
+
+    // Wait for any in-flight health worker on this host to finish. The DISABLE
+    // opcode ran on the main health loop thread and guarantees no new work is
+    // queued for this host; we only need to drain an already-queued job.
+    // Bounded wait — do not block teardown forever if the loop is stuck.
+    {
+        size_t spins = 0;
+        const size_t max_spins = 600;  // ~60s at 100ms
+        while (__atomic_load_n(&host->health.processing, __ATOMIC_ACQUIRE) && spins++ < max_spins)
+            sleep_usec(100 * USEC_PER_MS);
+
+        if (spins >= max_spins)
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "HEALTH: timed out waiting for host '%s' health worker to finish; proceeding with teardown",
+                   rrdhost_hostname(host));
+    }
 
     rrdhost_pluginsd_send_chart_slots_free(host);
     rrdhost_pluginsd_receive_chart_slots_free(host);

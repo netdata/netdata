@@ -88,6 +88,8 @@ struct health_plugin_globals {
 
         int32_t run_at_least_every_seconds;
         int32_t postpone_alarms_during_hibernation_for_seconds;
+
+        size_t max_concurrent_workers;  // max parallel health processing workers (capped to CPU count)
     } config;
 
     struct {
@@ -104,6 +106,7 @@ int health_readfile(const char *filename, void *data, bool stock_config);
 int health_parse_db_lookup(size_t line, const char *filename, char *string, struct rrd_alert_config *ac);
 void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae);
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void);
+void health_notifications_init(void);
 
 void health_alarm_wait_for_execution(ALARM_ENTRY *ae);
 
@@ -120,11 +123,12 @@ void health_prototype_to_json(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, bool for_hash
 bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result);
 
 struct health_raised_summary;
+struct health_stmt_set;
 struct health_raised_summary *alerts_raised_summary_create(RRDHOST *host);
 void alerts_raised_summary_populate(struct health_raised_summary *hrm);
 void alerts_raised_summary_free(struct health_raised_summary *hrm);
-void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm);
-void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm);
+void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm, struct health_stmt_set *stmts);
+void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm, struct health_stmt_set *stmts);
 
 void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap);

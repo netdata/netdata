@@ -89,6 +89,18 @@ static void register_libuv_worker_jobs_internal(void) {
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
 
+    // health (per-host alert processing on worker threads)
+    worker_register_job_name(UV_EVENT_HEALTH_HOST_LOCK, "health host lock");
+    worker_register_job_name(UV_EVENT_HEALTH_DB_QUERY, "health db lookup");
+    worker_register_job_name(UV_EVENT_HEALTH_CALC_EVAL, "health calc eval");
+    worker_register_job_name(UV_EVENT_HEALTH_WARNING_EVAL, "health warning eval");
+    worker_register_job_name(UV_EVENT_HEALTH_CRITICAL_EVAL, "health critical eval");
+    worker_register_job_name(UV_EVENT_HEALTH_ALARM_LOG_ENTRY, "health alert log entry");
+    worker_register_job_name(UV_EVENT_HEALTH_ALARM_LOG_PROCESS, "health alert log process");
+    worker_register_job_name(UV_EVENT_HEALTH_ALARM_LOG_QUEUE, "health alert log queue");
+    worker_register_job_name(UV_EVENT_HEALTH_DELAYED_INIT_RRDSET, "health rrdset init");
+    worker_register_job_name(UV_EVENT_HEALTH_CLEANUP, "health log cleanup");
+
     // maintenance
     worker_register_job_name(UV_EVENT_CLEANUP_OBSOLETE_CHARTS, "cleanup obsolete charts");
     worker_register_job_name(UV_EVENT_ARCHIVE_CHART_DIMENSIONS, "archive chart dimensions");
