@@ -291,7 +291,7 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 	stop := make(chan struct{})
 
 	var wg sync.WaitGroup
-	if handle.AppsEnabled {
+	if handle.AppsEnabled || handle.CgroupsEnabled {
 		store := NewCachestatSharedMemoryStore()
 		wg.Add(1)
 		go func() {
