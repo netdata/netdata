@@ -22,7 +22,6 @@ type apiClient interface {
 	LookupSites(ctx context.Context, accountID string, limit, from int64) (*catosdk.EntityLookup, error)
 	AccountSnapshot(ctx context.Context, accountID string, siteIDs []string) (*catosdk.AccountSnapshot, error)
 	AccountMetrics(ctx context.Context, accountID string, siteIDs []string, timeFrame string, buckets int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error)
-	EventsFeed(ctx context.Context, accountID string, marker *string) (*catosdk.EventsFeed, error)
 	SiteBgpStatus(ctx context.Context, accountID, siteID string) ([]*catosdk.SiteBgpStatusResult, error)
 }
 
@@ -149,29 +148,6 @@ func (c *sdkAPIClient) AccountMetrics(ctx context.Context, accountID string, sit
 			nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 			nil, nil, &accountID, nil, timeFrame, groupInterfaces, nil,
 		)
-		res = v
-		return err
-	})
-	return res, err
-}
-
-func (c *sdkAPIClient) EventsFeed(ctx context.Context, accountID string, marker *string) (*catosdk.EventsFeed, error) {
-	fields := []catomodels.EventFieldName{
-		catomodels.EventFieldNameEventID,
-		catomodels.EventFieldNameEventType,
-		catomodels.EventFieldNameEventSubType,
-		catomodels.EventFieldNameSeverity,
-		catomodels.EventFieldNameStatus,
-		catomodels.EventFieldNamePopName,
-		catomodels.EventFieldNameSrcSiteID,
-		catomodels.EventFieldNameSrcSiteName,
-		catomodels.EventFieldNameDestSiteID,
-		catomodels.EventFieldNameDestSiteName,
-	}
-
-	var res *catosdk.EventsFeed
-	err := c.withRetry(ctx, "eventsFeed", func() error {
-		v, err := c.client.EventsFeed(ctx, fields, []string{accountID}, nil, marker)
 		res = v
 		return err
 	})

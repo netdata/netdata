@@ -102,18 +102,3 @@ type bgpPeerState struct {
 	RoutesCountLimitExceeded bool
 	RIBOutRoutes             int64
 }
-
-type eventCount struct {
-	EventType    string
-	EventSubType string
-	Severity     string
-	Status       string
-	Count        int64
-}
-
-type eventKey struct {
-	EventType    string
-	EventSubType string
-	Severity     string
-	Status       string
-}

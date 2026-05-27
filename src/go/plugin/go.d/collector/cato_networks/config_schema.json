@@ -155,44 +155,6 @@
           }
         }
       },
-      "events": {
-        "title": "Events",
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "title": "Collect events",
-            "description": "Controls marker-based eventsFeed collection.",
-            "type": "string",
-            "enum": [
-              "auto",
-              "enabled",
-              "disabled"
-            ],
-            "default": "auto"
-          },
-          "marker_file": {
-            "title": "Events marker file",
-            "description": "Optional explicit file path used to persist the eventsFeed marker. Set this when multiple jobs intentionally monitor the same account, endpoint, and vnode independently.",
-            "type": "string"
-          },
-          "max_pages_per_cycle": {
-            "title": "Maximum EventsFeed pages per cycle",
-            "description": "Maximum marker pages drained from eventsFeed during one collection cycle.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 100,
-            "default": 10
-          },
-          "max_cardinality": {
-            "title": "Maximum event series",
-            "description": "Maximum unique event type/subtype/severity/status series before excess events are collapsed into an other bucket.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10000,
-            "default": 50
-          }
-        }
-      },
       "bgp": {
         "title": "BGP",
         "type": "object",

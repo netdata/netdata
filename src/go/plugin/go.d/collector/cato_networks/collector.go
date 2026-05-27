@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -96,11 +94,6 @@ type Collector struct {
 	client     apiClient
 	newClient  func(Config, *http.Client) (apiClient, error)
 
-	markerStore eventsMarkerPersistence
-	eventMarker string
-
-	markerStoreAvailable bool
-
 	mu       sync.RWMutex
 	topology *topology.Data
 
@@ -114,11 +107,6 @@ type Collector struct {
 	warningStates    map[string]string
 
 	now func() time.Time
-}
-
-type eventsMarkerPersistence interface {
-	read() (string, error)
-	write(string) error
 }
 
 type dryRunState struct {
@@ -213,19 +201,6 @@ func (c *Collector) Init(context.Context) error {
 			return fmt.Errorf("init Cato client: %w", err)
 		}
 		c.client = client
-	}
-
-	c.markerStore = newEventsMarkerStore(c.Events.MarkerFile, c.AccountID, c.URL, c.Vnode)
-	c.markerStoreAvailable = c.markerStore != nil
-	if c.markerStore != nil {
-		marker, err := c.markerStore.read()
-		if err != nil {
-			c.markerStoreAvailable = false
-			c.Warningf("events marker read failed, continuing without persisted marker: %v", err)
-		}
-		c.eventMarker = marker
-	} else if c.eventsEnabled() {
-		c.Warningf("events marker persistence disabled because Netdata varlib is unavailable and events.marker_file is not configured; events counters may reset across restarts")
 	}
 
 	c.discovery = discoveryState{}
@@ -331,18 +306,6 @@ func (c *Collector) collect(ctx context.Context, write bool) (err error) {
 
 	c.applyEntityControls(sites, &order)
 
-	var events eventsCollection
-	if write && c.eventsEnabled() {
-		events, err = c.collectEvents(ctx)
-		if err != nil {
-			c.warnRecoverable(warningKeyEvents, classifyCatoError(err), "events feed collection incomplete, error_class=%s", classifyCatoError(err))
-		} else {
-			c.clearRecoverableWarning(warningKeyEvents)
-			c.clearRecoverableWarning(warningKeyEventAccountErr)
-			c.health.MarkerPersistenceAvailable = c.markerStoreAvailable
-		}
-	}
-
 	now := c.now()
 	var topo *topology.Data
 	if c.topologyEnabled() {
@@ -354,53 +317,10 @@ func (c *Collector) collect(ctx context.Context, write bool) (err error) {
 	c.mu.Unlock()
 
 	if write {
-		c.writeMetrics(sites, order, events.counts)
-		c.commitEventsMarker(ctx, events.marker)
+		c.writeMetrics(sites, order)
 	}
 
 	return nil
-}
-
-func (c *Collector) commitEventsMarker(ctx context.Context, marker string) {
-	marker = strings.TrimSpace(marker)
-	if marker == "" {
-		return
-	}
-	c.eventMarker = marker
-	if c.markerStore == nil {
-		return
-	}
-	if err := c.writeEventsMarkerWithRetry(ctx, marker); err != nil {
-		c.markerStoreAvailable = false
-		c.health.MarkerPersistenceAvailable = false
-		c.markOperationFailure(operationEventMarker, err)
-		c.warnRecoverable(warningKeyEventMarker, classifyCatoError(err), "events marker write failed, error_class=%s", classifyCatoError(err))
-		return
-	}
-	c.markerStoreAvailable = true
-	c.health.MarkerPersistenceAvailable = true
-	c.markOperationSuccess(operationEventMarker)
-	c.clearRecoverableWarning(warningKeyEventMarker)
-}
-
-func (c *Collector) writeEventsMarkerWithRetry(ctx context.Context, marker string) error {
-	attempts := c.Retry.Attempts
-	if attempts <= 0 {
-		attempts = 1
-	}
-	var err error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		if err = c.markerStore.write(marker); err == nil {
-			return nil
-		}
-		if attempt == attempts || !isRetryableMarkerWriteError(err) {
-			return err
-		}
-		if sleepErr := sleepContext(ctx, retryWait(c.Retry.WaitMin.Duration(), c.Retry.WaitMax.Duration(), attempt)); sleepErr != nil {
-			return sleepErr
-		}
-	}
-	return err
 }
 
 func cloneStringMap(src map[string]string) map[string]string {
@@ -412,15 +332,4 @@ func cloneStringMap(src map[string]string) map[string]string {
 		dst[k] = v
 	}
 	return dst
-}
-
-func isRetryableMarkerWriteError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if os.IsTimeout(err) {
-		return true
-	}
-	var temporary interface{ Temporary() bool }
-	return errors.As(err, &temporary) && temporary.Temporary()
 }

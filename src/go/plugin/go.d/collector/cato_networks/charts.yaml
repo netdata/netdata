@@ -315,7 +315,6 @@ groups:
       - collector_selected_entities
       - collector_skipped_entities
       - collector_cardinality_limit_hit
-      - collector_events_marker_persistence_available
       - collector_bgp_sites_per_collection
       - collector_bgp_full_scan_seconds
       - collector_bgp_cached_sites
@@ -324,7 +323,6 @@ groups:
       - collector_operation_affected_sites_total
       - collector_collection_failures_total
       - collector_normalization_issues_total
-      - events_total
       - api_rate_limit_retries_total
       - api_transient_retries_total
     charts:
@@ -380,14 +378,6 @@ groups:
         dimensions:
           - selector: collector_cardinality_limit_hit
             name: hit
-      - id: collector_events_marker_persistence_status
-        title: Cato collector events marker persistence status
-        context: collector_events_marker_persistence_status
-        units: status
-        type: line
-        dimensions:
-          - selector: collector_events_marker_persistence_available
-            name: available
       - id: collector_bgp_scan_window
         title: Cato collector BGP full scan window
         context: collector_bgp_scan_window
@@ -466,18 +456,6 @@ groups:
         dimensions:
           - selector: collector_normalization_issues_total
             name: issues
-      - id: events
-        title: Cato events
-        context: events
-        units: events/s
-        type: line
-        instances:
-          by_labels: [event_type, event_sub_type, severity, status]
-        lifecycle:
-          expire_after_cycles: 5
-        dimensions:
-          - selector: events_total
-            name: events
       - id: api_retries
         title: Cato API retries
         context: api_retries

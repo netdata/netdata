@@ -27,7 +27,7 @@ modules:
         metrics_description: |
           This collector monitors Cato Networks accounts through the Cato GraphQL API.
 
-          It discovers sites, collects site and interface status, traffic and quality metrics, consumes marker-based events, collects BGP peer status, and exposes Cato site/PoP/BGP topology data.
+          It discovers sites, collects site and interface status, traffic and quality metrics, collects BGP peer status, and exposes Cato site/PoP/BGP topology data.
         method_description: |
           The collector uses the Cato GraphQL API endpoint with an account ID and API key.
       supported_platforms:
@@ -36,7 +36,7 @@ modules:
       multi_instance: true
       additional_permissions:
         description: |
-          A Cato API key with permission to read account snapshot, account metrics, events feed, entity lookup, and site BGP status data is required.
+          A Cato API key with permission to read account snapshot, account metrics, entity lookup, and site BGP status data is required.
       default_behavior:
         auto_detection:
           description: |
@@ -153,26 +153,6 @@ modules:
               default_value: 50
               required: false
               group: Metrics
-            - name: events.enabled
-              description: Controls marker-based eventsFeed collection. One of auto, enabled, disabled.
-              default_value: auto
-              required: false
-              group: Events
-            - name: events.marker_file
-              description: Optional explicit file path used to persist the eventsFeed marker. Set this when multiple jobs intentionally monitor the same account, endpoint, and vnode independently.
-              default_value: ""
-              required: false
-              group: Events
-            - name: events.max_pages_per_cycle
-              description: Maximum marker pages drained from eventsFeed during one collection cycle.
-              default_value: 10
-              required: false
-              group: Events
-            - name: events.max_cardinality
-              description: Maximum unique event type/subtype/severity/status series before excess events are collapsed into an other bucket.
-              default_value: 50
-              required: false
-              group: Events
             - name: bgp.enabled
               description: Controls siteBgpStatus collection. One of auto, enabled, disabled.
               default_value: auto
@@ -251,10 +231,6 @@ modules:
       - name: cato_networks_collector_collection_failed
         metric: cato_networks.collector_collection_status
         info: "Cato Networks collector is failing to complete collection"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
-      - name: cato_networks_collector_events_marker_persistence_unavailable
-        metric: cato_networks.collector_events_marker_persistence_status
-        info: "Cato Networks events are enabled but the collector cannot persist the EventsFeed marker"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
       - name: cato_networks_collector_cardinality_limit_hit
         metric: cato_networks.collector_cardinality_limit_status
@@ -464,12 +440,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: sites
-            - name: cato_networks.collector_events_marker_persistence_status
-              description: Events marker persistence availability.
-              unit: status
-              chart_type: line
-              dimensions:
-                - name: available
             - name: cato_networks.collector_bgp_scan_window
               description: Estimated time required to refresh BGP status for all discovered sites.
               unit: seconds
@@ -581,24 +551,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: issues
-        - name: event
-          description: These metrics refer to Cato events. When the configured cardinality cap is exceeded, excess event combinations are collapsed into the other bucket.
-          labels:
-            - name: event_type
-              description: Cato event type.
-            - name: event_sub_type
-              description: Cato event subtype.
-            - name: severity
-              description: Cato event severity.
-            - name: status
-              description: Cato event status.
-          metrics:
-            - name: cato_networks.events
-              description: Cato events.
-              unit: events/s
-              chart_type: line
-              dimensions:
-                - name: events
         - name: api query
           description: These metrics refer to Cato API query retries.
           labels:

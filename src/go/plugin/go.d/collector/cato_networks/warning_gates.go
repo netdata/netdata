@@ -3,13 +3,10 @@
 package cato_networks
 
 const (
-	warningKeyCollection      = "collection"
-	warningKeyDiscoveryCache  = "discovery_cache"
-	warningKeyMetrics         = "metrics"
-	warningKeyBGP             = "bgp"
-	warningKeyEvents          = "events"
-	warningKeyEventMarker     = "event_marker"
-	warningKeyEventAccountErr = "event_account_error"
+	warningKeyCollection     = "collection"
+	warningKeyDiscoveryCache = "discovery_cache"
+	warningKeyMetrics        = "metrics"
+	warningKeyBGP            = "bgp"
 )
 
 func (c *Collector) warnRecoverable(key, class, format string, args ...any) {

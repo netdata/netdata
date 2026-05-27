@@ -23,7 +23,7 @@ type trafficMetricWriters struct {
 	lastMileLoss    metrix.SnapshotGaugeVec
 }
 
-func (c *Collector) writeMetrics(sites map[string]*siteState, order []string, events []eventCount) {
+func (c *Collector) writeMetrics(sites map[string]*siteState, order []string) {
 	siteVec := c.store.Write().SnapshotMeter("").Vec("site_id", "site_name", "pop_name")
 	siteConnected := siteVec.Gauge("site_connectivity_connected")
 	siteDisconnected := siteVec.Gauge("site_connectivity_disconnected")
@@ -127,13 +127,6 @@ func (c *Collector) writeMetrics(sites map[string]*siteState, order []string, ev
 		}
 	}
 
-	if len(events) > 0 {
-		eventCounter := c.store.Write().StatefulMeter("").Vec("event_type", "event_sub_type", "severity", "status").Counter("events_total")
-		for _, event := range events {
-			eventCounter.WithLabelValues(event.EventType, event.EventSubType, event.Severity, event.Status).Add(float64(event.Count))
-		}
-	}
-
 	if provider, ok := c.client.(apiStatsProvider); ok {
 		writeAPIStats(c.store, provider.APIStats())
 	}
@@ -203,7 +196,6 @@ func (c *Collector) writeCollectorHealth() {
 	meter.Gauge("collector_collection_success").Observe(boolFloat(c.health.CollectionSuccess))
 	meter.Gauge("collector_discovered_sites").Observe(float64(c.health.DiscoveredSites))
 	writeEntitySelectionHealth(meter, c.health)
-	meter.Gauge("collector_events_marker_persistence_available").Observe(boolFloat(c.health.MarkerPersistenceAvailable))
 	if c.bgpEnabled() {
 		meter.Gauge("collector_bgp_sites_per_collection").Observe(float64(c.health.BGPSitesPerCollection))
 		meter.Gauge("collector_bgp_full_scan_seconds").Observe(float64(c.health.BGPFullScanSeconds))

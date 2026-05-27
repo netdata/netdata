@@ -10,12 +10,10 @@ import (
 )
 
 const (
-	operationDiscovery   = "entityLookup"
-	operationSnapshot    = "accountSnapshot"
-	operationMetrics     = "accountMetrics"
-	operationEvents      = "eventsFeed"
-	operationBGP         = "siteBgpStatus"
-	operationEventMarker = "eventsMarker"
+	operationDiscovery = "entityLookup"
+	operationSnapshot  = "accountSnapshot"
+	operationMetrics   = "accountMetrics"
+	operationBGP       = "siteBgpStatus"
 )
 
 const (
@@ -23,7 +21,6 @@ const (
 	normalizationSurfaceSiteOperational  = "site_operational"
 	normalizationSurfaceMetrics          = "metrics"
 	normalizationSurfaceBGP              = "bgp"
-	normalizationSurfaceEvents           = "events"
 )
 
 const (
@@ -34,22 +31,15 @@ const (
 	normalizationIssueAccountError           = "account_error"
 	normalizationIssueCardinalityLimit       = "cardinality_limit"
 	normalizationIssuePageCap                = "page_cap"
-	normalizationIssueMarkerStalled          = "marker_stalled"
-	normalizationIssueEmptyEventType         = "empty_event_type"
-	normalizationIssueEmptyEventSubType      = "empty_event_sub_type"
-	normalizationIssueEmptyEventSeverity     = "empty_event_severity"
-	normalizationIssueEmptyEventStatus       = "empty_event_status"
-	normalizationIssueComplexEventField      = "complex_event_field"
 )
 
 type collectorHealth struct {
 	CollectionSuccess bool
 	DiscoveredSites   int64
 
-	MarkerPersistenceAvailable bool
-	BGPSitesPerCollection      int64
-	BGPFullScanSeconds         int64
-	BGPCachedSites             int64
+	BGPSitesPerCollection int64
+	BGPFullScanSeconds    int64
+	BGPCachedSites        int64
 
 	SelectedEntities        map[string]int64
 	SkippedEntities         map[entitySkipKey]int64
@@ -84,7 +74,6 @@ type normalizationIssueKey struct {
 func (c *Collector) beginHealthCycle() {
 	c.ensureHealth()
 	c.health.CollectionSuccess = false
-	c.health.MarkerPersistenceAvailable = !c.eventsEnabled() || c.markerStoreAvailable
 	c.health.BGPSitesPerCollection = 0
 	c.health.BGPFullScanSeconds = 0
 	c.health.BGPCachedSites = 0

@@ -26,14 +26,11 @@ const (
 	defaultBGPRefreshEvery  = 300
 	defaultBGPMaxSites      = 25
 	defaultRetryAttempts    = 5
-	defaultEventsMaxPages   = 10
-	defaultEventsMaxSeries  = 50
 	defaultEntitySelector   = "*"
 	defaultMaxSites         = 500
 	defaultMaxIfacesPerSite = 32
 	defaultBGPMaxPeers      = 32
 	maxDiscoveryPages       = 1000
-	eventsFeedMaxFetchSize  = 3000
 )
 
 var (
@@ -59,7 +56,6 @@ type Config struct {
 	Limits            LimitsConfig    `yaml:"limits,omitempty" json:"limits,omitempty"`
 	Discovery         DiscoveryConfig `yaml:"discovery,omitempty" json:"discovery,omitempty"`
 	Metrics           MetricsConfig   `yaml:"metrics,omitempty" json:"metrics,omitempty"`
-	Events            EventsConfig    `yaml:"events,omitempty" json:"events,omitempty"`
 	BGP               BGPConfig       `yaml:"bgp,omitempty" json:"bgp,omitempty"`
 	Topology          TopologyConfig  `yaml:"topology,omitempty" json:"topology,omitempty"`
 	Retry             RetryConfig     `yaml:"retry,omitempty" json:"retry,omitempty"`
@@ -81,13 +77,6 @@ type MetricsConfig struct {
 type LimitsConfig struct {
 	MaxSites             *int `yaml:"max_sites,omitempty" json:"max_sites,omitempty"`
 	MaxInterfacesPerSite *int `yaml:"max_interfaces_per_site,omitempty" json:"max_interfaces_per_site,omitempty"`
-}
-
-type EventsConfig struct {
-	Enabled          confopt.AutoBool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
-	MarkerFile       string           `yaml:"marker_file,omitempty" json:"marker_file,omitempty"`
-	MaxPagesPerCycle int              `yaml:"max_pages_per_cycle,omitempty" json:"max_pages_per_cycle,omitempty"`
-	MaxCardinality   int              `yaml:"max_cardinality,omitempty" json:"max_cardinality,omitempty"`
 }
 
 type BGPConfig struct {
@@ -165,12 +154,6 @@ func (c *Config) applyDefaults() {
 	if c.BGP.MaxPeersPerSite == nil {
 		c.BGP.MaxPeersPerSite = intPtr(defaultBGPMaxPeers)
 	}
-	if c.Events.MaxPagesPerCycle <= 0 {
-		c.Events.MaxPagesPerCycle = defaultEventsMaxPages
-	}
-	if c.Events.MaxCardinality <= 0 {
-		c.Events.MaxCardinality = defaultEventsMaxSeries
-	}
 	if c.Retry.Attempts <= 0 {
 		c.Retry.Attempts = defaultRetryAttempts
 	}
@@ -231,12 +214,6 @@ func (c Config) validate() error {
 	if c.bgpMaxPeersPerSiteLimit() < 0 || c.bgpMaxPeersPerSiteLimit() > 10000 {
 		errs = append(errs, errors.New("'bgp.max_peers_per_site' must be between 0 and 10000"))
 	}
-	if c.Events.MaxPagesPerCycle < 1 || c.Events.MaxPagesPerCycle > 100 {
-		errs = append(errs, errors.New("'events.max_pages_per_cycle' must be between 1 and 100"))
-	}
-	if c.Events.MaxCardinality < 1 || c.Events.MaxCardinality > 10000 {
-		errs = append(errs, errors.New("'events.max_cardinality' must be between 1 and 10000"))
-	}
 	if c.Retry.Attempts < 1 || c.Retry.Attempts > 10 {
 		errs = append(errs, errors.New("'retry.attempts' must be between 1 and 10"))
 	}
@@ -257,10 +234,6 @@ func validCatoTimeFrame(v string) bool {
 
 func (c Config) metricsEnabled() bool {
 	return c.Metrics.Enabled.Bool(true)
-}
-
-func (c Config) eventsEnabled() bool {
-	return c.Events.Enabled.Bool(true)
 }
 
 func (c Config) bgpEnabled() bool {
