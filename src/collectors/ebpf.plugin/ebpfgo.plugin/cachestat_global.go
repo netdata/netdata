@@ -35,7 +35,7 @@ type cachestatGlobalPublish struct {
 type cachestatGlobalState struct {
 	initialized bool
 	prev        cachestatGlobalCounters
-	lastDirty   uint64
+	cumDirty    int64
 	cumHits     int64
 	cumMisses   int64
 }
@@ -98,9 +98,7 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 	apcl := diffCounters(current.AddToPageCacheLru, s.prev.AddToPageCacheLru)
 	apd := diffCounters(current.AccountPageDirtied, s.prev.AccountPageDirtied)
 
-	publish := cachestatGlobalPublish{
-		Dirty: int64(monotonicCounter(current.MarkBufferDirty, s.lastDirty)),
-	}
+	publish := cachestatGlobalPublish{}
 
 	total := mpa - mbd
 	if total < 0 {
@@ -124,13 +122,14 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 		publish.Ratio = 100
 	}
 
+	s.cumDirty += mbd
 	s.cumHits += hits
 	s.cumMisses += misses
 
+	publish.Dirty = s.cumDirty
 	publish.Hit = s.cumHits
 	publish.Miss = s.cumMisses
 	s.prev = current
-	s.lastDirty = monotonicCounter(current.MarkBufferDirty, s.lastDirty)
 	s.initialized = true
 
 	return publish, true
@@ -144,13 +143,6 @@ func diffCounters(current, previous uint64) int64 {
 	return int64(current - previous)
 }
 
-func monotonicCounter(current, previous uint64) uint64 {
-	if current < previous {
-		return previous
-	}
-
-	return current
-}
 
 func createCachestatGlobalCharts(api *netdataapi.API, updateEvery int) {
 	cachestatGlobalChartsOnce.Do(func() {
