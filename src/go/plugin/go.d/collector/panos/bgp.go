@@ -3,6 +3,7 @@
 package panos
 
 import (
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -19,8 +20,14 @@ const legacyBGPPeerCommand = "<show><routing><protocol><bgp><peer></peer></bgp><
 
 const (
 	noBGPReprobeInterval = 5 * time.Minute
-	staleChartMaxMisses  = 3
 	maxBGPPeerEntryDepth = 8
+
+	logKeyBGPEmptyQuery  = "panos:bgp:empty_query"
+	logKeyBGPQueryFailed = "panos:bgp:query_failed"
+	logKeyBGPProbeErrors = "panos:bgp:probe_errors"
+	logKeyBGPNoPeers     = "panos:bgp:no_peers"
+	logKeyBGPLegacy      = "panos:bgp:legacy"
+	logKeyBGPAdvanced    = "panos:bgp:advanced"
 )
 
 var advancedBGPPeerCommands = []string{
@@ -127,11 +134,14 @@ type panosBGPPrefixEntry struct {
 	OutgoingAdvertised string `xml:"outgoing-advertised"`
 }
 
-func (c *Collector) collectBGPPeers() ([]bgpPeer, error) {
+func (c *Collector) collectBGPPeers(ctx context.Context) ([]bgpPeer, error) {
 	if c.apiClient == nil {
 		return nil, errors.New("PAN-OS API client not initialized")
 	}
-	defer c.logSystemInfoOnce()
+	defer c.logSystemInfo()
+	if err := contextError(ctx); err != nil {
+		return nil, err
+	}
 
 	if c.routingEngine == routingEngineNone && c.now().Sub(c.noBGPProbedAt) < noBGPReprobeInterval {
 		c.Debugf("PAN-OS BGP peers not found on previous probe; skipping routing-engine probe until %s", c.noBGPProbedAt.Add(noBGPReprobeInterval).Format(time.RFC3339))
@@ -139,49 +149,67 @@ func (c *Collector) collectBGPPeers() ([]bgpPeer, error) {
 	}
 
 	if c.bgpCommand != "" {
-		peers, err := c.queryBGPPeers(c.bgpCommand)
-		if err == nil {
-			if len(peers) == 0 {
-				c.warningOnce("bgp_empty_query", fmt.Sprintf("PAN-OS BGP query returned no peers (routing_engine=%s, command=%s)", c.routingEngine, bgpCommandName(c.bgpCommand)))
-			} else {
-				c.clearRuntimeLogState("bgp_empty_query", "bgp_query_failed", "bgp_no_peers")
-			}
-			return peers, nil
+		peers, err := c.queryBGPPeers(ctx, c.bgpCommand)
+		if len(peers) > 0 {
+			return peers, err
 		}
-		c.warningOnce("bgp_query_failed", fmt.Sprintf("PAN-OS BGP query failed (routing_engine=%s, command=%s), probing routing engine again: %v", c.routingEngine, bgpCommandName(c.bgpCommand), err))
+		if err == nil {
+			staleCommand := c.bgpCommand
+			c.Limit(logKeyBGPEmptyQuery, 1, recurringLogEvery).
+				Warningf("PAN-OS BGP query returned no peers (routing_engine=%s, command=%s), probing routing engine again", c.routingEngine, bgpCommandName(staleCommand))
+			c.routingEngine = routingEngineUnknown
+			c.bgpCommand = ""
+			return c.probeAndCollectBGPPeersExcept(ctx, staleCommand, true)
+		}
+		c.Limit(logKeyBGPQueryFailed, 1, recurringLogEvery).
+			Warningf("PAN-OS BGP query failed (routing_engine=%s, command=%s), probing routing engine again: %v", c.routingEngine, bgpCommandName(c.bgpCommand), err)
 		c.routingEngine = routingEngineUnknown
 		c.bgpCommand = ""
 	}
 
-	return c.probeAndCollectBGPPeers()
+	return c.probeAndCollectBGPPeers(ctx)
 }
 
-func (c *Collector) probeAndCollectBGPPeers() ([]bgpPeer, error) {
-	var errs []error
-	var emptySuccess bool
+func (c *Collector) probeAndCollectBGPPeers(ctx context.Context) ([]bgpPeer, error) {
+	return c.probeAndCollectBGPPeersExcept(ctx, "", false)
+}
 
-	peers, err := c.queryBGPPeers(legacyBGPPeerCommand)
-	if err == nil && len(peers) > 0 {
-		c.routingEngine = routingEngineLegacy
-		c.bgpCommand = legacyBGPPeerCommand
-		c.clearRuntimeLogState("bgp_empty_query", "bgp_query_failed", "bgp_no_peers")
-		c.Infof("detected PAN-OS legacy routing engine for BGP collection (command=%s)", bgpCommandName(c.bgpCommand))
-		return peers, nil
-	}
-	if err == nil {
-		emptySuccess = true
-	} else {
-		errs = append(errs, fmt.Errorf("%s: %w", bgpCommandName(legacyBGPPeerCommand), err))
+func (c *Collector) probeAndCollectBGPPeersExcept(ctx context.Context, skipCommand string, emptySuccess bool) ([]bgpPeer, error) {
+	var errs []error
+
+	if legacyBGPPeerCommand != skipCommand {
+		if err := contextError(ctx); err != nil {
+			return nil, err
+		}
+		peers, err := c.queryBGPPeers(ctx, legacyBGPPeerCommand)
+		if len(peers) > 0 {
+			c.routingEngine = routingEngineLegacy
+			c.bgpCommand = legacyBGPPeerCommand
+			c.Limit(logKeyBGPLegacy, 1, recurringLogEvery).
+				Infof("detected PAN-OS legacy routing engine for BGP collection (command=%s)", bgpCommandName(c.bgpCommand))
+			return peers, err
+		}
+		if err == nil {
+			emptySuccess = true
+		} else {
+			errs = append(errs, fmt.Errorf("%s: %w", bgpCommandName(legacyBGPPeerCommand), err))
+		}
 	}
 
 	for _, cmd := range c.advancedBGPCommands {
-		peers, err = c.queryBGPPeers(cmd)
-		if err == nil && len(peers) > 0 {
+		if cmd == skipCommand {
+			continue
+		}
+		if err := contextError(ctx); err != nil {
+			return nil, err
+		}
+		peers, err := c.queryBGPPeers(ctx, cmd)
+		if len(peers) > 0 {
 			c.routingEngine = routingEngineAdvanced
 			c.bgpCommand = cmd
-			c.clearRuntimeLogState("bgp_empty_query", "bgp_query_failed", "bgp_no_peers")
-			c.Infof("detected PAN-OS Advanced Routing Engine for BGP collection (command=%s)", bgpCommandName(c.bgpCommand))
-			return peers, nil
+			c.Limit(logKeyBGPAdvanced, 1, recurringLogEvery).
+				Infof("detected PAN-OS Advanced Routing Engine for BGP collection (command=%s)", bgpCommandName(c.bgpCommand))
+			return peers, err
 		}
 		if err == nil {
 			emptySuccess = true
@@ -191,9 +219,16 @@ func (c *Collector) probeAndCollectBGPPeers() ([]bgpPeer, error) {
 	}
 
 	if emptySuccess {
+		if len(errs) > 0 {
+			err := errors.Join(errs...)
+			c.Limit(logKeyBGPProbeErrors, 1, recurringLogEvery).
+				Warningf("PAN-OS BGP probes returned no peers, but at least one probe failed; will retry all BGP probes next cycle: %v", err)
+			return nil, err
+		}
 		c.routingEngine = routingEngineNone
 		c.noBGPProbedAt = c.now()
-		c.infoOnce("bgp_no_peers", "connected to PAN-OS XML API, but no BGP peers were found by legacy or Advanced Routing Engine probes")
+		c.Limit(logKeyBGPNoPeers, 1, recurringLogEvery).
+			Info("connected to PAN-OS XML API, but no BGP peers were found by legacy or Advanced Routing Engine probes")
 		return nil, nil
 	}
 	if len(errs) > 0 {
@@ -202,14 +237,14 @@ func (c *Collector) probeAndCollectBGPPeers() ([]bgpPeer, error) {
 	return nil, nil
 }
 
-func (c *Collector) queryBGPPeers(cmd string) ([]bgpPeer, error) {
-	body, err := c.apiClient.op(cmd)
+func (c *Collector) queryBGPPeers(ctx context.Context, cmd string) ([]bgpPeer, error) {
+	body, err := c.apiClient.op(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s API call: %w", bgpCommandName(cmd), err)
 	}
 	peers, err := parseBGPPeers(body)
 	if err != nil {
-		return nil, fmt.Errorf("%s response: %w", bgpCommandName(cmd), err)
+		return peers, fmt.Errorf("%s response: %w", bgpCommandName(cmd), err)
 	}
 	return peers, nil
 }
@@ -228,12 +263,13 @@ func parseBGPPeers(body []byte) ([]bgpPeer, error) {
 		return nil, err
 	}
 
-	peers := make([]bgpPeer, 0, len(entries))
+	var peers []bgpPeer
+	var errs []error
 	seen := make(map[string]bool)
 	for _, entry := range entries {
 		peer, ok, err := entry.toBGPPeer()
 		if err != nil {
-			return nil, err
+			errs = append(errs, fmt.Errorf("BGP peer entry %s: %w", bgpPeerEntryName(entry), err))
 		}
 		if !ok {
 			continue
@@ -246,7 +282,11 @@ func parseBGPPeers(body []byte) ([]bgpPeer, error) {
 		peers = append(peers, peer)
 	}
 
-	return peers, nil
+	return peers, errors.Join(errs...)
+}
+
+func bgpPeerEntryName(entry panosBGPPeerEntry) string {
+	return firstNonEmpty(normalizeAddress(entry.peerAddress()), normalizeAddress(entry.peerName()), "unknown")
 }
 
 func decodeBGPPeerEntries(innerXML string) ([]panosBGPPeerEntry, error) {
@@ -365,10 +405,6 @@ func (e panosBGPPeerEntry) toBGPPeer() (bgpPeer, bool, error) {
 		return bgpPeer{}, false, err
 	}
 	prefixCounters, err := e.prefixCounters(peerAddr)
-	if err != nil {
-		return bgpPeer{}, false, err
-	}
-
 	peer := bgpPeer{
 		VR:             firstNonEmpty(e.vr(), "default"),
 		PeerAddress:    peerAddr,
@@ -386,7 +422,7 @@ func (e panosBGPPeerEntry) toBGPPeer() (bgpPeer, bool, error) {
 		PrefixCounters: prefixCounters,
 	}
 
-	return peer, true, nil
+	return peer, true, err
 }
 
 func (e panosBGPPeerEntry) hasPeerData() bool {
@@ -435,10 +471,12 @@ func (e panosBGPPeerEntry) peerGroup() string {
 
 func (e panosBGPPeerEntry) prefixCounters(peerAddr string) ([]bgpPrefixCounter, error) {
 	counters := make([]bgpPrefixCounter, 0, len(e.PrefixCounter.Entries))
+	var errs []error
 	for _, entry := range e.PrefixCounter.Entries {
 		counter, err := entry.toBGPPrefixCounter(peerAddr)
 		if err != nil {
-			return nil, err
+			errs = append(errs, err)
+			continue
 		}
 		if counter.AFI == "" {
 			counter.AFI = "unknown"
@@ -448,7 +486,7 @@ func (e panosBGPPeerEntry) prefixCounters(peerAddr string) ([]bgpPrefixCounter, 
 		}
 		counters = append(counters, counter)
 	}
-	return counters, nil
+	return counters, errors.Join(errs...)
 }
 
 func (e panosBGPPrefixEntry) toBGPPrefixCounter(peerAddr string) (bgpPrefixCounter, error) {
@@ -497,6 +535,9 @@ func (e panosBGPPrefixEntry) toBGPPrefixCounter(peerAddr string) (bgpPrefixCount
 
 func normalizeBGPState(state string) string {
 	v := strings.ToLower(strings.TrimSpace(state))
+	if v == "" {
+		return ""
+	}
 	v = stateNameReplacer.Replace(v)
 
 	switch {
@@ -513,7 +554,7 @@ func normalizeBGPState(state string) string {
 	case strings.Contains(v, "idle"):
 		return "idle"
 	default:
-		return ""
+		return "unknown"
 	}
 }
 

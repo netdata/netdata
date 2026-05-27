@@ -3,8 +3,10 @@
 package panos
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net/http"
 	"net/url"
@@ -18,7 +20,7 @@ import (
 )
 
 type panosAPIClient interface {
-	op(cmd string) ([]byte, error)
+	op(ctx context.Context, cmd string) ([]byte, error)
 	systemInfo() map[string]string
 	closeIdleConnections()
 }
@@ -75,30 +77,45 @@ func newPangoAPIClient(cfg Config) (panosAPIClient, error) {
 	}, nil
 }
 
-func (c *pangoAPIClient) op(cmd string) ([]byte, error) {
-	if err := c.ensureInitialized(); err != nil {
+func (c *pangoAPIClient) op(ctx context.Context, cmd string) ([]byte, error) {
+	if err := contextError(ctx); err != nil {
+		return nil, err
+	}
+	if err := c.ensureInitialized(ctx); err != nil {
 		return nil, err
 	}
 
+	if err := contextError(ctx); err != nil {
+		return nil, err
+	}
 	body, err := c.client.Op(cmd, c.vsys, nil, nil)
 	if err == nil || !c.canRefresh || !isUnauthorizedError(err) {
 		return body, sanitizePANOSAPIError(err)
 	}
 
+	if err := contextError(ctx); err != nil {
+		return nil, err
+	}
 	if refreshErr := c.client.RetrieveApiKey(); refreshErr != nil {
 		c.initialized = false
 		return nil, fmt.Errorf("refresh PAN-OS API key after unauthorized response: %w", sanitizePANOSAPIError(refreshErr))
 	}
 
+	if err := contextError(ctx); err != nil {
+		return nil, err
+	}
 	body, err = c.client.Op(cmd, c.vsys, nil, nil)
 	return body, sanitizePANOSAPIError(err)
 }
 
-func (c *pangoAPIClient) ensureInitialized() error {
+func (c *pangoAPIClient) ensureInitialized(ctx context.Context) error {
 	if c.initialized {
 		return nil
 	}
 
+	if err := contextError(ctx); err != nil {
+		return err
+	}
 	err := c.client.Initialize()
 	if err == nil {
 		c.initialized = true
@@ -108,10 +125,16 @@ func (c *pangoAPIClient) ensureInitialized() error {
 		return sanitizePANOSAPIError(err)
 	}
 
+	if err := contextError(ctx); err != nil {
+		return err
+	}
 	if refreshErr := c.client.RetrieveApiKey(); refreshErr != nil {
 		return fmt.Errorf("refresh PAN-OS API key after unauthorized initialization: %w", sanitizePANOSAPIError(refreshErr))
 	}
 
+	if err := contextError(ctx); err != nil {
+		return err
+	}
 	if err := c.client.Initialize(); err != nil {
 		return fmt.Errorf("re-initialize PAN-OS API client after key refresh: %w", sanitizePANOSAPIError(err))
 	}
@@ -126,9 +149,7 @@ func (c *pangoAPIClient) systemInfo() map[string]string {
 		return nil
 	}
 	cp := make(map[string]string, len(info))
-	for k, v := range info {
-		cp[k] = v
-	}
+	maps.Copy(cp, info)
 	return cp
 }
 
@@ -164,12 +185,7 @@ func isUnauthorizedError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "unauthorized") ||
-		strings.Contains(msg, "code 16") ||
-		strings.Contains(msg, "code: 16") ||
-		strings.Contains(msg, "code 22") ||
-		strings.Contains(msg, "code: 22") ||
-		strings.Contains(msg, "code 403") ||
-		strings.Contains(msg, "code: 403") ||
+		unauthorizedCodeRE.MatchString(msg) ||
 		strings.Contains(msg, "forbidden") ||
 		strings.Contains(msg, "session timed out")
 }
@@ -197,14 +213,22 @@ func parseAPIURL(rawURL string) (panosAPIURL, error) {
 	if u.Path != "" && u.Path != "/" && u.Path != "/api" {
 		return panosAPIURL{}, fmt.Errorf("config: url path must be empty, /, or /api")
 	}
+	if u.RawQuery != "" || u.Fragment != "" {
+		return panosAPIURL{}, errors.New("config: url must not include query or fragment")
+	}
 
 	var port uint
-	if u.Port() != "" {
-		v, err := strconv.ParseUint(u.Port(), 10, 16)
+	if rawPort := u.Port(); rawPort != "" {
+		v, err := strconv.ParseUint(rawPort, 10, 16)
 		if err != nil {
 			return panosAPIURL{}, fmt.Errorf("parse url port: %w", err)
 		}
+		if v == 0 {
+			return panosAPIURL{}, errors.New("config: url port must be greater than 0")
+		}
 		port = uint(v)
+	} else if hasExplicitPort(u.Host) {
+		return panosAPIURL{}, errors.New("config: url port must be numeric")
 	}
 
 	hostname := u.Hostname()
@@ -217,6 +241,13 @@ func parseAPIURL(rawURL string) (panosAPIURL, error) {
 		hostname: hostname,
 		port:     port,
 	}, nil
+}
+
+func hasExplicitPort(host string) bool {
+	if strings.HasPrefix(host, "[") {
+		return strings.Contains(host, "]:")
+	}
+	return strings.Count(host, ":") == 1
 }
 
 func newPangoTransport(cfg web.ClientConfig) (*http.Transport, error) {
@@ -242,7 +273,10 @@ func timeoutSeconds(cfg web.ClientConfig) int {
 	return max(1, int(math.Ceil(d.Seconds())))
 }
 
-var secretParamRE = regexp.MustCompile(`(?i)\b((?:key|apikey|api_key|password|pass)=)[^&\s]+`)
+var (
+	unauthorizedCodeRE = regexp.MustCompile(`(?i)\bcode:?\s*(?:16|22|403)\b`)
+	secretParamRE      = regexp.MustCompile(`(?i)\b((?:api_key|apikey|password|pass|username|user|key)=)[^&\s]+`)
+)
 
 func sanitizePANOSAPIError(err error) error {
 	if err == nil {

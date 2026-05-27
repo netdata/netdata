@@ -3,113 +3,137 @@
 package panos
 
 import (
+	"context"
 	"errors"
 	"sort"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (bool, error) {
 	if c.apiClient == nil {
-		return nil, errors.New("PAN-OS API client not initialized")
+		return false, errors.New("PAN-OS API client not initialized")
 	}
-	defer c.logSystemInfoOnce()
+	defer c.logSystemInfo()
 
-	mx := c.resetMetrics()
-	var errs []error
+	var result collectResult
 
-	c.beginDynamicChartCollection()
-
-	if c.CollectSystem {
-		if err := c.collectSystemMetrics(mx); err != nil {
-			errs = append(errs, err)
-		}
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
 	}
-	if c.CollectHA {
-		if err := c.collectHAMetrics(mx); err != nil {
-			errs = append(errs, err)
-		}
+	result.add(c.collectSystemMetrics(ctx))
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
 	}
-	if c.CollectEnvironment {
-		if err := c.collectEnvironmentMetrics(mx); err != nil {
-			errs = append(errs, err)
-		}
+	result.add(c.collectHAMetrics(ctx))
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
 	}
-	if c.CollectLicenses {
-		if err := c.collectLicenseMetrics(mx); err != nil {
-			errs = append(errs, err)
-		}
+	result.add(c.collectEnvironmentMetrics(ctx))
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
 	}
-	if c.CollectIPSec {
-		if err := c.collectIPSecMetrics(mx); err != nil {
-			errs = append(errs, err)
-		}
+	result.add(c.collectLicenseMetrics(ctx))
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
+	}
+	result.add(c.collectIPSecMetrics(ctx))
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
 	}
 
-	if c.CollectBGP {
-		peers, err := c.collectBGPPeers()
-		if err != nil {
-			errs = append(errs, err)
-		} else {
-			if len(peers) > 0 {
-				monitoredPeers, peerStats := c.filterBGPPeers(peers)
-				monitoredPeers, prefixStats := c.filterBGPPrefixFamilies(monitoredPeers)
-				c.collectBGPPeerCardinalityMetrics(mx, peerStats)
-				c.collectBGPPrefixFamilyCardinalityMetrics(mx, prefixStats)
-				c.collectPeerMetrics(mx, monitoredPeers)
-				seenVRs := c.collectVRMetrics(mx, peers)
-				c.removeStaleCharts(monitoredPeers, seenVRs)
-			} else {
-				c.removeStaleCharts(nil, nil)
-			}
-		}
+	peers, err := c.collectBGPPeers(ctx)
+	result.add(false, err)
+	if len(peers) > 0 {
+		monitoredPeers := orderedBGPPeers(peers)
+		result.add(c.collectPeerMetrics(monitoredPeers), nil)
+		result.add(c.collectVRMetrics(peers), nil)
 	}
 
-	c.removeStaleDynamicCharts()
-
-	if len(mx) == 0 {
-		if len(errs) > 0 {
-			return nil, errors.Join(errs...)
-		}
-		if c.CollectBGP && c.routingEngine == routingEngineNone {
-			return nil, errors.New("no PAN-OS BGP peers found; BGP may be unconfigured, unsupported for this account, or the XML response shape is not recognized")
-		}
-		return nil, nil
-	}
-
-	return mx, errors.Join(errs...)
+	return result.hasMetrics, errors.Join(result.errs...)
 }
 
-func (c *Collector) collectPeerMetrics(mx map[string]int64, peers []bgpPeer) {
+func contextError(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
+}
+
+type collectResult struct {
+	hasMetrics bool
+	errs       []error
+}
+
+func (r *collectResult) add(hasMetrics bool, err error) {
+	if hasMetrics {
+		r.hasMetrics = true
+	}
+	if err != nil {
+		r.errs = append(r.errs, err)
+	}
+}
+
+func (r *collectResult) addContextError(ctx context.Context) bool {
+	if err := contextError(ctx); err != nil {
+		r.add(false, err)
+		return true
+	}
+	return false
+}
+
+func orderedBGPPeers(peers []bgpPeer) []bgpPeer {
+	items := append([]bgpPeer(nil), peers...)
+	sort.SliceStable(items, func(i, j int) bool {
+		return bgpPeerOrderKey(items[i]) < bgpPeerOrderKey(items[j])
+	})
+
+	for i := range items {
+		counters := append([]bgpPrefixCounter(nil), items[i].PrefixCounters...)
+		sort.SliceStable(counters, func(j, k int) bool {
+			return bgpPrefixCounterOrderKey(counters[j]) < bgpPrefixCounterOrderKey(counters[k])
+		})
+		items[i].PrefixCounters = counters
+	}
+
+	return items
+}
+
+func bgpPeerOrderKey(peer bgpPeer) string {
+	return firstNonEmpty(peer.VR, "default") + "/" + firstNonEmpty(peer.PeerAddress, "unknown")
+}
+
+func bgpPrefixCounterOrderKey(counter bgpPrefixCounter) string {
+	return firstNonEmpty(counter.AFI, "unknown") + "/" + firstNonEmpty(counter.SAFI, "unknown")
+}
+
+func (c *Collector) collectPeerMetrics(peers []bgpPeer) bool {
+	if len(peers) == 0 {
+		return false
+	}
+
 	for _, peer := range peers {
-		c.addPeerCharts(peer)
-		key := peerKey(peer)
-
-		for _, state := range []string{"idle", "connect", "active", "opensent", "openconfirm", "established"} {
-			mx["bgp_peer_"+key+"_state_"+state] = 0
-		}
-		if peer.State != "" {
-			mx["bgp_peer_"+key+"_state_"+peer.State] = 1
-		}
-
-		mx["bgp_peer_"+key+"_uptime"] = peer.Uptime
-		mx["bgp_peer_"+key+"_messages_in"] = peer.MessagesIn
-		mx["bgp_peer_"+key+"_messages_out"] = peer.MessagesOut
-		mx["bgp_peer_"+key+"_updates_in"] = peer.UpdatesIn
-		mx["bgp_peer_"+key+"_updates_out"] = peer.UpdatesOut
-		mx["bgp_peer_"+key+"_flaps"] = peer.Flaps
-		mx["bgp_peer_"+key+"_established_transitions"] = peer.Established
+		labels := peerLabelValues(peer)
+		observeStateSetVec(c.metrics.bgp.peerState, peer.State, labels...)
+		c.metrics.bgp.peerUptime.WithLabelValues(labels...).Observe(float64(peer.Uptime))
+		c.metrics.bgp.peerMessagesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesIn))
+		c.metrics.bgp.peerMessagesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesOut))
+		c.metrics.bgp.peerUpdatesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesIn))
+		c.metrics.bgp.peerUpdatesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesOut))
+		c.metrics.bgp.peerFlaps.WithLabelValues(labels...).ObserveTotal(float64(peer.Flaps))
+		c.metrics.bgp.peerEstablishedTransitions.WithLabelValues(labels...).ObserveTotal(float64(peer.Established))
 
 		for _, counter := range peer.PrefixCounters {
-			c.addPrefixCharts(peer, counter)
-			prefixKey := prefixKey(peer, counter)
-			mx["bgp_peer_"+prefixKey+"_prefixes_received_total"] = counter.IncomingTotal
-			mx["bgp_peer_"+prefixKey+"_prefixes_received_accepted"] = counter.IncomingAccepted
-			mx["bgp_peer_"+prefixKey+"_prefixes_received_rejected"] = counter.IncomingRejected
-			mx["bgp_peer_"+prefixKey+"_prefixes_advertised"] = counter.OutgoingAdvertised
+			prefixLabels := prefixLabelValues(peer, counter)
+			c.metrics.bgp.peerPrefixesReceivedTotal.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingTotal))
+			c.metrics.bgp.peerPrefixesReceivedAccepted.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingAccepted))
+			c.metrics.bgp.peerPrefixesReceivedRejected.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingRejected))
+			c.metrics.bgp.peerPrefixesAdvertised.WithLabelValues(prefixLabels...).Observe(float64(counter.OutgoingAdvertised))
 		}
 	}
+
+	return true
 }
 
-func (c *Collector) collectVRMetrics(mx map[string]int64, peers []bgpPeer) []string {
+func (c *Collector) collectVRMetrics(peers []bgpPeer) bool {
 	type vrStats struct {
 		stateCounts map[string]int64
 		total       int64
@@ -139,31 +163,15 @@ func (c *Collector) collectVRMetrics(mx map[string]int64, peers []bgpPeer) []str
 	}
 	sort.Strings(vrs)
 
-	cardinality := cardinalityStats{Discovered: len(vrs)}
-	seenVRs := make([]string, 0, len(vrs))
 	for _, vr := range vrs {
-		if !matchesEntity(c.bgpVirtualRouterMatcher, vr) {
-			cardinality.OmittedBySelector++
-			continue
-		}
-		if cardinality.Monitored >= c.MaxBGPVirtualRouters {
-			cardinality.OmittedByLimit++
-			continue
-		}
-		cardinality.Monitored++
-
 		st := stats[vr]
-		c.addVRCharts(vr)
-		key := cleanID(vr)
-		seenVRs = append(seenVRs, key)
-
-		for _, state := range []string{"idle", "connect", "active", "opensent", "openconfirm", "established"} {
-			mx["bgp_vr_"+key+"_peers_state_"+state] = st.stateCounts[state]
+		labels := []string{vr}
+		for _, state := range bgpStates {
+			c.metrics.bgp.vrPeersByState[state].WithLabelValues(labels...).Observe(float64(st.stateCounts[state]))
 		}
-		mx["bgp_vr_"+key+"_peers_configured"] = st.total
-		mx["bgp_vr_"+key+"_peers_established"] = st.established
+		c.metrics.bgp.vrPeersConfigured.WithLabelValues(labels...).Observe(float64(st.total))
+		c.metrics.bgp.vrPeersEstablished.WithLabelValues(labels...).Observe(float64(st.established))
 	}
 
-	c.collectBGPVirtualRouterCardinalityMetrics(mx, cardinality)
-	return seenVRs
+	return len(vrs) > 0
 }
