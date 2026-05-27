@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "apps_plugin.h"
+#include "apps-cgroups-lookup-client.h"
+#include "apps-lookup-netipc.h"
 #include "libnetdata/parsers/duration.h"
 
 #define APPS_PLUGIN_FUNCTIONS() do { \
@@ -701,17 +703,27 @@ static inline int check_capabilities() {
 #endif
 #endif
 
+/*
+ * Lock order when more than one apps.plugin mutex is held:
+ * apps_and_stdout_mutex -> apps_pids_mutex -> cgroups_lookup_queue_mutex.
+ * APPS_LOOKUP handlers hold only apps_pids_mutex and never write to stdout.
+ */
 netdata_mutex_t apps_and_stdout_mutex;
+netdata_mutex_t apps_pids_mutex;
+_Atomic uint64_t apps_collection_generation = 0;
 
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&apps_and_stdout_mutex);
+    netdata_mutex_init(&apps_pids_mutex);
 }
 
 static void __attribute__((destructor)) destroy_mutex(void) {
+    netdata_mutex_destroy(&apps_pids_mutex);
     netdata_mutex_destroy(&apps_and_stdout_mutex);
 }
 
 static bool apps_plugin_exit = false;
+static bool apps_lookup_server_started = false;
 
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("apps.plugin");
@@ -797,6 +809,7 @@ int main(int argc, char **argv) {
 
     apps_pids_init();
     OS_FUNCTION(apps_os_init)();
+    apps_cgroups_lookup_init();
     int exit_status = 0;
 
     // ------------------------------------------------------------------------
@@ -840,10 +853,15 @@ int main(int argc, char **argv) {
             fatal("Received error on read pipe.");
         }
 
+        netdata_mutex_lock(&apps_pids_mutex);
+
         if(!collect_data_for_all_pids()) {
             netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
+            netdata_mutex_unlock(&apps_pids_mutex);
             netdata_mutex_unlock(&apps_and_stdout_mutex);
+            apps_lookup_netipc_cleanup();
+            apps_cgroups_lookup_cleanup();
             exit(1);
         }
 
@@ -853,6 +871,16 @@ int main(int argc, char **argv) {
             apps_ebpf_accumulate_cachestat();
 #endif
 
+        __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);
+
+        if (!apps_lookup_server_started) {
+            apps_lookup_netipc_init();
+            apps_lookup_server_started = true;
+        }
+
+        apps_cgroups_lookup_scan_pids();
+        netdata_mutex_unlock(&apps_pids_mutex);
+
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         OS_FUNCTION(apps_os_read_global_cpu_utilization)();
         normalize_utilization(apps_groups_root_target);
@@ -861,11 +889,16 @@ int main(int argc, char **argv) {
         if(unlikely(print_tree_and_exit)) {
             print_hierarchy(root_of_pids());
             netdata_mutex_unlock(&apps_and_stdout_mutex);
+            apps_lookup_netipc_cleanup();
+            apps_cgroups_lookup_cleanup();
             exit(0);
         }
 
-        if(send_resource_usage)
+        if(send_resource_usage) {
             send_resource_usage_to_netdata(dt);
+            apps_cgroups_lookup_send_charts_to_netdata(dt);
+            apps_lookup_netipc_send_charts_to_netdata(dt);
+        }
 
 #if (PROCESSES_HAVE_STATE == 1)
         send_proc_states_count(dt);
@@ -907,5 +940,7 @@ int main(int argc, char **argv) {
         debug_log("done Loop No %zu", global_iterations_counter);
     }
     netdata_mutex_unlock(&apps_and_stdout_mutex);
+    apps_lookup_netipc_cleanup();
+    apps_cgroups_lookup_cleanup();
     exit(exit_status);
 }

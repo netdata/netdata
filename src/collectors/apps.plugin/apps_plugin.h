@@ -231,6 +231,8 @@ extern NETDATA_DOUBLE
 extern size_t pagesize;
 
 extern netdata_mutex_t apps_and_stdout_mutex;
+extern netdata_mutex_t apps_pids_mutex;
+extern _Atomic uint64_t apps_collection_generation;
 
 // --------------------------------------------------------------------------------------------------------------------
 // string lengths
@@ -473,6 +475,7 @@ typedef enum __attribute__((packed)) {
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
     PID_LOG_SMAPS           = (1 << 7),
 #endif
+    PID_LOG_CGROUP          = (1 << 8),
 } PID_LOG;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -518,6 +521,8 @@ struct pid_fd {
 #define pid_stat_cmdline(p) (string2str((p)->cmdline))
 uint32_t all_files_len_get(void);
 
+struct cgroup_lookup_entry;
+
 struct pid_stat {
     int32_t pid;
     int32_t ppid;
@@ -551,6 +556,12 @@ struct pid_stat {
     STRING *comm;                   // the command, sanitized
     STRING *name;                   // the command name, if any, sanitized
     STRING *cmdline;                // the full command line of the program
+
+#if defined(OS_LINUX)
+    STRING *cgroup_path;            // /proc/PID/cgroup selected lookup key
+    struct cgroup_lookup_entry *cgroup_cache; // borrowed pointer, protected by apps_pids_mutex
+    uint64_t starttime;             // raw /proc/PID/stat field 21, in clock ticks
+#endif
 
 #if defined(OS_WINDOWS)
     COUNTER_DATA perflib[PDF_MAX];
@@ -630,6 +641,7 @@ struct pid_stat {
     char *io_filename;
     char *cmdline_filename;
     char *limits_filename;
+    char *cgroup_filename;
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
     char *smaps_rollup_filename;
     ARL_BASE *smaps_rollup_arl;
@@ -815,6 +827,10 @@ bool OS_FUNCTION(apps_os_collect_all_pids)(void);
 bool OS_FUNCTION(apps_os_read_pid_status)(struct pid_stat *p, void *ptr);
 bool OS_FUNCTION(apps_os_read_pid_stat)(struct pid_stat *p, void *ptr);
 bool OS_FUNCTION(apps_os_read_pid_io)(struct pid_stat *p, void *ptr);
+
+#if defined(OS_LINUX)
+bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr);
+#endif
 
 #if (PROCESSES_HAVE_PID_LIMITS == 1)
 bool OS_FUNCTION(apps_os_read_pid_limits)(struct pid_stat *p, void *ptr);

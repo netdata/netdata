@@ -2805,6 +2805,12 @@ if(ENABLE_PLUGIN_APPS)
     set(APPS_PLUGIN_FILES
             src/collectors/apps.plugin/apps_plugin.c
             src/collectors/apps.plugin/apps_plugin.h
+            src/collectors/apps.plugin/apps-cgroups-path.c
+            src/collectors/apps.plugin/apps-cgroups-path.h
+            src/collectors/apps.plugin/apps-cgroups-lookup-client.c
+            src/collectors/apps.plugin/apps-cgroups-lookup-client.h
+            src/collectors/apps.plugin/apps-lookup-netipc.c
+            src/collectors/apps.plugin/apps-lookup-netipc.h
             src/collectors/apps.plugin/apps_functions.c
             src/collectors/apps.plugin/apps_targets.c
             src/collectors/apps.plugin/apps_output.c
@@ -3032,6 +3038,15 @@ if(OS_LINUX)
             src/collectors/cgroups.plugin/cgroup-orchestrator.c)
     target_compile_definitions(cgroup-orchestrator-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
     target_link_libraries(cgroup-orchestrator-test libnetdata)
+
+    add_executable(apps-cgroups-path-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_path.c
+            src/collectors/apps.plugin/apps-cgroups-path.c)
+    target_link_libraries(apps-cgroups-path-test libnetdata)
+
+    add_executable(apps-lookup-protocol-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_lookup_protocol.c)
+    target_link_libraries(apps-lookup-protocol-test libnetdata)
 endif()
 
 if(ENABLE_CGROUPS_LOOKUP_SERVER)

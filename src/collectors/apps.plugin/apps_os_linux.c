@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "apps_plugin.h"
+#include "apps-cgroups-path.h"
+#include "apps-cgroups-lookup-client.h"
 #include <limits.h>
 #include <unistd.h>
 
@@ -805,6 +807,41 @@ bool apps_os_read_pid_status_linux(struct pid_stat *p, void *ptr __maybe_unused)
     return true;
 }
 
+/* REQUIRES apps_pids_mutex held by caller; MUST NOT lock apps_pids_mutex itself. */
+bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr __maybe_unused)
+{
+    if (unlikely(!p->cgroup_filename)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cgroup", netdata_configured_host_prefix, p->pid);
+        p->cgroup_filename = strdupz(filename);
+    }
+
+    int fd = open(p->cgroup_filename, procfile_open_flags);
+    if (fd == -1)
+        return false;
+
+    char content[FILENAME_MAX + 1];
+    ssize_t bytes = read(fd, content, sizeof(content) - 1);
+    int saved_errno = errno;
+    close(fd);
+
+    if (bytes <= 0) {
+        errno = bytes == 0 ? EINVAL : saved_errno;
+        return false;
+    }
+
+    content[bytes] = '\0';
+
+    char path[FILENAME_MAX + 1];
+    if (!apps_cgroup_parse_proc_pid_cgroup_content(content, path, sizeof(path))) {
+        errno = EINVAL;
+        return false;
+    }
+
+    apps_cgroups_lookup_set_pid_cgroup_path(p, path);
+    return true;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // global CPU utilization
 
@@ -936,7 +973,8 @@ bool apps_os_read_pid_stat_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->values[PDF_THREADS] = (int32_t) str2uint32_t(procfile_lineword(ff, 0, 19), NULL);
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
-    kernel_uint_t collected_starttime = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
+    p->starttime = str2kernel_uint_t(procfile_lineword(ff, 0, 21));
+    kernel_uint_t collected_starttime = p->starttime / system_hz;
     p->values[PDF_UPTIME] = (system_uptime_secs > collected_starttime)?(system_uptime_secs - collected_starttime):0;
     // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
     // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));
