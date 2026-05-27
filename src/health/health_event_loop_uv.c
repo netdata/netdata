@@ -465,8 +465,11 @@ static void health_batch_grow_to(struct health_event_loop_config *config, size_t
 }
 
 static void health_process_timer_tick(struct health_event_loop_config *config) {
-    // Skip if the previous batch is still running — we'll start the next one
-    // from the last worker's after_work_cb.
+    // Skip if the previous batch is still running. The next batch will be
+    // dispatched on a subsequent timer tick once the last worker clears
+    // batch_in_progress in health_batch_after_work_cb (which intentionally
+    // does NOT dispatch a new batch, to cap us at one batch per timer
+    // period).
     if (config->batch_in_progress)
         return;
 
