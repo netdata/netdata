@@ -255,7 +255,9 @@ modules:
               3. Update the **DSN** with the correct credentials for your PostgreSQL instance.
               4. Save the configuration — the collector reconnects automatically without a restart.
 
-              You do not need to manually edit configuration files or restart the Netdata Agent — updating credentials via Dynamic Configuration takes effect immediately. You do not need to create a new PostgreSQL user that matches the default credentials — simply update the collector job with the correct existing credentials for your PostgreSQL instance.
+              You do not need to manually edit configuration files or restart the Netdata Agent when updating credentials via Dynamic Configuration.
+
+              Use a PostgreSQL user that exists and has the required monitoring roles (recommended: the `netdata` user described in Prerequisites), then update the DSN accordingly.
 
     alerts:
       - name: postgres_total_connection_utilization
