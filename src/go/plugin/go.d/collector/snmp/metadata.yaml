@@ -1243,6 +1243,24 @@ modules:
               :::
 
               **Quick Checklist**
-              1. Do logs show “skipping data collection”?  
+              1. Do logs show "skipping data collection"?  
               2. Does *Internal → Stats* show collection time > `update_every`?  
               3. Increase `update_every` until skips disappear.
+
+          - name: Vnode display name changes after device hostname update
+            description: |
+              This occurs when a network device's SNMP sysName is changed — for example, renaming a switch from `sw-floor1` to `sw-buildingA-floor1` in the device's own configuration.
+
+              The SNMP collector derives the vnode hostname from the device's SNMP sysName (the `sysName` OID). When the device hostname changes, the displayed vnode name updates automatically on the next collection cycle. This is a cosmetic change only: the vnode GUID is auto-generated from the configured IP or DNS address (the `hostname` field in the SNMP job configuration), not from the device's SNMP sysName. The node identity remains stable — no duplicate nodes are created and no historical data is lost.
+
+              You do not need to manually set a GUID or reconfigure the job to prevent data duplication — the auto-generated GUID is already address-based and stable across device hostname changes.
+
+              If you want a fixed display name that does not change when the device hostname changes, set `vnode.hostname` in the SNMP job configuration to pin a specific name:
+
+              ```yaml
+              jobs:
+                - hostname: 192.0.2.1
+                  community: public
+                  vnode:
+                    hostname: core-switch-building-a
+              ```
