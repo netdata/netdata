@@ -213,6 +213,7 @@
         },
         "group_by": {
           "type": "array",
+          "description": "Supported aggregation scope ids a consumer may offer for grouping this view. For topology:network-connections the canonical process grouping ids are pid, process_name, cgroup, container, orchestrator, pod, namespace, workload, and service.",
           "items": {
             "$ref": "#/$defs/id"
           },
@@ -378,6 +379,7 @@
         },
         "aggregation_scopes": {
           "type": "array",
+          "description": "Aggregation scope ids this actor type can participate in. Process actors in topology:network-connections may reference pid, process_name, cgroup, container, orchestrator, pod, namespace, workload, and service.",
           "items": {
             "$ref": "#/$defs/id"
           },
@@ -2275,6 +2277,7 @@
     },
     "aggregation_scope": {
       "type": "object",
+      "description": "Named grouping contract over one or more table columns. When a grouping column is null or empty for a row, consumers preserve that row's actor identity instead of collapsing all null-keyed rows into one bucket.",
       "additionalProperties": false,
       "required": [
         "columns"

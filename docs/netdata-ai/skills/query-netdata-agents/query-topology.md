@@ -8,6 +8,18 @@ transport. For the production topology schema, response fields, compact table
 format, and interpretation rules, see
 [../query-netdata-cloud/query-topology.md](../query-netdata-cloud/query-topology.md).
 
+For `topology:network-connections`, process actors may include container and
+orchestrator columns: `cgroup_path`, `cgroup_name`, `orchestrator`,
+`k8s_pod_name`, `k8s_namespace`, `k8s_workload`, `docker_container_name`,
+`docker_image`, and `systemd_unit_name`. Supported grouping ids are `pid`,
+`process_name`, `cgroup`, `container`, `orchestrator`, `pod`, `namespace`,
+`workload`, and `service`.
+
+Use `processes:by_pid` for exact per-PID container attribution. Use
+`labels:<pattern>` to opt in to free-form labels with pipe-separated
+`simple_pattern` tokens, for example `labels:team|app`. Use
+`cgroup-paths:hide` to suppress full cgroup paths.
+
 ## Endpoint
 
 `POST /api/v3/function?function=topology:<source>`
@@ -41,6 +53,22 @@ agents_query_agent \
       actors: .actors.rows,
       links: .links.rows,
       evidence_rows: ([.evidence[]?.table.rows] | add // 0)
+    }'
+```
+
+Example with exact per-PID container grouping metadata:
+
+```bash
+agents_query_agent \
+    --node "$NODE_UUID" \
+    --host "$AGENT_TARGET" \
+    --machine-guid "$AGENT_MG" \
+    POST '/api/v3/function?function=topology:network-connections%20processes:by_pid%20labels:team%7Capp%20cgroup-paths:hide' \
+    '{"timeout":60000}' \
+  | jq '.data | {
+      group_by: .view.group_by,
+      process_scopes: .types.actor_types.process.aggregation_scopes,
+      actor_columns: [.actors.columns[].id]
     }'
 ```
 

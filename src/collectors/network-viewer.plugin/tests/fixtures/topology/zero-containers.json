@@ -1,0 +1,139 @@
+{
+  "status": 200,
+  "type": "topology",
+  "has_history": false,
+  "update_every": 1,
+  "data": {
+    "schema_version": "netdata.topology.v1",
+    "producer": {
+      "source": "network-connections",
+      "instance": "fixture-node",
+      "node_id": "node-fixture",
+      "machine_guid": "machine-fixture",
+      "agent_version": "test",
+      "plugin": "network-viewer.plugin",
+      "capabilities": ["topology-v1"]
+    },
+    "collected_at": "2026-05-27T00:00:00Z",
+    "view": {
+      "id": "network-connections",
+      "scope": "pid",
+      "mode": "aggregated",
+      "supported_modes": ["aggregated", "detailed"],
+      "group_by": ["pid", "process_name", "cgroup", "container", "orchestrator", "pod", "namespace", "workload", "service"]
+    },
+    "dictionaries": {"strings": []},
+    "types": {
+      "actor_types": {
+        "process": {
+          "layer": "process",
+          "identity": ["id"],
+          "merge_identity": ["machine_guid", "process"],
+          "aggregation_scopes": ["process_name", "pid", "cgroup", "container", "orchestrator", "pod", "namespace", "workload", "service"]
+        }
+      },
+      "link_types": {},
+      "table_types": {
+        "actor_labels": {
+          "role": "actor_inventory",
+          "owner": "actor",
+          "aggregation": "set",
+          "columns": [
+            {"id": "actor", "type": "actor_ref", "role": "reference"},
+            {"id": "key", "type": "string", "role": "group_key"},
+            {"id": "value", "type": "string", "role": "attribute"},
+            {"id": "source", "type": "string", "role": "attribute"},
+            {"id": "kind", "type": "string", "role": "attribute"},
+            {"id": "value_index", "type": "uint", "role": "attribute"}
+          ]
+        }
+      },
+      "aggregation_scopes": {
+        "process_name": {"columns": ["process"], "evidence_policy": "preserve"},
+        "pid": {"columns": ["pid", "net_ns_inode"], "evidence_policy": "preserve"},
+        "cgroup": {"columns": ["cgroup_path"], "evidence_policy": "preserve"},
+        "container": {"columns": ["cgroup_name"], "evidence_policy": "preserve"},
+        "orchestrator": {"columns": ["orchestrator"], "evidence_policy": "preserve"},
+        "pod": {"columns": ["k8s_pod_name"], "evidence_policy": "preserve"},
+        "namespace": {"columns": ["k8s_namespace"], "evidence_policy": "preserve"},
+        "workload": {"columns": ["k8s_workload"], "evidence_policy": "preserve"},
+        "service": {"columns": ["systemd_unit_name"], "evidence_policy": "preserve"}
+      }
+    },
+    "actors": {
+      "rows": 3,
+      "columns": [
+        {"id": "type", "type": "string"},
+        {"id": "id", "type": "string", "role": "identity"},
+        {"id": "machine_guid", "type": "string", "nullable": true},
+        {"id": "hostname", "type": "string", "nullable": true},
+        {"id": "process", "type": "string", "role": "group_key", "nullable": true},
+        {"id": "pid", "type": "uint", "role": "identity"},
+        {"id": "net_ns_inode", "type": "uint", "role": "identity"},
+        {"id": "cgroup_path", "type": "string", "role": "group_key", "nullable": true},
+        {"id": "cgroup_name", "type": "string", "role": "group_key", "nullable": true},
+        {"id": "orchestrator", "type": "string", "role": "group_key", "nullable": true},
+        {"id": "k8s_pod_name", "type": "string", "role": "group_key", "nullable": true},
+        {"id": "k8s_namespace", "type": "string", "role": "group_key", "nullable": true},
+        {"id": "k8s_workload", "type": "string", "role": "group_key", "nullable": true},
+        {"id": "docker_container_name", "type": "string", "role": "group_key", "nullable": true},
+        {"id": "docker_image", "type": "string", "role": "attribute", "nullable": true},
+        {"id": "systemd_unit_name", "type": "string", "role": "group_key", "nullable": true},
+        {"id": "display_name", "type": "string", "role": "attribute"},
+        {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+      ],
+      "values": [
+        {"codec": "const", "value": "process"},
+        {"codec": "values", "values": ["process:1001", "process:1002", "process:1003"]},
+        {"codec": "const", "value": "machine-fixture"},
+        {"codec": "const", "value": "node-fixture"},
+        {"codec": "values", "values": ["netdata", "ssh", "cron"]},
+        {"codec": "values", "values": [1001, 1002, 1003]},
+        {"codec": "values", "values": [2101, 2102, 2103]},
+        {"codec": "values", "values": [null, null, null]},
+        {"codec": "values", "values": [null, null, null]},
+        {"codec": "values", "values": [null, null, null]},
+        {"codec": "values", "values": [null, null, null]},
+        {"codec": "values", "values": [null, null, null]},
+        {"codec": "values", "values": [null, null, null]},
+        {"codec": "values", "values": [null, null, null]},
+        {"codec": "values", "values": [null, null, null]},
+        {"codec": "values", "values": [null, null, null]},
+        {"codec": "values", "values": ["netdata", "ssh", "cron"]},
+        {"codec": "values", "values": [2, 1, 1]}
+      ]
+    },
+    "links": {
+      "rows": 0,
+      "columns": [{"id": "type", "type": "string"}],
+      "values": [{"codec": "values", "values": []}]
+    },
+    "tables": {
+      "actor": {
+        "actor_labels": {
+          "type": "actor_labels",
+          "table": {
+            "rows": 0,
+            "columns": [
+              {"id": "actor", "type": "actor_ref", "role": "reference"},
+              {"id": "key", "type": "string", "role": "group_key"},
+              {"id": "value", "type": "string", "role": "attribute"},
+              {"id": "source", "type": "string", "role": "attribute"},
+              {"id": "kind", "type": "string", "role": "attribute"},
+              {"id": "value_index", "type": "uint", "role": "attribute"}
+            ],
+            "values": [
+              {"codec": "values", "values": []},
+              {"codec": "values", "values": []},
+              {"codec": "values", "values": []},
+              {"codec": "values", "values": []},
+              {"codec": "values", "values": []},
+              {"codec": "values", "values": []}
+            ]
+          }
+        }
+      }
+    },
+    "stats": {"actors": 3, "links": 0}
+  }
+}

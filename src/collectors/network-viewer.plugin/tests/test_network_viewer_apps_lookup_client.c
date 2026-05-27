@@ -200,6 +200,22 @@ int main(void)
         goto cleanup_client;
     if (!expect_ok(wait_for_cache_entries(1), "known PID was not cached"))
         goto cleanup_client;
+    NV_APPS_LOOKUP_FIELDS cached;
+    if (!expect_ok(nv_cache_lookup_pid(100, &cached), "known PID cache accessor missed"))
+        goto cleanup_client;
+    bool cached_ok =
+        expect_ok(cached.cgroup_status == NIPC_APPS_CGROUP_KNOWN, "cached cgroup status mismatch") &&
+        expect_ok(cached.orchestrator == NIPC_ORCHESTRATOR_DOCKER, "cached orchestrator mismatch") &&
+        expect_ok(strcmp(cached.cgroup_path, "/docker/test") == 0, "cached cgroup path mismatch") &&
+        expect_ok(strcmp(cached.cgroup_name, "test-container") == 0, "cached cgroup name mismatch") &&
+        expect_ok(cached.cgroup_label_count == 1, "cached label count mismatch") &&
+        expect_ok(strcmp(cached.cgroup_labels[0].key, "image") == 0, "cached label key mismatch") &&
+        expect_ok(strcmp(cached.cgroup_labels[0].value, "netdata/test") == 0, "cached label value mismatch");
+    nv_cache_lookup_fields_free(&cached);
+    if (!cached_ok)
+        goto cleanup_client;
+    if (!expect_ok(!nv_cache_lookup_pid(200, &cached), "retry-later PID should not be cached"))
+        goto cleanup_client;
     if (!expect_ok(wait_for_counter(&apps_lookup_cache_misses_unknown, 1), "retry-later PID was not counted as unknown miss"))
         goto cleanup_client;
 

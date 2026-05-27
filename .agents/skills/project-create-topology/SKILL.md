@@ -66,6 +66,11 @@ developer-facing and must stay in this project skill, not under
    - Declare `identity`, `merge_identity`, and `parent_identity` in actor types.
    - Prepare aggregation scopes such as node, process name, PID, container,
      Kubernetes workload, SNMP device/interface, or vSphere object.
+   - For network-connections container grouping, keep containers as canonical
+     columns on `process` actors unless the product explicitly needs separate
+     container actors. Emit `pid`, `process_name`, `cgroup`, `container`,
+     `orchestrator`, `pod`, `namespace`, `workload`, and `service` in
+     `view.group_by` and on the process actor type's `aggregation_scopes`.
 
 3. Pick graph links.
    - Graph links are renderable relationship groups.
@@ -97,6 +102,9 @@ developer-facing and must stay in this project skill, not under
    - Expose useful non-node actor labels and metadata, while keeping identity,
      correlation, grouping, sorting, filtering, and aggregation facts as typed
      canonical columns.
+   - When labels feed user-facing grouping, derive the grouping fields into
+     typed columns and apply any free-form label whitelist only at the Function
+     output boundary. Do not rely on `actor_labels` for grouping keys.
 
 6. Define telemetry overlays.
    - Use overlay templates once per payload or type.
@@ -413,6 +421,9 @@ For SNMP/L2 managed device actor modals:
 - Treat `actor_labels` as sensitive topology Function data. Preserve the source
   Function's access-control assumptions when forwarding, aggregating, testing,
   or documenting labels.
+- For sparse grouping columns, validate that consumers preserve actor identity
+  for null or empty grouping keys instead of merging every null row into one
+  bucket.
 - Modal sections are recipes over existing facts and do not duplicate
   high-cardinality evidence rows.
 - Raw JSON columns are hidden/debug-only unless a schema-declared projection

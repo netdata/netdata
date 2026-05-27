@@ -65,18 +65,60 @@ No action required.
 
 #### Options
 
+Optional APPS_LOOKUP cache-warming controls for topology and aggregated network-connection Functions.
+
+<details open><summary>Config options</summary>
 
 
-There are no configuration options.
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| apps lookup cache size | Maximum number of per-PID APPS_LOOKUP cache entries kept by network-viewer.plugin. | 8192 | no |
+| apps lookup generation refresh seconds | How often the background worker probes APPS_LOOKUP generation changes when the cache is otherwise warm. | 30 | no |
+
+
+</details>
 
 
 
 #### via File
 
-There is no configuration file.
+The configuration file name for this integration is `netdata.conf`.
+Configuration for this specific integration is located in the `[plugin:network-viewer]` section within that file.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config netdata.conf
+```
 
 ##### Examples
-There are no configuration examples.
+
+###### APPS_LOOKUP cache warming
+
+Keep the default cache size and generation refresh cadence.
+
+<details open><summary>Config</summary>
+
+```yaml
+[plugin:network-viewer]
+  apps lookup cache size = 8192
+  apps lookup generation refresh seconds = 30
+
+```
+</details>
 
 
 
@@ -87,6 +129,28 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per network-viewer plugin IPC
+
+network-viewer.plugin APPS_LOOKUP client cache-warming health and latency.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| netdata.collector.ipc.apps_lookup.client.requests | requests_sent, requests_responded, requests_failed | requests/s |
+| netdata.collector.ipc.apps_lookup.client.cache | cache_hits, cache_misses_unknown, cache_misses_intake_dropped, cache_evictions_pid_reuse, cache_evictions_lru, cache_evictions_generation_bump, cache_evictions_unknown_permanent | events/s |
+| netdata.collector.ipc.apps_lookup.client.peer | peer_connect_attempts, peer_disconnects, worker_refresh_probes | events/s |
+| netdata.collector.ipc.apps_lookup.client.worker_request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
+| netdata.collector.ipc.apps_lookup.client.function_handler_overhead_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | calls/s |
+| netdata.collector.ipc.apps_lookup.client.intake_depth | intake_depth | pids |
 
 
 
@@ -167,5 +231,59 @@ This function has no parameters.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
+
+
+### Network Connections Topology
+
+Shows active network connections as a topology graph with self, process, and endpoint actors.
+
+Process actors expose container and orchestrator grouping columns when APPS_LOOKUP cache data is available:
+cgroup path, cgroup name, orchestrator, Kubernetes pod, namespace, workload, Docker/container name,
+Docker image, and systemd unit name.
+
+Supported topology groupings are pid, process_name, cgroup, container, orchestrator, pod, namespace,
+workload, and service. Free-form labels are hidden by default and can be allowed per request with
+labels:<pattern>, where patterns are pipe-separated. Full cgroup paths are shown by default and can be
+hidden per request with cgroup-paths:hide.
+
+In the default processes:by_name mode, container and orchestrator columns reflect the first PID observed
+for each process name. Use processes:by_pid when exact per-container attribution is required.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Network-viewer.plugin:topology:network-connections` |
+| Require Cloud | no |
+| Performance | Adds nullable string columns to process actor rows; APPS_LOOKUP cache warming runs asynchronously. |
+| Security | Free-form labels are denied by default. cgroup_path may expose operator-chosen path segments and can be hidden with cgroup-paths:hide. |
+| Availability | Container columns are populated only when apps.plugin and cgroups.plugin provide APPS_LOOKUP data for the PID. |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Processes | select | Use processes:by_name or processes:by_pid. by_pid gives exact per-PID container attribution. | no | by_name | by_name (default), by_pid |
+| Labels | string | Optional pipe-separated simple-pattern whitelist for free-form actor labels. Omitted means deny all free-form labels. | no |  |  |
+| Cgroup Paths | select | Use cgroup-paths:show or cgroup-paths:hide to control the full cgroup_path column. | no | show | show (default), hide |
+
+#### Returns
+
+Topology payload using netdata.topology.v1.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| cgroup_path | string |  |  | Full cgroup path. Use cgroup-paths:hide to suppress it. |
+| cgroup_name | string |  |  | Cgroup or container display name. |
+| orchestrator | string |  |  | Container/orchestrator family, such as systemd, docker, k8s, kvm, lxc, podman, nspawn, host_root, or unknown. |
+| k8s_pod_name | string |  |  | Kubernetes pod name from cgroup labels. |
+| k8s_namespace | string |  |  | Kubernetes namespace from cgroup labels. |
+| k8s_workload | string |  |  | Kubernetes controller name, or a workload name derived from pod-name suffixes. |
+| docker_container_name | string |  |  | Kubernetes container name, Docker/Podman container name, or cgroup name fallback. |
+| docker_image | string |  |  | Docker/Podman image label when available. |
+| systemd_unit_name | string |  |  | systemd unit name extracted from the cgroup path. |
 
 

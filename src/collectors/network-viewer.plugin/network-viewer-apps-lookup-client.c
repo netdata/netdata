@@ -23,11 +23,6 @@
 
 typedef struct {
     char *key;
-    char *value;
-} NV_APPS_LOOKUP_LABEL;
-
-typedef struct {
-    char *key;
     uint32_t pid;
     uint32_t ppid;
     uint32_t uid;
@@ -185,6 +180,11 @@ static char *nv_apps_lookup_strndupz(const char *src, uint32_t len)
         memcpy(dst, src, len);
     dst[len] = '\0';
     return dst;
+}
+
+static char *nv_apps_lookup_strdupz_empty(const char *src)
+{
+    return strdupz(src ? src : "");
 }
 
 static void nv_apps_lookup_cache_entry_clear(NV_APPS_LOOKUP_CACHE_ENTRY *entry)
@@ -883,6 +883,62 @@ void nv_apps_lookup_warm_pids(const uint32_t *pids, size_t pid_count)
 
     nv_apps_lookup_handler_overhead_observe(now_monotonic_usec() - started_ut);
     freez(misses);
+}
+
+bool nv_cache_lookup_pid(uint32_t pid, NV_APPS_LOOKUP_FIELDS *out)
+{
+    if (!out)
+        return false;
+
+    *out = (NV_APPS_LOOKUP_FIELDS){ 0 };
+
+    if (pid == 0 || !apps_lookup_cache)
+        return false;
+
+    char key[16];
+    nv_apps_lookup_pid_key(pid, key);
+
+    netdata_mutex_lock(&apps_lookup_cache_mutex);
+    NV_APPS_LOOKUP_CACHE_ENTRY *entry = dictionary_get(apps_lookup_cache, key);
+    if (!entry) {
+        netdata_mutex_unlock(&apps_lookup_cache_mutex);
+        return false;
+    }
+
+    entry->last_used_usec = now_monotonic_usec();
+    out->cgroup_status = entry->cgroup_status;
+    out->orchestrator = entry->orchestrator;
+    out->starttime = entry->starttime;
+    out->apps_lookup_generation_observed = entry->observed_generation;
+    out->cgroup_path = nv_apps_lookup_strdupz_empty(entry->cgroup_path);
+    out->cgroup_name = nv_apps_lookup_strdupz_empty(entry->cgroup_name);
+
+    if (entry->label_count) {
+        out->cgroup_labels = callocz(entry->label_count, sizeof(*out->cgroup_labels));
+        out->cgroup_label_count = entry->label_count;
+        for (uint16_t i = 0; i < entry->label_count; i++) {
+            out->cgroup_labels[i].key = nv_apps_lookup_strdupz_empty(entry->labels[i].key);
+            out->cgroup_labels[i].value = nv_apps_lookup_strdupz_empty(entry->labels[i].value);
+        }
+    }
+
+    netdata_mutex_unlock(&apps_lookup_cache_mutex);
+    return true;
+}
+
+void nv_cache_lookup_fields_free(NV_APPS_LOOKUP_FIELDS *fields)
+{
+    if (!fields)
+        return;
+
+    freez(fields->cgroup_path);
+    freez(fields->cgroup_name);
+    for (uint16_t i = 0; i < fields->cgroup_label_count; i++) {
+        freez(fields->cgroup_labels[i].key);
+        freez(fields->cgroup_labels[i].value);
+    }
+    freez(fields->cgroup_labels);
+    *fields = (NV_APPS_LOOKUP_FIELDS){ 0 };
 }
 
 void nv_apps_lookup_send_charts_to_netdata(usec_t dt)

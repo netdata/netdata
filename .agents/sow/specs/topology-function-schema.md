@@ -524,6 +524,30 @@ detailed mode reads them from `evidence.socket`. `socket_ports` is an actor
 inventory for process port bullets only; it is not a standalone modal tab for
 network-connections.
 
+Network-connections process actors may carry container and orchestrator
+columns derived from the APPS_LOOKUP cache: `cgroup_path`, `cgroup_name`,
+`orchestrator`, `k8s_pod_name`, `k8s_namespace`, `k8s_workload`,
+`docker_container_name`, `docker_image`, and `systemd_unit_name`. The process
+actor type advertises nine grouping ids: `pid`, `process_name`, `cgroup`,
+`container`, `orchestrator`, `pod`, `namespace`, `workload`, and `service`.
+All new aggregation scopes use `evidence_policy: "preserve"`.
+
+The `orchestrator` column renders netipc orchestrators as `systemd`, `docker`,
+`k8s`, `kvm`, `lxc`, `podman`, or `nspawn`. It additionally renders
+APPS_LOOKUP host-root cgroup status as `host_root`; this is a producer-local
+topology value, not a netipc enum member.
+
+Free-form cgroup labels are denied by default in Function output. Operators
+opt in with `labels:<pattern>` using pipe-separated `simple_pattern` tokens.
+The whitelist is applied at network-viewer Function emission only; upstream
+cgroup caches and IPC payloads carry raw labels. `cgroup-paths:hide` suppresses
+only the full `cgroup_path` column.
+
+Sparse-scope rule: when a grouping column is null or empty for a row, consumers
+must preserve that row's actor identity instead of collapsing all null-keyed
+rows into one bucket. This applies to container and orchestrator scopes and to
+future sparse grouping dimensions.
+
 `topology:snmp` now emits `netdata.topology.v1` from the Function handler
 through an adapter over the existing SNMP topology engine output. The adapter
 preserves actors, links, L2 observation evidence, actor metadata, and actor

@@ -3,6 +3,7 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 #include "network-viewer-apps-lookup-client.h"
+#include "network-viewer-topology-containers.h"
 
 
 static SPAWN_SERVER *spawn_srv = NULL;
@@ -116,6 +117,7 @@ typedef struct {
     bool info_only;
     bool detailed;
     bool processes_by_pid;
+    bool cgroup_paths_visible;
     bool sockets_listening;
     bool sockets_inbound;
     bool sockets_outbound;
@@ -123,6 +125,7 @@ typedef struct {
     bool protocols_ipv6_tcp;
     bool protocols_ipv4_udp;
     bool protocols_ipv6_udp;
+    SIMPLE_PATTERN *label_whitelist;
 } NV_TOPOLOGY_OPTIONS;
 
 typedef struct {
@@ -230,6 +233,7 @@ static inline void topology_options_defaults(NV_TOPOLOGY_OPTIONS *opts) {
     memset(opts, 0, sizeof(*opts));
     opts->detailed = false; // default: aggregated graph view
     opts->processes_by_pid = false; // default: by_name
+    opts->cgroup_paths_visible = true;
     opts->sockets_listening = false;
     opts->sockets_inbound = true;
     opts->sockets_outbound = true;
@@ -307,6 +311,21 @@ static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *op
 
         if(strcmp(param, "endpoints:by_ip") == 0 || strcmp(param, "endpoints:by-ip") == 0)
             continue;
+
+        if(strncmp(param, "labels:", 7) == 0) {
+            simple_pattern_free(opts->label_whitelist);
+            opts->label_whitelist = nv_label_whitelist_parse(&param[7]);
+            continue;
+        }
+
+        if(strcmp(param, "cgroup-paths:show") == 0) {
+            opts->cgroup_paths_visible = true;
+            continue;
+        }
+        if(strcmp(param, "cgroup-paths:hide") == 0) {
+            opts->cgroup_paths_visible = false;
+            continue;
+        }
 
         if(strncmp(param, "sockets:", 8) == 0) {
             if(!sockets_selected_explicitly) {
@@ -1618,6 +1637,8 @@ static void topology_write_response_metadata(BUFFER *wb) {
         buffer_json_add_array_item_string(wb, "sockets");
         buffer_json_add_array_item_string(wb, "protocols");
         buffer_json_add_array_item_string(wb, "endpoints");
+        buffer_json_add_array_item_string(wb, "labels");
+        buffer_json_add_array_item_string(wb, "cgroup-paths");
     }
     buffer_json_array_close(wb);
     buffer_json_member_add_array(wb, "required_params");
@@ -1770,6 +1791,42 @@ static void topology_write_response_metadata(BUFFER *wb) {
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", "labels");
+            buffer_json_member_add_string(wb, "name", "Labels");
+            buffer_json_member_add_string(wb, "help", "Pipe-separated label-key whitelist for optional actor labels. Omit to hide free-form labels.");
+            buffer_json_member_add_string(wb, "type", "text");
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", "cgroup-paths");
+            buffer_json_member_add_string(wb, "name", "Cgroup Paths");
+            buffer_json_member_add_string(wb, "help", "Show or hide full cgroup paths in process actor columns.");
+            buffer_json_member_add_boolean(wb, "unique_view", true);
+            buffer_json_member_add_string(wb, "type", "select");
+            buffer_json_member_add_array(wb, "options");
+            {
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "show");
+                    buffer_json_member_add_string(wb, "name", "Show");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "hide");
+                    buffer_json_member_add_string(wb, "name", "Hide");
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
     }
     buffer_json_array_close(wb);
 }
@@ -1786,6 +1843,15 @@ typedef struct {
     char local_address_space[16];
     char ip[INET6_ADDRSTRLEN];
     char address_space[16];
+    char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
+    char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
+    char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
+    char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX];
+    char k8s_workload[NV_TOPOLOGY_K8S_NAME_MAX];
+    char docker_container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char docker_image[NV_TOPOLOGY_DOCKER_IMAGE_MAX];
+    char systemd_unit_name[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
     char display_name[NV_TOPOLOGY_KEY_MAX];
     char cmdline[NV_TOPOLOGY_CMDLINE_MAX];
     uint64_t pid;
@@ -2110,6 +2176,47 @@ static void topology_v1_add_actor_label_uint(
     topology_v1_add_actor_label(payload, actor, key, buffer, kind);
 }
 
+static void topology_v1_enrich_process_actor_from_cache(
+    const NV_TOPOLOGY_CONTEXT *ctx,
+    NV_TOPOLOGY_V1_PAYLOAD *payload,
+    uint64_t actor_index,
+    NV_TOPOLOGY_V1_ACTOR *actor,
+    uint32_t pid)
+{
+    if(!ctx || !payload || !actor || !pid)
+        return;
+
+    NV_APPS_LOOKUP_FIELDS cached;
+    if(!nv_cache_lookup_pid(pid, &cached))
+        return;
+
+    const char *orchestrator = nv_orchestrator_name(cached.cgroup_status, cached.orchestrator);
+    if(ctx->options.cgroup_paths_visible)
+        topology_v1_strncpy(actor->cgroup_path, sizeof(actor->cgroup_path), cached.cgroup_path);
+    topology_v1_strncpy(actor->cgroup_name, sizeof(actor->cgroup_name), cached.cgroup_name);
+    topology_v1_strncpy(actor->orchestrator, sizeof(actor->orchestrator), orchestrator);
+
+    nv_derive_k8s_pod_name(&cached, actor->k8s_pod_name, sizeof(actor->k8s_pod_name));
+    nv_derive_k8s_namespace(&cached, actor->k8s_namespace, sizeof(actor->k8s_namespace));
+    nv_derive_k8s_workload(&cached, actor->k8s_workload, sizeof(actor->k8s_workload));
+    nv_derive_docker_container_name(
+        &cached, actor->cgroup_name, actor->docker_container_name, sizeof(actor->docker_container_name));
+    nv_derive_docker_image(&cached, actor->docker_image, sizeof(actor->docker_image));
+    if(cached.orchestrator == NIPC_ORCHESTRATOR_SYSTEMD)
+        nv_derive_systemd_unit_name(cached.cgroup_path, actor->systemd_unit_name, sizeof(actor->systemd_unit_name));
+
+    if(ctx->options.label_whitelist) {
+        for(uint16_t i = 0; i < cached.cgroup_label_count; i++) {
+            const char *key = cached.cgroup_labels[i].key;
+            const char *value = cached.cgroup_labels[i].value;
+            if(key && value && simple_pattern_matches(ctx->options.label_whitelist, key))
+                topology_v1_add_actor_label_ex(payload, actor_index, key, value, "cgroups", "label", false, 0);
+        }
+    }
+
+    nv_cache_lookup_fields_free(&cached);
+}
+
 static void topology_v1_add_correlation_row(
     NV_TOPOLOGY_V1_CORRELATION_ROW **rows,
     size_t *rows_used,
@@ -2270,17 +2377,19 @@ static void topology_v1_collect_actors(
         topology_v1_strncpy(actor->local_address_space, sizeof(actor->local_address_space), pa->local_address_space);
         topology_v1_strncpy(actor->display_name, sizeof(actor->display_name), display_name);
         topology_v1_strncpy(actor->cmdline, sizeof(actor->cmdline), pa->cmdline);
+        uint64_t actor_index = payload->actors_used - 1;
+        if(pa->pid > 0)
+            topology_v1_enrich_process_actor_from_cache(ctx, payload, actor_index, actor, (uint32_t)pa->pid);
         actor->pid = (uint64_t)pa->pid;
         actor->ppid = (uint64_t)pa->ppid;
         actor->uid = (uint64_t)pa->uid;
         actor->net_ns_inode = pa->net_ns_inode;
         actor->sockets = pa->sockets;
-        actor->has_pid = ctx->options.processes_by_pid;
-        actor->has_ppid = ctx->options.processes_by_pid;
-        actor->has_uid = ctx->options.processes_by_pid;
-        actor->has_net_ns_inode = ctx->options.processes_by_pid;
+        actor->has_pid = true;
+        actor->has_ppid = true;
+        actor->has_uid = true;
+        actor->has_net_ns_inode = true;
 
-        uint64_t actor_index = payload->actors_used - 1;
         topology_v1_add_actor_label(payload, actor_index, "display_name", actor->display_name, "attribute");
         topology_v1_add_actor_label(payload, actor_index, "type", actor->type, "metadata");
         topology_v1_add_actor_label(payload, actor_index, "process", actor->process, "identity");
@@ -2290,11 +2399,11 @@ static void topology_v1_collect_actors(
         topology_v1_add_actor_label(payload, actor_index, "local_ip", actor->local_ip, "attribute");
         topology_v1_add_actor_label(payload, actor_index, "local_address_space", actor->local_address_space, "attribute");
         topology_v1_add_actor_label_uint(payload, actor_index, "socket_count", actor->sockets, "metric");
-        if(actor->has_pid)
+        if(ctx->options.processes_by_pid)
             topology_v1_add_actor_label_uint(payload, actor_index, "pid", actor->pid, "identity");
-        if(actor->has_uid)
+        if(ctx->options.processes_by_pid)
             topology_v1_add_actor_label_uint(payload, actor_index, "uid", actor->uid, "attribute");
-        if(actor->has_net_ns_inode)
+        if(ctx->options.processes_by_pid)
             topology_v1_add_actor_label_uint(payload, actor_index, "net_ns_inode", actor->net_ns_inode, "identity");
     }
     dfe_done(pa);
@@ -2702,6 +2811,15 @@ static void topology_v1_emit_actor_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "local_address_space", "string", "attribute", true, NULL);
     topology_v1_emit_column(wb, "ip", "ip", "identity", true, NULL);
     topology_v1_emit_column(wb, "address_space", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "cgroup_path", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "cgroup_name", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "orchestrator", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "k8s_pod_name", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "k8s_namespace", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "k8s_workload", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "docker_container_name", "string", "group_key", true, NULL);
+    topology_v1_emit_column(wb, "docker_image", "string", "attribute", true, NULL);
+    topology_v1_emit_column(wb, "systemd_unit_name", "string", "group_key", true, NULL);
     topology_v1_emit_column(wb, "display_name", "string", "attribute", true, NULL);
     topology_v1_emit_column(wb, "socket_count", "uint", "metric", false, "sum");
     topology_v1_emit_column(wb, "local_ip_count", "uint", "metric", true, "sum");
@@ -2951,7 +3069,8 @@ static void topology_v1_emit_actor_type(
     const char *id,
     const char *merge_a,
     const char *merge_b,
-    const char *scope,
+    const char *const *scopes,
+    size_t scopes_count,
     const char *label,
     const char *color_slot,
     const char *icon,
@@ -2981,7 +3100,8 @@ static void topology_v1_emit_actor_type(
             buffer_json_add_array_item_string(wb, merge_b);
         buffer_json_array_close(wb);
         buffer_json_member_add_array(wb, "aggregation_scopes");
-        buffer_json_add_array_item_string(wb, scope);
+        for(size_t i = 0; i < scopes_count; i++)
+            buffer_json_add_array_item_string(wb, scopes[i]);
         buffer_json_array_close(wb);
         buffer_json_member_add_object(wb, "search");
         {
@@ -2996,6 +3116,11 @@ static void topology_v1_emit_actor_type(
                 buffer_json_add_array_item_string(wb, "username");
                 buffer_json_add_array_item_string(wb, "cmdline");
                 buffer_json_add_array_item_string(wb, "local_ip");
+                buffer_json_add_array_item_string(wb, "cgroup_name");
+                buffer_json_add_array_item_string(wb, "docker_container_name");
+                buffer_json_add_array_item_string(wb, "k8s_pod_name");
+                buffer_json_add_array_item_string(wb, "k8s_namespace");
+                buffer_json_add_array_item_string(wb, "orchestrator");
             }
             else if(strcmp(id, "endpoint") == 0) {
                 buffer_json_add_array_item_string(wb, "display_name");
@@ -3242,22 +3367,28 @@ static void topology_v1_emit_link_type(
 }
 
 static void topology_v1_emit_type_registry(BUFFER *wb, bool detailed __maybe_unused) {
+    static const char *const self_scopes[] = { "node" };
+    static const char *const process_scopes[] = {
+        "process_name", "pid", "cgroup", "container", "orchestrator", "pod", "namespace", "workload", "service"
+    };
+    static const char *const endpoint_scopes[] = { "endpoint" };
+
     buffer_json_member_add_object(wb, "types");
     {
         buffer_json_member_add_object(wb, "actor_types");
         {
             topology_v1_emit_actor_type(
-                wb, "self", "machine_guid", "hostname", "node",
+                wb, "self", "machine_guid", "hostname", self_scopes, _countof(self_scopes),
                 "This host", "self", "self", "actor", true, "fixed", NULL, "emphasized", "strongest", false, NULL,
                 detailed,
                 "display_name", "hostname");
             topology_v1_emit_actor_type(
-                wb, "process", "machine_guid", "process", "process_name",
+                wb, "process", "machine_guid", "process", process_scopes, _countof(process_scopes),
                 "Process", "primary", "process", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
                 detailed,
                 "display_name", "process");
             topology_v1_emit_actor_type(
-                wb, "endpoint", "ip", "address_space", "endpoint",
+                wb, "endpoint", "ip", "address_space", endpoint_scopes, _countof(endpoint_scopes),
                 "Correlation endpoint", "derived", "remote-endpoint", "endpoint", true, "fixed", NULL, "compact", "weaker", false, NULL,
                 detailed,
                 "display_name", "ip");
@@ -3417,6 +3548,69 @@ static void topology_v1_emit_type_registry(BUFFER *wb, bool detailed __maybe_unu
             }
             buffer_json_object_close(wb);
 
+            buffer_json_member_add_object(wb, "cgroup");
+            {
+                buffer_json_member_add_array(wb, "columns");
+                buffer_json_add_array_item_string(wb, "cgroup_path");
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "evidence_policy", "preserve");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "container");
+            {
+                buffer_json_member_add_array(wb, "columns");
+                buffer_json_add_array_item_string(wb, "cgroup_name");
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "evidence_policy", "preserve");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "orchestrator");
+            {
+                buffer_json_member_add_array(wb, "columns");
+                buffer_json_add_array_item_string(wb, "orchestrator");
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "evidence_policy", "preserve");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "pod");
+            {
+                buffer_json_member_add_array(wb, "columns");
+                buffer_json_add_array_item_string(wb, "k8s_pod_name");
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "evidence_policy", "preserve");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "namespace");
+            {
+                buffer_json_member_add_array(wb, "columns");
+                buffer_json_add_array_item_string(wb, "k8s_namespace");
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "evidence_policy", "preserve");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "workload");
+            {
+                buffer_json_member_add_array(wb, "columns");
+                buffer_json_add_array_item_string(wb, "k8s_workload");
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "evidence_policy", "preserve");
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "service");
+            {
+                buffer_json_member_add_array(wb, "columns");
+                buffer_json_add_array_item_string(wb, "systemd_unit_name");
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "evidence_policy", "preserve");
+            }
+            buffer_json_object_close(wb);
+
         }
         buffer_json_object_close(wb);
     }
@@ -3561,6 +3755,15 @@ static void topology_v1_emit_actor_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *pay
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(local_address_space);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(ip);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(address_space);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(cgroup_path);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(cgroup_name);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(orchestrator);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(k8s_pod_name);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(k8s_namespace);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(k8s_workload);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(docker_container_name);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(docker_image);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(systemd_unit_name);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(display_name);
 
         topology_v1_values_start(wb);
@@ -4036,7 +4239,15 @@ static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
             buffer_json_add_array_item_string(wb, "detailed");
             buffer_json_array_close(wb);
             buffer_json_member_add_array(wb, "group_by");
-            buffer_json_add_array_item_string(wb, ctx->options.processes_by_pid ? "pid" : "process_name");
+            buffer_json_add_array_item_string(wb, "pid");
+            buffer_json_add_array_item_string(wb, "process_name");
+            buffer_json_add_array_item_string(wb, "cgroup");
+            buffer_json_add_array_item_string(wb, "container");
+            buffer_json_add_array_item_string(wb, "orchestrator");
+            buffer_json_add_array_item_string(wb, "pod");
+            buffer_json_add_array_item_string(wb, "namespace");
+            buffer_json_add_array_item_string(wb, "workload");
+            buffer_json_add_array_item_string(wb, "service");
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
@@ -4114,6 +4325,7 @@ static void network_viewer_topology_function(
     }
 
     topology_context_destroy(&ctx);
+    simple_pattern_free(options.label_whitelist);
     topology_finalize_response(transaction, wb, now_s);
 }
 
