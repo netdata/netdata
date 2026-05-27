@@ -318,13 +318,6 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
         host->health.delay_up_to = 0;
     }
 
-   static bool show_host_running = false;
-   if (unlink("/tmp/health_log") == 0)
-            show_host_running = !show_host_running;
-
-    if (show_host_running)
-           nd_log(NDLS_DAEMON, NDLP_INFO, "[%s]: Running health now.", rrdhost_hostname(host));
-
     worker_is_busy(UV_EVENT_HEALTH_HOST_LOCK);
     {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);

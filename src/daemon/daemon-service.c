@@ -106,8 +106,6 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "WEB_SERVER ");
     if(service & SERVICE_ACLK)
         buffer_strcat(wb, "ACLK ");
-    if(service & SERVICE_HEALTH)
-        buffer_strcat(wb, "HEALTH ");
     if(service & SERVICE_STREAMING)
         buffer_strcat(wb, "STREAMING ");
     if(service & ABILITY_STREAMING_CONNECTIONS)
