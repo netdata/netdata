@@ -1314,6 +1314,8 @@ Control groups (cgroups) monitoring plugin configuration
 | `run script to rename cgroups matching` | string | Pattern matching to determine which cgroups should be processed by the renaming script. Default is "*" (all cgroups). |
 | `cgroups to match as systemd services` | string | Pattern matching to identify cgroups that represent systemd services. Enables special handling for systemd service monitoring. |
 
+Note: the legacy cgroup-name config wording is historical; current builds satisfy it with the `cgroup-name` helper binary.
+
 ### Section `plugin:freebsd`
 FreeBSD system monitoring plugin configuration
 

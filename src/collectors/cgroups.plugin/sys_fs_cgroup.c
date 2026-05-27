@@ -382,7 +382,7 @@ void read_cgroup_plugin_configuration() {
                        " * "
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
-    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name", netdata_configured_primary_plugins_dir);
     cgroups_rename_script = inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-network", netdata_configured_primary_plugins_dir);

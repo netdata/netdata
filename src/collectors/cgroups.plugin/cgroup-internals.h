@@ -198,7 +198,7 @@ struct cgroup {
     uint32_t hash_chart_id;
 
     // 'cgroup_name' label value.
-    // by default this is the *id (path), later changed to the resolved name (cgroup-name.sh) or systemd service name.
+    // by default this is the *id (path), later changed to the resolved name (cgroup-name) or systemd service name.
     char *name;
 
     RRDLABELS *chart_labels;

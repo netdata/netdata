@@ -886,7 +886,7 @@ static int is_digits_only(const char *s) {
 
 static int is_cgroup_k8s_container(const char *id) {
     // examples:
-    // https://github.com/netdata/netdata/blob/0fc101679dcd12f1cb8acdd07bb4c85d8e553e53/collectors/cgroups.plugin/cgroup-name.sh#L121-L147
+    // See src/collectors/cgroups.plugin/cgroup-name/FLOW.md for the cgroup-name Kubernetes path rules.
     const char *p = id;
     const char *pp = NULL;
     int i = 0;
