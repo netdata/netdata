@@ -325,6 +325,7 @@ For virtual nodes, see [Does renaming a virtual node change its identity?](#does
 
 </details>
 
+<a id="does-renaming-a-virtual-node-change-its-identity"></a>
 <details>
 <summary>Does renaming a virtual node change its identity?</summary>
 
