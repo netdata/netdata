@@ -55,18 +55,34 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
+          name: "netdata.conf"
+          section_name: "[plugin:network-viewer]"
+          description: "The netdata main configuration file."
         options:
-          description: ""
+          description: "Optional APPS_LOOKUP cache-warming controls for topology and aggregated network-connection Functions."
           folding:
-            title: ""
-            enabled: false
-          list: []
+            title: "Config options"
+            enabled: true
+          list:
+            - name: apps lookup cache size
+              description: Maximum number of per-PID APPS_LOOKUP cache entries kept by network-viewer.plugin.
+              default_value: 8192
+              required: false
+            - name: apps lookup generation refresh seconds
+              description: How often the background worker probes APPS_LOOKUP generation changes when the cache is otherwise warm.
+              default_value: 30
+              required: false
         examples:
           folding:
-            enabled: false
-            title: ""
-          list: []
+            title: "Config"
+            enabled: true
+          list:
+            - name: APPS_LOOKUP cache warming
+              description: Keep the default cache size and generation refresh cadence.
+              config: |
+                [plugin:network-viewer]
+                  apps lookup cache size = 8192
+                  apps lookup generation refresh seconds = 30
     troubleshooting:
       problems:
         list: []
@@ -77,7 +93,71 @@ modules:
         enabled: false
       description: ""
       availability: []
-      scopes: []
+      scopes:
+        - name: network-viewer plugin IPC
+          description: network-viewer.plugin APPS_LOOKUP client cache-warming health and latency.
+          labels: []
+          metrics:
+            - name: netdata.collector.ipc.apps_lookup.client.requests
+              description: APPS_LOOKUP client request outcomes
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests_sent
+                - name: requests_responded
+                - name: requests_failed
+            - name: netdata.collector.ipc.apps_lookup.client.cache
+              description: APPS_LOOKUP client cache outcomes
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: cache_hits
+                - name: cache_misses_unknown
+                - name: cache_misses_intake_dropped
+                - name: cache_evictions_pid_reuse
+                - name: cache_evictions_lru
+                - name: cache_evictions_generation_bump
+                - name: cache_evictions_unknown_permanent
+            - name: netdata.collector.ipc.apps_lookup.client.peer
+              description: APPS_LOOKUP client peer connection events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: peer_connect_attempts
+                - name: peer_disconnects
+                - name: worker_refresh_probes
+            - name: netdata.collector.ipc.apps_lookup.client.worker_request_duration_ms
+              description: APPS_LOOKUP worker request duration cumulative histogram
+              unit: "requests/s"
+              chart_type: stacked
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
+            - name: netdata.collector.ipc.apps_lookup.client.function_handler_overhead_ms
+              description: APPS_LOOKUP Function handler cache-check and intake-enqueue overhead cumulative histogram
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
+            - name: netdata.collector.ipc.apps_lookup.client.intake_depth
+              description: APPS_LOOKUP client queued PIDs awaiting worker lookup
+              unit: "pids"
+              chart_type: line
+              dimensions:
+                - name: intake_depth
     functions:
       description: |
         This plugin exposes real-time functions for viewing active network connections and,

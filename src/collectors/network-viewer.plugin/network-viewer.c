@@ -2,6 +2,7 @@
 
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
+#include "network-viewer-apps-lookup-client.h"
 
 
 static SPAWN_SERVER *spawn_srv = NULL;
@@ -1433,6 +1434,77 @@ static void topology_context_destroy(NV_TOPOLOGY_CONTEXT *ctx) {
         dictionary_destroy(ctx->remote_actors);
     if(ctx->process_actors)
         dictionary_destroy(ctx->process_actors);
+}
+
+static int nv_uint32_compar(const void *a, const void *b)
+{
+    uint32_t av = *(const uint32_t *)a;
+    uint32_t bv = *(const uint32_t *)b;
+
+    return (av > bv) - (av < bv);
+}
+
+static size_t nv_pid_sort_unique(uint32_t *pids, size_t count)
+{
+    if (!pids || count < 2)
+        return count;
+
+    qsort(pids, count, sizeof(*pids), nv_uint32_compar);
+
+    size_t unique = 1;
+    for (size_t i = 1; i < count; i++) {
+        if (pids[i] != pids[unique - 1])
+            pids[unique++] = pids[i];
+    }
+
+    return unique;
+}
+
+static void nv_pid_append(uint32_t **pids, size_t *count, size_t *capacity, pid_t pid)
+{
+    if (!pids || !count || !capacity || pid <= 0)
+        return;
+
+    if (*count == *capacity) {
+        size_t new_capacity = *capacity ? *capacity * 2 : 64;
+        *pids = reallocz(*pids, new_capacity * sizeof(**pids));
+        *capacity = new_capacity;
+    }
+
+    (*pids)[(*count)++] = (uint32_t)pid;
+}
+
+static void nv_warm_cache_from_topology_actors(NV_TOPOLOGY_CONTEXT *ctx)
+{
+    if (!ctx || !ctx->process_actors)
+        return;
+
+    uint32_t *pids = NULL;
+    size_t count = 0, capacity = 0;
+    NV_PROCESS_ACTOR *pa;
+    dfe_start_read(ctx->process_actors, pa) {
+        nv_pid_append(&pids, &count, &capacity, pa->pid);
+    }
+    dfe_done(pa);
+
+    count = nv_pid_sort_unique(pids, count);
+    nv_apps_lookup_warm_pids(pids, count);
+    freez(pids);
+}
+
+static void nv_warm_cache_from_aggregated_sockets(LOCAL_SOCKET **sockets, size_t count)
+{
+    if (!sockets || count == 0)
+        return;
+
+    uint32_t *pids = NULL;
+    size_t pid_count = 0, capacity = 0;
+    for (size_t i = 0; i < count; i++)
+        nv_pid_append(&pids, &pid_count, &capacity, sockets[i] ? sockets[i]->pid : 0);
+
+    pid_count = nv_pid_sort_unique(pids, pid_count);
+    nv_apps_lookup_warm_pids(pids, pid_count);
+    freez(pids);
 }
 
 static bool topology_prepare_context(NV_TOPOLOGY_CONTEXT *ctx, usec_t now_ut, const NV_TOPOLOGY_OPTIONS *options) {
@@ -4036,8 +4108,10 @@ static void network_viewer_topology_function(
 
     NV_TOPOLOGY_CONTEXT ctx;
     bool ctx_ready = topology_prepare_context(&ctx, now_ut, &options);
-    if(ctx_ready)
+    if(ctx_ready) {
+        nv_warm_cache_from_topology_actors(&ctx);
         topology_write_data(wb, &ctx);
+    }
 
     topology_context_destroy(&ctx);
     topology_finalize_response(transaction, wb, now_s);
@@ -4197,6 +4271,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                     array[added++] = n;
                 }
 
+                nv_warm_cache_from_aggregated_sockets(array, added);
                 qsort(array, added, sizeof(LOCAL_SOCKET *), local_sockets_compar);
 
                 for(size_t i = 0; i < added ;i++) {
@@ -4938,8 +5013,12 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
+    nv_apps_lookup_init(&plugin_should_exit);
+    nv_apps_lookup_start();
+
     usec_t send_newline_ut = 0;
     bool tty = isatty(fileno(stdout)) == 1;
+    int exit_code = 0;
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
@@ -4948,16 +5027,31 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         usec_t dt_ut = heartbeat_next(&hb);
         send_newline_ut += dt_ut;
 
+        if(!__atomic_load_n(&plugin_should_exit, __ATOMIC_ACQUIRE) && nv_apps_lookup_worker_exited()) {
+            netdata_log_error("FATAL: network-viewer APPS_LOOKUP worker exited unexpectedly; requesting daemon respawn");
+            __atomic_store_n(&plugin_should_exit, true, __ATOMIC_RELEASE);
+            exit_code = 1;
+            break;
+        }
+
         if(!tty && send_newline_ut > USEC_PER_SEC) {
-            send_newline_and_flush(&stdout_mutex);
+            netdata_mutex_lock(&stdout_mutex);
+            nv_apps_lookup_send_charts_to_netdata(send_newline_ut);
+            fprintf(stdout, "\n");
+            fflush(stdout);
+            netdata_mutex_unlock(&stdout_mutex);
             send_newline_ut = 0;
         }
     }
+
+    functions_evloop_cancel_threads(wg);
+    functions_evloop_join_threads(wg);
+    nv_apps_lookup_stop();
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
     spawn_server_destroy(spawn_srv);
     spawn_srv = NULL;
 #endif
 
-    return 0;
+    return exit_code;
 }

@@ -3325,6 +3325,8 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_LINUX)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
                         src/collectors/network-viewer.plugin/network-viewer.c
                 )
         endif()
@@ -3356,6 +3358,10 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         install(TARGETS network-viewer.plugin
                 COMPONENT plugin-network-viewer
                 DESTINATION usr/libexec/netdata/plugins.d)
+
+        add_executable(network-viewer-apps-lookup-client-test EXCLUDE_FROM_ALL
+                src/collectors/network-viewer.plugin/tests/test_network_viewer_apps_lookup_client.c)
+        target_link_libraries(network-viewer-apps-lookup-client-test libnetdata)
 
         if(BUILD_FOR_PACKAGING)
                 install(FILES
