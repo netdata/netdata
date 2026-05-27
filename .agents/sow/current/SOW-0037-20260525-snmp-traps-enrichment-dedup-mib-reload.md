@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: in-progress
+Status: paused
 
-Sub-state: activated on 2026-05-26 after SOW-0036 reached implementation-complete / paused state. Reverse-DNS decision resolved on 2026-05-26: disabled by default, enabled explicitly in job configuration, never a mandatory hot-path dependency. M1-M4 implementation is complete on the feature branch as of 2026-05-26. NOT independently mergeable - merge gate is SOW-0039.
+Sub-state: implementation-complete / paused as of 2026-05-27 after M1-M4 landed on the feature branch. Reverse-DNS decision resolved on 2026-05-26: disabled by default, enabled explicitly in job configuration, never a mandatory hot-path dependency. NOT independently mergeable - merge gate is SOW-0039.
 
 ## Requirements
 
@@ -188,7 +188,7 @@ No raw trap payloads, SNMP communities, USM keys, private IPs from real environm
 - Specs: update `.agents/sow/specs/snmp-traps/netdata.md` for any decided reverse-DNS semantics or reload/API contract clarification.
 - End-user/operator docs: owned by SOW-0039; SOW-0037 records implementation facts for that bundle.
 - End-user/operator skills: no update expected until SOW-0039 docs/spec finalization.
-- SOW lifecycle: SOW-0037 is current/in-progress; SOW-0035 and SOW-0036 remain paused/implementation-complete; SOW-0038 and SOW-0039 remain pending.
+- SOW lifecycle: SOW-0037 is current/paused; SOW-0035 and SOW-0036 remain paused/implementation-complete; SOW-0038 is current/in-progress and SOW-0039 remains pending.
 
 ### Decisions
 
@@ -554,7 +554,7 @@ Implementation completed. Changes:
 
 ## Outcome
 
-M1-M4 implementation is complete on the feature branch. SOW-0037 remains current/in-progress instead of moved to `done/` because the branch is explicitly not independently mergeable until SOW-0039 finishes the collector consistency bundle.
+M1-M4 implementation is complete on the feature branch. SOW-0037 remains current/paused instead of moved to `done/` because the branch is explicitly not independently mergeable until SOW-0039 finishes the collector consistency bundle.
 
 ## Lessons Extracted
 
