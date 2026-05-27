@@ -1372,6 +1372,88 @@ template: ml_5min_node
 <br/>
 </details><br/>
 
+<details>
+<summary><strong>Example 8: Boolean / Binary Metric Alerting</strong></summary><br/>
+
+**Scenario:** Monitor a boolean 0/1 health-check gauge and choose the right aggregation method for your alerting intent.
+
+**Why This Matters:** Boolean metrics require different aggregation strategies depending on whether you need to detect any single failure, confirm a sustained outage, or check the current state. Choosing the wrong method leads to missed alerts or alert noise.
+
+**Approach 1: Detect Any Failure Event (sum)**
+
+```text
+ alarm: service_failure_event
+    on: my_service.health_status
+lookup: sum -5m unaligned absolute
+ every: 10s
+  crit: $this > 0
+```
+
+Use when the metric acts as a failure indicator — the value is 0 normally and 1 when a failure occurs. `sum` adds every sample in the window, so any single non-zero value produces a positive result. This is the same pattern used in [Example 4: Network Packet Drops](#example-4-network-packet-drops).
+
+**Approach 2: Detect Any Downtime (min) or Continuous Outage (max)**
+
+```text
+ alarm: service_any_downtime
+    on: my_service.health_status
+lookup: min -5m unaligned
+ every: 10s
+  crit: $this == 0
+```
+
+Use when the metric is 1 = healthy and 0 = unhealthy. `min` returns the lowest value in the window — if the metric dropped to 0 at any point, the alert fires. This catches even brief outages.
+
+For the stricter check of **continuous outage** (metric was never 1), use `max`:
+
+```text
+ alarm: service_continuous_outage
+    on: my_service.health_status
+lookup: max -5m unaligned
+ every: 10s
+  crit: $this == 0
+```
+
+`max` returns the highest value in the window. If `max == 0`, the metric never reached 1 — the service was down the entire time.
+
+**Approach 3: Instant State Check (calc, no lookup)**
+
+```text
+ alarm: service_current_state
+    on: my_service.health_status
+  calc: $status
+ every: 10s
+  crit: $this == 0
+ delay: down 5m
+```
+
+Use to check only the current value without time-window aggregation. The `calc: $status` references the chart dimension directly — no `lookup` needed. The `delay: down 5m` debounces recovery notifications, requiring the alert to stay clear for 5 minutes before sending recovery. This is the same pattern used in `health.d/timex.conf` for clock sync state monitoring.
+
+**Comparison: Which Method to Use**
+
+| Intent                                                  | Method | Lookup / Calc              | Condition   | Fires When                                |
+| ------------------------------------------------------- | ------ | -------------------------- | ----------- | ----------------------------------------- |
+| Any failure event (metric is 0 normally, 1 on failure)  | `sum`  | `sum -5m unaligned absolute` | `$this > 0` | Metric was non-zero at any point          |
+| Any downtime (metric is 1=healthy, 0=down)              | `min`  | `min -5m unaligned`        | `$this == 0` | Metric hit 0 at any point in the window  |
+| Continuous outage (metric is 1=healthy, 0=down)         | `max`  | `max -5m unaligned`        | `$this == 0` | Metric was 0 for the entire window       |
+| Current state only                                      | `calc` | `calc: $var` (no lookup)   | `$this == 0` | Current value is 0 (debounce with delay) |
+
+For a full list of available lookup methods and processing options (`average`, `min`, `max`, `sum`, `percentage`, `absolute`, etc.), see the [Alert Line `lookup`](#alert-line-lookup) section.
+
+**Key Points:**
+
+- Boolean 0/1 metrics work with all standard lookup methods — the choice depends on your alerting intent
+- Use `sum` with `absolute` for event/failure detection (same pattern as [Example 4: Network Packet Drops](#example-4-network-packet-drops))
+- Use `min` for "was it ever down?" and `max` for "was it continuously down?"
+- Use `calc` without `lookup` for instant state checks, combined with `delay` for debouncing
+
+**Variables Used:**
+
+- `$this` — Result of the `lookup` or `calc` expression
+- `$status` — Dimension value from the chart (used in the `calc` approach)
+
+<br/>
+</details><br/>
+
 **Next Steps:** Having trouble with your alerts? Continue to [Troubleshooting](#troubleshooting) for debugging techniques.
 
 ## Troubleshooting
