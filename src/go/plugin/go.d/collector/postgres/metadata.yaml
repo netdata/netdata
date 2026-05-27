@@ -263,23 +263,6 @@ modules:
 
               You do not need to create a new PostgreSQL user or modify `docker.conf` — simply updating the DSN in the auto-discovered job via Dynamic Configuration is sufficient.
 
-              **Alternative — Override the DSN template for all PostgreSQL containers**
-
-              If all your PostgreSQL containers share the same non-default credentials, you can edit `/etc/netdata/go.d/sd/docker.conf` and customize the `postgres` service rule's `config_template`:
-
-              ```yaml
-              services:
-                - id: "postgres"
-                  match: '{{ or (eq .PrivatePort "5432") (match "sp" .Image "postgres postgres:* */postgres */postgres:* */postgresql */postgresql:*") }}'
-                  config_template: |
-                    module: postgres
-                    name: docker_{{.Name}}
-                    dsn: postgres://<actual_user>:<actual_password>@{{.Address}}/postgres
-              ```
-
-              After editing `docker.conf`, [restart the Netdata Agent](/docs/netdata-agent/start-stop-restart.md).
-
-              For more details on Docker SD service rules, see the [Docker discovery documentation](/src/go/plugin/go.d/discovery/sdext/discoverer/dockersd/README.md#service-rules).
     alerts:
       - name: postgres_total_connection_utilization
         metric: postgres.connections_utilization
