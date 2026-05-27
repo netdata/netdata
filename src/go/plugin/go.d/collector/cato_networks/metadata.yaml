@@ -1,0 +1,614 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-cato_networks
+      plugin_name: go.d.plugin
+      module_name: cato_networks
+      monitored_instance:
+        name: Cato Networks
+        link: https://www.catonetworks.com/
+        icon_filename: network-wired.svg
+        categories:
+          - data-collection.networking
+      keywords:
+        - cato
+        - cato networks
+        - sase
+        - sd-wan
+        - bgp
+        - topology
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Cato Networks accounts through the Cato GraphQL API.
+
+          It discovers sites, collects site and interface status, traffic and quality metrics, consumes marker-based events, collects BGP peer status, and exposes Cato site/PoP/BGP topology data.
+        method_description: |
+          The collector uses the Cato GraphQL API endpoint with an account ID and API key.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          A Cato API key with permission to read account snapshot, account metrics, events feed, entity lookup, and site BGP status data is required.
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector does not auto-detect Cato accounts. Configure at least one job with `account_id` and `api_key`.
+        limits:
+          description: |
+            Site discovery is paginated. Site, interface, and BGP peer metric cardinality is bounded by `limits.max_sites`, `limits.max_interfaces_per_site`, and `bgp.max_peers_per_site`, with selectors to narrow scope before caps apply. Account metrics are batched by `metrics.max_sites_per_query`. BGP status collection is a rolling scan throttled by `bgp.max_sites_per_collection` and `bgp.refresh_every`.
+        performance_impact:
+          description: |
+            The default interval is 60 seconds. BGP status is refreshed every 300 seconds by default because it requires per-site API requests. Large accounts may need multiple BGP refresh windows before every site's BGP state is updated.
+    setup:
+      prerequisites:
+        list:
+          - title: Cato API credentials
+            description: |
+              Create or obtain a Cato API key and account ID with read access to the required GraphQL API surfaces.
+      configuration:
+        file:
+          name: go.d/cato_networks.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval, in seconds. Must be at least 60.
+              default_value: 60
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval, in seconds. Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: url
+              description: Cato GraphQL API endpoint. Production endpoints must use HTTPS; HTTP is accepted only for loopback test endpoints.
+              default_value: https://api.catonetworks.com/api/v1/graphql2
+              required: false
+              group: Target
+            - name: account_id
+              description: Cato account ID.
+              default_value: ""
+              required: true
+              group: Authentication
+            - name: api_key
+              description: Cato API key.
+              default_value: ""
+              required: true
+              group: Authentication
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 30
+              required: false
+              group: HTTP
+            - name: proxy_url
+              description: HTTP proxy URL. Empty value uses environment proxy variables.
+              default_value: ""
+              required: false
+              group: HTTP
+            - name: site_selector
+              description: Space-separated simple patterns matched against Cato site ID or site name. Use exclusions such as `!lab-* *`; exclusions win across site identity fields.
+              default_value: "*"
+              required: false
+              group: Cardinality
+            - name: interface_selector
+              description: Space-separated simple patterns matched against Cato interface ID or interface name. Use exclusions such as `!test-* *`; exclusions win across interface identity fields.
+              default_value: "*"
+              required: false
+              group: Cardinality
+            - name: limits.max_sites
+              description: Maximum Cato sites collected after `site_selector` filtering. Set to 0 to disable this cap.
+              default_value: 500
+              required: false
+              group: Cardinality
+            - name: limits.max_interfaces_per_site
+              description: Maximum interfaces collected per selected site after `interface_selector` filtering. Set to 0 to disable this cap.
+              default_value: 32
+              required: false
+              group: Cardinality
+            - name: discovery.refresh_every
+              description: Site discovery refresh interval, in seconds.
+              default_value: 300
+              required: false
+              group: Discovery
+            - name: discovery.page_limit
+              description: Maximum sites requested per entityLookup page.
+              default_value: 100
+              required: false
+              group: Discovery
+            - name: metrics.enabled
+              description: Controls accountMetrics collection. One of auto, enabled, disabled.
+              default_value: auto
+              required: false
+              group: Metrics
+            - name: metrics.time_frame
+              description: Cato TimeFrame string used for accountMetrics, for example last.PT5M or utc.2020-02-11/{04:50:15--16:50:15}.
+              default_value: last.PT5M
+              required: false
+              group: Metrics
+            - name: metrics.buckets
+              description: Number of accountMetrics buckets requested.
+              default_value: 5
+              required: false
+              group: Metrics
+            - name: metrics.group_interfaces
+              description: Controls the accountMetrics groupInterfaces argument. auto leaves the argument unset so Cato applies its default; enabled and disabled send explicit true or false.
+              default_value: auto
+              required: false
+              group: Metrics
+            - name: metrics.max_sites_per_query
+              description: Maximum site IDs sent in one accountMetrics query.
+              default_value: 50
+              required: false
+              group: Metrics
+            - name: events.enabled
+              description: Controls marker-based eventsFeed collection. One of auto, enabled, disabled.
+              default_value: auto
+              required: false
+              group: Events
+            - name: events.marker_file
+              description: Optional explicit file path used to persist the eventsFeed marker. Set this when multiple jobs intentionally monitor the same account, endpoint, and vnode independently.
+              default_value: ""
+              required: false
+              group: Events
+            - name: events.max_pages_per_cycle
+              description: Maximum marker pages drained from eventsFeed during one collection cycle.
+              default_value: 10
+              required: false
+              group: Events
+            - name: events.max_cardinality
+              description: Maximum unique event type/subtype/severity/status series before excess events are collapsed into an other bucket.
+              default_value: 50
+              required: false
+              group: Events
+            - name: bgp.enabled
+              description: Controls siteBgpStatus collection. One of auto, enabled, disabled.
+              default_value: auto
+              required: false
+              group: BGP
+            - name: bgp.refresh_every
+              description: Minimum interval between BGP status refreshes, in seconds.
+              default_value: 300
+              required: false
+              group: BGP
+            - name: bgp.max_sites_per_collection
+              description: Maximum sites queried for BGP status during one refresh.
+              default_value: 25
+              required: false
+              group: BGP
+            - name: bgp.peer_selector
+              description: Space-separated simple patterns matched against BGP peer remote IP or remote ASN. Use exclusions such as `!64512 *`; exclusions win across BGP peer identity fields.
+              default_value: "*"
+              required: false
+              group: BGP
+            - name: bgp.max_peers_per_site
+              description: Maximum BGP peers collected per selected site after `bgp.peer_selector` filtering. Set to 0 to disable this cap.
+              default_value: 32
+              required: false
+              group: BGP
+            - name: topology.enabled
+              description: Controls topology function data generation. One of auto, enabled, disabled.
+              default_value: auto
+              required: false
+              group: Topology
+            - name: retry.attempts
+              description: Maximum attempts for retryable Cato API errors.
+              default_value: 5
+              required: false
+              group: Retry
+            - name: retry.wait_min
+              description: Initial retry wait.
+              default_value: 5
+              required: false
+              group: Retry
+            - name: retry.wait_max
+              description: Maximum retry wait.
+              default_value: 30
+              required: false
+              group: Retry
+            - name: vnode
+              description: Associates this data collection job with a Virtual Node.
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: Collect Cato Networks account metrics and topology.
+              config: |
+                jobs:
+                  - name: account
+                    account_id: "12345"
+                    api_key: "replace-with-cato-api-key"
+    troubleshooting:
+      problems:
+        list:
+          - name: API rate limits
+            description: |
+              Increase `update_every`, reduce `metrics.max_sites_per_query`, or reduce `bgp.max_sites_per_collection` if the Cato API reports rate limiting.
+          - name: Cardinality limit hit
+            description: |
+              Check `cato_networks.collector_skipped_entities` to see whether sites, interfaces, or BGP peers were skipped by selector or cap, then narrow selectors or raise the relevant cap if the account has enough API and metric-cardinality headroom.
+          - name: Connection, TLS, or proxy failures
+            description: |
+              Check DNS, firewall egress, TLS inspection, proxy settings, endpoint region, and the normalized failure class in the collector operation failure charts.
+    alerts:
+      - name: cato_networks_collector_collection_failed
+        metric: cato_networks.collector_collection_status
+        info: "Cato Networks collector is failing to complete collection"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+      - name: cato_networks_collector_events_marker_persistence_unavailable
+        metric: cato_networks.collector_events_marker_persistence_status
+        info: "Cato Networks events are enabled but the collector cannot persist the EventsFeed marker"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+      - name: cato_networks_collector_cardinality_limit_hit
+        metric: cato_networks.collector_cardinality_limit_status
+        info: "Cato Networks collector skipped entities because a configured cardinality cap was reached"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+      - name: cato_networks_site_disconnected
+        metric: cato_networks.site_connectivity_status
+        info: "Cato site ${label:site_name} reports disconnected connectivity status"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+      - name: cato_networks_site_degraded
+        metric: cato_networks.site_connectivity_status
+        info: "Cato site ${label:site_name} reports degraded connectivity status"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+      - name: cato_networks_site_packet_loss
+        metric: cato_networks.site_packet_loss
+        info: "Cato site ${label:site_name} packet loss over the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+      - name: cato_networks_bgp_session_down
+        metric: cato_networks.bgp_session_status
+        info: "Cato BGP session to peer ${label:peer_ip} (${label:peer_asn}) is down"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: site
+          description: These metrics refer to a Cato site.
+          labels:
+            - name: site_id
+              description: Cato site ID.
+            - name: site_name
+              description: Cato site name.
+            - name: pop_name
+              description: Cato PoP name.
+          metrics:
+            - name: cato_networks.site_connectivity_status
+              description: Site connectivity status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: connected
+                - name: disconnected
+                - name: degraded
+                - name: unknown
+            - name: cato_networks.site_operational_status
+              description: Site operational status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: disabled
+                - name: locked
+                - name: unknown
+            - name: cato_networks.site_hosts
+              description: Site hosts.
+              unit: hosts
+              chart_type: line
+              dimensions:
+                - name: hosts
+            - name: cato_networks.site_traffic
+              description: Site traffic.
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.site_packet_loss
+              description: Site packet loss.
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.site_discarded_packets
+              description: Site discarded packets.
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.site_jitter
+              description: Site jitter.
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.site_latency
+              description: Site latency.
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: rtt
+                - name: last_mile
+            - name: cato_networks.site_last_mile_packet_loss
+              description: Site last mile packet loss.
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: loss
+        - name: interface
+          description: These metrics refer to a Cato site interface.
+          labels:
+            - name: site_id
+              description: Cato site ID.
+            - name: site_name
+              description: Cato site name.
+            - name: interface_id
+              description: Cato interface ID.
+            - name: interface_name
+              description: Interface name.
+          metrics:
+            - name: cato_networks.interface_connected
+              description: Interface connectivity status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: connected
+            - name: cato_networks.interface_tunnel_uptime
+              description: Interface tunnel uptime.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: cato_networks.interface_traffic
+              description: Interface traffic.
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.interface_packet_loss
+              description: Interface packet loss.
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.interface_discarded_packets
+              description: Interface discarded packets.
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.interface_jitter
+              description: Interface jitter.
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: upstream
+                - name: downstream
+            - name: cato_networks.interface_latency
+              description: Interface latency.
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: rtt
+        - name: bgp peer
+          description: These metrics refer to a Cato site BGP peer.
+          labels:
+            - name: site_id
+              description: Cato site ID.
+            - name: site_name
+              description: Cato site name.
+            - name: peer_ip
+              description: BGP peer IP.
+            - name: peer_asn
+              description: BGP peer ASN.
+          metrics:
+            - name: cato_networks.bgp_session_status
+              description: BGP session status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: up
+            - name: cato_networks.bgp_routes
+              description: BGP route counts.
+              unit: routes
+              chart_type: line
+              dimensions:
+                - name: accepted
+                - name: limit
+                - name: rib_out
+            - name: cato_networks.bgp_routes_limit_exceeded
+              description: BGP route limit exceeded status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: exceeded
+        - name: collector
+          description: These metrics describe the Cato collector's own collection health.
+          labels: []
+          metrics:
+            - name: cato_networks.collector_collection_status
+              description: Collector collection status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: successful
+            - name: cato_networks.collector_discovered_sites
+              description: Number of Cato sites discovered by the collector.
+              unit: sites
+              chart_type: line
+              dimensions:
+                - name: sites
+            - name: cato_networks.collector_events_marker_persistence_status
+              description: Events marker persistence availability.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: available
+            - name: cato_networks.collector_bgp_scan_window
+              description: Estimated time required to refresh BGP status for all discovered sites.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: window
+            - name: cato_networks.collector_bgp_scan_progress
+              description: BGP polling progress for the rolling BGP scan.
+              unit: sites
+              chart_type: line
+              dimensions:
+                - name: per_collection
+                - name: cached
+        - name: collector entity selection
+          description: These metrics describe how many Cato entities are selected for collection after selectors and cardinality caps are applied.
+          labels:
+            - name: entity
+              description: Entity class (`site`, `interface`, or `bgp_peer`).
+          metrics:
+            - name: cato_networks.collector_selected_entities
+              description: Selected entities by entity class.
+              unit: entities
+              chart_type: line
+              dimensions:
+                - name: selected
+            - name: cato_networks.collector_cardinality_limit_status
+              description: Whether a configured cardinality cap skipped at least one entity.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: hit
+        - name: collector skipped entity
+          description: These metrics describe Cato entities skipped by selectors or cardinality caps.
+          labels:
+            - name: entity
+              description: Entity class (`site`, `interface`, or `bgp_peer`).
+            - name: reason
+              description: Skip reason (`selector` or `limit`).
+          metrics:
+            - name: cato_networks.collector_skipped_entities
+              description: Skipped entities by entity class and reason.
+              unit: entities
+              chart_type: line
+              dimensions:
+                - name: skipped
+        - name: collector operation
+          description: These metrics describe per-operation Cato collector health.
+          labels:
+            - name: operation
+              description: Cato API operation or local collector operation.
+          metrics:
+            - name: cato_networks.collector_operation_status
+              description: Last observed operation status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: successful
+        - name: collector operation failure
+          description: These metrics describe per-operation Cato collector failures.
+          labels:
+            - name: operation
+              description: Cato API operation or local collector operation.
+            - name: error_class
+              description: Normalized failure class.
+          metrics:
+            - name: cato_networks.collector_operation_failures
+              description: Collector operation failures.
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: failures
+        - name: collector operation affected site
+          description: These metrics describe the number of Cato sites affected by partial accountMetrics or siteBgpStatus failures.
+          labels:
+            - name: operation
+              description: Cato API operation.
+            - name: error_class
+              description: Normalized failure class.
+          metrics:
+            - name: cato_networks.collector_operation_affected_sites
+              description: Sites affected by collector operation failures.
+              unit: sites/s
+              chart_type: line
+              dimensions:
+                - name: sites
+        - name: collector collection failure
+          description: These metrics describe full collection failures.
+          labels:
+            - name: error_class
+              description: Normalized failure class.
+          metrics:
+            - name: cato_networks.collector_collection_failures
+              description: Collector collection failures.
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: failures
+        - name: collector normalization issue
+          description: These metrics describe schema and normalization issues seen while converting Cato API payloads into Netdata metrics.
+          labels:
+            - name: surface
+              description: Collector surface where the issue was detected.
+            - name: issue
+              description: Normalized issue class.
+          metrics:
+            - name: cato_networks.collector_normalization_issues
+              description: Collector normalization issues.
+              unit: issues/s
+              chart_type: line
+              dimensions:
+                - name: issues
+        - name: event
+          description: These metrics refer to Cato events. When the configured cardinality cap is exceeded, excess event combinations are collapsed into the other bucket.
+          labels:
+            - name: event_type
+              description: Cato event type.
+            - name: event_sub_type
+              description: Cato event subtype.
+            - name: severity
+              description: Cato event severity.
+            - name: status
+              description: Cato event status.
+          metrics:
+            - name: cato_networks.events
+              description: Cato events.
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: events
+        - name: api query
+          description: These metrics refer to Cato API query retries.
+          labels:
+            - name: query
+              description: Cato API query name.
+          metrics:
+            - name: cato_networks.api_retries
+              description: Cato API retries.
+              unit: retries/s
+              chart_type: line
+              dimensions:
+                - name: rate_limit
+                - name: transient

@@ -1,0 +1,494 @@
+version: v1
+context_namespace: cato_networks
+groups:
+  - family: sites
+    metrics:
+      - site_connectivity_connected
+      - site_connectivity_disconnected
+      - site_connectivity_degraded
+      - site_connectivity_unknown
+      - site_operational_active
+      - site_operational_disabled
+      - site_operational_locked
+      - site_operational_unknown
+      - site_hosts
+      - site_bytes_upstream_max
+      - site_bytes_downstream_max
+      - site_lost_upstream_percent
+      - site_lost_downstream_percent
+      - site_packets_discarded_upstream
+      - site_packets_discarded_downstream
+      - site_jitter_upstream_ms
+      - site_jitter_downstream_ms
+      - site_rtt_ms
+      - site_last_mile_latency_ms
+      - site_last_mile_packet_loss_percent
+    charts:
+      - id: site_hosts
+        title: Cato site hosts
+        context: site_hosts
+        units: hosts
+        type: line
+        instances:
+          by_labels: [site_id, site_name, pop_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: site_hosts
+            name: hosts
+      - id: site_connectivity_status
+        title: Cato site connectivity status
+        context: site_connectivity_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, site_name, pop_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: site_connectivity_connected
+            name: connected
+          - selector: site_connectivity_disconnected
+            name: disconnected
+          - selector: site_connectivity_degraded
+            name: degraded
+          - selector: site_connectivity_unknown
+            name: unknown
+      - id: site_operational_status
+        title: Cato site operational status
+        context: site_operational_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, site_name, pop_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: site_operational_active
+            name: active
+          - selector: site_operational_disabled
+            name: disabled
+          - selector: site_operational_locked
+            name: locked
+          - selector: site_operational_unknown
+            name: unknown
+      - id: site_traffic
+        title: Cato site traffic
+        context: site_traffic
+        units: bytes
+        type: area
+        instances:
+          by_labels: [site_id, site_name, pop_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: site_bytes_upstream_max
+            name: upstream
+          - selector: site_bytes_downstream_max
+            name: downstream
+      - id: site_packet_loss
+        title: Cato site packet loss
+        context: site_packet_loss
+        units: percentage
+        type: line
+        instances:
+          by_labels: [site_id, site_name, pop_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: site_lost_upstream_percent
+            name: upstream
+          - selector: site_lost_downstream_percent
+            name: downstream
+      - id: site_discarded_packets
+        title: Cato site discarded packets
+        context: site_discarded_packets
+        units: packets
+        type: line
+        instances:
+          by_labels: [site_id, site_name, pop_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: site_packets_discarded_upstream
+            name: upstream
+          - selector: site_packets_discarded_downstream
+            name: downstream
+      - id: site_jitter
+        title: Cato site jitter
+        context: site_jitter
+        units: milliseconds
+        type: line
+        instances:
+          by_labels: [site_id, site_name, pop_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: site_jitter_upstream_ms
+            name: upstream
+          - selector: site_jitter_downstream_ms
+            name: downstream
+      - id: site_latency
+        title: Cato site latency
+        context: site_latency
+        units: milliseconds
+        type: line
+        instances:
+          by_labels: [site_id, site_name, pop_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: site_rtt_ms
+            name: rtt
+          - selector: site_last_mile_latency_ms
+            name: last_mile
+      - id: site_last_mile_packet_loss
+        title: Cato site last mile packet loss
+        context: site_last_mile_packet_loss
+        units: percentage
+        type: line
+        instances:
+          by_labels: [site_id, site_name, pop_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: site_last_mile_packet_loss_percent
+            name: loss
+  - family: interfaces
+    metrics:
+      - interface_connected
+      - interface_tunnel_uptime_seconds
+      - interface_bytes_upstream_max
+      - interface_bytes_downstream_max
+      - interface_lost_upstream_percent
+      - interface_lost_downstream_percent
+      - interface_packets_discarded_upstream
+      - interface_packets_discarded_downstream
+      - interface_jitter_upstream_ms
+      - interface_jitter_downstream_ms
+      - interface_rtt_ms
+    charts:
+      - id: interface_connected
+        title: Cato interface connectivity status
+        context: interface_connected
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, site_name, interface_id, interface_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: interface_connected
+            name: connected
+      - id: interface_tunnel_uptime
+        title: Cato interface tunnel uptime
+        context: interface_tunnel_uptime
+        units: seconds
+        type: line
+        instances:
+          by_labels: [site_id, site_name, interface_id, interface_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: interface_tunnel_uptime_seconds
+            name: uptime
+      - id: interface_traffic
+        title: Cato interface traffic
+        context: interface_traffic
+        units: bytes
+        type: area
+        instances:
+          by_labels: [site_id, site_name, interface_id, interface_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: interface_bytes_upstream_max
+            name: upstream
+          - selector: interface_bytes_downstream_max
+            name: downstream
+      - id: interface_packet_loss
+        title: Cato interface packet loss
+        context: interface_packet_loss
+        units: percentage
+        type: line
+        instances:
+          by_labels: [site_id, site_name, interface_id, interface_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: interface_lost_upstream_percent
+            name: upstream
+          - selector: interface_lost_downstream_percent
+            name: downstream
+      - id: interface_discarded_packets
+        title: Cato interface discarded packets
+        context: interface_discarded_packets
+        units: packets
+        type: line
+        instances:
+          by_labels: [site_id, site_name, interface_id, interface_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: interface_packets_discarded_upstream
+            name: upstream
+          - selector: interface_packets_discarded_downstream
+            name: downstream
+      - id: interface_jitter
+        title: Cato interface jitter
+        context: interface_jitter
+        units: milliseconds
+        type: line
+        instances:
+          by_labels: [site_id, site_name, interface_id, interface_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: interface_jitter_upstream_ms
+            name: upstream
+          - selector: interface_jitter_downstream_ms
+            name: downstream
+      - id: interface_latency
+        title: Cato interface latency
+        context: interface_latency
+        units: milliseconds
+        type: line
+        instances:
+          by_labels: [site_id, site_name, interface_id, interface_name]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: interface_rtt_ms
+            name: rtt
+  - family: bgp
+    metrics:
+      - bgp_session_up
+      - bgp_routes
+      - bgp_routes_limit
+      - bgp_routes_limit_exceeded
+      - bgp_rib_out_routes
+    charts:
+      - id: bgp_session_status
+        title: Cato BGP session status
+        context: bgp_session_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, site_name, peer_ip, peer_asn]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: bgp_session_up
+            name: up
+      - id: bgp_routes
+        title: Cato BGP routes
+        context: bgp_routes
+        units: routes
+        type: line
+        instances:
+          by_labels: [site_id, site_name, peer_ip, peer_asn]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: bgp_routes
+            name: accepted
+          - selector: bgp_routes_limit
+            name: limit
+          - selector: bgp_rib_out_routes
+            name: rib_out
+      - id: bgp_routes_limit_exceeded
+        title: Cato BGP route limit status
+        context: bgp_routes_limit_exceeded
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, site_name, peer_ip, peer_asn]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: bgp_routes_limit_exceeded
+            name: exceeded
+  - family: collector
+    metrics:
+      - collector_collection_success
+      - collector_discovered_sites
+      - collector_selected_entities
+      - collector_skipped_entities
+      - collector_cardinality_limit_hit
+      - collector_events_marker_persistence_available
+      - collector_bgp_sites_per_collection
+      - collector_bgp_full_scan_seconds
+      - collector_bgp_cached_sites
+      - collector_operation_success
+      - collector_operation_failures_total
+      - collector_operation_affected_sites_total
+      - collector_collection_failures_total
+      - collector_normalization_issues_total
+      - events_total
+      - api_rate_limit_retries_total
+      - api_transient_retries_total
+    charts:
+      - id: collector_collection_status
+        title: Cato collector collection status
+        context: collector_collection_status
+        units: status
+        type: line
+        dimensions:
+          - selector: collector_collection_success
+            name: successful
+      - id: collector_discovered_sites
+        title: Cato collector discovered sites
+        context: collector_discovered_sites
+        units: sites
+        type: line
+        dimensions:
+          - selector: collector_discovered_sites
+            name: sites
+      - id: collector_selected_entities
+        title: Cato collector selected entities
+        context: collector_selected_entities
+        units: entities
+        type: line
+        instances:
+          by_labels: [entity]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: collector_selected_entities
+            name: selected
+      - id: collector_skipped_entities
+        title: Cato collector skipped entities
+        context: collector_skipped_entities
+        units: entities
+        type: line
+        instances:
+          by_labels: [entity, reason]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: collector_skipped_entities
+            name: skipped
+      - id: collector_cardinality_limit_status
+        title: Cato collector cardinality limit status
+        context: collector_cardinality_limit_status
+        units: status
+        type: line
+        instances:
+          by_labels: [entity]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: collector_cardinality_limit_hit
+            name: hit
+      - id: collector_events_marker_persistence_status
+        title: Cato collector events marker persistence status
+        context: collector_events_marker_persistence_status
+        units: status
+        type: line
+        dimensions:
+          - selector: collector_events_marker_persistence_available
+            name: available
+      - id: collector_bgp_scan_window
+        title: Cato collector BGP full scan window
+        context: collector_bgp_scan_window
+        units: seconds
+        type: line
+        dimensions:
+          - selector: collector_bgp_full_scan_seconds
+            name: window
+      - id: collector_bgp_scan_progress
+        title: Cato collector BGP scan progress
+        context: collector_bgp_scan_progress
+        units: sites
+        type: line
+        dimensions:
+          - selector: collector_bgp_sites_per_collection
+            name: per_collection
+          - selector: collector_bgp_cached_sites
+            name: cached
+      - id: collector_operation_status
+        title: Cato collector API operation status
+        context: collector_operation_status
+        units: status
+        type: line
+        instances:
+          by_labels: [operation]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: collector_operation_success
+            name: successful
+      - id: collector_operation_failures
+        title: Cato collector API operation failures
+        context: collector_operation_failures
+        units: failures/s
+        type: line
+        instances:
+          by_labels: [operation, error_class]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: collector_operation_failures_total
+            name: failures
+      - id: collector_operation_affected_sites
+        title: Cato collector affected sites by API operation failures
+        context: collector_operation_affected_sites
+        units: sites/s
+        type: line
+        instances:
+          by_labels: [operation, error_class]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: collector_operation_affected_sites_total
+            name: sites
+      - id: collector_collection_failures
+        title: Cato collector collection failures
+        context: collector_collection_failures
+        units: failures/s
+        type: line
+        instances:
+          by_labels: [error_class]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: collector_collection_failures_total
+            name: failures
+      - id: collector_normalization_issues
+        title: Cato collector normalization issues
+        context: collector_normalization_issues
+        units: issues/s
+        type: line
+        instances:
+          by_labels: [surface, issue]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: collector_normalization_issues_total
+            name: issues
+      - id: events
+        title: Cato events
+        context: events
+        units: events/s
+        type: line
+        instances:
+          by_labels: [event_type, event_sub_type, severity, status]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: events_total
+            name: events
+      - id: api_retries
+        title: Cato API retries
+        context: api_retries
+        units: retries/s
+        type: line
+        instances:
+          by_labels: [query]
+        lifecycle:
+          expire_after_cycles: 5
+        dimensions:
+          - selector: api_rate_limit_retries_total
+            name: rate_limit
+          - selector: api_transient_retries_total
+            name: transient

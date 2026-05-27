@@ -42,6 +42,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/bind)                             |           ISC Bind            |
 | [boinc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/boinc)                           |             BOINC             |
 | [cassandra](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cassandra)                   |           Cassandra           |
+| [cato_networks](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cato_networks)           |         Cato Networks         |
 | [ceph](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ceph)                             |             Ceph              |
 | [chrony](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/chrony)                         |            Chrony             |
 | [clickhouse](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/clickhouse)                 |          ClickHouse           |

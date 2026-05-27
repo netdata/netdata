@@ -14,6 +14,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/bind"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/boinc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cassandra"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cato_networks"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ceph"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/chrony"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/clickhouse"
