@@ -383,23 +383,28 @@ inline int wait_on_socket_or_cancel_with_timeout(
                 DWORD available = 0;
                 if(!PeekNamedPipe(h, NULL, 0, NULL, &available, NULL)) {
                     DWORD winerr = GetLastError();
+                    short pipe_revents = POLLERR;
                     switch(winerr) {
                         case ERROR_BROKEN_PIPE:
                         case ERROR_PIPE_NOT_CONNECTED:
                         case ERROR_NO_DATA:
                             errno = EPIPE;
+                            pipe_revents = POLLHUP;
                             break;
                         case ERROR_INVALID_HANDLE:
                             errno = EBADF;
+                            pipe_revents = POLLNVAL;
                             break;
                         case ERROR_OPERATION_ABORTED:
                             errno = ECANCELED;
+                            pipe_revents = POLLERR;
                             break;
                         default:
                             errno = EIO;
+                            pipe_revents = POLLERR;
                             break;
                     }
-                    if(revents) *revents = POLLHUP;
+                    if(revents) *revents = pipe_revents;
                     return 2;
                 }
 
