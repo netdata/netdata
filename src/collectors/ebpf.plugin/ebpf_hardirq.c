@@ -696,6 +696,7 @@ void ebpf_hardirq_thread(void *ptr)
     if (ebpf_hardirq_load_bpf(em)) {
         goto endhardirq;
     }
+    ebpf_mark_program_loaded();
 
     ebpf_hardirq_allocate_global_vectors();
 

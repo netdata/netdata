@@ -418,6 +418,7 @@ void ebpf_mdflush_thread(void *ptr)
         netdata_log_error("Cannot load eBPF software.");
         goto endmdflush;
     }
+    ebpf_mark_program_loaded();
 
     mdflush_safe_clean = true;
     mdflush_collector(em);

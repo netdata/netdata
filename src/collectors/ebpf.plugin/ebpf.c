@@ -34,6 +34,7 @@ uint32_t integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
 ND_THREAD *socket_ipc = NULL;
 static size_t global_iterations_counter = 1;
 bool publish_internal_metrics = true;
+bool ebpf_program_loaded_any = false;
 
 netdata_mutex_t lock;
 netdata_mutex_t ebpf_exit_cleanup;
@@ -2295,6 +2296,26 @@ static void ebpf_signal_stop_handler(int sig)
         ebpf_stop_signal = (sig > 0) ? sig : 1;
 }
 
+static bool ebpf_all_enabled_threads_stopped(void)
+{
+    bool any_enabled = false;
+
+    for (size_t i = 0; ebpf_threads[i].name != NULL; i++) {
+        if (!ebpf_threads[i].enabled)
+            continue;
+
+        any_enabled = true;
+
+        if (!ebpf_threads[i].thread)
+            continue;
+
+        if (ebpf_module_enabled_get(&ebpf_modules[i]) < NETDATA_THREAD_EBPF_STOPPING)
+            return false;
+    }
+
+    return any_enabled;
+}
+
 /**
  * Entry point
  *
@@ -2402,6 +2423,7 @@ int main(int argc, char **argv)
     heartbeat_init(&hb, USEC_PER_SEC);
     int update_apps_every = (int)EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
     int update_apps_list = update_apps_every - 1;
+    int exit_code = 0;
     //Plugin will be killed when it receives a signal
     for (; !ebpf_plugin_stop(); global_iterations_counter++) {
         (void)heartbeat_next(&hb);
@@ -2413,6 +2435,12 @@ int main(int argc, char **argv)
         // shutdown time when fd/process/socket/vfs modules are enabled.
         if (ebpf_plugin_stop())
             break;
+
+        if (!ebpf_program_loaded() && ebpf_all_enabled_threads_stopped()) {
+            netdata_log_error("EBPF: failed to load any eBPF program, shutting down.");
+            exit_code = 1;
+            break;
+        }
 
         if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {
             netdata_mutex_lock(&lock);
@@ -2438,5 +2466,5 @@ int main(int argc, char **argv)
 
     ebpf_stop_threads((int)ebpf_stop_signal);
 
-    return 0;
+    return exit_code;
 }

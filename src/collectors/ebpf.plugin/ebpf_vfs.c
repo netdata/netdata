@@ -2985,6 +2985,7 @@ void ebpf_vfs_thread(void *ptr)
     if (ebpf_vfs_load_bpf(em)) {
         goto endvfs;
     }
+    ebpf_mark_program_loaded();
 
     int algorithms[NETDATA_KEY_PUBLISH_VFS_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX,

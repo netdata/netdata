@@ -590,6 +590,7 @@ void ebpf_oomkill_thread(void *ptr)
     if (!em->probe_links) {
         goto endoomkill;
     }
+    ebpf_mark_program_loaded();
 
     netdata_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
