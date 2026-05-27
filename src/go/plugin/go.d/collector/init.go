@@ -80,6 +80,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/openvpn"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/openvpn_status_log"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/oracledb"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/panos"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/pgbouncer"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/phpdaemon"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/phpfpm"
