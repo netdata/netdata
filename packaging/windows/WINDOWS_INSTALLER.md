@@ -103,7 +103,7 @@ msiexec /qn /i netdata-x64.msi
 
 :::note
 
-This offline method uses `msiexec /qn` for a silent installation. If you’re on Windows Server versions earlier than 2019, use the [GUI installer](#graphical-installation-gui) instead.
+This offline method uses `msiexec /qn` to install from a locally available MSI. On Windows Server versions earlier than 2019, the *automated download* commands in this document may fail due to TLS compatibility issues—download the MSI on another machine (Step 1) or use the [GUI installer](#graphical-installation-gui).
 
 :::
 
