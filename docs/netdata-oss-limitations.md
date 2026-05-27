@@ -125,7 +125,7 @@ The 5-node limit on multi-node dashboards applies to both **Anonymous** and **Co
 
 :::note
 
-Preferred node selection only affects Netdata Cloud dashboards. On the local agent dashboard (accessed directly at `http://<agent-ip>:19999`), the nodes shown in multi-node views are determined by the Agent's streaming configuration and cannot be changed via preferred node settings.
+Preferred node selection only affects Netdata Cloud dashboards. On the local Agent dashboard (accessed directly at `http://<agent-ip>:19999`), the nodes shown in multi-node views are determined by the Agent's streaming configuration and cannot be changed via preferred node settings.
 
 :::
 
