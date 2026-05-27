@@ -215,7 +215,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
 
     service_wait_exit(SERVICE_EXPORTERS | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
-    watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_AND_WEB_SERVERS_THREADS);
 
     // Drain websocket threads while data substrates are still alive. Websocket
     // message dispatch (e.g. MCP) is synchronous on the websocket thread; an
