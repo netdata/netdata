@@ -1455,6 +1455,84 @@ static int rrdlabels_unittest_migrate_check()
     return rc;
 }
 
+// Exercises the unmark + re-add + remove_all_unmarked cycle that
+// reload_host_labels() relies on, plus the rrdlabels_mark_source_as_old()
+// preservation path used when the kubernetes loader fails.
+static int rrdlabels_unittest_mark_source_as_old(void) {
+    fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
+    int errors = 0;
+
+    // Subtest A: the prune drops entries that no loader re-added.
+    {
+        RRDLABELS *l = rrdlabels_create();
+        rrdlabels_add(l, "cfg_key",  "cv", RRDLABEL_SRC_CONFIG);
+        rrdlabels_add(l, "k8s_key",  "kv", RRDLABEL_SRC_AUTO | RRDLABEL_SRC_K8S);
+        rrdlabels_add(l, "aclk_key", "av", RRDLABEL_SRC_AUTO | RRDLABEL_SRC_ACLK);
+
+        rrdlabels_unmark_all(l);
+        // simulate a successful config + aclk loader; the k8s loader added nothing
+        rrdlabels_add(l, "cfg_key",  "cv", RRDLABEL_SRC_CONFIG);
+        rrdlabels_add(l, "aclk_key", "av", RRDLABEL_SRC_AUTO | RRDLABEL_SRC_ACLK);
+        rrdlabels_remove_all_unmarked(l);
+
+        if (rrdlabels_exist(l, "k8s_key")) {
+            fprintf(stderr, "  FAIL (A): k8s_key should have been pruned (not re-added, not preserved)\n");
+            errors++;
+        }
+        if (!rrdlabels_exist(l, "cfg_key") || !rrdlabels_exist(l, "aclk_key")) {
+            fprintf(stderr, "  FAIL (A): re-added labels should have survived the prune\n");
+            errors++;
+        }
+        rrdlabels_destroy(l);
+    }
+
+    // Subtest B: mark_source_as_old(K8S) preserves k8s entries through the prune
+    // (the k8s-loader-failure preservation path in reload_host_labels()).
+    {
+        RRDLABELS *l = rrdlabels_create();
+        rrdlabels_add(l, "cfg_key",  "cv",  RRDLABEL_SRC_CONFIG);
+        rrdlabels_add(l, "k8s_key",  "kv",  RRDLABEL_SRC_AUTO | RRDLABEL_SRC_K8S);
+        rrdlabels_add(l, "k8s_key2", "kv2", RRDLABEL_SRC_AUTO | RRDLABEL_SRC_K8S);
+
+        rrdlabels_unmark_all(l);
+        // simulate successful config loader; k8s loader failed
+        rrdlabels_add(l, "cfg_key", "cv", RRDLABEL_SRC_CONFIG);
+        rrdlabels_mark_source_as_old(l, RRDLABEL_SRC_K8S);
+        rrdlabels_remove_all_unmarked(l);
+
+        if (!rrdlabels_exist(l, "k8s_key") || !rrdlabels_exist(l, "k8s_key2")) {
+            fprintf(stderr, "  FAIL (B): K8S labels should be preserved via mark_source_as_old\n");
+            errors++;
+        }
+        if (!rrdlabels_exist(l, "cfg_key")) {
+            fprintf(stderr, "  FAIL (B): cfg_key should still be present after the prune\n");
+            errors++;
+        }
+        rrdlabels_destroy(l);
+    }
+
+    // Subtest C: mark_source_as_old(K8S) only preserves labels whose source
+    // mask intersects K8S; entries with other-only sources are still pruned.
+    {
+        RRDLABELS *l = rrdlabels_create();
+        rrdlabels_add(l, "aclk_key", "av", RRDLABEL_SRC_AUTO | RRDLABEL_SRC_ACLK);
+        rrdlabels_add(l, "cfg_key",  "cv", RRDLABEL_SRC_CONFIG);
+
+        rrdlabels_unmark_all(l);
+        rrdlabels_mark_source_as_old(l, RRDLABEL_SRC_K8S);
+        rrdlabels_remove_all_unmarked(l);
+
+        if (rrdlabels_exist(l, "aclk_key") || rrdlabels_exist(l, "cfg_key")) {
+            fprintf(stderr, "  FAIL (C): non-K8S labels must not be preserved by mark_source_as_old(K8S)\n");
+            errors++;
+        }
+        rrdlabels_destroy(l);
+    }
+
+    fprintf(stderr, "%s: %d errors\n", __FUNCTION__, errors);
+    return errors;
+}
+
 struct pattern_array *trim_and_add_key_to_values(struct pattern_array *pa, const char *key, STRING *input);
 static int rrdlabels_unittest_check_pattern_list(RRDLABELS *labels, const char *pattern, bool expected) {
     fprintf(stderr, "rrdlabels_match_simple_pattern(labels, \"%s\") ... ", pattern);
@@ -1637,6 +1715,7 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_host_chart_labels();
     errors += rrdlabels_unittest_double_check();
     errors += rrdlabels_unittest_migrate_check();
+    errors += rrdlabels_unittest_mark_source_as_old();
     errors += rrdlabels_unittest_pattern_check();
 
     fprintf(stderr, "%d errors found\n", errors);
