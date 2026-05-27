@@ -101,6 +101,12 @@ Open a command prompt as Administrator and run a silent install **without** `TOK
 msiexec /qn /i netdata-x64.msi
 ```
 
+:::note
+
+This offline method uses `msiexec /qn`, so it is supported on Windows 10 and Windows Server 2019 or later. On earlier Windows Server versions, transfer the MSI to the offline system and use the [GUI installer](#graphical-installation-gui) instead.
+
+:::
+
 In an air-gapped environment, Netdata Cloud features are unavailable. The Agent runs in standalone local mode.
 
 :::tip
