@@ -1015,7 +1015,7 @@ static inline void ebpf_check_before2go()
 /**
  * Close the collector gracefully
  */
-static void ebpf_exit()
+static void ebpf_cleanup(void)
 {
 #ifdef LIBBPF_MAJOR_VERSION
     netdata_mutex_lock(&ebpf_exit_cleanup);
@@ -1043,8 +1043,12 @@ static void ebpf_exit()
     }
     ebpf_cgroup_cache_cleanup();
     netdata_integration_cleanup_shm();
+}
 
-    exit(0);
+static void ebpf_exit(int exit_code)
+{
+    ebpf_cleanup();
+    exit(exit_code);
 }
 
 /**
@@ -1162,7 +1166,7 @@ void ebpf_stop_threads(int sig)
 #endif
     netdata_mutex_unlock(&mutex_cgroup_shm);
 
-    // Join the cgroup integration thread before ebpf_exit() tears down the netipc cache it reads.
+    // Join the cgroup integration thread before cleanup tears down the netipc cache it reads.
     if (cgroup_integration_thread.thread) {
         nd_thread_join(cgroup_integration_thread.thread);
         cgroup_integration_thread.thread = NULL;
@@ -1186,7 +1190,7 @@ void ebpf_stop_threads(int sig)
     netdata_log_info(
         "EBPF SHUTDOWN: total stop duration %llums.", (unsigned long long)(total_duration_ut / USEC_PER_MS));
 
-    ebpf_exit();
+    ebpf_cleanup();
 }
 
 /**
@@ -1546,7 +1550,7 @@ static void ebpf_parse_args(int argc, char **argv)
             netdata_log_error(
                 "Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
                 ebpf_stock_config_dir);
-            ebpf_exit();
+            ebpf_exit(1);
         }
     } else
         netdata_log_info("Loaded config file '%s/apps_groups.conf'", ebpf_user_config_dir);
@@ -2365,7 +2369,7 @@ int main(int argc, char **argv)
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if (verify_netdata_host_prefix(true) == -1)
-        ebpf_exit();
+        ebpf_exit(1);
 
     ebpf_allocate_common_vectors();
 
