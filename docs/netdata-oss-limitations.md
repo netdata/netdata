@@ -125,7 +125,7 @@ The 5-node limit on multi-node views applies to both **Anonymous** and **Communi
 
 :::note
 
-Preferred nodes are a Netdata Cloud feature that requires signing in. They are **not available** in the local Agent dashboard.
+Preferred node selection only affects Netdata Cloud dashboards and requires signing in. On the local Agent dashboard (`http://<agent-ip>:19999`), preferred node settings are not available.
 
 :::
 
