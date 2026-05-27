@@ -103,7 +103,7 @@ msiexec /qn /i netdata-x64.msi
 
 :::note
 
-This offline method uses `msiexec /qn`, so it is supported on Windows 10 and Windows Server 2019 or later. On earlier Windows Server versions, transfer the MSI to the offline system and use the [GUI installer](#graphical-installation-gui) instead.
+This offline method uses `msiexec /qn` for a silent installation. If you’re on Windows Server versions earlier than 2019, use the [GUI installer](#graphical-installation-gui) instead.
 
 :::
 
@@ -117,7 +117,7 @@ Paid/enterprise users can use the local Dashboard for full monitoring without Cl
 
 :::note
 
-Free users on standalone Agents have limited functionality — the UI is locked and local monitoring is restricted. See [Limitations for Free Users](#limitations-for-free-users) for details.
+Free users on standalone Agents have limited functionality — the UI is locked and there is no local monitoring. See [Limitations for Free Users](#limitations-for-free-users) for details.
 
 :::
 
