@@ -134,4 +134,40 @@ struct ebpf_pid_stat {
     struct ebpf_publish_vfs vfs;
 };
 
+#ifdef __linux__
+#include <errno.h>
+#include <semaphore.h>
+#include <stdbool.h>
+#include <time.h>
+
+/* Timed semaphore acquire: 200 ms deadline per attempt, retries on EINTR. */
+static inline bool ebpfgo_shm_sem_wait(sem_t *sem)
+{
+    if (!sem || sem == SEM_FAILED) {
+        errno = EINVAL;
+        return false;
+    }
+
+    while (1) {
+        struct timespec ts;
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+            return false;
+
+        ts.tv_nsec += 200 * 1000 * 1000;
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_sec  += ts.tv_nsec / 1000000000L;
+            ts.tv_nsec %= 1000000000L;
+        }
+
+        if (sem_timedwait(sem, &ts) == 0)
+            return true;
+
+        if (errno == EINTR)
+            continue;
+
+        return false;
+    }
+}
+#endif /* __linux__ */
+
 #endif

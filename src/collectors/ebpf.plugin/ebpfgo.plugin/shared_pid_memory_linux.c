@@ -3,14 +3,10 @@
 #include "shared_pid_memory.h"
 
 #include <fcntl.h>
-#include <errno.h>
-#include <semaphore.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <time.h>
 #include <unistd.h>
 
 struct shared_pid_memory {
@@ -25,32 +21,10 @@ static inline size_t shared_pid_memory_nbytes(const struct shared_pid_memory *ct
     return ctx->total * sizeof(struct ebpf_pid_stat);
 }
 
-static bool shared_pid_memory_sem_wait(sem_t *sem)
+static void shared_pid_memory_unlink_all(void)
 {
-    if (!sem || sem == SEM_FAILED) {
-        errno = EINVAL;
-        return false;
-    }
-
-    while (1) {
-        struct timespec ts;
-        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-            return false;
-
-        ts.tv_nsec += 200 * 1000 * 1000;
-        if (ts.tv_nsec >= 1000000000L) {
-            ts.tv_sec += ts.tv_nsec / 1000000000L;
-            ts.tv_nsec %= 1000000000L;
-        }
-
-        if (sem_timedwait(sem, &ts) == 0)
-            return true;
-
-        if (errno == EINTR)
-            continue;
-
-        return false;
-    }
+    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
+    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
 }
 
 struct shared_pid_memory *shared_pid_memory_open(size_t total)
@@ -72,8 +46,7 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
     // Unlinking just the semaphore (as was done before) left the SHM inode unchanged,
     // so consumers never knew to reopen and ended up using a different semaphore
     // than the publisher — breaking mutual exclusion.
-    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
-    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
+    shared_pid_memory_unlink_all();
 
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
     if (ctx->shm_fd < 0)
@@ -112,7 +85,7 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
 
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
-        if (!shared_pid_memory_sem_wait(ctx->sem))
+        if (!ebpfgo_shm_sem_wait(ctx->sem))
             return -1;
         locked = true;
     }
@@ -142,8 +115,7 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
     if (ctx->shm_fd >= 0)
         close(ctx->shm_fd);
 
-    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
-    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
+    shared_pid_memory_unlink_all();
 
     free(ctx);
 }

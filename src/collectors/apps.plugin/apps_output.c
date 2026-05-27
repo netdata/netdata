@@ -306,50 +306,59 @@ static void send_cachestat_charts_to_netdata(struct target *w, const char *type,
     if (strcmp(type, NETDATA_APP_FAMILY) != 0)
         return;
 
-    fprintf(stdout,
-            "CHART %s.%s_ebpf_cachestat_hit_ratio '' 'Hit ratio' '%%' page_cache %s.ebpf_cachestat_hit_ratio line 20260 %d\n",
-            type, string2str(w->clean_name), type, update_every);
-    send_CLABEL_COMMIT(lbl_name, string2str(w->name));
-    fprintf(stdout, "DIMENSION ratio '' absolute 1 1\n");
+    static const struct {
+        const char *suffix;
+        const char *title;
+        const char *units;
+        const char *style;
+        int         priority;
+        const char *dim;
+        const char *algo;
+    } charts[] = {
+        { "ebpf_cachestat_hit_ratio",   "Hit ratio",                "%",        "line",    20260, "ratio",  "absolute"    },
+        { "ebpf_cachestat_dirty_pages", "Number of dirty pages",    "page/s",   "stacked", 20261, "pages",  "incremental" },
+        { "ebpf_cachestat_access",      "Number of accessed files", "hits/s",   "stacked", 20262, "hits",   "incremental" },
+        { "ebpf_cachestat_misses",      "Files out of page cache",  "misses/s", "stacked", 20263, "misses", "incremental" },
+    };
 
-    fprintf(stdout,
-            "CHART %s.%s_ebpf_cachestat_dirty_pages '' 'Number of dirty pages' 'page/s' page_cache %s.ebpf_cachestat_dirty_pages stacked 20261 %d\n",
-            type, string2str(w->clean_name), type, update_every);
-    send_CLABEL_COMMIT(lbl_name, string2str(w->name));
-    fprintf(stdout, "DIMENSION pages '' incremental 1 1\n");
-
-    fprintf(stdout,
-            "CHART %s.%s_ebpf_cachestat_access '' 'Number of accessed files' 'hits/s' page_cache %s.ebpf_cachestat_access stacked 20262 %d\n",
-            type, string2str(w->clean_name), type, update_every);
-    send_CLABEL_COMMIT(lbl_name, string2str(w->name));
-    fprintf(stdout, "DIMENSION hits '' incremental 1 1\n");
-
-    fprintf(stdout,
-            "CHART %s.%s_ebpf_cachestat_misses '' 'Files out of page cache' 'misses/s' page_cache %s.ebpf_cachestat_misses stacked 20263 %d\n",
-            type, string2str(w->clean_name), type, update_every);
-    send_CLABEL_COMMIT(lbl_name, string2str(w->name));
-    fprintf(stdout, "DIMENSION misses '' incremental 1 1\n");
+    const char *name  = string2str(w->clean_name);
+    const char *wname = string2str(w->name);
+    for (size_t i = 0; i < sizeof(charts) / sizeof(charts[0]); i++) {
+        fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' page_cache %s.%s %s %d %d\n",
+                type, name, charts[i].suffix, charts[i].title, charts[i].units,
+                type, charts[i].suffix, charts[i].style, charts[i].priority, update_every);
+        send_CLABEL_COMMIT(lbl_name, wname);
+        fprintf(stdout, "DIMENSION %s '' %s 1 1\n", charts[i].dim, charts[i].algo);
+    }
 }
 
 static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
     if (strcmp(type, NETDATA_APP_FAMILY) != 0)
         return;
 
-    send_BEGIN(type, string2str(w->clean_name), "ebpf_cachestat_hit_ratio", dt);
-    send_SET("ratio", w->cachestat.ratio);
-    send_END();
+    static const struct {
+        const char *chart;
+        const char *dim;
+    } entries[] = {
+        { "ebpf_cachestat_hit_ratio",   "ratio"  },
+        { "ebpf_cachestat_dirty_pages", "pages"  },
+        { "ebpf_cachestat_access",      "hits"   },
+        { "ebpf_cachestat_misses",      "misses" },
+    };
 
-    send_BEGIN(type, string2str(w->clean_name), "ebpf_cachestat_dirty_pages", dt);
-    send_SET("pages", w->cachestat.dirty);
-    send_END();
+    const kernel_uint_t values[] = {
+        (kernel_uint_t)w->cachestat.ratio,
+        (kernel_uint_t)w->cachestat.dirty,
+        (kernel_uint_t)w->cachestat.hit,
+        (kernel_uint_t)w->cachestat.miss,
+    };
 
-    send_BEGIN(type, string2str(w->clean_name), "ebpf_cachestat_access", dt);
-    send_SET("hits", w->cachestat.hit);
-    send_END();
-
-    send_BEGIN(type, string2str(w->clean_name), "ebpf_cachestat_misses", dt);
-    send_SET("misses", w->cachestat.miss);
-    send_END();
+    const char *name = string2str(w->clean_name);
+    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
+        send_BEGIN(type, name, entries[i].chart, dt);
+        send_SET(entries[i].dim, values[i]);
+        send_END();
+    }
 }
 #endif
 

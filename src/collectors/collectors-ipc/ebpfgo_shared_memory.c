@@ -4,11 +4,8 @@
 
 #if defined(OS_LINUX)
 
-#include <errno.h>
 #include <fcntl.h>
-#include <semaphore.h>
 #include <sys/mman.h>
-#include <time.h>
 #include <unistd.h>
 
 static inline size_t ebpfgo_shm_nbytes(size_t total)
@@ -38,33 +35,6 @@ static int netdata_ebpfgo_shared_pid_memory_compare_pid(const void *a, const voi
     return 0;
 }
 
-static bool netdata_ebpfgo_shared_pid_memory_sem_wait(sem_t *sem)
-{
-    if (!sem || sem == SEM_FAILED) {
-        errno = EINVAL;
-        return false;
-    }
-
-    while (1) {
-        struct timespec ts;
-        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-            return false;
-
-        ts.tv_nsec += 200 * 1000 * 1000;
-        if (ts.tv_nsec >= 1000000000L) {
-            ts.tv_sec += ts.tv_nsec / 1000000000L;
-            ts.tv_nsec %= 1000000000L;
-        }
-
-        if (sem_timedwait(sem, &ts) == 0)
-            return true;
-
-        if (errno == EINTR)
-            continue;
-
-        return false;
-    }
-}
 
 static bool netdata_ebpfgo_shared_pid_memory_open_sem(
     netdata_ebpfgo_shared_pid_memory_t *ctx,
@@ -174,10 +144,7 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
     if (!ctx || !shm_name)
         return false;
 
-    if (!ctx->shm) {
-        if (!netdata_ebpfgo_shared_pid_memory_open(ctx, shm_name, sem_name))
-            return false;
-    } else {
+    if (ctx->shm) {
         int fd = shm_open(shm_name, O_RDONLY, 0);
         if (fd < 0) {
             netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
@@ -195,12 +162,12 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
              ebpfgo_shm_stat_entry_count(&st) != ctx->shm_total);
         close(fd);
 
-        if (changed) {
+        if (changed)
             netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
-            if (!netdata_ebpfgo_shared_pid_memory_open(ctx, shm_name, sem_name))
-                return false;
-        }
     }
+
+    if (!ctx->shm && !netdata_ebpfgo_shared_pid_memory_open(ctx, shm_name, sem_name))
+        return false;
 
     if (ctx->sem == SEM_FAILED) {
         if (!netdata_ebpfgo_shared_pid_memory_open_sem(ctx, sem_name))
@@ -209,7 +176,7 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
 
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
-        if (!netdata_ebpfgo_shared_pid_memory_sem_wait(ctx->sem)) {
+        if (!ebpfgo_shm_sem_wait(ctx->sem)) {
             return ctx->snapshot && ctx->snapshot_total;
         }
         locked = true;
