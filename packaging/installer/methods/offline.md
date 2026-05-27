@@ -21,7 +21,6 @@ Local package tools like `apt-offline` may work for DEB/RPM installs — but we 
 For offline installation on Windows, see [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md#offline-air-gapped-installation). This guide covers UNIX-like systems only.
 
 :::
-:::
 
 ## Step 1: Prepare the Offline Installation Package
 
