@@ -811,6 +811,7 @@ static inline void discovery_cleanup_all_cgroups() {
             else
                 last->discovered_next = cg->discovered_next;
 
+            cgroup_netipc_lookup_reaped_path_add(cg->id);
             cgroup_free(cg);
 
             if(!last)
@@ -964,13 +965,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
 
     char comm[TASK_COMM_LEN + 1];
 
-    if (cg->container_orchestrator == CGROUPS_ORCHESTRATOR_UNSET) {
-        if (strstr(cg->id, "kubepods")) {
-            cg->container_orchestrator = CGROUPS_ORCHESTRATOR_K8S;
-        } else {
-            cg->container_orchestrator = CGROUPS_ORCHESTRATOR_UNKNOWN;
-        }
-    }
+    discovery_classify_orchestrator(cg);
 
     if (is_inside_k8s && !k8s_get_container_first_proc_comm(cg->id, comm)) {
         // container initialization may take some time when CPU % is high
@@ -1170,6 +1165,7 @@ static inline void discovery_find_all_cgroups() {
     netdata_log_debug(D_CGROUP, "searching for cgroups");
 
     worker_is_busy(WORKER_DISCOVERY_INIT);
+    discovery_orchestrator_begin_cycle();
     discovery_mark_as_unavailable_all_cgroups();
 
     worker_is_busy(WORKER_DISCOVERY_FIND);
@@ -1195,6 +1191,8 @@ static inline void discovery_find_all_cgroups() {
 
     worker_is_busy(WORKER_DISCOVERY_COPY);
     discovery_copy_discovered_cgroups_to_reader();
+
+    __atomic_add_fetch(&cgroup_discovery_generation, 1, __ATOMIC_RELEASE);
 
     netdata_mutex_unlock(&cgroup_root_mutex);
 
@@ -1229,6 +1227,7 @@ void cgroup_discovery_worker(void *ptr)
     service_register(NULL, NULL, NULL);
 
     cgroup_netipc_init();
+    cgroup_netipc_lookup_init();
 
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
@@ -1244,6 +1243,7 @@ void cgroup_discovery_worker(void *ptr)
     }
 
     // Stop the netipc server first so its worker threads cannot iterate cgroup_root while we free it.
+    cgroup_netipc_lookup_cleanup();
     cgroup_netipc_cleanup();
     discovery_walkdir_open_errors_cleanup();
 

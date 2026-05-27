@@ -870,6 +870,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
+        - name: cgroups plugin IPC
+          description: cgroups.plugin netipc lookup-server health and latency.
+          labels: []
+          metrics:
+            - name: netdata.collector.ipc.cgroups_lookup.server.requests
+              description: CGROUPS_LOOKUP server request outcomes
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests_responded
+                - name: requests_error
+            - name: netdata.collector.ipc.cgroups_lookup.server.request_duration_ms
+              description: CGROUPS_LOOKUP server request duration cumulative histogram
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
   - <<: *module
     meta:
       <<: *meta

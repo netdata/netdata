@@ -3,6 +3,8 @@
 #ifndef NETDATA_CGROUP_INTERNALS_H
 #define NETDATA_CGROUP_INTERNALS_H 1
 
+#include "netipc/netipc_protocol.h"
+
 #ifdef NETDATA_INTERNAL_CHECKS
 #define CGROUP_PROCFILE_FLAG PROCFILE_FLAG_DEFAULT
 #else
@@ -152,10 +154,24 @@ struct cgroup_network_interface {
 };
 
 enum cgroups_container_orchestrator {
-    CGROUPS_ORCHESTRATOR_UNSET,
-    CGROUPS_ORCHESTRATOR_UNKNOWN,
-    CGROUPS_ORCHESTRATOR_K8S
+    CGROUPS_ORCHESTRATOR_UNKNOWN = 0,
+    CGROUPS_ORCHESTRATOR_SYSTEMD = 1,
+    CGROUPS_ORCHESTRATOR_DOCKER  = 2,
+    CGROUPS_ORCHESTRATOR_K8S     = 3,
+    CGROUPS_ORCHESTRATOR_KVM     = 4,
+    CGROUPS_ORCHESTRATOR_LXC     = 5,
+    CGROUPS_ORCHESTRATOR_PODMAN  = 6,
+    CGROUPS_ORCHESTRATOR_NSPAWN  = 7,
 };
+
+_Static_assert(CGROUPS_ORCHESTRATOR_UNKNOWN == NIPC_ORCHESTRATOR_UNKNOWN, "cgroups UNKNOWN enum must match netipc");
+_Static_assert(CGROUPS_ORCHESTRATOR_SYSTEMD == NIPC_ORCHESTRATOR_SYSTEMD, "cgroups SYSTEMD enum must match netipc");
+_Static_assert(CGROUPS_ORCHESTRATOR_DOCKER == NIPC_ORCHESTRATOR_DOCKER, "cgroups DOCKER enum must match netipc");
+_Static_assert(CGROUPS_ORCHESTRATOR_K8S == NIPC_ORCHESTRATOR_K8S, "cgroups K8S enum must match netipc");
+_Static_assert(CGROUPS_ORCHESTRATOR_KVM == NIPC_ORCHESTRATOR_KVM, "cgroups KVM enum must match netipc");
+_Static_assert(CGROUPS_ORCHESTRATOR_LXC == NIPC_ORCHESTRATOR_LXC, "cgroups LXC enum must match netipc");
+_Static_assert(CGROUPS_ORCHESTRATOR_PODMAN == NIPC_ORCHESTRATOR_PODMAN, "cgroups PODMAN enum must match netipc");
+_Static_assert(CGROUPS_ORCHESTRATOR_NSPAWN == NIPC_ORCHESTRATOR_NSPAWN, "cgroups NSPAWN enum must match netipc");
 
 
 // *** WARNING *** The fields are not thread safe. Take care of safe usage.
@@ -171,6 +187,7 @@ struct cgroup {
     bool function_ready; // true after the first iteration of chart creation/update
 
     char pending_renames;
+    bool container_orchestrator_resolved;
 
     char *id;
     uint32_t hash;
@@ -332,6 +349,8 @@ extern char *cgroup_unified_base;
 extern int cgroup_root_count;
 extern int cgroup_root_max;
 extern int cgroup_max_depth;
+extern int cgroup_lookup_reaped_set_size;
+extern _Atomic uint64_t cgroup_discovery_generation;
 
 extern SIMPLE_PATTERN *enabled_cgroup_paths;
 extern SIMPLE_PATTERN *enabled_cgroup_names;
@@ -356,6 +375,12 @@ extern uint32_t throttled_time_hash;
 extern uint32_t throttled_usec_hash;
 
 extern struct cgroup *cgroup_root;
+
+void discovery_classify_orchestrator(struct cgroup *cg);
+void discovery_orchestrator_begin_cycle(void);
+#ifdef NETDATA_INTERNAL_CHECKS
+void discovery_orchestrator_set_proxmox_pve_present_for_testing(bool present);
+#endif
 
 enum cgroups_type { CGROUPS_AUTODETECT_FAIL, CGROUPS_V1, CGROUPS_V2 };
 

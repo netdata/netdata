@@ -36,7 +36,6 @@ static bool cgroup_find_procs_path_v1(char *path_buf, size_t path_buf_size, cons
 static bool cgroups_snapshot_handler(void *user __maybe_unused,
                                      const nipc_cgroups_req_t *request __maybe_unused,
                                      nipc_cgroups_builder_t *builder) {
-    static uint64_t generation = 0;
     static uint64_t last_logged_zero_generation = 0;
     static uint64_t last_logged_truncated_generation = 0;
     uint64_t snapshot_generation;
@@ -46,7 +45,7 @@ static bool cgroups_snapshot_handler(void *user __maybe_unused,
     netdata_mutex_lock(&cgroup_root_mutex);
 
     // set snapshot header — systemd is always enabled in this codebase
-    snapshot_generation = ++generation;
+    snapshot_generation = __atomic_load_n(&cgroup_discovery_generation, __ATOMIC_ACQUIRE);
     nipc_cgroups_builder_set_header(builder, CONFIG_BOOLEAN_YES, snapshot_generation);
 
     struct cgroup *cg;

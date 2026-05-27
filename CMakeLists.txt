@@ -196,6 +196,8 @@ cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEA
 cmake_dependent_option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD" False)
 
 cmake_dependent_option(ENABLE_PLUGIN_CGROUP_NETWORK "Enable Linux CGroup network usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_SERVER "Enable cgroups.plugin CGROUPS_LOOKUP netipc server" True "OS_LINUX" False)
+cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT "Build cgroups.plugin CGROUPS_LOOKUP test client" False "ENABLE_CGROUPS_LOOKUP_SERVER" False)
 cmake_dependent_option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
@@ -2057,9 +2059,11 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/sys_fs_cgroup.h
         src/collectors/cgroups.plugin/cgroup-internals.h
         src/collectors/cgroups.plugin/cgroup-discovery.c
+        src/collectors/cgroups.plugin/cgroup-orchestrator.c
         src/collectors/cgroups.plugin/cgroup-charts.c
         src/collectors/cgroups.plugin/cgroup-top.c
         src/collectors/cgroups.plugin/cgroup-netipc.c
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-netipc.c>"
         src/collectors/cgroups.plugin/cgroup-netipc.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
@@ -3015,6 +3019,28 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     install(TARGETS cgroup-network
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+if(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT)
+    add_executable(cgroup-lookup-test src/collectors/cgroups.plugin/cgroup-lookup-test/cgroup-lookup-test.c)
+    target_link_libraries(cgroup-lookup-test libnetdata)
+endif()
+
+if(OS_LINUX)
+    add_executable(cgroup-orchestrator-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_orchestrator.c
+            src/collectors/cgroups.plugin/cgroup-orchestrator.c)
+    target_compile_definitions(cgroup-orchestrator-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
+    target_link_libraries(cgroup-orchestrator-test libnetdata)
+endif()
+
+if(ENABLE_CGROUPS_LOOKUP_SERVER)
+    add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c
+            src/collectors/cgroups.plugin/cgroup-lookup-netipc.c
+            src/collectors/cgroups.plugin/cgroup-orchestrator.c)
+    target_compile_definitions(cgroup-lookup-netipc-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
+    target_link_libraries(cgroup-lookup-netipc-test libnetdata)
 endif()
 
 # Enable rust implementation if we don't have systemd and we want the journal plugin

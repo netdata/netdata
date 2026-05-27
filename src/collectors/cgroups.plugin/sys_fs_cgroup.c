@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-internals.h"
+#include "cgroup-netipc.h"
 
 // main cgroups thread worker jobs
 #define WORKER_CGROUPS_LOCK 0
@@ -33,6 +34,8 @@ char *cgroup_unified_base = NULL;
 int cgroup_root_count = 0;
 int cgroup_root_max = 1000;
 int cgroup_max_depth = 0;
+int cgroup_lookup_reaped_set_size = 4096;
+_Atomic uint64_t cgroup_discovery_generation = 0;
 SIMPLE_PATTERN *enabled_cgroup_paths = NULL;
 SIMPLE_PATTERN *enabled_cgroup_names = NULL;
 SIMPLE_PATTERN *search_cgroup_paths = NULL;
@@ -294,6 +297,12 @@ void read_cgroup_plugin_configuration() {
 
     cgroup_root_max = (int)inicfg_get_number(&netdata_config, "plugin:cgroups", "max cgroups to allow", cgroup_root_max);
     cgroup_max_depth = (int)inicfg_get_number(&netdata_config, "plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
+    cgroup_lookup_reaped_set_size = (int)inicfg_get_number(
+        &netdata_config, "plugin:cgroups", "cgroup lookup reaped set size", cgroup_lookup_reaped_set_size);
+    if (cgroup_lookup_reaped_set_size < 0) {
+        cgroup_lookup_reaped_set_size = 0;
+        inicfg_set_number(&netdata_config, "plugin:cgroups", "cgroup lookup reaped set size", cgroup_lookup_reaped_set_size);
+    }
 
     enabled_cgroup_paths = simple_pattern_create(
             inicfg_get(&netdata_config, "plugin:cgroups", "enable by default cgroups matching",
@@ -1424,5 +1433,7 @@ void cgroups_main(void *ptr) {
 
         worker_is_idle();
         netdata_mutex_unlock(&cgroup_root_mutex);
+
+        cgroup_netipc_lookup_update_charts(cgroup_update_every);
     }
 }
