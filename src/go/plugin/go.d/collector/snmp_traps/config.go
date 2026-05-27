@@ -124,6 +124,15 @@ var (
 	}}
 
 	configYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"__provider__":                {},
+		"__source__":                  {},
+		"__source_type__":             {},
+		"autodetection_retry":         {},
+		"function_only":               {},
+		"labels":                      {allowAny: true},
+		"module":                      {},
+		"name":                        {},
+		"priority":                    {},
 		"vnode":                       {},
 		"reverse_dns":                 {children: map[string]yamlKeySpec{"enabled": {}}},
 		"update_every":                {},

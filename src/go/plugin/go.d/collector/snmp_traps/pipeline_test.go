@@ -1157,6 +1157,32 @@ unexpected: true
 		}
 	})
 
+	t.Run("framework metadata keys", func(t *testing.T) {
+		var cfg Config
+		err := yaml.Unmarshal([]byte(`
+name: local
+module: snmp_traps
+autodetection_retry: 0
+priority: 70000
+function_only: false
+labels:
+  role: edge
+__provider__: file reader
+__source__: discoverer=file_reader,file=snmp_traps.conf
+__source_type__: user
+listen:
+  endpoints:
+    - protocol: udp
+      address: "127.0.0.1"
+      port: 9162
+versions: [v2c]
+communities: [public]
+`), &cfg)
+		if err != nil {
+			t.Fatalf("expected framework metadata keys to be accepted: %v", err)
+		}
+	})
+
 	t.Run("unknown nested config key", func(t *testing.T) {
 		var cfg Config
 		err := yaml.Unmarshal([]byte(`

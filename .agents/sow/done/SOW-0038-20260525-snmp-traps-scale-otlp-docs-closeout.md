@@ -4,7 +4,7 @@
 
 Status: completed
 
-Sub-state: completed on 2026-05-27 after M1, M2, and M3 implementation, validation, reviewer gates, artifact maintenance, and follow-up mapping. NOT independently mergeable — merge gate is SOW-0039.
+Sub-state: regression repaired on 2026-05-27 after manual `go.d.plugin` smoke testing found normal job creation rejected framework metadata keys before binding the listener. Previous closeout remains below for history; the regression section records the repair and validation.
 
 ## Requirements
 
@@ -711,4 +711,37 @@ This SOW is completed. It is not independently mergeable; SOW-0039 remains the f
 
 ## Regression Log
 
-None yet.
+### Regression - 2026-05-27 - go.d Framework Metadata Rejected Before Listener Bind
+
+What broke:
+
+- Direct collector e2e validation passed, but the normal `go.d.plugin -d -m snmp_traps -j local` path failed before binding the configured UDP listener.
+- The job factory passes framework-owned metadata keys (`name`, `module`, `autodetection_retry`, `priority`, `__provider__`, `__source__`, `__source_type__`) into the collector config map. `snmp_traps` strict YAML validation rejected the first internal key as an unknown operator config key, so job creation failed and the listener never started.
+
+Evidence:
+
+- `src/go/plugin/framework/confgroup/config.go` defines the framework config keys and internal metadata keys.
+- `src/go/plugin/go.d/collector/snmp_traps/config.go` strict unknown-key validation did not whitelist those framework-owned keys.
+- Manual smoke test evidence: local debug run reported `failed to apply config for snmp_traps[local] job: unknown config key "__provider__"` and `CONFIG go.d:collector:snmp_traps:local status failed`.
+- Control evidence: `go test -run TestCollectorReplayPcapThroughListenerToJournal -count=1 -v ./plugin/go.d/collector/snmp_traps` passed, proving the listener/journal packet path works when the collector is instantiated directly.
+
+Why previous validation missed it:
+
+- Prior tests exercised direct `Collector.Init()` and package-level config unmarshalling, but not the full `go.d.plugin` job factory path where framework metadata is injected before collector unmarshalling.
+
+Repair plan:
+
+- Allow the known go.d framework-owned top-level keys in the strict YAML key spec without relaxing nested operator configuration validation.
+- Add regression test coverage showing framework metadata is accepted while unrelated top-level and nested unknown keys remain rejected.
+- Rerun the direct e2e test and a manual `go.d.plugin` smoke test that sends a synthetic v2c coldStart trap to a high UDP port and queries the generated journal file.
+
+Validation updates required:
+
+- Direct e2e pass recorded: `go test -run TestCollectorReplayPcapThroughListenerToJournal -count=1 -v ./plugin/go.d/collector/snmp_traps` -> PASS.
+- Config regression coverage recorded: `go test -run 'TestConfigValidation|TestCollectorReplayPcapThroughListenerToJournal' -count=1 -v ./plugin/go.d/collector/snmp_traps` -> PASS, including new `framework_metadata_keys` case while `unknown_config_key` and `unknown_nested_config_key` still pass.
+- Manual `go.d.plugin` smoke test recorded: built `go.d.plugin` with a temporary cache dir, configured one `snmp_traps[local]` job on a high UDP port, ran under terminal debug mode, sent a synthetic v2c coldStart with `snmptrap`, and queried the generated journal directory. Evidence returned `MESSAGE="Device reinitializing and configuration may have been altered on [LOOPBACK_IP]."`, `TRAP_OID=[COLDSTART_TRAP_OID]`, `TRAP_NAME=SNMPv2-MIB::coldStart`, `TRAP_CATEGORY=state_change`, `TRAP_SEVERITY=notice`, `TRAP_VERSION=v2c`, and `TRAP_SOURCE_IP=[LOOPBACK_IP]`. The debug run logged `check success` and `CONFIG go.d:collector:snmp_traps:local status running`.
+- Full package validation recorded: `go test -count=1 -timeout 60s ./plugin/go.d/collector/snmp_traps/...` -> PASS (2.680s).
+- Static validation recorded: `go vet ./plugin/go.d/collector/snmp_traps/...` -> clean.
+- Whitespace validation recorded: `git diff --check` -> clean.
+- Reviewer findings: no external reviewer rerun was used for this narrow regression repair. The accepted finding came from manual runtime smoke testing, and the repair was self-reviewed against framework key definitions in `src/go/plugin/framework/confgroup/config.go` plus the retained unknown-key regression tests.
+- Artifact maintenance: specs and operator docs are unchanged because this repair preserves existing behavior and only accepts framework-owned metadata that normal go.d job creation already injects. SOW lifecycle is updated by reopening and reclosing SOW-0038 with this regression log.
