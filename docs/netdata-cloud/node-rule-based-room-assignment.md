@@ -77,7 +77,7 @@ Clauses:
     Value: database
 ```
 
-## Comparison Operators
+### Comparison Operators
 
 You can use the following operators to compare label values:
 
