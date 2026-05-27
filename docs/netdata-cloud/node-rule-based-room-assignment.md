@@ -150,7 +150,7 @@ Rules are evaluated in real time — as soon as a child Node connects with the m
 
 :::note
 
-Netdata deploys one child Agent per Kubernetes **node**, not per namespace. This pattern works best when each environment runs on dedicated node pools. If environments share nodes, consider using additional host labels (for example `node-role`) to differentiate them.
+Netdata deploys one child Agent per Kubernetes **node**, not per namespace or workload, and Room assignment rules apply to that child Agent as a whole. This pattern works best when each environment runs on dedicated nodes or node pools. If environments share the same nodes, host-label rules cannot route namespaces on those nodes into different Rooms.
 
 :::
 
