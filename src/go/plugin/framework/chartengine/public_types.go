@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package chartengine
+
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+)
+
+// Public aliases for emitter/integration packages. Keep these stable to avoid
+// leaking internal/program imports outside chartengine.
+type (
+	ChartMeta = program.ChartMeta
+	Algorithm = program.Algorithm
+	ChartType = program.ChartType
+)
+
+const (
+	// Priority is the default chart priority used by chartengine when templates
+	// and autogen routes do not specify one explicitly.
+	Priority = 70000
+)
+
+const (
+	AlgorithmAbsolute    = program.AlgorithmAbsolute
+	AlgorithmIncremental = program.AlgorithmIncremental
+)
+
+const (
+	ChartTypeLine    = program.ChartTypeLine
+	ChartTypeArea    = program.ChartTypeArea
+	ChartTypeStacked = program.ChartTypeStacked
+	ChartTypeHeatmap = program.ChartTypeHeatmap
+)

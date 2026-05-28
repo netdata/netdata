@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioClusterServersStatsRequest = module.Priority + iota
+	prioClusterServersStatsRequest = collectorapi.Priority + iota
 	prioClusterClientConnections
 	prioClusterActiveClients
 	prioClusterQueries
@@ -23,7 +23,7 @@ const (
 	prioServerDocuments
 )
 
-var clusterCharts = module.Charts{
+var clusterCharts = collectorapi.Charts{
 	clusterServersStatsRequestChart.Copy(),
 	clusterClientConnectionsChart.Copy(),
 	clusterActiveClientsChart.Copy(),
@@ -32,66 +32,66 @@ var clusterCharts = module.Charts{
 }
 
 var (
-	clusterServersStatsRequestChart = module.Chart{
+	clusterServersStatsRequestChart = collectorapi.Chart{
 		ID:       "cluster_cluster_servers_stats_request",
 		Title:    "Cluster Servers Stats Request",
 		Units:    "servers",
 		Fam:      "servers",
 		Ctx:      "rethinkdb.cluster_servers_stats_request",
 		Priority: prioClusterServersStatsRequest,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_servers_stats_request_success", Name: "success"},
 			{ID: "cluster_servers_stats_request_timeout", Name: "timeout"},
 		},
 	}
-	clusterClientConnectionsChart = module.Chart{
+	clusterClientConnectionsChart = collectorapi.Chart{
 		ID:       "cluster_client_connections",
 		Title:    "Cluster Client Connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "rethinkdb.cluster_client_connections",
 		Priority: prioClusterClientConnections,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_client_connections", Name: "connections"},
 		},
 	}
-	clusterActiveClientsChart = module.Chart{
+	clusterActiveClientsChart = collectorapi.Chart{
 		ID:       "cluster_active_clients",
 		Title:    "Cluster Active Clients",
 		Units:    "clients",
 		Fam:      "clients",
 		Ctx:      "rethinkdb.cluster_active_clients",
 		Priority: prioClusterActiveClients,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_clients_active", Name: "active"},
 		},
 	}
-	clusterQueriesChart = module.Chart{
+	clusterQueriesChart = collectorapi.Chart{
 		ID:       "cluster_queries",
 		Title:    "Cluster Queries",
 		Units:    "queries/s",
 		Fam:      "queries",
 		Ctx:      "rethinkdb.cluster_queries",
 		Priority: prioClusterQueries,
-		Dims: module.Dims{
-			{ID: "cluster_queries_total", Name: "queries", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "cluster_queries_total", Name: "queries", Algo: collectorapi.Incremental},
 		},
 	}
-	clusterDocumentsChart = module.Chart{
+	clusterDocumentsChart = collectorapi.Chart{
 		ID:       "cluster_documents",
 		Title:    "Cluster Documents",
 		Units:    "documents/s",
 		Fam:      "documents",
 		Ctx:      "rethinkdb.cluster_documents",
 		Priority: prioClusterDocuments,
-		Dims: module.Dims{
-			{ID: "cluster_read_docs_total", Name: "read", Algo: module.Incremental},
-			{ID: "cluster_written_docs_total", Name: "written", Mul: -1, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "cluster_read_docs_total", Name: "read", Algo: collectorapi.Incremental},
+			{ID: "cluster_written_docs_total", Name: "written", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
 )
 
-var serverChartsTmpl = module.Charts{
+var serverChartsTmpl = collectorapi.Charts{
 	serverStatsRequestStatusChartTmpl.Copy(),
 	serverConnectionsChartTmpl.Copy(),
 	serverActiveClientsChartTmpl.Copy(),
@@ -100,61 +100,61 @@ var serverChartsTmpl = module.Charts{
 }
 
 var (
-	serverStatsRequestStatusChartTmpl = module.Chart{
+	serverStatsRequestStatusChartTmpl = collectorapi.Chart{
 		ID:       "server_%s_stats_request_status",
 		Title:    "Server Stats Request Status",
 		Units:    "status",
 		Fam:      "srv status",
 		Ctx:      "rethinkdb.server_stats_request_status",
 		Priority: prioServerStatsRequestStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "server_%s_stats_request_status_success", Name: "success"},
 			{ID: "server_%s_stats_request_status_timeout", Name: "timeout"},
 		},
 	}
-	serverConnectionsChartTmpl = module.Chart{
+	serverConnectionsChartTmpl = collectorapi.Chart{
 		ID:       "server_%s_client_connections",
 		Title:    "Server Client Connections",
 		Units:    "connections",
 		Fam:      "srv connections",
 		Ctx:      "rethinkdb.server_client_connections",
 		Priority: prioServerClientConnections,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "server_%s_client_connections", Name: "connections"},
 		},
 	}
-	serverActiveClientsChartTmpl = module.Chart{
+	serverActiveClientsChartTmpl = collectorapi.Chart{
 		ID:       "server_%s_active_clients",
 		Title:    "Server Active Clients",
 		Units:    "clients",
 		Fam:      "srv clients",
 		Ctx:      "rethinkdb.server_active_clients",
 		Priority: prioServerActiveClients,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "server_%s_clients_active", Name: "active"},
 		},
 	}
-	serverQueriesChartTmpl = module.Chart{
+	serverQueriesChartTmpl = collectorapi.Chart{
 		ID:       "server_%s_queries",
 		Title:    "Server Queries",
 		Units:    "queries/s",
 		Fam:      "srv queries",
 		Ctx:      "rethinkdb.server_queries",
 		Priority: prioServerQueries,
-		Dims: module.Dims{
-			{ID: "server_%s_queries_total", Name: "queries", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "server_%s_queries_total", Name: "queries", Algo: collectorapi.Incremental},
 		},
 	}
-	serverDocumentsChartTmpl = module.Chart{
+	serverDocumentsChartTmpl = collectorapi.Chart{
 		ID:       "server_%s_documents",
 		Title:    "Server Documents",
 		Units:    "documents/s",
 		Fam:      "srv documents",
 		Ctx:      "rethinkdb.server_documents",
 		Priority: prioServerDocuments,
-		Dims: module.Dims{
-			{ID: "server_%s_read_docs_total", Name: "read", Algo: module.Incremental},
-			{ID: "server_%s_written_docs_total", Name: "written", Mul: -1, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "server_%s_read_docs_total", Name: "read", Algo: collectorapi.Incremental},
+			{ID: "server_%s_written_docs_total", Name: "written", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
 )
@@ -164,7 +164,7 @@ func (c *Collector) addServerCharts(srvUUID, srvName string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, srvUUID)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "sever_uuid", Value: srvUUID},
 			{Key: "sever_name", Value: srvName},
 		}

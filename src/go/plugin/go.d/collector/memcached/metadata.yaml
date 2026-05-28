@@ -20,7 +20,6 @@ modules:
         - memcache
         - cache
         - database
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Memcached metrics for proficient in-memory key-value store operations. Track cache hits, misses, and memory usage for efficient data caching."

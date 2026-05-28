@@ -5,24 +5,24 @@ package supervisord
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	summaryChartsPriority = module.Priority
+	summaryChartsPriority = collectorapi.Priority
 	groupChartsPriority   = summaryChartsPriority + 20
 )
 
-var summaryCharts = module.Charts{
+var summaryCharts = collectorapi.Charts{
 	{
 		ID:       "processes",
 		Title:    "Processes",
 		Units:    "processes",
 		Fam:      "summary",
 		Ctx:      "supervisord.summary_processes",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: summaryChartsPriority,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "running_processes", Name: "running"},
 			{ID: "non_running_processes", Name: "non-running"},
 		},
@@ -30,7 +30,7 @@ var summaryCharts = module.Charts{
 }
 
 var (
-	groupChartsTmpl = module.Charts{
+	groupChartsTmpl = collectorapi.Charts{
 		groupProcessesChartTmpl.Copy(),
 		groupProcessesStateCodeChartTmpl.Copy(),
 		groupProcessesExitStatusChartTmpl.Copy(),
@@ -38,40 +38,40 @@ var (
 		groupProcessesDowntimeChartTmpl.Copy(),
 	}
 
-	groupProcessesChartTmpl = module.Chart{
+	groupProcessesChartTmpl = collectorapi.Chart{
 		ID:    "group_%s_processes",
 		Title: "Processes",
 		Units: "processes",
 		Fam:   "group %s",
 		Ctx:   "supervisord.processes",
-		Type:  module.Stacked,
-		Dims: module.Dims{
+		Type:  collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "group_%s_running_processes", Name: "running"},
 			{ID: "group_%s_non_running_processes", Name: "non-running"},
 		},
 	}
-	groupProcessesStateCodeChartTmpl = module.Chart{
+	groupProcessesStateCodeChartTmpl = collectorapi.Chart{
 		ID:    "group_%s_processes_state_code",
 		Title: "State code",
 		Units: "code",
 		Fam:   "group %s",
 		Ctx:   "supervisord.process_state_code",
 	}
-	groupProcessesExitStatusChartTmpl = module.Chart{
+	groupProcessesExitStatusChartTmpl = collectorapi.Chart{
 		ID:    "group_%s_processes_exit_status",
 		Title: "Exit status",
 		Units: "status",
 		Fam:   "group %s",
 		Ctx:   "supervisord.process_exit_status",
 	}
-	groupProcessesUptimeChartTmpl = module.Chart{
+	groupProcessesUptimeChartTmpl = collectorapi.Chart{
 		ID:    "group_%s_processes_uptime",
 		Title: "Uptime",
 		Units: "seconds",
 		Fam:   "group %s",
 		Ctx:   "supervisord.process_uptime",
 	}
-	groupProcessesDowntimeChartTmpl = module.Chart{
+	groupProcessesDowntimeChartTmpl = collectorapi.Chart{
 		ID:    "group_%s_processes_downtime",
 		Title: "Downtime",
 		Units: "seconds",
@@ -80,7 +80,7 @@ var (
 	}
 )
 
-func newProcGroupCharts(group string) *module.Charts {
+func newProcGroupCharts(group string) *collectorapi.Charts {
 	charts := groupChartsTmpl.Copy()
 	for i, c := range *charts {
 		c.ID = fmt.Sprintf(c.ID, group)

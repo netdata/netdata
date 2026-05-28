@@ -5,13 +5,17 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
@@ -83,7 +87,7 @@ func (c *Collector) collectMetricsModeColumns(mx map[string]int64, m ConfigMetri
 				if d.StatusWhen == nil {
 					mx[id] += toInt64(raw)
 				} else if v, ok := mx[id]; !ok || v == 0 {
-					mx[id] = metrix.Bool(c.evalStatusWhen(d.StatusWhen, raw))
+					mx[id] = oldmetrix.Bool(c.evalStatusWhen(d.StatusWhen, raw))
 				}
 			}
 		}
@@ -123,7 +127,7 @@ func (c *Collector) collectMetricsModeKV(mx map[string]int64, m ConfigMetricBloc
 				if d.StatusWhen == nil {
 					mx[id] += toInt64(vraw)
 				} else if v, ok := mx[id]; !ok || v == 0 {
-					mx[id] = metrix.Bool(c.evalStatusWhen(d.StatusWhen, vraw))
+					mx[id] = oldmetrix.Bool(c.evalStatusWhen(d.StatusWhen, vraw))
 				}
 			}
 		}
@@ -162,9 +166,18 @@ func (c *Collector) evalStatusWhen(sw *ConfigStatusWhen, value string) bool {
 }
 
 func (c *Collector) openConnection(ctx context.Context) error {
-	db, err := sql.Open(c.Driver, c.DSN)
+	if c.CloudAuth.IsEnabled() && c.Driver == "pgx" {
+		return c.openPostgresAzureADConnection(ctx)
+	}
+
+	driverName, dsn, err := c.resolveConnectionParams()
 	if err != nil {
-		return fmt.Errorf("open %s: %w (dsn=%s)", c.Driver, err, redactDSN(c.DSN))
+		return err
+	}
+
+	db, err := sql.Open(driverName, dsn)
+	if err != nil {
+		return fmt.Errorf("open %s: %w (dsn=%s)", driverName, err, redactDSN(dsn))
 	}
 
 	db.SetConnMaxLifetime(10 * time.Minute)
@@ -178,10 +191,67 @@ func (c *Collector) openConnection(ctx context.Context) error {
 
 	if err := db.PingContext(pingCtx); err != nil {
 		_ = db.Close()
-		return fmt.Errorf("ping %s: %w (dsn=%s)", c.Driver, err, redactDSN(c.DSN))
+		return fmt.Errorf("ping %s: %w (dsn=%s)", driverName, err, redactDSN(dsn))
 	}
 
 	c.db = db
+	return nil
+}
+
+func (c *Collector) resolveConnectionParams() (string, string, error) {
+	driverName := c.Driver
+	dsn := c.DSN
+
+	if c.CloudAuth.IsEnabled() {
+		switch c.Driver {
+		case "sqlserver", "azuresql":
+			var err error
+			dsn, err = sqladapter.BuildMSSQLAzureADDSN(c.DSN, c.CloudAuth)
+			if err != nil {
+				return "", "", fmt.Errorf("prepare cloud_auth SQL Server DSN: %w", err)
+			}
+			driverName = sqladapter.MSSQLAzureDriverName
+		}
+	}
+
+	return driverName, dsn, nil
+}
+
+func (c *Collector) openPostgresAzureADConnection(ctx context.Context) error {
+	if c.azureTokenProvider == nil {
+		return errors.New("cloud auth token provider is not initialized for pgx")
+	}
+
+	cfg, err := pgx.ParseConfig(c.DSN)
+	if err != nil {
+		return fmt.Errorf("parse pgx DSN: %w", err)
+	}
+
+	db := stdlib.OpenDB(*cfg, stdlib.OptionBeforeConnect(c.azureADBeforeConnect))
+	db.SetConnMaxLifetime(10 * time.Minute)
+
+	pingCtx := ctx
+	cancel := func() {}
+	if d := c.Timeout.Duration(); d > 0 {
+		pingCtx, cancel = context.WithTimeout(ctx, d)
+	}
+	defer cancel()
+
+	if err := db.PingContext(pingCtx); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("ping pgx: %w (dsn=%s)", err, redactDSN(c.DSN))
+	}
+
+	c.db = db
+	return nil
+}
+
+func (c *Collector) azureADBeforeConnect(ctx context.Context, cfg *pgx.ConnConfig) error {
+	token, _, err := c.azureTokenProvider.Token(ctx)
+	if err != nil {
+		return err
+	}
+	cfg.Password = token
 	return nil
 }
 
@@ -245,8 +315,8 @@ func redactDSN(dsn string) string {
 	}
 
 	// If there's a colon, treat text before first ':' as user and the rest as password.
-	if colon := strings.IndexByte(userinfo, ':'); colon >= 0 {
-		user := userinfo[:colon]
+	if before, _, ok := strings.Cut(userinfo, ":"); ok {
+		user := before
 		// Keep user, redact password
 		redacted := user + ":****"
 		return dsn[:authStart] + redacted + dsn[at:]

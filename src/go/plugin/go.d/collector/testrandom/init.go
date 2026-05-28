@@ -5,7 +5,7 @@ package testrandom
 import (
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) validateConfig() error {
@@ -21,8 +21,8 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initCharts() (*module.Charts, error) {
-	charts := &module.Charts{}
+func (c *Collector) initCharts() (*collectorapi.Charts, error) {
+	charts := &collectorapi.Charts{}
 
 	var ctx int
 	v := calcContextEvery(c.Config.Charts.Num, c.Config.Charts.Contexts)
@@ -30,7 +30,7 @@ func (c *Collector) initCharts() (*module.Charts, error) {
 		if i != 0 && v != 0 && ctx < (c.Config.Charts.Contexts-1) && i%v == 0 {
 			ctx++
 		}
-		chart := newChart(i, ctx, c.Config.Charts.Labels, module.ChartType(c.Config.Charts.Type))
+		chart := newChart(i, ctx, c.Config.Charts.Labels, collectorapi.ChartType(c.Config.Charts.Type))
 
 		if err := charts.Add(chart); err != nil {
 			return nil, err
@@ -43,7 +43,7 @@ func (c *Collector) initCharts() (*module.Charts, error) {
 		if i != 0 && v != 0 && ctx < (c.Config.HiddenCharts.Contexts-1) && i%v == 0 {
 			ctx++
 		}
-		chart := newHiddenChart(i, ctx, c.Config.HiddenCharts.Labels, module.ChartType(c.Config.HiddenCharts.Type))
+		chart := newHiddenChart(i, ctx, c.Config.HiddenCharts.Labels, collectorapi.ChartType(c.Config.HiddenCharts.Type))
 
 		if err := charts.Add(chart); err != nil {
 			return nil, err

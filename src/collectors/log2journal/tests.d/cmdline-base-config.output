@@ -1,0 +1,6 @@
+COMPUTED=from_config
+CONFIG_LEVEL=test
+CONFIG_MESSAGE=message
+SOURCE=config_file
+VERSION=1.0
+

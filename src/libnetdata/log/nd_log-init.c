@@ -27,7 +27,29 @@ ND_UUID nd_log_get_invocation_id(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static void nd_log_make_stream_unbuffered(FILE *fp, int fd, const char *filename) {
+    if(fp && setvbuf(fp, NULL, _IONBF, 0) != 0)
+        netdata_log_error("Cannot disable buffering on fd %d ('%s')", fd, filename ? filename : "stdio");
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+void nd_log_initialize_mutexes(void) {
+    FUNCTION_RUN_ONCE();
+
+    for(size_t i = 0 ; i < _NDLS_MAX ; i++)
+        netdata_mutex_init(&nd_log.sources[i].mutex);
+
+    netdata_mutex_init(&nd_log.std_output.mutex);
+    netdata_mutex_init(&nd_log.std_error.mutex);
+    __atomic_store_n(&nd_log.mutexes_initialized, true, __ATOMIC_RELEASE);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 void nd_log_initialize_for_external_plugins(const char *name) {
+    nd_log_initialize_mutexes();
+
     // if we don't run under Netdata, log to stderr,
     // otherwise, use the logging method Netdata wants us to use.
 #if defined(OS_WINDOWS)
@@ -180,6 +202,7 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
         case NDLM_STDOUT:
             e->fp = stdout;
             e->fd = STDOUT_FILENO;
+            nd_log_make_stream_unbuffered(e->fp, e->fd, "stdout");
             break;
 
         case NDLM_DISABLED:
@@ -190,6 +213,7 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
             e->method = NDLM_STDERR;
             e->fp = stderr;
             e->fd = STDERR_FILENO;
+            nd_log_make_stream_unbuffered(e->fp, e->fd, "stderr");
             break;
 
         case NDLM_DEVNULL:
@@ -240,10 +264,8 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
                     e->fd = STDERR_FILENO;
                 }
             }
-            else {
-                if (setvbuf(e->fp, NULL, _IOLBF, 0) != 0)
-                    netdata_log_error("Cannot set line buffering on fd %d ('%s')", e->fd, e->filename);
-            }
+
+            nd_log_make_stream_unbuffered(e->fp, e->fd, e->filename);
         }
         break;
     }
@@ -263,6 +285,7 @@ void nd_log_stdin_init(int fd, const char *filename) {
 }
 
 void nd_log_initialize(void) {
+    nd_log_initialize_mutexes();
     nd_log_stdin_init(STDIN_FILENO, "/dev/null");
 
     for(size_t i = 0 ; i < _NDLS_MAX ; i++)
@@ -290,6 +313,7 @@ int nd_log_systemd_journal_fd(void) {
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     nd_log.fatal_hook_cb = NULL;
     nd_log.fatal_final_cb = NULL;
+    nd_log.single_threaded_child = true;
 
     gettid_uncached();
 #if defined(HAVE_LIBBACKTRACE)
@@ -309,8 +333,13 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
         nd_log.journal_direct.initialized = false;
     }
 
+    // Keep flood protection in the post-fork child by resetting the
+    // per-source throttle spinlocks and counters.
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
-        spinlock_init(&nd_log.sources[i].spinlock);
+        spinlock_init(&nd_log.sources[i].limits.spinlock);
+        nd_log.sources[i].limits.started_monotonic_ut = 0;
+        nd_log.sources[i].limits.counter = 0;
+        nd_log.sources[i].limits.prevented = 0;
         nd_log.sources[i].method = NDLM_DEFAULT;
         nd_log.sources[i].fd = -1;
         nd_log.sources[i].fp = NULL;
@@ -319,10 +348,6 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
         nd_log.sources[i].hEventLog = NULL;
 #endif
     }
-
-    // initialize spinlocks
-    spinlock_init(&nd_log.std_output.spinlock);
-    spinlock_init(&nd_log.std_error.spinlock);
 
     nd_log.syslog.initialized = false;
     nd_log.eventlog.initialized = false;

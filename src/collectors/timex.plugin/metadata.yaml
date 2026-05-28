@@ -15,7 +15,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Examine Timex metrics to gain insights into system clock operations. Study time sync status, clock drift, and adjustments to ensure accurate system timekeeping."

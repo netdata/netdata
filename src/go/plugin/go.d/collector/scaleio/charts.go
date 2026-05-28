@@ -7,20 +7,20 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio/client"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type (
-	// Charts is an alias for module.Charts.
-	Charts = module.Charts
-	// Dims is an alias for module.Dims.
-	Dims = module.Dims
-	// Vars is an alias for module.Vars.
-	Vars = module.Vars
+	// Charts is an alias for collectorapi.Charts.
+	Charts = collectorapi.Charts
+	// Dims is an alias for collectorapi.Dims.
+	Dims = collectorapi.Dims
+	// Vars is an alias for collectorapi.Vars.
+	Vars = collectorapi.Vars
 )
 
 var (
-	prioStoragePool = module.Priority + len(systemCharts) + 10
+	prioStoragePool = collectorapi.Priority + len(systemCharts) + 10
 	prioSdc         = prioStoragePool + len(storagePoolCharts) + 10
 )
 
@@ -51,7 +51,7 @@ var systemCharts = Charts{
 		Title: "Capacity Usage",
 		Units: "KiB",
 		Fam:   "capacity",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Ctx:   "scaleio.system_capacity_usage",
 		Dims: Dims{
 			{ID: "system_capacity_thick_in_use", Name: "thick"},
@@ -77,7 +77,7 @@ var systemCharts = Charts{
 		Title: "Capacity Health State",
 		Units: "KiB",
 		Fam:   "health",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Ctx:   "scaleio.system_capacity_health_state",
 		Dims: Dims{
 			{ID: "system_capacity_protected", Name: "protected"},
@@ -104,7 +104,7 @@ var systemCharts = Charts{
 		Units: "KiB/s",
 		Fam:   "workload",
 		Ctx:   "scaleio.system_workload_primary_bandwidth",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: "system_backend_primary_bandwidth_read", Name: "read", Div: 1000},
 			{ID: "system_backend_primary_bandwidth_write", Name: "write", Mul: -1, Div: 1000},
@@ -127,7 +127,7 @@ var systemCharts = Charts{
 		Units: "iops/s",
 		Fam:   "workload",
 		Ctx:   "scaleio.system_workload_primary_iops",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: "system_backend_primary_iops_read", Name: "read", Div: 1000},
 			{ID: "system_backend_primary_iops_write", Name: "write", Mul: -1, Div: 1000},
@@ -149,7 +149,7 @@ var systemCharts = Charts{
 		Title: "Rebalance",
 		Units: "KiB/s",
 		Fam:   "rebalance",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Ctx:   "scaleio.system_rebalance",
 		Dims: Dims{
 			{ID: "system_rebalance_bandwidth_read", Name: "read", Div: 1000},
@@ -183,7 +183,7 @@ var systemCharts = Charts{
 		Units: "KiB/s",
 		Fam:   "rebuild",
 		Ctx:   "scaleio.system_rebuild",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: "system_rebuild_total_bandwidth_read", Name: "read", Div: 1000},
 			{ID: "system_rebuild_total_bandwidth_write", Name: "write", Mul: -1, Div: 1000},
@@ -225,7 +225,7 @@ var systemCharts = Charts{
 		Units: "volumes",
 		Fam:   "components",
 		Ctx:   "scaleio.system_components_volumes_by_type",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "system_num_of_thick_base_volumes", Name: "thick"},
 			{ID: "system_num_of_thin_base_volumes", Name: "thin"},
@@ -237,7 +237,7 @@ var systemCharts = Charts{
 		Units: "volumes",
 		Fam:   "components",
 		Ctx:   "scaleio.system_components_volumes_by_mapping",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "system_num_of_mapped_volumes", Name: "mapped"},
 			{ID: "system_num_of_unmapped_volumes", Name: "unmapped"},
@@ -271,7 +271,7 @@ var storagePoolCharts = Charts{
 		Title: "Capacity Usage",
 		Units: "KiB",
 		Fam:   "pool %s",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Ctx:   "scaleio.storage_pool_capacity_usage",
 		Dims: Dims{
 			{ID: "storage_pool_%s_capacity_thick_in_use", Name: "thick"},
@@ -311,7 +311,7 @@ var storagePoolCharts = Charts{
 		Title: "Capacity Health State",
 		Units: "KiB",
 		Fam:   "pool %s",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Ctx:   "scaleio.storage_pool_capacity_health_state",
 		Dims: Dims{
 			{ID: "storage_pool_%s_capacity_protected", Name: "protected"},
@@ -369,7 +369,7 @@ var sdcCharts = Charts{
 		Units: "KiB/s",
 		Fam:   "sdc %s",
 		Ctx:   "scaleio.sdc_bandwidth",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: "sdc_%s_bandwidth_read", Name: "read", Div: 1000},
 			{ID: "sdc_%s_bandwidth_write", Name: "write", Mul: -1, Div: 1000},
@@ -381,7 +381,7 @@ var sdcCharts = Charts{
 		Units: "iops/s",
 		Fam:   "sdc %s",
 		Ctx:   "scaleio.sdc_iops",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: "sdc_%s_iops_read", Name: "read", Div: 1000},
 			{ID: "sdc_%s_iops_write", Name: "write", Mul: -1, Div: 1000},
@@ -393,7 +393,7 @@ var sdcCharts = Charts{
 		Units: "KiB",
 		Fam:   "sdc %s",
 		Ctx:   "scaleio.sdc_io_size",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: "sdc_%s_io_size_read", Name: "read", Div: 1000},
 			{ID: "sdc_%s_io_size_write", Name: "write", Mul: -1, Div: 1000},

@@ -110,10 +110,7 @@ func (e *nvidiaSmiLoopExec) queryGPUInfo() ([]byte, error) {
 }
 
 func (e *nvidiaSmiLoopExec) run() error {
-	secs := 5
-	if e.updateEvery < secs {
-		secs = e.updateEvery
-	}
+	secs := min(e.updateEvery, 5)
 
 	ndrunPath := filepath.Join(buildinfo.NetdataBinDir, "nd-run")
 	cmd := exec.Command(ndrunPath, e.binPath, "-q", "-x", "-l", strconv.Itoa(secs))

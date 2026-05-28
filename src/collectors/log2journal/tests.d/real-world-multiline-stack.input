@@ -1,0 +1,1 @@
+2024-01-15 10:30:25 ERROR Exception in thread "main": java.lang.NullPointerException\n\tat com.example.App.main(App.java:15)\n\tat java.base/java.lang.Thread.run(Thread.java:834)

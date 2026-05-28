@@ -27,8 +27,6 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.negotiateAPIVersion()
 	}
 
-	defer func() { _ = c.client.Close() }()
-
 	mx := make(map[string]int64)
 
 	if err := c.collectInfo(mx); err != nil {

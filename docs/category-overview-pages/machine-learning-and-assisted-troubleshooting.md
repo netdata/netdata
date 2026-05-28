@@ -42,7 +42,7 @@ See the [Troubleshooting overview](/docs/netdata-ai/troubleshooting/index.md).
 
 ### 5) Alerts Automation
 
-[Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md) lets you describe alert conditions in plain English while AI handles the syntax. Create production-ready alerts, get intelligent suggestions based on your infrastructure, and explain existing alert definitions.
+[Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md) uses AI to suggest, generate, and test alert configurations. Describe what you want to monitor in plain English, and the AI generates the complete alert definition, tests it against historical data to show how it would have triggered, and lets you deploy it to your nodes — no need to learn alert configuration syntax or manually tune thresholds.
 
 ### 6) Anomaly Detection
 

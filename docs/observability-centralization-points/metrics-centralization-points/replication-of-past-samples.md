@@ -117,7 +117,7 @@ You can monitor how replication is progressing through both your dashboard and A
 
 ### Dashboard Monitoring
 
-Check your replication progress right in your dashboard using the Netdata Function `Netdata-streaming`, under the `Top` tab.
+Check your replication progress right in your dashboard using the Netdata Function `Netdata-streaming`, under the `Live` tab.
 
 ### API Monitoring
 

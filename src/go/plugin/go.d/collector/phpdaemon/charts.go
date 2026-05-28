@@ -2,15 +2,15 @@
 
 package phpdaemon
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Chart is an alias for module.Chart
-	Chart = module.Chart
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Chart is an alias for collectorapi.Chart
+	Chart = collectorapi.Chart
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
 )
 
 var charts = Charts{
@@ -20,7 +20,7 @@ var charts = Charts{
 		Units: "workers",
 		Fam:   "workers",
 		Ctx:   "phpdaemon.workers",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "alive"},
 			{ID: "shutdown"},
@@ -32,7 +32,7 @@ var charts = Charts{
 		Units: "workers",
 		Fam:   "workers",
 		Ctx:   "phpdaemon.alive_workers",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "idle"},
 			{ID: "busy"},
@@ -45,7 +45,7 @@ var charts = Charts{
 		Units: "workers",
 		Fam:   "workers",
 		Ctx:   "phpdaemon.idle_workers",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "preinit"},
 			{ID: "init"},

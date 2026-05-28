@@ -329,5 +329,6 @@ size_t dictionary_referenced_items(DICTIONARY *dict);
 extern struct dictionary_stats dictionary_stats_category_other;
 
 int dictionary_unittest(size_t entries);
+int dictionary_unittest_benchmark(void);
 
 #endif /* NETDATA_DICTIONARY_H */

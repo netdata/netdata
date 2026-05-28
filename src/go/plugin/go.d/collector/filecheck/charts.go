@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioFileExistenceStatus = module.Priority + iota
+	prioFileExistenceStatus = collectorapi.Priority + iota
 	prioFileModificationTimeAgo
 	prioFileSize
 
@@ -21,87 +21,87 @@ const (
 )
 
 var (
-	fileExistenceStatusChartTmpl = module.Chart{
+	fileExistenceStatusChartTmpl = collectorapi.Chart{
 		ID:       "file_%s_existence_status",
 		Title:    "File existence",
 		Units:    "status",
 		Fam:      "file existence",
 		Ctx:      "filecheck.file_existence_status",
 		Priority: prioFileExistenceStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "file_%s_existence_status_exist", Name: "exist"},
 			{ID: "file_%s_existence_status_not_exist", Name: "not_exist"},
 		},
 	}
 
-	fileModificationTimeAgoChartTmpl = module.Chart{
+	fileModificationTimeAgoChartTmpl = collectorapi.Chart{
 		ID:       "file_%s_modification_time_ago",
 		Title:    "File time since the last modification",
 		Units:    "seconds",
 		Fam:      "file mtime",
 		Ctx:      "filecheck.file_modification_time_ago",
 		Priority: prioFileModificationTimeAgo,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "file_%s_mtime_ago", Name: "mtime_ago"},
 		},
 	}
-	fileSizeChartTmpl = module.Chart{
+	fileSizeChartTmpl = collectorapi.Chart{
 		ID:       "file_%s_size",
 		Title:    "File size",
 		Units:    "bytes",
 		Fam:      "file size",
 		Ctx:      "filecheck.file_size_bytes",
 		Priority: prioFileSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "file_%s_size_bytes", Name: "size"},
 		},
 	}
 )
 
 var (
-	dirExistenceStatusChartTmpl = module.Chart{
+	dirExistenceStatusChartTmpl = collectorapi.Chart{
 		ID:       "dir_%s_existence_status",
 		Title:    "Directory existence",
 		Units:    "status",
 		Fam:      "dir existence",
 		Ctx:      "filecheck.dir_existence_status",
 		Priority: prioDirExistenceStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "dir_%s_existence_status_exist", Name: "exist"},
 			{ID: "dir_%s_existence_status_not_exist", Name: "not_exist"},
 		},
 	}
 
-	dirModificationTimeAgoChartTmpl = module.Chart{
+	dirModificationTimeAgoChartTmpl = collectorapi.Chart{
 		ID:       "dir_%s_modification_time_ago",
 		Title:    "Directory time since the last modification",
 		Units:    "seconds",
 		Fam:      "dir mtime",
 		Ctx:      "filecheck.dir_modification_time_ago",
 		Priority: prioDirModificationTimeAgo,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "dir_%s_mtime_ago", Name: "mtime_ago"},
 		},
 	}
-	dirSizeChartTmpl = module.Chart{
+	dirSizeChartTmpl = collectorapi.Chart{
 		ID:       "dir_%s_size",
 		Title:    "Directory size",
 		Units:    "bytes",
 		Fam:      "dir size",
 		Ctx:      "filecheck.dir_size_bytes",
 		Priority: prioDirSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "dir_%s_size_bytes", Name: "size"},
 		},
 	}
-	dirFilesCountChartTmpl = module.Chart{
+	dirFilesCountChartTmpl = collectorapi.Chart{
 		ID:       "dir_%s_files_count",
 		Title:    "Directory files count",
 		Units:    "files",
 		Fam:      "dir files",
 		Ctx:      "filecheck.dir_files_count",
 		Priority: prioDirFilesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "dir_%s_files_count", Name: "files"},
 		},
 	}
@@ -184,13 +184,13 @@ func (c *Collector) updateDirCharts(infos []*statInfo) {
 	}
 }
 
-func (c *Collector) addFileCharts(filePath string, chartsTmpl ...*module.Chart) {
-	cs := append(module.Charts{}, chartsTmpl...)
+func (c *Collector) addFileCharts(filePath string, chartsTmpl ...*collectorapi.Chart) {
+	cs := append(collectorapi.Charts{}, chartsTmpl...)
 	charts := cs.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanPath(filePath))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "file_path", Value: filePath},
 		}
 		for _, dim := range chart.Dims {
@@ -203,13 +203,13 @@ func (c *Collector) addFileCharts(filePath string, chartsTmpl ...*module.Chart) 
 	}
 }
 
-func (c *Collector) addDirCharts(dirPath string, chartsTmpl ...*module.Chart) {
-	cs := append(module.Charts{}, chartsTmpl...)
+func (c *Collector) addDirCharts(dirPath string, chartsTmpl ...*collectorapi.Chart) {
+	cs := append(collectorapi.Charts{}, chartsTmpl...)
 	charts := cs.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanPath(dirPath))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "dir_path", Value: dirPath},
 		}
 		for _, dim := range chart.Dims {

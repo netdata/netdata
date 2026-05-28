@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "debugfs_plugin.h"
-#include "libnetdata/required_dummies.h"
 
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
@@ -44,6 +43,12 @@ static struct debugfs_module {
      .name = "libsensors",
      .enabled = CONFIG_BOOLEAN_YES,
      .func = do_module_libsensors
+    },
+    {
+        // Linux audit subsystem status via netlink
+        .name = "audit",
+        .enabled = CONFIG_BOOLEAN_YES,
+        .func = do_module_audit
     },
 
     // The terminator
@@ -207,8 +212,8 @@ int main(int argc, char **argv)
 #ifdef HAVE_CAPABILITY
         netdata_log_error(
             "debugfs.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-            "Without these, debugfs.plugin cannot access /sys/kernel/debug. "
-            "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
+            "cap_dac_read_search is needed for /sys/kernel/debug access, cap_audit_control for audit subsystem monitoring. "
+            "To enable capabilities run: sudo setcap cap_dac_read_search,cap_audit_control+ep %s; "
             "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; ",
             uid,
             euid,

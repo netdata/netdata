@@ -137,8 +137,8 @@ func (c *upsdClient) sendCommand(cmd string) ([]string, error) {
 		line := string(bytes)
 		resp = append(resp, line)
 
-		if strings.HasPrefix(line, "ERR ") {
-			errMsg = strings.TrimPrefix(line, "ERR ")
+		if after, ok := strings.CutPrefix(line, "ERR "); ok {
+			errMsg = after
 		}
 
 		return line != endLine && errMsg == "", nil

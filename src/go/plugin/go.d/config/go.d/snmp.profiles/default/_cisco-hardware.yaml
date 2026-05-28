@@ -1,0 +1,168 @@
+# Hardware metrics mixin for Cisco devices.
+# Enhanced memory pools, environmental voltage, supervisor redundancy, stack ring health.
+
+metrics:
+  # Enhanced memory pool (modern replacement for CISCO-MEMORY-POOL-MIB)
+  # Supports 64-bit HC counters on IOS-XE devices.
+  - MIB: CISCO-ENHANCED-MEMPOOL-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.221.1.1.1
+      name: cempMemPoolTable
+    symbols:
+      - {OID: 1.3.6.1.4.1.9.9.221.1.1.1.1.7, name: _cempMemPoolUsed}
+      - {OID: 1.3.6.1.4.1.9.9.221.1.1.1.1.8, name: _cempMemPoolFree}
+      - {OID: 1.3.6.1.4.1.9.9.221.1.1.1.1.18, name: _cempMemPoolHCUsed}
+      - {OID: 1.3.6.1.4.1.9.9.221.1.1.1.1.20, name: _cempMemPoolHCFree}
+      - OID: 1.3.6.1.4.1.9.9.221.1.1.1.1.10
+        name: cempMemPoolLowestFree
+        chart_meta:
+          description: Lowest amount of free memory observed since last clear (watermark)
+          family: 'System/Memory/Enhanced/LowestFree'
+          unit: "By"
+    metric_tags:
+      - tag: mem_pool_index
+        index: 1
+      - tag: _mem_pool_name
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.221.1.1.1.1.3
+          name: cempMemPoolName
+
+  # Voltage sensors (sibling of temperature/supply/fan already in _cisco-base.yaml)
+  - MIB: CISCO-ENVMON-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.13.1.2
+      name: ciscoEnvMonVoltageStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.13.1.2.1.3
+        name: ciscoEnvMonVoltageStatusValue
+        chart_meta:
+          description: Current measurement of the voltage testpoint
+          family: 'Hardware/Sensor/Voltage/Value'
+          unit: "mV"
+      - OID: 1.3.6.1.4.1.9.9.13.1.2.1.7
+        name: ciscoEnvMonVoltageState
+        chart_meta:
+          description: Current state of the voltage testpoint
+          family: 'Hardware/Sensor/Voltage/Status'
+          unit: "{status}"
+        mapping:
+          1: normal
+          2: warning
+          3: critical
+          4: shutdown
+          5: not_present
+          6: not_functioning
+    metric_tags:
+      - tag: voltage_index
+        index: 1
+      - tag: _voltage_desc
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.2.1.2
+          name: ciscoEnvMonVoltageStatusDescr
+
+  # Supervisor redundancy framework
+  - MIB: CISCO-RF-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.176.1.1.2.0
+      name: cRFStatusUnitState
+      chart_meta:
+        description: Current state of this redundancy unit
+        family: 'Hardware/Redundancy/Unit/Status'
+        unit: "{status}"
+      mapping:
+        1: not_known
+        2: disabled
+        3: initialization
+        4: negotiation
+        5: standby_cold
+        6: standby_hot
+        7: active_fast
+        8: active_drain
+        9: active
+        10: active_preconfig
+        11: active_postconfig
+        12: active_extraload
+        13: active_handback
+  - MIB: CISCO-RF-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.176.1.1.4.0
+      name: cRFStatusPeerUnitState
+      chart_meta:
+        description: Current state of the peer redundancy unit
+        family: 'Hardware/Redundancy/Peer/Status'
+        unit: "{status}"
+      mapping:
+        1: not_known
+        2: disabled
+        3: initialization
+        4: negotiation
+        5: standby_cold
+        6: standby_hot
+        7: active_fast
+        8: active_drain
+        9: active
+        10: active_preconfig
+        11: active_postconfig
+        12: active_extraload
+        13: active_handback
+  - MIB: CISCO-RF-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.176.1.1.6.0
+      name: cRFStatusDuplexMode
+      chart_meta:
+        description: Redundancy duplex mode (simplex=no redundancy, duplex=redundant pair)
+        family: 'Hardware/Redundancy/DuplexMode'
+        unit: "{status}"
+      mapping:
+        1: simplex
+        2: duplex
+  - MIB: CISCO-RF-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.176.1.1.8.0
+      name: cRFStatusLastSwactReasonCode
+      chart_meta:
+        description: Reason code for the last switchover
+        family: 'Hardware/Redundancy/LastSwitchover/Reason'
+        unit: "{reason}"
+      mapping:
+        1: unsupported
+        2: none
+        3: not_known
+        4: user_initiated
+        5: user_forced
+        6: active_removed
+        7: active_failed
+        8: active_no_heartbeat
+        9: active_no_shelf_power
+        10: active_no_ext_power
+        11: active_no_response
+
+  # Stack ring redundancy (scalar)
+  - MIB: CISCO-STACKWISE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.500.1.1.3.0
+      name: cswRingRedundant
+      chart_meta:
+        description: Whether the stack ring is in a redundant configuration
+        family: 'Hardware/StackWise/Ring/Redundancy'
+        unit: "{status}"
+      mapping:
+        1: redundant
+        2: not_redundant
+
+virtual_metrics:
+  # Enhanced memory: prefer 64-bit HC counters, fallback to 32-bit
+  - name: cempMemPoolUsage
+    per_row: true
+    group_by: ["mem_pool_index"]
+    alternatives:
+      - sources:
+          - {metric: _cempMemPoolHCUsed, table: cempMemPoolTable, as: used}
+          - {metric: _cempMemPoolHCFree, table: cempMemPoolTable, as: free}
+      - sources:
+          - {metric: _cempMemPoolUsed, table: cempMemPoolTable, as: used}
+          - {metric: _cempMemPoolFree, table: cempMemPoolTable, as: free}
+    chart_meta:
+      description: Enhanced memory pool usage
+      family: 'System/Memory/Enhanced'
+      unit: "By"

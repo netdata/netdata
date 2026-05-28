@@ -1,0 +1,196 @@
+# Security telemetry for Fortinet FortiGate devices
+# IPS intrusion stats, antivirus stats, webfilter stats — all per VDOM
+# Metrics are collected as hidden inputs; virtual_metrics combine related
+# dimensions into meaningful multi-dimension charts.
+
+metrics:
+  ### IPS intrusion statistics (per VDOM) — hidden inputs for virtual_metrics
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.9.2.1
+      name: fgIpsStatsTable
+    symbols:
+      - {OID: 1.3.6.1.4.1.12356.101.9.2.1.1.1, name: _fgIpsIntrusionsDetected}
+      - {OID: 1.3.6.1.4.1.12356.101.9.2.1.1.2, name: _fgIpsIntrusionsBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.9.2.1.1.3, name: _fgIpsCritSevDetections}
+      - {OID: 1.3.6.1.4.1.12356.101.9.2.1.1.4, name: _fgIpsHighSevDetections}
+      - {OID: 1.3.6.1.4.1.12356.101.9.2.1.1.5, name: _fgIpsMedSevDetections}
+      - {OID: 1.3.6.1.4.1.12356.101.9.2.1.1.6, name: _fgIpsLowSevDetections}
+      - {OID: 1.3.6.1.4.1.12356.101.9.2.1.1.7, name: _fgIpsInfoSevDetections}
+      - {OID: 1.3.6.1.4.1.12356.101.9.2.1.1.8, name: _fgIpsSignatureDetections}
+      - {OID: 1.3.6.1.4.1.12356.101.9.2.1.1.9, name: _fgIpsAnomalyDetections}
+    metric_tags:
+      - tag: vdom_index
+        index: 1
+      - tag: _vdom_name
+        table: fgVdTable
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.2
+          name: fgVdEntName
+
+  ### Antivirus statistics (per VDOM) — hidden inputs for virtual_metrics
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.8.2.1
+      name: fgAvStatsTable
+    symbols:
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.1, name: _fgAvVirusDetected}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.2, name: _fgAvVirusBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.3, name: _fgAvHTTPVirusDetected}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.4, name: _fgAvHTTPVirusBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.5, name: _fgAvSMTPVirusDetected}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.6, name: _fgAvSMTPVirusBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.7, name: _fgAvPOP3VirusDetected}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.8, name: _fgAvPOP3VirusBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.9, name: _fgAvIMAPVirusDetected}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.10, name: _fgAvIMAPVirusBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.11, name: _fgAvFTPVirusDetected}
+      - {OID: 1.3.6.1.4.1.12356.101.8.2.1.1.12, name: _fgAvFTPVirusBlocked}
+    metric_tags:
+      - tag: vdom_index
+        index: 1
+      - tag: _vdom_name
+        table: fgVdTable
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.2
+          name: fgVdEntName
+
+  ### Webfilter statistics (per VDOM) — hidden inputs for virtual_metrics
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.10.1.2.1
+      name: fgWebfilterStatsTable
+    symbols:
+      - {OID: 1.3.6.1.4.1.12356.101.10.1.2.1.1.1, name: _fgWfHTTPBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.10.1.2.1.1.2, name: _fgWfHTTPSBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.10.1.2.1.1.3, name: _fgWfHTTPURLBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.10.1.2.1.1.4, name: _fgWfHTTPSURLBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.10.1.2.1.1.5, name: _fgWfActiveXBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.10.1.2.1.1.6, name: _fgWfCookieBlocked}
+      - {OID: 1.3.6.1.4.1.12356.101.10.1.2.1.1.7, name: _fgWfAppletBlocked}
+    metric_tags:
+      - tag: vdom_index
+        index: 1
+      - tag: _vdom_name
+        table: fgVdTable
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.2
+          name: fgVdEntName
+
+virtual_metrics:
+  ### IPS — combined charts per VDOM
+  - name: fgIpsIntrusions
+    per_row: true
+    group_by: ["vdom_index"]
+    sources:
+      - {metric: _fgIpsIntrusionsDetected, table: fgIpsStatsTable, as: detected}
+      - {metric: _fgIpsIntrusionsBlocked, table: fgIpsStatsTable, as: blocked}
+    chart_meta:
+      description: IPS intrusions detected and blocked
+      family: 'Security/IPS/Events'
+      unit: "{event}/s"
+
+  - name: fgIpsSeverity
+    per_row: true
+    group_by: ["vdom_index"]
+    sources:
+      - {metric: _fgIpsCritSevDetections, table: fgIpsStatsTable, as: critical}
+      - {metric: _fgIpsHighSevDetections, table: fgIpsStatsTable, as: high}
+      - {metric: _fgIpsMedSevDetections, table: fgIpsStatsTable, as: medium}
+      - {metric: _fgIpsLowSevDetections, table: fgIpsStatsTable, as: low}
+      - {metric: _fgIpsInfoSevDetections, table: fgIpsStatsTable, as: info}
+    chart_meta:
+      description: IPS intrusion detections by severity
+      family: 'Security/IPS/Severity'
+      unit: "{event}/s"
+      type: stacked
+
+  - name: fgIpsMethod
+    per_row: true
+    group_by: ["vdom_index"]
+    sources:
+      - {metric: _fgIpsSignatureDetections, table: fgIpsStatsTable, as: signature}
+      - {metric: _fgIpsAnomalyDetections, table: fgIpsStatsTable, as: anomaly}
+    chart_meta:
+      description: IPS intrusion detections by method
+      family: 'Security/IPS/Method'
+      unit: "{event}/s"
+      type: stacked
+
+  ### Antivirus — detected vs blocked total, and by-protocol breakdowns
+  - name: fgAvVirusEvents
+    per_row: true
+    group_by: ["vdom_index"]
+    sources:
+      - {metric: _fgAvVirusDetected, table: fgAvStatsTable, as: detected}
+      - {metric: _fgAvVirusBlocked, table: fgAvStatsTable, as: blocked}
+    chart_meta:
+      description: Antivirus virus events detected and blocked
+      family: 'Security/Antivirus/Events'
+      unit: "{virus}/s"
+
+  - name: fgAvVirusDetectedByProtocol
+    per_row: true
+    group_by: ["vdom_index"]
+    sources:
+      - {metric: _fgAvHTTPVirusDetected, table: fgAvStatsTable, as: http}
+      - {metric: _fgAvSMTPVirusDetected, table: fgAvStatsTable, as: smtp}
+      - {metric: _fgAvPOP3VirusDetected, table: fgAvStatsTable, as: pop3}
+      - {metric: _fgAvIMAPVirusDetected, table: fgAvStatsTable, as: imap}
+      - {metric: _fgAvFTPVirusDetected, table: fgAvStatsTable, as: ftp}
+    chart_meta:
+      description: Antivirus virus detections by protocol
+      family: 'Security/Antivirus/Detected/Protocol'
+      unit: "{virus}/s"
+      type: stacked
+
+  - name: fgAvVirusBlockedByProtocol
+    per_row: true
+    group_by: ["vdom_index"]
+    sources:
+      - {metric: _fgAvHTTPVirusBlocked, table: fgAvStatsTable, as: http}
+      - {metric: _fgAvSMTPVirusBlocked, table: fgAvStatsTable, as: smtp}
+      - {metric: _fgAvPOP3VirusBlocked, table: fgAvStatsTable, as: pop3}
+      - {metric: _fgAvIMAPVirusBlocked, table: fgAvStatsTable, as: imap}
+      - {metric: _fgAvFTPVirusBlocked, table: fgAvStatsTable, as: ftp}
+    chart_meta:
+      description: Antivirus virus blocks by protocol
+      family: 'Security/Antivirus/Blocked/Protocol'
+      unit: "{virus}/s"
+      type: stacked
+
+  ### Webfilter — grouped by related dimensions
+  - name: fgWfSessionBlocked
+    per_row: true
+    group_by: ["vdom_index"]
+    sources:
+      - {metric: _fgWfHTTPBlocked, table: fgWebfilterStatsTable, as: http}
+      - {metric: _fgWfHTTPSBlocked, table: fgWebfilterStatsTable, as: https}
+    chart_meta:
+      description: Web filter sessions blocked by protocol
+      family: 'Security/Webfilter/Session/Blocked'
+      unit: "{session}/s"
+
+  - name: fgWfURLBlocked
+    per_row: true
+    group_by: ["vdom_index"]
+    sources:
+      - {metric: _fgWfHTTPURLBlocked, table: fgWebfilterStatsTable, as: http}
+      - {metric: _fgWfHTTPSURLBlocked, table: fgWebfilterStatsTable, as: https}
+    chart_meta:
+      description: Web filter URLs blocked by protocol
+      family: 'Security/Webfilter/URL/Blocked'
+      unit: "{url}/s"
+
+  - name: fgWfContentBlocked
+    per_row: true
+    group_by: ["vdom_index"]
+    sources:
+      - {metric: _fgWfActiveXBlocked, table: fgWebfilterStatsTable, as: activex}
+      - {metric: _fgWfCookieBlocked, table: fgWebfilterStatsTable, as: cookie}
+      - {metric: _fgWfAppletBlocked, table: fgWebfilterStatsTable, as: applet}
+    chart_meta:
+      description: Web filter content blocks by type
+      family: 'Security/Webfilter/Content/Blocked'
+      unit: "{block}/s"
+      type: stacked

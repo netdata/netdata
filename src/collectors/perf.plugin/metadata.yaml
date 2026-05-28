@@ -19,7 +19,6 @@ modules:
         - cpu performance
         - cpu cache
         - perf.plugin
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This collector monitors CPU performance metrics about cycles, instructions, migrations, cache operations and more."

@@ -138,7 +138,7 @@ func (c *Collector) processStats(stats []entry, mul float64) map[string]int64 {
 	return mx
 }
 
-func extractThread(key string) string      { idx := strings.IndexByte(key, '.'); return key[:idx] }
+func extractThread(key string) string      { before, _, _ := strings.Cut(key, "."); return before }
 func extractQueryType(key string) string   { i := len("num.query.type."); return key[i:] }
 func extractQueryClass(key string) string  { i := len("num.query.class."); return key[i:] }
 func extractQueryOpCode(key string) string { i := len("num.query.opcode."); return key[i:] }

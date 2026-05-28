@@ -1,0 +1,17 @@
+taxonomy_version: 1
+icons:
+  - apache
+  - apps
+  - azure
+  - cgroup
+  - compute
+  - hardware
+  - k8s
+  - mysql
+  - netdata
+  - none
+  - otel
+  - postgres
+  - snmp
+  - synthetics
+  - system

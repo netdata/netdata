@@ -48,6 +48,9 @@ struct rrdhost_system_info {
     char *network_default_iface_ip;
     char *network_default_iface_detection;
     int mc_version;
+    char *hw_product_name;
+    char *hw_sys_vendor;
+    char *hw_product_type;
 };
 #else
 struct rrdhost_system_info;
@@ -95,12 +98,19 @@ void rrdhost_system_info_to_json_v2(BUFFER *wb, struct rrdhost_system_info *syst
 void rrdhost_system_info_to_url_encode_stream(BUFFER *wb, struct rrdhost_system_info *system_info);
 
 typedef int (*add_host_sysinfo_key_value_t)(const char *name, const char *value, nd_uuid_t *uuid);
+
+// Number of NETDATA_* keys emitted by rrdhost_system_info_foreach(); callers
+// compare against the cb-success count to detect partial-store failures.
+// Keep in sync with the body of rrdhost_system_info_foreach().
+#define RRDHOST_SYSTEM_INFO_KEY_COUNT 27
+
 int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_host_sysinfo_key_value_t cb, nd_uuid_t *uuid);
 
 struct update_node_info;
 void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, struct update_node_info *node_info);
 
 void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_system_info *system_info);
+void rrdhost_system_info_to_json_object_fields(BUFFER *wb, struct rrdhost_system_info *system_info);
 
 bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds);
 void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b);

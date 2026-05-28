@@ -85,6 +85,9 @@
 #cmakedefine HAVE_GETRANDOM
 #cmakedefine HAVE_SYSINFO
 #cmakedefine HAVE_TIMEGM
+#cmakedefine HAVE_TZALLOC
+#cmakedefine HAVE_LOCALTIME_RZ
+#cmakedefine HAVE_TZFREE
 #cmakedefine HAVE_TM_GMTOFF
 
 #cmakedefine HAVE_LIBBACKTRACE
@@ -100,6 +103,7 @@
 #cmakedefine HAVE_SD_JOURNAL_OS_ROOT
 #cmakedefine HAVE_SD_JOURNAL_OPEN_FILES_FD
 #cmakedefine HAVE_SD_JOURNAL_RESTART_FIELDS
+#cmakedefine HAVE_SD_JOURNAL_ENUMERATE_AVAILABLE_UNIQUE
 #cmakedefine HAVE_SD_JOURNAL_GET_SEQNUM
 #cmakedefine ENABLE_SYSTEMD_DBUS
 
@@ -171,9 +175,11 @@
 // directory paths
 
 #define NETDATA_RUNTIME_PREFIX "@NETDATA_RUNTIME_PREFIX@"
+#cmakedefine NETDATA_WINDOWS_PATH_PREFIX "@NETDATA_WINDOWS_PATH_PREFIX_ESCAPED@"
 #cmakedefine CACHE_DIR "@CACHE_DIR@"
 #cmakedefine CONFIG_DIR "@CONFIG_DIR@"
 #cmakedefine LIBCONFIG_DIR "@LIBCONFIG_DIR@"
+#cmakedefine STOCK_DATA_DIR "@STOCK_DATA_DIR@"
 #cmakedefine LOG_DIR "@LOG_DIR@"
 #cmakedefine PLUGINS_DIR "@PLUGINS_DIR@"
 #cmakedefine WEB_DIR "@WEB_DIR@"

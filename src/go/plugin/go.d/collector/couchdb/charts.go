@@ -3,13 +3,13 @@
 package couchdb
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type (
-	Charts = module.Charts
-	Dims   = module.Dims
-	Vars   = module.Vars
+	Charts = collectorapi.Charts
+	Dims   = collectorapi.Dims
+	Vars   = collectorapi.Vars
 )
 
 var dbActivityCharts = Charts{
@@ -19,11 +19,11 @@ var dbActivityCharts = Charts{
 		Units: "requests/s",
 		Fam:   "dbactivity",
 		Ctx:   "couchdb.activity",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "couchdb_database_reads", Name: "DB reads", Algo: module.Incremental},
-			{ID: "couchdb_database_writes", Name: "DB writes", Algo: module.Incremental},
-			{ID: "couchdb_httpd_view_reads", Name: "View reads", Algo: module.Incremental},
+			{ID: "couchdb_database_reads", Name: "DB reads", Algo: collectorapi.Incremental},
+			{ID: "couchdb_database_writes", Name: "DB writes", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_view_reads", Name: "View reads", Algo: collectorapi.Incremental},
 		},
 	},
 }
@@ -35,15 +35,15 @@ var httpTrafficBreakdownCharts = Charts{
 		Units: "requests/s",
 		Fam:   "httptraffic",
 		Ctx:   "couchdb.request_methods",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "couchdb_httpd_request_methods_COPY", Name: "COPY", Algo: module.Incremental},
-			{ID: "couchdb_httpd_request_methods_DELETE", Name: "DELETE", Algo: module.Incremental},
-			{ID: "couchdb_httpd_request_methods_GET", Name: "GET", Algo: module.Incremental},
-			{ID: "couchdb_httpd_request_methods_HEAD", Name: "HEAD", Algo: module.Incremental},
-			{ID: "couchdb_httpd_request_methods_OPTIONS", Name: "OPTIONS", Algo: module.Incremental},
-			{ID: "couchdb_httpd_request_methods_POST", Name: "POST", Algo: module.Incremental},
-			{ID: "couchdb_httpd_request_methods_PUT", Name: "PUT", Algo: module.Incremental},
+			{ID: "couchdb_httpd_request_methods_COPY", Name: "COPY", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_request_methods_DELETE", Name: "DELETE", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_request_methods_GET", Name: "GET", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_request_methods_HEAD", Name: "HEAD", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_request_methods_OPTIONS", Name: "OPTIONS", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_request_methods_POST", Name: "POST", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_request_methods_PUT", Name: "PUT", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -52,31 +52,31 @@ var httpTrafficBreakdownCharts = Charts{
 		Units: "responses/s",
 		Fam:   "httptraffic",
 		Ctx:   "couchdb.response_codes",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "couchdb_httpd_status_codes_200", Name: "200 OK", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_201", Name: "201 Created", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_202", Name: "202 Accepted", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_204", Name: "204 No Content", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_206", Name: "206 Partial Content", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_301", Name: "301 Moved Permanently", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_302", Name: "302 Found", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_304", Name: "304 Not Modified", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_400", Name: "400 Bad Request", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_401", Name: "401 Unauthorized", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_403", Name: "403 Forbidden", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_404", Name: "404 Not Found", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_406", Name: "406 Not Acceptable", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_409", Name: "409 Conflict", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_412", Name: "412 Precondition Failed", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_413", Name: "413 Request Entity Too Long", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_414", Name: "414 Request URI Too Long", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_415", Name: "415 Unsupported Media Type", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_416", Name: "416 Requested Range Not Satisfiable", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_417", Name: "417 Expectation Failed", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_500", Name: "500 Internal Server Error", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_501", Name: "501 Not Implemented", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_503", Name: "503 Service Unavailable", Algo: module.Incremental},
+			{ID: "couchdb_httpd_status_codes_200", Name: "200 OK", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_201", Name: "201 Created", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_202", Name: "202 Accepted", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_204", Name: "204 No Content", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_206", Name: "206 Partial Content", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_301", Name: "301 Moved Permanently", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_302", Name: "302 Found", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_304", Name: "304 Not Modified", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_400", Name: "400 Bad Request", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_401", Name: "401 Unauthorized", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_403", Name: "403 Forbidden", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_404", Name: "404 Not Found", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_406", Name: "406 Not Acceptable", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_409", Name: "409 Conflict", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_412", Name: "412 Precondition Failed", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_413", Name: "413 Request Entity Too Long", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_414", Name: "414 Request URI Too Long", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_415", Name: "415 Unsupported Media Type", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_416", Name: "416 Requested Range Not Satisfiable", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_417", Name: "417 Expectation Failed", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_500", Name: "500 Internal Server Error", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_501", Name: "501 Not Implemented", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_503", Name: "503 Service Unavailable", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -85,12 +85,12 @@ var httpTrafficBreakdownCharts = Charts{
 		Units: "responses/s",
 		Fam:   "httptraffic",
 		Ctx:   "couchdb.response_code_classes",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "couchdb_httpd_status_codes_2xx", Name: "2xx Success", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_3xx", Name: "3xx Redirection", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_4xx", Name: "4xx Client error", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_5xx", Name: "5xx Server error", Algo: module.Incremental},
+			{ID: "couchdb_httpd_status_codes_2xx", Name: "2xx Success", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_3xx", Name: "3xx Redirection", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_4xx", Name: "4xx Client error", Algo: collectorapi.Incremental},
+			{ID: "couchdb_httpd_status_codes_5xx", Name: "5xx Server error", Algo: collectorapi.Incremental},
 		},
 	},
 }
@@ -102,7 +102,7 @@ var serverOperationsCharts = Charts{
 		Units: "tasks",
 		Fam:   "ops",
 		Ctx:   "couchdb.active_tasks",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "active_tasks_indexer", Name: "Indexer"},
 			{ID: "active_tasks_database_compaction", Name: "DB Compaction"},
@@ -116,7 +116,7 @@ var serverOperationsCharts = Charts{
 		Units: "jobs",
 		Fam:   "ops",
 		Ctx:   "couchdb.replicator_jobs",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "couch_replicator_jobs_running", Name: "Running"},
 			{ID: "couch_replicator_jobs_pending", Name: "Pending"},
@@ -143,7 +143,7 @@ var erlangStatisticsCharts = Charts{
 		Units: "B",
 		Fam:   "erlang",
 		Ctx:   "couchdb.erlang_vm_memory",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "memory_atom", Name: "atom"},
 			{ID: "memory_binary", Name: "binaries"},
@@ -180,9 +180,9 @@ var erlangStatisticsCharts = Charts{
 		Units: "reductions",
 		Fam:   "erlang",
 		Ctx:   "couchdb.reductions",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "reductions", Name: "reductions", Algo: module.Incremental},
+			{ID: "reductions", Name: "reductions", Algo: collectorapi.Incremental},
 		},
 	},
 }

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioControllerStatus = module.Priority + iota
+	prioControllerStatus = collectorapi.Priority + iota
 	prioControllerTemperature
 
 	prioControllerCacheModulePresenceStatus
@@ -26,7 +26,7 @@ const (
 	prioPhysicalDriveTemperature
 )
 
-var controllerChartsTmpl = module.Charts{
+var controllerChartsTmpl = collectorapi.Charts{
 	controllerStatusChartTmpl.Copy(),
 	controllerTemperatureChartTmpl.Copy(),
 
@@ -37,153 +37,153 @@ var controllerChartsTmpl = module.Charts{
 }
 
 var (
-	controllerStatusChartTmpl = module.Chart{
+	controllerStatusChartTmpl = collectorapi.Chart{
 		ID:       "cntrl_%s_slot_%s_status",
 		Title:    "Controller status",
 		Units:    "status",
 		Fam:      "controllers",
 		Ctx:      "hpssa.controller_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_slot_%s_status_ok", Name: "ok"},
 			{ID: "cntrl_%s_slot_%s_status_nok", Name: "nok"},
 		},
 	}
-	controllerTemperatureChartTmpl = module.Chart{
+	controllerTemperatureChartTmpl = collectorapi.Chart{
 		ID:       "cntrl_%s_slot_%s_temperature",
 		Title:    "Controller temperature",
 		Units:    "Celsius",
 		Fam:      "controllers",
 		Ctx:      "hpssa.controller_temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_slot_%s_temperature", Name: "temperature"},
 		},
 	}
 
-	controllerCacheModulePresenceStatusChartTmpl = module.Chart{
+	controllerCacheModulePresenceStatusChartTmpl = collectorapi.Chart{
 		ID:       "cntrl_%s_slot_%s_cache_presence_status",
 		Title:    "Controller cache module presence",
 		Units:    "status",
 		Fam:      "cache",
 		Ctx:      "hpssa.controller_cache_module_presence_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerCacheModulePresenceStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_slot_%s_cache_presence_status_present", Name: "present"},
 			{ID: "cntrl_%s_slot_%s_cache_presence_status_not_present", Name: "not_present"},
 		},
 	}
-	controllerCacheModuleStatusChartTmpl = module.Chart{
+	controllerCacheModuleStatusChartTmpl = collectorapi.Chart{
 		ID:       "cntrl_%s_slot_%s_cache_status",
 		Title:    "Controller cache module status",
 		Units:    "status",
 		Fam:      "cache",
 		Ctx:      "hpssa.controller_cache_module_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerCacheModuleStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_slot_%s_cache_status_ok", Name: "ok"},
 			{ID: "cntrl_%s_slot_%s_cache_status_nok", Name: "nok"},
 		},
 	}
-	controllerCacheModuleTemperatureChartTmpl = module.Chart{
+	controllerCacheModuleTemperatureChartTmpl = collectorapi.Chart{
 		ID:       "cntrl_%s_slot_%s_cache_temperature",
 		Title:    "Controller cache module temperature",
 		Units:    "Celsius",
 		Fam:      "cache",
 		Ctx:      "hpssa.controller_cache_module_temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerCacheModuleTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_slot_%s_cache_temperature", Name: "temperature"},
 		},
 	}
-	controllerCacheModuleBatteryStatusChartTmpl = module.Chart{
+	controllerCacheModuleBatteryStatusChartTmpl = collectorapi.Chart{
 		ID:       "cntrl_%s_slot_%s_cache_battery_status",
 		Title:    "Controller cache module battery status",
 		Units:    "status",
 		Fam:      "cache",
 		Ctx:      "hpssa.controller_cache_module_battery_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerCacheModuleBatteryStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_slot_%s_cache_battery_status_ok", Name: "ok"},
 			{ID: "cntrl_%s_slot_%s_cache_battery_status_nok", Name: "nok"},
 		},
 	}
 )
 
-var arrayChartsTmpl = module.Charts{
+var arrayChartsTmpl = collectorapi.Charts{
 	arrayStatusChartTmpl.Copy(),
 }
 
 var (
-	arrayStatusChartTmpl = module.Chart{
+	arrayStatusChartTmpl = collectorapi.Chart{
 		ID:       "array_%s_cntrl_%s_slot_%s_status",
 		Title:    "Array status",
 		Units:    "status",
 		Fam:      "arrays",
 		Ctx:      "hpssa.array_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioArrayStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "array_%s_cntrl_%s_slot_%s_status_ok", Name: "ok"},
 			{ID: "array_%s_cntrl_%s_slot_%s_status_nok", Name: "nok"},
 		},
 	}
 )
 
-var logicalDriveChartsTmpl = module.Charts{
+var logicalDriveChartsTmpl = collectorapi.Charts{
 	logicalDriveStatusChartTmpl.Copy(),
 }
 
 var (
-	logicalDriveStatusChartTmpl = module.Chart{
+	logicalDriveStatusChartTmpl = collectorapi.Chart{
 		ID:       "ld_%s_array_%s_cntrl_%s_slot_%s_status",
 		Title:    "Logical Drive status",
 		Units:    "status",
 		Fam:      "logical drives",
 		Ctx:      "hpssa.logical_drive_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioLogicalDriveStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ld_%s_array_%s_cntrl_%s_slot_%s_status_ok", Name: "ok"},
 			{ID: "ld_%s_array_%s_cntrl_%s_slot_%s_status_nok", Name: "nok"},
 		},
 	}
 )
 
-var physicalDriveChartsTmpl = module.Charts{
+var physicalDriveChartsTmpl = collectorapi.Charts{
 	physicalDriveStatusChartTmpl.Copy(),
 	physicalDriveTemperatureChartTmpl.Copy(),
 }
 
 var (
-	physicalDriveStatusChartTmpl = module.Chart{
+	physicalDriveStatusChartTmpl = collectorapi.Chart{
 		ID:       "pd_%s_ld_%s_array_%s_cntrl_%s_slot_%s_status",
 		Title:    "Physical Drive status",
 		Units:    "status",
 		Fam:      "physical drives",
 		Ctx:      "hpssa.physical_drive_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPhysicalDriveStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pd_%s_ld_%s_array_%s_cntrl_%s_slot_%s_status_ok", Name: "ok"},
 			{ID: "pd_%s_ld_%s_array_%s_cntrl_%s_slot_%s_status_nok", Name: "nok"},
 		},
 	}
-	physicalDriveTemperatureChartTmpl = module.Chart{
+	physicalDriveTemperatureChartTmpl = collectorapi.Chart{
 		ID:       "pd_%s_ld_%s_array_%s_cntrl_%s_slot_%s_temperature",
 		Title:    "Physical Drive temperature",
 		Units:    "Celsius",
 		Fam:      "physical drives",
 		Ctx:      "hpssa.physical_drive_temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPhysicalDriveTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pd_%s_ld_%s_array_%s_cntrl_%s_slot_%s_temperature", Name: "temperature"},
 		},
 	}
@@ -287,7 +287,7 @@ func (c *Collector) addControllerCharts(cntrl *hpssaController) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, strings.ToLower(cntrl.model), cntrl.slot)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "slot", Value: cntrl.slot},
 			{Key: "model", Value: cntrl.model},
 		}
@@ -311,7 +311,7 @@ func (c *Collector) addArrayCharts(arr *hpssaArray) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, arr.id, strings.ToLower(arr.cntrl.model), arr.cntrl.slot)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "slot", Value: arr.cntrl.slot},
 			{Key: "array_id", Value: arr.id},
 			{Key: "interface_type", Value: arr.interfaceType},
@@ -337,7 +337,7 @@ func (c *Collector) addLogicalDriveCharts(ld *hpssaLogicalDrive) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, ld.id, ld.arr.id, strings.ToLower(ld.cntrl.model), ld.cntrl.slot)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "slot", Value: ld.cntrl.slot},
 			{Key: "array_id", Value: ld.arr.id},
 			{Key: "logical_drive_id", Value: ld.id},
@@ -368,7 +368,7 @@ func (c *Collector) addPhysicalDriveCharts(pd *hpssaPhysicalDrive) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, pd.location, pd.ldId(), pd.arrId(), strings.ToLower(pd.cntrl.model), pd.cntrl.slot)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "slot", Value: pd.cntrl.slot},
 			{Key: "array_id", Value: pd.arrId()},
 			{Key: "logical_drive_id", Value: pd.ldId()},

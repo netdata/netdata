@@ -24,7 +24,7 @@ inline size_t pluginsd_initialize_plugin_directories()
     // Get the configuration entry
     if (likely(!plugins_dir_list)) {
         snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
-        plugins_dir_list = strdupz(inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
+        plugins_dir_list = strdupz(inicfg_get_quoted_path_list(&netdata_config, CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
     }
 
     // Parse it and store it to plugin directories

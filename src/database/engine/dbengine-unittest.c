@@ -81,27 +81,28 @@ static inline void storage_point_check(size_t region, size_t chart, size_t dim, 
 static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now) {
     rd->collector.last_collected_time.tv_sec = now;
     rd->collector.last_collected_time.tv_usec = 0;
-    rd->collector.collected_value = value;
+    rrddim_set_collected_int(rd, value);
     rrddim_set_updated(rd);
 
     rd->collector.counter++;
 
     collected_number v = (value >= 0) ? value : -value;
-    if(unlikely(v > rd->collector.collected_value_max)) rd->collector.collected_value_max = v;
+    if(unlikely(v > rd->collector.collected.i.collected_value_max)) rrddim_set_collected_max_int(rd, v);
 }
 
 static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
     /* We don't want to drop metrics when generating load,
      * we prefer to block data generation itself */
 
-    return rrdhost_find_or_create(
+    SYSTEM_TZ tz = system_tz_get();
+    RRDHOST *host = rrdhost_find_or_create(
         name,
         name,
         name,
         os_type,
-        netdata_configured_timezone,
-        netdata_configured_abbrev_timezone,
-        netdata_configured_utc_offset,
+        tz.timezone,
+        tz.abbrev_timezone,
+        tz.utc_offset,
         program_name,
         NETDATA_VERSION,
         nd_profile.update_every,
@@ -118,6 +119,8 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
         NULL,
         0
         );
+    system_tz_free(&tz);
+    return host;
 }
 
 static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS],

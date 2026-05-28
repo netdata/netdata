@@ -10,8 +10,9 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
     buffer_json_finalize(wb);
 }
 
-int rrdset2value_api_v1(
-        RRDSET *st
+int rrdset2value_api_v1_with_owa(
+        ONEWAYALLOC *owa
+        , RRDSET *st
         , BUFFER *wb
         , NETDATA_DOUBLE *n
         , const char *dimensions
@@ -34,9 +35,10 @@ int rrdset2value_api_v1(
         , QUERY_SOURCE query_source
         , STORAGE_PRIORITY priority
 ) {
+    internal_fatal(!owa, "rrdset2value_api_v1_with_owa(): owa must be non-NULL");
+
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
-    ONEWAYALLOC *owa = onewayalloc_create(0);
     RRDR *r = rrd2rrdr_legacy(
             owa,
             st,
@@ -95,6 +97,42 @@ int rrdset2value_api_v1(
 
 cleanup:
     rrdr_free(owa, r);
+    return ret;
+}
+
+int rrdset2value_api_v1(
+        RRDSET *st
+        , BUFFER *wb
+        , NETDATA_DOUBLE *n
+        , const char *dimensions
+        , size_t points
+        , time_t after
+        , time_t before
+        , RRDR_TIME_GROUPING group_method
+        , const char *group_options
+        , time_t resampling_time
+        , uint32_t options
+        , time_t *db_after
+        , time_t *db_before
+        , size_t *db_points_read
+        , size_t *db_points_per_tier
+        , size_t *result_points_generated
+        , int *value_is_null
+        , NETDATA_DOUBLE *anomaly_rate
+        , time_t timeout
+        , size_t tier
+        , QUERY_SOURCE query_source
+        , STORAGE_PRIORITY priority
+) {
+    // Back-compat wrapper for callers that don't need to reuse the arena
+    // across calls (e.g. the badge code path). Creates a throwaway owa.
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+    int ret = rrdset2value_api_v1_with_owa(
+            owa, st, wb, n, dimensions, points, after, before,
+            group_method, group_options, resampling_time, options,
+            db_after, db_before, db_points_read, db_points_per_tier,
+            result_points_generated, value_is_null, anomaly_rate,
+            timeout, tier, query_source, priority);
     onewayalloc_destroy(owa);
     return ret;
 }

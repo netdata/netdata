@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 var (
@@ -18,7 +19,7 @@ var (
 )
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -141,6 +142,45 @@ func TestCollector_Init_ConfigValidation(t *testing.T) {
 				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
 			},
 			wantFail: true,
+		},
+		"azure_ad with unsupported driver fails": {
+			setup: func(c *Collector) {
+				c.Driver = "mysql"
+				c.DSN = "user:pass@tcp(localhost:3306)/"
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+				c.CloudAuth.Provider = "azure_ad"
+				c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{
+					Mode: "default",
+				}
+			},
+			wantFail: true,
+		},
+		"azure_ad service principal missing secret fails": {
+			setup: func(c *Collector) {
+				c.Driver = "pgx"
+				c.DSN = "postgres://user@localhost/db"
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+				c.CloudAuth.Provider = "azure_ad"
+				c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{
+					Mode: "service_principal",
+					ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+						TenantID: "tenant",
+						ClientID: "client",
+					},
+				}
+			},
+			wantFail: true,
+		},
+		"azuresql driver accepted": {
+			setup: func(c *Collector) {
+				c.Driver = "azuresql"
+				c.DSN = "sqlserver://example.database.windows.net?database=master&fedauth=ActiveDirectoryDefault"
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+			},
+			wantFail: false,
 		},
 	}
 

@@ -1742,8 +1742,9 @@ void netdev_main(void *ptr_is_null __maybe_unused)
         worker_is_busy(0);
 
         netdata_mutex_lock(&netdev_mutex);
-        if (do_proc_net_dev(localhost->rrd_update_every, hb_dt))
-            break;
+        int ret = do_proc_net_dev(localhost->rrd_update_every, hb_dt);
         netdata_mutex_unlock(&netdev_mutex);
+        if (ret)
+            break;
     }
 }

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -100,8 +100,8 @@ func (c *Collector) collectHTTPCache(mx map[string]int64, ms *nginxMetrics) {
 	for name, cache := range *ms.httpCaches {
 		c.cache.putHTTPCache(name)
 		px := fmt.Sprintf("http_cache_%s_", name)
-		mx[px+"state_cold"] = metrix.Bool(cache.Cold)
-		mx[px+"state_warm"] = metrix.Bool(!cache.Cold)
+		mx[px+"state_cold"] = oldmetrix.Bool(cache.Cold)
+		mx[px+"state_warm"] = oldmetrix.Bool(!cache.Cold)
 		mx[px+"size"] = cache.Size
 		mx[px+"served_responses"] = cache.Hit.Responses + cache.Stale.Responses + cache.Updating.Responses + cache.Revalidated.Responses
 		mx[px+"written_responses"] = cache.Miss.ResponsesWritten + cache.Expired.ResponsesWritten + cache.Bypass.ResponsesWritten
@@ -173,7 +173,7 @@ func (c *Collector) collectHTTPUpstreams(mx map[string]int64, ms *nginxMetrics) 
 			px = fmt.Sprintf("http_upstream_%s_server_%s_zone_%s_", name, peer.Server, upstream.Zone)
 			mx[px+"active"] = peer.Active
 			for _, v := range []string{"up", "down", "draining", "unavail", "checking", "unhealthy"} {
-				mx[px+"state_"+v] = metrix.Bool(peer.State == v)
+				mx[px+"state_"+v] = oldmetrix.Bool(peer.State == v)
 			}
 			mx[px+"bytes_received"] = peer.Received
 			mx[px+"bytes_sent"] = peer.Sent
@@ -230,7 +230,7 @@ func (c *Collector) collectStreamUpstreams(mx map[string]int64, ms *nginxMetrics
 			mx[px+"active"] = peer.Active
 			mx[px+"connections"] = peer.Connections
 			for _, v := range []string{"up", "down", "unavail", "checking", "unhealthy"} {
-				mx[px+"state_"+v] = metrix.Bool(peer.State == v)
+				mx[px+"state_"+v] = oldmetrix.Bool(peer.State == v)
 			}
 			mx[px+"bytes_received"] = peer.Received
 			mx[px+"bytes_sent"] = peer.Sent

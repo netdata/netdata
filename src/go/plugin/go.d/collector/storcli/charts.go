@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioControllerHealthStatus = module.Priority + iota
+	prioControllerHealthStatus = collectorapi.Priority + iota
 	prioControllerStatus
 	prioControllerBBUStatus
 	prioControllerROCTemperature
@@ -24,75 +24,75 @@ const (
 	prioBBUTemperature
 )
 
-var controllerMegaraidChartsTmpl = module.Charts{
+var controllerMegaraidChartsTmpl = collectorapi.Charts{
 	controllerHealthStatusChartTmpl.Copy(),
 	controllerStatusChartTmpl.Copy(),
 	controllerBBUStatusChartTmpl.Copy(),
 }
 
-var controllerMpt3sasChartsTmpl = module.Charts{
+var controllerMpt3sasChartsTmpl = collectorapi.Charts{
 	controllerHealthStatusChartTmpl.Copy(),
 	controllerROCTemperatureChartTmpl.Copy(),
 }
 
 var (
-	controllerHealthStatusChartTmpl = module.Chart{
+	controllerHealthStatusChartTmpl = collectorapi.Chart{
 		ID:       "controller_%s_health_status",
 		Title:    "Controller health status",
 		Units:    "status",
 		Fam:      "cntrl status",
 		Ctx:      "storcli.controller_health_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerHealthStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_health_status_healthy", Name: "healthy"},
 			{ID: "cntrl_%s_health_status_unhealthy", Name: "unhealthy"},
 		},
 	}
-	controllerStatusChartTmpl = module.Chart{
+	controllerStatusChartTmpl = collectorapi.Chart{
 		ID:       "controller_%s_status",
 		Title:    "Controller status",
 		Units:    "status",
 		Fam:      "cntrl status",
 		Ctx:      "storcli.controller_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_status_optimal", Name: "optimal"},
 			{ID: "cntrl_%s_status_degraded", Name: "degraded"},
 			{ID: "cntrl_%s_status_partially_degraded", Name: "partially_degraded"},
 			{ID: "cntrl_%s_status_failed", Name: "failed"},
 		},
 	}
-	controllerBBUStatusChartTmpl = module.Chart{
+	controllerBBUStatusChartTmpl = collectorapi.Chart{
 		ID:       "controller_%s_bbu_status",
 		Title:    "Controller BBU status",
 		Units:    "status",
 		Fam:      "cntrl status",
 		Ctx:      "storcli.controller_bbu_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerBBUStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_bbu_status_healthy", Name: "healthy"},
 			{ID: "cntrl_%s_bbu_status_unhealthy", Name: "unhealthy"},
 			{ID: "cntrl_%s_bbu_status_na", Name: "na"},
 		},
 	}
-	controllerROCTemperatureChartTmpl = module.Chart{
+	controllerROCTemperatureChartTmpl = collectorapi.Chart{
 		ID:       "controller_%s_roc_temperature",
 		Title:    "Controller ROC temperature",
 		Units:    "Celsius",
 		Fam:      "cntrl roc temperature",
 		Ctx:      "storcli.controller_roc_temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioControllerROCTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cntrl_%s_roc_temperature_celsius", Name: "temperature"},
 		},
 	}
 )
 
-var physDriveChartsTmpl = module.Charts{
+var physDriveChartsTmpl = collectorapi.Charts{
 	physDriveMediaErrorsRateChartTmpl.Copy(),
 	physDrivePredictiveFailuresRateChartTmpl.Copy(),
 	physDriveSmartAlertStatusChartTmpl.Copy(),
@@ -100,79 +100,79 @@ var physDriveChartsTmpl = module.Charts{
 }
 
 var (
-	physDriveMediaErrorsRateChartTmpl = module.Chart{
+	physDriveMediaErrorsRateChartTmpl = collectorapi.Chart{
 		ID:       "phys_drive_%s_cntrl_%s_media_errors_rate",
 		Title:    "Physical Drive media errors rate",
 		Units:    "errors/s",
 		Fam:      "pd errors",
 		Ctx:      "storcli.phys_drive_errors",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPhysDriveErrors,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "phys_drive_%s_cntrl_%s_media_error_count", Name: "media"},
 			{ID: "phys_drive_%s_cntrl_%s_other_error_count", Name: "other"},
 		},
 	}
-	physDrivePredictiveFailuresRateChartTmpl = module.Chart{
+	physDrivePredictiveFailuresRateChartTmpl = collectorapi.Chart{
 		ID:       "phys_drive_%s_cntrl_%s_predictive_failures_rate",
 		Title:    "Physical Drive predictive failures rate",
 		Units:    "failures/s",
 		Fam:      "pd errors",
 		Ctx:      "storcli.phys_drive_predictive_failures",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPhysDrivePredictiveFailures,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "phys_drive_%s_cntrl_%s_predictive_failure_count", Name: "predictive_failures"},
 		},
 	}
-	physDriveSmartAlertStatusChartTmpl = module.Chart{
+	physDriveSmartAlertStatusChartTmpl = collectorapi.Chart{
 		ID:       "phys_drive_%s_cntrl_%s_smart_alert_status",
 		Title:    "Physical Drive SMART alert status",
 		Units:    "status",
 		Fam:      "pd smart",
 		Ctx:      "storcli.phys_drive_smart_alert_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPhysDriveSmartAlertStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "phys_drive_%s_cntrl_%s_smart_alert_status_active", Name: "active"},
 			{ID: "phys_drive_%s_cntrl_%s_smart_alert_status_inactive", Name: "inactive"},
 		},
 	}
-	physDriveTemperatureChartTmpl = module.Chart{
+	physDriveTemperatureChartTmpl = collectorapi.Chart{
 		ID:       "phys_drive_%s_cntrl_%s_temperature",
 		Title:    "Physical Drive temperature",
 		Units:    "Celsius",
 		Fam:      "pd temperature",
 		Ctx:      "storcli.phys_drive_temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPhysDriveTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "phys_drive_%s_cntrl_%s_temperature", Name: "temperature"},
 		},
 	}
 )
 
-var bbuChartsTmpl = module.Charts{
+var bbuChartsTmpl = collectorapi.Charts{
 	bbuTemperatureChartTmpl.Copy(),
 }
 
 var (
-	bbuTemperatureChartTmpl = module.Chart{
+	bbuTemperatureChartTmpl = collectorapi.Chart{
 		ID:       "bbu_%s_cntrl_%s_temperature",
 		Title:    "BBU temperature",
 		Units:    "Celsius",
 		Fam:      "bbu temperature",
 		Ctx:      "storcli.bbu_temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioBBUTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "bbu_%s_cntrl_%s_temperature", Name: "temperature"},
 		},
 	}
 )
 
 func (c *Collector) addControllerCharts(cntrl controllerInfo) {
-	var charts *module.Charts
+	var charts *collectorapi.Charts
 
 	switch cntrl.Version.DriverName {
 	case driverNameMegaraid:
@@ -190,7 +190,7 @@ func (c *Collector) addControllerCharts(cntrl controllerInfo) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, num)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "controller_number", Value: num},
 			{Key: "model", Value: strings.TrimSpace(cntrl.Basics.Model)},
 			{Key: "driver_name", Value: cntrl.Version.DriverName},
@@ -221,7 +221,7 @@ func (c *Collector) addPhysDriveCharts(cntrlNum int, di *driveInfo, ds *driveSta
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, da.WWN, num)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "controller_number", Value: num},
 			{Key: "enclosure_number", Value: enc},
 			{Key: "slot_number", Value: slot},
@@ -242,7 +242,7 @@ func (c *Collector) addBBUCharts(cntrlNum, bbuNum, model string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, bbuNum, cntrlNum)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "controller_number", Value: cntrlNum},
 			{Key: "bbu_number", Value: bbuNum},
 			{Key: "model", Value: model},

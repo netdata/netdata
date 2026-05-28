@@ -236,7 +236,13 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
         buffer_print_uint64_encoded(wb, integer_encoding, (usec_t) rd->collector.last_collected_time.tv_sec * USEC_PER_SEC +
                                                           (usec_t) rd->collector.last_collected_time.tv_usec);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_int64_encoded(wb, integer_encoding, rd->collector.last_collected_value);
+
+        bool send_double_baseline = rrddim_is_float(rd) && (capabilities & STREAM_CAP_FLOAT_BASELINE);
+        if(send_double_baseline)
+            buffer_print_netdata_double_encoded(wb, integer_encoding, rrddim_last_collected_as_double(rd));
+        else
+            buffer_print_int64_encoded(wb, integer_encoding, rrddim_last_collected_raw_int(rd));
+
         buffer_fast_strcat(wb, " ", 1);
         buffer_print_netdata_double_encoded(wb, integer_encoding, rd->collector.last_calculated_value);
         buffer_fast_strcat(wb, " ", 1);

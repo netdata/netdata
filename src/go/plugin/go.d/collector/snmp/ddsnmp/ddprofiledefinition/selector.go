@@ -10,8 +10,8 @@ type (
 	SelectorSpec []SelectorRule
 
 	SelectorRule struct {
-		SysObjectID SelectorIncludeExclude `yaml:"sysobjectid,omitempty" json:"sysobjectid,omitempty"`
-		SysDescr    SelectorIncludeExclude `yaml:"sysdescr,omitempty"    json:"sysdescr,omitempty"`
+		SysObjectID SelectorIncludeExclude `yaml:"sysobjectid,omitempty" json:"sysobjectid"`
+		SysDescr    SelectorIncludeExclude `yaml:"sysdescr,omitempty"    json:"sysdescr"`
 	}
 
 	SelectorIncludeExclude struct {

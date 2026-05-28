@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // TODO: check https://github.com/ProxySQL/proxysql-grafana-prometheus/blob/main/grafana/provisioning/dashboards/ProxySQL-Host-Statistics.json
 
 const (
-	prioClientConnectionsCount = module.Priority + iota
+	prioClientConnectionsCount = collectorapi.Priority + iota
 	prioClientConnectionsRate
 	prioServerConnectionsCount
 	prioServerConnectionsRate
@@ -55,7 +55,7 @@ const (
 )
 
 var (
-	baseCharts = module.Charts{
+	baseCharts = collectorapi.Charts{
 		clientConnectionsCountChart.Copy(),
 		clientConnectionsRateChart.Copy(),
 		serverConnectionsCountChart.Copy(),
@@ -86,332 +86,332 @@ var (
 		uptimeChart.Copy(),
 	}
 
-	clientConnectionsCountChart = module.Chart{
+	clientConnectionsCountChart = collectorapi.Chart{
 		ID:       "client_connections_count",
 		Title:    "Client connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "proxysql.client_connections_count",
 		Priority: prioClientConnectionsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "Client_Connections_connected", Name: "connected"},
 			{ID: "Client_Connections_non_idle", Name: "non_idle"},
 			{ID: "Client_Connections_hostgroup_locked", Name: "hostgroup_locked"},
 		},
 	}
-	clientConnectionsRateChart = module.Chart{
+	clientConnectionsRateChart = collectorapi.Chart{
 		ID:       "client_connections_rate",
 		Title:    "Client connections rate",
 		Units:    "connections/s",
 		Fam:      "connections",
 		Ctx:      "proxysql.client_connections_rate",
 		Priority: prioClientConnectionsRate,
-		Dims: module.Dims{
-			{ID: "Client_Connections_created", Name: "created", Algo: module.Incremental},
-			{ID: "Client_Connections_aborted", Name: "aborted", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "Client_Connections_created", Name: "created", Algo: collectorapi.Incremental},
+			{ID: "Client_Connections_aborted", Name: "aborted", Algo: collectorapi.Incremental},
 		},
 	}
 
-	serverConnectionsCountChart = module.Chart{
+	serverConnectionsCountChart = collectorapi.Chart{
 		ID:       "server_connections_count",
 		Title:    "Server connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "proxysql.server_connections_count",
 		Priority: prioServerConnectionsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "Server_Connections_connected", Name: "connected"},
 		},
 	}
-	serverConnectionsRateChart = module.Chart{
+	serverConnectionsRateChart = collectorapi.Chart{
 		ID:       "server_connections_rate",
 		Title:    "Server connections rate",
 		Units:    "connections/s",
 		Fam:      "connections",
 		Ctx:      "proxysql.server_connections_rate",
 		Priority: prioServerConnectionsRate,
-		Dims: module.Dims{
-			{ID: "Server_Connections_created", Name: "created", Algo: module.Incremental},
-			{ID: "Server_Connections_aborted", Name: "aborted", Algo: module.Incremental},
-			{ID: "Server_Connections_delayed", Name: "delayed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "Server_Connections_created", Name: "created", Algo: collectorapi.Incremental},
+			{ID: "Server_Connections_aborted", Name: "aborted", Algo: collectorapi.Incremental},
+			{ID: "Server_Connections_delayed", Name: "delayed", Algo: collectorapi.Incremental},
 		},
 	}
 
-	backendsTrafficChart = module.Chart{
+	backendsTrafficChart = collectorapi.Chart{
 		ID:       "backends_traffic",
 		Title:    "Backends traffic",
 		Units:    "B/s",
 		Fam:      "traffic",
 		Ctx:      "proxysql.backends_traffic",
 		Priority: prioBackendsTraffic,
-		Dims: module.Dims{
-			{ID: "Queries_backends_bytes_recv", Name: "recv", Algo: module.Incremental},
-			{ID: "Queries_backends_bytes_sent", Name: "sent", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "Queries_backends_bytes_recv", Name: "recv", Algo: collectorapi.Incremental},
+			{ID: "Queries_backends_bytes_sent", Name: "sent", Algo: collectorapi.Incremental},
 		},
 	}
-	frontendsTrafficChart = module.Chart{
+	frontendsTrafficChart = collectorapi.Chart{
 		ID:       "clients_traffic",
 		Title:    "Clients traffic",
 		Units:    "B/s",
 		Fam:      "traffic",
 		Ctx:      "proxysql.clients_traffic",
 		Priority: prioFrontendsTraffic,
-		Dims: module.Dims{
-			{ID: "Queries_frontends_bytes_recv", Name: "recv", Algo: module.Incremental},
-			{ID: "Queries_frontends_bytes_sent", Name: "sent", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "Queries_frontends_bytes_recv", Name: "recv", Algo: collectorapi.Incremental},
+			{ID: "Queries_frontends_bytes_sent", Name: "sent", Algo: collectorapi.Incremental},
 		},
 	}
 
-	activeTransactionsCountChart = module.Chart{
+	activeTransactionsCountChart = collectorapi.Chart{
 		ID:       "active_transactions_count",
 		Title:    "Client connections that are currently processing a transaction",
 		Units:    "transactions",
 		Fam:      "transactions",
 		Ctx:      "proxysql.active_transactions_count",
 		Priority: prioActiveTransactionsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "Active_Transactions", Name: "active"},
 		},
 	}
-	questionsRateChart = module.Chart{
+	questionsRateChart = collectorapi.Chart{
 		ID:       "questions_rate",
 		Title:    "Client requests / statements executed",
 		Units:    "questions/s",
 		Fam:      "queries",
 		Ctx:      "proxysql.questions_rate",
 		Priority: prioQuestionsRate,
-		Dims: module.Dims{
-			{ID: "Questions", Name: "questions", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "Questions", Name: "questions", Algo: collectorapi.Incremental},
 		},
 	}
-	slowQueriesRateChart = module.Chart{
+	slowQueriesRateChart = collectorapi.Chart{
 		ID:       "slow_queries_rate",
 		Title:    "Slow queries",
 		Units:    "queries/s",
 		Fam:      "queries",
 		Ctx:      "proxysql.slow_queries_rate",
 		Priority: prioSlowQueriesRate,
-		Dims: module.Dims{
-			{ID: "Slow_queries", Name: "slow", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "Slow_queries", Name: "slow", Algo: collectorapi.Incremental},
 		},
 	}
-	queriesRateChart = module.Chart{
+	queriesRateChart = collectorapi.Chart{
 		ID:       "queries_rate",
 		Title:    "Queries rate",
 		Units:    "queries/s",
 		Fam:      "queries",
 		Ctx:      "proxysql.queries_rate",
 		Priority: prioQueriesRate,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "Com_autocommit", Name: "autocommit", Algo: module.Incremental},
-			{ID: "Com_autocommit_filtered", Name: "autocommit_filtered", Algo: module.Incremental},
-			{ID: "Com_commit", Name: "commit", Algo: module.Incremental},
-			{ID: "Com_commit_filtered", Name: "commit_filtered", Algo: module.Incremental},
-			{ID: "Com_rollback", Name: "rollback", Algo: module.Incremental},
-			{ID: "Com_rollback_filtered", Name: "rollback_filtered", Algo: module.Incremental},
-			{ID: "Com_backend_change_user", Name: "backend_change_user", Algo: module.Incremental},
-			{ID: "Com_backend_init_db", Name: "backend_init_db", Algo: module.Incremental},
-			{ID: "Com_backend_set_names", Name: "backend_set_names", Algo: module.Incremental},
-			{ID: "Com_frontend_init_db", Name: "frontend_init_db", Algo: module.Incremental},
-			{ID: "Com_frontend_set_names", Name: "frontend_set_names", Algo: module.Incremental},
-			{ID: "Com_frontend_use_db", Name: "frontend_use_db", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "Com_autocommit", Name: "autocommit", Algo: collectorapi.Incremental},
+			{ID: "Com_autocommit_filtered", Name: "autocommit_filtered", Algo: collectorapi.Incremental},
+			{ID: "Com_commit", Name: "commit", Algo: collectorapi.Incremental},
+			{ID: "Com_commit_filtered", Name: "commit_filtered", Algo: collectorapi.Incremental},
+			{ID: "Com_rollback", Name: "rollback", Algo: collectorapi.Incremental},
+			{ID: "Com_rollback_filtered", Name: "rollback_filtered", Algo: collectorapi.Incremental},
+			{ID: "Com_backend_change_user", Name: "backend_change_user", Algo: collectorapi.Incremental},
+			{ID: "Com_backend_init_db", Name: "backend_init_db", Algo: collectorapi.Incremental},
+			{ID: "Com_backend_set_names", Name: "backend_set_names", Algo: collectorapi.Incremental},
+			{ID: "Com_frontend_init_db", Name: "frontend_init_db", Algo: collectorapi.Incremental},
+			{ID: "Com_frontend_set_names", Name: "frontend_set_names", Algo: collectorapi.Incremental},
+			{ID: "Com_frontend_use_db", Name: "frontend_use_db", Algo: collectorapi.Incremental},
 		},
 	}
 
-	backendStatementsCountChart = module.Chart{
+	backendStatementsCountChart = collectorapi.Chart{
 		ID:       "backend_statements_count",
 		Title:    "Statements available across all backend connections",
 		Units:    "statements",
 		Fam:      "statements",
 		Ctx:      "proxysql.backend_statements_count",
 		Priority: prioBackendStatementsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "Stmt_Server_Active_Total", Name: "total"},
 			{ID: "Stmt_Server_Active_Unique", Name: "unique"},
 		},
 	}
-	backendStatementsRateChart = module.Chart{
+	backendStatementsRateChart = collectorapi.Chart{
 		ID:       "backend_statements_rate",
 		Title:    "Statements executed against the backends",
 		Units:    "statements/s",
 		Fam:      "statements",
 		Ctx:      "proxysql.backend_statements_rate",
 		Priority: prioBackendStatementsRate,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "Com_backend_stmt_prepare", Name: "prepare", Algo: module.Incremental},
-			{ID: "Com_backend_stmt_execute", Name: "execute", Algo: module.Incremental},
-			{ID: "Com_backend_stmt_close", Name: "close", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "Com_backend_stmt_prepare", Name: "prepare", Algo: collectorapi.Incremental},
+			{ID: "Com_backend_stmt_execute", Name: "execute", Algo: collectorapi.Incremental},
+			{ID: "Com_backend_stmt_close", Name: "close", Algo: collectorapi.Incremental},
 		},
 	}
-	clientStatementsCountChart = module.Chart{
+	clientStatementsCountChart = collectorapi.Chart{
 		ID:       "client_statements_count",
 		Title:    "Statements that are in use by clients",
 		Units:    "statements",
 		Fam:      "statements",
 		Ctx:      "proxysql.client_statements_count",
 		Priority: prioFrontendStatementsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "Stmt_Client_Active_Total", Name: "total"},
 			{ID: "Stmt_Client_Active_Unique", Name: "unique"},
 		},
 	}
-	clientStatementsRateChart = module.Chart{
+	clientStatementsRateChart = collectorapi.Chart{
 		ID:       "client_statements_rate",
 		Title:    "Statements executed by clients",
 		Units:    "statements/s",
 		Fam:      "statements",
 		Ctx:      "proxysql.client_statements_rate",
 		Priority: prioFrontendStatementsRate,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "Com_frontend_stmt_prepare", Name: "prepare", Algo: module.Incremental},
-			{ID: "Com_frontend_stmt_execute", Name: "execute", Algo: module.Incremental},
-			{ID: "Com_frontend_stmt_close", Name: "close", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "Com_frontend_stmt_prepare", Name: "prepare", Algo: collectorapi.Incremental},
+			{ID: "Com_frontend_stmt_execute", Name: "execute", Algo: collectorapi.Incremental},
+			{ID: "Com_frontend_stmt_close", Name: "close", Algo: collectorapi.Incremental},
 		},
 	}
-	cachedStatementsCountChart = module.Chart{
+	cachedStatementsCountChart = collectorapi.Chart{
 		ID:       "cached_statements_count",
 		Title:    "Global prepared statements",
 		Units:    "statements",
 		Fam:      "statements",
 		Ctx:      "proxysql.cached_statements_count",
 		Priority: prioCachedStatementsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "Stmt_Cached", Name: "cached"},
 		},
 	}
 
-	queryCacheEntriesCountChart = module.Chart{
+	queryCacheEntriesCountChart = collectorapi.Chart{
 		ID:       "query_cache_entries_count",
 		Title:    "Query Cache entries",
 		Units:    "entries",
 		Fam:      "query cache",
 		Ctx:      "proxysql.query_cache_entries_count",
 		Priority: prioQueryCacheEntriesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "Query_Cache_Entries", Name: "entries"},
 		},
 	}
-	queryCacheMemoryUsedChart = module.Chart{
+	queryCacheMemoryUsedChart = collectorapi.Chart{
 		ID:       "query_cache_memory_used",
 		Title:    "Query Cache memory used",
 		Units:    "B",
 		Fam:      "query cache",
 		Ctx:      "proxysql.query_cache_memory_used",
 		Priority: prioQueryCacheMemoryUsed,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "Query_Cache_Memory_bytes", Name: "used"},
 		},
 	}
-	queryCacheIOChart = module.Chart{
+	queryCacheIOChart = collectorapi.Chart{
 		ID:       "query_cache_io",
 		Title:    "Query Cache I/O",
 		Units:    "B/s",
 		Fam:      "query cache",
 		Ctx:      "proxysql.query_cache_io",
 		Priority: prioQueryCacheIO,
-		Dims: module.Dims{
-			{ID: "Query_Cache_bytes_IN", Name: "in", Algo: module.Incremental},
-			{ID: "Query_Cache_bytes_OUT", Name: "out", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "Query_Cache_bytes_IN", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "Query_Cache_bytes_OUT", Name: "out", Algo: collectorapi.Incremental},
 		},
 	}
-	queryCacheRequestsRateChart = module.Chart{
+	queryCacheRequestsRateChart = collectorapi.Chart{
 		ID:       "query_cache_requests_rate",
 		Title:    "Query Cache requests",
 		Units:    "requests/s",
 		Fam:      "query cache",
 		Ctx:      "proxysql.query_cache_requests_rate",
 		Priority: prioQueryCacheRequestsRate,
-		Dims: module.Dims{
-			{ID: "Query_Cache_count_GET", Name: "read", Algo: module.Incremental},
-			{ID: "Query_Cache_count_SET", Name: "write", Algo: module.Incremental},
-			{ID: "Query_Cache_count_GET_OK", Name: "read_success", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "Query_Cache_count_GET", Name: "read", Algo: collectorapi.Incremental},
+			{ID: "Query_Cache_count_SET", Name: "write", Algo: collectorapi.Incremental},
+			{ID: "Query_Cache_count_GET_OK", Name: "read_success", Algo: collectorapi.Incremental},
 		},
 	}
 
-	mySQLMonitorWorkersCountChart = module.Chart{
+	mySQLMonitorWorkersCountChart = collectorapi.Chart{
 		ID:       "mysql_monitor_workers_count",
 		Title:    "MySQL monitor workers",
 		Units:    "threads",
 		Fam:      "monitor",
 		Ctx:      "proxysql.mysql_monitor_workers_count",
 		Priority: prioMySQLMonitorWorkersCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "MySQL_Monitor_Workers", Name: "workers"},
 			{ID: "MySQL_Monitor_Workers_Aux", Name: "auxiliary"},
 		},
 	}
-	mySQLMonitorWorkersRateChart = module.Chart{
+	mySQLMonitorWorkersRateChart = collectorapi.Chart{
 		ID:       "mysql_monitor_workers_rate",
 		Title:    "MySQL monitor workers rate",
 		Units:    "workers/s",
 		Fam:      "monitor",
 		Ctx:      "proxysql.mysql_monitor_workers_rate",
 		Priority: prioMySQLMonitorWorkersRate,
-		Dims: module.Dims{
-			{ID: "MySQL_Monitor_Workers_Started", Name: "started", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MySQL_Monitor_Workers_Started", Name: "started", Algo: collectorapi.Incremental},
 		},
 	}
-	mySQLMonitorConnectChecksRateChart = module.Chart{
+	mySQLMonitorConnectChecksRateChart = collectorapi.Chart{
 		ID:       "mysql_monitor_connect_checks_rate",
 		Title:    "MySQL monitor connect checks",
 		Units:    "checks/s",
 		Fam:      "monitor",
 		Ctx:      "proxysql.mysql_monitor_connect_checks_rate",
 		Priority: prioMySQLMonitorConnectChecksRate,
-		Dims: module.Dims{
-			{ID: "MySQL_Monitor_connect_check_OK", Name: "succeed", Algo: module.Incremental},
-			{ID: "MySQL_Monitor_connect_check_ERR", Name: "failed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MySQL_Monitor_connect_check_OK", Name: "succeed", Algo: collectorapi.Incremental},
+			{ID: "MySQL_Monitor_connect_check_ERR", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
-	mySQLMonitorPingChecksRateChart = module.Chart{
+	mySQLMonitorPingChecksRateChart = collectorapi.Chart{
 		ID:       "mysql_monitor_ping_checks_rate",
 		Title:    "MySQL monitor ping checks",
 		Units:    "checks/s",
 		Fam:      "monitor",
 		Ctx:      "proxysql.mysql_monitor_ping_checks_rate",
 		Priority: prioMySQLMonitorPingChecksRate,
-		Dims: module.Dims{
-			{ID: "MySQL_Monitor_ping_check_OK", Name: "succeed", Algo: module.Incremental},
-			{ID: "MySQL_Monitor_ping_check_ERR", Name: "failed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MySQL_Monitor_ping_check_OK", Name: "succeed", Algo: collectorapi.Incremental},
+			{ID: "MySQL_Monitor_ping_check_ERR", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
-	mySQLMonitorReadOnlyChecksRateChart = module.Chart{
+	mySQLMonitorReadOnlyChecksRateChart = collectorapi.Chart{
 		ID:       "mysql_monitor_read_only_checks_rate",
 		Title:    "MySQL monitor read only checks",
 		Units:    "checks/s",
 		Fam:      "monitor",
 		Ctx:      "proxysql.mysql_monitor_read_only_checks_rate",
 		Priority: prioMySQLMonitorReadOnlyChecksRate,
-		Dims: module.Dims{
-			{ID: "MySQL_Monitor_read_only_check_OK", Name: "succeed", Algo: module.Incremental},
-			{ID: "MySQL_Monitor_read_only_check_ERR", Name: "failed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MySQL_Monitor_read_only_check_OK", Name: "succeed", Algo: collectorapi.Incremental},
+			{ID: "MySQL_Monitor_read_only_check_ERR", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
-	mySQLMonitorReplicationLagChecksRateChart = module.Chart{
+	mySQLMonitorReplicationLagChecksRateChart = collectorapi.Chart{
 		ID:       "mysql_monitor_replication_lag_checks_rate",
 		Title:    "MySQL monitor replication lag checks",
 		Units:    "checks/s",
 		Fam:      "monitor",
 		Ctx:      "proxysql.mysql_monitor_replication_lag_checks_rate",
 		Priority: prioMySQLMonitorReplicationLagChecksRate,
-		Dims: module.Dims{
-			{ID: "MySQL_Monitor_replication_lag_check_OK", Name: "succeed", Algo: module.Incremental},
-			{ID: "MySQL_Monitor_replication_lag_check_ERR", Name: "failed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MySQL_Monitor_replication_lag_check_OK", Name: "succeed", Algo: collectorapi.Incremental},
+			{ID: "MySQL_Monitor_replication_lag_check_ERR", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
 
-	jemallocMemoryUsedChart = module.Chart{
+	jemallocMemoryUsedChart = collectorapi.Chart{
 		ID:       "jemalloc_memory_used",
 		Title:    "Jemalloc used memory",
 		Units:    "bytes",
 		Fam:      "memory",
 		Ctx:      "proxysql.jemalloc_memory_used",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioJemallocMemoryUsed,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jemalloc_active", Name: "active"},
 			{ID: "jemalloc_allocated", Name: "allocated"},
 			{ID: "jemalloc_mapped", Name: "mapped"},
@@ -420,15 +420,15 @@ var (
 			{ID: "jemalloc_retained", Name: "retained"},
 		},
 	}
-	memoryUsedCountChart = module.Chart{
+	memoryUsedCountChart = collectorapi.Chart{
 		ID:       "memory_used",
 		Title:    "Memory used",
 		Units:    "bytes",
 		Fam:      "memory",
 		Ctx:      "proxysql.memory_used",
 		Priority: prioMemoryUsed,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "Auth_memory", Name: "auth"},
 			{ID: "SQLite3_memory_bytes", Name: "sqlite3"},
 			{ID: "query_digest_memory", Name: "query_digest"},
@@ -442,79 +442,79 @@ var (
 			{ID: "stack_memory_cluster_threads", Name: "cluster_threads"},
 		},
 	}
-	uptimeChart = module.Chart{
+	uptimeChart = collectorapi.Chart{
 		ID:       "proxysql_uptime",
 		Title:    "Uptime",
 		Units:    "seconds",
 		Fam:      "uptime",
 		Ctx:      "proxysql.uptime",
 		Priority: prioUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ProxySQL_Uptime", Name: "uptime"},
 		},
 	}
 )
 
 var (
-	mySQLCommandChartsTmpl = module.Charts{
+	mySQLCommandChartsTmpl = collectorapi.Charts{
 		mySQLCommandExecutionRateChartTmpl.Copy(),
 		mySQLCommandExecutionTimeChartTmpl.Copy(),
 		mySQLCommandExecutionDurationHistogramChartTmpl.Copy(),
 	}
 
-	mySQLCommandExecutionRateChartTmpl = module.Chart{
+	mySQLCommandExecutionRateChartTmpl = collectorapi.Chart{
 		ID:       "mysql_command_%s_execution_rate",
 		Title:    "MySQL command execution",
 		Units:    "commands/s",
 		Fam:      "command exec",
 		Ctx:      "proxysql.mysql_command_execution_rate",
 		Priority: prioMySQLCommandExecutionsRate,
-		Dims: module.Dims{
-			{ID: "mysql_command_%s_Total_cnt", Name: "commands", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "mysql_command_%s_Total_cnt", Name: "commands", Algo: collectorapi.Incremental},
 		},
 	}
-	mySQLCommandExecutionTimeChartTmpl = module.Chart{
+	mySQLCommandExecutionTimeChartTmpl = collectorapi.Chart{
 		ID:       "mysql_command_%s_execution_time",
 		Title:    "MySQL command execution time",
 		Units:    "microseconds",
 		Fam:      "command exec time",
 		Ctx:      "proxysql.mysql_command_execution_time",
 		Priority: prioMySQLCommandExecutionTime,
-		Dims: module.Dims{
-			{ID: "mysql_command_%s_Total_Time_us", Name: "time", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "mysql_command_%s_Total_Time_us", Name: "time", Algo: collectorapi.Incremental},
 		},
 	}
-	mySQLCommandExecutionDurationHistogramChartTmpl = module.Chart{
+	mySQLCommandExecutionDurationHistogramChartTmpl = collectorapi.Chart{
 		ID:       "mysql_command_%s_execution_duration",
 		Title:    "MySQL command execution duration histogram",
 		Units:    "commands/s",
 		Fam:      "command exec duration",
 		Ctx:      "proxysql.mysql_command_execution_duration",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioMySQLCommandExecutionDurationHistogram,
-		Dims: module.Dims{
-			{ID: "mysql_command_%s_cnt_100us", Name: "100us", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_500us", Name: "500us", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_1ms", Name: "1ms", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_5ms", Name: "5ms", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_10ms", Name: "10ms", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_50ms", Name: "50ms", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_100ms", Name: "100ms", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_500ms", Name: "500ms", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_1s", Name: "1s", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_5s", Name: "5s", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_10s", Name: "10s", Algo: module.Incremental},
-			{ID: "mysql_command_%s_cnt_INFs", Name: "+Inf", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "mysql_command_%s_cnt_100us", Name: "100us", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_500us", Name: "500us", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_1ms", Name: "1ms", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_5ms", Name: "5ms", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_10ms", Name: "10ms", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_50ms", Name: "50ms", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_100ms", Name: "100ms", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_500ms", Name: "500ms", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_1s", Name: "1s", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_5s", Name: "5s", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_10s", Name: "10s", Algo: collectorapi.Incremental},
+			{ID: "mysql_command_%s_cnt_INFs", Name: "+Inf", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
-func newMySQLCommandCountersCharts(command string) *module.Charts {
+func newMySQLCommandCountersCharts(command string) *collectorapi.Charts {
 	charts := mySQLCommandChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, strings.ToLower(command))
-		chart.Labels = []module.Label{{Key: "command", Value: command}}
+		chart.Labels = []collectorapi.Label{{Key: "command", Value: command}}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, command)
 		}
@@ -543,41 +543,41 @@ func (c *Collector) removeMySQLCommandCountersCharts(command string) {
 }
 
 var (
-	mySQLUserChartsTmpl = module.Charts{
+	mySQLUserChartsTmpl = collectorapi.Charts{
 		mySQLUserConnectionsUtilizationChartTmpl.Copy(),
 		mySQLUserConnectionsCountChartTmpl.Copy(),
 	}
 
-	mySQLUserConnectionsUtilizationChartTmpl = module.Chart{
+	mySQLUserConnectionsUtilizationChartTmpl = collectorapi.Chart{
 		ID:       "mysql_user_%s_connections_utilization",
 		Title:    "MySQL user connections utilization",
 		Units:    "percentage",
 		Fam:      "user conns",
 		Ctx:      "proxysql.mysql_user_connections_utilization",
 		Priority: prioMySQLUserConnectionsUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "mysql_user_%s_frontend_connections_utilization", Name: "used"},
 		},
 	}
-	mySQLUserConnectionsCountChartTmpl = module.Chart{
+	mySQLUserConnectionsCountChartTmpl = collectorapi.Chart{
 		ID:       "mysql_user_%s_connections_count",
 		Title:    "MySQL user connections used",
 		Units:    "connections",
 		Fam:      "user conns",
 		Ctx:      "proxysql.mysql_user_connections_count",
 		Priority: prioMySQLUserConnectionsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "mysql_user_%s_frontend_connections", Name: "used"},
 		},
 	}
 )
 
-func newMySQLUserCharts(username string) *module.Charts {
+func newMySQLUserCharts(username string) *collectorapi.Charts {
 	charts := mySQLUserChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, username)
-		chart.Labels = []module.Label{{Key: "user", Value: username}}
+		chart.Labels = []collectorapi.Label{{Key: "user", Value: username}}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, username)
 		}
@@ -606,18 +606,18 @@ func (c *Collector) removeMySQLUserCharts(user string) {
 }
 
 var (
-	hostgroupChartsTmpl = module.Charts{
+	hostgroupChartsTmpl = collectorapi.Charts{
 		hostgroupBackendsStatusChartTmpl.Copy(),
 	}
 
-	hostgroupBackendsStatusChartTmpl = module.Chart{
+	hostgroupBackendsStatusChartTmpl = collectorapi.Chart{
 		ID:       "hostgroup_%s_backends_status",
 		Title:    "Hostgroup backends count in each status",
 		Units:    "backends",
 		Fam:      "hostgroup backends",
 		Ctx:      "proxysql.hostgroup_backends_status",
 		Priority: prioHostgroupStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "hostgroup_%s_backends_ONLINE", Name: "online"},
 			{ID: "hostgroup_%s_backends_SHUNNED", Name: "shunned"},
 			{ID: "hostgroup_%s_backends_OFFLINE_SOFT", Name: "offline_soft"},
@@ -626,12 +626,12 @@ var (
 	}
 )
 
-func newHostgroupCharts(hg string) *module.Charts {
+func newHostgroupCharts(hg string) *collectorapi.Charts {
 	charts := hostgroupChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, hg)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "hostgroup", Value: hg},
 		}
 		for _, dim := range chart.Dims {
@@ -662,7 +662,7 @@ func (c *Collector) removeHostgroupCharts(hg string) {
 }
 
 var (
-	backendChartsTmpl = module.Charts{
+	backendChartsTmpl = collectorapi.Charts{
 		backendStatusChartTmpl.Copy(),
 		backendConnectionsUsageChartTmpl.Copy(),
 		backendConnectionsRateChartTmpl.Copy(),
@@ -671,87 +671,87 @@ var (
 		backendLatencyChartTmpl.Copy(),
 	}
 
-	backendStatusChartTmpl = module.Chart{
+	backendStatusChartTmpl = collectorapi.Chart{
 		ID:       "backend_%s_status",
 		Title:    "Backend status",
 		Units:    "status",
 		Fam:      "backend status",
 		Ctx:      "proxysql.backend_status",
 		Priority: prioBackendStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "backend_%s_status_ONLINE", Name: "online"},
 			{ID: "backend_%s_status_SHUNNED", Name: "shunned"},
 			{ID: "backend_%s_status_OFFLINE_SOFT", Name: "offline_soft"},
 			{ID: "backend_%s_status_OFFLINE_HARD", Name: "offline_hard"},
 		},
 	}
-	backendConnectionsUsageChartTmpl = module.Chart{
+	backendConnectionsUsageChartTmpl = collectorapi.Chart{
 		ID:       "backend_%s_connections_usage",
 		Title:    "Backend connections usage",
 		Units:    "connections",
 		Fam:      "backend conns usage",
 		Ctx:      "proxysql.backend_connections_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioBackendConnectionsUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "backend_%s_ConnFree", Name: "free"},
 			{ID: "backend_%s_ConnUsed", Name: "used"},
 		},
 	}
-	backendConnectionsRateChartTmpl = module.Chart{
+	backendConnectionsRateChartTmpl = collectorapi.Chart{
 		ID:       "backend_%s_connections_rate",
 		Title:    "Backend connections established",
 		Units:    "connections/s",
 		Fam:      "backend conns established",
 		Ctx:      "proxysql.backend_connections_rate",
 		Priority: prioBackendConnectionsRate,
-		Dims: module.Dims{
-			{ID: "backend_%s_ConnOK", Name: "succeed", Algo: module.Incremental},
-			{ID: "backend_%s_ConnERR", Name: "failed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "backend_%s_ConnOK", Name: "succeed", Algo: collectorapi.Incremental},
+			{ID: "backend_%s_ConnERR", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
-	backendQueriesRateRateChartTmpl = module.Chart{
+	backendQueriesRateRateChartTmpl = collectorapi.Chart{
 		ID:       "backend_%s_queries_rate",
 		Title:    "Backend queries",
 		Units:    "queries/s",
 		Fam:      "backend queries",
 		Ctx:      "proxysql.backend_queries_rate",
 		Priority: prioBackendQueriesRateRate,
-		Dims: module.Dims{
-			{ID: "backend_%s_Queries", Name: "queries", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "backend_%s_Queries", Name: "queries", Algo: collectorapi.Incremental},
 		},
 	}
-	backendTrafficChartTmpl = module.Chart{
+	backendTrafficChartTmpl = collectorapi.Chart{
 		ID:       "backend_%s_traffic",
 		Title:    "Backend traffic",
 		Units:    "B/s",
 		Fam:      "backend traffic",
 		Ctx:      "proxysql.backend_traffic",
 		Priority: prioBackendTraffic,
-		Dims: module.Dims{
-			{ID: "backend_%s_Bytes_data_recv", Name: "recv", Algo: module.Incremental},
-			{ID: "backend_%s_Bytes_data_sent", Name: "sent", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "backend_%s_Bytes_data_recv", Name: "recv", Algo: collectorapi.Incremental},
+			{ID: "backend_%s_Bytes_data_sent", Name: "sent", Algo: collectorapi.Incremental},
 		},
 	}
-	backendLatencyChartTmpl = module.Chart{
+	backendLatencyChartTmpl = collectorapi.Chart{
 		ID:       "backend_%s_latency",
 		Title:    "Backend latency",
 		Units:    "microseconds",
 		Fam:      "backend latency",
 		Ctx:      "proxysql.backend_latency",
 		Priority: prioBackendLatency,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "backend_%s_Latency_us", Name: "latency"},
 		},
 	}
 )
 
-func newBackendCharts(hg, host, port string) *module.Charts {
+func newBackendCharts(hg, host, port string) *collectorapi.Charts {
 	charts := backendChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, backendID(hg, host, port))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "hostgroup", Value: hg},
 			{Key: "host", Value: host},
 			{Key: "port", Value: port},

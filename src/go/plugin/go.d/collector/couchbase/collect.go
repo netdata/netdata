@@ -7,7 +7,7 @@ import (
 	"net/url"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
@@ -52,50 +52,50 @@ func (c *Collector) collectBasicStats(collected map[string]int64, ms *cbMetrics)
 }
 
 func (c *Collector) addBucketToCharts(bucket string) {
-	c.addDimToChart(bucketQuotaPercentUsedChart.ID, &module.Dim{
+	c.addDimToChart(bucketQuotaPercentUsedChart.ID, &collectorapi.Dim{
 		ID:   indexDimID(bucket, "quota_percent_used"),
 		Name: bucket,
 		Div:  precision,
 	})
 
-	c.addDimToChart(bucketOpsPerSecChart.ID, &module.Dim{
+	c.addDimToChart(bucketOpsPerSecChart.ID, &collectorapi.Dim{
 		ID:   indexDimID(bucket, "ops_per_sec"),
 		Name: bucket,
 		Div:  precision,
 	})
 
-	c.addDimToChart(bucketDiskFetchesChart.ID, &module.Dim{
+	c.addDimToChart(bucketDiskFetchesChart.ID, &collectorapi.Dim{
 		ID:   indexDimID(bucket, "disk_fetches"),
 		Name: bucket,
 	})
 
-	c.addDimToChart(bucketItemCountChart.ID, &module.Dim{
+	c.addDimToChart(bucketItemCountChart.ID, &collectorapi.Dim{
 		ID:   indexDimID(bucket, "item_count"),
 		Name: bucket,
 	})
 
-	c.addDimToChart(bucketDiskUsedChart.ID, &module.Dim{
+	c.addDimToChart(bucketDiskUsedChart.ID, &collectorapi.Dim{
 		ID:   indexDimID(bucket, "disk_used"),
 		Name: bucket,
 	})
 
-	c.addDimToChart(bucketDataUsedChart.ID, &module.Dim{
+	c.addDimToChart(bucketDataUsedChart.ID, &collectorapi.Dim{
 		ID:   indexDimID(bucket, "data_used"),
 		Name: bucket,
 	})
 
-	c.addDimToChart(bucketMemUsedChart.ID, &module.Dim{
+	c.addDimToChart(bucketMemUsedChart.ID, &collectorapi.Dim{
 		ID:   indexDimID(bucket, "mem_used"),
 		Name: bucket,
 	})
 
-	c.addDimToChart(bucketVBActiveNumNonResidentChart.ID, &module.Dim{
+	c.addDimToChart(bucketVBActiveNumNonResidentChart.ID, &collectorapi.Dim{
 		ID:   indexDimID(bucket, "vb_active_num_non_resident"),
 		Name: bucket,
 	})
 }
 
-func (c *Collector) addDimToChart(chartID string, dim *module.Dim) {
+func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
 	chart := c.Charts().Get(chartID)
 	if chart == nil {
 		c.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)

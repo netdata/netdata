@@ -17,7 +17,6 @@ modules:
         description: ""
       keywords:
         - db2
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

@@ -17,13 +17,17 @@ struct ml_dimension_t {
     SPINLOCK slock;
     uint32_t suppression_window_counter;
     uint32_t suppression_anomaly_counter;
+    uint32_t reset_generation;
     bool training_in_progress;
+    bool has_received_downstream_model;
+    bool create_new_model_queued;
+    size_t cns_head;
 
     std::vector<calculated_number_t> cns;
 
     std::vector<ml_kmeans_inlined_t> km_contexts;
     ml_kmeans_t kmeans;
-    std::vector<DSample> feature;
+    DSample feature;
 };
 
 bool
@@ -130,12 +134,7 @@ public:
     ml_host_t *host() const {
         assert(acquired());
         RRDHOST *RH = rrdhost_acquired_to_rrdhost(AcqRH);
-        return reinterpret_cast<ml_host_t *>(RH->ml_host);
-    }
-
-    ml_queue_t *queue() const {
-        assert(acquired());
-        return host()->queue;
+        return reinterpret_cast<ml_host_t *>(__atomic_load_n(&RH->ml_host, __ATOMIC_ACQUIRE));
     }
 
     ml_dimension_t *dimension() const {

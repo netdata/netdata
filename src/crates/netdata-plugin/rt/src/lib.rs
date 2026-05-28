@@ -153,6 +153,140 @@ pub struct ProgressState {
     total: Arc<AtomicUsize>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::{Deserialize, Serialize};
+    use tokio::sync::mpsc;
+
+    #[derive(Debug, Deserialize, Serialize)]
+    struct EmptyRequest {}
+
+    #[derive(Debug, Deserialize, Serialize)]
+    struct EmptyResponse {
+        ok: bool,
+    }
+
+    struct CancelledHandler;
+
+    #[async_trait]
+    impl FunctionHandler for CancelledHandler {
+        type Request = EmptyRequest;
+        type Response = EmptyResponse;
+
+        async fn on_call(
+            &self,
+            _ctx: FunctionCallContext,
+            _request: Self::Request,
+        ) -> Result<Self::Response> {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            Ok(EmptyResponse { ok: true })
+        }
+
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new("test-cancelled", "test cancelled handler")
+        }
+    }
+
+    struct ProgressHandler;
+
+    #[async_trait]
+    impl FunctionHandler for ProgressHandler {
+        type Request = EmptyRequest;
+        type Response = EmptyResponse;
+
+        async fn on_call(
+            &self,
+            ctx: FunctionCallContext,
+            _request: Self::Request,
+        ) -> Result<Self::Response> {
+            ctx.progress.set_total(10);
+            tokio::time::sleep(Duration::from_millis(1_100)).await;
+            Ok(EmptyResponse { ok: true })
+        }
+
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new("test-progress", "test progress handler")
+        }
+    }
+
+    fn test_context(
+        transaction: &str,
+        outbound_tx: mpsc::UnboundedSender<Message>,
+    ) -> Arc<FunctionContext> {
+        Arc::new(FunctionContext {
+            function_call: Box::new(FunctionCall {
+                transaction: transaction.to_string(),
+                timeout: 30,
+                name: "test".to_string(),
+                args: Vec::new(),
+                access: None,
+                source: None,
+                payload: Some(br#"{}"#.to_vec()),
+            }),
+            cancellation_token: CancellationToken::new(),
+            outbound_tx,
+        })
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn cancelled_handlers_return_499() {
+        let adapter = HandlerAdapter {
+            handler: Arc::new(CancelledHandler),
+        };
+        let (outbound_tx, _outbound_rx) = mpsc::unbounded_channel();
+        let ctx = test_context("tx-cancelled", outbound_tx);
+        let cancel = ctx.cancellation_token.clone();
+
+        let task = tokio::spawn({
+            let ctx = Arc::clone(&ctx);
+            async move { adapter.handle_raw(ctx).await }
+        });
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        cancel.cancel();
+
+        let result = task.await.expect("cancelled handler task");
+        assert_eq!(result.status, 499);
+
+        let payload: serde_json::Value =
+            serde_json::from_slice(&result.payload).expect("parse cancelled payload");
+        assert_eq!(payload["status"], 499);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn handlers_emit_progress_when_total_is_set() {
+        let adapter = HandlerAdapter {
+            handler: Arc::new(ProgressHandler),
+        };
+        let (outbound_tx, mut outbound_rx) = mpsc::unbounded_channel();
+        let ctx = test_context("tx-progress", outbound_tx);
+
+        let task = tokio::spawn({
+            let ctx = Arc::clone(&ctx);
+            async move { adapter.handle_raw(ctx).await }
+        });
+
+        let progress = tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                match outbound_rx.recv().await {
+                    Some(Message::FunctionProgressResponse(progress)) => break progress,
+                    Some(_) => continue,
+                    None => panic!("outbound channel closed before progress"),
+                }
+            }
+        })
+        .await
+        .expect("timed out waiting for progress");
+
+        assert_eq!(progress.transaction, "tx-progress");
+        assert_eq!(progress.done, 0);
+        assert_eq!(progress.all, 10);
+
+        let result = task.await.expect("progress handler task");
+        assert_eq!(result.status, 200);
+    }
+}
+
 impl ProgressState {
     fn new() -> Self {
         Self {
@@ -183,6 +317,17 @@ impl ProgressState {
             self.done.load(Ordering::Relaxed),
             self.total.load(Ordering::Relaxed),
         )
+    }
+
+    /// Snapshot current progress counters.
+    pub fn snapshot(&self) -> (usize, usize) {
+        self.load()
+    }
+}
+
+impl Default for ProgressState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -250,6 +395,8 @@ type FunctionFuture = BoxFuture<'static, (String, FunctionResult)>;
 /// ```
 /// use async_trait::async_trait;
 /// use netdata_plugin_error::Result;
+/// use netdata_plugin_protocol::FunctionDeclaration;
+/// use rt::{FunctionCallContext, FunctionHandler};
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Deserialize)]
@@ -326,6 +473,50 @@ pub trait FunctionHandler: Send + Sync + 'static {
         request: Self::Request,
     ) -> Result<Self::Response>;
 
+    /// Parse the incoming request for this handler.
+    ///
+    /// Handlers can override this to support compatibility request shapes
+    /// while keeping the runtime itself protocol-agnostic.
+    fn parse_request(
+        &self,
+        function_call: &FunctionCall,
+    ) -> std::result::Result<Self::Request, FunctionResult> {
+        let transaction = function_call.transaction.clone();
+        match &function_call.payload {
+            Some(bytes) => match serde_json::from_slice(bytes) {
+                Ok(request) => Ok(request),
+                Err(e) => {
+                    error!("failed to deserialize request payload: {}", e);
+                    Err(FunctionResult {
+                        transaction,
+                        status: 400,
+                        expires: 0,
+                        format: "text/plain".to_string(),
+                        payload: format!("Invalid request: {}", e).as_bytes().to_vec(),
+                    })
+                }
+            },
+            None => match serde_json::from_slice(b"{}") {
+                Ok(request) => Ok(request),
+                Err(e) => {
+                    let payload = serde_json::to_vec(&json!({
+                        "error": "Request payload is empty",
+                    }))
+                    .expect("serializing a json value to work");
+
+                    error!("failed to deserialize empty payload: {}", e);
+                    Err(FunctionResult {
+                        transaction,
+                        status: 400,
+                        expires: 0,
+                        format: "text/plain".to_string(),
+                        payload,
+                    })
+                }
+            },
+        }
+    }
+
     /// Provide the function's declaration metadata.
     ///
     /// Returns a [`FunctionDeclaration`] that describes this function to Netdata,
@@ -371,38 +562,9 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
     async fn handle_raw(&self, ctx: Arc<FunctionContext>) -> FunctionResult {
         let transaction = ctx.function_call.transaction.clone();
 
-        // Deserialize the request payload
-        let payload: H::Request = match &ctx.function_call.payload {
-            Some(bytes) => match serde_json::from_slice(bytes) {
-                Ok(p) => p,
-                Err(e) => {
-                    error!("failed to deserialize request payload: {}", e);
-                    return FunctionResult {
-                        transaction,
-                        status: 400,
-                        expires: 0,
-                        format: "text/plain".to_string(),
-                        payload: format!("Invalid request: {}", e).as_bytes().to_vec(),
-                    };
-                }
-            },
-            None => match serde_json::from_slice(b"{}") {
-                Ok(p) => p,
-                Err(e) => {
-                    let payload =
-                        serde_json::to_vec(&json!({ "error": "Request payload is empty", }))
-                            .expect("serializing a json value to work");
-
-                    error!("failed to deserialize empty payload: {}", e);
-                    return FunctionResult {
-                        transaction,
-                        status: 400,
-                        expires: 0,
-                        format: "text/plain".to_string(),
-                        payload,
-                    };
-                }
-            },
+        let payload: H::Request = match self.handler.parse_request(&ctx.function_call) {
+            Ok(payload) => payload,
+            Err(result) => return result,
         };
 
         // Build the function call context
@@ -493,6 +655,11 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 }
             }
             Err(e) => {
+                let status = if ctx.cancellation_token.is_cancelled() {
+                    499
+                } else {
+                    500
+                };
                 if ctx.cancellation_token.is_cancelled() {
                     info!("function handler cancelled: {}", e);
                 } else {
@@ -500,11 +667,11 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 }
                 let error_json = json!({
                     "error": format!("{}", e),
-                    "status": 500
+                    "status": status
                 });
                 FunctionResult {
                     transaction,
-                    status: 500,
+                    status,
                     expires: 0,
                     format: "application/json".to_string(),
                     payload: serde_json::to_vec_pretty(&error_json).unwrap_or_else(|_| {
@@ -1022,6 +1189,7 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
                     function_call.payload = Some(payload);
                 }
             }
+
         }
 
         // Get handler

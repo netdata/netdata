@@ -2,10 +2,10 @@
 
 package vcsa
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 var (
-	vcsaHealthCharts = module.Charts{
+	vcsaHealthCharts = collectorapi.Charts{
 		systemHealthStatus.Copy(),
 		applMgmtHealthChart.Copy(),
 		loadHealthChart.Copy(),
@@ -16,13 +16,13 @@ var (
 		softwarePackagesHealthChart.Copy(),
 	}
 
-	systemHealthStatus = module.Chart{
+	systemHealthStatus = collectorapi.Chart{
 		ID:    "system_health_status",
 		Title: "VCSA Overall System health status",
 		Units: "status",
 		Fam:   "system",
 		Ctx:   "vcsa.system_health_status",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "system_status_green", Name: "green"},
 			{ID: "system_status_red", Name: "red"},
 			{ID: "system_status_yellow", Name: "yellow"},
@@ -31,13 +31,13 @@ var (
 			{ID: "system_status_unknown", Name: "unknown"},
 		},
 	}
-	applMgmtHealthChart = module.Chart{
+	applMgmtHealthChart = collectorapi.Chart{
 		ID:    "applmgmt_health_status",
 		Title: "VCSA Appliance Management Service (applmgmt) health status",
 		Units: "status",
 		Fam:   "appliance mgmt service",
 		Ctx:   "vcsa.applmgmt_health_status",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "applmgmt_status_green", Name: "green"},
 			{ID: "applmgmt_status_red", Name: "red"},
 			{ID: "applmgmt_status_yellow", Name: "yellow"},
@@ -46,13 +46,13 @@ var (
 			{ID: "applmgmt_status_unknown", Name: "unknown"},
 		},
 	}
-	loadHealthChart = module.Chart{
+	loadHealthChart = collectorapi.Chart{
 		ID:    "load_health_status",
 		Title: "VCSA Load health status",
 		Units: "status",
 		Fam:   "load",
 		Ctx:   "vcsa.load_health_status",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "load_status_green", Name: "green"},
 			{ID: "load_status_red", Name: "red"},
 			{ID: "load_status_yellow", Name: "yellow"},
@@ -61,13 +61,13 @@ var (
 			{ID: "load_status_unknown", Name: "unknown"},
 		},
 	}
-	memHealthChart = module.Chart{
+	memHealthChart = collectorapi.Chart{
 		ID:    "mem_health_status",
 		Title: "VCSA Memory health status",
 		Units: "status",
 		Fam:   "mem",
 		Ctx:   "vcsa.mem_health_status",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "mem_status_green", Name: "green"},
 			{ID: "mem_status_red", Name: "red"},
 			{ID: "mem_status_yellow", Name: "yellow"},
@@ -76,13 +76,13 @@ var (
 			{ID: "mem_status_unknown", Name: "unknown"},
 		},
 	}
-	swapHealthChart = module.Chart{
+	swapHealthChart = collectorapi.Chart{
 		ID:    "swap_health_status",
 		Title: "VCSA Swap health status",
 		Units: "status",
 		Fam:   "swap",
 		Ctx:   "vcsa.swap_health_status",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "swap_status_green", Name: "green"},
 			{ID: "swap_status_red", Name: "red"},
 			{ID: "swap_status_yellow", Name: "yellow"},
@@ -91,13 +91,13 @@ var (
 			{ID: "swap_status_unknown", Name: "unknown"},
 		},
 	}
-	dbStorageHealthChart = module.Chart{
+	dbStorageHealthChart = collectorapi.Chart{
 		ID:    "database_storage_health_status",
 		Title: "VCSA Database Storage health status",
 		Units: "status",
 		Fam:   "db storage",
 		Ctx:   "vcsa.database_storage_health_status",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "database_storage_status_green", Name: "green"},
 			{ID: "database_storage_status_red", Name: "red"},
 			{ID: "database_storage_status_yellow", Name: "yellow"},
@@ -106,13 +106,13 @@ var (
 			{ID: "database_storage_status_unknown", Name: "unknown"},
 		},
 	}
-	storageHealthChart = module.Chart{
+	storageHealthChart = collectorapi.Chart{
 		ID:    "storage_health_status",
 		Title: "VCSA Storage health status",
 		Units: "status",
 		Fam:   "storage",
 		Ctx:   "vcsa.storage_health_status",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "storage_status_green", Name: "green"},
 			{ID: "storage_status_red", Name: "red"},
 			{ID: "storage_status_yellow", Name: "yellow"},
@@ -121,13 +121,13 @@ var (
 			{ID: "storage_status_unknown", Name: "unknown"},
 		},
 	}
-	softwarePackagesHealthChart = module.Chart{
+	softwarePackagesHealthChart = collectorapi.Chart{
 		ID:    "software_packages_health_status",
 		Title: "VCSA Software Updates health status",
 		Units: "status",
 		Fam:   "software packages",
 		Ctx:   "vcsa.software_packages_health_status",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "software_packages_status_green", Name: "green"},
 			{ID: "software_packages_status_red", Name: "red"},
 			{ID: "software_packages_status_orange", Name: "orange"},

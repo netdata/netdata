@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioClientSessionConnections = module.Priority + iota
+	prioClientSessionConnections = collectorapi.Priority + iota
 	prioClientRequests
 
 	prioBackendsConnections
@@ -36,7 +36,7 @@ const (
 	prioChildProcessUptime
 )
 
-var varnishCharts = module.Charts{
+var varnishCharts = collectorapi.Charts{
 	clientSessionConnectionsChart.Copy(),
 	clientRequestsChart.Copy(),
 
@@ -58,267 +58,267 @@ var varnishCharts = module.Charts{
 	childProcessUptimeChart.Copy(),
 }
 
-var backendChartsTmpl = module.Charts{
+var backendChartsTmpl = collectorapi.Charts{
 	backendDataTransferChartTmpl.Copy(),
 }
 
-var storageChartsTmpl = module.Charts{
+var storageChartsTmpl = collectorapi.Charts{
 	storageSpaceUsageChartTmpl.Copy(),
 	storageAllocatedObjectsChartTmpl.Copy(),
 }
 
 // Client metrics
 var (
-	clientSessionConnectionsChart = module.Chart{
+	clientSessionConnectionsChart = collectorapi.Chart{
 		ID:       "client_session_connections",
 		Title:    "Client Session Connections",
 		Fam:      "client connections",
 		Units:    "connections/s",
 		Ctx:      "varnish.client_session_connections",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClientSessionConnections,
-		Dims: module.Dims{
-			{ID: "MAIN.sess_conn", Name: "accepted", Algo: module.Incremental},
-			{ID: "MAIN.sess_dropped", Name: "dropped", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.sess_conn", Name: "accepted", Algo: collectorapi.Incremental},
+			{ID: "MAIN.sess_dropped", Name: "dropped", Algo: collectorapi.Incremental},
 		},
 	}
 
-	clientRequestsChart = module.Chart{
+	clientRequestsChart = collectorapi.Chart{
 		ID:       "client_requests",
 		Title:    "Client Requests",
 		Fam:      "client requests",
 		Units:    "requests/s",
 		Ctx:      "varnish.client_requests",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClientRequests,
-		Dims: module.Dims{
-			{ID: "MAIN.client_req", Name: "received", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.client_req", Name: "received", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 // Cache activity
 var (
-	cacheHitRatioTotalChart = module.Chart{
+	cacheHitRatioTotalChart = collectorapi.Chart{
 		ID:       "cache_hit_ratio_total",
 		Title:    "Cache Hit Ratio Total",
 		Fam:      "cache activity",
 		Units:    "percent",
 		Ctx:      "varnish.cache_hit_ratio_total",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCacheHitRatioTotal,
-		Dims: module.Dims{
-			{ID: "MAIN.cache_hit", Name: "hit", Algo: module.PercentOfAbsolute},
-			{ID: "MAIN.cache_miss", Name: "miss", Algo: module.PercentOfAbsolute},
-			{ID: "MAIN.cache_hitpass", Name: "hitpass", Algo: module.PercentOfAbsolute},
-			{ID: "MAIN.cache_hitmiss", Name: "hitmiss", Algo: module.PercentOfAbsolute},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.cache_hit", Name: "hit", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "MAIN.cache_miss", Name: "miss", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "MAIN.cache_hitpass", Name: "hitpass", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "MAIN.cache_hitmiss", Name: "hitmiss", Algo: collectorapi.PercentOfAbsolute},
 		},
 	}
-	cacheHitRatioDeltaChart = module.Chart{
+	cacheHitRatioDeltaChart = collectorapi.Chart{
 		ID:       "cache_hit_ratio_delta",
 		Title:    "Cache Hit Ratio Current Poll",
 		Fam:      "cache activity",
 		Units:    "percent",
 		Ctx:      "varnish.cache_hit_ratio_delta",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCacheHitRatioDelta,
-		Dims: module.Dims{
-			{ID: "MAIN.cache_hit", Name: "hit", Algo: module.PercentOfIncremental},
-			{ID: "MAIN.cache_miss", Name: "miss", Algo: module.PercentOfIncremental},
-			{ID: "MAIN.cache_hitpass", Name: "hitpass", Algo: module.PercentOfIncremental},
-			{ID: "MAIN.cache_hitmiss", Name: "hitmiss", Algo: module.PercentOfIncremental},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.cache_hit", Name: "hit", Algo: collectorapi.PercentOfIncremental},
+			{ID: "MAIN.cache_miss", Name: "miss", Algo: collectorapi.PercentOfIncremental},
+			{ID: "MAIN.cache_hitpass", Name: "hitpass", Algo: collectorapi.PercentOfIncremental},
+			{ID: "MAIN.cache_hitmiss", Name: "hitmiss", Algo: collectorapi.PercentOfIncremental},
 		},
 	}
-	cachedObjectsExpiredChart = module.Chart{
+	cachedObjectsExpiredChart = collectorapi.Chart{
 		ID:       "cache_expired_objects",
 		Title:    "Cache Expired Objects",
 		Fam:      "cache activity",
 		Units:    "objects/s",
 		Ctx:      "varnish.cache_expired_objects",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioCacheExpiredObjects,
-		Dims: module.Dims{
-			{ID: "MAIN.n_expired", Name: "expired", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.n_expired", Name: "expired", Algo: collectorapi.Incremental},
 		},
 	}
-	cacheLRUActivityChart = module.Chart{
+	cacheLRUActivityChart = collectorapi.Chart{
 		ID:       "cache_lru_activity",
 		Title:    "Cache LRU Activity",
 		Fam:      "cache activity",
 		Units:    "objects/s",
 		Ctx:      "varnish.cache_lru_activity",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioCacheLRUActivity,
-		Dims: module.Dims{
-			{ID: "MAIN.n_lru_nuked", Name: "nuked", Algo: module.Incremental},
-			{ID: "MAIN.n_lru_moved", Name: "moved", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.n_lru_nuked", Name: "nuked", Algo: collectorapi.Incremental},
+			{ID: "MAIN.n_lru_moved", Name: "moved", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 // Threads
 var (
-	threadsTotalChart = module.Chart{
+	threadsTotalChart = collectorapi.Chart{
 		ID:       "threads",
 		Title:    "Threads In All Pools",
 		Fam:      "threads",
 		Units:    "threads",
 		Ctx:      "varnish.threads",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioThreadsTotal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "MAIN.threads", Name: "threads"},
 		},
 	}
-	threadManagementActivityChart = module.Chart{
+	threadManagementActivityChart = collectorapi.Chart{
 		ID:       "thread_management_activity",
 		Title:    "Thread Management Activity",
 		Fam:      "threads",
 		Units:    "threads/s",
 		Ctx:      "varnish.thread_management_activity",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioThreadManagementActivity,
-		Dims: module.Dims{
-			{ID: "MAIN.threads_created", Name: "created", Algo: module.Incremental},
-			{ID: "MAIN.threads_failed", Name: "failed", Algo: module.Incremental},
-			{ID: "MAIN.threads_destroyed", Name: "destroyed", Algo: module.Incremental},
-			{ID: "MAIN.threads_limited", Name: "limited", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.threads_created", Name: "created", Algo: collectorapi.Incremental},
+			{ID: "MAIN.threads_failed", Name: "failed", Algo: collectorapi.Incremental},
+			{ID: "MAIN.threads_destroyed", Name: "destroyed", Algo: collectorapi.Incremental},
+			{ID: "MAIN.threads_limited", Name: "limited", Algo: collectorapi.Incremental},
 		},
 	}
-	threadQueueLenChart = module.Chart{
+	threadQueueLenChart = collectorapi.Chart{
 		ID:       "thread_queue_len",
 		Title:    "Session Queue Length",
 		Fam:      "threads",
 		Units:    "requests",
 		Ctx:      "varnish.thread_queue_len",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioThreadQueueLen,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "MAIN.thread_queue_len", Name: "queue_len"},
 		},
 	}
 )
 
 var (
-	backendConnectionsChart = module.Chart{
+	backendConnectionsChart = collectorapi.Chart{
 		ID:       "backends_connections",
 		Title:    "Backend Connections",
 		Fam:      "backend connections",
 		Units:    "connections/s",
 		Ctx:      "varnish.backends_connections",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioBackendsConnections,
-		Dims: module.Dims{
-			{ID: "MAIN.backend_conn", Name: "successful", Algo: module.Incremental},
-			{ID: "MAIN.backend_unhealthy", Name: "unhealthy", Algo: module.Incremental},
-			{ID: "MAIN.backend_busy", Name: "busy", Algo: module.Incremental},
-			{ID: "MAIN.backend_fail", Name: "failed", Algo: module.Incremental},
-			{ID: "MAIN.backend_reuse", Name: "reused", Algo: module.Incremental},
-			{ID: "MAIN.backend_recycle", Name: "recycled", Algo: module.Incremental},
-			{ID: "MAIN.backend_retry", Name: "retry", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.backend_conn", Name: "successful", Algo: collectorapi.Incremental},
+			{ID: "MAIN.backend_unhealthy", Name: "unhealthy", Algo: collectorapi.Incremental},
+			{ID: "MAIN.backend_busy", Name: "busy", Algo: collectorapi.Incremental},
+			{ID: "MAIN.backend_fail", Name: "failed", Algo: collectorapi.Incremental},
+			{ID: "MAIN.backend_reuse", Name: "reused", Algo: collectorapi.Incremental},
+			{ID: "MAIN.backend_recycle", Name: "recycled", Algo: collectorapi.Incremental},
+			{ID: "MAIN.backend_retry", Name: "retry", Algo: collectorapi.Incremental},
 		},
 	}
-	backendRequestsChart = module.Chart{
+	backendRequestsChart = collectorapi.Chart{
 		ID:       "backends_requests",
 		Title:    "Backend Requests",
 		Fam:      "backend requests",
 		Units:    "requests/s",
 		Ctx:      "varnish.backends_requests",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioBackendsRequests,
-		Dims: module.Dims{
-			{ID: "MAIN.backend_req", Name: "sent", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.backend_req", Name: "sent", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 // ESI
 var (
-	esiParsingIssuesChart = module.Chart{
+	esiParsingIssuesChart = collectorapi.Chart{
 		ID:       "esi_parsing_issues",
 		Title:    "ESI Parsing Issues",
 		Fam:      "esi",
 		Units:    "issues/s",
 		Ctx:      "varnish.esi_parsing_issues",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioEsiStatistics,
-		Dims: module.Dims{
-			{ID: "MAIN.esi_errors", Name: "errors", Algo: module.Incremental},
-			{ID: "MAIN.esi_warnings", Name: "warnings", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "MAIN.esi_errors", Name: "errors", Algo: collectorapi.Incremental},
+			{ID: "MAIN.esi_warnings", Name: "warnings", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 // Uptime
 var (
-	mgmtProcessUptimeChart = module.Chart{
+	mgmtProcessUptimeChart = collectorapi.Chart{
 		ID:       "mgmt_process_uptime",
 		Title:    "Management Process Uptime",
 		Fam:      "uptime",
 		Units:    "seconds",
 		Ctx:      "varnish.mgmt_process_uptime",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioMgmtProcessUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "MGT.uptime", Name: "uptime"},
 		},
 	}
-	childProcessUptimeChart = module.Chart{
+	childProcessUptimeChart = collectorapi.Chart{
 		ID:       "child_process_uptime",
 		Title:    "Child Process Uptime",
 		Fam:      "uptime",
 		Units:    "seconds",
 		Ctx:      "varnish.child_process_uptime",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioChildProcessUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "MAIN.uptime", Name: "uptime"},
 		},
 	}
 )
 
 var (
-	backendDataTransferChartTmpl = module.Chart{
+	backendDataTransferChartTmpl = collectorapi.Chart{
 		ID:       "backend_%s_data_transfer",
 		Title:    "Backend Data Transfer",
 		Fam:      "backend traffic",
 		Units:    "bytes/s",
 		Ctx:      "varnish.backend_data_transfer",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioBackendDataTransfer,
-		Dims: module.Dims{
-			{ID: "VBE.%s.bereq_hdrbytes", Name: "req_header", Algo: module.Incremental},
-			{ID: "VBE.%s.bereq_bodybytes", Name: "req_body", Algo: module.Incremental},
-			{ID: "VBE.%s.beresp_hdrbytes", Name: "resp_header", Algo: module.Incremental, Mul: -1},
-			{ID: "VBE.%s.beresp_bodybytes", Name: "resp_body", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "VBE.%s.bereq_hdrbytes", Name: "req_header", Algo: collectorapi.Incremental},
+			{ID: "VBE.%s.bereq_bodybytes", Name: "req_body", Algo: collectorapi.Incremental},
+			{ID: "VBE.%s.beresp_hdrbytes", Name: "resp_header", Algo: collectorapi.Incremental, Mul: -1},
+			{ID: "VBE.%s.beresp_bodybytes", Name: "resp_body", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
 )
 
 var (
-	storageSpaceUsageChartTmpl = module.Chart{
+	storageSpaceUsageChartTmpl = collectorapi.Chart{
 		ID:       "storage_%s_usage",
 		Title:    "Storage Space Usage",
 		Fam:      "storage usage",
 		Units:    "bytes",
 		Ctx:      "varnish.storage_space_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioStorageSpaceUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "%s.g_space", Name: "free"},
 			{ID: "%s.g_bytes", Name: "used"},
 		},
 	}
 
-	storageAllocatedObjectsChartTmpl = module.Chart{
+	storageAllocatedObjectsChartTmpl = collectorapi.Chart{
 		ID:       "storage_%s_allocated_objects",
 		Title:    "Storage Allocated Objects",
 		Fam:      "storage usage",
 		Units:    "objects",
 		Ctx:      "varnish.storage_allocated_objects",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioStorageAllocatedObjects,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "%s.g_alloc", Name: "allocated"},
 		},
 	}
@@ -329,7 +329,7 @@ func (c *Collector) addBackendCharts(fullName string) {
 
 	for _, chart := range *charts {
 		chart.ID = cleanChartID(fmt.Sprintf(chart.ID, fullName))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "backend", Value: fullName},
 		}
 		for _, dim := range chart.Dims {
@@ -348,7 +348,7 @@ func (c *Collector) addStorageCharts(name string) {
 
 	for _, chart := range *charts {
 		chart.ID = cleanChartID(fmt.Sprintf(chart.ID, name))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "storage", Value: name},
 		}
 		for _, dim := range chart.Dims {

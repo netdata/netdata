@@ -647,8 +647,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     size_t dim_id;
     size_t dimensions = 0;
     struct rda_item *rda = rda_base;
-    total_number collected_total = 0;
-    total_number last_collected_total = 0;
+    NETDATA_DOUBLE collected_total = 0.0;
+    NETDATA_DOUBLE last_collected_total = 0.0;
     rrddim_foreach_read(rd, st) {
         if(rd_dfe.counter >= rda_slots)
             break;
@@ -664,22 +664,25 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         if(likely(rrddim_check_updated(rd))) {
             // if the new is smaller than the old (an overflow, or reset), set the old equal to the new
             // to reset the calculation (it will give zero as the calculation for this second)
-            if(unlikely(rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL && rd->collector.last_collected_value > rd->collector.collected_value)) {
-                netdata_log_debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
+            if(unlikely(rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL && rrddim_last_collected_as_double(rd) > rrddim_collected_as_double(rd))) {
+                netdata_log_debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " NETDATA_DOUBLE_FORMAT ", current = " NETDATA_DOUBLE_FORMAT
                                   , rrdset_id(st)
                                       , rrddim_name(rd)
-                                      , rd->collector.last_collected_value
-                                  , rd->collector.collected_value
+                                      , rrddim_last_collected_as_double(rd)
+                                  , rrddim_collected_as_double(rd)
                 );
 
                 if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
                     rda->reset_or_overflow = true;
 
-                rd->collector.last_collected_value = rd->collector.collected_value;
+                if(rrddim_is_float(rd))
+                    rrddim_set_last_collected_float(rd, rrddim_collected_as_double(rd));
+                else
+                    rrddim_set_last_collected_int(rd, rd->collector.collected.i.collected_value);
             }
 
-            last_collected_total += rd->collector.last_collected_value;
-            collected_total += rd->collector.collected_value;
+            last_collected_total += rrddim_last_collected_as_double(rd);
+            collected_total += rrddim_collected_as_double(rd);
 
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
                 netdata_log_error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
@@ -712,30 +715,30 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         }
 
         rrdset_debug(st, "%s: START "
-                         " last_collected_value = " COLLECTED_NUMBER_FORMAT
-                         " collected_value = " COLLECTED_NUMBER_FORMAT
+                         " last_collected_value = " NETDATA_DOUBLE_FORMAT
+                         " collected_value = " NETDATA_DOUBLE_FORMAT
                          " last_calculated_value = " NETDATA_DOUBLE_FORMAT
                          " calculated_value = " NETDATA_DOUBLE_FORMAT
                      , rrddim_name(rd)
-                         , rd->collector.last_collected_value
-                     , rd->collector.collected_value
+                         , rrddim_last_collected_as_double(rd)
+                     , rrddim_collected_as_double(rd)
                      , rd->collector.last_calculated_value
                      , rd->collector.calculated_value
         );
 
         switch(rd->algorithm) {
             case RRD_ALGORITHM_ABSOLUTE:
-                rd->collector.calculated_value = (NETDATA_DOUBLE)rd->collector.collected_value
+                rd->collector.calculated_value = rrddim_collected_as_double(rd)
                                                  * (NETDATA_DOUBLE)rd->multiplier
                                                  / (NETDATA_DOUBLE)rd->divisor;
 
                 rrdset_debug(st, "%s: CALC ABS/ABS-NO-IN " NETDATA_DOUBLE_FORMAT " = "
-                             COLLECTED_NUMBER_FORMAT
+                             NETDATA_DOUBLE_FORMAT
                                  " * " NETDATA_DOUBLE_FORMAT
                                  " / " NETDATA_DOUBLE_FORMAT
                              , rrddim_name(rd)
-                                 , rd->collector.calculated_value
-                             , rd->collector.collected_value
+                             , rd->collector.calculated_value
+                             , rrddim_collected_as_double(rd)
                              , (NETDATA_DOUBLE)rd->multiplier
                              , (NETDATA_DOUBLE)rd->divisor
                 );
@@ -749,16 +752,16 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                     // over the total of all dimensions
                     rd->collector.calculated_value =
                         (NETDATA_DOUBLE)100
-                        * (NETDATA_DOUBLE)rd->collector.collected_value
+                        * rrddim_collected_as_double(rd)
                         / (NETDATA_DOUBLE)collected_total;
 
                 rrdset_debug(st, "%s: CALC PCENT-ROW " NETDATA_DOUBLE_FORMAT " = 100"
-                                 " * " COLLECTED_NUMBER_FORMAT
-                                 " / " COLLECTED_NUMBER_FORMAT
+                                 " * " NETDATA_DOUBLE_FORMAT
+                                 " / " NETDATA_DOUBLE_FORMAT
                              , rrddim_name(rd)
                                  , rd->collector.calculated_value
-                             , rd->collector.collected_value
-                             , collected_total
+                             , rrddim_collected_as_double(rd)
+                             , (NETDATA_DOUBLE)collected_total
                 );
                 break;
 
@@ -768,64 +771,64 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                     continue;
                 }
 
-                // If the new is smaller than the old (an overflow, or reset), set the old equal to the new
-                // to reset the calculation (it will give zero as the calculation for this second).
-                // It is imperative to set the comparison to uint64_t since type collected_number is signed and
-                // produces wrong results as far as incremental counters are concerned.
-                if(unlikely((uint64_t)rd->collector.last_collected_value > (uint64_t)rd->collector.collected_value)) {
-                    netdata_log_debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
-                                      , rrdset_id(st)
-                                          , rrddim_name(rd)
-                                          , rd->collector.last_collected_value
-                                      , rd->collector.collected_value);
+                if(rrddim_is_int(rd)) {
+                    uint64_t last = (uint64_t)rd->collector.collected.i.last_collected_value;
+                    uint64_t new = (uint64_t)rd->collector.collected.i.collected_value;
+                    uint64_t max = (uint64_t)rd->collector.collected.i.collected_value_max;
 
-                    if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
-                        rda->reset_or_overflow = true;
+                    // If the new is smaller than the old (overflow/reset), handle wrap
+                    if(unlikely(last > new)) {
+                        netdata_log_debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " NETDATA_DOUBLE_FORMAT ", current = " NETDATA_DOUBLE_FORMAT
+                                          , rrdset_id(st)
+                                              , rrddim_name(rd)
+                                          , rrddim_last_collected_as_double(rd)
+                                          , rrddim_collected_as_double(rd));
 
-                    uint64_t last = (uint64_t)rd->collector.last_collected_value;
-                    uint64_t new = (uint64_t)rd->collector.collected_value;
-                    uint64_t max = (uint64_t)rd->collector.collected_value_max;
-                    uint64_t cap = 0;
+                        if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                            rda->reset_or_overflow = true;
 
-                    // Signed values are handled by exploiting two's complement which will produce positive deltas
-                    if (max > 0x00000000FFFFFFFFULL)
-                        cap = 0xFFFFFFFFFFFFFFFFULL; // handles signed and unsigned 64-bit counters
-                    else
-                        cap = 0x00000000FFFFFFFFULL; // handles signed and unsigned 32-bit counters
+                        uint64_t cap = (max > 0x00000000FFFFFFFFULL) ? 0xFFFFFFFFFFFFFFFFULL : 0x00000000FFFFFFFFULL;
+                        uint64_t delta = cap - last + new;
+                        uint64_t max_acceptable_rate = (cap / 100) * MAX_INCREMENTAL_PERCENT_RATE;
 
-                    uint64_t delta = cap - last + new;
-                    uint64_t max_acceptable_rate = (cap / 100) * MAX_INCREMENTAL_PERCENT_RATE;
-
-                    // If the delta is less than the maximum acceptable rate and the previous value was near the cap
-                    // then this is an overflow. There can be false positives such that a reset is detected as an
-                    // overflow.
-                    // TODO: remember recent history of rates and compare with current rate to reduce this chance.
-                    if (delta < max_acceptable_rate) {
+                        if (delta < max_acceptable_rate) {
+                            rd->collector.calculated_value +=
+                                (NETDATA_DOUBLE) delta
+                                * (NETDATA_DOUBLE) rd->multiplier
+                                / (NETDATA_DOUBLE) rd->divisor;
+                        } else {
+                            rd->collector.calculated_value += 0;
+                        }
+                    }
+                    else {
                         rd->collector.calculated_value +=
-                            (NETDATA_DOUBLE) delta
+                            (NETDATA_DOUBLE)((int64_t)(rd->collector.collected.i.collected_value - rd->collector.collected.i.last_collected_value))
                             * (NETDATA_DOUBLE) rd->multiplier
                             / (NETDATA_DOUBLE) rd->divisor;
-                    } else {
-                        // This is a reset. Any overflow with a rate greater than MAX_INCREMENTAL_PERCENT_RATE will also
-                        // be detected as a reset instead.
-                        rd->collector.calculated_value += (NETDATA_DOUBLE)0;
                     }
                 }
                 else {
-                    rd->collector.calculated_value +=
-                        (NETDATA_DOUBLE) (rd->collector.collected_value - rd->collector.last_collected_value)
-                        * (NETDATA_DOUBLE) rd->multiplier
-                        / (NETDATA_DOUBLE) rd->divisor;
+                    NETDATA_DOUBLE last = rrddim_last_collected_as_double(rd);
+                    NETDATA_DOUBLE cur  = rrddim_collected_as_double(rd);
+                    if(unlikely(cur < last)) {
+                        if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                            rda->reset_or_overflow = true;
+                        rd->collector.calculated_value += 0;
+                    }
+                    else {
+                        rd->collector.calculated_value +=
+                            (cur - last) * (NETDATA_DOUBLE) rd->multiplier / (NETDATA_DOUBLE) rd->divisor;
+                    }
                 }
 
                 rrdset_debug(st, "%s: CALC INC PRE " NETDATA_DOUBLE_FORMAT " = ("
-                             COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
+                             NETDATA_DOUBLE_FORMAT " - " NETDATA_DOUBLE_FORMAT
                                  ")"
                                  " * " NETDATA_DOUBLE_FORMAT
                                  " / " NETDATA_DOUBLE_FORMAT
                              , rrddim_name(rd)
                                  , rd->collector.calculated_value
-                             , rd->collector.collected_value, rd->collector.last_collected_value
+                             , rrddim_collected_as_double(rd), rrddim_last_collected_as_double(rd)
                              , (NETDATA_DOUBLE)rd->multiplier
                              , (NETDATA_DOUBLE)rd->divisor
                 );
@@ -844,16 +847,16 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                 else
                     rd->collector.calculated_value =
                         (NETDATA_DOUBLE)100
-                        * (NETDATA_DOUBLE)(rd->collector.collected_value - rd->collector.last_collected_value)
+                        * (NETDATA_DOUBLE)(rrddim_collected_as_double(rd) - rrddim_last_collected_as_double(rd))
                         / (NETDATA_DOUBLE)(collected_total - last_collected_total);
 
                 rrdset_debug(st, "%s: CALC PCENT-DIFF " NETDATA_DOUBLE_FORMAT " = 100"
-                                 " * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
-                                 " / (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
+                                 " * (" NETDATA_DOUBLE_FORMAT " - " NETDATA_DOUBLE_FORMAT ")"
+                                 " / (" NETDATA_DOUBLE_FORMAT " - " NETDATA_DOUBLE_FORMAT ")"
                              , rrddim_name(rd)
                                  , rd->collector.calculated_value
-                             , rd->collector.collected_value, rd->collector.last_collected_value
-                             , collected_total, last_collected_total
+                             , rrddim_collected_as_double(rd), rrddim_last_collected_as_double(rd)
+                             , (NETDATA_DOUBLE)collected_total, (NETDATA_DOUBLE)last_collected_total
                 );
                 break;
 
@@ -870,13 +873,13 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         }
 
         rrdset_debug(st, "%s: PHASE2 "
-                         " last_collected_value = " COLLECTED_NUMBER_FORMAT
-                         " collected_value = " COLLECTED_NUMBER_FORMAT
+                         " last_collected_value = " NETDATA_DOUBLE_FORMAT
+                         " collected_value = " NETDATA_DOUBLE_FORMAT
                          " last_calculated_value = " NETDATA_DOUBLE_FORMAT
                          " calculated_value = " NETDATA_DOUBLE_FORMAT
                      , rrddim_name(rd)
-                         , rd->collector.last_collected_value
-                     , rd->collector.collected_value
+                         , rrddim_last_collected_as_double(rd)
+                     , rrddim_collected_as_double(rd)
                      , rd->collector.last_calculated_value
                      , rd->collector.calculated_value
         );
@@ -913,9 +916,12 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         if(unlikely(!rrddim_check_updated(rd)))
             continue;
 
-        rrdset_debug(st, "%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", rrddim_name(rd), rd->collector.last_collected_value, rd->collector.collected_value);
+        rrdset_debug(st, "%s: setting last_collected_value (old: " NETDATA_DOUBLE_FORMAT ") to last_collected_value (new: " NETDATA_DOUBLE_FORMAT ")", rrddim_name(rd), rrddim_last_collected_as_double(rd), rrddim_collected_as_double(rd));
 
-        rd->collector.last_collected_value = rd->collector.collected_value;
+        if(rrddim_is_float(rd))
+            rrddim_set_last_collected_float(rd, rrddim_collected_as_double(rd));
+        else
+            rrddim_set_last_collected_int(rd, rd->collector.collected.i.collected_value);
 
         switch(rd->algorithm) {
             case RRD_ALGORITHM_INCREMENTAL:
@@ -947,17 +953,20 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         }
 
         rd->collector.calculated_value = 0;
-        rd->collector.collected_value = 0;
+        if(rrddim_is_float(rd))
+            rrddim_set_collected_float(rd, 0.0);
+        else
+            rrddim_set_collected_int(rd, 0);
         rrddim_clear_updated(rd);
 
         rrdset_debug(st, "%s: END "
-                         " last_collected_value = " COLLECTED_NUMBER_FORMAT
-                         " collected_value = " COLLECTED_NUMBER_FORMAT
+                         " last_collected_value = " NETDATA_DOUBLE_FORMAT
+                         " collected_value = " NETDATA_DOUBLE_FORMAT
                          " last_calculated_value = " NETDATA_DOUBLE_FORMAT
                          " calculated_value = " NETDATA_DOUBLE_FORMAT
                      , rrddim_name(rd)
-                         , rd->collector.last_collected_value
-                     , rd->collector.collected_value
+                         , rrddim_last_collected_as_double(rd)
+                     , rrddim_collected_as_double(rd)
                      , rd->collector.last_calculated_value
                      , rd->collector.calculated_value
         );

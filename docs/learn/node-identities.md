@@ -292,3 +292,49 @@ is ephemeral node = no    # Revert to permanent (default)
 Changes apply immediately. Ephemerality is stored as a host label and propagates to Parents and Netdata Cloud.
 
 </details>
+
+<details>
+<summary>How do I rename a node?</summary>
+
+A node's display name is determined by the `hostname` setting in `netdata.conf` under the `[global]` section. To rename a node, edit `netdata.conf` and set:
+
+```ini
+[global]
+    hostname = my-new-node-name
+```
+
+Use the [`edit-config` script](/docs/netdata-agent/configuration/README.md#edit-configuration-files) to safely edit configuration files, then [restart Netdata](/docs/netdata-agent/start-stop-restart.md).
+
+:::note
+
+Changing the hostname does **not** change the Machine GUID, Node ID, or Claimed ID. The node remains the same entity in Netdata Cloud and on Parent nodes. Historical metrics are preserved because they are keyed by Machine GUID, not hostname.
+
+:::
+
+:::warning
+
+**Do not use `NETDATA_HOSTNAME` as an environment variable to set the hostname.**
+
+`NETDATA_HOSTNAME` is an output variable set by the Netdata daemon at runtime for use by plugins and scripts — it is not an input configuration. To override a node's name within Netdata, use the `hostname` setting in `netdata.conf`. If `hostname` is not set, Netdata falls back to the system/container hostname.
+
+:::
+
+The updated hostname propagates to Parent nodes and Netdata Cloud on the next connection.
+
+For virtual nodes, see [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity).
+
+</details>
+
+<a id="does-renaming-a-virtual-node-change-its-identity"></a>
+<details>
+<summary>Does renaming a virtual node change its identity?</summary>
+
+A virtual node's identity is determined by its **`guid`** field — not its `hostname` or `name`. The fields behave as follows:
+
+- **`guid`** — This is the vnode's identity. Changing it creates an entirely new node in Netdata Cloud. The old vnode's historical data remains under the old GUID but is no longer associated with the new one.
+- **`hostname`** — This is used as the internal lookup key in the Agent and as the display name in dashboards. Changing `hostname` while keeping the same `guid` renames the display without creating a new node identity.
+- **`name`** — The Agent ignores this field. When set to a value different from `hostname`, the Agent logs a warning and overrides it with `hostname`.
+
+**To preserve data continuity when renaming a vnode**, change only the `hostname` field in the YAML config file under `/etc/netdata/vnodes/` and keep the `guid` unchanged. If a true identity change is needed, accept that historical data belongs to the old identity.
+
+</details>

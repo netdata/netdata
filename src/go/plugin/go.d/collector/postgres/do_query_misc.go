@@ -31,6 +31,17 @@ func (c *Collector) doQueryIsSuperUser() (bool, error) {
 	return v, nil
 }
 
+func (c *Collector) doQueryCanExecutePgLsDir() (bool, error) {
+	q := queryCanExecutePgLsDir()
+
+	var v bool
+	if err := c.doQueryRow(q, &v); err != nil {
+		return false, err
+	}
+
+	return v, nil
+}
+
 func (c *Collector) doQueryPGIsInRecovery() (bool, error) {
 	q := queryPGIsInRecovery()
 
@@ -65,6 +76,17 @@ func (c *Collector) doQuerySettingsMaxLocksHeld() (int64, error) {
 }
 
 const connErrMax = 3
+
+var unregisterConnConfig = stdlib.UnregisterConnConfig
+
+func closeDBAndUnregisterConnConfig(db *sql.DB, connStr string) {
+	if db != nil {
+		_ = db.Close()
+	}
+	if connStr != "" {
+		unregisterConnConfig(connStr)
+	}
+}
 
 func (c *Collector) doQueryQueryableDatabases() error {
 	q := queryQueryableDatabaseList()
@@ -105,8 +127,7 @@ func (c *Collector) doQueryQueryableDatabases() error {
 		if err != nil {
 			c.Warning(err)
 			conn.connErrors++
-			_ = db.Close()
-			stdlib.UnregisterConnConfig(connStr)
+			closeDBAndUnregisterConnConfig(db, connStr)
 			continue
 		}
 
@@ -114,8 +135,7 @@ func (c *Collector) doQueryQueryableDatabases() error {
 		if err != nil {
 			c.Warning(err)
 			conn.connErrors++
-			_ = db.Close()
-			stdlib.UnregisterConnConfig(connStr)
+			closeDBAndUnregisterConnConfig(db, connStr)
 			continue
 		}
 
@@ -123,8 +143,7 @@ func (c *Collector) doQueryQueryableDatabases() error {
 			c.Warningf("database '%s' has too many user tables(%d/%d)/indexes(%d/%d), skipping it",
 				dbname, tables, c.MaxDBTables, indexes, c.MaxDBIndexes)
 			conn.connErrors = connErrMax
-			_ = db.Close()
-			stdlib.UnregisterConnConfig(connStr)
+			closeDBAndUnregisterConnConfig(db, connStr)
 			continue
 		}
 

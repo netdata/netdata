@@ -19,7 +19,6 @@ modules:
         - libreswan
         - network
         - ipsec
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Libreswan performance for optimal IPsec VPN operations. Improve your VPN operations with Netdata''s real-time metrics and built-in alerts."

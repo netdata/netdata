@@ -1,39 +1,34 @@
 #!/usr/bin/env python3
 
 import json
-import os
 import re
 import sys
 from copy import deepcopy
-from pathlib import Path
 
-from jsonschema import Draft7Validator, ValidationError
-from referencing import Registry, Resource
-from referencing.jsonschema import DRAFT7
-from ruamel.yaml import YAML, YAMLError
+from jsonschema import ValidationError
 
-AGENT_REPO = 'netdata/netdata'
+from _common import (
+    AGENT_REPO,
+    INTEGRATIONS_PATH,
+    METADATA_PATTERN,
+    REPO_PATH,
+    debug,
+    fail_on_warnings,
+    load_collectors,
+    load_yaml,
+    make_id,
+    make_validator,
+    warn,
+)
 
-INTEGRATIONS_PATH = Path(__file__).parent
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
 JSON_PATH = INTEGRATIONS_PATH / 'integrations.json'
 CATEGORIES_FILE = INTEGRATIONS_PATH / 'categories.yaml'
-REPO_PATH = INTEGRATIONS_PATH.parent
-SCHEMA_PATH = INTEGRATIONS_PATH / 'schemas'
 DISTROS_FILE = REPO_PATH / '.github' / 'data' / 'distros.yml'
-METADATA_PATTERN = '*/metadata.yaml'
 
-COLLECTOR_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules' / 'websphere', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'scripts.d' / 'modules', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netdata-otel', True),
+FLOWS_SOURCES = [
+    (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'metadata.yaml', False),
 ]
 
 DEPLOY_SOURCES = [
@@ -60,7 +55,25 @@ AUTHENTICATION_SOURCES = [
     (AGENT_REPO, INTEGRATIONS_PATH / 'cloud-authentication' / 'metadata.yaml', False),
 ]
 
+SECRETSTORE_SOURCES = [
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'agent' / 'secrets' / 'secretstore' / 'backends', True),
+]
+
+SERVICE_DISCOVERY_SOURCES = [
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'discovery' / 'sdext' / 'discoverer', True),
+]
+
 COLLECTOR_RENDER_KEYS = [
+    'alerts',
+    'metrics',
+    'functions',
+    'overview',
+    'related_resources',
+    'setup',
+    'troubleshooting',
+]
+
+FLOWS_RENDER_KEYS = [
     'alerts',
     'metrics',
     'functions',
@@ -98,76 +111,34 @@ AUTHENTICATION_RENDER_KEYS = [
     'troubleshooting',
 ]
 
+SECRETSTORE_RENDER_KEYS = [
+    'overview',
+    'setup',
+    'collector_configs',
+    'troubleshooting',
+]
+
+SERVICE_DISCOVERY_RENDER_KEYS = [
+    'overview',
+    'setup',
+    'services',
+    'verify',
+    'troubleshooting',
+]
+
 CUSTOM_TAG_PATTERN = re.compile('\\{% if .*?%\\}.*?\\{% /if %\\}|\\{%.*?%\\}', flags=re.DOTALL)
 FIXUP_BLANK_PATTERN = re.compile('\\\\\\n *\\n')
 
-GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
-DEBUG = os.environ.get('DEBUG', False)
-
-
-def debug(msg):
-    if GITHUB_ACTIONS:
-        print(f':debug:{msg}')
-    elif DEBUG:
-        print(f'>>> {msg}')
-    else:
-        pass
-
-
-def warn(msg, path):
-    if GITHUB_ACTIONS:
-        print(f':warning file={path}:{msg}')
-    else:
-        print(f'!!! WARNING:{path}:{msg}')
-
-
-def retrieve_from_filesystem(uri):
-    path = SCHEMA_PATH / Path(uri)
-    contents = json.loads(path.read_text())
-    return Resource.from_contents(contents, DRAFT7)
-
-
-registry = Registry(retrieve=retrieve_from_filesystem)
-
-CATEGORY_VALIDATOR = Draft7Validator(
-    {'$ref': './categories.json#'},
-    registry=registry,
-)
-
-DEPLOY_VALIDATOR = Draft7Validator(
-    {'$ref': './deploy.json#'},
-    registry=registry,
-)
-
-EXPORTER_VALIDATOR = Draft7Validator(
-    {'$ref': './exporter.json#'},
-    registry=registry,
-)
-
-AGENT_NOTIFICATION_VALIDATOR = Draft7Validator(
-    {'$ref': './agent_notification.json#'},
-    registry=registry,
-)
-
-CLOUD_NOTIFICATION_VALIDATOR = Draft7Validator(
-    {'$ref': './cloud_notification.json#'},
-    registry=registry,
-)
-
-LOGS_VALIDATOR = Draft7Validator(
-    {'$ref': './logs.json#'},
-    registry=registry,
-)
-
-AUTHENTICATION_VALIDATOR = Draft7Validator(
-    {'$ref': './authentication.json#'},
-    registry=registry,
-)
-
-COLLECTOR_VALIDATOR = Draft7Validator(
-    {'$ref': './collector.json#'},
-    registry=registry,
-)
+CATEGORY_VALIDATOR = make_validator('./categories.json#')
+DEPLOY_VALIDATOR = make_validator('./deploy.json#')
+EXPORTER_VALIDATOR = make_validator('./exporter.json#')
+AGENT_NOTIFICATION_VALIDATOR = make_validator('./agent_notification.json#')
+CLOUD_NOTIFICATION_VALIDATOR = make_validator('./cloud_notification.json#')
+LOGS_VALIDATOR = make_validator('./logs.json#')
+AUTHENTICATION_VALIDATOR = make_validator('./authentication.json#')
+FLOWS_VALIDATOR = make_validator('./flows.json#')
+SECRETSTORE_VALIDATOR = make_validator('./secretstore.json#')
+SERVICE_DISCOVERY_VALIDATOR = make_validator('./service_discovery.json#')
 
 _jinja_env = False
 
@@ -191,7 +162,7 @@ def get_jinja_env():
             lstrip_blocks=True,
         )
 
-        _jinja_env.globals.update(strfy=strfy)
+        _jinja_env.globals.update(strfy=strfy, anchorfy=anchorfy)
 
     return _jinja_env
 
@@ -202,6 +173,38 @@ def strfy(value):
     if isinstance(value, str):
         return ' '.join([v.strip() for v in value.strip().split("\n") if v]).replace('|', '/')
     return value
+
+
+def anchorfy(value):
+    if value is None:
+        return ''
+
+    anchor = str(value).strip().lower()
+    anchor = re.sub(r'[^a-z0-9]+', '-', anchor)
+    anchor = re.sub(r'-{2,}', '-', anchor).strip('-')
+
+    return anchor
+
+
+def get_section_template_name(item, key):
+    integration_type = item.get('integration_type')
+
+    if key == 'setup':
+        if integration_type == 'secretstore':
+            return 'setup-secretstore.md'
+        if integration_type == 'service_discovery':
+            return 'setup-service_discovery.md'
+        if integration_type == 'logs':
+            return 'setup-logs.md'
+        return 'setup-generic.md'
+
+    if integration_type == 'service_discovery':
+        if key == 'services':
+            return 'sd-services.md'
+        if key == 'verify':
+            return 'sd-verify.md'
+
+    return f'{key}.md'
 
 
 def get_category_sets(categories):
@@ -223,42 +226,6 @@ def get_category_sets(categories):
     return (default, valid)
 
 
-def get_collector_metadata_entries():
-    ret = []
-
-    for r, d, m in COLLECTOR_SOURCES:
-        if d.exists() and d.is_dir() and m:
-            for item in d.glob(METADATA_PATTERN):
-                ret.append((r, item))
-        elif d.exists() and d.is_file() and not m:
-            if d.match(METADATA_PATTERN):
-                ret.append(d)
-
-    return ret
-
-
-def load_yaml(src):
-    yaml = YAML(typ='safe')
-
-    if not src.is_file():
-        warn(f'{src} is not a file.', src)
-        return False
-
-    try:
-        contents = src.read_text()
-    except (IOError, OSError):
-        warn(f'Failed to read {src}.', src)
-        return False
-
-    try:
-        data = yaml.load(contents)
-    except YAMLError:
-        warn(f'Failed to parse {src} as YAML.', src)
-        return False
-
-    return data
-
-
 def load_categories():
     categories = load_yaml(CATEGORIES_FILE)
 
@@ -268,37 +235,47 @@ def load_categories():
     try:
         CATEGORY_VALIDATOR.validate(categories)
     except ValidationError as e:
-        warn(f'Failed to validate {CATEGORIES_FILE} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', CATEGORIES_FILE)
+        warn(
+            f'Failed to validate {CATEGORIES_FILE} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            CATEGORIES_FILE)
         sys.exit(1)
 
     return categories
 
 
-def load_collectors():
+def load_flows():
     ret = []
 
-    entries = get_collector_metadata_entries()
+    for repo, path, match in FLOWS_SOURCES:
+        if match and path.exists() and path.is_dir():
+            files = list(path.glob(METADATA_PATTERN))
+        elif not match and path.exists() and path.is_file():
+            files = [path]
+        else:
+            files = []
 
-    for repo, path in entries:
-        debug(f'Loading {path}.')
-        data = load_yaml(path)
+        for file in files:
+            debug(f'Loading {file}.')
+            data = load_yaml(file)
 
-        if not data:
-            continue
+            if not data:
+                continue
 
-        try:
-            COLLECTOR_VALIDATOR.validate(data)
-        except ValidationError as e:
-            warn(f'Failed to validate {path} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', path)
-            continue
+            try:
+                FLOWS_VALIDATOR.validate(data)
+            except ValidationError as e:
+                warn(
+                    f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+                    file)
+                continue
 
-        for idx, item in enumerate(data['modules']):
-            item['meta']['plugin_name'] = data['plugin_name']
-            item['integration_type'] = 'collector'
-            item['_src_path'] = path
-            item['_repo'] = repo
-            item['_index'] = idx
-            ret.append(item)
+            for idx, item in enumerate(data['modules']):
+                item['meta']['plugin_name'] = data['plugin_name']
+                item['integration_type'] = 'flows'
+                item['_src_path'] = file
+                item['_repo'] = repo
+                item['_index'] = idx
+                ret.append(item)
 
     return ret
 
@@ -314,7 +291,9 @@ def _load_deploy_file(file, repo):
     try:
         DEPLOY_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     for idx, item in enumerate(data):
@@ -350,7 +329,9 @@ def _load_exporter_file(file, repo):
     try:
         EXPORTER_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -396,7 +377,9 @@ def _load_agent_notification_file(file, repo):
     try:
         AGENT_NOTIFICATION_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -442,7 +425,9 @@ def _load_cloud_notification_file(file, repo):
     try:
         CLOUD_NOTIFICATION_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -488,7 +473,9 @@ def _load_logs_file(file, repo):
     try:
         LOGS_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -534,7 +521,9 @@ def _load_authentication_file(file, repo):
     try:
         AUTHENTICATION_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -570,15 +559,100 @@ def load_authentications():
     return ret
 
 
-def make_id(meta):
-    if 'monitored_instance' in meta:
-        instance_name = meta['monitored_instance']['name'].replace(' ', '_')
-    elif 'instance_name' in meta:
-        instance_name = meta['instance_name']
-    else:
-        instance_name = '000_unknown'
+def _load_secretstore_file(file, repo):
+    debug(f'Loading {file}.')
+    data = load_yaml(file)
 
-    return f'{meta["plugin_name"]}-{meta["module_name"]}-{instance_name}'
+    if not data:
+        return []
+
+    try:
+        SECRETSTORE_VALIDATOR.validate(data)
+    except ValidationError as e:
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
+        return []
+
+    if 'id' in data:
+        data['integration_type'] = 'secretstore'
+        data['_src_path'] = file
+        data['_repo'] = repo
+        data['_index'] = 0
+
+        return [data]
+    else:
+        ret = []
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'secretstore'
+            item['_src_path'] = file
+            item['_repo'] = repo
+            item['_index'] = idx
+            ret.append(item)
+
+        return ret
+
+
+def load_secretstores():
+    ret = []
+
+    for repo, path, match in SECRETSTORE_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in path.glob(METADATA_PATTERN):
+                ret.extend(_load_secretstore_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_secretstore_file(path, repo))
+
+    return ret
+
+
+def _load_service_discovery_file(file, repo):
+    debug(f'Loading {file}.')
+    data = load_yaml(file)
+
+    if not data:
+        return []
+
+    try:
+        SERVICE_DISCOVERY_VALIDATOR.validate(data)
+    except ValidationError as e:
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
+        return []
+
+    if 'id' in data:
+        data['integration_type'] = 'service_discovery'
+        data['_src_path'] = file
+        data['_repo'] = repo
+        data['_index'] = 0
+
+        return [data]
+    else:
+        ret = []
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'service_discovery'
+            item['_src_path'] = file
+            item['_repo'] = repo
+            item['_index'] = idx
+            ret.append(item)
+
+        return ret
+
+
+def load_service_discoveries():
+    ret = []
+
+    for repo, path, match in SERVICE_DISCOVERY_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in path.glob(METADATA_PATTERN):
+                ret.extend(_load_service_discovery_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_service_discovery_file(path, repo))
+
+    return ret
 
 
 def make_edit_link(item):
@@ -633,8 +707,8 @@ def render_collectors(categories, collectors, ids):
     #   Level 2: plugin_name + module_name (all instances of that module)
     #   Level 3: plugin_name (all modules of that plugin)
     by_pm_instance = {}  # (plugin, module, instance) -> [items]
-    by_pm = {}           # (plugin, module) -> [items]
-    by_plugin = {}       # plugin -> [items]
+    by_pm = {}  # (plugin, module) -> [items]
+    by_plugin = {}  # plugin -> [items]
 
     for i in collectors:
         m = i['meta']
@@ -730,7 +804,7 @@ def render_collectors(categories, collectors, ids):
 
         for key in COLLECTOR_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, related=related, clean=False)
                 clean_data = template.render(entry=item, related=related, clean=True)
 
@@ -824,7 +898,7 @@ def render_exporters(categories, exporters, ids):
 
         for key in EXPORTER_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -866,7 +940,7 @@ def render_agent_notifications(categories, notifications, ids):
 
         for key in AGENT_NOTIFICATION_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
 
                 clean_data = template.render(entry=item, clean=True)
@@ -909,7 +983,7 @@ def render_cloud_notifications(categories, notifications, ids):
 
         for key in CLOUD_NOTIFICATION_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -933,6 +1007,53 @@ def render_cloud_notifications(categories, notifications, ids):
     return notifications, clean_notifications, ids
 
 
+def render_flows(categories, flows, ids):
+    debug('Generating flow IDs.')
+
+    for item in flows:
+        item['id'] = make_id(item['meta'])
+
+    debug('Sorting flows.')
+
+    sort_integrations(flows)
+
+    debug('Checking flow ids.')
+
+    flows, ids = dedupe_integrations(flows, ids)
+
+    clean_flows = []
+
+    for item in flows:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
+        for key in FLOWS_RENDER_KEYS:
+            if key in item.keys():
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
+                data = template.render(entry=item, clean=False)
+                clean_data = template.render(entry=item, clean=True)
+
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
+            else:
+                data = ''
+                clean_data = ''
+
+            item[key] = data
+            clean_item[key] = clean_data
+
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_flows.append(clean_item)
+
+    return flows, clean_flows, ids
+
+
 def render_logs(categories, logs, ids):
     debug('Sorting logs.')
 
@@ -951,7 +1072,7 @@ def render_logs(categories, logs, ids):
 
         for key in LOGS_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -994,7 +1115,7 @@ def render_authentications(categories, authentications, ids):
         for key in AUTHENTICATION_RENDER_KEYS:
 
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -1016,6 +1137,99 @@ def render_authentications(categories, authentications, ids):
         clean_authentications.append(clean_item)
 
     return authentications, clean_authentications, ids
+
+
+def render_secretstores(categories, secretstores, ids):
+    debug('Sorting secretstores.')
+
+    sort_integrations(secretstores)
+
+    debug('Checking secretstore ids.')
+
+    secretstores, ids = dedupe_integrations(secretstores, ids)
+
+    clean_secretstores = []
+
+    for item in secretstores:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+        collector_configs = item.get('collector_configs', {})
+        collector_configs_summary = {}
+        if isinstance(collector_configs, dict):
+            summary = collector_configs.get('summary', {})
+            if isinstance(summary, dict):
+                collector_configs_summary = deepcopy(summary)
+
+        item['collector_configs_summary'] = deepcopy(collector_configs_summary)
+        clean_item['collector_configs_summary'] = deepcopy(collector_configs_summary)
+
+        for key in SECRETSTORE_RENDER_KEYS:
+            if key in item.keys():
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
+                data = template.render(entry=item, clean=False)
+                clean_data = template.render(entry=item, clean=True)
+
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
+            else:
+                data = ''
+                clean_data = ''
+
+            item[key] = data
+            clean_item[key] = clean_data
+
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_secretstores.append(clean_item)
+
+    return secretstores, clean_secretstores, ids
+
+
+def render_service_discoveries(categories, service_discoveries, ids):
+    debug('Sorting service discoveries.')
+
+    sort_integrations(service_discoveries)
+
+    debug('Checking service discovery ids.')
+
+    service_discoveries, ids = dedupe_integrations(service_discoveries, ids)
+
+    clean_service_discoveries = []
+
+    for item in service_discoveries:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
+        for key in SERVICE_DISCOVERY_RENDER_KEYS:
+            if key in item.keys():
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
+                data = template.render(entry=item, clean=False)
+                clean_data = template.render(entry=item, clean=True)
+
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
+            else:
+                data = ''
+                clean_data = ''
+
+            item[key] = data
+            clean_item[key] = clean_data
+
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_service_discoveries.append(clean_item)
+
+    return service_discoveries, clean_service_discoveries, ids
 
 
 def convert_local_links(text, prefix):
@@ -1048,7 +1262,10 @@ def main():
     agent_notifications = load_agent_notifications()
     cloud_notifications = load_cloud_notifications()
     logs = load_logs()
+    flows = load_flows()
     authentications = load_authentications()
+    secretstores = load_secretstores()
+    service_discoveries = load_service_discoveries()
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
@@ -1058,13 +1275,19 @@ def main():
     cloud_notifications, clean_cloud_notifications, ids = render_cloud_notifications(categories, cloud_notifications,
                                                                                      ids)
     logs, clean_logs, ids = render_logs(categories, logs, ids)
+    flows, clean_flows, ids = render_flows(categories, flows, ids)
     authentications, clean_authentications, ids = render_authentications(categories, authentications, ids)
+    secretstores, clean_secretstores, ids = render_secretstores(categories, secretstores, ids)
+    service_discoveries, clean_service_discoveries, ids = render_service_discoveries(categories, service_discoveries,
+                                                                                     ids)
 
-    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + logs + authentications
+    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + logs + flows + authentications + secretstores + service_discoveries
     render_integrations(categories, integrations)
 
-    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_logs + clean_authentications
+    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_logs + clean_flows + clean_authentications + clean_secretstores + clean_service_discoveries
     render_json(categories, clean_integrations)
+
+    return fail_on_warnings()
 
 
 if __name__ == '__main__':

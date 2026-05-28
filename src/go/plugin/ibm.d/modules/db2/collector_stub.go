@@ -8,11 +8,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 }
 
 func New() *Collector {
@@ -29,7 +29,7 @@ func (c *Collector) Check(context.Context) error {
 	return errors.New("db2 collector requires CGO support")
 }
 
-func (c *Collector) Charts() *module.Charts { return nil }
+func (c *Collector) Charts() *collectorapi.Charts { return nil }
 
 func (c *Collector) Collect(context.Context) map[string]int64 { return nil }
 

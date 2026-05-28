@@ -1,0 +1,30 @@
+{
+  "fan": [
+    {
+      "durable-id": "fan_0.0",
+      "name": "Fan 0",
+      "location": "Enclosure 0, Left",
+      "health": "OK",
+      "health-numeric": 0,
+      "status": "Up",
+      "speed": 4800
+    },
+    {
+      "durable-id": "fan_0.1",
+      "name": "Fan 1",
+      "location": "Enclosure 0, Right",
+      "health": "OK",
+      "health-numeric": 0,
+      "status": "Up",
+      "speed": 4700
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

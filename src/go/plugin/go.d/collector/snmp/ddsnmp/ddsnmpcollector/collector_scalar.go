@@ -20,6 +20,7 @@ type scalarCollector struct {
 	missingOIDs map[string]bool
 	log         *logger.Logger
 	valProc     *valueProcessor
+	tagProc     *globalTagProcessor
 }
 
 func newScalarCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *scalarCollector {
@@ -28,6 +29,7 @@ func newScalarCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, 
 		missingOIDs: missingOIDs,
 		log:         log,
 		valProc:     newValueProcessor(),
+		tagProc:     newGlobalTagProcessor(),
 	}
 }
 
@@ -70,6 +72,20 @@ func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 		}
 
 		oids = append(oids, cfg.Symbol.OID)
+
+		for _, tagCfg := range cfg.MetricTags {
+			if tagCfg.Symbol.OID == "" {
+				continue
+			}
+
+			tagOID := trimOID(tagCfg.Symbol.OID)
+			if sc.missingOIDs[tagOID] {
+				missingOIDs = append(missingOIDs, tagCfg.Symbol.OID)
+				continue
+			}
+
+			oids = append(oids, tagCfg.Symbol.OID)
+		}
 	}
 
 	// Sort and deduplicate
@@ -144,10 +160,26 @@ func (sc *scalarCollector) processScalarMetric(cfg ddprofiledefinition.MetricsCo
 
 	value, err := sc.valProc.processValue(cfg.Symbol, pdu)
 	if err != nil {
+		if errors.Is(err, errNoTextDateValue) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("error processing value for OID %s (%s): %w", cfg.Symbol.Name, cfg.Symbol.OID, err)
 	}
 
 	staticTags := parseStaticTags(cfg.StaticTags)
+	var tags map[string]string
+	if len(cfg.MetricTags) > 0 {
+		tags = make(map[string]string)
+		ta := tagAdder{tags: tags}
+		for _, tagCfg := range cfg.MetricTags {
+			if tagCfg.Symbol.OID == "" {
+				continue
+			}
+			if err := sc.tagProc.processTag(tagCfg, pdus, ta); err != nil {
+				sc.log.Debugf("Error processing scalar tag '%s' for metric '%s': %v", tagCfg.Tag, cfg.Symbol.Name, err)
+			}
+		}
+	}
 
-	return buildScalarMetric(cfg.Symbol, pdu, value, staticTags)
+	return buildScalarMetric(cfg.Symbol, pdu, value, tags, staticTags)
 }

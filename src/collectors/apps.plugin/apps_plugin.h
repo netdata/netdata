@@ -101,6 +101,7 @@ struct pid_info {
 #define PROCESSES_HAVE_UID                   0
 #define PROCESSES_HAVE_GID                   0
 #define PROCESSES_HAVE_SID                   1
+#define PROCESSES_HAVE_SERVICE               1
 #define PROCESSES_HAVE_MAJFLT                0
 #define PROCESSES_HAVE_CHILDREN_FLTS         0
 #define PROCESSES_HAVE_VMSWAP                1
@@ -294,6 +295,9 @@ typedef enum __attribute__((packed)) {
 #if (PROCESSES_HAVE_SID == 1)
     TARGET_TYPE_SID,
 #endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    TARGET_TYPE_SERVICE,
+#endif
     TARGET_TYPE_TREE,
 } TARGET_TYPE;
 
@@ -407,6 +411,9 @@ struct target {
 #if (PROCESSES_HAVE_SID == 1)
     STRING *sid_name;
 #endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    STRING *service_name;
+#endif
 
     kernel_uint_t values[PDF_MAX];
 
@@ -516,6 +523,9 @@ struct pid_stat {
 #if (PROCESSES_HAVE_SID == 1)
     struct target *sid_target;      // sid based targets
 #endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    struct target *service_target;  // service based targets
+#endif
 
     STRING *comm_orig;              // the command, as-collected
     STRING *comm;                   // the command, sanitized
@@ -538,6 +548,9 @@ struct pid_stat {
 #endif
 #if (PROCESSES_HAVE_SID == 1)
     STRING *sid_name;
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    STRING *service_name;
 #endif
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
@@ -730,6 +743,12 @@ struct target *get_gid_target(gid_t gid);
 #if (PROCESSES_HAVE_SID == 1)
 extern struct target *sids_root_target;
 struct target *get_sid_target(STRING *sid_name);
+#endif
+
+#if (PROCESSES_HAVE_SERVICE == 1)
+extern bool enable_services_charts;
+extern struct target *services_root_target;
+struct target *get_service_target(STRING *service_name);
 #endif
 
 extern struct target *apps_groups_root_target;

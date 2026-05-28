@@ -272,7 +272,11 @@ int do_ipfw(int update_every, usec_t dt) {
                     break;
 
                 dyn_rule = (ipfw_dyn_rule *) (tlv + 1);
+#if __FreeBSD__ >= 15
+                rulenum = (uint16_t)dyn_rule->rulenum;
+#else
                 bcopy(&dyn_rule->rule, &rulenum, sizeof(rulenum));
+#endif
 
                 for (srn = 0; srn < (static_rules_num - 1); srn++) {
                     if (dyn_rule->expire > 0)

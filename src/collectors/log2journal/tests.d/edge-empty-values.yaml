@@ -1,0 +1,48 @@
+pattern: "(?P<msg>.*)"  # Valid pattern
+
+inject:
+  - key: EMPTY_VALUE
+    value: ""  # Empty value
+    
+  - key: ""  # Empty key - should error
+    value: "test"
+    
+  - key: WHITESPACE_VALUE
+    value: "   "  # Only whitespace
+    
+  - key: TAB_VALUE
+    value: "			"  # Only tabs
+
+rewrite:
+  - key: ""  # Empty key
+    value: "test"
+    inject: yes
+    
+  - key: TEST_KEY
+    match: ".*"  # Valid match pattern
+    value: ""  # Empty replacement
+    
+  - key: ANOTHER_KEY
+    match: ".*"
+    value: ""  # Empty replacement
+
+rename:
+  - old_key: ""
+    new_key: NEW_NAME
+    
+  - old_key: OLD_NAME  
+    new_key: ""  # Empty new name
+    
+  - old_key: "   "  # Whitespace only
+    new_key: "TRIMMED"
+
+# Comment out problematic empty values that cause parse errors
+# filter:
+#   include: ""  # Empty include pattern
+#   exclude: ""  # Empty exclude pattern
+
+# unmatched:
+#   key: ""  # Empty unmatched key
+# inject:
+#   - key: ""
+#     value: "test"

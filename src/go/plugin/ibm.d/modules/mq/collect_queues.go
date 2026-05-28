@@ -208,10 +208,7 @@ func (c *Collector) collectQueueMetrics() error {
 		return filtered[i].Name < filtered[j].Name
 	})
 
-	limit := c.Config.MaxQueues
-	if limit < 0 {
-		limit = 0
-	}
+	limit := max(c.Config.MaxQueues, 0)
 
 	aggregated := make(map[string]*queueGroupAggregate)
 	overflowTotals := &queueGroupAggregate{}

@@ -15,7 +15,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 var (
@@ -33,7 +33,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -464,7 +464,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			var mx map[string]int64
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				mx = collr.Collect(context.Background())
 				time.Sleep(time.Duration(collr.UpdateEvery) * time.Second)
 			}

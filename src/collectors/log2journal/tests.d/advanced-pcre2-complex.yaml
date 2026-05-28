@@ -1,0 +1,41 @@
+---
+# Advanced PCRE2 complex patterns test
+# Tests complex named groups, nested patterns, edge cases
+
+pattern: |
+  (?x)                                      # Extended mode
+  ^
+  (?<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z) \s+
+  \[(?<thread_id>\d+)\] \s+
+  (?<level>DEBUG|INFO|WARN|ERROR|FATAL) \s+
+  (?<logger_name>[a-zA-Z0-9._-]+) \s+ - \s+
+  (?<message>
+    (?:User \s+ (?<user_name>\w+) \s+)?     # Optional user
+    (?:Action: \s+ (?<action>\w+) \s+)?     # Optional action  
+    (?:Resource: \s+ (?<resource>\S+) \s+)? # Optional resource
+    (?<description>.*)                       # Remaining message
+  )
+  $
+
+inject:
+  - key: LOG_PROCESSOR
+    value: "advanced-pcre2"
+
+rewrite:
+  # Test complex variable substitution with nested groups
+  - key: STRUCTURED_MESSAGE
+    value: "ts=${timestamp} level=${level} logger=${logger_name}"
+    inject: yes
+    
+  # Test conditional processing based on captured groups
+  - key: USER_ACTION
+    value: "${user_name}:${action}:${resource}"
+    inject: yes
+    
+  # Test processing optional groups (may be empty)
+  - key: HAS_USER
+    value: "checked"
+    inject: yes
+
+filename:
+  key: FILENAME

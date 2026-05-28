@@ -81,6 +81,56 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 3. Grant Administrator privileges when prompted.
 4. Complete the setup wizard.
 
+## Offline (Air-gapped) Installation
+
+Use this method to install Netdata on a Windows system with no internet access.
+
+### Step 1: Download the MSI
+
+On an internet-connected machine, download the MSI installer using one of the links from the [Download the Windows Installer](#download-the-windows-installer-msi) table above.
+
+### Step 2: Transfer to the Offline System
+
+Copy the downloaded `.msi` file to the offline Windows system using a USB drive, network share, or other secure transfer method.
+
+### Step 3: Install Without Cloud Parameters
+
+Open a command prompt as Administrator and run a silent install **without** `TOKEN` or `ROOMS` parameters:
+
+```powershell
+msiexec /qn /i netdata-x64.msi
+```
+
+:::note
+
+This offline method uses `msiexec /qn` to install from a locally available MSI. On Windows Server versions earlier than 2019, the *automated download* commands in this document may fail due to TLS compatibility issues—download the MSI on another machine (Step 1) or use the [GUI installer](#graphical-installation-gui).
+
+:::
+
+In an air-gapped environment, Netdata Cloud features are unavailable. The Agent runs in standalone local mode.
+
+:::tip
+
+Paid/enterprise users can use the local Dashboard for full monitoring without Cloud connectivity.
+
+:::
+
+:::note
+
+Free users on standalone Agents have limited functionality — the UI is locked and there is no local monitoring. See [Limitations for Free Users](#limitations-for-free-users) for details.
+
+:::
+
+### Step 4: Access the Local Dashboard
+
+See [Access Netdata Dashboard](#access-netdata-dashboard).
+
+:::caution
+
+Automatic updates require internet access and are not possible on air-gapped systems. To update, repeat the transfer process with a newer MSI.
+
+:::
+
 ## Access Netdata Dashboard
 
 After installation, open your browser and go to:
@@ -95,6 +145,13 @@ By using silent installation, you agree to:
 
 - [GPL-3 License](https://raw.githubusercontent.com/netdata/netdata/refs/heads/master/LICENSE) — Netdata Agent
 - [NCUL1 License](https://app.netdata.cloud/LICENSE.txt) — Netdata Web Interface
+
+## Where is Netdata?
+
+When Netdata is installed on Windows, it automatically registers as a Windows Service and appears in
+**Add or remove programs** (also known as **Programs and Features** or **Apps & features** in newer Windows versions).
+The service can be monitored through the [Netdata Dashboard](http://localhost:19999).
+To start, stop, or restart the service, use Windows Services (services.msc) or command-line tools
 
 ## Automatic Updates
 

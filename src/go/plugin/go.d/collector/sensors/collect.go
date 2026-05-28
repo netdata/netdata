@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sensors/lmsensors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const precision = 1000
@@ -168,8 +168,8 @@ func writeMetric(mx map[string]int64, key string, value *float64) {
 
 func writeMetricAlarm(mx map[string]int64, px string, value *bool) {
 	if value != nil {
-		mx[px+"alarm_clear"] = metrix.Bool(!*value)
-		mx[px+"alarm_triggered"] = metrix.Bool(*value)
+		mx[px+"alarm_clear"] = oldmetrix.Bool(!*value)
+		mx[px+"alarm_triggered"] = oldmetrix.Bool(*value)
 	}
 }
 

@@ -12,8 +12,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
@@ -245,7 +245,7 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 				if !seen {
 					dimID := "rest_client_by_code_" + codeID
 					if codeChart != nil && !codeChart.HasDim(dimID) {
-						if err := codeChart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental}); err != nil {
+						if err := codeChart.AddDim(&Dim{ID: dimID, Name: code, Algo: collectorapi.Incremental}); err != nil {
 							c.Warningf("failed to add REST client code dimension %s: %v", code, err)
 						} else {
 							codeChart.MarkNotCreated()
@@ -263,7 +263,7 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 				if !seen {
 					dimID := "rest_client_by_method_" + methodID
 					if methodChart != nil && !methodChart.HasDim(dimID) {
-						if err := methodChart.AddDim(&Dim{ID: dimID, Name: method, Algo: module.Incremental}); err != nil {
+						if err := methodChart.AddDim(&Dim{ID: dimID, Name: method, Algo: collectorapi.Incremental}); err != nil {
 							c.Warningf("failed to add REST client method dimension %s: %v", method, err)
 						} else {
 							methodChart.MarkNotCreated()
@@ -743,7 +743,7 @@ func (c *Collector) addVerbDimension(verb string) {
 	}
 	dimID := "request_by_verb_" + cleanID(verb)
 	if !chart.HasDim(dimID) {
-		if err := chart.AddDim(&Dim{ID: dimID, Name: verb, Algo: module.Incremental}); err != nil {
+		if err := chart.AddDim(&Dim{ID: dimID, Name: verb, Algo: collectorapi.Incremental}); err != nil {
 			c.Warningf("failed to add verb dimension %s: %v", verb, err)
 		} else {
 			chart.MarkNotCreated()
@@ -766,7 +766,7 @@ func (c *Collector) addCodeDimension(code string) {
 	}
 	dimID := "request_by_code_" + cleanID(code)
 	if !chart.HasDim(dimID) {
-		if err := chart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental}); err != nil {
+		if err := chart.AddDim(&Dim{ID: dimID, Name: code, Algo: collectorapi.Incremental}); err != nil {
 			c.Warningf("failed to add code dimension %s: %v", code, err)
 		} else {
 			chart.MarkNotCreated()
@@ -788,7 +788,7 @@ func (c *Collector) addResourceDimension(resource string) {
 	}
 	dimID := "request_by_resource_" + cleanID(resource)
 	if !chart.HasDim(dimID) {
-		if err := chart.AddDim(&Dim{ID: dimID, Name: resource, Algo: module.Incremental}); err != nil {
+		if err := chart.AddDim(&Dim{ID: dimID, Name: resource, Algo: collectorapi.Incremental}); err != nil {
 			c.Warningf("failed to add resource dimension %s: %v", resource, err)
 		} else {
 			chart.MarkNotCreated()

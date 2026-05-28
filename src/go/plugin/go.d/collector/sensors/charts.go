@@ -9,12 +9,12 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sensors/lmsensors"
 )
 
 const (
-	prioTemperatureSensorInput = module.Priority + iota
+	prioTemperatureSensorInput = collectorapi.Priority + iota
 	prioTemperatureSensorAlarm
 
 	prioVoltageSensorInput
@@ -39,68 +39,68 @@ const (
 	prioIntrusionSensorAlarm
 )
 
-var temperatureSensorChartsTmpl = module.Charts{
+var temperatureSensorChartsTmpl = collectorapi.Charts{
 	temperatureSensorInputChartTmpl.Copy(),
 	temperatureSensorAlarmChartTmpl.Copy(),
 }
 
-var voltageSensorChartsTmpl = module.Charts{
+var voltageSensorChartsTmpl = collectorapi.Charts{
 	voltageSensorInputChartTmpl.Copy(),
 	voltageSensorAverageChartTmpl.Copy(),
 	voltageSensorAlarmChartTmpl.Copy(),
 }
 
-var fanSensorChartsTmpl = module.Charts{
+var fanSensorChartsTmpl = collectorapi.Charts{
 	fanSensorInputChartTmpl.Copy(),
 	fanSensorAlarmChartTmpl.Copy(),
 }
 
-var currentSensorChartsTmpl = module.Charts{
+var currentSensorChartsTmpl = collectorapi.Charts{
 	currentSensorInputChartTmpl.Copy(),
 	currentSensorAverageChartTmpl.Copy(),
 	currentSensorAlarmChartTmpl.Copy(),
 }
 
-var powerSensorChartsTmpl = module.Charts{
+var powerSensorChartsTmpl = collectorapi.Charts{
 	powerSensorInputChartTmpl.Copy(),
 	powerSensorAverageChartTmpl.Copy(),
 	powerSensorAlarmChartTmpl.Copy(),
 }
 
-var energySensorChartsTmpl = module.Charts{
+var energySensorChartsTmpl = collectorapi.Charts{
 	energySensorInputChartTmpl.Copy(),
 }
 
-var humiditySensorChartsTmpl = module.Charts{
+var humiditySensorChartsTmpl = collectorapi.Charts{
 	humiditySensorInputChartTmpl.Copy(),
 }
 
-var intrusionSensorChartsTmpl = module.Charts{
+var intrusionSensorChartsTmpl = collectorapi.Charts{
 	intrusionSensorAlarmChartTmpl.Copy(),
 }
 
 var (
-	temperatureSensorInputChartTmpl = module.Chart{
+	temperatureSensorInputChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_temperature",
 		Title:    "Sensor Temperature",
 		Units:    "Celsius",
 		Fam:      "temperature",
 		Ctx:      "sensors.chip_sensor_temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioTemperatureSensorInput,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_input", Name: "input", Div: precision},
 		},
 	}
-	temperatureSensorAlarmChartTmpl = module.Chart{
+	temperatureSensorAlarmChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_temperature_alarm",
 		Title:    "Temperature Sensor Alarm",
 		Units:    "status",
 		Fam:      "temperature",
 		Ctx:      "sensors.chip_sensor_temperature_alarm",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioTemperatureSensorAlarm,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_alarm_clear", Name: "clear"},
 			{ID: "chip_%s_sensor_%s_alarm_triggered", Name: "triggered"},
 		},
@@ -108,39 +108,39 @@ var (
 )
 
 var (
-	voltageSensorInputChartTmpl = module.Chart{
+	voltageSensorInputChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_voltage",
 		Title:    "Sensor Voltage",
 		Units:    "Volts",
 		Fam:      "voltage",
 		Ctx:      "sensors.chip_sensor_voltage",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioVoltageSensorInput,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_input", Name: "input", Div: precision},
 		},
 	}
-	voltageSensorAverageChartTmpl = module.Chart{
+	voltageSensorAverageChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_voltage_average",
 		Title:    "Sensor Voltage Average",
 		Units:    "Volts",
 		Fam:      "voltage",
 		Ctx:      "sensors.chip_sensor_voltage_average",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioVoltageSensorAverage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_average", Name: "average", Div: precision},
 		},
 	}
-	voltageSensorAlarmChartTmpl = module.Chart{
+	voltageSensorAlarmChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_voltage_alarm",
 		Title:    "Voltage Sensor Alarm",
 		Units:    "status",
 		Fam:      "voltage",
 		Ctx:      "sensors.chip_sensor_voltage_alarm",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioVoltageSensorAlarm,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_alarm_clear", Name: "clear"},
 			{ID: "chip_%s_sensor_%s_alarm_triggered", Name: "triggered"},
 		},
@@ -148,27 +148,27 @@ var (
 )
 
 var (
-	fanSensorInputChartTmpl = module.Chart{
+	fanSensorInputChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_fan",
 		Title:    "Sensor Fan",
 		Units:    "RPM",
 		Fam:      "fan",
 		Ctx:      "sensors.chip_sensor_fan",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioFanSensorInput,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_input", Name: "input", Div: precision},
 		},
 	}
-	fanSensorAlarmChartTmpl = module.Chart{
+	fanSensorAlarmChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_fan_alarm",
 		Title:    "Fan Sensor Alarm",
 		Units:    "status",
 		Fam:      "fan",
 		Ctx:      "sensors.chip_sensor_fan_alarm",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioFanSensorAlarm,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_alarm_clear", Name: "clear"},
 			{ID: "chip_%s_sensor_%s_alarm_triggered", Name: "triggered"},
 		},
@@ -176,39 +176,39 @@ var (
 )
 
 var (
-	currentSensorInputChartTmpl = module.Chart{
+	currentSensorInputChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_current",
 		Title:    "Sensor Current",
 		Units:    "Amperes",
 		Fam:      "current",
 		Ctx:      "sensors.chip_sensor_current",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioCurrentSensorInput,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_input", Name: "input", Div: precision},
 		},
 	}
-	currentSensorAverageChartTmpl = module.Chart{
+	currentSensorAverageChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_current_average",
 		Title:    "Sensor Current Average",
 		Units:    "Amperes",
 		Fam:      "current",
 		Ctx:      "sensors.chip_sensor_current_average",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioCurrentSensorAverage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_average", Name: "average", Div: precision},
 		},
 	}
-	currentSensorAlarmChartTmpl = module.Chart{
+	currentSensorAlarmChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_current_alarm",
 		Title:    "Sensor Alarm",
 		Units:    "status",
 		Fam:      "current",
 		Ctx:      "sensors.chip_sensor_current_alarm",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioCurrentSensorAlarm,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_alarm_clear", Name: "clear"},
 			{ID: "chip_%s_sensor_%s_alarm_triggered", Name: "triggered"},
 		},
@@ -216,39 +216,39 @@ var (
 )
 
 var (
-	powerSensorInputChartTmpl = module.Chart{
+	powerSensorInputChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_power",
 		Title:    "Sensor Power",
 		Units:    "Watts",
 		Fam:      "power",
 		Ctx:      "sensors.chip_sensor_power",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPowerSensorInput,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_input", Name: "input", Div: precision},
 		},
 	}
-	powerSensorAverageChartTmpl = module.Chart{
+	powerSensorAverageChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_power_average",
 		Title:    "Sensor Power Average",
 		Units:    "Watts",
 		Fam:      "power",
 		Ctx:      "sensors.chip_sensor_power_average",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPowerSensorAverage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_average", Name: "average", Div: precision},
 		},
 	}
-	powerSensorAlarmChartTmpl = module.Chart{
+	powerSensorAlarmChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_power_alarm",
 		Title:    "Power Sensor Alarm",
 		Units:    "status",
 		Fam:      "current",
 		Ctx:      "sensors.chip_sensor_power_alarm",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPowerSensorAlarm,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_alarm_clear", Name: "clear"},
 			{ID: "chip_%s_sensor_%s_alarm_triggered", Name: "triggered"},
 		},
@@ -256,45 +256,45 @@ var (
 )
 
 var (
-	energySensorInputChartTmpl = module.Chart{
+	energySensorInputChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_energy",
 		Title:    "Sensor Energy",
 		Units:    "Joules",
 		Fam:      "energy",
 		Ctx:      "sensors.chip_sensor_energy",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioEnergySensorInput,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_input", Name: "input", Div: precision},
 		},
 	}
 )
 
 var (
-	humiditySensorInputChartTmpl = module.Chart{
+	humiditySensorInputChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_humidity",
 		Title:    "Sensor Humidity",
 		Units:    "percent",
 		Fam:      "humidity",
 		Ctx:      "sensors.chip_sensor_humidity",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioHumiditySensorInput,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_input", Name: "input", Div: precision},
 		},
 	}
 )
 
 var (
-	intrusionSensorAlarmChartTmpl = module.Chart{
+	intrusionSensorAlarmChartTmpl = collectorapi.Chart{
 		ID:       "%s_%s_intrusion_alarm",
 		Title:    "Sensor Intrusion Alarm",
 		Units:    "status",
 		Fam:      "intrusion",
 		Ctx:      "sensors.chip_sensor_intrusion_alarm",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioIntrusionSensorAlarm,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "chip_%s_sensor_%s_alarm_clear", Name: "clear"},
 			{ID: "chip_%s_sensor_%s_alarm_triggered", Name: "triggered"},
 		},
@@ -483,7 +483,7 @@ func (c *Collector) addIntrusionCharts(chip *lmsensors.Chip, sn *lmsensors.Intru
 	c.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
 }
 
-func (c *Collector) addCharts(charts *module.Charts, chipUniqueName, chipSysDevice, snName, snLabel string) {
+func (c *Collector) addCharts(charts *collectorapi.Charts, chipUniqueName, chipSysDevice, snName, snLabel string) {
 	if len(*charts) == 0 {
 		return
 	}
@@ -495,7 +495,7 @@ func (c *Collector) addCharts(charts *module.Charts, chipUniqueName, chipSysDevi
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, chipUniqueName, snName)
 		chart.ID = cleanChartId(chart.ID)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "chip", Value: chipSysDevice},
 			{Key: "chip_id", Value: chipUniqueName},
 			{Key: "sensor", Value: snName},

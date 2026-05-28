@@ -3,6 +3,7 @@
 extends:
   - _system-base.yaml
   - _cisco-base.yaml
+  - _cisco-bgp4-mib.yaml
 
 
 metadata:

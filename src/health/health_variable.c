@@ -75,7 +75,7 @@ static bool variable_lookup_in_chart(struct variable_lookup_job *vbd, RRDSET *st
                 variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_stored_value, st, "last stored value of dimension");
                 break;
             case DIM_SELECT_RAW:
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_value, st, "last collected value of dimension");
+                variable_lookup_add_result_with_score(vbd, rrddim_last_collected_as_double(rd), st, "last collected value of dimension");
                 break;
             case DIM_SELECT_LAST_COLLECTED:
                 variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_time.tv_sec, st, "last collected time of dimension");
@@ -380,9 +380,7 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
 
     // find the components of the variable
     {
-        char id[string_strlen(vbd.dim) + 1];
-        memcpy(id, string2str(vbd.dim), string_strlen(vbd.dim));
-        id[string_strlen(vbd.dim)] = '\0';
+        char *id = strdupz(string2str(vbd.dim));
 
         char *dot = strrchr(id, '.');
         while(dot) {
@@ -397,6 +395,8 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
             *dot = '.';
             dot = dot2;
         }
+
+        freez(id);
     }
 
 find_best_scored:

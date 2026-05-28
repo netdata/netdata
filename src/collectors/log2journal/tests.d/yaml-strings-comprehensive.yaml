@@ -1,0 +1,98 @@
+---
+# Comprehensive YAML string styles with UTF-8
+# Tests all YAML string quoting styles and UTF-8 combinations
+
+pattern: "(?P<test_type>\\w+): (?P<data>.*)"
+
+inject:
+  # Plain scalars with UTF-8
+  - key: PLAIN_UTF8
+    value: Café naïve résumé piñata übung
+
+  # Double quoted strings with UTF-8 
+  - key: DOUBLE_QUOTED_UTF8
+    value: "Japanese: こんにちは Arabic: مرحبا Russian: Привет"
+
+  # Single quoted strings with UTF-8
+  - key: SINGLE_QUOTED_UTF8
+    value: 'Chinese: 你好 Korean: 안녕하세요 Thai: สวัสดี'
+
+  # Literal block scalar with UTF-8
+  - key: LITERAL_UTF8
+    value: |
+      Line 1: Émojis 🎉 🚀 ✅ ❌ 🌟
+      Line 2: Greek: αβγδε Hebrew: שלום
+      Line 3: Math: ∑∏∆√∞≠≤≥±×÷
+      
+  # Folded block scalar with UTF-8
+  - key: FOLDED_UTF8  
+    value: >
+      This line contains émojis 🎯 and
+      special characters like café naïve
+      which should fold together properly.
+
+  # Mixed quotes and escapes
+  - key: MIXED_QUOTES
+    value: "Single 'quotes' and \"escaped doubles\" with café"
+
+  # Control characters and escapes  
+  - key: CONTROL_CHARS
+    value: "Tab:\t Newline:\n Carriage:\r Backslash:\\ Quote:\""
+
+  # Unicode escapes
+  - key: UNICODE_ESCAPES
+    value: "Unicode: \u00E9 \u00FC \u00F1 \u2603"
+
+  # Raw UTF-8 vs escaped
+  - key: RAW_UTF8
+    value: "Direct: café vs Escaped: caf\u00E9"
+
+  # Empty and whitespace variations
+  - key: EMPTY_STRING
+    value: ""
+  - key: SPACE_STRING  
+    value: " "
+  - key: TAB_STRING
+    value: "\t"
+  - key: WHITESPACE_ONLY
+    value: "   \t   \n   "
+
+  # Long UTF-8 string
+  - key: LONG_UTF8
+    value: "English, Español, Français, Deutsch, Italiano, Português, Русский, 中文, 日本語, 한국어, العربية, עברית, हिन्दी, বাংলা, తెలుగు, தமிழ், ไทย, Tiếng Việt"
+
+  # Numbers as strings vs numbers
+  - key: STRING_NUMBER
+    value: "123"
+  - key: NUMBER_VALUE
+    value: 123
+  - key: STRING_FLOAT
+    value: "123.45"  
+  - key: FLOAT_VALUE
+    value: 123.45
+
+  # Boolean as strings vs booleans
+  - key: STRING_TRUE
+    value: "true"
+  - key: BOOL_TRUE
+    value: true
+  - key: STRING_FALSE
+    value: "false"
+  - key: BOOL_FALSE
+    value: false
+
+  # Null variations
+  - key: STRING_NULL
+    value: "null"
+  - key: NULL_VALUE
+    value: null
+  - key: TILDE_NULL
+    value: ~
+
+filename:
+  key: FILENAME
+
+rewrite:
+  - key: MESSAGE
+    value: 'Processed UTF-8: ${data}'
+    inject: yes

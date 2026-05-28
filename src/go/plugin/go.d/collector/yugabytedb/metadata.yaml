@@ -21,7 +21,6 @@ modules:
         - database
         - yb
         - yugabyte
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -267,7 +266,7 @@ modules:
     alerts: []
     functions:
       description: |
-        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+        This collector exposes real-time functions for interactive troubleshooting in the Live tab.
       list:
         - id: top-queries
           name: Top Queries

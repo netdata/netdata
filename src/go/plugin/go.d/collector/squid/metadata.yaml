@@ -19,7 +19,6 @@ modules:
         - squid
         - web delivery
         - squid caching proxy
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

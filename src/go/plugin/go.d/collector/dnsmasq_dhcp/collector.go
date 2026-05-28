@@ -12,7 +12,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
 )
 
@@ -20,9 +20,9 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("dnsmasq_dhcp", module.Creator{
+	collectorapi.Register("dnsmasq_dhcp", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 	})
 }
@@ -50,10 +50,10 @@ type Config struct {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *module.Charts
+	charts *collectorapi.Charts
 
 	leasesModTime    time.Time
 	parseConfigTime  time.Time
@@ -92,7 +92,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

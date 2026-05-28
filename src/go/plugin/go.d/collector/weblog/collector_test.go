@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,7 +46,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -738,7 +738,7 @@ func testCharts(t *testing.T, c *Collector, mx map[string]int64) {
 	testCustomTimeFieldCharts(t, c)
 	testCustomNumericFieldCharts(t, c)
 
-	module.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
+	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 }
 
 func testVhostChart(t *testing.T, c *Collector) {
@@ -1105,13 +1105,13 @@ func testCustomNumericFieldCharts(t *testing.T, c *Collector) {
 
 var (
 	emptySummary   = newWebLogSummary()
-	emptyHistogram = metrix.NewHistogram(metrix.DefBuckets)
+	emptyHistogram = oldmetrix.NewHistogram(oldmetrix.DefBuckets)
 )
 
-func isEmptySummary(s metrix.Summary) bool     { return reflect.DeepEqual(s, emptySummary) }
-func isEmptyHistogram(h metrix.Histogram) bool { return reflect.DeepEqual(h, emptyHistogram) }
+func isEmptySummary(s oldmetrix.Summary) bool     { return reflect.DeepEqual(s, emptySummary) }
+func isEmptyHistogram(h oldmetrix.Histogram) bool { return reflect.DeepEqual(h, emptyHistogram) }
 
-func isEmptyCounterVec(cv metrix.CounterVec) bool {
+func isEmptyCounterVec(cv oldmetrix.CounterVec) bool {
 	for _, c := range cv {
 		if c.Value() > 0 {
 			return false
@@ -1180,10 +1180,10 @@ func prepareWebLogCollectFull(t *testing.T) *Collector {
 		CustomTimeFields: []customTimeField{
 			{
 				Name:      "random_time_field",
-				Histogram: metrix.DefBuckets,
+				Histogram: oldmetrix.DefBuckets,
 			},
 		},
-		Histogram:      metrix.DefBuckets,
+		Histogram:      oldmetrix.DefBuckets,
 		GroupRespCodes: true,
 	}
 	collr := New()
@@ -1314,11 +1314,11 @@ func prepareWebLogCollectCustomTimeFields(t *testing.T) *Collector {
 		CustomTimeFields: []customTimeField{
 			{
 				Name:      "time1",
-				Histogram: metrix.DefBuckets,
+				Histogram: oldmetrix.DefBuckets,
 			},
 			{
 				Name:      "time2",
-				Histogram: metrix.DefBuckets,
+				Histogram: oldmetrix.DefBuckets,
 			},
 		},
 		Path:           "testdata/custom_time_fields.log",

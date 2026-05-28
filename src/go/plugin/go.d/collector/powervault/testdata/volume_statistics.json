@@ -1,0 +1,63 @@
+{
+  "volume-statistics": [
+    {
+      "volume-name": "prod-db-01",
+      "iops": 850,
+      "bytes-per-second-numeric": 35651584,
+      "data-read-numeric": 64424509440,
+      "data-written-numeric": 32212254720,
+      "number-of-reads": 3200000,
+      "number-of-writes": 1600000,
+      "write-cache-percent": 52,
+      "write-cache-hits": 1200000,
+      "write-cache-misses": 120000,
+      "read-cache-hits": 2400000,
+      "read-cache-misses": 320000,
+      "percent-tier-ssd": 60,
+      "percent-tier-sas": 30,
+      "percent-tier-sata": 10
+    },
+    {
+      "volume-name": "prod-app-01",
+      "iops": 320,
+      "bytes-per-second-numeric": 13107200,
+      "data-read-numeric": 21474836480,
+      "data-written-numeric": 10737418240,
+      "number-of-reads": 1500000,
+      "number-of-writes": 800000,
+      "write-cache-percent": 28,
+      "write-cache-hits": 600000,
+      "write-cache-misses": 80000,
+      "read-cache-hits": 1100000,
+      "read-cache-misses": 150000,
+      "percent-tier-ssd": 40,
+      "percent-tier-sas": 40,
+      "percent-tier-sata": 20
+    },
+    {
+      "volume-name": "test-backup",
+      "iops": 50,
+      "bytes-per-second-numeric": 2097152,
+      "data-read-numeric": 5368709120,
+      "data-written-numeric": 10737418240,
+      "number-of-reads": 200000,
+      "number-of-writes": 400000,
+      "write-cache-percent": 8,
+      "write-cache-hits": 100000,
+      "write-cache-misses": 50000,
+      "read-cache-hits": 150000,
+      "read-cache-misses": 80000,
+      "percent-tier-ssd": 0,
+      "percent-tier-sas": 50,
+      "percent-tier-sata": 50
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

@@ -20,6 +20,8 @@ We have decided to redistribute all these, instead of using them through a CDN, 
 | [xxHash](https://github.com/Cyan4973/xxHash)                            | Copyright (c) 2012-2021 Yann Collet                                                | [BSD](https://github.com/Cyan4973/xxHash/blob/dev/LICENSE)                               |
 | [Judy Arrays](https://sourceforge.net/projects/judy/)                   | Copyright (C) 2000 - 2002 Hewlett-Packard Company                                  | [LGPLv2](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.en.html)                     |
 | [dlib](https://github.com/davisking/dlib/)                              | Copyright (C) 2019  Davis E. King (davis@dlib.net), Nils Labugt                    | [Boost Software License](https://github.com/davisking/dlib/blob/master/dlib/LICENSE.txt) |
+| [DB-IP ASN Lite](https://db-ip.com/db/download/ip-to-asn-lite)          | DB-IP.com                                                                          | [CC BY 4.0](https://db-ip.com/db/lite.php)                                                |
+| [DB-IP City Lite](https://db-ip.com/db/download/ip-to-city-lite)        | DB-IP.com                                                                          | [CC BY 4.0](https://db-ip.com/db/lite.php)                                                |
 
 ---
 

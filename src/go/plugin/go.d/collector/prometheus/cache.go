@@ -3,7 +3,7 @@
 package prometheus
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func newCache() *cache {
@@ -18,7 +18,7 @@ type (
 	cacheEntry struct {
 		seen         bool
 		notSeenTimes int
-		charts       []*module.Chart
+		charts       []*collectorapi.Chart
 	}
 )
 
@@ -34,7 +34,7 @@ func (c *cache) hasP(key string) bool {
 	return ok
 }
 
-func (c *cache) addChart(key string, chart *module.Chart) {
+func (c *cache) addChart(key string, chart *collectorapi.Chart) {
 	if v, ok := c.entries[key]; ok {
 		v.charts = append(v.charts, chart)
 	}

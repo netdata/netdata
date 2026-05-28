@@ -1,0 +1,256 @@
+# Vendor-native Huawei BGP visibility from HUAWEI-BGP-VPN-MIB.
+# hwBgpPeerAddrFamilyTable, hwBgpPeerTable, hwBgpPeerRouteTable, and
+# hwBgpPeerMessageTable share the same address-family row index:
+# instance ID, AFI, SAFI, peer address type, and peer address. The index
+# components are not-accessible in Huawei's MIB reference, so AFI/SAFI and
+# peer address descriptors are index-derived or resolved through typed
+# cross-table sources.
+#
+# https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-BGP-VPN-MIB
+# https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-BGP-VPN-MIB
+
+bgp:
+  - id: huawei-bgp-device-counts
+    MIB: HUAWEI-BGP-VPN-MIB
+    kind: device
+    device_counts:
+      peers:
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.4.1, name: huawei.hwBgpPeerSessionNum }
+      ibgp_peers:
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.4.2, name: huawei.hwIBgpPeerSessionNum }
+      ebgp_peers:
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.4.3, name: huawei.hwEBgpPeerSessionNum }
+
+  - id: huawei-bgp-peer-family
+    MIB: HUAWEI-BGP-VPN-MIB
+    kind: peer_family
+    table: &huawei_bgp_peer_table
+      name: hwBgpPeerTable
+      OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2
+    identity: &huawei_bgp_peer_family_identity
+      routing_instance: &huawei_bgp_routing_instance
+        table: hwBgpPeerAddrFamilyTable
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6, name: huawei.hwBgpPeerVrfName }
+      neighbor: &huawei_bgp_neighbor
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4, name: huawei.hwBgpPeerRemoteAddr, format: ip_address }
+      remote_as: &huawei_bgp_remote_as
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2, name: huawei.hwBgpPeerRemoteAs, format: uint32 }
+      address_family: &huawei_bgp_address_family
+        index: 2
+        mapping:
+          1: ipv4
+          2: ipv6
+          25: l2vpn
+          196: l2vpn
+      subsequent_address_family: &huawei_bgp_subsequent_address_family
+        index: 3
+        allow_private: true
+        mapping:
+          1: unicast
+          2: multicast
+          4: labeled_unicast
+          5: mvpn
+          65: vpls
+          66: mdt
+          70: evpn
+          74: sd-wan
+          128: vpn
+          132: rtfilter
+    descriptors: &huawei_bgp_peer_family_descriptors
+      peer_type: &huawei_bgp_peer_type
+        index: 4
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      bgp_version:
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.1, name: huawei.hwBgpPeerNegotiatedVersion }
+      description:
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12, name: huawei.hwBgpPeerDescription }
+    admin:
+      enabled:
+        symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.11
+          name: huawei.hwBgpPeerAdminStatus
+          mapping:
+            1: stop
+            2: start
+    state:
+      symbol:
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.5
+        name: huawei.hwBgpPeerState
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+    transitions:
+      established:
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.6, name: huawei.hwBgpPeerFsmEstablishedCounter }
+    last_error:
+      code:
+        symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.9
+          name: huawei.hwBgpPeerLastErrorCode
+          format: hex
+          extract_value: '^([0-9a-f]{2})'
+      subcode:
+        symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.9
+          name: huawei.hwBgpPeerLastErrorSubcode
+          format: hex
+          extract_value: '^[0-9a-f]{2}([0-9a-f]{2})'
+    graceful_restart:
+      state:
+        symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.8
+          name: huawei.hwBgpPeerGRStatus
+          mapping:
+            1: peer_not_being_helped
+            2: peer_restarting
+            3: peer_finish_restart
+            4: peer_helping
+    reasons:
+      unavailability:
+        symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.10
+          name: huawei.hwBgpPeerUnAvaiReason
+          mapping:
+            1: configuration_lead_peer_down
+            2: receive_notification
+            3: receive_error_packet
+            4: hold_timer_expire
+            5: remote_peer_not_reachable
+            6: direct_connect_interface_down
+            7: route_limit
+
+  - id: huawei-bgp-peer-family-routes
+    MIB: HUAWEI-BGP-VPN-MIB
+    kind: peer_family
+    table:
+      name: hwBgpPeerRouteTable
+      OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3
+    identity: &huawei_bgp_cross_table_peer_family_identity
+      routing_instance: *huawei_bgp_routing_instance
+      neighbor:
+        table: hwBgpPeerTable
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4, name: huawei.hwBgpPeerRemoteAddr, format: ip_address }
+      remote_as:
+        table: hwBgpPeerTable
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2, name: huawei.hwBgpPeerRemoteAs, format: uint32 }
+      address_family: *huawei_bgp_address_family
+      subsequent_address_family: *huawei_bgp_subsequent_address_family
+    descriptors: &huawei_bgp_cross_table_peer_family_descriptors
+      peer_type: *huawei_bgp_peer_type
+      bgp_version:
+        table: hwBgpPeerTable
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.1, name: huawei.hwBgpPeerNegotiatedVersion }
+      description:
+        table: hwBgpPeerTable
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12, name: huawei.hwBgpPeerDescription }
+    routes:
+      total:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.1, name: huawei.hwBgpPeerPrefixRcvCounter }
+        active:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.2, name: huawei.hwBgpPeerPrefixActiveCounter }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.3, name: huawei.hwBgpPeerPrefixAdvCounter }
+
+  - id: huawei-bgp-peer-family-messages
+    MIB: HUAWEI-BGP-VPN-MIB
+    kind: peer_family
+    table:
+      name: hwBgpPeerMessageTable
+      OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4
+    identity: *huawei_bgp_cross_table_peer_family_identity
+    descriptors: *huawei_bgp_cross_table_peer_family_descriptors
+    traffic:
+      messages:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.1, name: huawei.hwBgpPeerInTotalMsgCounter }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.2, name: huawei.hwBgpPeerOutTotalMsgCounter }
+      opens:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.3, name: huawei.hwBgpPeerInOpenMsgCounter }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.8, name: huawei.hwBgpPeerOutOpenMsgCounter }
+      updates:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.4, name: huawei.hwBgpPeerInUpdateMsgCounter }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.9, name: huawei.hwBgpPeerOutUpdateMsgCounter }
+      notifications:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.5, name: huawei.hwBgpPeerInNotificationMsgCounter }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.10, name: huawei.hwBgpPeerOutNotificationMsgCounter }
+      keepalives:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.6, name: huawei.hwBgpPeerInKeepAliveMsgCounter }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.11, name: huawei.hwBgpPeerOutKeepAliveMsgCounter }
+      route_refreshes:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.7, name: huawei.hwBgpPeerInRouteFreshMsgCounter }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.12, name: huawei.hwBgpPeerOutRouteFreshMsgCounter }
+
+  - id: huawei-bgp-peer-statistics
+    MIB: HUAWEI-BGP-VPN-MIB
+    kind: peer
+    table:
+      name: hwBgpPeerStatisticTable
+      OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7
+    identity:
+      routing_instance:
+        index: 2
+      neighbor:
+        index_transform:
+          - start: 3
+        name: huawei.hwBgpPeerStatisticRemoteAddr
+        format: ip_address
+      remote_as:
+        table: hwBgpPeerTable
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2, name: huawei.hwBgpPeerRemoteAs, format: uint32 }
+        lookup_symbol: &huawei_bgp_peer_remote_addr_lookup
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          name: huawei.hwBgpPeerRemoteAddr
+          extract_value: '^(?:[^.]+\.){2}(?:4|16)\.(.*)$'
+          format: ip_address
+    descriptors:
+      peer_type:
+        index: 3
+        mapping:
+          4: ipv4
+          16: ipv6
+      bgp_version:
+        table: hwBgpPeerTable
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.1, name: huawei.hwBgpPeerNegotiatedVersion }
+        lookup_symbol: *huawei_bgp_peer_remote_addr_lookup
+      description:
+        table: hwBgpPeerTable
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12, name: huawei.hwBgpPeerDescription }
+        lookup_symbol: *huawei_bgp_peer_remote_addr_lookup
+    transitions:
+      established:
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4, name: huawei.hwBgpPeerFsmEstablishedTransitions }
+      down:
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.5, name: huawei.hwBgpPeerDownCounts }
+    traffic:
+      updates:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.6, name: huawei.hwBgpPeerInUpdateMsgs }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.7, name: huawei.hwBgpPeerOutUpdateMsgs }
+      messages:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.8, name: huawei.hwBgpPeerInTotalMsgs }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.9, name: huawei.hwBgpPeerOutTotalMsgs }

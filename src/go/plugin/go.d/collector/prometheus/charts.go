@@ -9,23 +9,23 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioDefault   = module.Priority
+	prioDefault   = collectorapi.Priority
 	prioGORuntime = prioDefault + 10
 )
 
 func (c *Collector) addGaugeChart(id, name, help string, labels labels.Labels) {
 	units := getChartUnits(name)
 
-	cType := module.Line
+	cType := collectorapi.Line
 	if strings.HasSuffix(units, "bytes") {
-		cType = module.Area
+		cType = collectorapi.Area
 	}
 
-	chart := &module.Chart{
+	chart := &collectorapi.Chart{
 		ID:       id,
 		Title:    getChartTitle(name, help),
 		Units:    units,
@@ -33,14 +33,14 @@ func (c *Collector) addGaugeChart(id, name, help string, labels labels.Labels) {
 		Ctx:      getChartContext(c.application(), name),
 		Type:     cType,
 		Priority: getChartPriority(name),
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: id, Name: name, Div: precision},
 		},
 	}
 
 	for _, lbl := range labels {
 		chart.Labels = append(chart.Labels,
-			module.Label{
+			collectorapi.Label{
 				Key:   c.labelName(lbl.Name),
 				Value: apostropheReplacer.Replace(lbl.Value),
 			},
@@ -64,12 +64,12 @@ func (c *Collector) addCounterChart(id, name, help string, labels labels.Labels)
 		units += "/s"
 	}
 
-	cType := module.Line
+	cType := collectorapi.Line
 	if strings.HasSuffix(units, "bytes/s") {
-		cType = module.Area
+		cType = collectorapi.Area
 	}
 
-	chart := &module.Chart{
+	chart := &collectorapi.Chart{
 		ID:       id,
 		Title:    getChartTitle(name, help),
 		Units:    units,
@@ -77,13 +77,13 @@ func (c *Collector) addCounterChart(id, name, help string, labels labels.Labels)
 		Ctx:      getChartContext(c.application(), name),
 		Type:     cType,
 		Priority: getChartPriority(name),
-		Dims: module.Dims{
-			{ID: id, Name: name, Algo: module.Incremental, Div: precision},
+		Dims: collectorapi.Dims{
+			{ID: id, Name: name, Algo: collectorapi.Incremental, Div: precision},
 		},
 	}
 	for _, lbl := range labels {
 		chart.Labels = append(chart.Labels,
-			module.Label{
+			collectorapi.Label{
 				Key:   c.labelName(lbl.Name),
 				Value: apostropheReplacer.Replace(lbl.Value),
 			},
@@ -107,7 +107,7 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 		units += "/s"
 	}
 
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		{
 			ID:       id,
 			Title:    getChartTitle(name, help),
@@ -115,10 +115,10 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 			Fam:      getChartFamily(name),
 			Ctx:      getChartContext(c.application(), name),
 			Priority: getChartPriority(name),
-			Dims: func() (dims module.Dims) {
+			Dims: func() (dims collectorapi.Dims) {
 				for _, v := range quantiles {
 					s := formatFloat(v.Quantile())
-					dims = append(dims, &module.Dim{
+					dims = append(dims, &collectorapi.Dim{
 						ID:   fmt.Sprintf("%s_quantile=%s", id, s),
 						Name: fmt.Sprintf("quantile_%s", s),
 						Div:  precision * precision,
@@ -134,8 +134,8 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 			Fam:      getChartFamily(name),
 			Ctx:      getChartContext(c.application(), name) + "_sum",
 			Priority: getChartPriority(name),
-			Dims: module.Dims{
-				{ID: id + "_sum", Name: name + "_sum", Algo: module.Incremental, Div: precision},
+			Dims: collectorapi.Dims{
+				{ID: id + "_sum", Name: name + "_sum", Algo: collectorapi.Incremental, Div: precision},
 			},
 		},
 		{
@@ -145,15 +145,15 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 			Fam:      getChartFamily(name),
 			Ctx:      getChartContext(c.application(), name) + "_count",
 			Priority: getChartPriority(name),
-			Dims: module.Dims{
-				{ID: id + "_count", Name: name + "_count", Algo: module.Incremental},
+			Dims: collectorapi.Dims{
+				{ID: id + "_count", Name: name + "_count", Algo: collectorapi.Incremental},
 			},
 		},
 	}
 
 	for _, chart := range charts {
 		for _, lbl := range labels {
-			chart.Labels = append(chart.Labels, module.Label{
+			chart.Labels = append(chart.Labels, collectorapi.Label{
 				Key:   c.labelName(lbl.Name),
 				Value: apostropheReplacer.Replace(lbl.Value),
 			})
@@ -175,7 +175,7 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 		units += "/s"
 	}
 
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		{
 			ID:       id,
 			Title:    getChartTitle(name, help),
@@ -183,13 +183,13 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 			Fam:      getChartFamily(name),
 			Ctx:      getChartContext(c.application(), name),
 			Priority: getChartPriority(name),
-			Dims: func() (dims module.Dims) {
+			Dims: func() (dims collectorapi.Dims) {
 				for _, v := range buckets {
 					s := formatFloat(v.UpperBound())
-					dims = append(dims, &module.Dim{
+					dims = append(dims, &collectorapi.Dim{
 						ID:   fmt.Sprintf("%s_bucket=%s", id, s),
 						Name: fmt.Sprintf("bucket_%s", s),
-						Algo: module.Incremental,
+						Algo: collectorapi.Incremental,
 					})
 				}
 				return dims
@@ -202,8 +202,8 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 			Fam:      getChartFamily(name),
 			Ctx:      getChartContext(c.application(), name) + "_sum",
 			Priority: getChartPriority(name),
-			Dims: module.Dims{
-				{ID: id + "_sum", Name: name + "_sum", Algo: module.Incremental, Div: precision},
+			Dims: collectorapi.Dims{
+				{ID: id + "_sum", Name: name + "_sum", Algo: collectorapi.Incremental, Div: precision},
 			},
 		},
 		{
@@ -213,15 +213,15 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 			Fam:      getChartFamily(name),
 			Ctx:      getChartContext(c.application(), name) + "_count",
 			Priority: getChartPriority(name),
-			Dims: module.Dims{
-				{ID: id + "_count", Name: name + "_count", Algo: module.Incremental},
+			Dims: collectorapi.Dims{
+				{ID: id + "_count", Name: name + "_count", Algo: collectorapi.Incremental},
 			},
 		},
 	}
 
 	for _, chart := range charts {
 		for _, lbl := range labels {
-			chart.Labels = append(chart.Labels, module.Label{
+			chart.Labels = append(chart.Labels, collectorapi.Label{
 				Key:   c.labelName(lbl.Name),
 				Value: apostropheReplacer.Replace(lbl.Value),
 			})

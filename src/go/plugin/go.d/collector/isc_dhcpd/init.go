@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
 )
 
@@ -55,8 +55,8 @@ func (c *Collector) initPools() ([]ipPool, error) {
 	return pools, nil
 }
 
-func (c *Collector) initCharts(pools []ipPool) (*module.Charts, error) {
-	charts := &module.Charts{}
+func (c *Collector) initCharts(pools []ipPool) (*collectorapi.Charts, error) {
+	charts := &collectorapi.Charts{}
 
 	if err := charts.Add(activeLeasesTotalChart.Copy()); err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (c *Collector) initCharts(pools []ipPool) (*module.Charts, error) {
 
 		for _, chart := range *poolCharts {
 			chart.ID = fmt.Sprintf(chart.ID, cleanPoolNameForChart(pool.name))
-			chart.Labels = []module.Label{
+			chart.Labels = []collectorapi.Label{
 				{Key: "dhcp_pool_name", Value: pool.name},
 			}
 			for _, dim := range chart.Dims {

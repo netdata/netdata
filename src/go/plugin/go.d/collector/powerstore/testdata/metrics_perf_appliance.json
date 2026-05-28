@@ -1,0 +1,1 @@
+[{"appliance_id":"A1","read_iops":1500.5,"write_iops":800.3,"total_iops":2300.8,"read_bandwidth":157286400,"write_bandwidth":83886080,"total_bandwidth":241172480,"avg_read_latency":250.5,"avg_write_latency":350.2,"avg_latency":290.1,"io_workload_cpu_utilization":35.5}]

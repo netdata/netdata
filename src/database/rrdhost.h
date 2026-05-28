@@ -96,6 +96,11 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
     RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 28), // set when the host has updated global functions
     RRDHOST_FLAG_RRDCONTEXT_GET_RETENTION       = (1 << 29), // set when rrdcontext needs to update the retention of the host
+
+    RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS       = (1 << 30), // svc_rrdhost_obsolete_all_charts() is running on this host;
+                                                             // gates rrdhost_set_receiver() so a reconnect cannot attach
+                                                             // mid-pass. Set under receiver_lock; the heavy work runs
+                                                             // without holding receiver_lock so readers stay unblocked.
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_get(host)                         atomic_flags_get(&((host)->flags))
@@ -341,14 +346,26 @@ struct rrdhost {
 
 extern RRDHOST *localhost;
 
+// receiver_lock protects host->receiver and the host->stream.rcv.status fields.
+//
+// Hold time must stay short-bounded: no caller may hold receiver_lock across
+// O(charts), I/O, sends, ML stop/start, or any wait on other subsystems. The
+// obsolete-all cleanup pass (service.c) used to violate this; it now sets
+// RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS under the lock and runs the heavy
+// work without holding it. rrdhost_set_receiver() checks that flag under
+// the lock and returns RRDHOST_SET_RECEIVER_CLEANUP_BUSY when the cleanup
+// pass is in progress; the caller answers the child with BUSY_TRY_LATER and
+// the child reconnects via normal backoff. With cleanup off the lock, all
+// other readers (status, ACLK, capabilities, paths, event-driven sends)
+// keep blocking-lock semantics and stay truthful.
 #define rrdhost_receiver_lock(host) spinlock_lock(&(host)->receiver_lock)
 #define rrdhost_receiver_unlock(host) spinlock_unlock(&(host)->receiver_lock)
 
 #define rrdhost_hostname(host) string2str((host)->hostname)
 #define rrdhost_registry_hostname(host) string2str((host)->registry_hostname)
 #define rrdhost_os(host) string2str((host)->os)
-#define rrdhost_timezone(host) string2str((host)->timezone)
-#define rrdhost_abbrev_timezone(host) string2str((host)->abbrev_timezone)
+// Timezone fields are mutable at runtime (DST refresh); use rrdhost_tz_get() for thread-safe access.
+// Do NOT access host->timezone or host->abbrev_timezone directly outside of rrdhost_update_lock.
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
 
@@ -456,6 +473,7 @@ RRDHOST *rrdhost_find_or_create(
 void rrdhost_free_all(void);
 
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host);
+void rrdhost_free___without_having_rrd_wrlock(RRDHOST *host);
 void rrdhost_cleanup_data_collection_and_health(RRDHOST *host);
 
 bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
@@ -466,6 +484,19 @@ void set_host_properties(
     RRD_DB_MODE memory_mode, const char *registry_hostname,
     const char *os, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *prog_name, const char *prog_version);
+
+bool rrdhost_update_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset);
+
+// Thread-safe timezone snapshot from an RRDHOST.
+// The returned struct owns strdup'd copies; release with rrdhost_tz_free().
+typedef struct {
+    char *timezone;        // IANA timezone name (owned, strdup'd)
+    char *abbrev_timezone; // abbreviated timezone (owned, strdup'd)
+    int32_t utc_offset;    // offset from UTC in seconds
+} RRDHOST_TZ;
+
+RRDHOST_TZ rrdhost_tz_get(RRDHOST *host);
+void rrdhost_tz_free(RRDHOST_TZ *tz);
 
 static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, time_t *from, time_t *to) {
     time_t first_time_s = 0, last_time_s = 0;

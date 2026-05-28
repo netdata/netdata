@@ -21,7 +21,6 @@ modules:
         - cache
         - web server
         - web cache
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

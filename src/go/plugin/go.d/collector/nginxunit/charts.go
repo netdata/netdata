@@ -3,56 +3,56 @@
 package nginxunit
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioRequestsRate = module.Priority + iota
+	prioRequestsRate = collectorapi.Priority + iota
 	prioConnectionsRate
 	prioConnectionsCurrent
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	requestsRateChart.Copy(),
 	connectionsRateChart.Copy(),
 	connectionsCurrentChart.Copy(),
 }
 
-var requestsRateChart = module.Chart{
+var requestsRateChart = collectorapi.Chart{
 	ID:       "requests",
 	Title:    "Requests",
 	Units:    "requests/s",
 	Fam:      "requests",
 	Ctx:      "nginxunit.requests_rate",
 	Priority: prioRequestsRate,
-	Dims: module.Dims{
-		{ID: "requests_total", Name: "requests", Algo: module.Incremental},
+	Dims: collectorapi.Dims{
+		{ID: "requests_total", Name: "requests", Algo: collectorapi.Incremental},
 	},
 }
 
-var connectionsRateChart = module.Chart{
+var connectionsRateChart = collectorapi.Chart{
 	ID:       "connections_rate",
 	Title:    "Connections",
 	Units:    "connections/s",
 	Fam:      "connections",
 	Ctx:      "nginxunit.connections_rate",
 	Priority: prioConnectionsRate,
-	Type:     module.Stacked,
-	Dims: module.Dims{
-		{ID: "connections_accepted", Name: "accepted", Algo: module.Incremental},
-		{ID: "connections_closed", Name: "closed", Algo: module.Incremental},
+	Type:     collectorapi.Stacked,
+	Dims: collectorapi.Dims{
+		{ID: "connections_accepted", Name: "accepted", Algo: collectorapi.Incremental},
+		{ID: "connections_closed", Name: "closed", Algo: collectorapi.Incremental},
 	},
 }
 
-var connectionsCurrentChart = module.Chart{
+var connectionsCurrentChart = collectorapi.Chart{
 	ID:       "connections_current",
 	Title:    "Current Connections",
 	Units:    "connections",
 	Fam:      "connections",
 	Ctx:      "nginxunit.connections_current",
 	Priority: prioConnectionsCurrent,
-	Type:     module.Stacked,
-	Dims: module.Dims{
+	Type:     collectorapi.Stacked,
+	Dims: collectorapi.Dims{
 		{ID: "connections_active", Name: "active"},
 		{ID: "connections_idle", Name: "idle"},
 	},

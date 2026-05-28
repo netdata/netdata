@@ -1,0 +1,257 @@
+# VXLAN Network Virtualization Endpoint (NVE) metrics for Cisco Nexus.
+# MIB: CISCO-NETWORK-VIRTUALIZATION-OVERLAY-MIB (1.3.6.1.4.1.9.9.820)
+# Monitors NVE instances, VNI configuration/replication mode, peer adjacency,
+# and per-VNI / per-peer traffic counters.
+
+metrics:
+  # ---- NVE instance table (one row per NVE interface) ----
+  - MIB: CISCO-NETWORK-VIRTUALIZATION-OVERLAY-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.820.1.1.1
+      name: cnvoNvoTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.1.1.2
+        name: cnvoNvoEncapType
+        chart_meta:
+          description: Encapsulation type for the NVE instance
+          family: 'Network/VXLAN/NVE/EncapType'
+          unit: "{type}"
+        mapping:
+          1: unknown
+          2: vxlan
+          3: nvgre
+    metric_tags:
+      - tag: nve_instance
+        index: 1
+      - tag: _nve_source_ifindex
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.820.1.1.1.1.3
+          name: cnvoNvoSourceInterface
+
+  # ---- Virtual network (VNI) table (one row per NVE instance + VNI) ----
+  - MIB: CISCO-NETWORK-VIRTUALIZATION-OVERLAY-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.820.1.1.2
+      name: cnvoVNetTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.2.1.6
+        name: cnvoVNetReplication
+        chart_meta:
+          description: Replication mode of the VNI
+          family: 'Network/VXLAN/VNI/Replication'
+          unit: "{mode}"
+        mapping:
+          1: multicast
+          2: unconfigured
+          3: unicast_bgp
+          4: unicast_static
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.2.1.8
+        name: cnvoVNetVniType
+        chart_meta:
+          description: Type of the virtual network identifier
+          family: 'Network/VXLAN/VNI/Type'
+          unit: "{type}"
+        mapping:
+          1: unknown
+          2: l2
+          3: l3
+    metric_tags:
+      - tag: nve_instance
+        index: 1
+      - tag: vni
+        index: 2
+      - tag: _vni_vlan
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.820.1.1.2.1.4
+          name: cnvoVNetVlan
+      - tag: _vni_vrf_or_bd
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.820.1.1.2.1.9
+          name: cnvoVNetIpVrfOrBridgeDomainName
+
+  # ---- NVE peer table (one row per NVE instance + remote VTEP) ----
+  # Index: (cnvoNvoInstanceId, cnvoPeerIpAddrType, cnvoPeerIpAddr)
+  # InetAddress index encoding: addrType.addrLen.byte0.byte1...
+  # For IPv4 10.0.0.2: full suffix is .1.1.4.10.0.0.2
+  #   pos 0=instanceId, 1=addrType, 2=addrLen, 3-6=IPv4 bytes
+  # NOTE: index_transform start:3 end:6 covers IPv4 only. Datacenter VXLAN underlay
+  # is virtually always IPv4. IPv6 support needs engine "keep to end" capability.
+  - MIB: CISCO-NETWORK-VIRTUALIZATION-OVERLAY-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.820.1.1.3
+      name: cnvoPeerTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.3.1.4
+        name: cnvoPeerLearningSourceType
+        chart_meta:
+          description: How this NVE peer was learned
+          family: 'Network/VXLAN/Peer/LearningSource'
+          unit: "{type}"
+        mapping:
+          1: unknown
+          2: data_plane
+          3: control_plane
+    metric_tags:
+      - tag: nve_instance
+        index: 1
+      - tag: _nve_peer_addr_type
+        index: 2
+      - tag: nve_peer_addr
+        symbol:
+          name: peerAddrFromIndex
+          format: ip_address
+        index_transform:
+          - start: 3
+            end: 6
+
+  # ---- Per-VNI traffic statistics ----
+  - MIB: CISCO-NETWORK-VIRTUALIZATION-OVERLAY-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.820.1.1.4
+      name: cnvoVNetStatsTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.4.1.5
+        name: _cnvoVNetInUnicastPackets
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.4.1.1
+        name: _cnvoVNetOutUnicastPackets
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.4.1.6
+        name: _cnvoVNetInUnicastBytes
+        scale_factor: 8
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.4.1.2
+        name: _cnvoVNetOutUnicastBytes
+        scale_factor: 8
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.4.1.7
+        name: _cnvoVNetInMulticastPackets
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.4.1.3
+        name: _cnvoVNetOutMulticastPackets
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.4.1.8
+        name: _cnvoVNetInMulticastBytes
+        scale_factor: 8
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.4.1.4
+        name: _cnvoVNetOutMulticastBytes
+        scale_factor: 8
+    metric_tags:
+      - tag: nve_instance
+        index: 1
+      - tag: vni
+        index: 2
+
+  # ---- Per-peer traffic statistics ----
+  # Index: (cnvoNvoInstanceId, cnvoPeerIpAddrType, cnvoPeerIpAddr)
+  # Same IPv4-only index_transform limitation as cnvoPeerTable above.
+  - MIB: CISCO-NETWORK-VIRTUALIZATION-OVERLAY-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.820.1.1.5
+      name: cnvoNvoPeerStatsTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.5.1.5
+        name: _cnvoNvoPeerInUnicastPackets
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.5.1.1
+        name: _cnvoNvoPeerOutUnicastPackets
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.5.1.6
+        name: _cnvoNvoPeerInUnicastBytes
+        scale_factor: 8
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.5.1.2
+        name: _cnvoNvoPeerOutUnicastBytes
+        scale_factor: 8
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.5.1.7
+        name: _cnvoNvoPeerInMulticastPackets
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.5.1.3
+        name: _cnvoNvoPeerOutMulticastPackets
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.5.1.8
+        name: _cnvoNvoPeerInMulticastBytes
+        scale_factor: 8
+      - OID: 1.3.6.1.4.1.9.9.820.1.1.5.1.4
+        name: _cnvoNvoPeerOutMulticastBytes
+        scale_factor: 8
+    metric_tags:
+      - tag: nve_instance
+        index: 1
+      - tag: _nve_peer_addr_type
+        index: 2
+      - tag: nve_peer_addr
+        symbol:
+          name: peerStatsAddrFromIndex
+          format: ip_address
+        index_transform:
+          - start: 3
+            end: 6
+
+virtual_metrics:
+  # Per-VNI unicast traffic
+  - name: cnvoVNetUnicastTraffic
+    per_row: true
+    group_by: ["nve_instance", "vni"]
+    sources:
+      - metric: _cnvoVNetInUnicastBytes
+        table: cnvoVNetStatsTable
+        as: in
+      - metric: _cnvoVNetOutUnicastBytes
+        table: cnvoVNetStatsTable
+        as: out
+    chart_meta:
+      description: VXLAN VNI unicast traffic
+      family: 'Network/VXLAN/VNI/Traffic/Unicast'
+      unit: "bit/s"
+
+  # Per-VNI unicast packets
+  - name: cnvoVNetUnicastPackets
+    per_row: true
+    group_by: ["nve_instance", "vni"]
+    sources:
+      - metric: _cnvoVNetInUnicastPackets
+        table: cnvoVNetStatsTable
+        as: in
+      - metric: _cnvoVNetOutUnicastPackets
+        table: cnvoVNetStatsTable
+        as: out
+    chart_meta:
+      description: VXLAN VNI unicast packets
+      family: 'Network/VXLAN/VNI/Packets/Unicast'
+      unit: "{packet}/s"
+
+  # Per-VNI multicast traffic
+  - name: cnvoVNetMulticastTraffic
+    per_row: true
+    group_by: ["nve_instance", "vni"]
+    sources:
+      - metric: _cnvoVNetInMulticastBytes
+        table: cnvoVNetStatsTable
+        as: in
+      - metric: _cnvoVNetOutMulticastBytes
+        table: cnvoVNetStatsTable
+        as: out
+    chart_meta:
+      description: VXLAN VNI multicast traffic (BUM replication)
+      family: 'Network/VXLAN/VNI/Traffic/Multicast'
+      unit: "bit/s"
+
+  # Per-peer unicast traffic (one chart per peer row — full index differentiates peers)
+  - name: cnvoNvoPeerUnicastTraffic
+    per_row: true
+    sources:
+      - metric: _cnvoNvoPeerInUnicastBytes
+        table: cnvoNvoPeerStatsTable
+        as: in
+      - metric: _cnvoNvoPeerOutUnicastBytes
+        table: cnvoNvoPeerStatsTable
+        as: out
+    chart_meta:
+      description: VXLAN per-peer unicast traffic
+      family: 'Network/VXLAN/Peer/Traffic/Unicast'
+      unit: "bit/s"
+
+  # Per-peer unicast packets
+  - name: cnvoNvoPeerUnicastPackets
+    per_row: true
+    sources:
+      - metric: _cnvoNvoPeerInUnicastPackets
+        table: cnvoNvoPeerStatsTable
+        as: in
+      - metric: _cnvoNvoPeerOutUnicastPackets
+        table: cnvoNvoPeerStatsTable
+        as: out
+    chart_meta:
+      description: VXLAN per-peer unicast packets
+      family: 'Network/VXLAN/Peer/Packets/Unicast'
+      unit: "{packet}/s"

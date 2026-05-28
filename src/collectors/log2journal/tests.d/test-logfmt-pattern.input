@@ -1,0 +1,1 @@
+level=info method=GET path="/api/users" status=200 duration=150ms req_id=abc-123 msg="User list retrieved" user_token=secret123

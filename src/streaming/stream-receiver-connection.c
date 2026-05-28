@@ -229,7 +229,17 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
 //            return false;
 //        }
 
-        if(!rrdhost_set_receiver(host, rpt)) {
+        RRDHOST_SET_RECEIVER_RESULT result = rrdhost_set_receiver(host, rpt);
+        if (result == RRDHOST_SET_RECEIVER_CLEANUP_BUSY) {
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; internal cleanup is in progress for this node, please retry shortly",
+                STREAM_HANDSHAKE_PARENT_BUSY_TRY_LATER, NDLP_INFO);
+
+            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_BUSY_TRY_LATER);
+            return false;
+        }
+        if (result == RRDHOST_SET_RECEIVER_ALREADY_ATTACHED) {
             stream_receiver_log_status(
                 rpt,
                 "rejecting streaming connection; host is already served by another receiver",
@@ -611,6 +621,34 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
         stream_receiver_free(rpt);
         return HTTP_RESP_OK;
+    }
+
+    {
+        RRDHOST *existing = rrdhost_find_by_guid(rpt->machine_guid);
+        // RRDHOST_OPTION_VIRTUAL_HOST is only set by local collectors (pluginsd_host_define_end),
+        // never by streaming. The stale detection in pluginsd_host() clears it when a vnode stops
+        // being collected, so archived/orphaned vnodes will not have this flag set.
+        // No additional checks for RRDHOST_FLAG_COLLECTOR_ONLINE or RRDHOST_FLAG_ARCHIVED are needed.
+        if(existing && rrdhost_is_virtual(existing)) {
+            stream_receiver_takeover_web_connection(w, rpt);
+
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; this is a locally collected vnode",
+                STREAM_HANDSHAKE_PARENT_VNODE_IS_LOCAL, NDLP_DEBUG);
+
+            char initial_response[HTTP_HEADER_SIZE + 1];
+            snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_LOCAL_VNODE);
+
+            if(nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60) !=
+                (ssize_t)strlen(initial_response)) {
+                nd_log_daemon(NDLP_ERR, "STREAM RCV '%s' [from [%s]:%s]: failed to reply.",
+                              rpt->hostname, rpt->remote_ip, rpt->remote_port);
+            }
+
+            stream_receiver_free(rpt);
+            return HTTP_RESP_OK;
+        }
     }
 
     if(unlikely(web_client_streaming_rate_t > 0)) {

@@ -11,65 +11,66 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
+//go:embed "charts.yaml"
+var pingChartTemplateV2 string
+
 func init() {
-	module.Register("ping", module.Creator{
+	collectorapi.Register("ping", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 5,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		CreateV2: func() collectorapi.CollectorV2 { return New() },
+		Config:   func() any { return &Config{} },
 	})
 }
 
 func New() *Collector {
+	store := metrix.NewCollectorStore()
+
 	return &Collector{
 		Config: Config{
-			ProberConfig: ProberConfig{
+			ProbeConfig: pinger.ProbeConfig{
 				Network:    "ip",
 				Privileged: true,
 				Packets:    5,
 				Interval:   confopt.Duration(time.Millisecond * 100),
 			},
-			JitterEWMASamples: 16,
-			JitterSMAWindow:   10,
+			AnalysisConfig: pinger.AnalysisConfig{
+				JitterEWMASamples: 16,
+				JitterSMAWindow:   10,
+			},
 		},
 
-		charts:     &module.Charts{},
-		hosts:      make(map[string]bool),
-		newProber:  NewProber,
-		jitterEWMA: make(map[string]float64),
-		jitterSMA:  make(map[string][]float64),
+		newPinger: pinger.New,
+		store:     store,
 	}
 }
 
 type Config struct {
-	Vnode             string   `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery       int      `yaml:"update_every,omitempty" json:"update_every"`
-	Hosts             []string `yaml:"hosts" json:"hosts"`
-	JitterEWMASamples int      `yaml:"jitter_ewma_samples,omitempty" json:"jitter_ewma_samples"`
-	JitterSMAWindow   int      `yaml:"jitter_sma_window,omitempty" json:"jitter_sma_window"`
-	ProberConfig      `yaml:",inline" json:",inline"`
+	Vnode                 string   `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery           int      `yaml:"update_every,omitempty" json:"update_every"`
+	Hosts                 []string `yaml:"hosts" json:"hosts"`
+	pinger.ProbeConfig    `yaml:",inline" json:",inline"`
+	pinger.AnalysisConfig `yaml:",inline" json:",inline"`
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *module.Charts
+	client    pinger.Client
+	newPinger func(pinger.Config, *logger.Logger) (pinger.Client, error)
 
-	prober    Prober
-	newProber func(ProberConfig, *logger.Logger) Prober
-
-	hosts      map[string]bool
-	jitterEWMA map[string]float64   // EWMA jitter state per host
-	jitterSMA  map[string][]float64 // SMA jitter window per host
+	store metrix.CollectorStore
 }
 
 func (c *Collector) Configuration() any {
@@ -82,41 +83,27 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	pr, err := c.initProber()
+	pr, err := c.initPinger()
 	if err != nil {
-		return fmt.Errorf("init ping prober: %v", err)
+		return fmt.Errorf("init ping client: %v", err)
 	}
-	c.prober = pr
+	c.client = pr
 
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
-	if err != nil {
-		return err
-	}
-	if len(mx) == 0 {
+func (c *Collector) Check(ctx context.Context) error {
+	samples := c.collectSamples(ctx, false)
+	if len(samples) == 0 {
 		return errors.New("no metrics collected")
-
 	}
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
-	return c.charts
-}
-
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
-	if err != nil {
-		c.Error(err)
-	}
-
-	if len(mx) == 0 {
-		return nil
-	}
-	return mx
-}
+func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 
 func (c *Collector) Cleanup(context.Context) {}
+
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
+
+func (c *Collector) ChartTemplateYAML() string { return pingChartTemplateV2 }

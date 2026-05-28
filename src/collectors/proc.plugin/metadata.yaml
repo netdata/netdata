@@ -17,7 +17,6 @@ modules:
       keywords:
         - cpu utilization
         - process counts
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -215,7 +214,6 @@ modules:
         description: ""
       keywords:
         - entropy
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -323,7 +321,6 @@ modules:
         description: ""
       keywords:
         - uptime
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -410,7 +407,6 @@ modules:
         - page faults
         - oom
         - numa
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -626,7 +622,6 @@ modules:
         description: ""
       keywords:
         - interrupts
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -742,7 +737,6 @@ modules:
       keywords:
         - load
         - load average
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -870,7 +864,6 @@ modules:
         description: ""
       keywords:
         - pressure
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1045,7 +1038,6 @@ modules:
       keywords:
         - softirqs
         - interrupts
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1152,7 +1144,6 @@ modules:
         description: ""
       keywords:
         - softnet
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1280,7 +1271,6 @@ modules:
         - ram
         - available
         - committed
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1519,7 +1509,6 @@ modules:
         description: ""
       keywords:
         - memory page types
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration provides metrics about the system's memory page types"
@@ -1612,7 +1601,6 @@ modules:
         - dimm
         - ram
         - hardware
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1752,7 +1740,6 @@ modules:
         description: ""
       keywords:
         - numa
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1846,7 +1833,6 @@ modules:
         - ksm
         - samepage
         - merging
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1941,7 +1927,6 @@ modules:
         description: ""
       keywords:
         - zram
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2042,7 +2027,6 @@ modules:
         - ipc
         - semaphores
         - shared memory
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2172,7 +2156,6 @@ modules:
         - disks
         - io
         - block devices
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2384,7 +2367,6 @@ modules:
         - cache
         - ssd
         - block devices
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2533,7 +2515,6 @@ modules:
         - mdadm
         - mdstat
         - raid
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors the status of MD RAID devices."
@@ -2671,7 +2652,6 @@ modules:
         description: ""
       keywords:
         - network interfaces
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor network interface metrics about bandwidth, state, errors and more."
@@ -2893,7 +2873,6 @@ modules:
         description: ""
       keywords:
         - wireless devices
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor wireless devices with metrics about status, link quality, signal level, noise level and more."
@@ -3004,7 +2983,6 @@ modules:
       keywords:
         - infiniband
         - rdma
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors InfiniBand network inteface statistics."
@@ -3151,7 +3129,6 @@ modules:
         - icmp
         - netstat
         - snmp
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration provides metrics from the `netstat`, `snmp` and `snmp6` modules."
@@ -3731,7 +3708,6 @@ modules:
         description: ""
       keywords:
         - sockets
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration provides socket statistics."
@@ -3865,7 +3841,6 @@ modules:
         description: ""
       keywords:
         - ipv6 sockets
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration provides IPv6 socket statistics."
@@ -3962,7 +3937,6 @@ modules:
         description: ""
       keywords:
         - ip virtual server
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors IP Virtual Server statistics"
@@ -4050,7 +4024,6 @@ modules:
       keywords:
         - nfs client
         - filesystem
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration provides statistics from the Linux kernel's NFS Client."
@@ -4151,7 +4124,6 @@ modules:
       keywords:
         - nfs server
         - filesystem
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration provides statistics from the Linux kernel's NFS Server."
@@ -4285,7 +4257,6 @@ modules:
       keywords:
         - sctp
         - stream control transmission protocol
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration provides statistics about the Stream Control Transmission Protocol (SCTP)."
@@ -4390,7 +4361,6 @@ modules:
         - connection tracking mechanism
         - netfilter
         - conntrack
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors the connection tracking mechanism of Netfilter in the Linux Kernel."
@@ -4509,7 +4479,6 @@ modules:
         description: ""
       keywords:
         - synproxy
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration provides statistics about the Synproxy netfilter module."
@@ -4599,7 +4568,6 @@ modules:
         - arc
         - zfs
         - filesystem
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors  ZFS Adadptive Replacement Cache (ARC) statistics."
@@ -4863,7 +4831,6 @@ modules:
       keywords:
         - btrfs
         - filesystem
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration provides usage and error statistics from the BTRFS filesystem."
@@ -5053,7 +5020,6 @@ modules:
       keywords:
         - psu
         - power supply
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors Power supply metrics, such as battery status, AC power status and more."
@@ -5170,7 +5136,6 @@ modules:
         - amd
         - gpu
         - hardware
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors AMD GPU metrics, such as utilization, clock frequency and memory usage."

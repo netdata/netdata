@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioConnectorRequestsCount = module.Priority + iota
+	prioConnectorRequestsCount = collectorapi.Priority + iota
 	prioConnectorRequestsBandwidth
 	prioConnectorRequestsProcessingTime
 	prioConnectorRequestsErrors
@@ -23,19 +23,19 @@ const (
 )
 
 var (
-	defaultCharts = module.Charts{
+	defaultCharts = collectorapi.Charts{
 		jvmMemoryUsageChart.Copy(),
 	}
 
-	jvmMemoryUsageChart = module.Chart{
+	jvmMemoryUsageChart = collectorapi.Chart{
 		ID:       "jvm_memory_usage",
 		Title:    "JVM Memory Usage",
 		Units:    "bytes",
 		Fam:      "memory",
 		Ctx:      "tomcat.jvm_memory_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioJvmMemoryUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jvm_memory_free", Name: "free"},
 			{ID: "jvm_memory_used", Name: "used"},
 		},
@@ -43,7 +43,7 @@ var (
 )
 
 var (
-	connectorChartsTmpl = module.Charts{
+	connectorChartsTmpl = collectorapi.Charts{
 		connectorRequestsCountChartTmpl.Copy(),
 		connectorRequestsBandwidthChartTmpl.Copy(),
 		connectorRequestsProcessingTimeChartTmpl.Copy(),
@@ -51,65 +51,65 @@ var (
 		connectorRequestThreadsChartTmpl.Copy(),
 	}
 
-	connectorRequestsCountChartTmpl = module.Chart{
+	connectorRequestsCountChartTmpl = collectorapi.Chart{
 		ID:       "connector_%_requests",
 		Title:    "Connector Requests",
 		Units:    "requests/s",
 		Fam:      "requests",
 		Ctx:      "tomcat.connector_requests",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioConnectorRequestsCount,
-		Dims: module.Dims{
-			{ID: "connector_%s_request_info_request_count", Name: "requests", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "connector_%s_request_info_request_count", Name: "requests", Algo: collectorapi.Incremental},
 		},
 	}
-	connectorRequestsBandwidthChartTmpl = module.Chart{
+	connectorRequestsBandwidthChartTmpl = collectorapi.Chart{
 		ID:       "connector_%s_requests_bandwidth",
 		Title:    "Connector Requests Bandwidth",
 		Units:    "bytes/s",
 		Fam:      "requests",
 		Ctx:      "tomcat.connector_bandwidth",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioConnectorRequestsBandwidth,
-		Dims: module.Dims{
-			{ID: "connector_%s_request_info_bytes_received", Name: "received", Algo: module.Incremental},
-			{ID: "connector_%s_request_info_bytes_sent", Name: "sent", Mul: -1, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "connector_%s_request_info_bytes_received", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "connector_%s_request_info_bytes_sent", Name: "sent", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	connectorRequestsProcessingTimeChartTmpl = module.Chart{
+	connectorRequestsProcessingTimeChartTmpl = collectorapi.Chart{
 		ID:       "connector_%_requests_processing_time",
 		Title:    "Connector Requests Processing Time",
 		Units:    "milliseconds",
 		Fam:      "requests",
 		Ctx:      "tomcat.connector_requests_processing_time",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioConnectorRequestsProcessingTime,
-		Dims: module.Dims{
-			{ID: "connector_%s_request_info_processing_time", Name: "processing_time", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "connector_%s_request_info_processing_time", Name: "processing_time", Algo: collectorapi.Incremental},
 		},
 	}
-	connectorRequestsErrorsChartTmpl = module.Chart{
+	connectorRequestsErrorsChartTmpl = collectorapi.Chart{
 		ID:       "connector_%_errors",
 		Title:    "Connector Errors",
 		Units:    "errors/s",
 		Fam:      "requests",
 		Ctx:      "tomcat.connector_errors",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioConnectorRequestsErrors,
-		Dims: module.Dims{
-			{ID: "connector_%s_request_info_error_count", Name: "errors", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "connector_%s_request_info_error_count", Name: "errors", Algo: collectorapi.Incremental},
 		},
 	}
 
-	connectorRequestThreadsChartTmpl = module.Chart{
+	connectorRequestThreadsChartTmpl = collectorapi.Chart{
 		ID:       "connector_%s_request_threads",
 		Title:    "Connector RequestConfig Threads",
 		Units:    "threads",
 		Fam:      "threads",
 		Ctx:      "tomcat.connector_request_threads",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioConnectorRequestThreads,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "connector_%s_thread_info_idle", Name: "idle"},
 			{ID: "connector_%s_thread_info_busy", Name: "busy"},
 		},
@@ -117,19 +117,19 @@ var (
 )
 
 var (
-	jvmMemoryPoolChartsTmpl = module.Charts{
+	jvmMemoryPoolChartsTmpl = collectorapi.Charts{
 		jvmMemoryPoolMemoryUsageChartTmpl.Copy(),
 	}
 
-	jvmMemoryPoolMemoryUsageChartTmpl = module.Chart{
+	jvmMemoryPoolMemoryUsageChartTmpl = collectorapi.Chart{
 		ID:       "jvm_mem_pool_%s_memory_usage",
 		Title:    "JVM Mem Pool Memory Usage",
 		Units:    "bytes",
 		Fam:      "memory",
 		Ctx:      "tomcat.jvm_mem_pool_memory_usage",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioJvmMemoryPoolMemoryUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jvm_memorypool_%s_commited", Name: "commited"},
 			{ID: "jvm_memorypool_%s_used", Name: "used"},
 			{ID: "jvm_memorypool_%s_max", Name: "max"},
@@ -142,7 +142,7 @@ func (c *Collector) addConnectorCharts(name string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(name))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "connector_name", Value: strings.Trim(name, "\"")},
 		}
 		for _, dim := range chart.Dims {
@@ -162,7 +162,7 @@ func (c *Collector) addMemPoolCharts(name, typ string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(name))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "mempool_name", Value: name},
 			{Key: "mempool_type", Value: typ},
 		}

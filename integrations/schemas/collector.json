@@ -86,10 +86,6 @@
                   "description"
                 ]
               },
-              "most_popular": {
-                "type": "boolean",
-                "description": "Whether or not the integration is to be flagged as most-popular, meaning it will show up at the top of the menu."
-              },
               "community": {
                 "type": "boolean",
                 "description": "Whether or not the integration should be flagged as community."
@@ -100,10 +96,9 @@
               "module_name",
               "monitored_instance",
               "keywords",
-              "related_resources",
-              "info_provided_to_referring_integrations",
-              "most_popular"
-            ]
+                "related_resources",
+                "info_provided_to_referring_integrations"
+              ]
           },
           "overview": {
             "type": "object",
@@ -283,6 +278,54 @@
                 "items": {
                   "type": "string",
                   "description": "Availability condition name."
+                }
+              },
+              "dynamic_context_prefixes": {
+                "type": "array",
+                "description": "Dynamic chart context prefixes this collector is allowed to reference from taxonomy.yaml. Use only when the collector emits contexts that are not fully listed in metadata.yaml but share a stable namespace prefix.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "prefix": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Static prefix shared by dynamic chart contexts."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Why this collector needs a dynamic context-prefix selector."
+                    }
+                  },
+                  "required": [
+                    "prefix",
+                    "reason"
+                  ]
+                }
+              },
+              "dynamic_collect_plugins": {
+                "type": "array",
+                "description": "Agent collect_plugin labels this collector is allowed to reference from taxonomy.yaml. Use only when dynamic chart contexts cannot be selected by stable context prefix.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "plugin": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Agent _collect_plugin label value."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Why this collector needs a collect_plugin selector."
+                    }
+                  },
+                  "required": [
+                    "plugin",
+                    "reason"
+                  ]
                 }
               },
               "scopes": {

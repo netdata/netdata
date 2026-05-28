@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collectMetricsPrometheus(mx map[string]int64) error {
@@ -143,8 +143,8 @@ func (c *Collector) collectGaugeBool(mx map[string]int64, mfs prometheus.MetricF
 	v := mf.Metrics()[0].Gauge().Value()
 
 	if !math.IsNaN(v) {
-		mx[name+"_yes"] = metrix.Bool(v == 1)
-		mx[name+"_no"] = metrix.Bool(v == 0)
+		mx[name+"_yes"] = oldmetrix.Bool(v == 1)
+		mx[name+"_no"] = oldmetrix.Bool(v == 0)
 	}
 }
 

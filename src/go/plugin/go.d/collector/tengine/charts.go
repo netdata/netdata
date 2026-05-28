@@ -2,13 +2,13 @@
 
 package tengine
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
 )
 
 var charts = Charts{
@@ -18,10 +18,10 @@ var charts = Charts{
 		Units: "B/s",
 		Fam:   "bandwidth",
 		Ctx:   "tengine.bandwidth_total",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: "bytes_in", Name: "in", Algo: module.Incremental},
-			{ID: "bytes_out", Name: "out", Algo: module.Incremental, Mul: -1},
+			{ID: "bytes_in", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "bytes_out", Name: "out", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	},
 	{
@@ -31,7 +31,7 @@ var charts = Charts{
 		Fam:   "connections",
 		Ctx:   "tengine.connections_total",
 		Dims: Dims{
-			{ID: "conn_total", Name: "accepted", Algo: module.Incremental},
+			{ID: "conn_total", Name: "accepted", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -41,7 +41,7 @@ var charts = Charts{
 		Fam:   "requests",
 		Ctx:   "tengine.requests_total",
 		Dims: Dims{
-			{ID: "req_total", Name: "processed", Algo: module.Incremental},
+			{ID: "req_total", Name: "processed", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -50,13 +50,13 @@ var charts = Charts{
 		Units: "requests/s",
 		Fam:   "requests",
 		Ctx:   "tengine.requests_per_response_code_family_total",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "http_2xx", Name: "2xx", Algo: module.Incremental},
-			{ID: "http_5xx", Name: "5xx", Algo: module.Incremental},
-			{ID: "http_3xx", Name: "3xx", Algo: module.Incremental},
-			{ID: "http_4xx", Name: "4xx", Algo: module.Incremental},
-			{ID: "http_other_status", Name: "other", Algo: module.Incremental},
+			{ID: "http_2xx", Name: "2xx", Algo: collectorapi.Incremental},
+			{ID: "http_5xx", Name: "5xx", Algo: collectorapi.Incremental},
+			{ID: "http_3xx", Name: "3xx", Algo: collectorapi.Incremental},
+			{ID: "http_4xx", Name: "4xx", Algo: collectorapi.Incremental},
+			{ID: "http_other_status", Name: "other", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -65,22 +65,22 @@ var charts = Charts{
 		Units: "requests/s",
 		Ctx:   "tengine.requests_per_response_code_detailed_total",
 		Fam:   "requests",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "http_200", Name: "200", Algo: module.Incremental},
-			{ID: "http_206", Name: "206", Algo: module.Incremental},
-			{ID: "http_302", Name: "302", Algo: module.Incremental},
-			{ID: "http_304", Name: "304", Algo: module.Incremental},
-			{ID: "http_403", Name: "403", Algo: module.Incremental},
-			{ID: "http_404", Name: "404", Algo: module.Incremental},
-			{ID: "http_416", Name: "419", Algo: module.Incremental},
-			{ID: "http_499", Name: "499", Algo: module.Incremental},
-			{ID: "http_500", Name: "500", Algo: module.Incremental},
-			{ID: "http_502", Name: "502", Algo: module.Incremental},
-			{ID: "http_503", Name: "503", Algo: module.Incremental},
-			{ID: "http_504", Name: "504", Algo: module.Incremental},
-			{ID: "http_508", Name: "508", Algo: module.Incremental},
-			{ID: "http_other_detail_status", Name: "other", Algo: module.Incremental},
+			{ID: "http_200", Name: "200", Algo: collectorapi.Incremental},
+			{ID: "http_206", Name: "206", Algo: collectorapi.Incremental},
+			{ID: "http_302", Name: "302", Algo: collectorapi.Incremental},
+			{ID: "http_304", Name: "304", Algo: collectorapi.Incremental},
+			{ID: "http_403", Name: "403", Algo: collectorapi.Incremental},
+			{ID: "http_404", Name: "404", Algo: collectorapi.Incremental},
+			{ID: "http_416", Name: "419", Algo: collectorapi.Incremental},
+			{ID: "http_499", Name: "499", Algo: collectorapi.Incremental},
+			{ID: "http_500", Name: "500", Algo: collectorapi.Incremental},
+			{ID: "http_502", Name: "502", Algo: collectorapi.Incremental},
+			{ID: "http_503", Name: "503", Algo: collectorapi.Incremental},
+			{ID: "http_504", Name: "504", Algo: collectorapi.Incremental},
+			{ID: "http_508", Name: "508", Algo: collectorapi.Incremental},
+			{ID: "http_other_detail_status", Name: "other", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -90,7 +90,7 @@ var charts = Charts{
 		Fam:   "upstream",
 		Ctx:   "tengine.requests_upstream_total",
 		Dims: Dims{
-			{ID: "ups_req", Name: "requests", Algo: module.Incremental},
+			{ID: "ups_req", Name: "requests", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -100,7 +100,7 @@ var charts = Charts{
 		Fam:   "upstream",
 		Ctx:   "tengine.tries_upstream_total",
 		Dims: Dims{
-			{ID: "ups_tries", Name: "calls", Algo: module.Incremental},
+			{ID: "ups_tries", Name: "calls", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -108,11 +108,11 @@ var charts = Charts{
 		Title: "Upstream Requests Per Response Code Family",
 		Units: "requests/s",
 		Fam:   "upstream",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Ctx:   "tengine.requests_upstream_per_response_code_family_total",
 		Dims: Dims{
-			{ID: "http_ups_4xx", Name: "4xx", Algo: module.Incremental},
-			{ID: "http_ups_5xx", Name: "5xx", Algo: module.Incremental},
+			{ID: "http_ups_4xx", Name: "4xx", Algo: collectorapi.Incremental},
+			{ID: "http_ups_5xx", Name: "5xx", Algo: collectorapi.Incremental},
 		},
 	},
 }

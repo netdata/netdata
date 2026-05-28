@@ -23,12 +23,12 @@ arch_order:  # sort order for per-architecture jobs in CI
 arch_data:  # Mapping of per-architecture matrix behavior.
   amd64: &amd64
     qemu: false
-    runner: &x86-runner ubuntu-22.04
+    runner: &x86-runner ubuntu-24.04
   x86_64: *amd64
   i386: *amd64
   armhf: &arm
     qemu: false
-    runner: &arm-runner ubuntu-22.04-arm
+    runner: &arm-runner ubuntu-24.04-arm
   armhfp: *arm
   armv6l: *arm
   armv7l: *arm
@@ -69,12 +69,12 @@ include:
     test:
       ebpf-core: true
   - <<: *alpine
-    version: "3.21"
+    version: "3.23"
     support_type: Core
     notes: ''
     eol_check: true
   - <<: *alpine
-    version: "3.20"
+    version: "3.22"
     support_type: Core
     notes: ''
     eol_check: true
@@ -216,7 +216,7 @@ include:
 
   - &fedora
     distro: fedora
-    version: "43"
+    version: "44"
     support_type: Core
     notes: ''
     eol_check: true
@@ -225,11 +225,18 @@ include:
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/43
+      repo_distro: fedora/44
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "43"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/43
     test:
       ebpf-core: true
   - <<: *fedora
@@ -356,7 +363,7 @@ include:
 
   - &ubuntu
     distro: ubuntu
-    version: "24.04"
+    version: "26.04"
     support_type: Core
     notes: ''
     eol_check: true
@@ -369,7 +376,7 @@ include:
       apt-get remove -y libjson-c-dev
     packages: &ubuntu_packages
       type: deb
-      repo_distro: ubuntu/noble
+      repo_distro: ubuntu/resolute
       builder_rev: v2
       arches:
         - amd64
@@ -382,6 +389,11 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/questing
+  - <<: *ubuntu
+    version: "24.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/noble
   - <<: *ubuntu
     version: "22.04"
     packages:

@@ -1,0 +1,21 @@
+pattern: "test pattern"
+
+# Test wrong types for various fields
+
+# inject should be an array, not a string
+inject: "this should be an array"
+
+# rewrite with wrong type for stop field
+rewrite:
+  - key: TEST_KEY
+    value: "test"
+    stop: "yes"  # should be boolean yes/no, not string
+    
+# rename with missing required fields
+rename:
+  - new_key: NEW_NAME
+    # missing old_key
+    
+# filter include with wrong type
+filter:
+  include: 123  # should be a string pattern

@@ -1,5 +1,4 @@
 //go:build cgo
-// +build cgo
 
 package as400
 
@@ -1069,10 +1068,7 @@ func (c *Collector) slowPathIntervalSeconds() int {
 	}
 	interval := int(c.slow.config.interval / time.Second)
 	if interval < 1 {
-		interval = c.fastPathIntervalSeconds()
-		if interval < 1 {
-			interval = 1
-		}
+		interval = max(c.fastPathIntervalSeconds(), 1)
 	}
 	return interval
 }
@@ -1110,8 +1106,8 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	c.Collector.Cleanup(ctx)
 }
 
-// EnableDump allows the collector to emit structured dump artifacts when requested.
-func (c *Collector) EnableDump(dir string) {
+// EnableCaptureArtifacts allows the collector to emit structured capture artifacts when requested.
+func (c *Collector) EnableCaptureArtifacts(dir string) {
 	ctx, err := newDumpContext(dir, &c.Config)
 	if err != nil {
 		c.Errorf("failed to initialise dump context: %v", err)

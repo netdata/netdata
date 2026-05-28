@@ -31,6 +31,9 @@ struct adfs_certificate {
     RRDSET *st_adfs_device_authentications_total;
     RRDDIM *rd_adfs_device_authentications_total;
 
+    RRDSET *st_adfs_extranet_account_lockouts_total;
+    RRDDIM *rd_adfs_extranet_account_lockouts_total;
+
     RRDSET *st_adfs_external_authentications;
     RRDDIM *rd_adfs_external_authentications_success;
     RRDDIM *rd_adfs_external_authentications_failure;
@@ -128,6 +131,7 @@ struct adfs_certificate {
 
     // Auth
     COUNTER_DATA ADFSDeviceAuthentications;
+    COUNTER_DATA ADFSExtranetAccountLockouts;
     COUNTER_DATA ADFSExternalAuthenticationsSuccess;
     COUNTER_DATA ADFSExternalAuthenticationsFailure;
     COUNTER_DATA ADFSFederationAuthentications;
@@ -184,6 +188,7 @@ struct adfs_certificate {
 
     // Auth
     .st_adfs_device_authentications_total = NULL,
+    .st_adfs_extranet_account_lockouts_total = NULL,
     .st_adfs_external_authentications = NULL,
     .st_adfs_federation_authentications = NULL,
     .st_adfs_federation_metadata_authentications = NULL,
@@ -226,6 +231,7 @@ struct adfs_certificate {
 
     // Auth
     .ADFSDeviceAuthentications.key = "Device Authentications",
+    .ADFSExtranetAccountLockouts.key = "Extranet Account Lockouts",
     .ADFSExternalAuthenticationsSuccess.key = "External Authentications",
     .ADFSExternalAuthenticationsFailure.key = "External Authentication Failures",
     .ADFSFederationAuthentications.key = "Federated Authentications",
@@ -241,9 +247,9 @@ struct adfs_certificate {
     .ADFSOauthClientPrivkeyJwtAuthenticationFailure.key = "OAuth Client Private Key Jwt Authentication Failures",
     .ADFSOauthClientSecretBasicAuthenticationsSuccess.key = "OAuth Client Secret Basic Authentications",
     .ADFSOauthClientSecretBasicAuthenticationsFailure.key = "OAuth Client Secret Basic Authentication Failures",
-    .ADFSOauthClientSecretPostAuthenticationsSuccess.key = "OAuth Client Secret Post Authentication",
+    .ADFSOauthClientSecretPostAuthenticationsSuccess.key = "OAuth Client Secret Post Authentications",
     .ADFSOauthClientSecretPostAuthenticationsFailure.key = "OAuth Client Secret Post Authentication Failures",
-    .ADFSOauthClientWindowsAuthenticationsSuccess.key = "OAuth Client Windows Integrated Authentication",
+    .ADFSOauthClientWindowsAuthenticationsSuccess.key = "OAuth Client Windows Integrated Authentications",
     .ADFSOauthClientWindowsAuthenticationsFailure.key = "OAuth Client Windows Integrated Authentication Failures",
     .ADFSOauthLogonCertificateRequestsSuccess.key = "OAuth Logon Certificate Token Requests",
     .ADFSOauthLogonCertificateRequestsFailure.key = "OAuth Logon Certificate Request Failures",
@@ -498,6 +504,41 @@ void netdata_adfs_device_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
         adfs.rd_adfs_device_authentications_total,
         (collected_number)adfs.ADFSDeviceAuthentications.current.Data);
     rrdset_done(adfs.st_adfs_device_authentications_total);
+}
+
+void netdata_adfs_extranet_account_lockouts(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &adfs.ADFSExtranetAccountLockouts)) {
+        return;
+    }
+
+    if (!adfs.st_adfs_extranet_account_lockouts_total) {
+        adfs.st_adfs_extranet_account_lockouts_total = rrdset_create_localhost(
+            "adfs",
+            "extranet_account_lockouts",
+            NULL,
+            "auth",
+            "adfs.extranet_account_lockouts",
+            "Extranet account lockouts",
+            "lockouts/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibADFS",
+            PRIO_ADFS_EXTRANET_ACCOUNT_LOCKOUTS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        adfs.rd_adfs_extranet_account_lockouts_total = rrddim_add(
+            adfs.st_adfs_extranet_account_lockouts_total, "lockouts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        adfs.st_adfs_extranet_account_lockouts_total,
+        adfs.rd_adfs_extranet_account_lockouts_total,
+        (collected_number)adfs.ADFSExtranetAccountLockouts.current.Data);
+    rrdset_done(adfs.st_adfs_extranet_account_lockouts_total);
 }
 
 void netdata_adfs_external_authentications(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
@@ -1429,6 +1470,7 @@ static bool do_ADFS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         // Auth
         netdata_adfs_device_authentications,
+        netdata_adfs_extranet_account_lockouts,
         netdata_adfs_external_authentications,
         netdata_adfs_federated_authentications,
         netdata_adfs_federation_metadata_authentications,

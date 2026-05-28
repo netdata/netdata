@@ -1,0 +1,1 @@
+192.168.1.1 - user1 [01/Jan/2024:10:00:00 +0000] "GET /index.html HTTP/1.1" 200 1234 "https://example.com" "Mozilla/5.0"

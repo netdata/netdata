@@ -18,7 +18,7 @@ FILE_LOCK file_lock_get(const char *filename) {
 
 #if defined(OS_LINUX) || defined(OS_FREEBSD) || defined(OS_MACOS)
     // Try to create a new file, or open existing one
-    int fd = open(filename, O_RDWR | O_CREAT, 0666);
+    int fd = open(filename, O_RDWR | O_CREAT, 0600);
     if(fd == -1)
         return FILE_LOCK_INVALID;
 

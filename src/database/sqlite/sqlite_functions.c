@@ -55,7 +55,7 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
             case SQLITE_BUSY:
             case SQLITE_LOCKED:
                 pulse_sqlite3_query_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
-                usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+                sleep_usec(SQLITE_INSERT_DELAY * USEC_PER_MS);
                 continue;
             default:
                 break;
@@ -77,7 +77,7 @@ static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database, int r
     if (db_meta == database) {
         char recover_file[FILENAME_MAX + 1];
         snprintfz(recover_file, FILENAME_MAX, "%s/.netdata-meta.db.%s", netdata_configured_cache_dir, SQLITE_CORRUPT == rc ? "recover" : "delete" );
-        int fd = open(recover_file, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 444);
+        int fd = open(recover_file, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
         if (fd >= 0) {
             close(fd);
             return true;
@@ -347,7 +347,7 @@ int db_execute(sqlite3 *db, const char *cmd, int *sqlite_rc)
         }
 
         if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
-            usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+            sleep_usec(SQLITE_INSERT_DELAY * USEC_PER_MS);
             continue;
         }
 
@@ -454,6 +454,22 @@ void sql_close_database(sqlite3 *database, const char *database_name)
 }
 
 extern sqlite3 *db_context_meta;
+
+// Close a thread-local sqlite3 handle while serializing against sqlite_library_shutdown().
+// If the SQLite library is no longer initialized, the handle is leaked deliberately; the OS
+// will reclaim it at process exit, which is strictly safer than crashing inside pcache1.
+void sql_close_thread_db_safe(sqlite3 **database)
+{
+    if (unlikely(!database || !*database))
+        return;
+
+    spinlock_lock(&sqlite_spinlock);
+    if (sqlite_library_initialized)
+        (void) sqlite3_close_v2(*database);
+    spinlock_unlock(&sqlite_spinlock);
+
+    *database = NULL;
+}
 
 void sqlite_close_databases(void)
 {

@@ -2,12 +2,12 @@
 
 package hdfs
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	Charts = module.Charts
-	Dims   = module.Dims
-	Vars   = module.Vars
+	Charts = collectorapi.Charts
+	Dims   = collectorapi.Dims
+	Vars   = collectorapi.Vars
 )
 
 var jvmCharts = Charts{
@@ -17,7 +17,7 @@ var jvmCharts = Charts{
 		Units: "MiB",
 		Fam:   "jvm",
 		Ctx:   "hdfs.heap_memory",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: "jvm_mem_heap_committed", Name: "committed", Div: 1000},
 			{ID: "jvm_mem_heap_used", Name: "used", Div: 1000},
@@ -33,7 +33,7 @@ var jvmCharts = Charts{
 		Fam:   "jvm",
 		Ctx:   "hdfs.gc_count_total",
 		Dims: Dims{
-			{ID: "jvm_gc_count", Name: "gc", Algo: module.Incremental},
+			{ID: "jvm_gc_count", Name: "gc", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -43,7 +43,7 @@ var jvmCharts = Charts{
 		Fam:   "jvm",
 		Ctx:   "hdfs.gc_time_total",
 		Dims: Dims{
-			{ID: "jvm_gc_time_millis", Name: "time", Algo: module.Incremental},
+			{ID: "jvm_gc_time_millis", Name: "time", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -53,8 +53,8 @@ var jvmCharts = Charts{
 		Fam:   "jvm",
 		Ctx:   "hdfs.gc_threshold",
 		Dims: Dims{
-			{ID: "jvm_gc_num_info_threshold_exceeded", Name: "info", Algo: module.Incremental},
-			{ID: "jvm_gc_num_warn_threshold_exceeded", Name: "warn", Algo: module.Incremental},
+			{ID: "jvm_gc_num_info_threshold_exceeded", Name: "info", Algo: collectorapi.Incremental},
+			{ID: "jvm_gc_num_warn_threshold_exceeded", Name: "warn", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -63,7 +63,7 @@ var jvmCharts = Charts{
 		Units: "num",
 		Fam:   "jvm",
 		Ctx:   "hdfs.threads",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "jvm_threads_new", Name: "new"},
 			{ID: "jvm_threads_runnable", Name: "runnable"},
@@ -79,12 +79,12 @@ var jvmCharts = Charts{
 		Units: "logs/s",
 		Fam:   "jvm",
 		Ctx:   "hdfs.logs_total",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "jvm_log_info", Name: "info", Algo: module.Incremental},
-			{ID: "jvm_log_error", Name: "error", Algo: module.Incremental},
-			{ID: "jvm_log_warn", Name: "warn", Algo: module.Incremental},
-			{ID: "jvm_log_fatal", Name: "fatal", Algo: module.Incremental},
+			{ID: "jvm_log_info", Name: "info", Algo: collectorapi.Incremental},
+			{ID: "jvm_log_error", Name: "error", Algo: collectorapi.Incremental},
+			{ID: "jvm_log_warn", Name: "warn", Algo: collectorapi.Incremental},
+			{ID: "jvm_log_fatal", Name: "fatal", Algo: collectorapi.Incremental},
 		},
 	},
 }
@@ -96,10 +96,10 @@ var rpcActivityCharts = Charts{
 		Units: "kilobits/s",
 		Fam:   "rpc",
 		Ctx:   "hdfs.rpc_bandwidth",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: "rpc_received_bytes", Name: "received", Div: 1000, Algo: module.Incremental},
-			{ID: "rpc_sent_bytes", Name: "sent", Div: -1000, Algo: module.Incremental},
+			{ID: "rpc_received_bytes", Name: "received", Div: 1000, Algo: collectorapi.Incremental},
+			{ID: "rpc_sent_bytes", Name: "sent", Div: -1000, Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -109,7 +109,7 @@ var rpcActivityCharts = Charts{
 		Fam:   "rpc",
 		Ctx:   "hdfs.rpc_calls",
 		Dims: Dims{
-			{ID: "rpc_queue_time_num_ops", Name: "calls", Algo: module.Incremental},
+			{ID: "rpc_queue_time_num_ops", Name: "calls", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -161,7 +161,7 @@ var fsNameSystemCharts = Charts{
 		Units: "KiB",
 		Fam:   "fs name system",
 		Ctx:   "hdfs.capacity",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "fsns_capacity_remaining", Name: "remaining", Div: 1024},
 			{ID: "fsns_capacity_used", Name: "used", Div: 1024},
@@ -176,7 +176,7 @@ var fsNameSystemCharts = Charts{
 		Units: "KiB",
 		Fam:   "fs name system",
 		Ctx:   "hdfs.used_capacity",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "fsns_capacity_used_dfs", Name: "dfs", Div: 1024},
 			{ID: "fsns_capacity_used_non_dfs", Name: "non_dfs", Div: 1024},
@@ -199,7 +199,7 @@ var fsNameSystemCharts = Charts{
 		Fam:   "fs name system",
 		Ctx:   "hdfs.volume_failures_total",
 		Dims: Dims{
-			{ID: "fsns_volume_failures_total", Name: "failures", Algo: module.Incremental},
+			{ID: "fsns_volume_failures_total", Name: "failures", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -240,7 +240,7 @@ var fsNameSystemCharts = Charts{
 		Units: "num",
 		Fam:   "fs name system",
 		Ctx:   "hdfs.data_nodes",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "fsns_num_live_data_nodes", Name: "live"},
 			{ID: "fsns_num_dead_data_nodes", Name: "dead"},
@@ -256,7 +256,7 @@ var fsDatasetStateCharts = Charts{
 		Units: "KiB",
 		Fam:   "fs dataset",
 		Ctx:   "hdfs.datanode_capacity",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "fsds_capacity_remaining", Name: "remaining", Div: 1024},
 			{ID: "fsds_capacity_used", Name: "used", Div: 1024},
@@ -271,7 +271,7 @@ var fsDatasetStateCharts = Charts{
 		Units: "KiB",
 		Fam:   "fs dataset",
 		Ctx:   "hdfs.datanode_used_capacity",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "fsds_capacity_used_dfs", Name: "dfs", Div: 1024},
 			{ID: "fsds_capacity_used_non_dfs", Name: "non_dfs", Div: 1024},
@@ -296,10 +296,10 @@ var fsDataNodeActivityCharts = Charts{
 		Units: "KiB/s",
 		Fam:   "activity",
 		Ctx:   "hdfs.datanode_bandwidth",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: "dna_bytes_read", Name: "reads", Div: 1024, Algo: module.Incremental},
-			{ID: "dna_bytes_written", Name: "writes", Div: -1024, Algo: module.Incremental},
+			{ID: "dna_bytes_read", Name: "reads", Div: 1024, Algo: collectorapi.Incremental},
+			{ID: "dna_bytes_written", Name: "writes", Div: -1024, Algo: collectorapi.Incremental},
 		},
 	},
 }

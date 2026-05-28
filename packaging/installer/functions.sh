@@ -273,7 +273,23 @@ check_for_feature() {
 }
 
 prepare_cmake_options() {
-  NETDATA_CMAKE_OPTIONS="-S ./ -B ${NETDATA_BUILD_DIR} ${CMAKE_OPTS} ${NETDATA_PREFIX+-DCMAKE_INSTALL_PREFIX="${NETDATA_PREFIX}"} ${NETDATA_USER:+-DNETDATA_USER=${NETDATA_USER}} ${NETDATA_CMAKE_OPTIONS} "
+  NETDATA_CMAKE_OPTIONS="-S ./ -B ${NETDATA_BUILD_DIR} ${CMAKE_OPTS} ${NETDATA_USER:+-DNETDATA_USER=${NETDATA_USER}} ${NETDATA_CMAKE_OPTIONS} "
+
+  # Keep forwarding the install prefix even when it is empty.
+  # This installer uses an empty prefix for /usr/... destinations instead of
+  # CMake's /usr/local default.
+  NETDATA_CMAKE_INSTALL_PREFIX_OPTION="-DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX-}"
+  NETDATA_WINDOWS_PATH_PREFIX_OPTION=
+
+  #
+  # Do not append either prefix-related option to NETDATA_CMAKE_OPTIONS,
+  # because that variable is later expanded as a space-delimited string and
+  # path values may contain spaces. Keep them as dedicated variables so
+  # callers can pass them as separately quoted arguments.
+
+  if [ -n "${NETDATA_WINDOWS_PATH_PREFIX:-}" ]; then
+    NETDATA_WINDOWS_PATH_PREFIX_OPTION="-DNETDATA_WINDOWS_PATH_PREFIX=${NETDATA_WINDOWS_PATH_PREFIX}"
+  fi
 
   NEED_OLD_CXX=0
 
@@ -377,6 +393,7 @@ prepare_cmake_options() {
   enable_feature DBENGINE "${ENABLE_DBENGINE:-1}"
   enable_feature ML "${NETDATA_ENABLE_ML:-1}"
   enable_feature PLUGIN_APPS "${ENABLE_APPS:-1}"
+  enable_feature PLUGIN_NETFLOW "${ENABLE_NETFLOW:-0}"
   enable_feature PLUGIN_OTEL "${ENABLE_OTEL:-0}"
   enable_feature PLUGIN_OTEL_SIGNAL_VIEWER "${ENABLE_OTEL_SIGNAL_VIEWER:-0}"
   enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"

@@ -301,7 +301,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
 
     if(st->pluginsd.set) {
         // reset pos to reuse the same RDAs
-        st->pluginsd.pos = 0;
+        __atomic_store_n(&st->pluginsd.pos, 0, __ATOMIC_RELAXED);
         st->pluginsd.set = false;
     }
 
@@ -315,7 +315,15 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
         rd->collector.last_collected_time.tv_usec = (suseconds_t)(last_collected_ut % USEC_PER_SEC);
     }
 
-    rd->collector.last_collected_value = last_collected_value_str ? str2ll_encoded(last_collected_value_str) : 0;
+    // The sender only sends float baselines when it has STREAM_CAP_FLOAT_BASELINE;
+    // older senders always send int64, even for float dimensions.
+    bool sender_sent_float = rrddim_is_float(rd) && (parser->user.capabilities & STREAM_CAP_FLOAT_BASELINE);
+    if(sender_sent_float)
+        rrddim_set_last_collected_float(rd, last_collected_value_str ? str2ndd_encoded(last_collected_value_str, NULL) : 0.0);
+    else if(rrddim_is_float(rd))
+        rrddim_set_last_collected_float(rd, last_collected_value_str ? (NETDATA_DOUBLE)str2ll_encoded(last_collected_value_str) : 0.0);
+    else
+        rrddim_set_last_collected_int(rd, last_collected_value_str ? str2ll_encoded(last_collected_value_str) : 0);
     rd->collector.last_calculated_value = last_calculated_value_str ? str2ndd_encoded(last_calculated_value_str, NULL) : 0;
     rd->collector.last_stored_value = last_stored_value_str ? str2ndd_encoded(last_stored_value_str, NULL) : 0.0;
 
@@ -465,7 +473,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
                 "with enable_streaming = true, but there was no replication in progress for this chart.",
                 rrdhost_hostname(host), rrdset_id(st));
 
-        pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
+        pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, NULL);
 
         host->stream.rcv.status.replication.percent = 100.0;
         worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->stream.rcv.status.replication.percent);
@@ -565,7 +573,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
                     pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
             }
 
-            pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
+            pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, NULL);
             host->stream.rcv.status.replication.percent = 100.0;
             worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->stream.rcv.status.replication.percent);
 
@@ -584,7 +592,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
     st->stream.rcv.who = REPLAY_WHO_ME;
 #endif
 
-    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
+    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, NULL);
 
     rrdcontext_updated_retention_rrdset(st);
 

@@ -19,7 +19,7 @@ The Netdata dashboard consists of the following main sections:
 - [Nodes Tab](/docs/dashboards-and-charts/nodes-tab.md)
 - [Netdata Charts](/docs/dashboards-and-charts/netdata-charts.md)
 - [Metrics Tab and Single Node Tabs](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)
-- [Top Tab](/docs/dashboards-and-charts/top-tab.md)
+- [Live Tab](/docs/dashboards-and-charts/live-tab.md)
 - [Logs Tab](/docs/dashboards-and-charts/logs-tab.md)
 - [Dashboards Tab](/docs/dashboards-and-charts/dashboards-tab.md)
 - [Alerts Tab](/docs/dashboards-and-charts/alerts-tab.md)

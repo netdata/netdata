@@ -233,12 +233,13 @@ bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_
         if(!*keys[k]) continue;
 
         size_t klen = strlen(keys[k]);
-        char tag_open[klen + 2];
+        char *tag_open = mallocz(klen + 2);
         tag_open[0] = '<';
         strcpy(&tag_open[1], keys[k]);
         tag_open[klen + 1] = '\0';
 
         const char *new_start = strstr(start, tag_open);
+        freez(tag_open);
         if(!new_start)
             return false;
 
@@ -253,7 +254,7 @@ bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_
         }
         start++; // skip the >
 
-        char tag_close[klen + 4];
+        char *tag_close = mallocz(klen + 4);
         tag_close[0] = '<';
         tag_close[1] = '/';
         strcpy(&tag_close[2], keys[k]);
@@ -261,6 +262,7 @@ bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_
         tag_close[klen + 3] = '\0';
 
         const char *new_end = strstr(start, tag_close);
+        freez(tag_close);
         if(!new_end || (end && new_end > end))
             return false;
 

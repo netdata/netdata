@@ -2,17 +2,17 @@
 
 package coredns
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Chart is an alias for module.Chart
-	Chart = module.Chart
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
-	// Dim is an alias for module.Dim
-	Dim = module.Dim
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Chart is an alias for collectorapi.Chart
+	Chart = collectorapi.Chart
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
+	// Dim is an alias for collectorapi.Dim
+	Dim = collectorapi.Dim
 )
 
 var summaryCharts = Charts{
@@ -23,7 +23,7 @@ var summaryCharts = Charts{
 		Fam:   "summary",
 		Ctx:   "coredns.dns_request_count_total",
 		Dims: Dims{
-			{ID: "request_total", Name: "requests", Algo: module.Incremental},
+			{ID: "request_total", Name: "requests", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -33,7 +33,7 @@ var summaryCharts = Charts{
 		Fam:   "summary",
 		Ctx:   "coredns.dns_responses_count_total",
 		Dims: Dims{
-			{ID: "response_total", Name: "responses", Algo: module.Incremental},
+			{ID: "response_total", Name: "responses", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -42,10 +42,10 @@ var summaryCharts = Charts{
 		Units: "requests/s",
 		Fam:   "summary",
 		Ctx:   "coredns.dns_request_count_total_per_status",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "request_per_status_processed", Name: "processed", Algo: module.Incremental},
-			{ID: "request_per_status_dropped", Name: "dropped", Algo: module.Incremental},
+			{ID: "request_per_status_processed", Name: "processed", Algo: collectorapi.Incremental},
+			{ID: "request_per_status_dropped", Name: "dropped", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -55,7 +55,7 @@ var summaryCharts = Charts{
 		Fam:   "summary",
 		Ctx:   "coredns.dns_no_matching_zone_dropped_total",
 		Dims: Dims{
-			{ID: "no_matching_zone_dropped_total", Name: "dropped", Algo: module.Incremental},
+			{ID: "no_matching_zone_dropped_total", Name: "dropped", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -65,7 +65,7 @@ var summaryCharts = Charts{
 		Fam:   "summary",
 		Ctx:   "coredns.dns_panic_count_total",
 		Dims: Dims{
-			{ID: "panic_total", Name: "panics", Algo: module.Incremental},
+			{ID: "panic_total", Name: "panics", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -74,10 +74,10 @@ var summaryCharts = Charts{
 		Units: "requests/s",
 		Fam:   "summary",
 		Ctx:   "coredns.dns_requests_count_total_per_proto",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "request_per_proto_udp", Name: "udp", Algo: module.Incremental},
-			{ID: "request_per_proto_tcp", Name: "tcp", Algo: module.Incremental},
+			{ID: "request_per_proto_udp", Name: "udp", Algo: collectorapi.Incremental},
+			{ID: "request_per_proto_tcp", Name: "tcp", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -86,10 +86,10 @@ var summaryCharts = Charts{
 		Units: "requests/s",
 		Fam:   "summary",
 		Ctx:   "coredns.dns_requests_count_total_per_ip_family",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "request_per_ip_family_v4", Name: "v4", Algo: module.Incremental},
-			{ID: "request_per_ip_family_v6", Name: "v6", Algo: module.Incremental},
+			{ID: "request_per_ip_family_v4", Name: "v4", Algo: collectorapi.Incremental},
+			{ID: "request_per_ip_family_v6", Name: "v6", Algo: collectorapi.Incremental},
 		},
 	},
 	//{
@@ -125,24 +125,24 @@ var summaryCharts = Charts{
 		Units: "requests/s",
 		Fam:   "summary",
 		Ctx:   "coredns.dns_requests_count_total_per_per_type",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "request_per_type_A", Name: "A", Algo: module.Incremental},
-			{ID: "request_per_type_AAAA", Name: "AAAA", Algo: module.Incremental},
-			{ID: "request_per_type_MX", Name: "MX", Algo: module.Incremental},
-			{ID: "request_per_type_SOA", Name: "SOA", Algo: module.Incremental},
-			{ID: "request_per_type_CNAME", Name: "CNAME", Algo: module.Incremental},
-			{ID: "request_per_type_PTR", Name: "PTR", Algo: module.Incremental},
-			{ID: "request_per_type_TXT", Name: "TXT", Algo: module.Incremental},
-			{ID: "request_per_type_NS", Name: "NS", Algo: module.Incremental},
-			{ID: "request_per_type_DS", Name: "DS", Algo: module.Incremental},
-			{ID: "request_per_type_DNSKEY", Name: "DNSKEY", Algo: module.Incremental},
-			{ID: "request_per_type_RRSIG", Name: "RRSIG", Algo: module.Incremental},
-			{ID: "request_per_type_NSEC", Name: "NSEC", Algo: module.Incremental},
-			{ID: "request_per_type_NSEC3", Name: "NSEC3", Algo: module.Incremental},
-			{ID: "request_per_type_IXFR", Name: "IXFR", Algo: module.Incremental},
-			{ID: "request_per_type_ANY", Name: "ANY", Algo: module.Incremental},
-			{ID: "request_per_type_other", Name: "other", Algo: module.Incremental},
+			{ID: "request_per_type_A", Name: "A", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_AAAA", Name: "AAAA", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_MX", Name: "MX", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_SOA", Name: "SOA", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_CNAME", Name: "CNAME", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_PTR", Name: "PTR", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_TXT", Name: "TXT", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_NS", Name: "NS", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_DS", Name: "DS", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_DNSKEY", Name: "DNSKEY", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_RRSIG", Name: "RRSIG", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_NSEC", Name: "NSEC", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_NSEC3", Name: "NSEC3", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_IXFR", Name: "IXFR", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_ANY", Name: "ANY", Algo: collectorapi.Incremental},
+			{ID: "request_per_type_other", Name: "other", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -151,28 +151,28 @@ var summaryCharts = Charts{
 		Units: "responses/s",
 		Fam:   "summary",
 		Ctx:   "coredns.dns_responses_count_total_per_rcode",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "response_per_rcode_NOERROR", Name: "NOERROR", Algo: module.Incremental},
-			{ID: "response_per_rcode_FORMERR", Name: "FORMERR", Algo: module.Incremental},
-			{ID: "response_per_rcode_SERVFAIL", Name: "SERVFAIL", Algo: module.Incremental},
-			{ID: "response_per_rcode_NXDOMAIN", Name: "NXDOMAIN", Algo: module.Incremental},
-			{ID: "response_per_rcode_NOTIMP", Name: "NOTIMP", Algo: module.Incremental},
-			{ID: "response_per_rcode_REFUSED", Name: "REFUSED", Algo: module.Incremental},
-			{ID: "response_per_rcode_YXDOMAIN", Name: "YXDOMAIN", Algo: module.Incremental},
-			{ID: "response_per_rcode_YXRRSET", Name: "YXRRSET", Algo: module.Incremental},
-			{ID: "response_per_rcode_NXRRSET", Name: "NXRRSET", Algo: module.Incremental},
-			{ID: "response_per_rcode_NOTAUTH", Name: "NOTAUTH", Algo: module.Incremental},
-			{ID: "response_per_rcode_NOTZONE", Name: "NOTZONE", Algo: module.Incremental},
-			{ID: "response_per_rcode_BADSIG", Name: "BADSIG", Algo: module.Incremental},
-			{ID: "response_per_rcode_BADKEY", Name: "BADKEY", Algo: module.Incremental},
-			{ID: "response_per_rcode_BADTIME", Name: "BADTIME", Algo: module.Incremental},
-			{ID: "response_per_rcode_BADMODE", Name: "BADMODE", Algo: module.Incremental},
-			{ID: "response_per_rcode_BADNAME", Name: "BADNAME", Algo: module.Incremental},
-			{ID: "response_per_rcode_BADALG", Name: "BADALG", Algo: module.Incremental},
-			{ID: "response_per_rcode_BADTRUNC", Name: "BADTRUNC", Algo: module.Incremental},
-			{ID: "response_per_rcode_BADCOOKIE", Name: "BADCOOKIE", Algo: module.Incremental},
-			{ID: "response_per_rcode_other", Name: "other", Algo: module.Incremental},
+			{ID: "response_per_rcode_NOERROR", Name: "NOERROR", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_FORMERR", Name: "FORMERR", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_SERVFAIL", Name: "SERVFAIL", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_NXDOMAIN", Name: "NXDOMAIN", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_NOTIMP", Name: "NOTIMP", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_REFUSED", Name: "REFUSED", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_YXDOMAIN", Name: "YXDOMAIN", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_YXRRSET", Name: "YXRRSET", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_NXRRSET", Name: "NXRRSET", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_NOTAUTH", Name: "NOTAUTH", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_NOTZONE", Name: "NOTZONE", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_BADSIG", Name: "BADSIG", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_BADKEY", Name: "BADKEY", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_BADTIME", Name: "BADTIME", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_BADMODE", Name: "BADMODE", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_BADNAME", Name: "BADNAME", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_BADALG", Name: "BADALG", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_BADTRUNC", Name: "BADTRUNC", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_BADCOOKIE", Name: "BADCOOKIE", Algo: collectorapi.Incremental},
+			{ID: "response_per_rcode_other", Name: "other", Algo: collectorapi.Incremental},
 		},
 	},
 }
@@ -185,7 +185,7 @@ var serverCharts = Charts{
 		Fam:   "%s %s",
 		Ctx:   "coredns.server_dns_request_count_total",
 		Dims: Dims{
-			{ID: "%s_request_total", Name: "requests", Algo: module.Incremental},
+			{ID: "%s_request_total", Name: "requests", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -195,7 +195,7 @@ var serverCharts = Charts{
 		Fam:   "%s %s",
 		Ctx:   "coredns.server_dns_responses_count_total",
 		Dims: Dims{
-			{ID: "%s_response_total", Name: "responses", Algo: module.Incremental},
+			{ID: "%s_response_total", Name: "responses", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -204,10 +204,10 @@ var serverCharts = Charts{
 		Units: "requests/s",
 		Fam:   "%s %s",
 		Ctx:   "coredns.server_dns_request_count_total_per_status",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "%s_request_per_status_processed", Name: "processed", Algo: module.Incremental},
-			{ID: "%s_request_per_status_dropped", Name: "dropped", Algo: module.Incremental},
+			{ID: "%s_request_per_status_processed", Name: "processed", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_status_dropped", Name: "dropped", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -216,10 +216,10 @@ var serverCharts = Charts{
 		Units: "requests/s",
 		Fam:   "%s %s",
 		Ctx:   "coredns.server_dns_requests_count_total_per_proto",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "%s_request_per_proto_udp", Name: "udp", Algo: module.Incremental},
-			{ID: "%s_request_per_proto_tcp", Name: "tcp", Algo: module.Incremental},
+			{ID: "%s_request_per_proto_udp", Name: "udp", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_proto_tcp", Name: "tcp", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -228,10 +228,10 @@ var serverCharts = Charts{
 		Units: "requests/s",
 		Fam:   "%s %s",
 		Ctx:   "coredns.server_dns_requests_count_total_per_ip_family",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "%s_request_per_ip_family_v4", Name: "v4", Algo: module.Incremental},
-			{ID: "%s_request_per_ip_family_v6", Name: "v6", Algo: module.Incremental},
+			{ID: "%s_request_per_ip_family_v4", Name: "v4", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_ip_family_v6", Name: "v6", Algo: collectorapi.Incremental},
 		},
 	},
 	//{
@@ -267,24 +267,24 @@ var serverCharts = Charts{
 		Units: "requests/s",
 		Fam:   "%s %s",
 		Ctx:   "coredns.server_dns_requests_count_total_per_per_type",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "%s_request_per_type_A", Name: "A", Algo: module.Incremental},
-			{ID: "%s_request_per_type_AAAA", Name: "AAAA", Algo: module.Incremental},
-			{ID: "%s_request_per_type_MX", Name: "MX", Algo: module.Incremental},
-			{ID: "%s_request_per_type_SOA", Name: "SOA", Algo: module.Incremental},
-			{ID: "%s_request_per_type_CNAME", Name: "CNAME", Algo: module.Incremental},
-			{ID: "%s_request_per_type_PTR", Name: "PTR", Algo: module.Incremental},
-			{ID: "%s_request_per_type_TXT", Name: "TXT", Algo: module.Incremental},
-			{ID: "%s_request_per_type_NS", Name: "NS", Algo: module.Incremental},
-			{ID: "%s_request_per_type_DS", Name: "DS", Algo: module.Incremental},
-			{ID: "%s_request_per_type_DNSKEY", Name: "DNSKEY", Algo: module.Incremental},
-			{ID: "%s_request_per_type_RRSIG", Name: "RRSIG", Algo: module.Incremental},
-			{ID: "%s_request_per_type_NSEC", Name: "NSEC", Algo: module.Incremental},
-			{ID: "%s_request_per_type_NSEC3", Name: "NSEC3", Algo: module.Incremental},
-			{ID: "%s_request_per_type_IXFR", Name: "IXFR", Algo: module.Incremental},
-			{ID: "%s_request_per_type_ANY", Name: "ANY", Algo: module.Incremental},
-			{ID: "%s_request_per_type_other", Name: "other", Algo: module.Incremental},
+			{ID: "%s_request_per_type_A", Name: "A", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_AAAA", Name: "AAAA", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_MX", Name: "MX", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_SOA", Name: "SOA", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_CNAME", Name: "CNAME", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_PTR", Name: "PTR", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_TXT", Name: "TXT", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_NS", Name: "NS", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_DS", Name: "DS", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_DNSKEY", Name: "DNSKEY", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_RRSIG", Name: "RRSIG", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_NSEC", Name: "NSEC", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_NSEC3", Name: "NSEC3", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_IXFR", Name: "IXFR", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_ANY", Name: "ANY", Algo: collectorapi.Incremental},
+			{ID: "%s_request_per_type_other", Name: "other", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -293,28 +293,28 @@ var serverCharts = Charts{
 		Units: "responses/s",
 		Fam:   "%s %s",
 		Ctx:   "coredns.server_dns_responses_count_total_per_rcode",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "%s_response_per_rcode_NOERROR", Name: "NOERROR", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_FORMERR", Name: "FORMERR", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_SERVFAIL", Name: "SERVFAIL", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_NXDOMAIN", Name: "NXDOMAIN", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_NOTIMP", Name: "NOTIMP", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_REFUSED", Name: "REFUSED", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_YXDOMAIN", Name: "YXDOMAIN", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_YXRRSET", Name: "YXRRSET", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_NXRRSET", Name: "NXRRSET", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_NOTAUTH", Name: "NOTAUTH", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_NOTZONE", Name: "NOTZONE", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_BADSIG", Name: "BADSIG", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_BADKEY", Name: "BADKEY", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_BADTIME", Name: "BADTIME", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_BADMODE", Name: "BADMODE", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_BADNAME", Name: "BADNAME", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_BADALG", Name: "BADALG", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_BADTRUNC", Name: "BADTRUNC", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_BADCOOKIE", Name: "BADCOOKIE", Algo: module.Incremental},
-			{ID: "%s_response_per_rcode_other", Name: "other", Algo: module.Incremental},
+			{ID: "%s_response_per_rcode_NOERROR", Name: "NOERROR", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_FORMERR", Name: "FORMERR", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_SERVFAIL", Name: "SERVFAIL", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_NXDOMAIN", Name: "NXDOMAIN", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_NOTIMP", Name: "NOTIMP", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_REFUSED", Name: "REFUSED", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_YXDOMAIN", Name: "YXDOMAIN", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_YXRRSET", Name: "YXRRSET", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_NXRRSET", Name: "NXRRSET", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_NOTAUTH", Name: "NOTAUTH", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_NOTZONE", Name: "NOTZONE", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_BADSIG", Name: "BADSIG", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_BADKEY", Name: "BADKEY", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_BADTIME", Name: "BADTIME", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_BADMODE", Name: "BADMODE", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_BADNAME", Name: "BADNAME", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_BADALG", Name: "BADALG", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_BADTRUNC", Name: "BADTRUNC", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_BADCOOKIE", Name: "BADCOOKIE", Algo: collectorapi.Incremental},
+			{ID: "%s_response_per_rcode_other", Name: "other", Algo: collectorapi.Incremental},
 		},
 	},
 }

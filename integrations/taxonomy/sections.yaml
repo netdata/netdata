@@ -1,0 +1,104 @@
+taxonomy_version: 1
+sections:
+  - id: system
+    title: System
+    icon: system
+    section_order: 10
+    status: active
+
+  - id: kubernetes
+    title: Kubernetes
+    icon: k8s
+    section_order: 20
+    status: active
+
+  - id: containers-vms
+    title: Containers and VMs
+    icon: cgroup
+    section_order: 30
+    status: active
+
+  - id: synthetic-checks
+    title: Synthetic Checks
+    icon: synthetics
+    section_order: 40
+    status: active
+
+  - id: remote-devices
+    title: Remote Devices
+    icon: snmp
+    section_order: 50
+    status: active
+
+  - id: otel
+    title: OpenTelemetry
+    icon: otel
+    section_order: 60
+    status: active
+
+  - id: azure-monitor
+    title: Azure Monitor
+    icon: azure
+    section_order: 70
+    status: active
+
+  - id: applications
+    title: Applications
+    icon: apps
+    section_order: 80
+    status: active
+
+  - id: netdata
+    title: Netdata
+    icon: netdata
+    section_order: 90
+    status: active
+
+  - id: applications.apache
+    parent_id: applications
+    title: Apache
+    icon: apache
+    section_order: 100
+    status: active
+
+  - id: applications.mysql
+    parent_id: applications
+    title: MySQL
+    icon: mysql
+    section_order: 110
+    status: active
+
+  - id: applications.postgres
+    parent_id: applications
+    title: PostgreSQL
+    icon: postgres
+    section_order: 120
+    status: active
+
+  - id: system.hardware
+    parent_id: system
+    title: Hardware
+    icon: hardware
+    section_order: 130
+    status: active
+
+  - id: system.hardware.gpus
+    parent_id: system.hardware
+    title: GPUs
+    icon: compute
+    section_order: 140
+    status: active
+
+  - id: system.hardware.gpus.nvidia
+    parent_id: system.hardware.gpus
+    title: NVIDIA GPUs
+    icon: compute
+    section_order: 150
+    status: active
+
+  - id: remote-devices.snmp
+    parent_id: remote-devices
+    title: SNMP-enabled Devices
+    icon: snmp
+    section_order: 160
+    status: active

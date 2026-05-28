@@ -20,7 +20,6 @@ modules:
         - database
         - nosql
         - big data
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

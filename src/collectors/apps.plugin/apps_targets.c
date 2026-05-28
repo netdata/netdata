@@ -5,14 +5,15 @@
 pid_t INIT_PID = OS_INIT_PID;
 
 static STRING *get_clean_name(STRING *name) {
-    char buf[string_strlen(name) + 1];
-    memcpy(buf, string2str(name), string_strlen(name) + 1);
+    char *buf = strdupz(string2str(name));
     netdata_fix_chart_name(buf);
 
     for (char *d = buf; *d ; d++)
         if (*d == '.') *d = '_';
 
-    return string_strdupz(buf);
+    STRING *clean = string_strdupz(buf);
+    freez(buf);
+    return clean;
 }
 
 static inline STRING *get_numeric_string(uint64_t n) {
@@ -296,6 +297,33 @@ struct target *get_sid_target(STRING *sid_name) {
     sids_root_target = w;
 
     debug_log("added uid %s ('%s') target", string2str(w->sid_name), string2str(w->name));
+
+    return w;
+}
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
+// Service
+
+#if (PROCESSES_HAVE_SERVICE == 1)
+struct target *services_root_target = NULL;
+
+struct target *get_service_target(STRING *service_name) {
+    struct target *w;
+    for(w = services_root_target ; w ; w = w->next)
+        if(w->service_name == service_name) return w;
+
+    w = callocz(sizeof(struct target), 1);
+    w->type = TARGET_TYPE_SERVICE;
+    w->service_name = string_dup(service_name);
+    w->id = string_dup(service_name);
+    w->name = string_dup(service_name);
+    w->clean_name = get_clean_name(w->name);
+
+    w->next = services_root_target;
+    services_root_target = w;
+
+    debug_log("added service '%s' target", string2str(w->service_name));
 
     return w;
 }

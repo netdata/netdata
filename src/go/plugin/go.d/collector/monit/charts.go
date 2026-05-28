@@ -6,45 +6,45 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioServiceCheckStatus = module.Priority + iota
+	prioServiceCheckStatus = collectorapi.Priority + iota
 	prioUptime
 )
 
-var baseCharts = module.Charts{
+var baseCharts = collectorapi.Charts{
 	uptimeChart.Copy(),
 }
 
 var (
-	uptimeChart = module.Chart{
+	uptimeChart = collectorapi.Chart{
 		ID:       "uptime",
 		Title:    "Uptime",
 		Units:    "seconds",
 		Fam:      "uptime",
 		Ctx:      "monit.uptime",
 		Priority: prioUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "uptime"},
 		},
 	}
 )
 
-var serviceCheckChartsTmpl = module.Charts{
+var serviceCheckChartsTmpl = collectorapi.Charts{
 	serviceCheckStatusChartTmpl.Copy(),
 }
 
 var (
-	serviceCheckStatusChartTmpl = module.Chart{
+	serviceCheckStatusChartTmpl = collectorapi.Chart{
 		ID:       "service_check_type_%s_name_%s_status",
 		Title:    "Service Check Status",
 		Units:    "status",
 		Fam:      "service status",
 		Ctx:      "monit.service_check_status",
 		Priority: prioServiceCheckStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "service_check_type_%s_name_%s_status_ok", Name: "ok"},
 			{ID: "service_check_type_%s_name_%s_status_error", Name: "error"},
 			{ID: "service_check_type_%s_name_%s_status_initializing", Name: "initializing"},
@@ -58,7 +58,7 @@ func (c *Collector) addServiceCheckCharts(svc statusServiceCheck, srv *statusSer
 
 	for _, chart := range *charts {
 		chart.ID = cleanChartId(fmt.Sprintf(chart.ID, svc.svcType(), svc.Name))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "server_hostname", Value: srv.LocalHostname},
 			{Key: "service_check_name", Value: svc.Name},
 			{Key: "service_check_type", Value: svc.svcType()},

@@ -14,7 +14,7 @@ import (
 	promlabels "github.com/prometheus/prometheus/model/labels"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const precision = 1000.0
@@ -172,13 +172,13 @@ func (c *Collector) emitInterconnectTotals(mx map[string]int64, totals map[strin
 	}
 }
 
-func (c *Collector) ensureChart(instance entityInstance, spec contextSpec) (string, *module.Chart) {
+func (c *Collector) ensureChart(instance entityInstance, spec contextSpec) (string, *collectorapi.Chart) {
 	chartKey := spec.ID + "|" + instance.key
 	if ch, ok := c.cache.getChart(chartKey); ok {
 		return chartKey, ch.chart
 	}
 
-	chart := &module.Chart{
+	chart := &collectorapi.Chart{
 		ID:       makeID(spec.ID, instance.key),
 		Title:    spec.Title,
 		Units:    spec.Units,
@@ -186,7 +186,7 @@ func (c *Collector) ensureChart(instance entityInstance, spec contextSpec) (stri
 		Ctx:      spec.ID,
 		Type:     spec.Type,
 		Priority: spec.Priority,
-		Labels:   append([]module.Label(nil), instance.chartLabels...),
+		Labels:   append([]collectorapi.Label(nil), instance.chartLabels...),
 	}
 
 	if err := c.Charts().Add(chart); err != nil {
@@ -199,7 +199,7 @@ func (c *Collector) ensureChart(instance entityInstance, spec contextSpec) (stri
 
 func (c *Collector) ensureDim(
 	chartKey string,
-	chart *module.Chart,
+	chart *collectorapi.Chart,
 	spec metricSpec,
 	lbls promlabels.Labels,
 	typ sampleKind,
@@ -222,12 +222,12 @@ func (c *Collector) ensureDim(
 	}
 
 	if exists := ch.touchDim(dimID); !exists {
-		dim := &module.Dim{ID: dimID, Name: dimName, Div: int(precision)}
+		dim := &collectorapi.Dim{ID: dimID, Name: dimName, Div: int(precision)}
 		switch typ {
 		case sampleCounter:
-			dim.Algo = module.Incremental
+			dim.Algo = collectorapi.Incremental
 		default:
-			dim.Algo = module.Absolute
+			dim.Algo = collectorapi.Absolute
 		}
 		if shouldHideDimensionByDefault(spec.Context.ID, dimName) {
 			dim.Hidden = true
@@ -342,7 +342,7 @@ func isInvalidMetricValue(v float64) bool {
 type entityInstance struct {
 	entity      metricEntity
 	key         string
-	chartLabels []module.Label
+	chartLabels []collectorapi.Label
 }
 
 func resolveEntityInstance(lbls promlabels.Labels) entityInstance {
@@ -456,7 +456,7 @@ func normalizeLabelKey(s string) string {
 	return sanitizeID(s)
 }
 
-func buildChartLabels(idx map[string]string) []module.Label {
+func buildChartLabels(idx map[string]string) []collectorapi.Label {
 	ignore := map[string]bool{
 		"hostname": true, // host identity is already part of Netdata host model
 		"err_code": true, // used for dynamic XID dimension split, not chart label
@@ -474,9 +474,9 @@ func buildChartLabels(idx map[string]string) []module.Label {
 	}
 
 	sort.Strings(keys)
-	labels := make([]module.Label, 0, len(keys))
+	labels := make([]collectorapi.Label, 0, len(keys))
 	for _, key := range keys {
-		labels = append(labels, module.Label{Key: normalizeLabelKey(key), Value: idx[key]})
+		labels = append(labels, collectorapi.Label{Key: normalizeLabelKey(key), Value: idx[key]})
 	}
 	return labels
 }

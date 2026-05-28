@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/docker/dockerfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 
 	"github.com/docker/docker/api/types"
@@ -24,15 +26,23 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("docker", module.Creator{
+	collectorapi.Register("docker", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         dockerfunc.Methods,
+		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+			c, ok := job.Collector().(*Collector)
+			if !ok {
+				return nil
+			}
+			return c.funcRouter
+		},
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			Address:              docker.DefaultDockerHost,
 			Timeout:              confopt.Duration(time.Second * 2),
@@ -47,6 +57,8 @@ func New() *Collector {
 		cntrSr:     matcher.TRUE(),
 		containers: make(map[string]bool),
 	}
+	c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{collector: c})
+	return c
 }
 
 type Config struct {
@@ -61,13 +73,15 @@ type Config struct {
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+		charts *collectorapi.Charts
 
 		client    dockerClient
 		newClient func(Config) (dockerClient, error)
+
+		funcRouter funcapi.MethodHandler
 
 		verNegotiated bool
 		containers    map[string]bool
@@ -98,6 +112,9 @@ func (c *Collector) Init(context.Context) error {
 		}
 		c.cntrSr = sr
 	}
+	if c.funcRouter == nil {
+		c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{collector: c})
+	}
 
 	return nil
 }
@@ -114,7 +131,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
@@ -130,7 +147,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.client == nil {
 		return
 	}

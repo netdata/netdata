@@ -30,7 +30,6 @@ modules:
               monitored_instance_name: "Kubernetes Containers"
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

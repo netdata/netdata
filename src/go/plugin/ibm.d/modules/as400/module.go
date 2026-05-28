@@ -1,12 +1,11 @@
 //go:build cgo
-// +build cgo
 
 package as400
 
 import (
 	_ "embed"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
@@ -30,9 +29,9 @@ func (c *Collector) Configuration() any {
 }
 
 func init() {
-	module.Register("as400", module.Creator{
+	collectorapi.Register("as400", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create: func() module.Module {
+		Create: func() collectorapi.CollectorV1 {
 			return New()
 		},
 		Config: func() any {

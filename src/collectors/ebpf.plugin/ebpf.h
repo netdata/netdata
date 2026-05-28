@@ -6,12 +6,14 @@
 #ifndef __FreeBSD__
 #include <linux/perf_event.h>
 #endif
+#include <stdatomic.h>
 #include <stdint.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <dlfcn.h>
 
@@ -22,6 +24,7 @@
 #include "libbpf_api/ebpf.h"
 
 #include "collectors/cgroups.plugin/sys_fs_cgroup.h"
+#include "libnetdata/netipc/netipc_netdata.h"
 
 #include "ebpf_apps.h"
 #include "ebpf_functions.h"
@@ -56,7 +59,7 @@ extern struct mount_bpf *mount_bpf_obj;
 extern struct mdflush_bpf *mdflush_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
 extern struct socket_bpf *socket_bpf_obj;
-extern struct swap_bpf *bpf_obj;
+extern struct swap_bpf *swap_bpf_obj;
 extern struct vfs_bpf *vfs_bpf_obj;
 extern struct process_bpf *process_bpf_obj;
 #endif
@@ -204,46 +207,6 @@ void ebpf_global_labels(
     int *algorithm,
     int end);
 
-void ebpf_write_chart_cmd(
-    char *type,
-    char *id,
-    char *suffix,
-    char *title,
-    char *units,
-    char *family,
-    char *charttype,
-    char *context,
-    int order,
-    int update_every,
-    char *module);
-
-void ebpf_write_global_dimension(char *name, char *id, char *algorithm);
-
-void ebpf_create_global_dimension(void *ptr, int end);
-
-void ebpf_create_chart(
-    char *type,
-    char *id,
-    char *title,
-    char *units,
-    char *family,
-    char *context,
-    char *charttype,
-    int order,
-    void (*ncd)(void *, int),
-    void *move,
-    int end,
-    int update_every,
-    char *module);
-
-void write_chart_dimension(char *dim, long long value);
-
-void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end);
-
-void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
-
-void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, char *dread, long long vread);
-
 /**
  * Create Chart labels
  *
@@ -273,7 +236,7 @@ static inline void ebpf_commit_label()
  * @param name   the chart name
  * @param metric the chart suffix (used with apps and cgroups)
  */
-static inline void ebpf_write_begin_chart(char *family, char *name, char *metric)
+static inline void ebpf_write_begin_chart(const char *family, const char *name, const char *metric)
 {
     printf("BEGIN %s.%s%s\n", family, name, metric);
 }
@@ -308,9 +271,9 @@ extern struct ebpf_pid_stat *ebpf_root_of_pids;
 extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
-extern int shm_fd_ebpf_cgroup;
-extern sem_t *shm_sem_ebpf_cgroup;
+extern _Atomic int ebpf_cgroup_systemd_enabled;
+extern _Atomic int ebpf_cgroup_integration_active;
+extern _Atomic int send_cgroup_chart;
 extern netdata_mutex_t mutex_cgroup_shm;
 extern size_t ebpf_all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
@@ -320,30 +283,33 @@ extern struct btf *default_btf;
 extern void *default_btf;
 #endif
 
+extern uint32_t integration_with_collectors;
+extern int running_on_kernel;
+extern int isrh;
+extern const char *btf_path;
+
 // Socket functions and variables
 // Common functions
 void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
-void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long long v1);
+
+// BPF teardown callbacks — called by main thread after all module threads have been joined
+void ebpf_unload_legacy_bpf(ebpf_module_t *em); // legacy-only modules: process, disk, softirq, oomkill, mdflush
+void ebpf_cachestat_unload_bpf(ebpf_module_t *em);
+void ebpf_dcstat_unload_bpf(ebpf_module_t *em);
+void ebpf_swap_unload_bpf(ebpf_module_t *em);
+void ebpf_vfs_unload_bpf(ebpf_module_t *em);
+void ebpf_filesystem_unload_bpf(ebpf_module_t *em);
+void ebpf_mount_unload_bpf(ebpf_module_t *em);
+void ebpf_fd_unload_bpf(ebpf_module_t *em);
+void ebpf_shm_unload_bpf(ebpf_module_t *em);
+void ebpf_sync_unload_bpf(ebpf_module_t *em);
 collected_number get_value_from_structure(char *basis, size_t offset);
 void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
-void ebpf_write_chart_obsolete(
-    char *type,
-    char *id,
-    char *suffix,
-    char *title,
-    char *units,
-    char *family,
-    char *charttype,
-    char *context,
-    int order,
-    int update_every);
-void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 ARAL *ebpf_allocate_pid_aral(char *name, size_t size);
 void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links);
-
 void ebpf_read_global_table_stats(
     netdata_idx_t *stats,
     netdata_idx_t *values,
@@ -354,19 +320,105 @@ void ebpf_read_global_table_stats(
 void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key);
 netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid);
 
-void parse_network_viewer_section(struct config *cfg);
 void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);
 void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 void ebpf_read_local_addresses_unsafe();
 
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
+extern volatile sig_atomic_t ebpf_stop_signal;
 extern bool ebpf_plugin_exit;
 extern uint64_t collect_pids;
 
+static inline void ebpf_cgroup_systemd_enabled_set(int value)
+{
+    atomic_store_explicit(&ebpf_cgroup_systemd_enabled, value, memory_order_release);
+}
+
+static inline int ebpf_cgroup_systemd_enabled_get(void)
+{
+    return atomic_load_explicit(&ebpf_cgroup_systemd_enabled, memory_order_acquire);
+}
+
+static inline void ebpf_cgroup_integration_active_set(int value)
+{
+    atomic_store_explicit(&ebpf_cgroup_integration_active, value, memory_order_release);
+}
+
+static inline int ebpf_cgroup_integration_active_get(void)
+{
+    return atomic_load_explicit(&ebpf_cgroup_integration_active, memory_order_acquire);
+}
+
+static inline void ebpf_send_cgroup_chart_set(int value)
+{
+    atomic_store_explicit(&send_cgroup_chart, value, memory_order_release);
+}
+
+static inline int ebpf_send_cgroup_chart_get(void)
+{
+    return atomic_load_explicit(&send_cgroup_chart, memory_order_acquire);
+}
+
 static inline bool ebpf_plugin_stop(void)
 {
-    return __atomic_load_n(&ebpf_plugin_exit, __ATOMIC_ACQUIRE) || nd_thread_signaled_to_cancel();
+    return __atomic_load_n(&ebpf_plugin_exit, __ATOMIC_ACQUIRE) ||
+           ebpf_stop_signal ||
+           nd_thread_signaled_to_cancel();
+}
+
+// `enabled` is sampled from stats/shutdown paths without a single shared mutex.
+// Keep those state transitions defined without changing the plugin's lock layout.
+static inline enum ebpf_threads_status ebpf_module_enabled_get(ebpf_module_t *em)
+{
+    return __atomic_load_n(&em->enabled, __ATOMIC_RELAXED);
+}
+
+static inline void ebpf_module_enabled_set(ebpf_module_t *em, enum ebpf_threads_status enabled)
+{
+    __atomic_store_n(&em->enabled, enabled, __ATOMIC_RELAXED);
+}
+
+static inline bool ebpf_module_thread_has_valid_state(ebpf_module_t *em)
+{
+    enum ebpf_threads_status enabled = ebpf_module_enabled_get(em);
+
+    if (likely(enabled == NETDATA_THREAD_EBPF_RUNNING || enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING))
+        return true;
+
+    collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)enabled);
+    return false;
+}
+
+static inline bool ebpf_shm_sem_wait_or_stop(sem_t *sem)
+{
+    if (unlikely(!sem || sem == SEM_FAILED)) {
+        errno = EINVAL;
+        return false;
+    }
+
+    while (!ebpf_plugin_stop()) {
+        struct timespec ts;
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+            return false;
+
+        ts.tv_nsec += 200 * 1000 * 1000;
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_sec += ts.tv_nsec / 1000000000L;
+            ts.tv_nsec %= 1000000000L;
+        }
+
+        if (sem_timedwait(sem, &ts) == 0)
+            return true;
+
+        if (errno == ETIMEDOUT || errno == EINTR)
+            continue;
+
+        return false;
+    }
+
+    errno = ECANCELED;
+    return false;
 }
 
 void ebpf_stop_threads(int sig);

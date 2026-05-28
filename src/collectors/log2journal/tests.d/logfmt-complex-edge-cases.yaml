@@ -1,0 +1,5 @@
+pattern: logfmt
+
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: logfmt-app

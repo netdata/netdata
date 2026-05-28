@@ -1,0 +1,9 @@
+pattern: '(?P<MESSAGE>.*)'
+
+inject:
+  - key: VAR_A
+    value: '${VAR_B}'
+  - key: VAR_B  
+    value: '${VAR_A}'
+  - key: VAR_C
+    value: '${VAR_C}'

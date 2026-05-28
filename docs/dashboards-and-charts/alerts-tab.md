@@ -67,6 +67,30 @@ In the **Raised Alerts** tab:
     - Create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notification-silencing-rules).
     - Ask AI to troubleshoot the alert.
 
+:::note
+
+Cloud alert silencing rules are available on Netdata Cloud for Community and Paid plans (anonymous access cannot create rules).
+
+Users can also silence or disable alerts at the Agent level by editing alert configuration. For example, set `to: silent` in the alert's `health.d/*.conf` file and run `sudo netdatacli reload-health` to stop notifications, or use `enabled alarms = !alert_name *` in `netdata.conf` to exclude specific alerts entirely (requires restarting the Agent). See [manual configuration](/src/health/REFERENCE.md) for step-by-step instructions.
+
+:::
+
+## Creating and Tuning Alerts
+
+From the Alerts tab, you can create new alerts or tune existing ones:
+
+- **[Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md)** — Describe what you want in plain English and let AI generate the alert configuration, including thresholds and tuning parameters
+- **[Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md)** — Visual UI wizard for manual alert creation and fine-tuning
+- **[Manual configuration](/src/health/REFERENCE.md)** — Edit `health.d/*.conf` files directly for full control
+
+:::note
+
+**Alerts Automation** and the **Alerts Configuration Manager** require a Netdata Cloud paid plan.
+See [Netdata OSS limitations and feature availability](/docs/netdata-oss-limitations.md) to confirm plan requirements.
+Community plan users can still create and tune alerts using [manual configuration](/src/health/REFERENCE.md).
+
+:::
+
 ## Alert Configurations Tab
 
 The **Alert Configurations** tab shows the configuration of all running alerts in your Room.

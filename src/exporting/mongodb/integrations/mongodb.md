@@ -46,21 +46,22 @@ The following options can be defined for this exporter.
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | enabled | Enables or disables an exporting connector instance (yes/no). | no | yes |
-| destination | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | localhost | yes |
+| [destination](#option-destination) | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | localhost | yes |
 | username | Username for HTTP authentication | my_username | no |
 | password | Password for HTTP authentication | my_password | no |
 | data source | Selects the kind of data that will be sent to the external database. (as collected/average/sum) |  | no |
 | hostname | The hostname to be used for sending data to the external database server. | [global].hostname | no |
 | prefix | The prefix to add to all metrics. | Netdata | no |
-| update every | Frequency of sending sending data to the external database, in seconds. | 10 | no |
-| buffer on failures | The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. | 10 | no |
+| [update every](#option-update-every) | Frequency of sending sending data to the external database, in seconds. | 10 | no |
+| [buffer on failures](#option-buffer-on-failures) | The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. | 10 | no |
 | timeout ms | The timeout in milliseconds to wait for the external database server to process the data. | 2 * update_every * 1000 | no |
-| send hosts matching | Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#simple-patterns). | localhost * | no |
-| send charts matching | One or more space separated patterns (use * as wildcard) checked against both chart id and chart name. | * | no |
-| send names instead of ids | Controls the metric names Netdata should send to the external database (yes/no). |  | no |
+| [send hosts matching](#option-send-hosts-matching) | Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#simple-patterns). | localhost * | no |
+| [send charts matching](#option-send-charts-matching) | One or more space separated patterns (use * as wildcard) checked against both chart id and chart name. | * | no |
+| [send names instead of ids](#option-send-names-instead-of-ids) | Controls the metric names Netdata should send to the external database (yes/no). |  | no |
 | send configured labels | Controls if host labels defined in the `[host labels]` section in `netdata.conf` should be sent to the external database (yes/no). |  | no |
 | send automatic labels | Controls if automatically created labels, like `_os_name` or `_architecture` should be sent to the external database (yes/no). |  | no |
 
+<a id="option-destination"></a>
 ##### destination
 
 The format of each item in this list, is: [PROTOCOL:]IP[:PORT].
@@ -79,17 +80,20 @@ destination = [ffff:...:0001]:2003 10.11.12.1:2003
 When multiple servers are defined, Netdata will try the next one when the previous one fails.
 
 
+<a id="option-update-every"></a>
 ##### update every
 
 Netdata will add some randomness to this number, to prevent stressing the external server when many Netdata servers
 send data to the same database. This randomness does not affect the quality of the data, only the time they are sent.
 
 
+<a id="option-buffer-on-failures"></a>
 ##### buffer on failures
 
 If the server fails to receive the data after that many failures, data loss on the connector instance is expected (Netdata will also log it).
 
 
+<a id="option-send-hosts-matching"></a>
 ##### send hosts matching
 
 Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern).
@@ -100,6 +104,7 @@ A pattern starting with `!` gives a negative match. So to match all hosts named 
 use `!*child* *db*` (so, the order is important: the first pattern matching the hostname will be used - positive or negative).
 
 
+<a id="option-send-charts-matching"></a>
 ##### send charts matching
 
 A pattern starting with ! gives a negative match. So to match all charts named apps.* except charts ending in *reads,
@@ -108,6 +113,7 @@ positive or negative). There is also a URL parameter filter that can be used whi
 has a higher priority than the configuration option.
 
 
+<a id="option-send-names-instead-of-ids"></a>
 ##### send names instead of ids
 
 Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
@@ -44,15 +44,15 @@ func (c *Collector) collectAutopilotHealth(mx map[string]int64) error {
 		if srv.ID == c.cfg.Config.NodeID {
 			// SerfStatus: alive, left, failed or none:
 			// https://github.com/hashicorp/consul/blob/c7ef04c5979dbc311ff3c67b7bf3028a93e8b0f1/agent/consul/operator_autopilot_endpoint.go#L124-L133
-			mx["autopilot_server_sefStatus_alive"] = metrix.Bool(srv.SerfStatus == "alive")
-			mx["autopilot_server_sefStatus_left"] = metrix.Bool(srv.SerfStatus == "left")
-			mx["autopilot_server_sefStatus_failed"] = metrix.Bool(srv.SerfStatus == "failed")
-			mx["autopilot_server_sefStatus_none"] = metrix.Bool(srv.SerfStatus == "none")
+			mx["autopilot_server_sefStatus_alive"] = oldmetrix.Bool(srv.SerfStatus == "alive")
+			mx["autopilot_server_sefStatus_left"] = oldmetrix.Bool(srv.SerfStatus == "left")
+			mx["autopilot_server_sefStatus_failed"] = oldmetrix.Bool(srv.SerfStatus == "failed")
+			mx["autopilot_server_sefStatus_none"] = oldmetrix.Bool(srv.SerfStatus == "none")
 			// https://github.com/hashicorp/raft-autopilot/blob/d936f51c374c3b7902d5e4fdafe9f7d8d199ea53/types.go#L110
-			mx["autopilot_server_healthy_yes"] = metrix.Bool(srv.Healthy)
-			mx["autopilot_server_healthy_no"] = metrix.Bool(!srv.Healthy)
-			mx["autopilot_server_voter_yes"] = metrix.Bool(srv.Voter)
-			mx["autopilot_server_voter_no"] = metrix.Bool(!srv.Voter)
+			mx["autopilot_server_healthy_yes"] = oldmetrix.Bool(srv.Healthy)
+			mx["autopilot_server_healthy_no"] = oldmetrix.Bool(!srv.Healthy)
+			mx["autopilot_server_voter_yes"] = oldmetrix.Bool(srv.Voter)
+			mx["autopilot_server_voter_no"] = oldmetrix.Bool(!srv.Voter)
 			mx["autopilot_server_stable_time"] = int64(time.Since(srv.StableSince).Seconds())
 			mx["autopilot_server_stable_time"] = int64(time.Since(srv.StableSince).Seconds())
 			if !srv.Leader {

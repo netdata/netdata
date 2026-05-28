@@ -108,9 +108,9 @@ func parseDHCPRangeValue(s string) (r string) {
 	s = strings.ReplaceAll(s, " ", "")
 
 	var start, end netip.Addr
-	parts := strings.Split(s, ",")
+	parts := strings.SplitSeq(s, ",")
 
-	for _, v := range parts {
+	for v := range parts {
 		if !start.IsValid() {
 			start, _ = netip.ParseAddr(v)
 			continue

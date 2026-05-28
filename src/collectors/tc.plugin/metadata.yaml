@@ -15,7 +15,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Examine tc metrics to gain insights into Linux traffic control operations. Study packet flow rates, queue lengths, and drop rates to optimize network traffic flow."

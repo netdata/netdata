@@ -1,0 +1,21 @@
+BINARY_NUMBER=0b1010
+BOOL_ON=on
+BOOL_TRUE=true
+BOOL_YES=yes
+DECIMAL_NUMBER=123.456
+DOUBLE_QUOTE_ESCAPES=Contains "quotes" and \backslashes\ and 
+ newlines
+FOLDED_MULTILINE=This is a folded style that should become a single line.
+
+HEX_NUMBER=0xFF
+LITERAL_MULTILINE=Line one
+Line two with spaces   
+Line three
+
+MESSAGE=test message
+NULL_VALUE=null
+OCTAL_NUMBER=0o755
+SCIENTIFIC_NOTATION=1.23e4
+SINGLE_QUOTE_MULTILINE=Single quoted with newline
+TILDE_NULL=~
+
