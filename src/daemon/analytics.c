@@ -1298,9 +1298,11 @@ void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
         if (rrdhost_update_timezone(localhost, timezone, new_abbrev, new_offset)) {
             // Timezone changed — update the two labels directly, persist, and notify.
             if (localhost->rrdlabels) {
-                rrdlabels_add(localhost->rrdlabels, "_timezone", timezone, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(localhost->rrdlabels, "_abbrev_timezone", new_abbrev, RRDLABEL_SRC_AUTO);
+                bool labels_changed = rrdlabels_add_changed(localhost->rrdlabels, "_timezone", timezone, RRDLABEL_SRC_AUTO);
+                labels_changed |= rrdlabels_add_changed(localhost->rrdlabels, "_abbrev_timezone", new_abbrev, RRDLABEL_SRC_AUTO);
                 rrdhost_flag_set(localhost, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+                if(labels_changed)
+                    rrdhost_flag_set(localhost, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
                 stream_send_host_labels(localhost);
             }
             aclk_queue_node_info(localhost, false);

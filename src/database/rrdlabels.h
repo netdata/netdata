@@ -32,6 +32,10 @@ RRDLABELS *rrdlabels_create(void);
 void rrdlabels_destroy(RRDLABELS *labels_dict);
 void rrdlabels_flush(RRDLABELS *labels);
 void rrdlabels_add(RRDLABELS *labels, const char *name, const char *value, RRDLABEL_SRC ls);
+// like rrdlabels_add() but returns true when the call actually changed the
+// label set (new key, or value changed for an existing key); false when the
+// key already existed with the same value.
+bool rrdlabels_add_changed(RRDLABELS *labels, const char *name, const char *value, RRDLABEL_SRC ls);
 void rrdlabels_add_pair(RRDLABELS *labels, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb, const char *key);
 void rrdlabels_key_to_buffer_array_item(RRDLABELS *labels, BUFFER *wb);
@@ -72,7 +76,19 @@ int rrdlabels_to_buffer(RRDLABELS *labels, BUFFER *wb, const char *before_each, 
                         void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
 void rrdlabels_to_buffer_json_members(RRDLABELS *labels, BUFFER *wb);
 
-void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src);
+// migrate dst toward src by key/value: labels present in src but missing from
+// dst are added, labels present in dst but missing from src are removed
+// (entries flagged RRDLABEL_FLAG_DONT_DELETE are preserved). The RRDLABEL_SRC
+// bits on entries that are already present in both are NOT reconciled to src.
+// Returns true when at least one label was added or removed, false otherwise.
+// A false return does not imply dst equals src bit-for-bit (preserved
+// DONT_DELETE entries and unchanged RRDLABEL_SRC bits can still differ).
+bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src);
+
+// finalize a CLABEL stream commit: remove unmarked entries and report whether
+// the resulting label set differs from the pre-commit set (added, removed, or
+// value-changed entries).
+bool rrdlabels_remove_all_unmarked_and_changed(RRDLABELS *labels);
 void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src);
 size_t rrdlabels_common_count(RRDLABELS *labels1, RRDLABELS *labels2);
 

@@ -9,7 +9,8 @@ void rrdhost_set_is_parent_label(void) {
 
     if (count == 0 || count == 1) {
         RRDLABELS *labels = localhost->rrdlabels;
-        rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
+        if(rrdlabels_add_changed(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO))
+            rrdhost_flag_set(localhost, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
         // queue a node info
         aclk_queue_node_info(localhost, false);
@@ -202,7 +203,8 @@ void reload_host_labels(void) {
     // RRDLABEL_FLAG_DONT_DELETE entries are preserved.
     rrdlabels_remove_all_unmarked(localhost->rrdlabels);
 
-    rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(localhost,
+                     RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE | RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
     stream_send_host_labels(localhost);
 }

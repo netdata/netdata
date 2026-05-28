@@ -252,9 +252,9 @@ static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABE
 // ----------------------------------------------------------------------------
 // rrdlabels_add()
 
-static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, const char *value, RRDLABEL_SRC ls)
+static bool labels_add_already_sanitized(RRDLABELS *labels, const char *key, const char *value, RRDLABEL_SRC ls)
 {
-    if (unlikely(!labels || !key)) return;
+    if (unlikely(!labels || !key)) return false;
 
     RRDLABEL *new_label = add_label_name_value(key, value);
 
@@ -271,11 +271,13 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
     int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
     RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
 
+    bool changed;
     if(*PValue) {
         new_ls |= RRDLABEL_FLAG_OLD;
         *((RRDLABEL_SRC *)PValue) = new_ls;
 
         delete_label(new_label);
+        changed = false;
     }
     else {
         new_ls |= RRDLABEL_FLAG_NEW;
@@ -289,6 +291,7 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
             delete_label(old_label_with_same_key);
         }
+        changed = true;
     }
 
     labels->version++;
@@ -297,13 +300,20 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
 //    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
 
     spinlock_unlock(&labels->spinlock);
+
+    return changed;
 }
 
 void rrdlabels_add(RRDLABELS *labels, const char *name, const char *value, RRDLABEL_SRC ls)
 {
+    (void)rrdlabels_add_changed(labels, name, value, ls);
+}
+
+bool rrdlabels_add_changed(RRDLABELS *labels, const char *name, const char *value, RRDLABEL_SRC ls)
+{
     if(!labels) {
         netdata_log_error("%s(): called with NULL dictionary.", __FUNCTION__ );
-        return;
+        return false;
     }
 
     char n[RRDLABELS_MAX_NAME_LENGTH + 1], v[RRDLABELS_MAX_VALUE_LENGTH + 1];
@@ -312,10 +322,10 @@ void rrdlabels_add(RRDLABELS *labels, const char *name, const char *value, RRDLA
 
     if(!*n) {
         netdata_log_error("%s: cannot add name '%s' (value '%s') which is sanitized as empty string", __FUNCTION__, name, value);
-        return;
+        return false;
     }
 
-    labels_add_already_sanitized(labels, n, v, ls);
+    return labels_add_already_sanitized(labels, n, v, ls);
 }
 
 bool rrdlabels_exist(RRDLABELS *labels, const char *key)
@@ -550,11 +560,12 @@ void rrdlabels_unmark_all(RRDLABELS *labels)
     spinlock_unlock(&labels->spinlock);
 }
 
-static void rrdlabels_remove_all_unmarked_unsafe(RRDLABELS *labels)
+static size_t rrdlabels_remove_all_unmarked_unsafe(RRDLABELS *labels)
 {
     Pvoid_t *PValue;
     Word_t Index = 0;
     bool first_then_next = true;
+    size_t removed = 0;
 
     while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
         if (!((*((RRDLABEL_SRC *)PValue)) & (RRDLABEL_FLAG_INTERNAL))) {
@@ -566,18 +577,21 @@ static void rrdlabels_remove_all_unmarked_unsafe(RRDLABELS *labels)
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
 
             delete_label((RRDLABEL *)Index);
+            removed++;
             if (labels->JudyL != (Pvoid_t) NULL) {
                 Index = 0;
                 first_then_next = true;
             }
         }
     }
+
+    return removed;
 }
 
 void rrdlabels_remove_all_unmarked(RRDLABELS *labels)
 {
     spinlock_lock(&labels->spinlock);
-    rrdlabels_remove_all_unmarked_unsafe(labels);
+    (void)rrdlabels_remove_all_unmarked_unsafe(labels);
     spinlock_unlock(&labels->spinlock);
 }
 
@@ -597,6 +611,28 @@ void rrdlabels_mark_source_as_old(RRDLABELS *labels, RRDLABEL_SRC src_match)
     }
 
     spinlock_unlock(&labels->spinlock);
+}
+
+bool rrdlabels_remove_all_unmarked_and_changed(RRDLABELS *labels)
+{
+    if(!labels) return false;
+
+    spinlock_lock(&labels->spinlock);
+
+    size_t added = 0;
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+    bool first_then_next = true;
+    while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
+        if ((*((RRDLABEL_SRC *)PValue)) & RRDLABEL_FLAG_NEW)
+            added++;
+    }
+
+    size_t removed = rrdlabels_remove_all_unmarked_unsafe(labels);
+
+    spinlock_unlock(&labels->spinlock);
+
+    return (added > 0) || (removed > 0);
 }
 
 // ----------------------------------------------------------------------------
@@ -663,9 +699,9 @@ static SIMPLE_PATTERN_RESULT rrdlabels_walkthrough_read_sp(RRDLABELS *labels, SI
 // rrdlabels_migrate_to_these()
 // migrate an existing label list to a new list
 
-void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
+bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     if (!dst || !src || (dst == src))
-        return;
+        return false;
 
     spinlock_lock(&dst->spinlock);
     spinlock_lock(&src->spinlock);
@@ -674,6 +710,7 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
 
     RRDLABEL *label;
     Pvoid_t *PValue;
+    size_t added = 0;
 
     RRDLABEL_SRC ls;
     lfe_start_nolock(src, label, ls)
@@ -690,6 +727,7 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
             dup_label(label);
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
+            added++;
         }
         else
             flag = RRDLABEL_FLAG_OLD;
@@ -698,11 +736,13 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     }
     lfe_done_nolock();
 
-    rrdlabels_remove_all_unmarked_unsafe(dst);
+    size_t removed = rrdlabels_remove_all_unmarked_unsafe(dst);
     dst->version = src->version;
 
     spinlock_unlock(&src->spinlock);
     spinlock_unlock(&dst->spinlock);
+
+    return (added > 0) || (removed > 0);
 }
 
 //
@@ -1011,15 +1051,22 @@ uint32_t rrdlabels_version(RRDLABELS *labels __maybe_unused)
 }
 
 void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels) {
+    bool labels_changed = false;
+
     if(!st->rrdlabels)
         st->rrdlabels = rrdlabels_create();
 
     if (new_rrdlabels)
-        rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
+        labels_changed = rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
 
     rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
     rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     rrdset_metadata_updated(st);
+
+    if(labels_changed) {
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -1533,6 +1580,122 @@ static int rrdlabels_unittest_mark_source_as_old(void) {
     return errors;
 }
 
+#define UT_EXPECT(_cond, _msg) do {                                            \
+    if (!(_cond)) {                                                            \
+        fprintf(stderr, "  FAIL: %s\n", (_msg));                               \
+        errors++;                                                              \
+    }                                                                          \
+} while (0)
+
+static int rrdlabels_unittest_change_detection(void) {
+    fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
+    int errors = 0;
+
+    // ---- rrdlabels_add_changed: new vs same vs value-change ----
+    RRDLABELS *l = rrdlabels_create();
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v1", RRDLABEL_SRC_CONFIG) == true,
+              "add of new label should return true");
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v1", RRDLABEL_SRC_CONFIG) == false,
+              "re-add of identical key+value should return false");
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v2", RRDLABEL_SRC_CONFIG) == true,
+              "value change for an existing key should return true");
+    UT_EXPECT(rrdlabels_add_changed(l, "k2", "v2", RRDLABEL_SRC_CONFIG) == true,
+              "add of a different new key should return true");
+    rrdlabels_destroy(l);
+
+    // ---- rrdlabels_migrate_to_these: empty/identical/diff/DONT_DELETE ----
+    RRDLABELS *dst = rrdlabels_create();
+    RRDLABELS *src = rrdlabels_create();
+
+    // empty dst, empty src => no add, no remove => false
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == false,
+              "migrate of two empty label sets should return false");
+
+    // populate src; dst empty => added > 0 => true
+    rrdlabels_add(src, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(src, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate to empty dst should return true when src has labels");
+
+    // identical content now (dst was populated from src) => false
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == false,
+              "migrate with identical key/value sets should return false");
+
+    // src adds one => true
+    rrdlabels_add(src, "k3", "v3", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate that adds a label should return true");
+
+    // src drops one => true (removed > 0)
+    {
+        RRDLABELS *trimmed = rrdlabels_create();
+        rrdlabels_add(trimmed, "k1", "v1", RRDLABEL_SRC_CONFIG);
+        rrdlabels_add(trimmed, "k2", "v2", RRDLABEL_SRC_CONFIG);
+        UT_EXPECT(rrdlabels_migrate_to_these(dst, trimmed) == true,
+                  "migrate that removes a label should return true");
+        rrdlabels_destroy(trimmed);
+    }
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // DONT_DELETE: a label that is not in src remains in dst; nothing added or
+    // removed, so the function returns false even though dst != src.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == false,
+              "migrate where the only diff is a DONT_DELETE label should return false");
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "DONT_DELETE label should be preserved after migrate");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // ---- rrdlabels_remove_all_unmarked_and_changed: CLABEL-commit semantics ----
+    // (1) unmark + re-add identical set => no change => false
+    l = rrdlabels_create();
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(l, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_unmark_all(l);
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(l, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_remove_all_unmarked_and_changed(l) == false,
+              "remove_all_unmarked_and_changed: identical re-commit should return false");
+    rrdlabels_destroy(l);
+
+    // (2) unmark + add a new label => added > 0 => true
+    l = rrdlabels_create();
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_unmark_all(l);
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(l, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_remove_all_unmarked_and_changed(l) == true,
+              "remove_all_unmarked_and_changed: adding a label should return true");
+    rrdlabels_destroy(l);
+
+    // (3) unmark + commit a subset => removed > 0 => true
+    l = rrdlabels_create();
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(l, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_unmark_all(l);
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_remove_all_unmarked_and_changed(l) == true,
+              "remove_all_unmarked_and_changed: dropping a label should return true");
+    rrdlabels_destroy(l);
+
+    // (4) unmark + change a value => true (the changed entry is NEW)
+    l = rrdlabels_create();
+    rrdlabels_add(l, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_unmark_all(l);
+    rrdlabels_add(l, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_remove_all_unmarked_and_changed(l) == true,
+              "remove_all_unmarked_and_changed: value change should return true");
+    rrdlabels_destroy(l);
+
+    return errors;
+}
+
+#undef UT_EXPECT
+
 struct pattern_array *trim_and_add_key_to_values(struct pattern_array *pa, const char *key, STRING *input);
 static int rrdlabels_unittest_check_pattern_list(RRDLABELS *labels, const char *pattern, bool expected) {
     fprintf(stderr, "rrdlabels_match_simple_pattern(labels, \"%s\") ... ", pattern);
@@ -1716,6 +1879,7 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_double_check();
     errors += rrdlabels_unittest_migrate_check();
     errors += rrdlabels_unittest_mark_source_as_old();
+    errors += rrdlabels_unittest_change_detection();
     errors += rrdlabels_unittest_pattern_check();
 
     fprintf(stderr, "%d errors found\n", errors);
