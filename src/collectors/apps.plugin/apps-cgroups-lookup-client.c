@@ -429,6 +429,7 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
     nipc_client_config_t config = {
         .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
         .preferred_profiles = NIPC_PROFILE_SHM_FUTEX,
+        .max_request_payload_bytes = NIPC_MAX_PAYLOAD_CAP,
         .auth_token = netipc_auth_token(),
     };
 

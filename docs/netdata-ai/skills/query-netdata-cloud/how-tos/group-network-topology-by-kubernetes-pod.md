@@ -30,8 +30,8 @@ without exposing Cloud tokens, node ids, pod labels, or cgroup paths?
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
-     --function 'topology:network-connections%20processes:by_pid%20cgroup-paths:hide' \
-     --body '{}' \
+     --function 'topology:network-connections' \
+     --body '{"selections":{"group_by":["pid"]}}' \
      > .local/audits/query-netdata-cloud/network-topology-by-pod.json
    ```
 
@@ -91,8 +91,7 @@ IP addresses, or customer-identifying pod names into durable artifacts.
 
 ## Notes / gotchas
 
-- `cgroup-paths:hide` suppresses the raw `cgroup_path` column values.
-- Canonical Kubernetes columns (`k8s_namespace`, `k8s_pod_name`,
+- - Canonical Kubernetes columns (`k8s_namespace`, `k8s_pod_name`,
   `k8s_workload`) do not require `labels:<pattern>`.
 - `labels:<pattern>` controls only free-form actor labels. Its separator
   is `|`; commas are literal.

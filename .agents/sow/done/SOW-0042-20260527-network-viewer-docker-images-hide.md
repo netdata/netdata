@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: open
+Status: closed
 
-Sub-state: tracked from SOW-0036 follow-up item 4. Not started.
+Sub-state: closed as obsolete by SOW-0036 regression repair on 2026-05-28.
 
 ## Requirements
 
@@ -13,6 +13,15 @@ Sub-state: tracked from SOW-0036 follow-up item 4. Not started.
 Add an operator-controlled `docker-images:<show|hide>` Function argument for
 `topology:network-connections` so the `docker_image` process actor column can be
 suppressed in stricter multi-tenant environments.
+
+Closure note:
+
+- This purpose is no longer valid as a direct follow-up to SOW-0036. The
+  corrected contract removes the `cgroup-paths:<show|hide>` pattern and avoids
+  adding per-field hide/show controls for grouped topology actors.
+- Raw container metadata, including `docker_image`, is now limited to
+  `group_by:pid`. Any future privacy policy for PID-mode raw fields needs a
+  fresh product decision, not a mirrored hide knob.
 
 ### User Request
 
@@ -24,14 +33,14 @@ Facts:
 
 - SOW-0036 emits `docker_image` as a nullable process actor attribute when the
   APPS_LOOKUP cache has an `image` label.
-- SOW-0036 added `cgroup-paths:hide` but did not add `docker-images:hide`.
+- SOW-0036 regression repair removed the `cgroup-paths:hide` pattern.
 - Image registry hostnames and repository paths can contain tenant-identifying
   strings in some environments.
 
 Inferences:
 
-- The implementation should mirror `cgroup-paths:<show|hide>` option parsing
-  and metadata exposure.
+- No implementation should mirror `cgroup-paths:<show|hide>`; that pattern is
+  removed.
 
 Unknowns:
 
@@ -78,7 +87,8 @@ Affected contracts and surfaces:
 
 Existing patterns to reuse:
 
-- SOW-0036 `cgroup-paths:<show|hide>` parsing and column suppression pattern.
+- None. The prior `cgroup-paths:<show|hide>` parsing and column suppression
+  pattern was removed by SOW-0036 regression repair.
 
 Risk and blast radius:
 

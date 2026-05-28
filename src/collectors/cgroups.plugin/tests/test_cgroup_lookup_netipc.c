@@ -206,8 +206,8 @@ int main(void)
     cgroup_netipc_lookup_reaped_set_insert(gone_path);
 
     nipc_client_config_t config = {
-        .supported_profiles = NIPC_PROFILE_BASELINE,
-        .preferred_profiles = NIPC_PROFILE_BASELINE,
+        .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
+        .preferred_profiles = NIPC_PROFILE_SHM_FUTEX,
         .auth_token = netipc_auth_token(),
     };
 

@@ -213,7 +213,7 @@
         },
         "group_by": {
           "type": "array",
-          "description": "Supported aggregation scope ids a consumer may offer for grouping this view. For topology:network-connections the canonical process grouping ids are pid, process_name, cgroup, container, orchestrator, pod, namespace, workload, and service.",
+          "description": "Supported aggregation scope ids a consumer may offer for grouping this view. For topology:network-connections the supported grouping ids are process_name, pid, and container.",
           "items": {
             "$ref": "#/$defs/id"
           },
@@ -379,7 +379,7 @@
         },
         "aggregation_scopes": {
           "type": "array",
-          "description": "Aggregation scope ids this actor type can participate in. Process actors in topology:network-connections may reference pid, process_name, cgroup, container, orchestrator, pod, namespace, workload, and service.",
+          "description": "Aggregation scope ids this actor type can participate in. Network-connections process actors may reference process_name and pid; container actors may reference container.",
           "items": {
             "$ref": "#/$defs/id"
           },

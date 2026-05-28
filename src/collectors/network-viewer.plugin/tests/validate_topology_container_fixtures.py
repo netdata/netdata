@@ -9,38 +9,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "topology"
 
-GROUP_BY = [
-    "pid",
-    "process_name",
-    "cgroup",
-    "container",
-    "orchestrator",
-    "pod",
-    "namespace",
-    "workload",
-    "service",
-]
+GROUP_BY = ["process_name", "pid", "container"]
 
 NEW_COLUMNS = {
-    "cgroup_path": ("string", "group_key"),
-    "cgroup_name": ("string", "group_key"),
-    "orchestrator": ("string", "group_key"),
-    "k8s_pod_name": ("string", "group_key"),
-    "k8s_namespace": ("string", "group_key"),
-    "k8s_workload": ("string", "group_key"),
-    "docker_container_name": ("string", "group_key"),
+    "container_name": ("string", "group_key"),
+    "cgroup_path": ("string", "attribute"),
+    "cgroup_name": ("string", "attribute"),
+    "orchestrator": ("string", "attribute"),
+    "k8s_pod_name": ("string", "attribute"),
+    "k8s_namespace": ("string", "attribute"),
+    "k8s_workload": ("string", "attribute"),
+    "docker_container_name": ("string", "attribute"),
     "docker_image": ("string", "attribute"),
-    "systemd_unit_name": ("string", "group_key"),
+    "systemd_unit_name": ("string", "attribute"),
 }
 
 SCOPES = {
-    "cgroup": ["cgroup_path"],
-    "container": ["cgroup_name"],
-    "orchestrator": ["orchestrator"],
-    "pod": ["k8s_pod_name"],
-    "namespace": ["k8s_namespace"],
-    "workload": ["k8s_workload"],
-    "service": ["systemd_unit_name"],
+    "process_name": ["process"],
+    "pid": ["pid", "net_ns_inode"],
+    "container": ["container_name"],
 }
 
 
@@ -87,17 +74,9 @@ def assert_contract(payload):
     assert data["view"]["group_by"] == GROUP_BY
 
     process_scopes = data["types"]["actor_types"]["process"]["aggregation_scopes"]
-    assert process_scopes == [
-        "process_name",
-        "pid",
-        "cgroup",
-        "container",
-        "orchestrator",
-        "pod",
-        "namespace",
-        "workload",
-        "service",
-    ]
+    assert process_scopes == ["process_name", "pid"]
+    container_scopes = data["types"]["actor_types"]["container"]["aggregation_scopes"]
+    assert container_scopes == ["container"]
 
     actor_columns = {column["id"]: column for column in data["actors"]["columns"]}
     for name, (column_type, role) in NEW_COLUMNS.items():
@@ -126,16 +105,19 @@ def assert_with_containers(payload):
     rows = actor_rows(payload)
 
     assert row_by_pid(rows, 101)["orchestrator"] == "docker"
+    assert row_by_pid(rows, 101)["container_name"] == "demo-nginx"
     assert row_by_pid(rows, 101)["cgroup_name"] == "demo-nginx"
     assert row_by_pid(rows, 201)["orchestrator"] == "k8s"
     assert row_by_pid(rows, 201)["k8s_pod_name"] == "web-7b9d5f4c5-q2lrz"
     assert row_by_pid(rows, 201)["k8s_namespace"] == "demo"
     assert row_by_pid(rows, 201)["k8s_workload"] == "web"
     assert row_by_pid(rows, 301)["orchestrator"] == "systemd"
+    assert row_by_pid(rows, 301)["container_name"] == "sshd.service"
     assert row_by_pid(rows, 301)["systemd_unit_name"] == "sshd.service"
     assert row_by_pid(rows, 401)["orchestrator"] == "lxc"
     assert row_by_pid(rows, 501)["orchestrator"] == "kvm"
     assert row_by_pid(rows, 601)["orchestrator"] == "host_root"
+    assert row_by_pid(rows, 601)["container_name"] == "bash"
     assert row_by_pid(rows, 601)["cgroup_name"] is None
 
     labels = label_rows(payload)
@@ -146,6 +128,8 @@ def assert_zero_containers(payload):
     assert_contract(payload)
     rows = actor_rows(payload)
     for column in NEW_COLUMNS:
+        if column == "container_name":
+            continue
         assert all(value is None for value in rows[column]), column
 
 

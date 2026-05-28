@@ -31,30 +31,26 @@ Agent version you are querying.
 
 ## Network-connections grouping
 
-`topology:network-connections` process actors can expose container and
-orchestrator columns when the Agent has APPS_LOOKUP cache data for the PID:
+`topology:network-connections` supports three actor grouping levels:
 
-`cgroup_path`, `cgroup_name`, `orchestrator`, `k8s_pod_name`,
-`k8s_namespace`, `k8s_workload`, `docker_container_name`, `docker_image`, and
-`systemd_unit_name`.
+- `group_by:process_name` returns grouped process-name actors.
+- `group_by:pid` returns one process actor per PID and is the only view that
+  emits raw fields such as PID, UID, command line, cgroup path, and detailed
+  container metadata.
+- `group_by:container` returns container actors grouped by canonical
+  `container_name`. Services use the service name, and non-container,
+  non-service processes fall back to process name.
 
-The payload advertises these `view.group_by` ids:
-
-`pid`, `process_name`, `cgroup`, `container`, `orchestrator`, `pod`,
-`namespace`, `workload`, and `service`.
+The payload advertises these `view.group_by` ids: `process_name`, `pid`, and
+`container`.
 
 Useful request arguments:
 
-- `processes:by_pid` returns per-PID process actors, which gives exact
-  container attribution when the same process name runs in multiple containers.
+- `group_by:pid` returns per-PID process actors.
+- `group_by:container` returns container/service actors.
 - `labels:<pattern>` allows optional free-form actor labels. Omit it to hide
   free-form labels. Tokens are pipe-separated, for example
   `labels:team|app|version-*`; commas are literal.
-- `cgroup-paths:hide` hides full `cgroup_path` values while leaving the other
-  grouping columns available.
-
-If a grouping column is null or hidden, consumers should preserve actor identity
-for that row instead of merging every null row into one bucket.
 
 ## Endpoint
 
@@ -97,18 +93,18 @@ curl -sS -X POST \
   -d "$PAYLOAD"
 ```
 
-Example with exact per-PID container columns, selected labels, and hidden full
-cgroup paths:
+Example with exact per-PID raw fields and selected labels:
 
 ```bash
 curl -sS -X POST \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections%20processes:by_pid%20labels:team%7Capp%20cgroup-paths:hide" \
-  -d '{"timeout":60000}' \
+  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
+  -d '{"timeout":60000,"selections":{"group_by":["pid"],"labels":["team|app"]}}' \
   | jq '.data | {
       group_by: .view.group_by,
       process_scopes: .types.actor_types.process.aggregation_scopes,
+      container_scopes: .types.actor_types.container.aggregation_scopes,
       actor_columns: [.actors.columns[].id]
     }'
 ```
@@ -119,8 +115,8 @@ Example Kubernetes pod/namespace view inspection:
 curl -sS -X POST \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections%20processes:by_pid" \
-  -d '{"timeout":60000}' \
+  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
+  -d '{"timeout":60000,"selections":{"group_by":["pid"]}}' \
   | jq '.data.actors as $actors
         | ($actors.columns | map(.id)) as $cols
         | ($cols | index("k8s_namespace")) as $ns

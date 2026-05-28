@@ -4,6 +4,8 @@
 
 Status: completed
 
+Regression note (2026-05-28): reopened after local runtime inspection showed the user-visible controls do not match the intended product contract. The implementation exposed `cgroup-paths:show|hide` and enriched `process` actors with container metadata, but did not expose a clear `group_by` selector or container-level actor view.
+
 Sub-state: completed 2026-05-27. Agent-side topology container/orchestrator grouping implementation, docs, specs, public skill updates, fixtures, and follow-up mapping are complete. Validation-host checks were performed on the local workstation; Docker, systemd, and libvirt/virsh were available, Kubernetes API and LXC runtime coverage were not available and are scoped out of this Agent-side close.
 
 Sub-state (prior, round-10-minor-fixes): applied after 6/6 READY votes (reviewer, reviewer, reviewer, reviewer, reviewer, reviewer) — 2 actionable non-blocking minors applied before reviewer final pass; full per-finding disposition recorded in `.local/sow-reviews/SOW-0036/round-10/FIXES-APPLIED-minor.md`:
@@ -453,4 +455,282 @@ Follow-up mapping is complete: every valid follow-up item is represented by a pe
 
 ## Regression Log
 
-None yet.
+## Regression - 2026-05-28
+
+What broke:
+
+- The completed SOW-0036 outcome exposed container metadata as extra columns on `process` actors instead of making topology grouping a first-class actor-level product control.
+- The visible Function controls include `cgroup-paths:show|hide`, which is an implementation/privacy toggle, not a useful topology grouping decision.
+- The visible Function controls do not expose the expected grouping choice: PID, process name, or container name.
+- Runtime verification of the first repair found a second bug: the topology
+  Function parsed selector values only from the legacy function string, while
+  the Function UI sends v3 data requests as JSON payload selections.
+- Runtime verification of the installed Agent found the multi-plugin enrichment
+  chain was still broken: `cgroups.plugin` created its lookup sockets under the
+  daemon runtime directory, but external plugins could resolve a different
+  runtime directory for writable netipc endpoints.
+- Runtime verification also found the installed `cgroup-name` helper was not
+  executable, so cgroup discovery could not run the helper after local install.
+- Runtime verification after those repairs found the enrichment chain still
+  reconnecting: `apps.plugin` could connect to `CGROUPS_LOOKUP`, but real SHM
+  lookup calls failed before enrichment data reached `network-viewer.plugin`.
+  This made the Function run, but container grouping either returned process
+  actors or lacked live cgroup/container attribution.
+
+Evidence:
+
+- `src/collectors/network-viewer.plugin/network-viewer.c` emits only `self`, `process`, and `endpoint` actor types in the type registry; container grouping is currently an aggregation scope on `process`, not a distinct selected actor level.
+- `src/collectors/network-viewer.plugin/network-viewer.c` emits `view.group_by`, but the Function metadata exposes `processes` and `cgroup-paths` controls instead of a real `group_by` control.
+- `src/collectors/network-viewer.plugin/metadata.yaml` documents `cgroup-paths` as a user parameter and only documents `processes:by_name|by_pid`.
+- `src/plugins.d/FUNCTION_UI_REFERENCE.md:73-80` documents v3 Function data
+  requests as POST JSON with `selections`.
+- Runtime plugin protocol check against `/tmp/network-viewer.plugin` before the
+  second repair: payload `{"selections":{"group_by":["container"]}}` still
+  returned `data.stats.group_by="process_name"`, proving the payload was
+  ignored.
+- Local runtime inspection showed `/run/netdata/cgroups-lookup.sock` and
+  `/run/netdata/cgroups-snapshot.sock` existed, but `apps.plugin` logged
+  `APPS_LOOKUP server init failed` and `CGROUPS_LOOKUP service unavailable`.
+- `src/libnetdata/os/run_dir.c` previously honored `NETDATA_RUN_DIR` only for
+  read-only callers and required writable access to `/run` before accepting an
+  existing `/run/netdata`; the repaired code checks the existing child runtime
+  directory first and honors `NETDATA_RUN_DIR` for writable callers too:
+  `src/libnetdata/os/run_dir.c:24`, `src/libnetdata/os/run_dir.c:44`.
+- Local runtime inspection showed the installed helper at
+  `/usr/libexec/netdata/plugins.d/cgroup-name` was `0644`, and the journal
+  contained `posix_spawn()` / `cannot popen()` failures for that helper.
+- The executable permission gap came from installer/package permission logic:
+  `netdata-installer.sh` reset libexec files to `0644` and only restored
+  executable bits for `*plugin` and `*.sh`; `cgroup-name` matches neither.
+  The repair adds explicit `0750` handling in `netdata-installer.sh:984`,
+  `packaging/makeself/install-or-update.sh:183`, and
+  `packaging/cmake/pkg-files/deb/netdata/postinst:31`.
+- Temporary lookup instrumentation on the installed Agent showed
+  `apps.plugin` `CGROUPS_LOOKUP` calls failing first as `NIPC_ERR_TRUNCATED`
+  and then, after enabling the SHM/futex unit-test path, as
+  `NIPC_ERR_BAD_LAYOUT`. The failure happened on normal lookup batches, not on
+  topology JSON generation.
+- The netipc SHM client send path used the same buffer for the typed request
+  payload and for the outer `header + payload` SHM message. Encoding the outer
+  header before copying the payload overwrote the beginning of the payload when
+  `payload == ctx->send_buf`. The repair moves the payload with overlap-safe
+  `memmove()` before encoding the outer header:
+  `src/libnetdata/netipc/src/service/netipc_service.c:431`,
+  `src/libnetdata/netipc/src/service/netipc_service.c:435`,
+  `src/libnetdata/netipc/src/service/netipc_service.c:443`,
+  `src/libnetdata/netipc/src/service/netipc_service_win.c:444`,
+  `src/libnetdata/netipc/src/service/netipc_service_win.c:448`.
+- The public netipc service config exposed response capacity but not request
+  payload capacity, so normal lookup clients could negotiate too-small request
+  buffers and force avoidable overflow/reconnect cycles. The repair adds
+  `max_request_payload_bytes` to both public config structs and forwards it to
+  POSIX/Windows transport configs:
+  `src/libnetdata/netipc/include/netipc/netipc_service.h:83`,
+  `src/libnetdata/netipc/include/netipc/netipc_service.h:100`,
+  `src/libnetdata/netipc/src/service/netipc_service.c:247`,
+  `src/libnetdata/netipc/src/service/netipc_service.c:266`,
+  `src/libnetdata/netipc/src/service/netipc_service_win.c:256`,
+  `src/libnetdata/netipc/src/service/netipc_service_win.c:275`.
+- The generic request payload default was `16` bytes, which is far below real
+  lookup payload size. The repair uses the library default request capacity:
+  `src/libnetdata/netipc/src/service/netipc_service.c:227`,
+  `src/libnetdata/netipc/src/service/netipc_service_win.c:235`.
+- The two lookup clients now request the maximum supported request payload
+  capacity up front, avoiding resize reconnects for normal batches:
+  `src/collectors/apps.plugin/apps-cgroups-lookup-client.c:429`,
+  `src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c:774`.
+- The POSIX SHM server session loop did not notice when the UDS control peer
+  disconnected while the worker was waiting on SHM receive, so old session SHM
+  files could remain mapped until timeout and look like extra clients. The
+  repair checks the control fd on SHM receive timeout and closes sessions after
+  capacity/envelope/internal-error responses:
+  `src/libnetdata/netipc/src/service/netipc_service.c:991`,
+  `src/libnetdata/netipc/src/service/netipc_service.c:1141`,
+  `src/libnetdata/netipc/src/service/netipc_service.c:1236`,
+  `src/libnetdata/netipc/src/service/netipc_service.c:1327`.
+- `cgroup-lookup-netipc-test` now negotiates SHM/futex instead of baseline-only,
+  so the test covers the transport path that failed in the installed Agent:
+  `src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c:208`.
+
+Why previous validation missed it:
+
+- Fixture validation proved schema validity and metadata pass-through, not the product interaction. It checked that `view.group_by` was present in JSON, but did not verify that local/Cloud users could select the intended grouping or that non-PID views avoid variable per-process/container details.
+- The first repair validated command-string options such as
+  `group_by:container`, but did not validate the actual v3 UI payload shape:
+  `{"selections":{"group_by":["container"]}}`.
+- The second repair validated sockets and installed helper permissions, but the
+  previous unit test still used baseline UDS only. That missed SHM-specific
+  send-buffer aliasing, request-capacity negotiation, and stale SHM session
+  cleanup.
+
+Corrected product contract:
+
+- `group_by:pid` is the only view that may emit raw per-PID information such as PID, UID, network namespace, command line, cgroup path, and full container metadata.
+- `group_by:process_name` groups multiple processes by process name. It must not emit fields that can vary across grouped processes, including PID, UID, network namespace, command line, cgroup path, or container metadata.
+- `group_by:container` groups by a canonical `container_name`. For services this is the service name. For processes that are not containers and not services, this falls back to process name.
+- Future grouping dimensions such as Kubernetes label values can be added later, but must follow the same rule: fields that vary inside the selected grouping must not be emitted as actor facts for that grouped actor.
+- `cgroup-paths:show|hide` is removed from user-facing controls.
+
+Repair plan:
+
+1. Replace the user-facing `processes` selector with `group_by` options: `pid`, `process_name`, `container`.
+2. Keep legacy parsing for `processes:by_pid` and `processes:by_name` as compatibility aliases.
+3. Remove the `cgroup-paths` parser, metadata parameter, Function info parameter, generated docs, public skill examples, and developer docs/spec references.
+4. Add canonical `container_name` derivation and use it for `group_by:container` actor identity, display, and grouping.
+5. Emit raw per-PID details only for `group_by:pid`; keep grouped process/container actors free of variable raw fields.
+6. Advertise `v: 3` in Function metadata and parse v3 POST payload
+   selections, including `selections.group_by`, `selections.__topology_mode`,
+   `selections.sockets`, `selections.protocols`, `selections.endpoints`, and
+   `selections.labels`.
+7. Update fixtures, validators, docs, specs, and project skill guidance to match the corrected product contract.
+8. Repair runtime-directory discovery so writable external plugin callers reuse
+   the daemon runtime directory instead of falling back to a private
+   `/tmp/netdata` path.
+9. Repair local installer, static makeself, and Debian post-install permission
+   handling so `cgroup-name` is installed executable without setuid.
+10. Repair netipc SHM request construction so the typed request payload is not
+    corrupted by the outer SHM message header.
+11. Expose and propagate netipc request payload capacity through the public
+    L2/L3 service config, and set lookup clients to a capacity that can carry
+    normal lookup batches without reconnecting.
+12. Repair netipc SHM session cleanup so server workers exit when their control
+    peer disconnects or after sending a terminal capacity/envelope/internal
+    error response.
+
+Validation plan:
+
+- Rebuild `network-viewer.plugin` and topology tests.
+- Validate topology fixtures and schema for `group_by:pid`, `group_by:process_name`, and `group_by:container`.
+- Run a local debug Function smoke and inspect that the visible metadata exposes `group_by` and no `cgroup-paths`.
+- Run `./install.sh` to rebuild, install, and restart the local Agent.
+- Verify `/usr/libexec/netdata/plugins.d/cgroup-name` is executable after
+  install.
+- Verify the live installed Agent exposes `cgroups-lookup.sock`,
+  `apps-lookup.sock`, and the network-viewer APPS_LOOKUP client without
+  `APPS_LOOKUP server init failed`, `CGROUPS_LOOKUP service unavailable`,
+  `cannot popen(cgroup-name)`, or `posix_spawn(cgroup-name)` errors.
+- Re-run the live `topology:network-connections` Function with
+  `selections.group_by=["container"]` and verify container actor rows are
+  returned.
+- Run the netipc lookup unit tests through the SHM/futex path and verify the
+  request no longer fails with `BAD_LAYOUT`.
+- After reinstall/restart, inspect journal, `/run/netdata`, `lsof`, and `ss` to
+  verify there is one live `CGROUPS_LOOKUP` client (`apps.plugin`) and one live
+  `APPS_LOOKUP` client (`network-viewer.plugin`) without accumulating stale SHM
+  sessions.
+- Run `.agents/sow/audit.sh` and whitespace checks.
+
+Sensitive data handling plan:
+
+- No raw production cgroup paths, labels, pod names, service names, registry
+  names, customer identifiers, tokens, node ids, or private endpoint values are
+  written to durable artifacts.
+- Fixture and documentation examples use synthetic or placeholder values.
+- Raw cgroup paths and detailed container metadata are limited to
+  `group_by:pid`; grouped process/container actor rows do not emit variable raw
+  per-PID details.
+
+Sensitive data gate:
+
+- `.agents/sow/audit.sh` sensitive-data guardrail passed on 2026-05-28.
+- Search of source/docs/specs/project skills/pending SOWs confirms the removed
+  `cgroup-paths` control no longer appears outside legacy parser aliases and
+  closed historical SOW text.
+
+Validation results:
+
+- `python3 src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py` passed: validated 4 fixtures.
+- `go run ./tools/functions-validation/validate --schema ../plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json --input <fixture>` passed for all four network-viewer topology fixtures.
+- Direct compile check of `src/collectors/network-viewer.plugin/network-viewer.c` using `build/compile_commands.json` passed, output object written to `/tmp/network-viewer.c.o`.
+- Direct link check using the existing build objects plus `/tmp/network-viewer.c.o` passed, output binary written to `/tmp/network-viewer.plugin`.
+- Standalone plugin protocol info call
+  `FUNCTION_PAYLOAD ... "topology:network-connections info" ... {}` returned
+  `status=200`, `type=topology`, `v=3`, `accepted_params` containing
+  `group_by`, required param ids containing `group_by`, and no `data` member.
+- Standalone plugin protocol v3 data call with payload
+  `{"selections":{"group_by":["process_name"]}}` returned
+  `data.stats.group_by="process_name"`, process actor rows, zero non-null PID
+  values, and zero non-null container-name values.
+- Standalone plugin protocol v3 data call with payload
+  `{"selections":{"group_by":["pid"]}}` returned
+  `data.stats.group_by="pid"`, process actor rows, non-null process and PID
+  values, and PID-mode container metadata only where cache enrichment was
+  available.
+- Standalone plugin protocol v3 data call with payload
+  `{"selections":{"group_by":["container"]}}` returned
+  `data.stats.group_by="container"`, container actor rows, non-null
+  `container_name` values for those rows, zero non-null process values, and
+  zero non-null PID values.
+- `./install.sh` completed successfully on 2026-05-28 and restarted the local
+  Agent.
+- Installed helper validation: `/usr/libexec/netdata/plugins.d/cgroup-name`
+  is executable after install (`0750`).
+- Installed runtime socket validation: `/run/netdata` contains
+  `cgroups-snapshot.sock`, `cgroups-lookup.sock`, and `apps-lookup.sock`.
+- Installed journal validation since the post-install restart: one cgroups
+  snapshot server start, one cgroups lookup server start, one APPS_LOOKUP server
+  start, one network-viewer APPS_LOOKUP client connection, and zero
+  `APPS_LOOKUP server init failed`, `CGROUPS_LOOKUP service unavailable`,
+  `cannot popen(cgroup-name)`, or `posix_spawn(cgroup-name)` failures.
+- Installed Function metadata validation through the authenticated direct Agent
+  path returned `status=200`, `type=topology`, `v=3`; `accepted_params`
+  contained `group_by` and did not contain `cgroup-paths`.
+- Installed Function data validation through the authenticated direct Agent path
+  returned the expected row shape for all three grouping values:
+  `group_by=["process_name"]` returned process actors with zero non-null PID rows
+  and zero non-null container-name rows; `group_by=["pid"]` returned process
+  actors with non-null PID/process/container-name rows; and
+  `group_by=["container"]` returned container actors with zero non-null PID rows,
+  zero non-null process-name rows, and non-null container-name rows. At
+  validation time the container query returned `status=200`, `type=topology`,
+  `data.stats.group_by="container"`, `data.view.scope="container"`, 32
+  container actors, 63 endpoint actors, and 1 self actor.
+- `sudo -n cmake --build build --target cgroup-lookup-netipc-test
+  apps-lookup-protocol-test network-viewer-apps-lookup-client-test -j2`
+  completed successfully after the netipc repair.
+- `sudo -n ./build/cgroup-lookup-netipc-test` passed with SHM/futex negotiation
+  enabled, covering the transport path that reproduced the installed-Agent
+  `BAD_LAYOUT` failure.
+- `sudo -n ./build/apps-lookup-protocol-test` passed.
+- `sudo -n ./build/network-viewer-apps-lookup-client-test` passed.
+- `./install.sh` completed successfully after the netipc repair and restarted
+  the local Agent.
+- Post-restart journal validation from the new Agent start showed one
+  `CGROUPS_LOOKUP` server start, one `APPS_LOOKUP` server start, one
+  `apps.plugin` connection to `CGROUPS_LOOKUP`, and one `network-viewer.plugin`
+  connection to `APPS_LOOKUP`. It showed zero post-restart `TEMP DEBUG`,
+  `BAD_LAYOUT`, `TRUNCATED`, `OVERFLOW`, lost-lookup, or lookup-unavailable
+  messages. One unrelated cgroups snapshot truncation warning remained.
+- Post-restart socket validation after repeated Function calls showed exactly
+  one live `CGROUPS_LOOKUP` session (`netdata` server to `apps.plugin` client),
+  one live `APPS_LOOKUP` session (`apps.plugin` server to
+  `network-viewer.plugin` client), and one live `cgroups-snapshot` session
+  (`netdata` server to `ebpf.plugin` client). `/run/netdata` contained one SHM
+  file per live service session, not two accumulating lookup clients.
+- Authenticated direct Agent Function validation after the netipc repair
+  returned working actor-level selector behavior:
+  `group_by=["pid"]` returned 45 process actors, 51 endpoint actors, and 1 self
+  actor; `group_by=["process_name"]` returned 29 process actors, 51 endpoint
+  actors, and 1 self actor; `group_by=["container"]` returned 22 container
+  actors, 51 endpoint actors, and 1 self actor. The container response had
+  `data.stats.group_by="container"` and advertised actor types `container`,
+  `endpoint`, `process`, and `self`.
+- `git diff --check` passed.
+- `go test ./tools/functions-validation/validate` passed from `src/go`.
+- `./install.sh` rebuilt and installed `netdata`, `apps.plugin`, and
+  `network-viewer.plugin`; the earlier root-owned `build/` limitation was
+  resolved by running the requested installer path.
+- `.agents/sow/audit.sh` passed with pre-existing non-project skill
+  classification warnings; sensitive-data guardrail passed and SOW
+  status/directory consistency passed.
+
+Follow-up mapping after regression:
+
+- SOW-0039 is closed as obsolete because `group_by:process_name` must not emit
+  container metadata.
+- SOW-0042 is closed as obsolete because the hide/show control pattern is
+  removed from this product surface.
+- SOW-0041 remains open and was updated to the three actor-level grouping
+  choices: `process_name`, `pid`, and `container`.
+- SOW-0040 remains open; it concerns detailed tabular cache population, not the
+  topology actor grouping selector.

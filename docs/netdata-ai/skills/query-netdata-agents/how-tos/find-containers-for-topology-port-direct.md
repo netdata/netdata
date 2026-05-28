@@ -36,8 +36,8 @@ raw labels, cgroup paths, or private IPs?
      --node "$NODE_UUID" \
      --host "$AGENT_HOST" \
      --machine-guid "$MACHINE_GUID" \
-     --function 'topology:network-connections%20processes:by_pid%20cgroup-paths:hide' \
-     --body '{}' \
+     --function 'topology:network-connections' \
+     --body '{"selections":{"group_by":["pid"]}}' \
      > .local/audits/query-netdata-agents/network-topology-port-agent.json
    ```
 
@@ -108,8 +108,8 @@ workload names into durable artifacts unless explicitly approved.
 
 - This relies on the `socket_ports` actor table emitted by
   `topology:network-connections`.
-- `processes:by_pid` gives the best container attribution.
-- `cgroup-paths:hide` keeps raw cgroup paths out of saved audit output.
+- `group_by:pid` gives the best container attribution.
+- Raw cgroup paths are present in `group_by:pid`; do not copy them into durable artifacts.
 - Use the Cloud sibling how-to when direct Agent access is not available.
 
 ## Source guides

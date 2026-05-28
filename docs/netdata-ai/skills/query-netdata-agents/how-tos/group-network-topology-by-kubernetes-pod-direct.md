@@ -36,8 +36,8 @@ GUIDs, pod labels, or cgroup paths?
      --node "$NODE_UUID" \
      --host "$AGENT_HOST" \
      --machine-guid "$MACHINE_GUID" \
-     --function 'topology:network-connections%20processes:by_pid%20cgroup-paths:hide' \
-     --body '{}' \
+     --function 'topology:network-connections' \
+     --body '{"selections":{"group_by":["pid"]}}' \
      > .local/audits/query-netdata-agents/network-topology-by-pod-agent.json
    ```
 
@@ -101,8 +101,7 @@ pod names into durable artifacts.
 - The wrapper resolves and caches the per-agent bearer under
   `.local/audits/query-netdata-agents/bearers/`. That directory is
   gitignored and must remain local.
-- `cgroup-paths:hide` suppresses raw `cgroup_path` values.
-- Canonical Kubernetes columns do not require `labels:<pattern>`.
+- - Canonical Kubernetes columns do not require `labels:<pattern>`.
 - Use the same `NODE_UUID`, `MACHINE_GUID`, and `AGENT_HOST` tuple from
   the same Agent identity response.
 

@@ -23,10 +23,15 @@ Agent-side SOW can close without claiming Cloud UI grouping is already done.
 
 Facts:
 
-- SOW-0036 emits the Agent payload: new process columns, aggregation scopes,
-  and a nine-entry `view.group_by` selector list.
+- SOW-0036 regression repair emits the Agent payload with three actor grouping
+  choices: `process_name`, `pid`, and `container`.
+- `group_by:pid` returns per-PID `process` actors with raw per-PID fields.
+- `group_by:process_name` returns grouped `process` actors without variable
+  per-process/container fields.
+- `group_by:container` returns grouped `container` actors keyed by canonical
+  `container_name`.
 - SOW-0036 explicitly does not implement Cloud frontend or Cloud topology
-  service rebucketing.
+  service selection UX.
 
 Inferences:
 
@@ -41,9 +46,9 @@ Unknowns:
 
 - Cloud frontend exposes a grouping selector for topology payloads that declare
   `view.group_by`.
-- Cloud topology aggregation honors the selected grouping scope.
-- Null or empty grouping keys preserve actor identity instead of collapsing into
-  one shared bucket.
+- Cloud topology aggregation honors the selected actor grouping.
+- Cloud grouping respects the Agent actor type and merge identity emitted for
+  the selected mode.
 - Agent payloads emitted by SOW-0036 require no further Agent-side changes.
 
 ## Analysis

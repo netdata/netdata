@@ -774,6 +774,7 @@ void nv_apps_lookup_init(bool *plugin_should_exit)
     nipc_client_config_t config = {
         .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
         .preferred_profiles = NIPC_PROFILE_SHM_FUTEX,
+        .max_request_payload_bytes = NIPC_MAX_PAYLOAD_CAP,
         .auth_token = netipc_auth_token(),
     };
     nipc_client_init(&apps_lookup_client_ctx, os_run_dir(true), NV_APPS_LOOKUP_SERVICE_NAME, &config);

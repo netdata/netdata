@@ -66,11 +66,15 @@ developer-facing and must stay in this project skill, not under
    - Declare `identity`, `merge_identity`, and `parent_identity` in actor types.
    - Prepare aggregation scopes such as node, process name, PID, container,
      Kubernetes workload, SNMP device/interface, or vSphere object.
-   - For network-connections container grouping, keep containers as canonical
-     columns on `process` actors unless the product explicitly needs separate
-     container actors. Emit `pid`, `process_name`, `cgroup`, `container`,
-     `orchestrator`, `pod`, `namespace`, `workload`, and `service` in
-     `view.group_by` and on the process actor type's `aggregation_scopes`.
+   - For network-connections, the product contract is explicit actor-level
+     grouping: `group_by:process_name` emits grouped `process` actors,
+     `group_by:pid` emits per-PID `process` actors with raw per-PID details, and
+     `group_by:container` emits `container` actors grouped by canonical
+     `container_name`. Do not expose raw cgroup/container metadata in grouped
+     process/container views.
+   - Network-connections advertises `v: 3`; verify selector behavior with the
+     actual POST payload shape (`selections.group_by`) and keep legacy
+     function-string aliases only as compatibility paths.
 
 3. Pick graph links.
    - Graph links are renderable relationship groups.

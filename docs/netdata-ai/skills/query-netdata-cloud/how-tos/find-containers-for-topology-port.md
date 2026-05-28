@@ -30,8 +30,8 @@ without exposing Cloud tokens, raw labels, cgroup paths, or private IPs?
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
-     --function 'topology:network-connections%20processes:by_pid%20cgroup-paths:hide' \
-     --body '{}' \
+     --function 'topology:network-connections' \
+     --body '{"selections":{"group_by":["pid"]}}' \
      > .local/audits/query-netdata-cloud/network-topology-port.json
    ```
 
@@ -102,10 +102,10 @@ artifacts unless explicitly approved.
 
 - This relies on the `socket_ports` actor table emitted by
   `topology:network-connections`.
-- `processes:by_pid` gives the best container attribution. The
+- `group_by:pid` gives the best container attribution. The
   process-name view can merge same-name processes from different
   containers.
-- `cgroup-paths:hide` keeps raw cgroup paths out of saved audit output.
+- Raw cgroup paths are present in `group_by:pid`; do not copy them into durable artifacts.
 
 ## Source guides
 

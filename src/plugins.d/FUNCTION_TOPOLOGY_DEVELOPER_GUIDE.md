@@ -1042,70 +1042,55 @@ Common column rules:
 If a table or column has no valid aggregation, mark it `none` and keep rows
 attached to their owner. Do not silently drop rows.
 
-### Container And Orchestrator Grouping
+### Network Connections Actor Grouping
 
-`topology:network-connections` enriches `process` actor rows with container
-and orchestrator columns when the APPS_LOOKUP cache has per-PID cgroup data.
-The canonical actor columns are:
+`topology:network-connections` supports three actor grouping levels:
+
+- `group_by:process_name`: one `process` actor per process name.
+- `group_by:pid`: one `process` actor per PID. This is the only mode that may
+  emit raw per-PID fields.
+- `group_by:container`: one `container` actor per canonical `container_name`.
+  For systemd services, `container_name` is the service name. For non-container,
+  non-service processes, it falls back to process name.
+
+The actor columns are:
 
 | Column | Role | Source |
 |---|---|---|
-| `cgroup_path` | group key | APPS_LOOKUP cgroup path; hidden when `cgroup-paths:hide` is requested |
-| `cgroup_name` | group key | APPS_LOOKUP cgroup name |
-| `orchestrator` | group key | rendered from APPS_LOOKUP cgroup status and orchestrator enum |
-| `k8s_pod_name` | group key | `k8s_pod_name` label |
-| `k8s_namespace` | group key | `k8s_namespace` label |
-| `k8s_workload` | group key | `k8s_controller_name`, or pod-name suffix stripping |
-| `docker_container_name` | group key | `k8s_container_name`, `container_name`, then `cgroup_name` |
-| `docker_image` | attribute | `image` label |
-| `systemd_unit_name` | group key | systemd unit component from `cgroup_path` |
+| `process` | group key | process name; populated for `process_name` and `pid` modes |
+| `pid` | identity | host PID; populated only for `group_by:pid` |
+| `container_name` | group key | systemd unit, Docker/Kubernetes container name, cgroup name, then process fallback |
+| `cgroup_path` | attribute | APPS_LOOKUP cgroup path; populated only for `group_by:pid` |
+| `cgroup_name` | attribute | APPS_LOOKUP cgroup name; populated only for `group_by:pid` |
+| `orchestrator` | attribute | rendered from APPS_LOOKUP cgroup status and orchestrator enum; populated only for `group_by:pid` |
+| `k8s_pod_name` | attribute | `k8s_pod_name` label; populated only for `group_by:pid` |
+| `k8s_namespace` | attribute | `k8s_namespace` label; populated only for `group_by:pid` |
+| `k8s_workload` | attribute | `k8s_controller_name`, or pod-name suffix stripping; populated only for `group_by:pid` |
+| `docker_container_name` | attribute | `k8s_container_name`, `container_name`, then `cgroup_name`; populated only for `group_by:pid` |
+| `docker_image` | attribute | `image` label; populated only for `group_by:pid` |
+| `systemd_unit_name` | attribute | systemd unit component from `cgroup_path`; populated only for `group_by:pid` |
 
-These columns are populated only for `process` actors. `self` and `endpoint`
-actor rows keep these values `null`.
-
-The process actor type advertises these aggregation scopes:
+The actor types advertise these aggregation scopes:
 
 - `process_name` -> `process`
 - `pid` -> `pid`, `net_ns_inode`
-- `cgroup` -> `cgroup_path`
-- `container` -> `cgroup_name`
-- `orchestrator` -> `orchestrator`
-- `pod` -> `k8s_pod_name`
-- `namespace` -> `k8s_namespace`
-- `workload` -> `k8s_workload`
-- `service` -> `systemd_unit_name`
+- `container` -> `container_name`
 
-`view.group_by` lists all nine ids so consumers can offer the same selector.
-`view.scope` remains the producer's natural current scope, `process_name` by
-default or `pid` when the existing `processes:by_pid` argument is requested.
+`view.group_by` lists exactly `process_name`, `pid`, and `container`.
+`view.scope` is the active group selected for the Function call.
 
 The `orchestrator` column values are `systemd`, `docker`, `k8s`, `kvm`,
 `lxc`, `podman`, `nspawn`, `host_root`, and `unknown`. `host_root` is a
 producer-local rendering of APPS_LOOKUP `cgroup_status == HOST_ROOT`; it is
-not a netipc orchestrator enum value.
+not a netipc orchestrator enum value. These values are raw PID-mode attributes,
+not standalone topology groupings in the current contract.
 
 Free-form cgroup labels are not emitted by default. Operators opt in per
 Function call with `labels:<pattern>`, where `pattern` is pipe-separated and
 matched against label keys with `simple_pattern` semantics, for example
 `labels:team|app|version-*`. Commas are literal characters. The whitelist is
 applied only at Function-output emission; upstream caches and IPC payloads
-carry the raw labels.
-
-`cgroup-paths:<show|hide>` controls the full `cgroup_path` column. The default
-is `show`; `hide` emits `null` for `cgroup_path` while preserving the other
-container columns.
-
-Sparse-scope behavior is explicit: when the selected grouping column is null
-or empty for a row, consumers preserve that row's actor identity instead of
-collapsing all null rows into a single bucket. For example,
-`group_by=cgroup` with `cgroup-paths:hide` behaves like per-actor grouping for
-rows whose `cgroup_path` is hidden. Operators who want leaf container grouping
-without full paths should use `group_by=container`.
-
-In default comm-keyed mode (`processes:by_name`), container and orchestrator
-columns reflect the first PID seen for each process name. Operators who need
-accurate per-container attribution when the same process name appears in
-multiple containers should request `processes:by_pid`.
+carry the raw labels. Raw cgroup paths are emitted only in `group_by:pid`.
 
 ## Correlation Plane
 

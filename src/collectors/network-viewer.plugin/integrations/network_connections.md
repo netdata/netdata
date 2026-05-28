@@ -235,28 +235,25 @@ This function has no parameters.
 
 ### Network Connections Topology
 
-Shows active network connections as a topology graph with self, process, and endpoint actors.
+Shows active network connections as a topology graph with self, process or container, and endpoint actors.
 
-Process actors expose container and orchestrator grouping columns when APPS_LOOKUP cache data is available:
-cgroup path, cgroup name, orchestrator, Kubernetes pod, namespace, workload, Docker/container name,
-Docker image, and systemd unit name.
+The group_by selector controls the actor level. process_name groups sockets by process name, pid shows
+one actor per PID with the raw per-PID information, and container groups sockets by canonical
+container_name. For systemd services, container_name is the service name. For non-container,
+non-service processes, container_name falls back to the process name.
 
-Supported topology groupings are pid, process_name, cgroup, container, orchestrator, pod, namespace,
-workload, and service. Free-form labels are hidden by default and can be allowed per request with
-labels:<pattern>, where patterns are pipe-separated. Full cgroup paths are shown by default and can be
-hidden per request with cgroup-paths:hide.
-
-In the default processes:by_name mode, container and orchestrator columns reflect the first PID observed
-for each process name. Use processes:by_pid when exact per-container attribution is required.
+Raw fields that can vary across grouped processes, such as PID, UID, network namespace, command line,
+cgroup path, and detailed container metadata, are emitted only in group_by:pid. Free-form labels are
+hidden by default and can be allowed per request with labels:<pattern>, where patterns are pipe-separated.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Network-viewer.plugin:topology:network-connections` |
 | Require Cloud | no |
-| Performance | Adds nullable string columns to process actor rows; APPS_LOOKUP cache warming runs asynchronously. |
-| Security | Free-form labels are denied by default. cgroup_path may expose operator-chosen path segments and can be hidden with cgroup-paths:hide. |
-| Availability | Container columns are populated only when apps.plugin and cgroups.plugin provide APPS_LOOKUP data for the PID. |
+| Performance | group_by:container performs APPS_LOOKUP cache reads to derive canonical container_name; cache warming runs asynchronously. |
+| Security | Free-form labels are denied by default. Raw cgroup paths are emitted only in group_by:pid and may expose operator-chosen path segments. |
+| Availability | container_name uses APPS_LOOKUP data when available and falls back to process name when no container or service identity exists. |
 
 #### Prerequisites
 
@@ -266,9 +263,8 @@ No additional configuration is required.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
-| Processes | select | Use processes:by_name or processes:by_pid. by_pid gives exact per-PID container attribution. | no | by_name | by_name (default), by_pid |
+| Group By | select | Use group_by:process_name, group_by:pid, or group_by:container to select the topology actor level. | no | process_name | process_name (default), pid, container |
 | Labels | string | Optional pipe-separated simple-pattern whitelist for free-form actor labels. Omitted means deny all free-form labels. | no |  |  |
-| Cgroup Paths | select | Use cgroup-paths:show or cgroup-paths:hide to control the full cgroup_path column. | no | show | show (default), hide |
 
 #### Returns
 
@@ -276,14 +272,13 @@ Topology payload using netdata.topology.v1.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| cgroup_path | string |  |  | Full cgroup path. Use cgroup-paths:hide to suppress it. |
-| cgroup_name | string |  |  | Cgroup or container display name. |
-| orchestrator | string |  |  | Container/orchestrator family, such as systemd, docker, k8s, kvm, lxc, podman, nspawn, host_root, or unknown. |
-| k8s_pod_name | string |  |  | Kubernetes pod name from cgroup labels. |
-| k8s_namespace | string |  |  | Kubernetes namespace from cgroup labels. |
-| k8s_workload | string |  |  | Kubernetes controller name, or a workload name derived from pod-name suffixes. |
-| docker_container_name | string |  |  | Kubernetes container name, Docker/Podman container name, or cgroup name fallback. |
-| docker_image | string |  |  | Docker/Podman image label when available. |
-| systemd_unit_name | string |  |  | systemd unit name extracted from the cgroup path. |
-
-
+| container_name | string |  |  | Canonical container/service actor name used by group_by:container. |
+| cgroup_path | string |  |  | Full cgroup path, emitted only in group_by:pid. |
+| cgroup_name | string |  |  | Cgroup or container display name, emitted only in group_by:pid. |
+| orchestrator | string |  |  | Container/orchestrator family, emitted only in group_by:pid. |
+| k8s_pod_name | string |  |  | Kubernetes pod name, emitted only in group_by:pid. |
+| k8s_namespace | string |  |  | Kubernetes namespace, emitted only in group_by:pid. |
+| k8s_workload | string |  |  | Kubernetes controller name, emitted only in group_by:pid. |
+| docker_container_name | string |  |  | Kubernetes container, Docker/Podman container, or cgroup fallback name, emitted only in group_by:pid. |
+| docker_image | string |  |  | Docker/Podman image label, emitted only in group_by:pid. |
+| systemd_unit_name | string |  |  | systemd unit name, emitted only in group_by:pid. |

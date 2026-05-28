@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: open
+Status: closed
 
-Sub-state: tracked from SOW-0036 follow-up item 1. Not started.
+Sub-state: closed as obsolete by SOW-0036 regression repair on 2026-05-28.
 
 ## Requirements
 
@@ -13,6 +13,14 @@ Sub-state: tracked from SOW-0036 follow-up item 1. Not started.
 Improve `topology:network-connections` container attribution in the default
 `processes:by_name` view so same-name processes running in different containers
 do not inherit only the first observed PID's container metadata.
+
+Closure note:
+
+- This purpose is no longer valid. The corrected SOW-0036 contract says
+  `group_by:process_name` must not emit container metadata because the process
+  actor can represent multiple processes across containers or nodes.
+- Container identity is now exposed by `group_by:container`, not by enriching
+  the grouped process-name actor.
 
 ### User Request
 
