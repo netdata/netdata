@@ -270,6 +270,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
     } tier_retention[nd_profile.storage_tiers];
 
     RRDDIM *rd = rrdmetric_rrddim_get_and_lock(rm);
+    bool values_stored_as_rates = rd && rd->algorithm == RRD_ALGORITHM_INCREMENTAL;
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = qn->rrdhost->db[tier].eng;
@@ -343,6 +344,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         memset(qm, 0, sizeof(*qm));
 
         qm->status = options;
+        qm->values_stored_as_rates = values_stored_as_rates;
 
         qm->link.query_node_id = qn->slot;
         qm->link.query_context_id = qc->slot;
