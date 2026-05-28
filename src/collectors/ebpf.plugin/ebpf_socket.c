@@ -3126,6 +3126,7 @@ void ebpf_socket_thread(void *ptr)
     if (ebpf_socket_load_bpf(em)) {
         goto endsocket;
     }
+    ebpf_mark_program_loaded();
 
     int algorithms[NETDATA_MAX_SOCKET_VECTOR] = {
         NETDATA_EBPF_ABSOLUTE_IDX,

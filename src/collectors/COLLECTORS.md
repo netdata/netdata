@@ -291,6 +291,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [OpenVPN](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/openvpn/integrations/openvpn.md) | This collector monitors OpenVPN servers. |
 | [OpenVPN status log](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/openvpn_status_log/integrations/openvpn_status_log.md) | This collector monitors OpenVPN server. |
 | [Optical modules](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/ethtool/integrations/optical_modules.md) | This collector monitors optical transceiver modules' diagnostic parameters (temperature, voltage, laser bias current, transmit/receive power levels) from network interfaces equipped with modules that support Digital Diagnostic Monitoring (DDM). |
+| [Palo Alto Networks PAN-OS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/panos/integrations/palo_alto_networks_pan-os.md) | This collector monitors Palo Alto Networks PAN-OS firewalls. |
 | [Pi-hole](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/pihole/integrations/pi-hole.md) | This collector monitors Pi-hole instances using [Pi-hole API 6.0](https://ftl.pi-hole.net/master/docs/). |
 | [PowerDNS Authoritative Server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/powerdns/integrations/powerdns_authoritative_server.md) | This collector monitors PowerDNS Authoritative Server instances. |
 | [PowerDNS Recursor](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/powerdns_recursor/integrations/powerdns_recursor.md) | This collector monitors PowerDNS Recursor instances. |
@@ -304,9 +305,11 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Starlink (SpaceX)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/starlink_spacex.md) | Monitor SpaceX Starlink satellite internet metrics for efficient internet service management and performance. |
 | [strongSwan](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/strongswan.md) | Track strongSwan VPN and IPSec metrics using the vici interface for efficient virtual private network (VPN) management and performance. |
 | [Synproxy](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/synproxy.md) | This integration provides statistics about the Synproxy netfilter module. |
+| TCP Stack | Monitor TCP stack counters and connection states on Windows systems. |
 | [tc QoS classes](https://github.com/netdata/netdata/blob/master/src/collectors/tc.plugin/integrations/tc_qos_classes.md) | Examine tc metrics to gain insights into Linux traffic control operations. |
 | [Timex](https://github.com/netdata/netdata/blob/master/src/collectors/timex.plugin/integrations/timex.md) | Examine Timex metrics to gain insights into system clock operations. |
 | [Tor](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/tor/integrations/tor.md) | Tracks Tor's download and upload traffic, as well as its uptime. |
+| UDP Stack | Monitor UDP datagram counters on Windows systems. |
 | [Ubiquiti UFiber OLT](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/ubiquiti_ufiber_olt.md) | Track Ubiquiti UFiber GPON (Gigabit Passive Optical Network) device metrics for efficient fiber-optic network management and performance. |
 | [Unbound](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/unbound/integrations/unbound.md) | This collector monitors Unbound servers. |
 | [WireGuard](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | This collector monitors WireGuard VPN devices and peers traffic. |

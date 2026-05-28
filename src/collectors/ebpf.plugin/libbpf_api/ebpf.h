@@ -418,6 +418,7 @@ typedef struct ebpf_filesystem_partitions {
     char *family_name;
     struct bpf_object *objects;
     struct bpf_link **probe_links;
+    bool load_failed;
 
     netdata_ebpf_histogram_t hread;
     netdata_ebpf_histogram_t hwrite;

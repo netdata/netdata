@@ -150,7 +150,7 @@ modules:
               config: |
                 jobs:
                   - name: smartctl
-                    devices_poll_interval: 60  # Collect S.M.A.R.T statistics every 60 seconds
+                    poll_devices_every: 60  # Collect S.M.A.R.T statistics every 60 seconds
             - name: Concurrent scanning for multiple devices
               description: |
                 This example demonstrates enabling concurrent scanning to improve performance when monitoring many devices.

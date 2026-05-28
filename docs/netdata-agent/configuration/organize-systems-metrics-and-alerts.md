@@ -168,6 +168,8 @@ Add your own labels to categorize systems by any criteria you need.
 
 5. Verify your labels at `http://HOST-IP:19999/api/v1/info`
 
+Use custom host labels such as `environment` with [Node Rule-Based Room Assignment](/docs/netdata-cloud/node-rule-based-room-assignment.md) to route Kubernetes Nodes into separate Rooms.
+
 ### Stream labels from Child to Parent
 
 In Parent-Child setups, host labels automatically stream from children to the parent node. Access any child's labels through the parent at:

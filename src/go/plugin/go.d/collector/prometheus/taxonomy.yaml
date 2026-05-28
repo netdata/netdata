@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: prometheus
+taxonomy_optout:
+  reason: Generic Prometheus jobs define dynamic, endpoint-specific chart contexts at runtime and do not expose stable collector-level metric scopes for dashboard taxonomy placement.
