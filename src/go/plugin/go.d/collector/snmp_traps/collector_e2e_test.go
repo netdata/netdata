@@ -9,17 +9,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	buildinfo "github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 )
 
 func TestCollectorReplayPcapThroughListenerToJournal(t *testing.T) {
 	requireJournalctl(t)
 	setMinimalProfileDir(t)
-
-	oldCacheDir := buildinfo.CacheDir
-	buildinfo.CacheDir = t.TempDir()
-	t.Cleanup(func() { buildinfo.CacheDir = oldCacheDir })
+	withTestCacheDir(t)
 
 	port := freeUDPPort(t)
 	c := New()

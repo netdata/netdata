@@ -4,7 +4,7 @@
 
 Status: paused
 
-Sub-state: activated on 2026-05-25. Implementation and validation for the SOW-0035 feature-branch slice are complete and pushed in commit `38964171435f`. Terminal completion is intentionally deferred to SOW-0039 because SOW-0035 through SOW-0039 are not independently mergeable and close together at the final collector-consistency and merge gate. The user has fixed the implementation language to Go and clarified the listener/profile lifecycle contract. Implementation is delegated primarily to `deepseek/deepseek-v4-pro`; remaining reviews are delegated to `glm`, `kimi`, `minimax`, and `qwen` after `mimo` was removed from the reviewer pool due to quota exhaustion. The coordinating assistant remains responsible for architecture, direct edits, unblocking, integration, validation, and final quality.
+Sub-state: activated on 2026-05-25. Implementation and validation for the SOW-0035 feature-branch slice are complete and pushed in commit `38964171435f`. Terminal completion is intentionally deferred to SOW-0039 because SOW-0035 through SOW-0039 are not independently mergeable and close together at the final collector-consistency and merge gate. Reopened on 2026-05-27 for a test-isolation repair after local runtime inspection found trap test artifacts under `/var/cache/netdata/traps/`; the repair is implemented and validated, and the SOW is paused again pending SOW-0039. The user has fixed the implementation language to Go and clarified the listener/profile lifecycle contract. Implementation is delegated primarily to `deepseek/deepseek-v4-pro`; remaining reviews are delegated to `glm`, `kimi`, `minimax`, and `qwen` after `mimo` was removed from the reviewer pool due to quota exhaustion. The coordinating assistant remains responsible for architecture, direct edits, unblocking, integration, validation, and final quality.
 
 ## Requirements
 
@@ -877,6 +877,60 @@ Implementation slice complete on the feature branch, including creation-time pre
 - SOW-0037: hot reload / per-generation profile holder accounting beyond the single-generation SOW-0035 cache.
 - SOW-0039: final merge gate must re-check SDK append/drain throughput and decide whether the SDK SOW-0009 optimization is required before merge.
 - SDK repository pending SOW-0009 (`systemd-journal-sdk/.agents/sow/pending/SOW-0009-20260523-benchmark-profile-optimize.md`): benchmark/profile/optimize the SDK writers using the deterministic ingestion corpus.
+
+## Test Isolation Repair - 2026-05-27
+
+Facts:
+
+- The running Netdata installation had accumulated many SNMP trap journal files under `/var/cache/netdata/traps/`.
+- The root cause in the test suite is that `journalRoot(jobName)` uses `buildinfo.CacheDir`, which defaults to the production cache root, while several `Collector.Init()` tests exercised journal writer creation without replacing `buildinfo.CacheDir`.
+- Existing evidence: `src/go/plugin/go.d/collector/snmp_traps/journal_writer.go` builds the journal root from `buildinfo.CacheDir`; `src/go/plugin/go.d/collector/snmp_traps/init_test.go` and `src/go/plugin/go.d/collector/snmp_traps/profile_test.go` contain Init-path tests that did not set a temporary cache root; the e2e test already did this locally and showed the intended pattern.
+
+Plan:
+
+- Stop Netdata, empty `/var/cache/netdata/traps/`, and start Netdata again before code changes.
+- Add one package test helper that overrides `buildinfo.CacheDir` to an explicit `/tmp/snmp-traps-test-cache-*` directory and restores the original value with `t.Cleanup`.
+- Use the helper in every trap test that reaches `Collector.Init()` and in the `journalRoot` unit test so test journals cannot be written under production paths.
+- Run the focused `snmp_traps` package tests and verify the test run does not add or modify `/var/cache/netdata/traps/`. If the live Netdata service recreates its own `local` journal after startup, compare the directory before and after tests instead of treating runtime-created live files as test artifacts.
+
+Sensitive data handling:
+
+- No production trap payloads, community strings, device identifiers, or trap journal contents are copied into repository artifacts. The durable SOW record uses only paths and code references.
+
+Validation:
+
+- `sudo systemctl stop netdata` completed, `/var/cache/netdata/traps/` was emptied, and `sudo systemctl start netdata` restored the service.
+- After startup, the live `snmp_traps` job recreated `/var/cache/netdata/traps/local/` and bound UDP/162 through `go.d.plugin`; this is runtime state from the configured listener, not test output.
+- Before/after snapshots around the focused test runs had the same four production trap-path entries, so the tests did not add or modify production trap journal files.
+- `timeout 240 go test ./plugin/go.d/collector/snmp_traps -count=1` passed.
+- `timeout 360 go test -race ./plugin/go.d/collector/snmp_traps -count=1` passed.
+- `git diff --check` passed.
+
+## Full Ingestion Throughput Clarification - 2026-05-28
+
+Facts:
+
+- The previously discussed journal numbers were only half of the pipeline.
+- `src/go/plugin/go.d/collector/snmp_traps/benchmark_test.go:113` `BenchmarkPacketTrap` includes packet decode/profile/rendering through `Collector.handlePacket()`, but its sink is `countingWriter` (`benchmark_test.go:48`), so it does not exercise journal serialization or SDK journal output.
+- `src/go/plugin/go.d/collector/snmp_traps/benchmark_test.go:269` `BenchmarkJournalTrapWriterDrain` exercises queued trap writer + SDK journal output, but it starts from `benchmarkTrapEntry()` (`benchmark_test.go:278`), so it does not exercise packet input/decode/profile/rendering.
+- Any shorthand statement that the SDK journal output benchmark is "ingestion throughput" is therefore incorrect. It is output throughput only.
+
+Temporary full-pipeline benchmark:
+
+- Run against `github.com/netdata/systemd-journal-sdk/go@v0.3.0` with an uncommitted overlay benchmark.
+- Path measured: synthetic SNMPv2c packet bytes -> `Collector.handlePacket()` -> decode/profile/template/render -> `journalTrapWriter` queue -> SDK journal append/sync -> `journalctl --directory` row-count verification after the timed section.
+- Correctness check: 1,000 packets produced 1,000 queryable journal rows.
+- `go test -modfile=<temp-v0.3.0.mod> -mod=mod -overlay=<temp-full-pipeline-overlay.json> ./plugin/go.d/collector/snmp_traps -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=30000x -run '^$' -count=3`
+  - 30,000 packets/run: 13.35-13.96 us/op, 71.6K-74.9K packets/s, 71.6K-74.9K persisted entries/s, 0-1 drops/run, 12,625-12,626 B/op, 206 allocs/op.
+- `go test -modfile=<temp-v0.3.0.mod> -mod=mod -overlay=<temp-full-pipeline-overlay.json> ./plugin/go.d/collector/snmp_traps -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=100000x -run '^$' -count=3`
+  - 100,000 packets/run: 14.64-17.98 us/op, 55.6K-68.3K packets/s, 55.6K-68.3K persisted entries/s, 1-2 drops/run, 12,580-12,581 B/op, 206 allocs/op.
+
+Current performance interpretation:
+
+- Raw SDK journal append is not the full pipeline.
+- Queued journal output from prebuilt `TrapEntry` is not the full pipeline.
+- The current full packet-to-journal path on this workstation is approximately 55K-75K persisted traps/sec for the synthetic v2c profile-hit case, depending on run length and local I/O variability.
+- The hot-path allocation cost is dominated by full ingestion work, not only the SDK writer, and needs a separate optimization pass if the merge target is materially above this range.
 
 ## Regression Log
 

@@ -80,6 +80,7 @@ func TestProfileCacheReleaseIdempotent(t *testing.T) {
 
 func TestCollectorInitAcquiresProfileCache(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 
 	port := freeUDPPort(t)
 
@@ -97,6 +98,7 @@ func TestCollectorInitAcquiresProfileCache(t *testing.T) {
 
 func TestMultipleCollectorsShareSameCache(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 
 	port1 := freeUDPPort(t)
 	port2 := freeUDPPort(t)
@@ -128,6 +130,7 @@ func TestMultipleCollectorsShareSameCache(t *testing.T) {
 
 func TestInitBindFailureReleasesProfileRef(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	require.NoError(t, err)

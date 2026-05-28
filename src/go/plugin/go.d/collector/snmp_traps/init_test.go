@@ -166,6 +166,7 @@ func TestValidateVersions(t *testing.T) {
 
 func TestCollectorInit_BindsEndpointsAndCheckIsNoop(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 	port := freeUDPPort(t)
 
 	c := New()
@@ -182,6 +183,7 @@ func TestCollectorInit_BindsEndpointsAndCheckIsNoop(t *testing.T) {
 
 func TestCollectorInit_IdempotentDoubleInit(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 	port := freeUDPPort(t)
 
 	c := New()
@@ -199,6 +201,8 @@ func TestCollectorInit_IdempotentDoubleInit(t *testing.T) {
 }
 
 func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
+	withTestCacheDir(t)
+
 	c := New()
 	c.SetJobName("../bad")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: 162}}
@@ -212,6 +216,8 @@ func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
 }
 
 func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
+	withTestCacheDir(t)
+
 	c := New()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "tcp", Address: "127.0.0.1", Port: 162}}
@@ -226,6 +232,7 @@ func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
 
 func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 	firstPort := freeUDPPort(t)
 	secondPort := freeUDPPort(t)
 
@@ -254,6 +261,7 @@ func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
 
 func TestCollectorInit_BindFailureIsCodedError(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	require.NoError(t, err)
 	defer conn.Close()
@@ -273,6 +281,8 @@ func TestCollectorInit_BindFailureIsCodedError(t *testing.T) {
 }
 
 func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
+	withTestCacheDir(t)
+
 	c := New()
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: 162}}
@@ -289,6 +299,7 @@ func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
 func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
 	setTestDirs(t, t.TempDir())
 	resetProfileCacheForTest()
+	withTestCacheDir(t)
 
 	c := New()
 	c.SetJobName("local")
@@ -306,6 +317,7 @@ func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
 
 func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 	firstPort := freeUDPPort(t)
 	secondConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	require.NoError(t, err)
@@ -330,6 +342,7 @@ func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
 
 func TestCollectorInit_CleansCreatedV3StateOnEngineBootsFailure(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 	withEngineStateDir(t)
 
 	const jobName = "cleanup-v3-state"
@@ -358,6 +371,7 @@ func TestCollectorInit_CleansCreatedV3StateOnEngineBootsFailure(t *testing.T) {
 
 func TestCollectorCleanupIsIdempotent(t *testing.T) {
 	setMinimalProfileDir(t)
+	withTestCacheDir(t)
 	port := freeUDPPort(t)
 
 	c := New()

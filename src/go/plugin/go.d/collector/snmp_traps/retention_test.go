@@ -3,6 +3,7 @@
 package snmp_traps
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -294,12 +295,11 @@ func TestParseRetentionConfigRotationDurationDisabled(t *testing.T) {
 }
 
 func TestJournalRoot(t *testing.T) {
+	cacheDir := withTestCacheDir(t)
 	root := journalRoot("local")
-	if root == "" {
-		t.Fatal("expected non-empty journal root")
-	}
-	if root[len(root)-6:] != "/local" {
-		t.Fatalf("expected suffix /local, got %q", root)
+	want := filepath.Join(cacheDir, "traps", "local")
+	if root != want {
+		t.Fatalf("expected %q, got %q", want, root)
 	}
 }
 
