@@ -397,8 +397,9 @@ inline int wait_on_socket_or_cancel_with_timeout(
                             break;
                         case ERROR_OPERATION_ABORTED:
                             errno = ECANCELED;
-                            pipe_revents = POLLERR;
-                            break;
+                            if(revents)
+                                *revents = 0;
+                            return -1;
                         default:
                             errno = EIO;
                             pipe_revents = POLLERR;
