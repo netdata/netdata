@@ -201,13 +201,22 @@ void apps_cgroups_lookup_unlink_pid(struct pid_stat *p)
     if (!p || !p->cgroup_cache)
         return;
 
-    if (p->cgroup_cache->refcount > 0)
-        p->cgroup_cache->refcount--;
+    struct cgroup_lookup_entry *entry = p->cgroup_cache;
+
+    if (entry->refcount > 0)
+        entry->refcount--;
     else
         netdata_log_error("apps.plugin cgroups lookup cache refcount underflow for '%s'",
-                          string2str(p->cgroup_cache->key));
+                          string2str(entry->key));
 
     p->cgroup_cache = NULL;
+
+    if (entry->refcount == 0 && cgroups_lookup_cache) {
+        STRING *key = string_dup(entry->key);
+        dictionary_del(cgroups_lookup_cache, string2str(key));
+        string_freez(key);
+        cgroups_lookup_counter_inc(&cgroups_lookup_cache_evictions);
+    }
 }
 
 void apps_cgroups_lookup_set_pid_cgroup_path(struct pid_stat *p, const char *path)
@@ -310,18 +319,6 @@ static void cgroups_lookup_queue_drain(void)
         freez(entry);
         entry = next;
     }
-}
-
-static void cgroups_lookup_reset_all_entries_on_generation_bump(void)
-{
-    struct cgroup_lookup_entry *entry;
-    dfe_start_read(cgroups_lookup_cache, entry) {
-        cgroups_lookup_entry_clear_payload(entry);
-        entry->cgroup_status = NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER;
-        entry->generation = 0;
-        entry->pending = false;
-    }
-    dfe_done(entry);
 }
 
 static bool cgroups_lookup_copy_labels_from_item(
@@ -429,7 +426,6 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
     nipc_client_config_t config = {
         .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
         .preferred_profiles = NIPC_PROFILE_SHM_FUTEX,
-        .max_request_payload_bytes = NIPC_MAX_PAYLOAD_CAP,
         .auth_token = netipc_auth_token(),
     };
 
@@ -497,10 +493,8 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
             cgroups_lookup_counter_inc(&cgroups_lookup_requests_responded);
 
             netdata_mutex_lock(&apps_pids_mutex);
-            if (response.generation > last_observed_generation) {
+            if (response.generation > last_observed_generation)
                 last_observed_generation = response.generation;
-                cgroups_lookup_reset_all_entries_on_generation_bump();
-            }
 
             for (uint32_t i = 0; i < response.item_count; i++)
                 cgroups_lookup_commit_response_item(&items[i], response.generation);

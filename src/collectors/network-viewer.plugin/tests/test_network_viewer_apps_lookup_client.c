@@ -198,7 +198,7 @@ int main(void)
 
     if (!expect_ok(wait_for_counter(&mock_requests, 1), "worker did not call APPS_LOOKUP mock"))
         goto cleanup_client;
-    if (!expect_ok(wait_for_cache_entries(1), "known PID was not cached"))
+    if (!expect_ok(wait_for_cache_entries(2), "known and retry-later PIDs were not cached"))
         goto cleanup_client;
     NV_APPS_LOOKUP_FIELDS cached;
     if (!expect_ok(nv_cache_lookup_pid(100, &cached), "known PID cache accessor missed"))
@@ -214,7 +214,15 @@ int main(void)
     nv_cache_lookup_fields_free(&cached);
     if (!cached_ok)
         goto cleanup_client;
-    if (!expect_ok(!nv_cache_lookup_pid(200, &cached), "retry-later PID should not be cached"))
+    if (!expect_ok(nv_cache_lookup_pid(200, &cached), "retry-later PID partial cache accessor missed"))
+        goto cleanup_client;
+    bool partial_ok =
+        expect_ok(cached.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER, "retry-later PID cgroup status mismatch") &&
+        expect_ok(cached.orchestrator == NIPC_ORCHESTRATOR_UNKNOWN, "retry-later PID orchestrator mismatch") &&
+        expect_ok(cached.cgroup_path && cached.cgroup_path[0] == '\0', "retry-later PID cgroup path should be empty") &&
+        expect_ok(cached.cgroup_name && cached.cgroup_name[0] == '\0', "retry-later PID cgroup name should be empty");
+    nv_cache_lookup_fields_free(&cached);
+    if (!partial_ok)
         goto cleanup_client;
     if (!expect_ok(wait_for_counter(&apps_lookup_cache_misses_unknown, 1), "retry-later PID was not counted as unknown miss"))
         goto cleanup_client;
@@ -223,7 +231,7 @@ int main(void)
 
     if (!expect_ok(wait_for_counter(&apps_lookup_cache_hits, 1), "cached known PID was not served as a hit"))
         goto cleanup_client;
-    if (!expect_ok(wait_for_counter(&apps_lookup_cache_misses_unknown, 2), "retry-later PID was cached or not retried"))
+    if (!expect_ok(wait_for_counter(&apps_lookup_cache_misses_unknown, 2), "retry-later PID was not retried"))
         goto cleanup_client;
     if (!expect_ok(wait_for_counter(&apps_lookup_requests_responded, 2), "worker did not complete the retry-later refresh"))
         goto cleanup_client;

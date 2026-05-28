@@ -147,6 +147,7 @@ typedef struct {
     DICTIONARY *endpoint_owners_service;
     DICTIONARY *endpoint_owners_service_any_ns;
     DICTIONARY *links;
+    DICTIONARY *container_field_snapshot;
     usec_t now_ut;
     uint64_t sockets_total;
     uint64_t skipped_sockets;
@@ -1025,6 +1026,34 @@ static void topology_container_fields_fill(
     nv_cache_lookup_fields_free(&cached);
 }
 
+static void topology_container_fields_snapshot(
+    const NV_TOPOLOGY_CONTEXT *ctx,
+    uint32_t pid,
+    const char *process,
+    NV_TOPOLOGY_CONTAINER_FIELDS *fields)
+{
+    if(!fields)
+        return;
+
+    if(!ctx || !ctx->container_field_snapshot || !pid) {
+        topology_container_fields_fill(pid, process, fields);
+        return;
+    }
+
+    char key[16];
+    snprintfz(key, sizeof(key), "%u", pid);
+    NV_TOPOLOGY_CONTAINER_FIELDS *cached = dictionary_get(ctx->container_field_snapshot, key);
+    if(cached) {
+        *fields = *cached;
+        return;
+    }
+
+    NV_TOPOLOGY_CONTAINER_FIELDS tmp;
+    topology_container_fields_fill(pid, process, &tmp);
+    dictionary_set(ctx->container_field_snapshot, key, &tmp, sizeof(tmp));
+    *fields = tmp;
+}
+
 static bool topology_process_name_is_unknown(const char *process_name) {
     return !process_name || !*process_name || strcmp(process_name, "[unknown]") == 0;
 }
@@ -1679,6 +1708,8 @@ static void topology_context_destroy(NV_TOPOLOGY_CONTEXT *ctx) {
 
     if(ctx->links)
         dictionary_destroy(ctx->links);
+    if(ctx->container_field_snapshot)
+        dictionary_destroy(ctx->container_field_snapshot);
     if(ctx->endpoint_owners_service_any_ns)
         dictionary_destroy(ctx->endpoint_owners_service_any_ns);
     if(ctx->endpoint_owners_service)
@@ -1786,11 +1817,12 @@ static bool topology_prepare_context(NV_TOPOLOGY_CONTEXT *ctx, usec_t now_ut, co
     ctx->endpoint_owners_service = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
     ctx->endpoint_owners_service_any_ns = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
     ctx->links = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_TOPOLOGY_LINK));
+    ctx->container_field_snapshot = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_TOPOLOGY_CONTAINER_FIELDS));
 
     if(!(ctx->process_actors && ctx->remote_actors && ctx->local_ips &&
          ctx->endpoint_owners_exact && ctx->endpoint_owners_exact_any_ns &&
          ctx->endpoint_owners_service && ctx->endpoint_owners_service_any_ns &&
-         ctx->links))
+         ctx->links && ctx->container_field_snapshot))
         return false;
 
     if(!os_hostname(ctx->hostname, sizeof(ctx->hostname), netdata_configured_host_prefix))
@@ -2397,6 +2429,17 @@ static void topology_v1_add_actor_label_uint(
     topology_v1_add_actor_label(payload, actor, key, buffer, kind);
 }
 
+static void topology_v1_add_actor_label_if_set(
+    NV_TOPOLOGY_V1_PAYLOAD *payload,
+    uint64_t actor,
+    const char *key,
+    const char *value,
+    const char *kind)
+{
+    if(value && *value)
+        topology_v1_add_actor_label(payload, actor, key, value, kind);
+}
+
 static void topology_v1_enrich_process_actor_from_cache(
     const NV_TOPOLOGY_CONTEXT *ctx,
     NV_TOPOLOGY_V1_PAYLOAD *payload,
@@ -2406,9 +2449,6 @@ static void topology_v1_enrich_process_actor_from_cache(
 {
     if(!ctx || !payload || !actor || !pid)
         return;
-
-    if(!actor->container_name[0])
-        topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), actor->process);
 
     NV_APPS_LOOKUP_FIELDS cached;
     if(!nv_cache_lookup_pid(pid, &cached))
@@ -2433,6 +2473,17 @@ static void topology_v1_enrich_process_actor_from_cache(
         topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), actor->docker_container_name);
     else if(actor->cgroup_name[0])
         topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), actor->cgroup_name);
+
+    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_path", actor->cgroup_path, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_name", actor->cgroup_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "container_name", actor->container_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "orchestrator", actor->orchestrator, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_pod_name", actor->k8s_pod_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_namespace", actor->k8s_namespace, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_workload", actor->k8s_workload, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_container_name", actor->docker_container_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_image", actor->docker_image, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_name", actor->systemd_unit_name, "attribute");
 
     if(ctx->options.label_whitelist) {
         for(uint16_t i = 0; i < cached.cgroup_label_count; i++) {
@@ -2594,7 +2645,7 @@ static void topology_v1_collect_actors(
         char display_name[NV_TOPOLOGY_KEY_MAX];
         NV_TOPOLOGY_CONTAINER_FIELDS container_fields = { 0 };
         if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-            topology_container_fields_fill((uint32_t)pa->pid, pa->process, &container_fields);
+            topology_container_fields_snapshot(ctx, (uint32_t)pa->pid, pa->process, &container_fields);
 
         topology_actor_id_for_process(
             ctx,
@@ -2669,6 +2720,8 @@ static void topology_v1_collect_actors(
         if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID)
             topology_v1_add_actor_label_uint(payload, actor_index, "pid", actor->pid, "identity");
         if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID)
+            topology_v1_add_actor_label_uint(payload, actor_index, "ppid", actor->ppid, "attribute");
+        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID)
             topology_v1_add_actor_label_uint(payload, actor_index, "uid", actor->uid, "attribute");
         if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID)
             topology_v1_add_actor_label_uint(payload, actor_index, "net_ns_inode", actor->net_ns_inode, "identity");
@@ -2719,7 +2772,7 @@ static bool topology_v1_process_actor_index(
     char actor_id[NV_TOPOLOGY_KEY_MAX];
     NV_TOPOLOGY_CONTAINER_FIELDS container_fields = { 0 };
     if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-        topology_container_fields_fill((uint32_t)pid, process, &container_fields);
+        topology_container_fields_snapshot(ctx, (uint32_t)pid, process, &container_fields);
 
     topology_actor_id_for_process(
         ctx,
@@ -3339,6 +3392,16 @@ static void topology_v1_emit_modal_label_identification(
                     topology_v1_emit_modal_identification_field(wb, "username", "User");
                     topology_v1_emit_modal_identification_field(wb, "namespace_type", "Namespace");
                     topology_v1_emit_modal_identification_field(wb, "local_ip", "Local IP");
+                    topology_v1_emit_modal_identification_field(wb, "container_name", "Container");
+                    topology_v1_emit_modal_identification_field(wb, "orchestrator", "Orchestrator");
+                    topology_v1_emit_modal_identification_field(wb, "cgroup_name", "Cgroup");
+                    topology_v1_emit_modal_identification_field(wb, "cgroup_path", "Cgroup Path");
+                    topology_v1_emit_modal_identification_field(wb, "k8s_pod_name", "K8s Pod");
+                    topology_v1_emit_modal_identification_field(wb, "k8s_namespace", "K8s Namespace");
+                    topology_v1_emit_modal_identification_field(wb, "k8s_workload", "K8s Workload");
+                    topology_v1_emit_modal_identification_field(wb, "docker_container_name", "Docker Container");
+                    topology_v1_emit_modal_identification_field(wb, "docker_image", "Docker Image");
+                    topology_v1_emit_modal_identification_field(wb, "systemd_unit_name", "Systemd Unit");
                     topology_v1_emit_modal_identification_field(wb, "cmdline", "Command");
                 }
                 topology_v1_emit_modal_identification_field(wb, "socket_count", "Sockets");
@@ -3412,6 +3475,16 @@ static void topology_v1_emit_actor_type(
                     buffer_json_add_array_item_string(wb, "username");
                     buffer_json_add_array_item_string(wb, "cmdline");
                     buffer_json_add_array_item_string(wb, "local_ip");
+                    buffer_json_add_array_item_string(wb, "container_name");
+                    buffer_json_add_array_item_string(wb, "orchestrator");
+                    buffer_json_add_array_item_string(wb, "cgroup_name");
+                    buffer_json_add_array_item_string(wb, "cgroup_path");
+                    buffer_json_add_array_item_string(wb, "k8s_pod_name");
+                    buffer_json_add_array_item_string(wb, "k8s_namespace");
+                    buffer_json_add_array_item_string(wb, "k8s_workload");
+                    buffer_json_add_array_item_string(wb, "docker_container_name");
+                    buffer_json_add_array_item_string(wb, "docker_image");
+                    buffer_json_add_array_item_string(wb, "systemd_unit_name");
                 }
             }
             else if(strcmp(id, "container") == 0) {

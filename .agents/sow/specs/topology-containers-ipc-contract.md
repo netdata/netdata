@@ -1,7 +1,7 @@
 # Topology Containers IPC Contract
 
 Status: current
-Last updated: 2026-05-27
+Last updated: 2026-05-28
 
 ## Purpose
 
@@ -49,10 +49,11 @@ Lookup caches have no time-based TTL.
 An entry stays valid until one of these events happens:
 
 - The producer returns `UNKNOWN_PERMANENT` for the entry.
-- The producer returns a newer generation, so generation-scoped entries are invalidated.
+- The consumer observes a concrete key identity change, such as PID starttime reuse or cgroup path change.
 - The consumer stops seeing the item in its own working set and prunes it as part of normal bounded-cache maintenance.
+- Bounded-cache pressure or plugin shutdown removes the entry.
 
-Consumers must not periodically refresh known entries only because time passed.
+Consumers must not periodically refresh known entries only because time passed, and must not invalidate a whole lookup cache during normal operation only because a producer generation changed.
 
 ## Lookup Status
 
@@ -70,19 +71,20 @@ Consumers must not periodically refresh known entries only because time passed.
 Inner cgroup status:
 
 - `KNOWN`: cgroup enrichment is valid and cacheable.
-- `UNKNOWN_RETRY_LATER`: do not cache the missing cgroup enrichment.
+- `UNKNOWN_RETRY_LATER`: cgroup enrichment is incomplete; if the outer PID status is `KNOWN`, cache the valid PID/process facts as incomplete and re-query while the PID remains in the consumer's current working set.
 - `UNKNOWN_PERMANENT`: evict cgroup enrichment for this PID key.
 - `HOST_ROOT`: the PID belongs to the host/root cgroup case; this is a valid non-container result.
 
-Consumers must branch on the inner `cgroup_status`; outer `KNOWN` is not enough to cache container enrichment.
+Consumers must branch on the inner `cgroup_status`; outer `KNOWN` is enough to cache PID/process facts, but not enough to cache complete container enrichment.
 
 ## Generation
 
 - `cgroups.plugin` increments `cgroup_discovery_generation` on full discovery cycles.
 - `apps.plugin` increments `apps_collection_generation` on collection cycles.
 - Producers include the current generation in every lookup response.
-- Consumers compare observed generations and invalidate generation-scoped cache entries on a bump.
-- Generation is the restart/staleness signal. Wall clock, process ID, uptime, or request sequence numbers are not the contract.
+- Consumers may record observed generations for telemetry or diagnostics.
+- Consumers must not invalidate whole lookup caches, rewrite all entries to retry-later, or timer-refresh known entries because of a normal generation bump.
+- Per-entry status, current working-set demand, PID/cgroup cleanup, identity changes, bounded pressure, and shutdown are the cache-lifetime contract.
 
 ## Fallback And Blocking
 

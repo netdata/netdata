@@ -16,9 +16,6 @@
 #define NV_APPS_LOOKUP_CACHE_DEFAULT 8192U
 #define NV_APPS_LOOKUP_CACHE_MIN 1U
 #define NV_APPS_LOOKUP_CACHE_MAX 65536U
-#define NV_APPS_LOOKUP_REFRESH_DEFAULT 30U
-#define NV_APPS_LOOKUP_REFRESH_MIN 5U
-#define NV_APPS_LOOKUP_REFRESH_MAX 300U
 #define NV_APPS_LOOKUP_CONNECT_RETRY_SEC 1U
 
 typedef struct {
@@ -46,19 +43,15 @@ typedef struct {
 
 static DICTIONARY *apps_lookup_cache = NULL;
 static DICTIONARY *apps_lookup_intake = NULL;
-static DICTIONARY *apps_lookup_last_seen_pids = NULL;
 
 static netdata_mutex_t apps_lookup_cache_mutex;
 static netdata_mutex_t apps_lookup_intake_mutex;
 static netdata_mutex_t apps_lookup_client_mutex;
 
 static uint32_t apps_lookup_max_cache_size = NV_APPS_LOOKUP_CACHE_DEFAULT;
-static uint32_t apps_lookup_refresh_seconds = NV_APPS_LOOKUP_REFRESH_DEFAULT;
 static uint32_t apps_lookup_cache_size = 0;
 static uint32_t apps_lookup_intake_size = 0;
-static uint32_t apps_lookup_last_seen_size = 0;
 static uint64_t apps_lookup_intake_sequence = 0;
-static uint64_t apps_lookup_last_seen_sequence = 0;
 static uint64_t apps_lookup_last_observed_generation = 0;
 
 static int apps_lookup_intake_eventfd = -1;
@@ -81,11 +74,9 @@ static _Atomic uint64_t apps_lookup_cache_misses_unknown = 0;
 static _Atomic uint64_t apps_lookup_cache_misses_intake_dropped = 0;
 static _Atomic uint64_t apps_lookup_cache_evictions_pid_reuse = 0;
 static _Atomic uint64_t apps_lookup_cache_evictions_lru = 0;
-static _Atomic uint64_t apps_lookup_cache_evictions_generation_bump = 0;
 static _Atomic uint64_t apps_lookup_cache_evictions_unknown_permanent = 0;
 static _Atomic uint64_t apps_lookup_peer_connect_attempts = 0;
 static _Atomic uint64_t apps_lookup_peer_disconnects = 0;
-static _Atomic uint64_t apps_lookup_worker_refresh_probes = 0;
 static _Atomic uint64_t apps_lookup_intake_depth = 0;
 static _Atomic uint64_t apps_lookup_worker_duration_le_1ms = 0;
 static _Atomic uint64_t apps_lookup_worker_duration_le_5ms = 0;
@@ -241,12 +232,6 @@ static void nv_apps_lookup_pid_sets_create(void)
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL,
             sizeof(NV_APPS_LOOKUP_PID_ENTRY));
-
-    if (!apps_lookup_last_seen_pids)
-        apps_lookup_last_seen_pids = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL,
-            sizeof(NV_APPS_LOOKUP_PID_ENTRY));
 }
 
 static void nv_apps_lookup_cache_destroy(void)
@@ -265,10 +250,6 @@ static void nv_apps_lookup_pid_sets_destroy(void)
     apps_lookup_intake_size = 0;
     __atomic_store_n(&apps_lookup_intake_depth, 0, __ATOMIC_RELAXED);
 
-    if (apps_lookup_last_seen_pids)
-        dictionary_destroy(apps_lookup_last_seen_pids);
-    apps_lookup_last_seen_pids = NULL;
-    apps_lookup_last_seen_size = 0;
 }
 
 static bool nv_apps_lookup_pid_set_evict_oldest(DICTIONARY *dict, uint32_t *size)
@@ -391,48 +372,68 @@ static uint32_t *nv_apps_lookup_drain_intake(uint32_t *count)
     return pids;
 }
 
-static bool nv_apps_lookup_cache_lowest_pid(uint32_t *pid)
+static int nv_apps_lookup_u32_compare(const void *a, const void *b)
 {
-    if (!pid)
-        return false;
+    uint32_t av = *(const uint32_t *)a;
+    uint32_t bv = *(const uint32_t *)b;
 
-    bool found = false;
-    netdata_mutex_lock(&apps_lookup_cache_mutex);
-    NV_APPS_LOOKUP_CACHE_ENTRY *entry;
-    dfe_start_read(apps_lookup_cache, entry) {
-        if (!found || entry->pid < *pid) {
-            *pid = entry->pid;
-            found = true;
-        }
-    }
-    dfe_done(entry);
-    netdata_mutex_unlock(&apps_lookup_cache_mutex);
-
-    return found;
+    return (av > bv) - (av < bv);
 }
 
-static void nv_apps_lookup_merge_last_seen_into_intake(void)
+static size_t nv_apps_lookup_sort_unique_pids(uint32_t *pids, size_t count)
 {
-    netdata_mutex_lock(&apps_lookup_intake_mutex);
+    if (!pids || count < 2)
+        return count;
 
-    NV_APPS_LOOKUP_PID_ENTRY *entry;
-    dfe_start_read(apps_lookup_last_seen_pids, entry) {
-        nv_apps_lookup_pid_set_add(
-            apps_lookup_intake,
-            &apps_lookup_intake_size,
-            NV_APPS_LOOKUP_INTAKE_MAX,
-            &apps_lookup_intake_sequence,
-            entry->pid,
-            true);
+    qsort(pids, count, sizeof(*pids), nv_apps_lookup_u32_compare);
+
+    size_t unique = 1;
+    for (size_t i = 1; i < count; i++) {
+        if (pids[i] != pids[unique - 1])
+            pids[unique++] = pids[i];
+    }
+
+    return unique;
+}
+
+static bool nv_apps_lookup_pid_in_sorted(const uint32_t *pids, size_t count, uint32_t pid)
+{
+    if (!pids || count == 0)
+        return false;
+
+    return bsearch(&pid, pids, count, sizeof(*pids), nv_apps_lookup_u32_compare) != NULL;
+}
+
+static void nv_apps_lookup_cache_prune_to_pids(const uint32_t *pids, size_t count)
+{
+    if (!apps_lookup_cache || apps_lookup_cache_size == 0)
+        return;
+
+    uint32_t *victims = NULL;
+    size_t victims_count = 0, victims_capacity = 0;
+
+    NV_APPS_LOOKUP_CACHE_ENTRY *entry;
+    dfe_start_read(apps_lookup_cache, entry) {
+        if (nv_apps_lookup_pid_in_sorted(pids, count, entry->pid))
+            continue;
+
+        if (victims_count == victims_capacity) {
+            victims_capacity = victims_capacity ? victims_capacity * 2 : 64;
+            victims = reallocz(victims, victims_capacity * sizeof(*victims));
+        }
+        victims[victims_count++] = entry->pid;
     }
     dfe_done(entry);
 
-    bool intake_has_entries = apps_lookup_intake_size > 0;
-    __atomic_store_n(&apps_lookup_intake_depth, apps_lookup_intake_size, __ATOMIC_RELAXED);
-    netdata_mutex_unlock(&apps_lookup_intake_mutex);
+    for (size_t i = 0; i < victims_count; i++) {
+        char key[16];
+        nv_apps_lookup_pid_key(victims[i], key);
+        dictionary_del(apps_lookup_cache, key);
+        if (apps_lookup_cache_size > 0)
+            apps_lookup_cache_size--;
+    }
 
-    if (intake_has_entries)
-        nv_apps_lookup_signal_worker();
+    freez(victims);
 }
 
 static bool nv_apps_lookup_cache_evict_lru(void)
@@ -513,23 +514,15 @@ static void nv_apps_lookup_cache_fill_from_item(
     }
 }
 
-static bool nv_apps_lookup_apply_response(
+static void nv_apps_lookup_apply_response(
     const uint32_t *request_pids,
     uint32_t request_count,
     const nipc_apps_lookup_resp_view_t *response)
 {
-    bool generation_bumped = false;
-
     netdata_mutex_lock(&apps_lookup_cache_mutex);
 
-    if (response->generation > apps_lookup_last_observed_generation) {
-        uint32_t evicted = apps_lookup_cache_size;
-        dictionary_flush(apps_lookup_cache);
-        apps_lookup_cache_size = 0;
+    if (response->generation > apps_lookup_last_observed_generation)
         apps_lookup_last_observed_generation = response->generation;
-        __atomic_add_fetch(&apps_lookup_cache_evictions_generation_bump, evicted, __ATOMIC_RELAXED);
-        generation_bumped = true;
-    }
 
     for (uint32_t i = 0; i < response->item_count; i++) {
         nipc_apps_lookup_item_view_t item;
@@ -539,6 +532,13 @@ static bool nv_apps_lookup_apply_response(
         }
 
         if (item.status == NIPC_PID_LOOKUP_UNKNOWN) {
+            char key[16];
+            nv_apps_lookup_pid_key(item.pid, key);
+            if (dictionary_get(apps_lookup_cache, key)) {
+                dictionary_del(apps_lookup_cache, key);
+                if (apps_lookup_cache_size > 0)
+                    apps_lookup_cache_size--;
+            }
             nv_apps_lookup_counter_inc(&apps_lookup_cache_misses_unknown);
             continue;
         }
@@ -557,12 +557,9 @@ static bool nv_apps_lookup_apply_response(
             continue;
         }
 
-        if (item.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER) {
-            nv_apps_lookup_counter_inc(&apps_lookup_cache_misses_unknown);
-            continue;
-        }
-
-        if (item.cgroup_status != NIPC_APPS_CGROUP_KNOWN && item.cgroup_status != NIPC_APPS_CGROUP_HOST_ROOT) {
+        if (item.cgroup_status != NIPC_APPS_CGROUP_KNOWN &&
+            item.cgroup_status != NIPC_APPS_CGROUP_HOST_ROOT &&
+            item.cgroup_status != NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER) {
             nv_apps_lookup_counter_inc(&apps_lookup_requests_failed);
             continue;
         }
@@ -579,13 +576,15 @@ static bool nv_apps_lookup_apply_response(
 
         if (entry)
             nv_apps_lookup_cache_fill_from_item(entry, &item, response->generation);
+
+        if (item.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER)
+            nv_apps_lookup_counter_inc(&apps_lookup_cache_misses_unknown);
     }
 
     netdata_mutex_unlock(&apps_lookup_cache_mutex);
 
     (void)request_pids;
     (void)request_count;
-    return generation_bumped;
 }
 
 static bool nv_apps_lookup_client_ensure_ready(void)
@@ -648,9 +647,7 @@ static void nv_apps_lookup_worker_main(void *arg __maybe_unused)
             .fd = apps_lookup_intake_eventfd,
             .events = POLLIN,
         };
-        int timeout_ms = (int)apps_lookup_refresh_seconds * MSEC_PER_SEC;
-        int ret = poll(&pfd, 1, timeout_ms);
-        bool timer_fired = ret == 0;
+        int ret = poll(&pfd, 1, -1);
 
         if (ret < 0) {
             if (errno == EINTR)
@@ -665,16 +662,6 @@ static void nv_apps_lookup_worker_main(void *arg __maybe_unused)
 
         uint32_t pid_count = 0;
         uint32_t *pids = nv_apps_lookup_drain_intake(&pid_count);
-
-        if (pid_count == 0 && timer_fired) {
-            uint32_t probe_pid = 0;
-            if (nv_apps_lookup_cache_lowest_pid(&probe_pid)) {
-                pids = mallocz(sizeof(*pids));
-                pids[0] = probe_pid;
-                pid_count = 1;
-                nv_apps_lookup_counter_inc(&apps_lookup_worker_refresh_probes);
-            }
-        }
 
         if (pid_count == 0) {
             freez(pids);
@@ -718,10 +705,8 @@ static void nv_apps_lookup_worker_main(void *arg __maybe_unused)
             continue;
         }
 
-        bool generation_bumped = nv_apps_lookup_apply_response(pids, pid_count, &response);
+        nv_apps_lookup_apply_response(pids, pid_count, &response);
         netdata_mutex_unlock(&apps_lookup_client_mutex);
-        if (generation_bumped)
-            nv_apps_lookup_merge_last_seen_into_intake();
         freez(pids);
     }
 
@@ -750,15 +735,6 @@ void nv_apps_lookup_init(bool *plugin_should_exit)
         NV_APPS_LOOKUP_CACHE_MIN,
         NV_APPS_LOOKUP_CACHE_MAX);
 
-    apps_lookup_refresh_seconds = nv_apps_lookup_clamp_u32(
-        (uint32_t)inicfg_get_duration_seconds(
-            &netdata_config,
-            "plugin:network-viewer",
-            "apps lookup generation refresh seconds",
-            NV_APPS_LOOKUP_REFRESH_DEFAULT),
-        NV_APPS_LOOKUP_REFRESH_MIN,
-        NV_APPS_LOOKUP_REFRESH_MAX);
-
     if (netdata_mutex_init(&apps_lookup_cache_mutex) != 0 ||
         netdata_mutex_init(&apps_lookup_intake_mutex) != 0 ||
         netdata_mutex_init(&apps_lookup_client_mutex) != 0)
@@ -774,7 +750,6 @@ void nv_apps_lookup_init(bool *plugin_should_exit)
     nipc_client_config_t config = {
         .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
         .preferred_profiles = NIPC_PROFILE_SHM_FUTEX,
-        .max_request_payload_bytes = NIPC_MAX_PAYLOAD_CAP,
         .auth_token = netipc_auth_token(),
     };
     nipc_client_init(&apps_lookup_client_ctx, os_run_dir(true), NV_APPS_LOOKUP_SERVICE_NAME, &config);
@@ -835,55 +810,52 @@ void nv_apps_lookup_warm_pids(const uint32_t *pids, size_t pid_count)
         return;
 
     usec_t started_ut = now_monotonic_usec();
-    uint32_t *misses = mallocz(sizeof(*misses) * pid_count);
-    size_t miss_count = 0;
     usec_t now_ut = now_monotonic_usec();
+    uint32_t *working_pids = mallocz(sizeof(*working_pids) * pid_count);
+    size_t working_count = 0;
+
+    for (size_t i = 0; i < pid_count; i++) {
+        if (pids[i] != 0)
+            working_pids[working_count++] = pids[i];
+    }
+
+    working_count = nv_apps_lookup_sort_unique_pids(working_pids, working_count);
+    if (working_count == 0) {
+        freez(working_pids);
+        nv_apps_lookup_handler_overhead_observe(now_monotonic_usec() - started_ut);
+        return;
+    }
 
     netdata_mutex_lock(&apps_lookup_cache_mutex);
-    for (size_t i = 0; i < pid_count; i++) {
-        if (pids[i] == 0)
-            continue;
-
+    nv_apps_lookup_cache_prune_to_pids(working_pids, working_count);
+    for (size_t i = 0; i < working_count; i++) {
         char key[16];
-        nv_apps_lookup_pid_key(pids[i], key);
+        nv_apps_lookup_pid_key(working_pids[i], key);
         NV_APPS_LOOKUP_CACHE_ENTRY *entry = dictionary_get(apps_lookup_cache, key);
         if (entry) {
             entry->last_used_usec = now_ut;
             nv_apps_lookup_counter_inc(&apps_lookup_cache_hits);
         }
-        else {
-            misses[miss_count++] = pids[i];
-        }
     }
     netdata_mutex_unlock(&apps_lookup_cache_mutex);
 
     netdata_mutex_lock(&apps_lookup_intake_mutex);
-    for (size_t i = 0; i < pid_count; i++)
-        nv_apps_lookup_pid_set_add(
-            apps_lookup_last_seen_pids,
-            &apps_lookup_last_seen_size,
-            apps_lookup_max_cache_size,
-            &apps_lookup_last_seen_sequence,
-            pids[i],
-            false);
-
-    for (size_t i = 0; i < miss_count; i++)
+    for (size_t i = 0; i < working_count; i++)
         nv_apps_lookup_pid_set_add(
             apps_lookup_intake,
             &apps_lookup_intake_size,
             NV_APPS_LOOKUP_INTAKE_MAX,
             &apps_lookup_intake_sequence,
-            misses[i],
+            working_pids[i],
             true);
 
     __atomic_store_n(&apps_lookup_intake_depth, apps_lookup_intake_size, __ATOMIC_RELAXED);
     netdata_mutex_unlock(&apps_lookup_intake_mutex);
 
-    if (miss_count)
-        nv_apps_lookup_signal_worker();
+    nv_apps_lookup_signal_worker();
 
     nv_apps_lookup_handler_overhead_observe(now_monotonic_usec() - started_ut);
-    freez(misses);
+    freez(working_pids);
 }
 
 bool nv_cache_lookup_pid(uint32_t pid, NV_APPS_LOOKUP_FIELDS *out)
@@ -959,12 +931,10 @@ void nv_apps_lookup_send_charts_to_netdata(usec_t dt)
                 "DIMENSION cache_misses_intake_dropped '' incremental 1 1\n"
                 "DIMENSION cache_evictions_pid_reuse '' incremental 1 1\n"
                 "DIMENSION cache_evictions_lru '' incremental 1 1\n"
-                "DIMENSION cache_evictions_generation_bump '' incremental 1 1\n"
                 "DIMENSION cache_evictions_unknown_permanent '' incremental 1 1\n"
                 "CHART netdata.collector_ipc_apps_lookup_client_peer '' 'Network Viewer APPS_LOOKUP Client Peer' 'events/s' network-viewer.plugin netdata.collector.ipc.apps_lookup.client.peer line 140042 1\n"
                 "DIMENSION peer_connect_attempts '' incremental 1 1\n"
                 "DIMENSION peer_disconnects '' incremental 1 1\n"
-                "DIMENSION worker_refresh_probes '' incremental 1 1\n"
                 "CHART netdata.collector_ipc_apps_lookup_client_worker_duration '' 'Network Viewer APPS_LOOKUP Worker Request Duration' 'requests/s' network-viewer.plugin netdata.collector.ipc.apps_lookup.client.worker_request_duration_ms stacked 140043 1\n"
                 "DIMENSION le_1ms '' incremental 1 1\n"
                 "DIMENSION le_5ms '' incremental 1 1\n"
@@ -999,13 +969,11 @@ void nv_apps_lookup_send_charts_to_netdata(usec_t dt)
             "SET cache_misses_intake_dropped = %" PRIu64 "\n"
             "SET cache_evictions_pid_reuse = %" PRIu64 "\n"
             "SET cache_evictions_lru = %" PRIu64 "\n"
-            "SET cache_evictions_generation_bump = %" PRIu64 "\n"
             "SET cache_evictions_unknown_permanent = %" PRIu64 "\n"
             "END\n"
             "BEGIN netdata.collector_ipc_apps_lookup_client_peer %" PRIu64 "\n"
             "SET peer_connect_attempts = %" PRIu64 "\n"
             "SET peer_disconnects = %" PRIu64 "\n"
-            "SET worker_refresh_probes = %" PRIu64 "\n"
             "END\n"
             "BEGIN netdata.collector_ipc_apps_lookup_client_worker_duration %" PRIu64 "\n"
             "SET le_1ms = %" PRIu64 "\n"
@@ -1040,12 +1008,10 @@ void nv_apps_lookup_send_charts_to_netdata(usec_t dt)
             nv_apps_lookup_counter_get(&apps_lookup_cache_misses_intake_dropped),
             nv_apps_lookup_counter_get(&apps_lookup_cache_evictions_pid_reuse),
             nv_apps_lookup_counter_get(&apps_lookup_cache_evictions_lru),
-            nv_apps_lookup_counter_get(&apps_lookup_cache_evictions_generation_bump),
             nv_apps_lookup_counter_get(&apps_lookup_cache_evictions_unknown_permanent),
             dt,
             nv_apps_lookup_counter_get(&apps_lookup_peer_connect_attempts),
             nv_apps_lookup_counter_get(&apps_lookup_peer_disconnects),
-            nv_apps_lookup_counter_get(&apps_lookup_worker_refresh_probes),
             dt,
             nv_apps_lookup_counter_get(&apps_lookup_worker_duration_le_1ms),
             nv_apps_lookup_counter_get(&apps_lookup_worker_duration_le_5ms),

@@ -6,6 +6,8 @@ Status: completed
 
 Sub-state: completed 2026-05-27. All six implementation SOWs completed and committed; the durable IPC contract spec was added.
 
+Sub-state (cache-contract correction 2026-05-28): SOW-0043 supersedes the generation-bump cache invalidation text in this master plan and child SOWs. Producer generations are diagnostics/restart hints only. Normal operation must not invalidate whole lookup caches and must not timer-refresh already-known entries; lookup updates are driven by the consumer's current working set, with eviction on concrete producer status, PID/cgroup cleanup, path/starttime changes, bounded-cache pressure, or shutdown.
+
 Sub-state (final-review cleanup 2026-05-26): post-review cleanup removed stale "Unknowns" text, removed stale placeholder wording in the affected-surface list after D9 chose `src/collectors/cgroups.plugin/cgroup-name/`, rewrote the obsolete user-decision-pass plan step after D8-D11 were recorded, and corrected D10 wording to remove a factual contradiction: netipc has no per-request timeout in the current POSIX client call path (`src/libnetdata/netipc/src/service/netipc_service.c`, `call_with_retry`). No semantic decisions changed.
 
 ## Requirements
@@ -58,7 +60,7 @@ Inferences:
 - The "two services per plugin" pattern (one for snapshot, one for lookup) is the cleanest extension of the existing netipc design and avoids breaking the `ebpf.plugin → cgroups-snapshot` consumer.
 - An apps.plugin APPS_LOOKUP server thread parallel to the existing apps collection loop is the right structural fit (mirror of `cgroup-netipc.c`).
 - Network-viewer.plugin queries APPS_LOOKUP only for the working set of PIDs visible in current network connections; the cache will stabilise quickly under normal load.
-- Generation tracking is the only durable way to detect peer restart (server uptime, sequence numbers, and PID checks all fail in some scenarios — but a strictly-monotonic generation bump on every full scan is robust).
+- Generation tracking is useful for diagnostics and restart visibility, but SOW-0043 corrected the cache contract: consumers do not flush whole caches on normal generation bumps.
 
 Open plan-level decisions: NONE remaining — see D8-D11 in the Decisions section.
 
@@ -111,7 +113,7 @@ Current state:
 Risks (high-level — each implementation SOW details its own):
 
 - Concurrency contention on `cgroup_root_mutex`: the new CGROUPS_LOOKUP handler will take the same mutex as the discovery thread. Long lookups could delay discovery, and vice versa. Mitigation: lookups are O(matching only, not full scan), handler holds the mutex only while reading.
-- Cache-invalidation correctness across plugin restarts. Mitigation: generation-driven eviction (Contract 4) + caller iteration discipline (Contract 3).
+- Cache-lifetime correctness across plugin restarts and producer churn. Mitigation: caller iteration discipline (Contract 3), explicit status handling, PID/cgroup cleanup, path/starttime checks, and bounded-cache pressure; generation is not a normal-operation invalidation trigger.
 - Apps.plugin becoming an APPS_LOOKUP server may add CPU under high-PID workloads. Mitigation: handler is read-only against existing per-PID state; no extra collection work.
 - Network-viewer cold-start: empty cache, burst of APPS_LOOKUP queries. Mitigation: bounded by the number of active connections, not the number of all PIDs.
 - IPC peer absent → consumer must degrade silently to its current behaviour. Mitigation: every implementation SOW must include an explicit fallback test in its validation plan.
@@ -218,19 +220,22 @@ These nine contracts apply to all six implementation SOWs. When SOW-0032 reaches
 **Contract 1 — Cache lifetime.**
 Cache entries in any consumer (apps.plugin caching CGROUPS_LOOKUP results, network-viewer caching APPS_LOOKUP results) live until one of:
 
-- The producer signals `UNKNOWN_PERMANENT` for a previously-KNOWN entry → evict.
-- The producer signals a new generation (Contract 4) → evict everything from the previous generation.
-- The consumer's own iteration discipline (Contract 3) stops asking about the key → entry naturally ages out via normal cache pruning (LRU bounded by max-known-set is acceptable; no TTL on the time axis).
+- The producer signals `UNKNOWN_PERMANENT` for a previously-known entry → evict the affected entry.
+- The consumer observes a concrete key identity change, such as PID starttime reuse or cgroup path change → replace or evict the affected entry.
+- The consumer's authoritative working-set cleanup says the key disappeared, such as PID exit, cgroup reference count reaching zero, or a socket working-set prune → evict the affected entry.
+- Bounded-cache pressure or plugin shutdown removes entries as normal resource management.
 
-No TTL-based eviction. No "refresh every N seconds even if known". The cache is a faithful mirror of what the producer has told us, scoped to what we still care about.
+No TTL-based eviction. No "refresh every N seconds even if known". No normal-operation whole-cache invalidation on producer generation bumps. The cache is a faithful mirror of what the producer has told us, scoped to what the consumer's current working set still cares about.
 
 **Contract 2 — Three-state UNKNOWN semantics.**
 
 - `KNOWN` → data is valid; consumer caches and uses it.
-- `UNKNOWN_RETRY_LATER` → producer doesn't know yet; consumer does NOT cache; consumer asks again on the next iteration where the key is still in its working set.
-- `UNKNOWN_PERMANENT` → producer will never know (resource gone); consumer evicts from cache and never asks again about this key (within the current generation).
+- `UNKNOWN_RETRY_LATER` → producer doesn't know yet; consumer asks again on the next iteration where the key is still in its working set.
+- `UNKNOWN_PERMANENT` → producer will not know this key while this resource identity is alive; consumer evicts the affected cached entry and stops using it unless a later authoritative working-set observation creates a new resource identity.
 
-For APPS_LOOKUP, the outer `status` field is two-state (KNOWN/UNKNOWN); the inner `cgroup_status` field is four-state (KNOWN/RETRY/PERMANENT/HOST_ROOT). Same semantics, applied per-field.
+For `CGROUPS_LOOKUP`, `UNKNOWN_RETRY_LATER` has no complete payload to cache, so the consumer keeps the key pending for retry only while the cgroup path remains in its working set.
+
+For `APPS_LOOKUP`, the outer `status` field is two-state (KNOWN/UNKNOWN); the inner `cgroup_status` field is four-state (KNOWN/RETRY/PERMANENT/HOST_ROOT). `outer=KNOWN, inner=UNKNOWN_RETRY_LATER` is partial data: PID/process fields are valid and cacheable as incomplete facts, but cgroup/container enrichment is not complete and the PID must be re-queried while it remains in the current network-viewer working set.
 
 **Contract 3 — Caller iteration discipline.**
 Every plugin iteration refreshes its working set from the authoritative source:
@@ -242,13 +247,9 @@ Every plugin iteration refreshes its working set from the authoritative source:
 The plugin queries IPC only for items currently in its working set. Items that have left the working set (exited container, exited PID, closed socket) are no longer asked about. This is the eviction mechanism for stale entries — the cache only contains entries the consumer still cares about.
 
 **Contract 4 — Generation semantics.**
-Each producer maintains a strictly-monotonic `generation` counter, bumped on every full scan (discovery cycle for cgroups, collection cycle for apps). The generation is returned in every CGROUPS_LOOKUP / APPS_LOOKUP response. Consumers compare the generation on each response; on bump:
+Each producer maintains a monotonic `generation` counter, bumped on full discovery or collection cycles and returned in every CGROUPS_LOOKUP / APPS_LOOKUP response.
 
-- Evict all cached entries from the previous generation (their data may be stale relative to the new producer state).
-- Re-query items still in the working set during the next iteration.
-- Continue serving from cache for already-cached entries that match the new generation (the cache is replenished gradually as the consumer's working set is re-validated).
-
-The generation field is the only durable mechanism for detecting peer restart. Wall clock, PID, sequence numbers, and uptime are all unreliable across restart.
+Generation is an observability and restart-hint field only. Consumers may record the latest observed generation for telemetry or diagnostics, but a normal generation bump must not flush a lookup cache, must not rewrite all entries to retry-later, and must not trigger a timer refresh of known entries. Cache updates continue to be driven by Contract 1 and Contract 3: current working-set demand plus explicit per-entry status or cleanup events.
 
 **Contract 5 — Fallback when peer absent.**
 Every IPC-enabled plugin MUST work standalone when the peer is absent or unresponsive. Required behaviour:

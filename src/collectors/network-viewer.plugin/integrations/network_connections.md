@@ -74,7 +74,6 @@ Optional APPS_LOOKUP cache-warming controls for topology and aggregated network-
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | apps lookup cache size | Maximum number of per-PID APPS_LOOKUP cache entries kept by network-viewer.plugin. | 8192 | no |
-| apps lookup generation refresh seconds | How often the background worker probes APPS_LOOKUP generation changes when the cache is otherwise warm. | 30 | no |
 
 
 </details>
@@ -108,14 +107,13 @@ sudo ./edit-config netdata.conf
 
 ###### APPS_LOOKUP cache warming
 
-Keep the default cache size and generation refresh cadence.
+Keep the default APPS_LOOKUP cache size.
 
 <details open><summary>Config</summary>
 
 ```yaml
 [plugin:network-viewer]
   apps lookup cache size = 8192
-  apps lookup generation refresh seconds = 30
 
 ```
 </details>
@@ -146,8 +144,8 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | netdata.collector.ipc.apps_lookup.client.requests | requests_sent, requests_responded, requests_failed | requests/s |
-| netdata.collector.ipc.apps_lookup.client.cache | cache_hits, cache_misses_unknown, cache_misses_intake_dropped, cache_evictions_pid_reuse, cache_evictions_lru, cache_evictions_generation_bump, cache_evictions_unknown_permanent | events/s |
-| netdata.collector.ipc.apps_lookup.client.peer | peer_connect_attempts, peer_disconnects, worker_refresh_probes | events/s |
+| netdata.collector.ipc.apps_lookup.client.cache | cache_hits, cache_misses_unknown, cache_misses_intake_dropped, cache_evictions_pid_reuse, cache_evictions_lru, cache_evictions_unknown_permanent | events/s |
+| netdata.collector.ipc.apps_lookup.client.peer | peer_connect_attempts, peer_disconnects | events/s |
 | netdata.collector.ipc.apps_lookup.client.worker_request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
 | netdata.collector.ipc.apps_lookup.client.function_handler_overhead_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | calls/s |
 | netdata.collector.ipc.apps_lookup.client.intake_depth | intake_depth | pids |

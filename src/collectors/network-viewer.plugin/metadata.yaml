@@ -68,21 +68,16 @@ modules:
               description: Maximum number of per-PID APPS_LOOKUP cache entries kept by network-viewer.plugin.
               default_value: 8192
               required: false
-            - name: apps lookup generation refresh seconds
-              description: How often the background worker probes APPS_LOOKUP generation changes when the cache is otherwise warm.
-              default_value: 30
-              required: false
         examples:
           folding:
             title: "Config"
             enabled: true
           list:
             - name: APPS_LOOKUP cache warming
-              description: Keep the default cache size and generation refresh cadence.
+              description: Keep the default APPS_LOOKUP cache size.
               config: |
                 [plugin:network-viewer]
                   apps lookup cache size = 8192
-                  apps lookup generation refresh seconds = 30
     troubleshooting:
       problems:
         list: []
@@ -116,7 +111,6 @@ modules:
                 - name: cache_misses_intake_dropped
                 - name: cache_evictions_pid_reuse
                 - name: cache_evictions_lru
-                - name: cache_evictions_generation_bump
                 - name: cache_evictions_unknown_permanent
             - name: netdata.collector.ipc.apps_lookup.client.peer
               description: APPS_LOOKUP client peer connection events
@@ -125,7 +119,6 @@ modules:
               dimensions:
                 - name: peer_connect_attempts
                 - name: peer_disconnects
-                - name: worker_refresh_probes
             - name: netdata.collector.ipc.apps_lookup.client.worker_request_duration_ms
               description: APPS_LOOKUP worker request duration cumulative histogram
               unit: "requests/s"
