@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "web/api/formatters/rrd2json.h"
+#include "database/contexts/rrdcontext-internal.h"
 
 static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
     bool ok = sanitize_command_argument_string(dst, src, dst_size);
@@ -1518,6 +1519,40 @@ static int test_incremental_sum_lookup_respects_update_every(void) {
     return rc;
 }
 
+static int test_rrdmetric_algorithm_follows_rrddim(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-algo-track", "unittest-algo-track", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    int rc = 0;
+    RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
+    if(!rm || rrdmetric_algorithm_atomic_load(rm) != RRD_ALGORITHM_INCREMENTAL) {
+        fprintf(stderr, "%s: after rrddim_add INCREMENTAL, rm->algorithm = %d (want %d)\n",
+                __FUNCTION__, rm ? (int)rrdmetric_algorithm_atomic_load(rm) : -1,
+                (int)RRD_ALGORITHM_INCREMENTAL);
+        rc = 1;
+    }
+
+    rrddim_set_algorithm(st, rd, RRD_ALGORITHM_ABSOLUTE);
+    rm = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
+    if(!rm || rrdmetric_algorithm_atomic_load(rm) != RRD_ALGORITHM_ABSOLUTE) {
+        fprintf(stderr, "%s: after rrddim_set_algorithm ABSOLUTE, rm->algorithm = %d (want %d)\n",
+                __FUNCTION__, rm ? (int)rrdmetric_algorithm_atomic_load(rm) : -1,
+                (int)RRD_ALGORITHM_ABSOLUTE);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 int run_all_mockup_tests(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
@@ -1531,6 +1566,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_incremental_sum_lookup_respects_update_every())
+        return 1;
+
+    if(test_rrdmetric_algorithm_follows_rrddim())
         return 1;
 
     if(!test_variable_renames())
