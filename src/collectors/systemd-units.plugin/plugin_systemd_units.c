@@ -2,7 +2,6 @@
 
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 
 #include <linux/capability.h>
 #include <syslog.h>

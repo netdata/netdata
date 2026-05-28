@@ -30,6 +30,22 @@ static long rrdr_line_init(RRDR *r __maybe_unused, time_t t __maybe_unused, long
     return rrdr_line;
 }
 
+ALWAYS_INLINE
+static NETDATA_DOUBLE query_point_grouping_value(
+    QUERY_POINT point, QUERY_ENGINE_OPS *ops, RRDR_TIME_GROUPING add_flush) {
+    if(likely(add_flush != RRDR_GROUPING_SUM || !ops->qm->values_stored_as_rates))
+        return point.value;
+
+    if(unlikely(storage_point_is_unset(point.sp) || storage_point_is_gap(point.sp) || !point.sp.count))
+        return point.value;
+
+    time_t duration = point.sp.end_time_s - point.sp.start_time_s;
+    if(unlikely(duration <= 0))
+        return point.value;
+
+    return point.value * (NETDATA_DOUBLE)duration / (NETDATA_DOUBLE)point.sp.count;
+}
+
 // ----------------------------------------------------------------------------
 // dimension level query engine
 
@@ -59,7 +75,9 @@ static long rrdr_line_init(RRDR *r __maybe_unused, time_t t __maybe_unused, long
         if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
             (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
                                                                         \
-        time_grouping_add(r, (point).value, add_flush);                 \
+        NETDATA_DOUBLE grouping_value =                                    \
+            query_point_grouping_value(point, ops, add_flush);             \
+        time_grouping_add(r, grouping_value, add_flush);                   \
                                                                         \
         storage_point_merge_to((ops)->group_point, (point).sp);         \
         if(!(point).added)                                              \

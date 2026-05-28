@@ -1012,7 +1012,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/procfile/procfile.h
         src/libnetdata/query_progress/progress.c
         src/libnetdata/query_progress/progress.h
-        src/libnetdata/required_dummies.h
         src/libnetdata/socket/security.c
         src/libnetdata/socket/security.h
         src/libnetdata/simple_hashtable/simple_hashtable.h
@@ -1232,6 +1231,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/mmap_limit.h
         src/libnetdata/signals/signals.c
         src/libnetdata/signals/signals.h
+        src/libnetdata/runtime-paths/runtime-paths.c
+        src/libnetdata/runtime-paths/runtime-paths.h
         src/libnetdata/os/machine_id.c
         src/libnetdata/os/machine_id.h
         src/libnetdata/os/process_memory.c
