@@ -44,7 +44,7 @@ func newEntitySelector(name, expr string) (*entitySelector, error) {
 		return nil, nil
 	}
 	selector := &entitySelector{}
-	for _, term := range strings.Fields(expr) {
+	for term := range strings.FieldsSeq(expr) {
 		positive := true
 		if strings.HasPrefix(term, "!") {
 			positive = false

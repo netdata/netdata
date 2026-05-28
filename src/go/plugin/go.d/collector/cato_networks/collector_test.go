@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -96,6 +97,10 @@ func (f *fakeAPIClient) SiteBgpStatus(_ context.Context, _ string, siteID string
 		}
 	}
 	return f.bgp[siteID], nil
+}
+
+func (f *fakeAPIClient) APIStats() apiStats {
+	return apiStats{}
 }
 
 func fixedCatoTestNow() time.Time {
@@ -350,11 +355,11 @@ func TestConfigApplyDefaultsNormalizesStringInputs(t *testing.T) {
 		AccountID: " 12345 ",
 		APIKey:    " secret ",
 		Limits: LimitsConfig{
-			MaxSites:             intPtr(0),
-			MaxInterfacesPerSite: intPtr(0),
+			MaxSites:             new(0),
+			MaxInterfacesPerSite: new(0),
 		},
 		BGP: BGPConfig{
-			MaxPeersPerSite: intPtr(0),
+			MaxPeersPerSite: new(0),
 		},
 	}
 	cfg.URL = " https://api.catonetworks.com/api/v1/graphql2 "
@@ -525,12 +530,12 @@ func TestCollectorMapsUnrecognizedStatusesToUnknown(t *testing.T) {
 	fake.snapshot = &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{
 		Sites: []*catosdk.AccountSnapshot_AccountSnapshot_Sites{
 			{
-				ID:                             strPtr("1001"),
+				ID:                             new("1001"),
 				ConnectivityStatusSiteSnapshot: connectivityPtr("Initializing"),
 				OperationalStatusSiteSnapshot:  operationalPtr("Maintenance"),
-				PopName:                        strPtr("POP-Paris"),
+				PopName:                        new("POP-Paris"),
 				InfoSiteSnapshot: &catosdk.AccountSnapshot_AccountSnapshot_Sites_InfoSiteSnapshot{
-					Name: strPtr("Paris Office"),
+					Name: new("Paris Office"),
 				},
 			},
 		},
@@ -610,16 +615,16 @@ func TestCollectorAppliesSiteSelectorAndLimit(t *testing.T) {
 	c.Metrics.Enabled = "no"
 	c.BGP.Enabled = "no"
 	c.SiteSelector = "!Toulouse* *"
-	c.Limits.MaxSites = intPtr(1)
+	c.Limits.MaxSites = new(1)
 	fake := newFixtureAPIClient()
 	total := int64(3)
 	siteType := catomodels.EntityTypeSite
 	fake.lookup = &catosdk.EntityLookup{EntityLookup: catosdk.EntityLookup_EntityLookup{
 		Total: &total,
 		Items: []*catosdk.EntityLookup_EntityLookup_Items{
-			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1001", Name: strPtr("Paris Office"), Type: siteType}},
-			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1002", Name: strPtr("Toulouse Office"), Type: siteType}},
-			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1003", Name: strPtr("Madrid Office"), Type: siteType}},
+			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1001", Name: new("Paris Office"), Type: siteType}},
+			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1002", Name: new("Toulouse Office"), Type: siteType}},
+			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1003", Name: new("Madrid Office"), Type: siteType}},
 		},
 	}}
 	c.client = fake
@@ -650,17 +655,17 @@ func TestCollectorAppliesInterfaceAndBGPPeerSelectorsAndLimits(t *testing.T) {
 	c.AccountID = "12345"
 	c.APIKey = "secret"
 	c.InterfaceSelector = "wan*"
-	c.Limits.MaxInterfacesPerSite = intPtr(1)
-	c.BGP.MaxPeersPerSite = intPtr(1)
+	c.Limits.MaxInterfacesPerSite = new(1)
+	c.BGP.MaxPeersPerSite = new(1)
 	c.BGP.MaxSitesPerCollection = 1
 	fake := newFixtureAPIClient()
 	snapshot := fixtureSnapshot()
 	snapshot.GetAccountSnapshot().GetSites()[0].GetDevices()[0].Interfaces = append(
 		snapshot.GetAccountSnapshot().GetSites()[0].GetDevices()[0].GetInterfaces(),
 		&catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces{
-			ID:        strPtr("wan2"),
-			Name:      strPtr("WAN 2"),
-			Connected: boolPtr(true),
+			ID:        new("wan2"),
+			Name:      new("WAN 2"),
+			Connected: new(true),
 		},
 	)
 	fake.snapshot = snapshot
@@ -883,14 +888,14 @@ func TestMergeMetricsMergesAllInterfaceIntoSiteMetrics(t *testing.T) {
 	metrics := &catosdk.AccountMetrics{AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
 		Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
 			{
-				ID: strPtr("1001"),
+				ID: new("1001"),
 				Metrics: &catosdk.AccountMetrics_AccountMetrics_Sites_Metrics{
 					BytesUpstream: &siteBytesUpstream,
 					Rtt:           &siteRTT,
 				},
 				Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
 					{
-						Name: strPtr("all"),
+						Name: new("all"),
 						Timeseries: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
 							{Label: "bytesDownstreamMax", Data: [][]float64{{1, 200}}},
 						},
@@ -1443,7 +1448,7 @@ func TestWriteAPIStatsWritesRetryCounterTotalsAndDeltas(t *testing.T) {
 	labels := metrix.Labels{"query": operationMetrics}
 
 	cc.BeginCycle()
-	writeAPIStats(c.store, apiStats{Retries: map[string]apiRetryStats{
+	writeAPIStats(c.metrics.api, apiStats{Retries: map[string]apiRetryStats{
 		operationMetrics: {RateLimit: 2, Transient: 3},
 	}})
 	cc.CommitCycleSuccess()
@@ -1454,7 +1459,7 @@ func TestWriteAPIStatsWritesRetryCounterTotalsAndDeltas(t *testing.T) {
 	requireNoDelta(t, reader, "api_transient_retries_total", labels)
 
 	cc.BeginCycle()
-	writeAPIStats(c.store, apiStats{Retries: map[string]apiRetryStats{
+	writeAPIStats(c.metrics.api, apiStats{Retries: map[string]apiRetryStats{
 		operationMetrics: {RateLimit: 5, Transient: 7},
 	}})
 	cc.CommitCycleSuccess()
@@ -1492,7 +1497,7 @@ func TestSDKClientRetriesClientDeadlineExceeded(t *testing.T) {
 func TestNormalizeSnapshotDefaultsNilInfoAndStatuses(t *testing.T) {
 	snapshot := &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{
 		Sites: []*catosdk.AccountSnapshot_AccountSnapshot_Sites{
-			{ID: strPtr("1001")},
+			{ID: new("1001")},
 		},
 	}}
 
@@ -1556,9 +1561,7 @@ func newRawCatoFixtureServerWithResponses(t *testing.T, overrides map[string]raw
 		operationMetrics:   {body: loadSDKCompatibleMockoonResponseBody(t, "accountMetrics")},
 		operationBGP:       {body: loadTestdata(t, "cato-site-bgp-status.schema-shaped.json")},
 	}
-	for operation, response := range overrides {
-		responses[operation] = response
-	}
+	maps.Copy(responses, overrides)
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -1707,8 +1710,8 @@ func fixtureLookup() *catosdk.EntityLookup {
 	return &catosdk.EntityLookup{EntityLookup: catosdk.EntityLookup_EntityLookup{
 		Total: &total,
 		Items: []*catosdk.EntityLookup_EntityLookup_Items{
-			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1001", Name: strPtr("Paris Office"), Type: siteType}},
-			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1002", Name: strPtr("Toulouse Office"), Type: siteType}},
+			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1001", Name: new("Paris Office"), Type: siteType}},
+			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1002", Name: new("Toulouse Office"), Type: siteType}},
 		},
 	}}
 }
@@ -1718,7 +1721,7 @@ func fixtureLookupPage(total int64, ids ...string) *catosdk.EntityLookup {
 	items := make([]*catosdk.EntityLookup_EntityLookup_Items, 0, len(ids))
 	for _, id := range ids {
 		items = append(items, &catosdk.EntityLookup_EntityLookup_Items{
-			Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: id, Name: strPtr("Site " + id), Type: siteType},
+			Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: id, Name: new("Site " + id), Type: siteType},
 		})
 	}
 	return &catosdk.EntityLookup{EntityLookup: catosdk.EntityLookup_EntityLookup{
@@ -1731,45 +1734,45 @@ func fixtureSnapshot() *catosdk.AccountSnapshot {
 	return &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{
 		Sites: []*catosdk.AccountSnapshot_AccountSnapshot_Sites{
 			{
-				ID:                             strPtr("1001"),
+				ID:                             new("1001"),
 				ConnectivityStatusSiteSnapshot: connectivityPtr("connected"),
 				OperationalStatusSiteSnapshot:  operationalPtr("active"),
-				PopName:                        strPtr("POP-Paris"),
-				HostCount:                      int64Ptr(42),
-				ConnectedSince:                 strPtr("2026-05-01T10:00:00Z"),
+				PopName:                        new("POP-Paris"),
+				HostCount:                      new(int64(42)),
+				ConnectedSince:                 new("2026-05-01T10:00:00Z"),
 				InfoSiteSnapshot: &catosdk.AccountSnapshot_AccountSnapshot_Sites_InfoSiteSnapshot{
-					Name:        strPtr("Paris Office"),
-					Description: strPtr("Main site"),
-					CountryCode: strPtr("FR"),
-					CountryName: strPtr("France"),
+					Name:        new("Paris Office"),
+					Description: new("Main site"),
+					CountryCode: new("FR"),
+					CountryName: new("France"),
 				},
 				Devices: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices{
 					{
-						ID:        strPtr("dev-1"),
-						Name:      strPtr("Socket 1"),
-						Type:      strPtr("socket"),
-						Connected: boolPtr(true),
+						ID:        new("dev-1"),
+						Name:      new("Socket 1"),
+						Type:      new("socket"),
+						Connected: new(true),
 						Interfaces: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces{
 							{
-								ID:             strPtr("wan1"),
-								Name:           strPtr("WAN 1"),
-								Connected:      boolPtr(true),
-								PopName:        strPtr("POP-Paris"),
-								TunnelRemoteIP: strPtr("203.0.113.10"),
-								TunnelUptime:   int64Ptr(3600),
+								ID:             new("wan1"),
+								Name:           new("WAN 1"),
+								Connected:      new(true),
+								PopName:        new("POP-Paris"),
+								TunnelRemoteIP: new("203.0.113.10"),
+								TunnelUptime:   new(int64(3600)),
 							},
 						},
 					},
 				},
 			},
 			{
-				ID:                             strPtr("1002"),
+				ID:                             new("1002"),
 				ConnectivityStatusSiteSnapshot: connectivityPtr("Degraded"),
 				OperationalStatusSiteSnapshot:  operationalPtr("locked"),
-				PopName:                        strPtr("POP-Toulouse"),
-				HostCount:                      int64Ptr(7),
+				PopName:                        new("POP-Toulouse"),
+				HostCount:                      new(int64(7)),
 				InfoSiteSnapshot: &catosdk.AccountSnapshot_AccountSnapshot_Sites_InfoSiteSnapshot{
-					Name: strPtr("Toulouse Office"),
+					Name: new("Toulouse Office"),
 				},
 			},
 		},
@@ -1780,11 +1783,11 @@ func fixtureMetrics() *catosdk.AccountMetrics {
 	return &catosdk.AccountMetrics{AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
 		Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
 			{
-				ID:   strPtr("1001"),
-				Name: strPtr("Paris Office"),
+				ID:   new("1001"),
+				Name: new("Paris Office"),
 				Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
 					{
-						Name: strPtr("all"),
+						Name: new("all"),
 						Timeseries: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
 							{Label: "bytesUpstreamMax", Data: [][]float64{{1, 6008}, {2, 7168}}},
 							{Label: "bytesDownstreamMax", Data: [][]float64{{1, 12008}, {2, 11168}}},
@@ -1833,11 +1836,14 @@ func mustCycleController(t *testing.T, s metrix.CollectorStore) metrix.CycleCont
 	return managed.CycleController()
 }
 
-func strPtr(v string) *string { return &v }
+//go:fix inline
+func strPtr(v string) *string { return new(v) }
 
-func boolPtr(v bool) *bool { return &v }
+//go:fix inline
+func boolPtr(v bool) *bool { return new(v) }
 
-func int64Ptr(v int64) *int64 { return &v }
+//go:fix inline
+func int64Ptr(v int64) *int64 { return new(v) }
 
 func connectivityPtr(v string) *catomodels.ConnectivityStatus {
 	status := catomodels.ConnectivityStatus(v)

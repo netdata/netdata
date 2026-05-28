@@ -54,8 +54,8 @@ func New() *Collector {
 			SiteSelector:      defaultEntitySelector,
 			InterfaceSelector: defaultEntitySelector,
 			Limits: LimitsConfig{
-				MaxSites:             intPtr(defaultMaxSites),
-				MaxInterfacesPerSite: intPtr(defaultMaxIfacesPerSite),
+				MaxSites:             new(defaultMaxSites),
+				MaxInterfacesPerSite: new(defaultMaxIfacesPerSite),
 			},
 			Discovery: DiscoveryConfig{
 				RefreshEvery: defaultDiscoveryEvery,
@@ -70,7 +70,7 @@ func New() *Collector {
 				RefreshEvery:          defaultBGPRefreshEvery,
 				MaxSitesPerCollection: defaultBGPMaxSites,
 				PeerSelector:          defaultEntitySelector,
-				MaxPeersPerSite:       intPtr(defaultBGPMaxPeers),
+				MaxPeersPerSite:       new(defaultBGPMaxPeers),
 			},
 			Retry: RetryConfig{
 				Attempts: defaultRetryAttempts,
@@ -79,6 +79,7 @@ func New() *Collector {
 			},
 		},
 		store:     store,
+		metrics:   newCollectorMetrics(store),
 		newClient: newSDKAPIClient,
 		now:       time.Now,
 	}
@@ -88,7 +89,8 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	store metrix.CollectorStore
+	store   metrix.CollectorStore
+	metrics *collectorMetrics
 
 	httpClient *http.Client
 	client     apiClient
@@ -107,21 +109,6 @@ type Collector struct {
 	warningStates    map[string]string
 
 	now func() time.Time
-}
-
-type discoveryState struct {
-	siteIDs           []string
-	siteNames         map[string]string
-	fetchedAt         time.Time
-	totalSites        int
-	skippedBySelector int
-	skippedByLimit    int
-}
-
-type bgpState struct {
-	bySite      map[string][]bgpPeerState
-	nextRefresh time.Time
-	nextIndex   int
 }
 
 func (c *Collector) Configuration() any { return c.Config }
@@ -198,73 +185,6 @@ func (c *Collector) currentTopology() (*topology.Data, bool) {
 	data.Actors = append([]topology.Actor(nil), c.topology.Actors...)
 	data.Links = append([]topology.Link(nil), c.topology.Links...)
 	return &data, true
-}
-
-func (c *Collector) collect(ctx context.Context) (err error) {
-	c.beginHealthCycle()
-	defer func() {
-		if contextErr(ctx) != nil {
-			return
-		}
-		c.health.CollectionSuccess = err == nil
-		c.updateSiteSelectionHealth()
-		if err != nil {
-			c.markCollectionFailure(err)
-		}
-		c.writeCollectorHealth()
-	}()
-
-	if c.client == nil {
-		return errors.New("Cato client is not initialized")
-	}
-
-	if err := c.refreshDiscovery(ctx, false); err != nil {
-		return wrapCatoOperationError("site discovery", err)
-	}
-	if len(c.discovery.siteIDs) == 0 {
-		return errors.New("no Cato sites discovered")
-	}
-
-	sites, order, err := c.collectSnapshot(ctx)
-	if err != nil {
-		return wrapCatoOperationError("account snapshot", err)
-	}
-	if len(sites) == 0 {
-		return errors.New("no Cato sites returned by account snapshot")
-	}
-	c.pruneUnselectedSites(sites, &order)
-
-	if c.metricsEnabled() {
-		if err := c.collectMetrics(ctx, sites); err != nil {
-			c.warnRecoverable(warningKeyMetrics, classifyCatoError(err), "account metrics collection incomplete, error_class=%s", classifyCatoError(err))
-		} else {
-			c.clearRecoverableWarning(warningKeyMetrics)
-		}
-	}
-
-	if c.bgpEnabled() {
-		if err := c.collectBGP(ctx, sites, order); err != nil {
-			c.warnRecoverable(warningKeyBGP, classifyCatoError(err), "BGP status collection incomplete, error_class=%s", classifyCatoError(err))
-		} else {
-			c.clearRecoverableWarning(warningKeyBGP)
-		}
-	}
-
-	c.applyEntityControls(sites, &order)
-
-	now := c.now()
-	var topo *topology.Data
-	if c.topologyEnabled() {
-		topo = buildTopology(c.AccountID, sites, order, now)
-	}
-
-	c.mu.Lock()
-	c.topology = topo
-	c.mu.Unlock()
-
-	c.writeMetrics(sites, order)
-
-	return nil
 }
 
 func contextErr(ctx context.Context) error {

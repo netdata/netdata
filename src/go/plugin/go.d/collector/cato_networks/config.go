@@ -53,12 +53,12 @@ type Config struct {
 
 	SiteSelector      string          `yaml:"site_selector,omitempty" json:"site_selector,omitempty"`
 	InterfaceSelector string          `yaml:"interface_selector,omitempty" json:"interface_selector,omitempty"`
-	Limits            LimitsConfig    `yaml:"limits,omitempty" json:"limits,omitempty"`
-	Discovery         DiscoveryConfig `yaml:"discovery,omitempty" json:"discovery,omitempty"`
-	Metrics           MetricsConfig   `yaml:"metrics,omitempty" json:"metrics,omitempty"`
-	BGP               BGPConfig       `yaml:"bgp,omitempty" json:"bgp,omitempty"`
-	Topology          TopologyConfig  `yaml:"topology,omitempty" json:"topology,omitempty"`
-	Retry             RetryConfig     `yaml:"retry,omitempty" json:"retry,omitempty"`
+	Limits            LimitsConfig    `yaml:"limits,omitempty" json:"limits"`
+	Discovery         DiscoveryConfig `yaml:"discovery,omitempty" json:"discovery"`
+	Metrics           MetricsConfig   `yaml:"metrics,omitempty" json:"metrics"`
+	BGP               BGPConfig       `yaml:"bgp,omitempty" json:"bgp"`
+	Topology          TopologyConfig  `yaml:"topology,omitempty" json:"topology"`
+	Retry             RetryConfig     `yaml:"retry,omitempty" json:"retry"`
 }
 
 type DiscoveryConfig struct {
@@ -119,10 +119,10 @@ func (c *Config) applyDefaults() {
 		c.InterfaceSelector = defaultEntitySelector
 	}
 	if c.Limits.MaxSites == nil {
-		c.Limits.MaxSites = intPtr(defaultMaxSites)
+		c.Limits.MaxSites = new(defaultMaxSites)
 	}
 	if c.Limits.MaxInterfacesPerSite == nil {
-		c.Limits.MaxInterfacesPerSite = intPtr(defaultMaxIfacesPerSite)
+		c.Limits.MaxInterfacesPerSite = new(defaultMaxIfacesPerSite)
 	}
 	if c.Timeout.Duration() == 0 {
 		c.Timeout = defaultTimeout
@@ -152,7 +152,7 @@ func (c *Config) applyDefaults() {
 		c.BGP.PeerSelector = defaultEntitySelector
 	}
 	if c.BGP.MaxPeersPerSite == nil {
-		c.BGP.MaxPeersPerSite = intPtr(defaultBGPMaxPeers)
+		c.BGP.MaxPeersPerSite = new(defaultBGPMaxPeers)
 	}
 	if c.Retry.Attempts <= 0 {
 		c.Retry.Attempts = defaultRetryAttempts
@@ -278,4 +278,5 @@ func isLoopbackHost(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-func intPtr(v int) *int { return &v }
+//go:fix inline
+func intPtr(v int) *int { return new(v) }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -24,6 +25,7 @@ type apiClient interface {
 	AccountSnapshot(ctx context.Context, accountID string, siteIDs []string) (*catosdk.AccountSnapshot, error)
 	AccountMetrics(ctx context.Context, accountID string, siteIDs []string, timeFrame string, buckets int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error)
 	SiteBgpStatus(ctx context.Context, accountID, siteID string) ([]*catosdk.SiteBgpStatusResult, error)
+	APIStats() apiStats
 }
 
 type sdkAPIClient struct {
@@ -40,10 +42,6 @@ type rawGraphQLClient struct {
 	apiKey     string
 	headers    map[string]string
 	httpClient *http.Client
-}
-
-type apiStatsProvider interface {
-	APIStats() apiStats
 }
 
 type apiStats struct {
@@ -232,9 +230,7 @@ func (c *sdkAPIClient) APIStats() apiStats {
 	defer c.statsMu.Unlock()
 
 	out := apiStats{Retries: make(map[string]apiRetryStats, len(c.stats.Retries))}
-	for name, stats := range c.stats.Retries {
-		out.Retries[name] = stats
-	}
+	maps.Copy(out.Retries, c.stats.Retries)
 	return out
 }
 

@@ -12,20 +12,10 @@ import (
 	catoscalars "github.com/catonetworks/cato-go-sdk/scalars"
 )
 
-func ptrString(v *string) string {
+func derefZero[T any](v *T) T {
 	if v == nil {
-		return ""
-	}
-	return *v
-}
-
-func ptrBool(v *bool) bool {
-	return v != nil && *v
-}
-
-func ptrInt64(v *int64) int64 {
-	if v == nil {
-		return 0
+		var zero T
+		return zero
 	}
 	return *v
 }
@@ -74,7 +64,7 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 	var order []string
 
 	for _, raw := range snapshot.GetAccountSnapshot().GetSites() {
-		siteID := ptrString(raw.GetID())
+		siteID := derefZero(raw.GetID())
 		if siteID == "" {
 			continue
 		}
@@ -89,11 +79,11 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 			connType    string
 		)
 		if info := raw.GetInfoSiteSnapshot(); info != nil {
-			infoName = ptrString(info.GetName())
-			description = ptrString(info.GetDescription())
-			countryCode = ptrString(info.GetCountryCode())
-			countryName = ptrString(info.GetCountryName())
-			region = ptrString(info.GetRegion())
+			infoName = derefZero(info.GetName())
+			description = derefZero(info.GetDescription())
+			countryCode = derefZero(info.GetCountryCode())
+			countryName = derefZero(info.GetCountryName())
+			region = derefZero(info.GetRegion())
 			if info.GetType() != nil {
 				siteType = fmt.Sprint(*info.GetType())
 			}
@@ -107,39 +97,39 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 			Description:        description,
 			ConnectivityStatus: normalizeStatus(connectivityStatusString(raw.GetConnectivityStatusSiteSnapshot())),
 			OperationalStatus:  normalizeStatus(operationalStatusString(raw.GetOperationalStatusSiteSnapshot())),
-			PopName:            ptrString(raw.GetPopName()),
+			PopName:            derefZero(raw.GetPopName()),
 			CountryCode:        countryCode,
 			CountryName:        countryName,
 			Region:             region,
 			SiteType:           siteType,
 			ConnectionType:     connType,
-			LastConnected:      ptrString(raw.GetLastConnected()),
-			ConnectedSince:     ptrString(raw.GetConnectedSince()),
-			HostCount:          ptrInt64(raw.GetHostCount()),
+			LastConnected:      derefZero(raw.GetLastConnected()),
+			ConnectedSince:     derefZero(raw.GetConnectedSince()),
+			HostCount:          derefZero(raw.GetHostCount()),
 			Interfaces:         make(map[string]*interfaceState),
 		}
 
 		for _, dev := range raw.GetDevices() {
 			device := deviceState{
-				ID:             ptrString(dev.GetID()),
-				Name:           ptrString(dev.GetName()),
-				Type:           ptrString(dev.GetType()),
-				Connected:      ptrBool(dev.GetConnected()),
-				HaRole:         ptrString(dev.GetHaRole()),
-				InternalIP:     ptrString(dev.GetInternalIP()),
-				LastPopName:    ptrString(dev.GetLastPopName()),
-				ConnectedSince: ptrString(dev.GetConnectedSince()),
+				ID:             derefZero(dev.GetID()),
+				Name:           derefZero(dev.GetName()),
+				Type:           derefZero(dev.GetType()),
+				Connected:      derefZero(dev.GetConnected()),
+				HaRole:         derefZero(dev.GetHaRole()),
+				InternalIP:     derefZero(dev.GetInternalIP()),
+				LastPopName:    derefZero(dev.GetLastPopName()),
+				ConnectedSince: derefZero(dev.GetConnectedSince()),
 			}
 			if socket := dev.GetSocketInfo(); socket != nil {
-				device.SocketID = ptrString(socket.GetID())
-				device.SocketSerial = ptrString(socket.GetSerial())
-				device.SocketVersion = ptrString(socket.GetVersion())
+				device.SocketID = derefZero(socket.GetID())
+				device.SocketSerial = derefZero(socket.GetSerial())
+				device.SocketVersion = derefZero(socket.GetVersion())
 			}
 			site.Devices = append(site.Devices, device)
 
 			linkStateByID := make(map[string]*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_InterfacesLinkState)
 			for _, linkState := range dev.GetInterfacesLinkState() {
-				if id := ptrString(linkState.GetID()); id != "" {
+				if id := derefZero(linkState.GetID()); id != "" {
 					linkStateByID[id] = linkState
 				}
 			}
@@ -149,7 +139,7 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 					continue
 				}
 				if linkState := linkStateByID[iface.ID]; linkState != nil {
-					iface.LinkUp = ptrBool(linkState.GetUp())
+					iface.LinkUp = derefZero(linkState.GetUp())
 				}
 				key := interfaceKey(iface.ID, iface.Name)
 				site.Interfaces[key] = &iface
@@ -165,25 +155,25 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 
 func normalizeSnapshotInterface(raw *catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces) interfaceState {
 	iface := interfaceState{
-		ID:             ptrString(raw.GetID()),
-		Name:           ptrString(raw.GetName()),
-		Type:           ptrString(raw.GetType()),
-		Connected:      ptrBool(raw.GetConnected()),
-		PopName:        ptrString(raw.GetPopName()),
-		TunnelRemoteIP: ptrString(raw.GetTunnelRemoteIP()),
-		TunnelUptime:   ptrInt64(raw.GetTunnelUptime()),
-		PhysicalPort:   ptrInt64(raw.GetPhysicalPort()),
+		ID:             derefZero(raw.GetID()),
+		Name:           derefZero(raw.GetName()),
+		Type:           derefZero(raw.GetType()),
+		Connected:      derefZero(raw.GetConnected()),
+		PopName:        derefZero(raw.GetPopName()),
+		TunnelRemoteIP: derefZero(raw.GetTunnelRemoteIP()),
+		TunnelUptime:   derefZero(raw.GetTunnelUptime()),
+		PhysicalPort:   derefZero(raw.GetPhysicalPort()),
 	}
 	if info := raw.GetInfoInterfaceSnapshot(); info != nil {
 		if iface.ID == "" {
 			iface.ID = info.GetID()
 		}
 		if iface.Name == "" {
-			iface.Name = ptrString(info.GetName())
+			iface.Name = derefZero(info.GetName())
 		}
-		iface.DestType = ptrString(info.GetDestType())
-		iface.UpstreamBandwidth = ptrInt64(info.GetUpstreamBandwidth())
-		iface.DownstreamBandwidth = ptrInt64(info.GetDownstreamBandwidth())
+		iface.DestType = derefZero(info.GetDestType())
+		iface.UpstreamBandwidth = derefZero(info.GetUpstreamBandwidth())
+		iface.DownstreamBandwidth = derefZero(info.GetDownstreamBandwidth())
 	}
 	return iface
 }
@@ -191,7 +181,7 @@ func normalizeSnapshotInterface(raw *catosdk.AccountSnapshot_AccountSnapshot_Sit
 func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) []string {
 	var issues []string
 	for _, rawSite := range metrics.GetAccountMetrics().GetSites() {
-		siteID := ptrString(rawSite.GetID())
+		siteID := derefZero(rawSite.GetID())
 		if siteID == "" {
 			continue
 		}
@@ -200,13 +190,13 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 		if site == nil {
 			site = &siteState{
 				ID:         siteID,
-				Name:       siteDisplayName(siteID, nil, "", ptrString(rawSite.GetName())),
+				Name:       siteDisplayName(siteID, nil, "", derefZero(rawSite.GetName())),
 				Interfaces: make(map[string]*interfaceState),
 			}
 			sites[siteID] = site
 		}
 		if site.Name == "" {
-			site.Name = siteDisplayName(siteID, nil, "", ptrString(rawSite.GetName()))
+			site.Name = siteDisplayName(siteID, nil, "", derefZero(rawSite.GetName()))
 		}
 
 		site.Metrics = mergeSiteMetrics(site.Metrics, rawSite.GetMetrics())
@@ -242,24 +232,24 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 
 func normalizeMetricsInterface(raw *catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces) (interfaceState, []string) {
 	iface := interfaceState{
-		Name:           ptrString(raw.GetName()),
-		TunnelRemoteIP: ptrString(raw.GetRemoteIP()),
+		Name:           derefZero(raw.GetName()),
+		TunnelRemoteIP: derefZero(raw.GetRemoteIP()),
 	}
 	var issues []string
 	if info := raw.GetInterfaceInfo(); info != nil {
 		iface.ID = info.GetID()
 		if iface.Name == "" {
-			iface.Name = ptrString(info.GetName())
+			iface.Name = derefZero(info.GetName())
 		}
-		iface.DestType = ptrString(info.GetDestType())
-		iface.UpstreamBandwidth = ptrInt64(info.GetUpstreamBandwidth())
-		iface.DownstreamBandwidth = ptrInt64(info.GetDownstreamBandwidth())
+		iface.DestType = derefZero(info.GetDestType())
+		iface.UpstreamBandwidth = derefZero(info.GetUpstreamBandwidth())
+		iface.DownstreamBandwidth = derefZero(info.GetDownstreamBandwidth())
 	}
 	if socket := raw.GetSocketInfo(); socket != nil && iface.Type == "" && socket.GetPlatform() != nil {
 		iface.Type = fmt.Sprint(*socket.GetPlatform())
 	}
 	if remote := raw.GetRemoteIPInfo(); remote != nil && iface.TunnelRemoteIP == "" {
-		iface.TunnelRemoteIP = ptrString(remote.GetIP())
+		iface.TunnelRemoteIP = derefZero(remote.GetIP())
 	}
 
 	var metricIssues []string
