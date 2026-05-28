@@ -368,13 +368,15 @@ void function_network_protocols(
         // Normalized columns — TCP: segments, UDP: datagrams
         nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams)", "segments/datagrams/s");
         nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams)",     "segments/datagrams/s");
-        nv_add_int_field(wb, &field_id, "Errors",   "Errors (Failures/Rx Errors)",   "errors/s");
+        nv_add_int_field(wb, &field_id, "Errors",   "Errors (Failures/Rx Errors)",   "errors");
 
         // TCP-only columns (UDP rows carry 0)
-        nv_add_int_field(wb, &field_id, "ConnActive",        "Active Connections Opened",         "opens/s");
+        // ConnActive/ConnPassive/ConnReset are PERF_COUNTER_RAWCOUNT cumulative totals,
+        // not per-second rates, so units have no /s suffix.
+        nv_add_int_field(wb, &field_id, "ConnActive",        "Active Connections Opened",         "opens");
         nv_add_int_field(wb, &field_id, "ConnEstablished",   "Currently Established Connections",  "connections");
-        nv_add_int_field(wb, &field_id, "ConnPassive",       "Passive Connections Opened",         "opens/s");
-        nv_add_int_field(wb, &field_id, "ConnReset",         "Reset Connections",                  "resets/s");
+        nv_add_int_field(wb, &field_id, "ConnPassive",       "Passive Connections Opened",         "opens");
+        nv_add_int_field(wb, &field_id, "ConnReset",         "Reset Connections",                  "resets");
         nv_add_int_field(wb, &field_id, "SegsTotal",         "Total Segments",                     "segments/s");
         nv_add_int_field(wb, &field_id, "SegsRetransmitted", "Retransmitted Segments",             "segments/s");
 
