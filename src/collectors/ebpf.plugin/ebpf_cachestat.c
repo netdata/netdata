@@ -1850,6 +1850,7 @@ void ebpf_cachestat_thread(void *ptr)
     if (ebpf_cachestat_load_bpf(em)) {
         goto endcachestat;
     }
+    ebpf_mark_program_loaded();
 
     ebpf_cachestat_allocate_global_vectors();
 

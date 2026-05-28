@@ -360,6 +360,8 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
             if (em->load & EBPF_LOAD_LEGACY) {
                 if (ebpf_sync_load_legacy(w, em))
                     errors++;
+                else
+                    ebpf_mark_program_loaded();
 
                 em->info.thread_name = saved_name;
             }
@@ -378,6 +380,8 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                             w->sync_obj = NULL;
                             w->enabled = false;
                             errors++;
+                        } else {
+                            ebpf_mark_program_loaded();
                         }
                     }
                 } else {

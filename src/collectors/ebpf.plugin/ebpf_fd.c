@@ -1689,6 +1689,7 @@ void ebpf_fd_thread(void *ptr)
     if (ebpf_fd_load_bpf(em)) {
         goto endfd;
     }
+    ebpf_mark_program_loaded();
 
     ebpf_fd_allocate_global_vectors();
 

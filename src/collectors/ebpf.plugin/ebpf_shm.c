@@ -1447,6 +1447,7 @@ void ebpf_shm_thread(void *ptr)
     if (ebpf_shm_load_bpf(em)) {
         goto endshm;
     }
+    ebpf_mark_program_loaded();
 
     ebpf_shm_allocate_global_vectors();
 

@@ -527,6 +527,7 @@ void ebpf_mount_thread(void *ptr)
     if (ebpf_mount_load_bpf(em)) {
         goto endmount;
     }
+    ebpf_mark_program_loaded();
 
     int algorithms[NETDATA_EBPF_MOUNT_SYSCALL] = {NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX};
 

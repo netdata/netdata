@@ -24,6 +24,10 @@ struct cgroup *discovered_cgroup_root = NULL;
 char cgroup_chart_id_prefix[] = "cgroup_";
 char services_chart_id_prefix[] = "systemd_";
 const char *cgroups_rename_script = NULL;
+static DICTIONARY *discovery_walkdir_open_errors = NULL;
+static size_t discovery_walkdir_open_errors_count = 0;
+
+#define DISCOVERY_WALKDIR_OPEN_ERRORS_MAX 256
 
 // (legacy SHM globals removed — replaced by netipc in cgroup-netipc.c)
 
@@ -349,6 +353,54 @@ static inline struct cgroup *discovery_cgroup_find(const char *id) {
     return cg;
 }
 
+struct discovery_walkdir_open_error_prune {
+    size_t remaining;
+};
+
+static int discovery_walkdir_open_error_prune_cb(const DICTIONARY_ITEM *item, void *value __maybe_unused, void *data) {
+    struct discovery_walkdir_open_error_prune *prune = data;
+
+    if (!prune->remaining)
+        return -1;
+
+    dictionary_del(discovery_walkdir_open_errors, dictionary_acquired_item_name(item));
+    discovery_walkdir_open_errors_count--;
+    prune->remaining--;
+
+    return prune->remaining ? 0 : -1;
+}
+
+static inline bool discovery_walkdir_open_error_first(const char *dirpath) {
+    if (unlikely(!discovery_walkdir_open_errors))
+        discovery_walkdir_open_errors = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+
+    if (dictionary_get(discovery_walkdir_open_errors, dirpath))
+        return false;
+
+    if (discovery_walkdir_open_errors_count >= DISCOVERY_WALKDIR_OPEN_ERRORS_MAX) {
+        struct discovery_walkdir_open_error_prune prune = {
+            .remaining = discovery_walkdir_open_errors_count - DISCOVERY_WALKDIR_OPEN_ERRORS_MAX + 1,
+        };
+
+        dictionary_walkthrough_write(discovery_walkdir_open_errors, discovery_walkdir_open_error_prune_cb, &prune);
+    }
+
+    uint8_t logged = 1;
+    dictionary_set(discovery_walkdir_open_errors, dirpath, &logged, sizeof(logged));
+    discovery_walkdir_open_errors_count++;
+
+    return true;
+}
+
+static inline void discovery_walkdir_open_errors_cleanup(void) {
+    if (!discovery_walkdir_open_errors)
+        return;
+
+    dictionary_destroy(discovery_walkdir_open_errors);
+    discovery_walkdir_open_errors = NULL;
+    discovery_walkdir_open_errors_count = 0;
+}
+
 static int calc_cgroup_depth(const char *id) {
     int depth = 0;
     const char *s;
@@ -407,10 +459,16 @@ static inline int discovery_find_walkdir(const char *base, const char *dirpath) 
 
     DIR *dir = opendir(dirpath);
     if(!dir) {
-        if(errno == EACCES && strcmp(dirpath, base) != 0)
-            nd_log_collector(NDLP_DEBUG, "CGROUP: cannot open directory '%s': %s", dirpath, strerror(errno));
-        else
-            collector_error("CGROUP: cannot open directory '%s': %s", dirpath, strerror(errno));
+        int err = errno;
+        bool first_log_for_path = discovery_walkdir_open_error_first(dirpath);
+
+        if(err == EACCES && strcmp(dirpath, base) != 0) {
+            if (first_log_for_path)
+                nd_log_collector(NDLP_DEBUG, "CGROUP: cannot open directory '%s': %s", dirpath, strerror(err));
+        }
+        else if (first_log_for_path) {
+            collector_error("CGROUP: cannot open directory '%s': %s", dirpath, strerror(err));
+        }
         return ret;
     }
     ret = 1;
@@ -1187,6 +1245,7 @@ void cgroup_discovery_worker(void *ptr)
 
     // Stop the netipc server first so its worker threads cannot iterate cgroup_root while we free it.
     cgroup_netipc_cleanup();
+    discovery_walkdir_open_errors_cleanup();
 
     // free all cgroups
     netdata_mutex_lock(&cgroup_root_mutex);

@@ -1825,6 +1825,8 @@ void ebpf_process_thread(void *ptr)
     if (ebpf_process_load_bpf(em)) {
         em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
         ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPING);
+    } else {
+        ebpf_mark_program_loaded();
     }
 
     int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {
