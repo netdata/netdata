@@ -233,6 +233,14 @@
 - Docs: task class: improve_docs — add free-tier alert silencing/disabling ([#22567](https://github.com/netdata/netdata/issues/22567))
 - Fix systemd journal plugin OTEL log directory discovery ([#22569](https://github.com/netdata/netdata/issues/22569))
 - Remove OTel journal discovery from systemd-journal.plugin ([#22572](https://github.com/netdata/netdata/issues/22572))
+- Docs: task class: improve_docs fix incorrect config key name ([#22546](https://github.com/netdata/netdata/issues/22546))
+- Regenerate integrations docs ([#22575](https://github.com/netdata/netdata/issues/22575))
+- Docs: task class: improve_docs. add an 'offline/air-gapped windows ([#22547](https://github.com/netdata/netdata/issues/22547))
+- Docs: task class: improve_docs — add a kubernetes multi-environment example ([#22548](https://github.com/netdata/netdata/issues/22548))
+- Docs: task class: improve_docs — add cloud-only prerequisite clarification ([#22508](https://github.com/netdata/netdata/issues/22508))
+- Add PAN-OS go.d collector ([#22389](https://github.com/netdata/netdata/issues/22389))
+- Docs: task class: improve_docs — add an faq entry to node-identities.md ([#22565](https://github.com/netdata/netdata/issues/22565))
+- Remove stale labels after host label reload ([#22571](https://github.com/netdata/netdata/issues/22571))
 
 ## [2.10.0] - 2026-04-09
 
