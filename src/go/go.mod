@@ -9,6 +9,7 @@ replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-202509122027
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/sprig/v3 v3.3.0
+	github.com/PaloAltoNetworks/pango v0.10.2
 	github.com/Wing924/ltsv v0.4.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/axiomhq/hyperloglog v0.2.6

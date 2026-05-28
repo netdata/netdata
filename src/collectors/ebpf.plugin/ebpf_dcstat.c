@@ -1590,6 +1590,7 @@ void ebpf_dcstat_thread(void *ptr)
     if (ebpf_dcstat_load_bpf(em)) {
         goto enddcstat;
     }
+    ebpf_mark_program_loaded();
 
     ebpf_dcstat_allocate_global_vectors();
 

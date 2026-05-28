@@ -263,6 +263,7 @@ void ebpf_softirq_thread(void *ptr)
     if (!em->probe_links) {
         goto endsoftirq;
     }
+    ebpf_mark_program_loaded();
 
     softirq_safe_clean = true;
     softirq_collector(em);

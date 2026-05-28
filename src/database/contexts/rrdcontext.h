@@ -214,6 +214,7 @@ typedef struct _query_dimension {
 
 typedef struct _query_metric {
     RRDR_DIMENSION_FLAGS status;
+    bool values_stored_as_rates;
 
     struct query_metric_tier {
         STORAGE_METRIC_HANDLE *smh;

@@ -1,0 +1,90 @@
+<response status="success">
+  <result>
+    <entry peer="edge-primary" vr="default">
+      <peer-group>edge</peer-group>
+      <peer-router-id>203.0.113.10</peer-router-id>
+      <local-address>192.0.2.254:0</local-address>
+      <remote-as>65001</remote-as>
+      <status>Established</status>
+      <status-duration>3600</status-duration>
+      <password-set>no</password-set>
+      <passive>no</passive>
+      <multi-hop-ttl>2</multi-hop-ttl>
+      <peer-address>192.0.2.1:179</peer-address>
+      <reflector-client>not-client</reflector-client>
+      <same-confederation>no</same-confederation>
+      <aggregate-confed-as>no</aggregate-confed-as>
+      <peering-type>External BGP</peering-type>
+      <connect-retry-interval>15</connect-retry-interval>
+      <open-delay>0</open-delay>
+      <idle-hold>15</idle-hold>
+      <prefix-limit>1000</prefix-limit>
+      <holdtime>90</holdtime>
+      <holdtime-config>90</holdtime-config>
+      <keepalive>30</keepalive>
+      <keepalive-config>30</keepalive-config>
+      <msg-total-in>100</msg-total-in>
+      <msg-total-out>120</msg-total-out>
+      <msg-update-in>10</msg-update-in>
+      <msg-update-out>12</msg-update-out>
+      <last-update-age>26</last-update-age>
+      <last-error />
+      <status-flap-counts>2</status-flap-counts>
+      <established-counts>3</established-counts>
+      <ORF-entry-received>0</ORF-entry-received>
+      <nexthop-self>no</nexthop-self>
+      <nexthop-thirdparty>yes</nexthop-thirdparty>
+      <nexthop-peer>no</nexthop-peer>
+      <config>
+        <remove-private-as>no</remove-private-as>
+      </config>
+      <peer-capability>
+        <list>
+          <capability>Multiprotocol Extensions(1)</capability>
+          <value>IPv4 Unicast</value>
+        </list>
+        <list>
+          <capability>Route Refresh(2)</capability>
+          <value>yes</value>
+        </list>
+      </peer-capability>
+      <prefix-counter>
+        <entry afi-safi="bgpAfiIpv4-unicast">
+          <incoming-total>40</incoming-total>
+          <incoming-accepted>38</incoming-accepted>
+          <incoming-rejected>2</incoming-rejected>
+          <policy-rejected>0</policy-rejected>
+          <outgoing-total>10</outgoing-total>
+          <outgoing-advertised>8</outgoing-advertised>
+        </entry>
+        <entry afi-safi="bgpAfiIpv6-unicast">
+          <incoming-total>6</incoming-total>
+          <incoming-accepted>6</incoming-accepted>
+          <incoming-rejected>0</incoming-rejected>
+          <policy-rejected>0</policy-rejected>
+          <outgoing-total>4</outgoing-total>
+          <outgoing-advertised>3</outgoing-advertised>
+        </entry>
+      </prefix-counter>
+    </entry>
+    <entry peer="transit-backup" vr="blue">
+      <peer-group>transit</peer-group>
+      <peer-router-id>203.0.113.20</peer-router-id>
+      <local-address>198.51.100.254</local-address>
+      <remote-as>65002</remote-as>
+      <status>Active</status>
+      <status-duration>00:05:30</status-duration>
+      <password-set>yes</password-set>
+      <passive>yes</passive>
+      <multi-hop-ttl>1</multi-hop-ttl>
+      <peer-address>198.51.100.1</peer-address>
+      <msg-total-in>7</msg-total-in>
+      <msg-total-out>9</msg-total-out>
+      <msg-update-in>1</msg-update-in>
+      <msg-update-out>0</msg-update-out>
+      <last-error>Hold timer expired</last-error>
+      <status-flap-counts>1</status-flap-counts>
+      <established-counts>1</established-counts>
+    </entry>
+  </result>
+</response>

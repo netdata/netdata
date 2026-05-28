@@ -195,7 +195,7 @@ Allows you to override the default devices poll interval (data collection).
 ```yaml
 jobs:
   - name: smartctl
-    devices_poll_interval: 60  # Collect S.M.A.R.T statistics every 60 seconds
+    poll_devices_every: 60  # Collect S.M.A.R.T statistics every 60 seconds
 
 ```
 </details>

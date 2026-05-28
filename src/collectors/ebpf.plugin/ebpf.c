@@ -34,6 +34,7 @@ uint32_t integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
 ND_THREAD *socket_ipc = NULL;
 static size_t global_iterations_counter = 1;
 bool publish_internal_metrics = true;
+bool ebpf_program_loaded_any = false;
 
 netdata_mutex_t lock;
 netdata_mutex_t ebpf_exit_cleanup;
@@ -981,7 +982,7 @@ static inline void ebpf_check_before2go()
 /**
  * Close the collector gracefully
  */
-static void ebpf_exit()
+static void ebpf_cleanup(void)
 {
 #ifdef LIBBPF_MAJOR_VERSION
     netdata_mutex_lock(&ebpf_exit_cleanup);
@@ -1009,8 +1010,12 @@ static void ebpf_exit()
     }
     ebpf_cgroup_cache_cleanup();
     netdata_integration_cleanup_shm();
+}
 
-    exit(0);
+static void ebpf_exit(int exit_code)
+{
+    ebpf_cleanup();
+    exit(exit_code);
 }
 
 /**
@@ -1128,7 +1133,7 @@ void ebpf_stop_threads(int sig)
 #endif
     netdata_mutex_unlock(&mutex_cgroup_shm);
 
-    // Join the cgroup integration thread before ebpf_exit() tears down the netipc cache it reads.
+    // Join the cgroup integration thread before cleanup tears down the netipc cache it reads.
     if (cgroup_integration_thread.thread) {
         nd_thread_join(cgroup_integration_thread.thread);
         cgroup_integration_thread.thread = NULL;
@@ -1152,7 +1157,7 @@ void ebpf_stop_threads(int sig)
     netdata_log_info(
         "EBPF SHUTDOWN: total stop duration %llums.", (unsigned long long)(total_duration_ut / USEC_PER_MS));
 
-    ebpf_exit();
+    ebpf_cleanup();
 }
 
 /**
@@ -1503,7 +1508,7 @@ static void ebpf_parse_args(int argc, char **argv)
             netdata_log_error(
                 "Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
                 ebpf_stock_config_dir);
-            ebpf_exit();
+            ebpf_exit(1);
         }
     } else
         netdata_log_info("Loaded config file '%s/apps_groups.conf'", ebpf_user_config_dir);
@@ -2253,6 +2258,26 @@ static void ebpf_signal_stop_handler(int sig)
         ebpf_stop_signal = (sig > 0) ? sig : 1;
 }
 
+static bool ebpf_all_enabled_threads_stopped(void)
+{
+    bool any_enabled = false;
+
+    for (size_t i = 0; ebpf_threads[i].name != NULL; i++) {
+        if (!ebpf_threads[i].enabled)
+            continue;
+
+        any_enabled = true;
+
+        if (!ebpf_threads[i].thread)
+            continue;
+
+        if (ebpf_module_enabled_get(&ebpf_modules[i]) < NETDATA_THREAD_EBPF_STOPPING)
+            return false;
+    }
+
+    return any_enabled;
+}
+
 /**
  * Entry point
  *
@@ -2302,7 +2327,7 @@ int main(int argc, char **argv)
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if (verify_netdata_host_prefix(true) == -1)
-        ebpf_exit();
+        ebpf_exit(1);
 
     ebpf_allocate_common_vectors();
 
@@ -2360,6 +2385,7 @@ int main(int argc, char **argv)
     heartbeat_init(&hb, USEC_PER_SEC);
     int update_apps_every = (int)EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
     int update_apps_list = update_apps_every - 1;
+    int exit_code = 0;
     //Plugin will be killed when it receives a signal
     for (; !ebpf_plugin_stop(); global_iterations_counter++) {
         (void)heartbeat_next(&hb);
@@ -2371,6 +2397,12 @@ int main(int argc, char **argv)
         // shutdown time when fd/process/socket/vfs modules are enabled.
         if (ebpf_plugin_stop())
             break;
+
+        if (!ebpf_program_loaded() && ebpf_all_enabled_threads_stopped()) {
+            netdata_log_error("EBPF: failed to load any eBPF program, shutting down.");
+            exit_code = 1;
+            break;
+        }
 
         if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {
             netdata_mutex_lock(&lock);
@@ -2396,5 +2428,5 @@ int main(int argc, char **argv)
 
     ebpf_stop_threads((int)ebpf_stop_signal);
 
-    return 0;
+    return exit_code;
 }

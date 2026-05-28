@@ -1332,6 +1332,7 @@ void ebpf_swap_thread(void *ptr)
     if (ebpf_swap_load_bpf(em)) {
         goto endswap;
     }
+    ebpf_mark_program_loaded();
 
     ebpf_swap_allocate_global_vectors();
 

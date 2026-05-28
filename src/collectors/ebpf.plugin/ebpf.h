@@ -119,6 +119,7 @@ typedef struct netdata_ebpf_judy_pid_stats {
 } netdata_ebpf_judy_pid_stats_t;
 
 extern ebpf_module_t ebpf_modules[];
+extern bool ebpf_program_loaded_any;
 
 typedef struct ebpf_tracepoint {
     bool enabled;
@@ -361,6 +362,16 @@ static inline bool ebpf_plugin_stop(void)
     return __atomic_load_n(&ebpf_plugin_exit, __ATOMIC_ACQUIRE) ||
            ebpf_stop_signal ||
            nd_thread_signaled_to_cancel();
+}
+
+static inline void ebpf_mark_program_loaded(void)
+{
+    __atomic_store_n(&ebpf_program_loaded_any, true, __ATOMIC_RELEASE);
+}
+
+static inline bool ebpf_program_loaded(void)
+{
+    return __atomic_load_n(&ebpf_program_loaded_any, __ATOMIC_ACQUIRE);
 }
 
 // `enabled` is sampled from stats/shutdown paths without a single shared mutex.
