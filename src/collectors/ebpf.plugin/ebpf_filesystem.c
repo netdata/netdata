@@ -621,6 +621,9 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     bool loaded_any = false;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
+        if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION)
+            loaded_any = true;
+
         if (efp->load_failed)
             continue;
 
