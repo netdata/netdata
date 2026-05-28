@@ -19,6 +19,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat load failed: %v\n", err)
 		os.Exit(1)
 	}
+	if handle == nil || handle.Runtime == nil {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: no eBPF program loaded\n")
+		os.Exit(1)
+	}
 
 	if updateEvery <= 0 {
 		updateEvery = handle.UpdateEvery
