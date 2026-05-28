@@ -73,26 +73,26 @@ modules:
       availability: []
       scopes: []
     functions:
-        description: |
-          This plugin exposes a real-time function for viewing active network connections.
-        list:
-          - id: network-connections
-            name: Network Connections
-            description: |
-              Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
+      description: |
+        This plugin exposes a real-time function for viewing active network connections.
+      list:
+        - id: network-connections
+          name: Network Connections
+          description: |
+            Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
 
-              Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
-              including connection direction (listen, inbound, outbound, local), process information,
-              and TCP performance metrics (RTT, retransmissions).
+            Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
+            including connection direction (listen, inbound, outbound, local), process information,
+            and TCP performance metrics (RTT, retransmissions).
 
-              Connections are classified as system or container based on network namespace.
-            parameters: []
-            returns:
-              description: ""
-              columns: []
-            performance: ""
-            security: ""
-            availability: ""
+            Connections are classified as system or container based on network namespace.
+          parameters: []
+          returns:
+            description: ""
+            columns: []
+          performance: ""
+          security: ""
+          availability: ""
   - meta:
       plugin_name: network-viewer.plugin
       module_name: PerflibNetworkProtocols
@@ -167,23 +167,23 @@ modules:
       availability: []
       scopes: []
     functions:
-        description: |
-          This collector exposes a real-time function for viewing Windows TCP and UDP stack statistics.
-        list:
-          - id: network-protocols
-            name: Network Protocols
-            description: |
-              Shows Windows TCP and UDP stack counters grouped by transport protocol (TCP/UDP)
-              and IP family (IPv4/IPv6).
+      description: |
+        This collector exposes a real-time function for viewing Windows TCP and UDP stack statistics.
+      list:
+        - id: network-protocols
+          name: Network Protocols
+          description: |
+            Shows Windows TCP and UDP stack counters grouped by transport protocol (TCP/UDP)
+            and IP family (IPv4/IPv6).
 
-              Each row covers one transport+family combination (TCPv4, TCPv6, UDPv4, UDPv6) and includes
-              traffic counters (received, sent, errors), TCP-specific connection counters
-              (active opens, established, passive opens, resets, total segments, retransmitted segments),
-              and the UDP-specific datagrams-with-no-port counter.
-            parameters: []
-            returns:
-              description: ""
-              columns: []
-            performance: ""
-            security: ""
-            availability: ""
+            Each row covers one transport+family combination (TCPv4, TCPv6, UDPv4, UDPv6) and includes
+            traffic counters (received, sent, errors), TCP-specific connection counters
+            (active opens, established, passive opens, resets, total segments, retransmitted segments),
+            and the UDP-specific datagrams-with-no-port counter.
+          parameters: []
+          returns:
+            description: ""
+            columns: []
+          performance: ""
+          security: ""
+          availability: ""
