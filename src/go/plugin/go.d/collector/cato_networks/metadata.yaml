@@ -240,12 +240,13 @@ modules:
             - name: interface_name
               description: Interface name.
           metrics:
-            - name: cato_networks.interface_connected
-              description: Interface connectivity status.
+            - name: cato_networks.interface_connection_status
+              description: Interface connection status.
               unit: status
               chart_type: line
               dimensions:
                 - name: connected
+                - name: disconnected
             - name: cato_networks.interface_tunnel_uptime
               description: Interface tunnel uptime.
               unit: seconds
@@ -304,6 +305,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: up
+                - name: down
+                - name: unknown
             - name: cato_networks.bgp_routes
               description: BGP route counts.
               unit: routes
@@ -312,9 +315,10 @@ modules:
                 - name: accepted
                 - name: limit
                 - name: rib_out
-            - name: cato_networks.bgp_routes_limit_exceeded
+            - name: cato_networks.bgp_routes_limit_status
               description: BGP route limit exceeded status.
               unit: status
               chart_type: line
               dimensions:
+                - name: ok
                 - name: exceeded

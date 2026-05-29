@@ -11,30 +11,24 @@ type collectorMetrics struct {
 }
 
 type siteMetricInstruments struct {
-	connectivityConnected    metrix.SnapshotGaugeVec
-	connectivityDisconnected metrix.SnapshotGaugeVec
-	connectivityDegraded     metrix.SnapshotGaugeVec
-	connectivityUnknown      metrix.SnapshotGaugeVec
-	operationalActive        metrix.SnapshotGaugeVec
-	operationalDisabled      metrix.SnapshotGaugeVec
-	operationalLocked        metrix.SnapshotGaugeVec
-	operationalUnknown       metrix.SnapshotGaugeVec
-	hosts                    metrix.SnapshotGaugeVec
-	traffic                  trafficMetricWriters
+	connectivityStatus metrix.SnapshotStateSetVec
+	operationalStatus  metrix.SnapshotStateSetVec
+	hosts              metrix.SnapshotGaugeVec
+	traffic            trafficMetricWriters
 }
 
 type interfaceMetricInstruments struct {
-	connected    metrix.SnapshotGaugeVec
-	tunnelUptime metrix.SnapshotGaugeVec
-	traffic      trafficMetricWriters
+	connectionStatus metrix.SnapshotStateSetVec
+	tunnelUptime     metrix.SnapshotGaugeVec
+	traffic          trafficMetricWriters
 }
 
 type bgpMetricInstruments struct {
-	sessionUp           metrix.SnapshotGaugeVec
-	routes              metrix.SnapshotGaugeVec
-	routesLimit         metrix.SnapshotGaugeVec
-	routesLimitExceeded metrix.SnapshotGaugeVec
-	ribOutRoutes        metrix.SnapshotGaugeVec
+	sessionStatus    metrix.SnapshotStateSetVec
+	routes           metrix.SnapshotGaugeVec
+	routesLimit      metrix.SnapshotGaugeVec
+	routesLimitState metrix.SnapshotStateSetVec
+	ribOutRoutes     metrix.SnapshotGaugeVec
 }
 
 type trafficMetricWriters struct {
@@ -51,6 +45,12 @@ type trafficMetricWriters struct {
 	lastMileLoss    metrix.SnapshotGaugeVec
 }
 
+var siteConnectivityStates = []string{"connected", "disconnected", "degraded", "unknown"}
+var siteOperationalStates = []string{"active", "disabled", "locked", "unknown"}
+var interfaceConnectionStates = []string{"connected", "disconnected"}
+var bgpSessionStates = []string{"up", "down", "unknown"}
+var bgpRoutesLimitStates = []string{"ok", "exceeded"}
+
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 	meter := store.Write().SnapshotMeter("")
 
@@ -60,15 +60,9 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 
 	return &collectorMetrics{
 		site: siteMetricInstruments{
-			connectivityConnected:    siteVec.Gauge("site_connectivity_connected"),
-			connectivityDisconnected: siteVec.Gauge("site_connectivity_disconnected"),
-			connectivityDegraded:     siteVec.Gauge("site_connectivity_degraded"),
-			connectivityUnknown:      siteVec.Gauge("site_connectivity_unknown"),
-			operationalActive:        siteVec.Gauge("site_operational_active"),
-			operationalDisabled:      siteVec.Gauge("site_operational_disabled"),
-			operationalLocked:        siteVec.Gauge("site_operational_locked"),
-			operationalUnknown:       siteVec.Gauge("site_operational_unknown"),
-			hosts:                    siteVec.Gauge("site_hosts"),
+			connectivityStatus: newStateSetVec(siteVec, "site_connectivity_status", siteConnectivityStates),
+			operationalStatus:  newStateSetVec(siteVec, "site_operational_status", siteOperationalStates),
+			hosts:              siteVec.Gauge("site_hosts"),
 			traffic: trafficMetricWriters{
 				bytesUp:         siteVec.Gauge("site_bytes_upstream_max"),
 				bytesDown:       siteVec.Gauge("site_bytes_downstream_max"),
@@ -84,8 +78,8 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			},
 		},
 		iface: interfaceMetricInstruments{
-			connected:    ifaceVec.Gauge("interface_connected"),
-			tunnelUptime: ifaceVec.Gauge("interface_tunnel_uptime_seconds"),
+			connectionStatus: newStateSetVec(ifaceVec, "interface_connection_status", interfaceConnectionStates),
+			tunnelUptime:     ifaceVec.Gauge("interface_tunnel_uptime_seconds"),
 			traffic: trafficMetricWriters{
 				bytesUp:     ifaceVec.Gauge("interface_bytes_upstream_max"),
 				bytesDown:   ifaceVec.Gauge("interface_bytes_downstream_max"),
@@ -99,11 +93,15 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			},
 		},
 		bgp: bgpMetricInstruments{
-			sessionUp:           bgpVec.Gauge("bgp_session_up"),
-			routes:              bgpVec.Gauge("bgp_routes"),
-			routesLimit:         bgpVec.Gauge("bgp_routes_limit"),
-			routesLimitExceeded: bgpVec.Gauge("bgp_routes_limit_exceeded"),
-			ribOutRoutes:        bgpVec.Gauge("bgp_rib_out_routes"),
+			sessionStatus:    newStateSetVec(bgpVec, "bgp_session_status", bgpSessionStates),
+			routes:           bgpVec.Gauge("bgp_routes"),
+			routesLimit:      bgpVec.Gauge("bgp_routes_limit"),
+			routesLimitState: newStateSetVec(bgpVec, "bgp_routes_limit_status", bgpRoutesLimitStates),
+			ribOutRoutes:     bgpVec.Gauge("bgp_rib_out_routes"),
 		},
 	}
+}
+
+func newStateSetVec(meter metrix.SnapshotVecMeter, name string, states []string) metrix.SnapshotStateSetVec {
+	return meter.StateSet(name, metrix.WithStateSetMode(metrix.ModeEnum), metrix.WithStateSetStates(states...))
 }

@@ -123,12 +123,12 @@ func TestCollectorCollectsMetricsAndTopology(t *testing.T) {
 	collectOnce(t, c)
 
 	reader := c.store.Read()
-	requireValue(t, reader, "site_connectivity_connected", metrix.Labels{
+	requireStateValue(t, reader, "site_connectivity_status", "connected", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"pop_name":  "POP-Paris",
 	}, 1)
-	requireValue(t, reader, "site_connectivity_degraded", metrix.Labels{
+	requireStateValue(t, reader, "site_connectivity_status", "degraded", metrix.Labels{
 		"site_id":   "1002",
 		"site_name": "Toulouse Office",
 		"pop_name":  "POP-Toulouse",
@@ -155,7 +155,7 @@ func TestCollectorCollectsMetricsAndTopology(t *testing.T) {
 		"interface_id":   "",
 		"interface_name": "all",
 	}, 2)
-	requireValue(t, reader, "bgp_session_up", metrix.Labels{
+	requireStateValue(t, reader, "bgp_session_status", "up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.10",
@@ -227,17 +227,17 @@ func TestCollectorDecodesRawCentreonFixtureThroughSDK(t *testing.T) {
 	collectOnce(t, c)
 
 	reader := c.store.Read()
-	requireValue(t, reader, "site_connectivity_connected", metrix.Labels{
+	requireStateValue(t, reader, "site_connectivity_status", "connected", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"pop_name":  "POP-Paris",
 	}, 1)
-	requireValue(t, reader, "site_connectivity_disconnected", metrix.Labels{
+	requireStateValue(t, reader, "site_connectivity_status", "disconnected", metrix.Labels{
 		"site_id":   "1002",
 		"site_name": "Toulouse Office",
 		"pop_name":  "POP-Toulouse",
 	}, 1)
-	requireValue(t, reader, "site_connectivity_degraded", metrix.Labels{
+	requireStateValue(t, reader, "site_connectivity_status", "degraded", metrix.Labels{
 		"site_id":   "1003",
 		"site_name": "Saint Girons Office",
 		"pop_name":  "POP-Ariege",
@@ -252,7 +252,7 @@ func TestCollectorDecodesRawCentreonFixtureThroughSDK(t *testing.T) {
 		"site_name": "Paris Office",
 		"pop_name":  "POP-Paris",
 	}, 1)
-	requireValue(t, reader, "bgp_session_up", metrix.Labels{
+	requireStateValue(t, reader, "bgp_session_status", "up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.10",
@@ -438,7 +438,7 @@ func TestCollectorContinuesOnPartialBGPFailures(t *testing.T) {
 		"site_name": "Paris Office",
 		"pop_name":  "POP-Paris",
 	}, 7168)
-	requireValue(t, reader, "bgp_session_up", metrix.Labels{
+	requireStateValue(t, reader, "bgp_session_status", "up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.10",
@@ -469,12 +469,12 @@ func TestCollectorMapsUnrecognizedStatusesToUnknown(t *testing.T) {
 	collectOnce(t, c)
 
 	reader := c.store.Read()
-	requireValue(t, reader, "site_connectivity_unknown", metrix.Labels{
+	requireStateValue(t, reader, "site_connectivity_status", "unknown", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"pop_name":  "POP-Paris",
 	}, 1)
-	requireValue(t, reader, "site_operational_unknown", metrix.Labels{
+	requireStateValue(t, reader, "site_operational_status", "unknown", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"pop_name":  "POP-Paris",
@@ -543,12 +543,12 @@ func TestCollectorAppliesSiteSelector(t *testing.T) {
 
 	require.Equal(t, []string{"1001"}, c.discovery.siteIDs)
 	reader := c.store.Read()
-	requireValue(t, reader, "site_connectivity_connected", metrix.Labels{
+	requireStateValue(t, reader, "site_connectivity_status", "connected", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"pop_name":  "POP-Paris",
 	}, 1)
-	requireMetricMissing(t, reader, "site_connectivity_degraded", metrix.Labels{
+	requireStateMetricMissing(t, reader, "site_connectivity_status", "degraded", metrix.Labels{
 		"site_id":   "1002",
 		"site_name": "Toulouse Office",
 		"pop_name":  "POP-Toulouse",
@@ -580,26 +580,26 @@ func TestCollectorCollectsAllInterfacesAndBGPPeers(t *testing.T) {
 	collectOnce(t, c)
 
 	reader := c.store.Read()
-	requireValue(t, reader, "interface_connected", metrix.Labels{
+	requireStateValue(t, reader, "interface_connection_status", "connected", metrix.Labels{
 		"site_id":        "1001",
 		"site_name":      "Paris Office",
 		"interface_id":   "wan1",
 		"interface_name": "WAN 1",
 	}, 1)
-	requireValue(t, reader, "interface_connected", metrix.Labels{
+	requireStateValue(t, reader, "interface_connection_status", "connected", metrix.Labels{
 		"site_id":        "1001",
 		"site_name":      "Paris Office",
 		"interface_id":   "wan2",
 		"interface_name": "WAN 2",
 	}, 1)
 
-	requireValue(t, reader, "bgp_session_up", metrix.Labels{
+	requireStateValue(t, reader, "bgp_session_status", "up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.10",
 		"peer_asn":  "64512",
 	}, 1)
-	requireValue(t, reader, "bgp_session_up", metrix.Labels{
+	requireStateValue(t, reader, "bgp_session_status", "up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.11",
@@ -632,7 +632,7 @@ func TestCollectorUsesCachedDiscoveryWhenRefreshFailsAfterBootstrap(t *testing.T
 	require.Equal(t, []string{"1001", "1002"}, c.discovery.siteIDs)
 	require.Equal(t, now, c.discovery.fetchedAt)
 	reader := c.store.Read()
-	requireValue(t, reader, "site_connectivity_connected", metrix.Labels{
+	requireStateValue(t, reader, "site_connectivity_status", "connected", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"pop_name":  "POP-Paris",
@@ -673,13 +673,12 @@ func TestCollectorFiltersEmptyBGPPeers(t *testing.T) {
 	collectOnce(t, c)
 
 	reader := c.store.Read()
-	_, ok := reader.Value("bgp_session_up", metrix.Labels{
+	requireStateMetricMissing(t, reader, "bgp_session_status", "up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "",
 		"peer_asn":  "",
 	})
-	require.False(t, ok)
 }
 
 func TestNormalizeBGPDropsPeersWithoutRemoteIdentity(t *testing.T) {
@@ -718,7 +717,7 @@ func TestCollectorUsesCachedDiscoveryAndBGPStateWithinRefreshWindow(t *testing.T
 	cc.CommitCycleSuccess()
 
 	reader := c.store.Read()
-	requireValue(t, reader, "bgp_session_up", metrix.Labels{
+	requireStateValue(t, reader, "bgp_session_status", "up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.10",
@@ -741,7 +740,7 @@ func TestCollectorUsesCachedDiscoveryAndBGPStateWithinRefreshWindow(t *testing.T
 	reader = c.store.Read()
 	require.Equal(t, lookupCalls, fake.lookupCalls)
 	require.Equal(t, bgpCalls, fake.bgpCalls)
-	requireValue(t, reader, "bgp_session_up", metrix.Labels{
+	requireStateValue(t, reader, "bgp_session_status", "up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.10",
@@ -1229,11 +1228,13 @@ func TestSDKClientAccountSnapshotFallsBackOnEnumDecodeError(t *testing.T) {
 	require.Equal(t, "degraded", connectivityStatusString(snapshot.GetAccountSnapshot().GetSites()[0].GetConnectivityStatusSiteSnapshot()))
 }
 
-func TestBGPSessionUpRequiresExactEstablishedStatus(t *testing.T) {
-	require.True(t, isBGPSessionUp("Established"))
-	require.True(t, isBGPSessionUp("up"))
-	require.False(t, isBGPSessionUp("not_established"))
-	require.False(t, isBGPSessionUp("idle"))
+func TestBGPSessionState(t *testing.T) {
+	require.Equal(t, "up", bgpSessionState("Established"))
+	require.Equal(t, "up", bgpSessionState("up"))
+	require.Equal(t, "down", bgpSessionState("not_established"))
+	require.Equal(t, "down", bgpSessionState("idle"))
+	require.Equal(t, "unknown", bgpSessionState(""))
+	require.Equal(t, "unknown", bgpSessionState("unknown"))
 }
 
 func TestNormalizeSnapshotDefaultsNilInfoAndStatuses(t *testing.T) {
@@ -1576,10 +1577,26 @@ func requireValue(t *testing.T, r metrix.Reader, name string, labels metrix.Labe
 	require.Equal(t, want, got)
 }
 
+func requireStateValue(t *testing.T, r metrix.Reader, name, state string, labels metrix.Labels, want float64) {
+	t.Helper()
+	point, ok := r.StateSet(name, labels)
+	require.True(t, ok, "missing state set %s labels %#v", name, labels)
+	require.Equal(t, want != 0, point.States[state])
+}
+
 func requireMetricMissing(t *testing.T, r metrix.Reader, name string, labels metrix.Labels) {
 	t.Helper()
 	_, ok := r.Value(name, labels)
 	require.False(t, ok, "unexpected metric %s labels %#v", name, labels)
+}
+
+func requireStateMetricMissing(t *testing.T, r metrix.Reader, name, state string, labels metrix.Labels) {
+	t.Helper()
+	point, ok := r.StateSet(name, labels)
+	if !ok {
+		return
+	}
+	require.NotContains(t, point.States, state, "unexpected state set %s state %s labels %#v", name, state, labels)
 }
 
 func requireDelta(t *testing.T, r metrix.Reader, name string, labels metrix.Labels, want float64) {

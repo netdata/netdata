@@ -4,6 +4,8 @@ package cato_networks
 
 import (
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
 func (c *Collector) writeMetrics(sites map[string]*siteState, order []string) {
@@ -14,32 +16,24 @@ func (c *Collector) writeMetrics(sites map[string]*siteState, order []string) {
 		}
 		labels := []string{site.ID, site.Name, site.PopName}
 
-		connected, disconnected, degraded, unknownConnectivity := c.siteConnectivityValues(site.ConnectivityStatus)
-		c.metrics.site.connectivityConnected.WithLabelValues(labels...).Observe(connected)
-		c.metrics.site.connectivityDisconnected.WithLabelValues(labels...).Observe(disconnected)
-		c.metrics.site.connectivityDegraded.WithLabelValues(labels...).Observe(degraded)
-		c.metrics.site.connectivityUnknown.WithLabelValues(labels...).Observe(unknownConnectivity)
-		active, disabled, locked, unknownOperational := c.siteOperationalValues(site.OperationalStatus)
-		c.metrics.site.operationalActive.WithLabelValues(labels...).Observe(active)
-		c.metrics.site.operationalDisabled.WithLabelValues(labels...).Observe(disabled)
-		c.metrics.site.operationalLocked.WithLabelValues(labels...).Observe(locked)
-		c.metrics.site.operationalUnknown.WithLabelValues(labels...).Observe(unknownOperational)
+		observeStateSetVec(c.metrics.site.connectivityStatus, c.siteConnectivityState(site.ConnectivityStatus), labels...)
+		observeStateSetVec(c.metrics.site.operationalStatus, c.siteOperationalState(site.OperationalStatus), labels...)
 		c.metrics.site.hosts.WithLabelValues(labels...).Observe(float64(site.HostCount))
 		writeTrafficMetrics(site.Metrics, labels, c.metrics.site.traffic)
 
 		for _, iface := range site.Interfaces {
 			ifaceLabels := []string{site.ID, site.Name, iface.ID, iface.Name}
-			c.metrics.iface.connected.WithLabelValues(ifaceLabels...).Observe(boolFloat(iface.Connected || iface.LinkUp))
+			observeStateSetVec(c.metrics.iface.connectionStatus, boolState(iface.Connected || iface.LinkUp, "connected", "disconnected"), ifaceLabels...)
 			writeTrafficMetrics(iface.Metrics, ifaceLabels, c.metrics.iface.traffic)
 			c.metrics.iface.tunnelUptime.WithLabelValues(ifaceLabels...).Observe(float64(iface.TunnelUptime))
 		}
 
 		for _, peer := range site.BGPPeers {
 			peerLabels := []string{site.ID, site.Name, peer.RemoteIP, peer.RemoteASN}
-			c.metrics.bgp.sessionUp.WithLabelValues(peerLabels...).Observe(boolFloat(isBGPSessionUp(peer.BGPSession)))
+			observeStateSetVec(c.metrics.bgp.sessionStatus, bgpSessionState(peer.BGPSession), peerLabels...)
 			c.metrics.bgp.routes.WithLabelValues(peerLabels...).Observe(float64(peer.RoutesCount))
 			c.metrics.bgp.routesLimit.WithLabelValues(peerLabels...).Observe(float64(peer.RoutesCountLimit))
-			c.metrics.bgp.routesLimitExceeded.WithLabelValues(peerLabels...).Observe(boolFloat(peer.RoutesCountLimitExceeded))
+			observeStateSetVec(c.metrics.bgp.routesLimitState, boolState(peer.RoutesCountLimitExceeded, "exceeded", "ok"), peerLabels...)
 			c.metrics.bgp.ribOutRoutes.WithLabelValues(peerLabels...).Observe(float64(peer.RIBOutRoutes))
 		}
 	}
@@ -82,46 +76,60 @@ func writeTrafficMetrics(m trafficMetrics, labels []string, writers trafficMetri
 	}
 }
 
-func boolFloat(v bool) float64 {
-	if v {
-		return 1
+func observeStateSetVec(vec metrix.SnapshotStateSetVec, active string, labels ...string) {
+	if active == "" {
+		return
 	}
-	return 0
+	vec.WithLabelValues(labels...).Enable(active)
 }
 
-func isBGPSessionUp(status string) bool {
+func boolState(ok bool, trueState, falseState string) string {
+	if ok {
+		return trueState
+	}
+	return falseState
+}
+
+func bgpSessionState(status string) string {
 	status = strings.ToLower(strings.TrimSpace(status))
-	return status == "up" || status == "established"
+	switch status {
+	case "up", "established":
+		return "up"
+	case "", "unknown":
+		return "unknown"
+	default:
+		return "down"
+	}
 }
 
-func (c *Collector) siteConnectivityValues(status string) (connected, disconnected, degraded, unknown float64) {
-	switch strings.TrimSpace(status) {
+func (c *Collector) siteConnectivityState(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "connected":
-		return 1, 0, 0, 0
+		return "connected"
 	case "disconnected":
-		return 0, 1, 0, 0
+		return "disconnected"
 	case "degraded":
-		return 0, 0, 1, 0
+		return "degraded"
 	case "", "unknown":
-		return 0, 0, 0, 1
+		return "unknown"
 	default:
 		c.logNormalizationIssue(normalizationSurfaceSiteConnectivity, normalizationIssueUnknownStatus)
-		return 0, 0, 0, 1
+		return "unknown"
 	}
 }
 
-func (c *Collector) siteOperationalValues(status string) (active, disabled, locked, unknown float64) {
-	switch strings.TrimSpace(status) {
+func (c *Collector) siteOperationalState(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "active":
-		return 1, 0, 0, 0
+		return "active"
 	case "disabled":
-		return 0, 1, 0, 0
+		return "disabled"
 	case "locked":
-		return 0, 0, 1, 0
+		return "locked"
 	case "", "unknown":
-		return 0, 0, 0, 1
+		return "unknown"
 	default:
 		c.logNormalizationIssue(normalizationSurfaceSiteOperational, normalizationIssueUnknownStatus)
-		return 0, 0, 0, 1
+		return "unknown"
 	}
 }
