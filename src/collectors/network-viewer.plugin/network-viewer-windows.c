@@ -526,6 +526,8 @@ cleanup:
 
 // --- Address space classification -----------------------------------------------
 
+static const uint8_t nv_ipv6_loopback_addr[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+
 static const char *nv_ipv4_address_space(DWORD ip_nbo)
 {
     uint32_t ip = ntohl(ip_nbo);
@@ -545,11 +547,10 @@ static const char *nv_ipv4_address_space(DWORD ip_nbo)
 static const char *nv_ipv6_address_space(const UCHAR *b)
 {
     static const uint8_t zero[16]   = {0};
-    static const uint8_t loop[16]   = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
     static const uint8_t v4map[12]  = {0,0,0,0,0,0,0,0,0,0,0xFF,0xFF};
 
     if (!memcmp(b, zero, 16)) return "zero";
-    if (!memcmp(b, loop, 16)) return "loopback";
+    if (!memcmp(b, nv_ipv6_loopback_addr, 16)) return "loopback";
     if (!memcmp(b, v4map, 12)) {
         DWORD v4;
         memcpy(&v4, b + 12, 4);
@@ -570,8 +571,7 @@ static bool nv_is_ipv4_loopback(DWORD ip_nbo)
 
 static bool nv_is_ipv6_loopback(const UCHAR *b)
 {
-    static const uint8_t loop[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
-    return !memcmp(b, loop, 16);
+    return !memcmp(b, nv_ipv6_loopback_addr, 16);
 }
 
 // --- TCP state number → string --------------------------------------------------
