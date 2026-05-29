@@ -372,7 +372,7 @@ Filter the results for IDs starting with `statsd_`. Use the returned chart `id` 
 
 :::info
 
-**Troubleshooting "No metrics were matched to query":** This error typically occurs when you use the raw StatsD metric name (e.g., `statsd.test.metric`) as the `chart` parameter instead of the constructed chart reference (e.g., `statsd_test.metric_counter`). To resolve this, verify the correct chart name using `/api/v1/charts` before querying metric data.
+**Troubleshooting "No metrics where matched to query":** This error typically occurs when you use the raw StatsD metric name (e.g., `statsd.test.metric`) as the `chart` parameter instead of the constructed chart reference (e.g., `statsd_test.metric_counter`). To resolve this, verify the correct chart name using `/api/v1/charts` before querying metric data.
 
 For example, after sending `test.metric:100|c` via StatsD, the correct query is:
 
