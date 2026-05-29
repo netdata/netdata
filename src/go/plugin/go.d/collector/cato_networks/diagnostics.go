@@ -29,7 +29,6 @@ const (
 	normalizationIssueEmptyPeer              = "empty_peer"
 	normalizationIssueParseInt               = "parse_int"
 	normalizationIssueAccountError           = "account_error"
-	normalizationIssueCardinalityLimit       = "cardinality_limit"
 	normalizationIssuePageCap                = "page_cap"
 )
 
@@ -43,7 +42,6 @@ type collectorHealth struct {
 
 	SelectedEntities        map[string]int64
 	SkippedEntities         map[entitySkipKey]int64
-	CardinalityLimitHits    map[string]int64
 	LastOperations          map[string]operationHealth
 	OperationFailures       map[operationFailureKey]int64
 	OperationAffectedSites  map[operationFailureKey]int64
@@ -112,7 +110,6 @@ func (c *Collector) beginHealthCycle() {
 	c.health.BGPCachedSites = 0
 	c.health.SelectedEntities = make(map[string]int64)
 	c.health.SkippedEntities = make(map[entitySkipKey]int64)
-	c.health.CardinalityLimitHits = make(map[string]int64)
 	c.updateSiteSelectionHealth()
 	// LastOperations is stateful because the chart reports last observed status.
 }
@@ -148,15 +145,11 @@ func (c *Collector) markNormalizationIssue(surface, issue string) {
 	c.health.NormalizationIssues[normalizationIssueKey{Surface: surface, Issue: issue}]++
 }
 
-func (c *Collector) markEntitySelection(entity string, selected, skippedSelector, skippedLimit int) {
+func (c *Collector) markEntitySelection(entity string, selected, skippedSelector int) {
 	c.ensureHealth()
 	c.health.SelectedEntities[entity] = int64(selected)
 	if skippedSelector > 0 {
 		c.health.SkippedEntities[entitySkipKey{Entity: entity, Reason: selectionSkipSelector}] = int64(skippedSelector)
-	}
-	if skippedLimit > 0 {
-		c.health.SkippedEntities[entitySkipKey{Entity: entity, Reason: selectionSkipLimit}] = int64(skippedLimit)
-		c.health.CardinalityLimitHits[entity] = 1
 	}
 }
 
@@ -164,10 +157,10 @@ func (c *Collector) updateSiteSelectionHealth() {
 	c.ensureHealth()
 	total := c.discovery.totalSites
 	if total == 0 && len(c.discovery.siteIDs) > 0 {
-		total = len(c.discovery.siteIDs) + c.discovery.skippedBySelector + c.discovery.skippedByLimit
+		total = len(c.discovery.siteIDs) + c.discovery.skippedBySelector
 	}
 	c.health.DiscoveredSites = int64(total)
-	c.markEntitySelection(selectionEntitySite, len(c.discovery.siteIDs), c.discovery.skippedBySelector, c.discovery.skippedByLimit)
+	c.markEntitySelection(selectionEntitySite, len(c.discovery.siteIDs), c.discovery.skippedBySelector)
 }
 
 func (c *Collector) ensureHealth() {
@@ -176,9 +169,6 @@ func (c *Collector) ensureHealth() {
 	}
 	if c.health.SkippedEntities == nil {
 		c.health.SkippedEntities = make(map[entitySkipKey]int64)
-	}
-	if c.health.CardinalityLimitHits == nil {
-		c.health.CardinalityLimitHits = make(map[string]int64)
 	}
 	if c.health.LastOperations == nil {
 		c.health.LastOperations = make(map[string]operationHealth)

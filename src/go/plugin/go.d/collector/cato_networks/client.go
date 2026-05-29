@@ -31,7 +31,7 @@ type apiClient interface {
 type sdkAPIClient struct {
 	client  *catosdk.Client
 	raw     rawGraphQLClient
-	retry   RetryConfig
+	retry   retryConfig
 	sleep   func(context.Context, time.Duration) error
 	statsMu sync.Mutex
 	stats   apiStats
@@ -69,7 +69,7 @@ func newSDKAPIClient(cfg Config, httpClient *http.Client) (apiClient, error) {
 			headers:    headers,
 			httpClient: httpClient,
 		},
-		retry: cfg.Retry,
+		retry: defaultRetryConfig(),
 		sleep: sleepContext,
 		stats: apiStats{Retries: make(map[string]apiRetryStats)},
 	}, nil

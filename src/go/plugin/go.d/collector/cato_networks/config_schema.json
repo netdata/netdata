@@ -35,6 +35,7 @@
         "title": "API key",
         "description": "Cato API key.",
         "type": "string",
+        "sensitive": true,
         "minLength": 1
       },
       "site_selector": {
@@ -42,34 +43,6 @@
         "description": "Space-separated simple patterns matched against Cato site ID or site name. Use exclusions such as '!lab-* *'. Exclusions win across site identity fields.",
         "type": "string",
         "default": "*"
-      },
-      "interface_selector": {
-        "title": "Interface selector",
-        "description": "Space-separated simple patterns matched against Cato interface ID or interface name. Use exclusions such as '!test-* *'. Exclusions win across interface identity fields.",
-        "type": "string",
-        "default": "*"
-      },
-      "limits": {
-        "title": "Cardinality limits",
-        "type": "object",
-        "properties": {
-          "max_sites": {
-            "title": "Maximum selected sites",
-            "description": "Maximum Cato sites collected after site_selector filtering. Set to 0 to disable this cap.",
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100000,
-            "default": 500
-          },
-          "max_interfaces_per_site": {
-            "title": "Maximum interfaces per site",
-            "description": "Maximum interfaces collected per selected site after interface_selector filtering. Set to 0 to disable this cap.",
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 10000,
-            "default": 32
-          }
-        }
       },
       "timeout": {
         "title": "Timeout",
@@ -82,169 +55,6 @@
         "title": "Proxy URL",
         "description": "HTTP proxy URL. Empty value uses environment proxy variables.",
         "type": "string"
-      },
-      "discovery": {
-        "title": "Discovery",
-        "type": "object",
-        "properties": {
-          "refresh_every": {
-            "title": "Discovery refresh interval",
-            "description": "Site discovery refresh interval, in seconds.",
-            "type": "integer",
-            "minimum": 60,
-            "default": 300
-          },
-          "page_limit": {
-            "title": "Discovery page size",
-            "description": "Maximum sites requested per entityLookup page.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 1000,
-            "default": 100
-          }
-        }
-      },
-      "metrics": {
-        "title": "Metrics",
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "title": "Collect account metrics",
-            "description": "Controls accountMetrics collection.",
-            "type": "string",
-            "enum": [
-              "auto",
-              "enabled",
-              "disabled"
-            ],
-            "default": "auto"
-          },
-          "time_frame": {
-            "title": "Metrics timeframe",
-            "description": "Cato TimeFrame string used for accountMetrics, for example last.PT5M or utc.2020-02-11/{04:50:15--16:50:15}.",
-            "type": "string",
-            "pattern": "^(last\\.P[A-Z0-9]+|utc\\.\\S+)$",
-            "default": "last.PT5M"
-          },
-          "buckets": {
-            "title": "Metrics buckets",
-            "description": "Number of accountMetrics buckets requested.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 1000,
-            "default": 5
-          },
-          "group_interfaces": {
-            "title": "Group by interfaces",
-            "description": "Controls the accountMetrics groupInterfaces argument. auto leaves the argument unset so Cato applies its default; enabled and disabled send explicit true or false.",
-            "type": "string",
-            "enum": [
-              "auto",
-              "enabled",
-              "disabled"
-            ],
-            "default": "auto"
-          },
-          "max_sites_per_query": {
-            "title": "Maximum sites per metrics query",
-            "description": "Maximum site IDs sent in one accountMetrics query.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 1000,
-            "default": 50
-          }
-        }
-      },
-      "bgp": {
-        "title": "BGP",
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "title": "Collect BGP status",
-            "description": "Controls siteBgpStatus collection.",
-            "type": "string",
-            "enum": [
-              "auto",
-              "enabled",
-              "disabled"
-            ],
-            "default": "auto"
-          },
-          "refresh_every": {
-            "title": "BGP refresh interval",
-            "description": "Minimum interval between BGP status refreshes, in seconds.",
-            "type": "integer",
-            "minimum": 60,
-            "default": 300
-          },
-          "max_sites_per_collection": {
-            "title": "Maximum sites per BGP collection",
-            "description": "Maximum sites queried for BGP status during one refresh.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 1000,
-            "default": 25
-          },
-          "peer_selector": {
-            "title": "BGP peer selector",
-            "description": "Space-separated simple patterns matched against BGP peer remote IP or remote ASN. Use exclusions such as '!64512 *'. Exclusions win across BGP peer identity fields.",
-            "type": "string",
-            "default": "*"
-          },
-          "max_peers_per_site": {
-            "title": "Maximum BGP peers per site",
-            "description": "Maximum BGP peers collected per selected site after bgp.peer_selector filtering. Set to 0 to disable this cap.",
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 10000,
-            "default": 32
-          }
-        }
-      },
-      "topology": {
-        "title": "Topology",
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "title": "Build topology",
-            "description": "Controls topology function data generation.",
-            "type": "string",
-            "enum": [
-              "auto",
-              "enabled",
-              "disabled"
-            ],
-            "default": "auto"
-          }
-        }
-      },
-      "retry": {
-        "title": "Retry",
-        "type": "object",
-        "properties": {
-          "attempts": {
-            "title": "Attempts",
-            "description": "Maximum attempts for retryable Cato API errors.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10,
-            "default": 5
-          },
-          "wait_min": {
-            "title": "Minimum wait",
-            "description": "Initial retry wait.",
-            "type": "number",
-            "minimum": 0,
-            "default": 5
-          },
-          "wait_max": {
-            "title": "Maximum wait",
-            "description": "Maximum retry wait.",
-            "type": "number",
-            "minimum": 0,
-            "default": 30
-          }
-        }
       },
       "vnode": {
         "title": "Vnode",

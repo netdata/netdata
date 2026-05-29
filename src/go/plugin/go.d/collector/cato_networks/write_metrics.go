@@ -110,11 +110,9 @@ func (c *Collector) writeCollectorHealth() {
 	c.metrics.health.collectionSuccess.Observe(boolFloat(c.health.CollectionSuccess))
 	c.metrics.health.discoveredSites.Observe(float64(c.health.DiscoveredSites))
 	writeEntitySelectionHealth(c.metrics.health, c.health)
-	if c.bgpEnabled() {
-		c.metrics.health.bgpSitesPerCollection.Observe(float64(c.health.BGPSitesPerCollection))
-		c.metrics.health.bgpFullScanSeconds.Observe(float64(c.health.BGPFullScanSeconds))
-		c.metrics.health.bgpCachedSites.Observe(float64(c.health.BGPCachedSites))
-	}
+	c.metrics.health.bgpSitesPerCollection.Observe(float64(c.health.BGPSitesPerCollection))
+	c.metrics.health.bgpFullScanSeconds.Observe(float64(c.health.BGPFullScanSeconds))
+	c.metrics.health.bgpCachedSites.Observe(float64(c.health.BGPCachedSites))
 
 	if len(c.health.LastOperations) > 0 {
 		for _, operation := range sortedOperationNames(c.health.LastOperations) {
@@ -149,13 +147,8 @@ func (c *Collector) writeCollectorHealth() {
 }
 
 func writeEntitySelectionHealth(metrics collectorHealthMetricInstruments, health collectorHealth) {
-	for _, entity := range []string{selectionEntitySite, selectionEntityInterface, selectionEntityBGPPeer} {
-		metrics.selectedEntities.WithLabelValues(entity).Observe(float64(health.SelectedEntities[entity]))
-		metrics.cardinalityLimitHit.WithLabelValues(entity).Observe(float64(health.CardinalityLimitHits[entity]))
-		for _, reason := range []string{selectionSkipSelector, selectionSkipLimit} {
-			metrics.skippedEntities.WithLabelValues(entity, reason).Observe(float64(health.SkippedEntities[entitySkipKey{Entity: entity, Reason: reason}]))
-		}
-	}
+	metrics.selectedEntities.WithLabelValues(selectionEntitySite).Observe(float64(health.SelectedEntities[selectionEntitySite]))
+	metrics.skippedEntities.WithLabelValues(selectionEntitySite, selectionSkipSelector).Observe(float64(health.SkippedEntities[entitySkipKey{Entity: selectionEntitySite, Reason: selectionSkipSelector}]))
 }
 
 func sortedOperationNames(values map[string]operationHealth) []string {

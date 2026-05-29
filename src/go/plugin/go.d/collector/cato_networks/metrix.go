@@ -62,7 +62,6 @@ type collectorHealthMetricInstruments struct {
 	collectionSuccess      metrix.SnapshotGauge
 	discoveredSites        metrix.SnapshotGauge
 	selectedEntities       metrix.SnapshotGaugeVec
-	cardinalityLimitHit    metrix.SnapshotGaugeVec
 	skippedEntities        metrix.SnapshotGaugeVec
 	bgpSitesPerCollection  metrix.SnapshotGauge
 	bgpFullScanSeconds     metrix.SnapshotGauge
@@ -143,7 +142,6 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			collectionSuccess:      meter.Gauge("collector_collection_success"),
 			discoveredSites:        meter.Gauge("collector_discovered_sites"),
 			selectedEntities:       entityVec.Gauge("collector_selected_entities"),
-			cardinalityLimitHit:    entityVec.Gauge("collector_cardinality_limit_hit"),
 			skippedEntities:        entityReasonVec.Gauge("collector_skipped_entities"),
 			bgpSitesPerCollection:  meter.Gauge("collector_bgp_sites_per_collection"),
 			bgpFullScanSeconds:     meter.Gauge("collector_bgp_full_scan_seconds"),

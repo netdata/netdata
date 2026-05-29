@@ -117,6 +117,23 @@ func collectOnce(t *testing.T, c *Collector) {
 	cc.CommitCycleSuccess()
 }
 
+func useSingleAttemptSDKClient(c *Collector) {
+	c.newClient = func(cfg Config, httpClient *http.Client) (apiClient, error) {
+		client, err := newSDKAPIClient(cfg, httpClient)
+		if err != nil {
+			return nil, err
+		}
+		sdkClient, ok := client.(*sdkAPIClient)
+		if !ok {
+			return client, nil
+		}
+		sdkClient.retry.Attempts = 1
+		sdkClient.retry.WaitMin = confopt.Duration(time.Millisecond)
+		sdkClient.retry.WaitMax = confopt.Duration(time.Millisecond)
+		return sdkClient, nil
+	}
+}
+
 func TestCollectorCollectsMetricsAndTopology(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
@@ -170,35 +187,6 @@ func TestCollectorCollectsMetricsAndTopology(t *testing.T) {
 	require.Equal(t, topologySource, topo.Source)
 	require.Len(t, topo.Actors, 5)
 	require.Len(t, topo.Links, 3)
-}
-
-func TestCollectorOmitsTrafficMetricsWhenAccountMetricsDisabled(t *testing.T) {
-	c := New()
-	c.AccountID = "12345"
-	c.APIKey = "secret"
-	c.Metrics.Enabled = confopt.AutoBoolDisabled
-	c.BGP.Enabled = confopt.AutoBoolDisabled
-	c.client = newFixtureAPIClient()
-	c.now = fixedCatoTestNow
-	collectOnce(t, c)
-
-	reader := c.store.Read()
-	requireValue(t, reader, "site_connectivity_connected", metrix.Labels{
-		"site_id":   "1001",
-		"site_name": "Paris Office",
-		"pop_name":  "POP-Paris",
-	}, 1)
-	requireMetricMissing(t, reader, "site_bytes_upstream_max", metrix.Labels{
-		"site_id":   "1001",
-		"site_name": "Paris Office",
-		"pop_name":  "POP-Paris",
-	})
-	requireMetricMissing(t, reader, "interface_bytes_upstream_max", metrix.Labels{
-		"site_id":        "1001",
-		"site_name":      "Paris Office",
-		"interface_id":   "wan1",
-		"interface_name": "WAN 1",
-	})
 }
 
 func TestWriteMetricsDistinguishesDuplicateInterfaceNames(t *testing.T) {
@@ -331,13 +319,6 @@ func TestConfigValidation(t *testing.T) {
 	require.Equal(t, defaultEndpoint, cfg.URL)
 	require.Equal(t, defaultUpdateEvery, cfg.UpdateEvery)
 
-	cfg.Metrics.TimeFrame = "garbage"
-	err = cfg.validate()
-	require.ErrorContains(t, err, "'metrics.time_frame'")
-
-	cfg.Metrics.TimeFrame = "utc.2020-02-11/{04:50:15--16:50:15}"
-	require.NoError(t, cfg.validate())
-
 	cfg.URL = "ftp://api.catonetworks.com/api/v1/graphql2"
 	err = cfg.validate()
 	require.ErrorContains(t, err, "'url' scheme")
@@ -354,19 +335,9 @@ func TestConfigApplyDefaultsNormalizesStringInputs(t *testing.T) {
 	cfg := Config{
 		AccountID: " 12345 ",
 		APIKey:    " secret ",
-		Limits: LimitsConfig{
-			MaxSites:             new(0),
-			MaxInterfacesPerSite: new(0),
-		},
-		BGP: BGPConfig{
-			MaxPeersPerSite: new(0),
-		},
 	}
 	cfg.URL = " https://api.catonetworks.com/api/v1/graphql2 "
 	cfg.SiteSelector = " !lab-* * "
-	cfg.InterfaceSelector = " wan* "
-	cfg.Metrics.TimeFrame = " last.PT5M "
-	cfg.BGP.PeerSelector = " 64512 "
 
 	cfg.applyDefaults()
 
@@ -374,26 +345,32 @@ func TestConfigApplyDefaultsNormalizesStringInputs(t *testing.T) {
 	require.Equal(t, "secret", cfg.APIKey)
 	require.Equal(t, "https://api.catonetworks.com/api/v1/graphql2", cfg.URL)
 	require.Equal(t, "!lab-* *", cfg.SiteSelector)
-	require.Equal(t, "wan*", cfg.InterfaceSelector)
-	require.Equal(t, "last.PT5M", cfg.Metrics.TimeFrame)
-	require.Equal(t, "64512", cfg.BGP.PeerSelector)
-	require.Zero(t, cfg.maxSitesLimit())
-	require.Zero(t, cfg.maxInterfacesPerSiteLimit())
-	require.Zero(t, cfg.bgpMaxPeersPerSiteLimit())
 	require.NoError(t, cfg.validate())
 }
 
-func TestGroupInterfacesAutoUsesNilSDKArgument(t *testing.T) {
-	cfg := Config{Metrics: MetricsConfig{GroupInterfaces: confopt.AutoBoolAuto}}
-	require.Nil(t, cfg.groupInterfaces())
+func TestConfigSchemaMarksAPIKeySensitive(t *testing.T) {
+	var schema struct {
+		JSONSchema struct {
+			Properties map[string]map[string]any `json:"properties"`
+		} `json:"jsonSchema"`
+	}
 
-	cfg.Metrics.GroupInterfaces = confopt.AutoBoolEnabled
-	require.NotNil(t, cfg.groupInterfaces())
-	require.True(t, *cfg.groupInterfaces())
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
+	require.Equal(t, true, schema.JSONSchema.Properties["api_key"]["sensitive"])
+}
 
-	cfg.Metrics.GroupInterfaces = confopt.AutoBoolDisabled
-	require.NotNil(t, cfg.groupInterfaces())
-	require.False(t, *cfg.groupInterfaces())
+func TestAccountMetricsUsesDefaultSDKArguments(t *testing.T) {
+	c := New()
+	c.AccountID = "12345"
+	c.APIKey = "secret"
+	fake := newFixtureAPIClient()
+	c.client = fake
+	c.now = fixedCatoTestNow
+
+	collectOnce(t, c)
+
+	require.Len(t, fake.groupInterfaces, 1)
+	require.Nil(t, fake.groupInterfaces[0])
 }
 
 func TestCheckUsesOnlyCheapProbe(t *testing.T) {
@@ -426,7 +403,6 @@ func TestCheckDoesNotPopulateBGPCache(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Metrics.Enabled = "no"
 	c.client = newFixtureAPIClient()
 	c.now = fixedCatoTestNow
 
@@ -457,7 +433,6 @@ func TestCollectorReportsUnknownTimeseriesLabels(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.BGP.Enabled = "no"
 	fake := newFixtureAPIClient()
 	iface := fake.metrics.GetAccountMetrics().GetSites()[0].GetInterfaces()[0]
 	iface.Timeseries = append(iface.Timeseries, &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
@@ -475,13 +450,11 @@ func TestCollectorReportsUnknownTimeseriesLabels(t *testing.T) {
 	}, 1)
 }
 
-func TestCollectorContinuesOnPartialMetricsAndBGPFailures(t *testing.T) {
+func TestCollectorContinuesOnPartialBGPFailures(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Metrics.MaxSitesPerQuery = 1
 	fake := newFixtureAPIClient()
-	fake.metricsErrSites = map[string]error{"1002": errors.New("site metrics failed")}
 	fake.bgpErrSites = map[string]error{"1002": errors.New("site bgp failed")}
 	c.client = fake
 	c.now = fixedCatoTestNow
@@ -500,18 +473,10 @@ func TestCollectorContinuesOnPartialMetricsAndBGPFailures(t *testing.T) {
 		"peer_asn":  "64512",
 	}, 1)
 	requireValue(t, reader, "collector_collection_success", nil, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationMetrics}, 0)
+	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationMetrics}, 1)
 	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationBGP}, 0)
 	requireValue(t, reader, "collector_operation_failures_total", metrix.Labels{
-		"operation":   operationMetrics,
-		"error_class": "error",
-	}, 1)
-	requireValue(t, reader, "collector_operation_failures_total", metrix.Labels{
 		"operation":   operationBGP,
-		"error_class": "error",
-	}, 1)
-	requireValue(t, reader, "collector_operation_affected_sites_total", metrix.Labels{
-		"operation":   operationMetrics,
 		"error_class": "error",
 	}, 1)
 	requireValue(t, reader, "collector_operation_affected_sites_total", metrix.Labels{
@@ -524,8 +489,6 @@ func TestCollectorMapsUnrecognizedStatusesToUnknown(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Metrics.Enabled = "no"
-	c.BGP.Enabled = "no"
 	fake := newFixtureAPIClient()
 	fake.snapshot = &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{
 		Sites: []*catosdk.AccountSnapshot_AccountSnapshot_Sites{
@@ -590,32 +553,29 @@ func TestCollectorDiscoversMultiplePages(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Metrics.Enabled = "no"
-	c.BGP.Enabled = "no"
-	c.Discovery.PageLimit = 2
 	fake := newFixtureAPIClient()
+	ids := numberedSiteIDs(1001, 205)
 	fake.lookupPages = map[int64]*catosdk.EntityLookup{
-		0: fixtureLookupPage(5, "1001", "1002"),
-		2: fixtureLookupPage(5, "1003", "1004"),
-		4: fixtureLookupPage(5, "1005"),
+		0:   fixtureLookupPage(205, ids[:100]...),
+		100: fixtureLookupPage(205, ids[100:200]...),
+		200: fixtureLookupPage(205, ids[200:]...),
 	}
 	c.client = fake
 	c.now = fixedCatoTestNow
 	collectOnce(t, c)
 
-	require.Equal(t, []string{"1001", "1002", "1003", "1004", "1005"}, c.discovery.siteIDs)
+	require.Len(t, c.discovery.siteIDs, 205)
+	require.Equal(t, "1001", c.discovery.siteIDs[0])
+	require.Equal(t, "1205", c.discovery.siteIDs[len(c.discovery.siteIDs)-1])
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_discovered_sites", nil, 5)
+	requireValue(t, reader, "collector_discovered_sites", nil, 205)
 }
 
-func TestCollectorAppliesSiteSelectorAndLimit(t *testing.T) {
+func TestCollectorAppliesSiteSelector(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Metrics.Enabled = "no"
-	c.BGP.Enabled = "no"
-	c.SiteSelector = "!Toulouse* *"
-	c.Limits.MaxSites = new(1)
+	c.SiteSelector = "!Toulouse* Paris*"
 	fake := newFixtureAPIClient()
 	total := int64(3)
 	siteType := catomodels.EntityTypeSite
@@ -635,9 +595,7 @@ func TestCollectorAppliesSiteSelectorAndLimit(t *testing.T) {
 	reader := c.store.Read()
 	requireValue(t, reader, "collector_discovered_sites", nil, 3)
 	requireValue(t, reader, "collector_selected_entities", metrix.Labels{"entity": selectionEntitySite}, 1)
-	requireValue(t, reader, "collector_skipped_entities", metrix.Labels{"entity": selectionEntitySite, "reason": selectionSkipSelector}, 1)
-	requireValue(t, reader, "collector_skipped_entities", metrix.Labels{"entity": selectionEntitySite, "reason": selectionSkipLimit}, 1)
-	requireValue(t, reader, "collector_cardinality_limit_hit", metrix.Labels{"entity": selectionEntitySite}, 1)
+	requireValue(t, reader, "collector_skipped_entities", metrix.Labels{"entity": selectionEntitySite, "reason": selectionSkipSelector}, 2)
 	requireValue(t, reader, "site_connectivity_connected", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
@@ -650,14 +608,10 @@ func TestCollectorAppliesSiteSelectorAndLimit(t *testing.T) {
 	})
 }
 
-func TestCollectorAppliesInterfaceAndBGPPeerSelectorsAndLimits(t *testing.T) {
+func TestCollectorCollectsAllInterfacesAndBGPPeers(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.InterfaceSelector = "wan*"
-	c.Limits.MaxInterfacesPerSite = new(1)
-	c.BGP.MaxPeersPerSite = new(1)
-	c.BGP.MaxSitesPerCollection = 1
 	fake := newFixtureAPIClient()
 	snapshot := fixtureSnapshot()
 	snapshot.GetAccountSnapshot().GetSites()[0].GetDevices()[0].Interfaces = append(
@@ -679,47 +633,37 @@ func TestCollectorAppliesInterfaceAndBGPPeerSelectorsAndLimits(t *testing.T) {
 	collectOnce(t, c)
 
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_selected_entities", metrix.Labels{"entity": selectionEntityInterface}, 1)
-	requireValue(t, reader, "collector_skipped_entities", metrix.Labels{"entity": selectionEntityInterface, "reason": selectionSkipSelector}, 1)
-	requireValue(t, reader, "collector_skipped_entities", metrix.Labels{"entity": selectionEntityInterface, "reason": selectionSkipLimit}, 1)
-	requireValue(t, reader, "collector_cardinality_limit_hit", metrix.Labels{"entity": selectionEntityInterface}, 1)
 	requireValue(t, reader, "interface_connected", metrix.Labels{
 		"site_id":        "1001",
 		"site_name":      "Paris Office",
 		"interface_id":   "wan1",
 		"interface_name": "WAN 1",
 	}, 1)
-	requireMetricMissing(t, reader, "interface_connected", metrix.Labels{
+	requireValue(t, reader, "interface_connected", metrix.Labels{
 		"site_id":        "1001",
 		"site_name":      "Paris Office",
 		"interface_id":   "wan2",
 		"interface_name": "WAN 2",
-	})
+	}, 1)
 
-	requireValue(t, reader, "collector_selected_entities", metrix.Labels{"entity": selectionEntityBGPPeer}, 1)
-	requireValue(t, reader, "collector_skipped_entities", metrix.Labels{"entity": selectionEntityBGPPeer, "reason": selectionSkipLimit}, 1)
-	requireValue(t, reader, "collector_cardinality_limit_hit", metrix.Labels{"entity": selectionEntityBGPPeer}, 1)
 	requireValue(t, reader, "bgp_session_up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.10",
 		"peer_asn":  "64512",
 	}, 1)
-	requireMetricMissing(t, reader, "bgp_session_up", metrix.Labels{
+	requireValue(t, reader, "bgp_session_up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.11",
 		"peer_asn":  "64513",
-	})
+	}, 1)
 }
 
 func TestCollectorUsesCachedDiscoveryWhenRefreshFailsAfterBootstrap(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Metrics.Enabled = "no"
-	c.BGP.Enabled = "no"
-	c.Discovery.RefreshEvery = 300
 	fake := newFixtureAPIClient()
 	c.client = fake
 	now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
@@ -753,10 +697,11 @@ func TestCollectorDoesNotAdvanceBGPRotationWhenAllRequestsFail(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Metrics.Enabled = "no"
-	c.BGP.MaxSitesPerCollection = 1
 	fake := newFixtureAPIClient()
-	fake.bgpErrSites = map[string]error{"1001": errors.New("rate limit exceeded")}
+	fake.bgpErrSites = map[string]error{
+		"1001": errors.New("rate limit exceeded"),
+		"1002": errors.New("rate limit exceeded"),
+	}
 	c.client = fake
 	now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	c.now = func() time.Time { return now }
@@ -773,19 +718,17 @@ func TestCollectorDoesNotAdvanceBGPRotationWhenAllRequestsFail(t *testing.T) {
 	requireValue(t, reader, "collector_operation_failures_total", metrix.Labels{
 		"operation":   operationBGP,
 		"error_class": "rate_limit",
-	}, 1)
+	}, 2)
 	requireValue(t, reader, "collector_operation_affected_sites_total", metrix.Labels{
 		"operation":   operationBGP,
 		"error_class": "rate_limit",
-	}, 1)
+	}, 2)
 }
 
 func TestCollectorFiltersEmptyBGPPeers(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Metrics.Enabled = "no"
-	c.BGP.MaxSitesPerCollection = 1
 	fake := newFixtureAPIClient()
 	fake.bgp["1001"] = []*catosdk.SiteBgpStatusResult{{}}
 	c.client = fake
@@ -918,12 +861,23 @@ func TestBGPPollingRotatesAcrossSites(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.BGP.RefreshEvery = 60
-	c.BGP.MaxSitesPerCollection = 1
 	fake := newFixtureAPIClient()
-	fake.bgp["1002"] = []*catosdk.SiteBgpStatusResult{
+	ids := numberedSiteIDs(1001, 26)
+	fake.lookup = fixtureLookupPage(26, ids...)
+	fake.snapshot = fixtureSnapshotForSiteIDs(ids...)
+	fake.bgp = make(map[string][]*catosdk.SiteBgpStatusResult, len(ids))
+	for _, siteID := range ids {
+		fake.bgp[siteID] = []*catosdk.SiteBgpStatusResult{
+			{
+				RemoteIP:   "192.0.2." + strings.TrimPrefix(siteID, "10"),
+				RemoteASN:  "64512",
+				BGPSession: "Established",
+			},
+		}
+	}
+	fake.bgp["1026"] = []*catosdk.SiteBgpStatusResult{
 		{
-			RemoteIP:   "192.0.2.20",
+			RemoteIP:   "192.0.2.126",
 			RemoteASN:  "64513",
 			BGPSession: "Established",
 		},
@@ -937,28 +891,26 @@ func TestBGPPollingRotatesAcrossSites(t *testing.T) {
 	cc.BeginCycle()
 	require.NoError(t, c.Collect(context.Background()))
 	cc.CommitCycleSuccess()
-	require.Len(t, c.bgp.bySite, 1)
+	require.Len(t, c.bgp.bySite, defaultBGPMaxSites)
 	require.Contains(t, c.bgp.bySite, "1001")
+	require.NotContains(t, c.bgp.bySite, "1026")
 
-	now = now.Add(61 * time.Second)
+	now = now.Add(seconds(defaultBGPRefreshEvery) + time.Second)
 	cc.BeginCycle()
 	require.NoError(t, c.Collect(context.Background()))
 	cc.CommitCycleSuccess()
-	require.Len(t, c.bgp.bySite, 2)
-	require.Contains(t, c.bgp.bySite, "1002")
+	require.Len(t, c.bgp.bySite, 26)
+	require.Contains(t, c.bgp.bySite, "1026")
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_bgp_sites_per_collection", nil, 1)
-	requireValue(t, reader, "collector_bgp_full_scan_seconds", nil, 120)
-	requireValue(t, reader, "collector_bgp_cached_sites", nil, 2)
+	requireValue(t, reader, "collector_bgp_sites_per_collection", nil, defaultBGPMaxSites)
+	requireValue(t, reader, "collector_bgp_full_scan_seconds", nil, 600)
+	requireValue(t, reader, "collector_bgp_cached_sites", nil, 26)
 }
 
 func TestCollectorResetsBGPHealthWhenCollectionFailsBeforeBGP(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Metrics.Enabled = "no"
-	c.BGP.RefreshEvery = 60
-	c.BGP.MaxSitesPerCollection = 1
 	fake := newFixtureAPIClient()
 	fake.bgp["1002"] = []*catosdk.SiteBgpStatusResult{
 		{
@@ -977,17 +929,17 @@ func TestCollectorResetsBGPHealthWhenCollectionFailsBeforeBGP(t *testing.T) {
 	require.NoError(t, c.Collect(context.Background()))
 	cc.CommitCycleSuccess()
 
-	now = now.Add(61 * time.Second)
+	now = now.Add(seconds(defaultBGPRefreshEvery) + time.Second)
 	cc.BeginCycle()
 	require.NoError(t, c.Collect(context.Background()))
 	cc.CommitCycleSuccess()
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_bgp_sites_per_collection", nil, 1)
-	requireValue(t, reader, "collector_bgp_full_scan_seconds", nil, 120)
+	requireValue(t, reader, "collector_bgp_sites_per_collection", nil, 2)
+	requireValue(t, reader, "collector_bgp_full_scan_seconds", nil, 300)
 	requireValue(t, reader, "collector_bgp_cached_sites", nil, 2)
 
 	fake.snapshotErr = errors.New("snapshot unavailable")
-	now = now.Add(61 * time.Second)
+	now = now.Add(seconds(defaultBGPRefreshEvery) + time.Second)
 	cc.BeginCycle()
 	err := c.Collect(context.Background())
 	cc.CommitCycleSuccess()
@@ -1207,7 +1159,7 @@ func TestSDKClientClassifiesHTTPAndGraphQLErrors(t *testing.T) {
 			c.URL = server.URL
 			c.AccountID = "12345"
 			c.APIKey = "secret"
-			c.Retry.Attempts = 1
+			useSingleAttemptSDKClient(c)
 			c.now = func() time.Time { return time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC) }
 
 			require.NoError(t, c.Init(context.Background()))
@@ -1307,7 +1259,7 @@ func TestSDKClientClassifiesHTTPClientTimeout(t *testing.T) {
 	c.AccountID = "12345"
 	c.APIKey = "secret"
 	c.Timeout = confopt.Duration(time.Millisecond)
-	c.Retry.Attempts = 1
+	useSingleAttemptSDKClient(c)
 
 	require.NoError(t, c.Init(context.Background()))
 	cc := mustCycleController(t, c.store)
@@ -1361,7 +1313,7 @@ func TestCollectorSanitizesReturnedProviderErrors(t *testing.T) {
 	c.URL = server.URL
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	c.Retry.Attempts = 1
+	useSingleAttemptSDKClient(c)
 
 	require.NoError(t, c.Init(context.Background()))
 	cc := mustCycleController(t, c.store)
@@ -1390,9 +1342,6 @@ func TestSDKClientAccountSnapshotFallsBackOnEnumDecodeError(t *testing.T) {
 	cfg := Config{
 		AccountID: "12345",
 		APIKey:    "secret",
-		Retry: RetryConfig{
-			Attempts: 1,
-		},
 	}
 	cfg.URL = server.URL
 	client, err := newSDKAPIClient(cfg, server.Client())
@@ -1419,7 +1368,7 @@ func TestBGPSessionUpRequiresExactEstablishedStatus(t *testing.T) {
 
 func TestSDKClientRecordsRetryStats(t *testing.T) {
 	client := &sdkAPIClient{
-		retry: RetryConfig{
+		retry: retryConfig{
 			Attempts: 2,
 			WaitMin:  confopt.Duration(time.Millisecond),
 			WaitMax:  confopt.Duration(time.Millisecond),
@@ -1472,7 +1421,7 @@ func TestWriteAPIStatsWritesRetryCounterTotalsAndDeltas(t *testing.T) {
 
 func TestSDKClientRetriesClientDeadlineExceeded(t *testing.T) {
 	client := &sdkAPIClient{
-		retry: RetryConfig{
+		retry: retryConfig{
 			Attempts: 2,
 			WaitMin:  confopt.Duration(time.Millisecond),
 			WaitMax:  confopt.Duration(time.Millisecond),
@@ -1728,6 +1677,30 @@ func fixtureLookupPage(total int64, ids ...string) *catosdk.EntityLookup {
 		Total: &total,
 		Items: items,
 	}}
+}
+
+func numberedSiteIDs(start, count int) []string {
+	ids := make([]string, 0, count)
+	for id := start; id < start+count; id++ {
+		ids = append(ids, fmt.Sprint(id))
+	}
+	return ids
+}
+
+func fixtureSnapshotForSiteIDs(ids ...string) *catosdk.AccountSnapshot {
+	sites := make([]*catosdk.AccountSnapshot_AccountSnapshot_Sites, 0, len(ids))
+	for _, siteID := range ids {
+		sites = append(sites, &catosdk.AccountSnapshot_AccountSnapshot_Sites{
+			ID:                             new(siteID),
+			ConnectivityStatusSiteSnapshot: connectivityPtr("connected"),
+			OperationalStatusSiteSnapshot:  operationalPtr("active"),
+			PopName:                        new("POP-" + siteID),
+			InfoSiteSnapshot: &catosdk.AccountSnapshot_AccountSnapshot_Sites_InfoSiteSnapshot{
+				Name: new("Site " + siteID),
+			},
+		})
+	}
+	return &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{Sites: sites}}
 }
 
 func fixtureSnapshot() *catosdk.AccountSnapshot {

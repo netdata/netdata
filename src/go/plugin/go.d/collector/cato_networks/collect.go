@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
 type discoveryState struct {
@@ -18,7 +16,6 @@ type discoveryState struct {
 	fetchedAt         time.Time
 	totalSites        int
 	skippedBySelector int
-	skippedByLimit    int
 }
 
 func (c *Collector) collect(ctx context.Context) (err error) {
@@ -55,29 +52,23 @@ func (c *Collector) collect(ctx context.Context) (err error) {
 	}
 	c.pruneUnselectedSites(sites, &order)
 
-	if c.metricsEnabled() {
-		if err := c.collectMetrics(ctx, sites); err != nil {
-			c.warnRecoverable(warningKeyMetrics, classifyCatoError(err), "account metrics collection incomplete, error_class=%s", classifyCatoError(err))
-		} else {
-			c.clearRecoverableWarning(warningKeyMetrics)
-		}
+	if err := c.collectMetrics(ctx, sites); err != nil {
+		c.warnRecoverable(warningKeyMetrics, classifyCatoError(err), "account metrics collection incomplete, error_class=%s", classifyCatoError(err))
+	} else {
+		c.clearRecoverableWarning(warningKeyMetrics)
 	}
 
-	if c.bgpEnabled() {
-		if err := c.collectBGP(ctx, sites, order); err != nil {
-			c.warnRecoverable(warningKeyBGP, classifyCatoError(err), "BGP status collection incomplete, error_class=%s", classifyCatoError(err))
-		} else {
-			c.clearRecoverableWarning(warningKeyBGP)
-		}
+	if err := c.collectBGP(ctx, sites, order); err != nil {
+		c.warnRecoverable(warningKeyBGP, classifyCatoError(err), "BGP status collection incomplete, error_class=%s", classifyCatoError(err))
+	} else {
+		c.clearRecoverableWarning(warningKeyBGP)
 	}
 
-	c.applyEntityControls(sites, &order)
+	c.pruneUnselectedSites(sites, &order)
+	c.updateSiteSelectionHealth()
 
 	now := c.now()
-	var topo *topology.Data
-	if c.topologyEnabled() {
-		topo = buildTopology(c.AccountID, sites, order, now)
-	}
+	topo := buildTopology(c.AccountID, sites, order, now)
 
 	c.mu.Lock()
 	c.topology = topo
@@ -91,12 +82,12 @@ func (c *Collector) collect(ctx context.Context) (err error) {
 func (c *Collector) refreshDiscovery(ctx context.Context, force bool) error {
 	now := c.now()
 	if !force && len(c.discovery.siteIDs) > 0 {
-		if now.Sub(c.discovery.fetchedAt) < seconds(c.Discovery.RefreshEvery) {
+		if now.Sub(c.discovery.fetchedAt) < seconds(defaultDiscoveryEvery) {
 			return nil
 		}
 	}
 
-	limit := int64(c.Discovery.PageLimit)
+	limit := int64(defaultDiscoveryLimit)
 	var from int64
 	siteNames := make(map[string]string)
 	var siteIDs []string
@@ -140,14 +131,13 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) error {
 		}
 	}
 
-	selectedSiteIDs, skippedBySelector, skippedByLimit := c.selectSites(siteIDs, siteNames)
+	selectedSiteIDs, skippedBySelector := c.selectSites(siteIDs, siteNames)
 	c.discovery = discoveryState{
 		siteIDs:           selectedSiteIDs,
 		siteNames:         siteNames,
 		fetchedAt:         now,
 		totalSites:        len(siteIDs),
 		skippedBySelector: skippedBySelector,
-		skippedByLimit:    skippedByLimit,
 	}
 	c.markOperationSuccess(operationDiscovery)
 	c.clearRecoverableWarning(warningKeyDiscoveryCache)

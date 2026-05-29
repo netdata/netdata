@@ -60,7 +60,7 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 		return fmt.Errorf("all siteBgpStatus requests failed")
 	}
 	c.bgp.nextIndex = (c.bgp.nextIndex + limit) % len(order)
-	c.bgp.nextRefresh = now.Add(seconds(c.BGP.RefreshEvery))
+	c.bgp.nextRefresh = now.Add(seconds(defaultBGPRefreshEvery))
 	mergeBGPState(sites, c.bgp.bySite)
 
 	if errCount == 0 && successCount > 0 {
@@ -73,7 +73,7 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 }
 
 func (c *Collector) bgpSitesPerCollectionLimit(siteCount int) int {
-	limit := min(c.BGP.MaxSitesPerCollection, siteCount)
+	limit := min(defaultBGPMaxSites, siteCount)
 	if limit < 0 {
 		return 0
 	}
@@ -110,6 +110,6 @@ func (c *Collector) updateBGPPollingHealth(siteCount, sitesPerCollection int) {
 	c.ensureHealth()
 	cycles := (siteCount + sitesPerCollection - 1) / sitesPerCollection
 	c.health.BGPSitesPerCollection = int64(sitesPerCollection)
-	c.health.BGPFullScanSeconds = int64(cycles * c.BGP.RefreshEvery)
+	c.health.BGPFullScanSeconds = int64(cycles * defaultBGPRefreshEvery)
 	c.health.BGPCachedSites = int64(len(c.bgp.bySite))
 }

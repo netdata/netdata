@@ -21,9 +21,9 @@ func (c *Collector) collectMetrics(ctx context.Context, sites map[string]*siteSt
 	var errCount int
 	var successCount int
 	var batchCount int
-	for batch := range slices.Chunk(ids, c.Metrics.MaxSitesPerQuery) {
+	for batch := range slices.Chunk(ids, defaultMaxSitesPerQuery) {
 		batchCount++
-		res, err := c.client.AccountMetrics(ctx, c.AccountID, batch, c.Metrics.TimeFrame, c.Metrics.Buckets, c.groupInterfaces())
+		res, err := c.client.AccountMetrics(ctx, c.AccountID, batch, defaultMetricsTimeFrame, defaultMetricsBuckets, nil)
 		if err != nil {
 			errCount++
 			c.markOperationFailure(operationMetrics, err)

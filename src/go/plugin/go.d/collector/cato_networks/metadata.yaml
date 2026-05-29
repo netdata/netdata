@@ -43,7 +43,7 @@ modules:
             This collector does not auto-detect Cato accounts. Configure at least one job with `account_id` and `api_key`.
         limits:
           description: |
-            Site discovery is paginated. Site, interface, and BGP peer metric cardinality is bounded by `limits.max_sites`, `limits.max_interfaces_per_site`, and `bgp.max_peers_per_site`, with selectors to narrow scope before caps apply. Account metrics are batched by `metrics.max_sites_per_query`. BGP status collection is a rolling scan throttled by `bgp.max_sites_per_collection` and `bgp.refresh_every`.
+            Site discovery is paginated. The optional `site_selector` filters sites before snapshot, metrics, BGP, and topology collection. Account metrics are batched internally, and BGP status collection uses an internal rolling scan to avoid querying every site on every collection cycle.
         performance_impact:
           description: |
             The default interval is 60 seconds. BGP status is refreshed every 300 seconds by default because it requires per-site API requests. Large accounts may need multiple BGP refresh windows before every site's BGP state is updated.
@@ -103,101 +103,6 @@ modules:
               default_value: "*"
               required: false
               group: Cardinality
-            - name: interface_selector
-              description: Space-separated simple patterns matched against Cato interface ID or interface name. Use exclusions such as `!test-* *`; exclusions win across interface identity fields.
-              default_value: "*"
-              required: false
-              group: Cardinality
-            - name: limits.max_sites
-              description: Maximum Cato sites collected after `site_selector` filtering. Set to 0 to disable this cap.
-              default_value: 500
-              required: false
-              group: Cardinality
-            - name: limits.max_interfaces_per_site
-              description: Maximum interfaces collected per selected site after `interface_selector` filtering. Set to 0 to disable this cap.
-              default_value: 32
-              required: false
-              group: Cardinality
-            - name: discovery.refresh_every
-              description: Site discovery refresh interval, in seconds.
-              default_value: 300
-              required: false
-              group: Discovery
-            - name: discovery.page_limit
-              description: Maximum sites requested per entityLookup page.
-              default_value: 100
-              required: false
-              group: Discovery
-            - name: metrics.enabled
-              description: Controls accountMetrics collection. One of auto, enabled, disabled.
-              default_value: auto
-              required: false
-              group: Metrics
-            - name: metrics.time_frame
-              description: Cato TimeFrame string used for accountMetrics, for example last.PT5M or utc.2020-02-11/{04:50:15--16:50:15}.
-              default_value: last.PT5M
-              required: false
-              group: Metrics
-            - name: metrics.buckets
-              description: Number of accountMetrics buckets requested.
-              default_value: 5
-              required: false
-              group: Metrics
-            - name: metrics.group_interfaces
-              description: Controls the accountMetrics groupInterfaces argument. auto leaves the argument unset so Cato applies its default; enabled and disabled send explicit true or false.
-              default_value: auto
-              required: false
-              group: Metrics
-            - name: metrics.max_sites_per_query
-              description: Maximum site IDs sent in one accountMetrics query.
-              default_value: 50
-              required: false
-              group: Metrics
-            - name: bgp.enabled
-              description: Controls siteBgpStatus collection. One of auto, enabled, disabled.
-              default_value: auto
-              required: false
-              group: BGP
-            - name: bgp.refresh_every
-              description: Minimum interval between BGP status refreshes, in seconds.
-              default_value: 300
-              required: false
-              group: BGP
-            - name: bgp.max_sites_per_collection
-              description: Maximum sites queried for BGP status during one refresh.
-              default_value: 25
-              required: false
-              group: BGP
-            - name: bgp.peer_selector
-              description: Space-separated simple patterns matched against BGP peer remote IP or remote ASN. Use exclusions such as `!64512 *`; exclusions win across BGP peer identity fields.
-              default_value: "*"
-              required: false
-              group: BGP
-            - name: bgp.max_peers_per_site
-              description: Maximum BGP peers collected per selected site after `bgp.peer_selector` filtering. Set to 0 to disable this cap.
-              default_value: 32
-              required: false
-              group: BGP
-            - name: topology.enabled
-              description: Controls topology function data generation. One of auto, enabled, disabled.
-              default_value: auto
-              required: false
-              group: Topology
-            - name: retry.attempts
-              description: Maximum attempts for retryable Cato API errors.
-              default_value: 5
-              required: false
-              group: Retry
-            - name: retry.wait_min
-              description: Initial retry wait.
-              default_value: 5
-              required: false
-              group: Retry
-            - name: retry.wait_max
-              description: Maximum retry wait.
-              default_value: 30
-              required: false
-              group: Retry
             - name: vnode
               description: Associates this data collection job with a Virtual Node.
               default_value: ""
@@ -220,10 +125,7 @@ modules:
         list:
           - name: API rate limits
             description: |
-              Increase `update_every`, reduce `metrics.max_sites_per_query`, or reduce `bgp.max_sites_per_collection` if the Cato API reports rate limiting.
-          - name: Cardinality limit hit
-            description: |
-              Check `cato_networks.collector_skipped_entities` to see whether sites, interfaces, or BGP peers were skipped by selector or cap, then narrow selectors or raise the relevant cap if the account has enough API and metric-cardinality headroom.
+              Increase `update_every` or narrow `site_selector` if the Cato API reports rate limiting.
           - name: Connection, TLS, or proxy failures
             description: |
               Check DNS, firewall egress, TLS inspection, proxy settings, endpoint region, and the normalized failure class in the collector operation failure charts.
@@ -231,10 +133,6 @@ modules:
       - name: cato_networks_collector_collection_failed
         metric: cato_networks.collector_collection_status
         info: "Cato Networks collector is failing to complete collection"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
-      - name: cato_networks_collector_cardinality_limit_hit
-        metric: cato_networks.collector_cardinality_limit_status
-        info: "Cato Networks collector skipped entities because a configured cardinality cap was reached"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
       - name: cato_networks_site_disconnected
         metric: cato_networks.site_connectivity_status
@@ -454,33 +352,27 @@ modules:
                 - name: per_collection
                 - name: cached
         - name: collector entity selection
-          description: These metrics describe how many Cato entities are selected for collection after selectors and cardinality caps are applied.
+          description: These metrics describe how many Cato sites are selected for collection after `site_selector` is applied.
           labels:
             - name: entity
-              description: Entity class (`site`, `interface`, or `bgp_peer`).
+              description: Entity class. Currently always `site`.
           metrics:
             - name: cato_networks.collector_selected_entities
-              description: Selected entities by entity class.
+              description: Selected Cato sites.
               unit: entities
               chart_type: line
               dimensions:
                 - name: selected
-            - name: cato_networks.collector_cardinality_limit_status
-              description: Whether a configured cardinality cap skipped at least one entity.
-              unit: status
-              chart_type: line
-              dimensions:
-                - name: hit
         - name: collector skipped entity
-          description: These metrics describe Cato entities skipped by selectors or cardinality caps.
+          description: These metrics describe Cato sites skipped by `site_selector`.
           labels:
             - name: entity
-              description: Entity class (`site`, `interface`, or `bgp_peer`).
+              description: Entity class. Currently always `site`.
             - name: reason
-              description: Skip reason (`selector` or `limit`).
+              description: Skip reason. Currently always `selector`.
           metrics:
             - name: cato_networks.collector_skipped_entities
-              description: Skipped entities by entity class and reason.
+              description: Skipped Cato sites by reason.
               unit: entities
               chart_type: line
               dimensions:

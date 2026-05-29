@@ -51,32 +51,7 @@ func New() *Collector {
 					Timeout: defaultTimeout,
 				},
 			},
-			SiteSelector:      defaultEntitySelector,
-			InterfaceSelector: defaultEntitySelector,
-			Limits: LimitsConfig{
-				MaxSites:             new(defaultMaxSites),
-				MaxInterfacesPerSite: new(defaultMaxIfacesPerSite),
-			},
-			Discovery: DiscoveryConfig{
-				RefreshEvery: defaultDiscoveryEvery,
-				PageLimit:    defaultDiscoveryLimit,
-			},
-			Metrics: MetricsConfig{
-				TimeFrame:        defaultMetricsTimeFrame,
-				Buckets:          defaultMetricsBuckets,
-				MaxSitesPerQuery: defaultMaxSitesPerQuery,
-			},
-			BGP: BGPConfig{
-				RefreshEvery:          defaultBGPRefreshEvery,
-				MaxSitesPerCollection: defaultBGPMaxSites,
-				PeerSelector:          defaultEntitySelector,
-				MaxPeersPerSite:       new(defaultBGPMaxPeers),
-			},
-			Retry: RetryConfig{
-				Attempts: defaultRetryAttempts,
-				WaitMin:  defaultRetryWaitMin,
-				WaitMax:  defaultRetryWaitMax,
-			},
+			SiteSelector: defaultEntitySelector,
 		},
 		store:     store,
 		metrics:   newCollectorMetrics(store),
@@ -103,10 +78,8 @@ type Collector struct {
 	bgp       bgpState
 	health    collectorHealth
 
-	siteMatcher      *entitySelector
-	interfaceMatcher *entitySelector
-	bgpPeerMatcher   *entitySelector
-	warningStates    map[string]string
+	siteMatcher   *entitySelector
+	warningStates map[string]string
 
 	now func() time.Time
 }

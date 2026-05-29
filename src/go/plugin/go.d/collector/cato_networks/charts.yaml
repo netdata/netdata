@@ -314,7 +314,6 @@ groups:
       - collector_discovered_sites
       - collector_selected_entities
       - collector_skipped_entities
-      - collector_cardinality_limit_hit
       - collector_bgp_sites_per_collection
       - collector_bgp_full_scan_seconds
       - collector_bgp_cached_sites
@@ -366,18 +365,6 @@ groups:
         dimensions:
           - selector: collector_skipped_entities
             name: skipped
-      - id: collector_cardinality_limit_status
-        title: Cato collector cardinality limit status
-        context: collector_cardinality_limit_status
-        units: status
-        type: line
-        instances:
-          by_labels: [entity]
-        lifecycle:
-          expire_after_cycles: 5
-        dimensions:
-          - selector: collector_cardinality_limit_hit
-            name: hit
       - id: collector_bgp_scan_window
         title: Cato collector BGP full scan window
         context: collector_bgp_scan_window
