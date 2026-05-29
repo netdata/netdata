@@ -1632,6 +1632,27 @@ static int rrdlabels_unittest_mark_source_as_old(void) {
     }                                                                          \
 } while (0)
 
+// Returns true when labels[key] resolves to exactly `expected`.
+static bool rrdlabels_unittest_value_is(RRDLABELS *labels, const char *key, const char *expected) {
+    char *v = NULL;
+    rrdlabels_get_value_strdup_or_null(labels, &v, key);
+    bool ok = (v != NULL && strcmp(v, expected) == 0);
+    freez(v);
+    return ok;
+}
+
+// Plant `n` pinned DONT_DELETE entries that share `key` but carry distinct
+// `values`, writing them straight into labels->JudyL. This bypasses the
+// public add/migrate/copy paths so a multi-duplicate starting state -- which
+// the fixed code can no longer produce -- can be constructed for tests.
+static void rrdlabels_unittest_plant_dups(RRDLABELS *labels, const char *key, const char *const *values, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        RRDLABEL *stale = add_label_name_value(key, values[i]);
+        Pvoid_t *p = JudyLIns(&labels->JudyL, (Word_t)stale, PJE0);
+        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
+    }
+}
+
 static int rrdlabels_unittest_change_detection(void) {
     fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
     int errors = 0;
@@ -1705,13 +1726,8 @@ static int rrdlabels_unittest_change_detection(void) {
               "migrate with a value change should return true");
     UT_EXPECT(rrdlabels_entries(dst) == 1,
               "migrate with a value change should leave one entry per key");
-    {
-        char *v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
-        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
-                  "migrate with a value change should leave the new value in dst");
-        freez(v);
-    }
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v2"),
+              "migrate with a value change should leave the new value in dst");
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
@@ -1726,13 +1742,8 @@ static int rrdlabels_unittest_change_detection(void) {
               "migrate with a value change for a DONT_DELETE key should return true");
     UT_EXPECT(rrdlabels_entries(dst) == 1,
               "migrate must not leave a duplicate (key,old-value) when DONT_DELETE was set");
-    {
-        char *v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
-        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
-                  "migrate with a DONT_DELETE value change should leave the new value in dst");
-        freez(v);
-    }
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v2"),
+              "migrate with a DONT_DELETE value change should leave the new value in dst");
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
@@ -1747,13 +1758,8 @@ static int rrdlabels_unittest_change_detection(void) {
     rrdlabels_copy(dst, src);
     UT_EXPECT(rrdlabels_entries(dst) == 1,
               "copy with a value change should leave one entry per key");
-    {
-        char *v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
-        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
-                  "copy with a value change should leave the new value in dst");
-        freez(v);
-    }
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v2"),
+              "copy with a value change should leave the new value in dst");
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
@@ -1765,13 +1771,8 @@ static int rrdlabels_unittest_change_detection(void) {
     rrdlabels_copy(dst, src);
     UT_EXPECT(rrdlabels_entries(dst) == 1,
               "copy must not leave a duplicate (key,old-value) when DONT_DELETE was set");
-    {
-        char *v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
-        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
-                  "copy with a DONT_DELETE value change should leave the new value in dst");
-        freez(v);
-    }
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v2"),
+              "copy with a DONT_DELETE value change should leave the new value in dst");
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
@@ -1792,20 +1793,10 @@ static int rrdlabels_unittest_change_detection(void) {
     //   - the function returns true even though added==0 and removed==0
     //     (regression on the `cleaned` term in the return would fail here);
     //   - dst ends with the single source entry.
+    static const char *const planted_dups[] = { "va", "vb", "vc" };
     dst = rrdlabels_create();
     src = rrdlabels_create();
-    {
-        RRDLABEL *stale_a = add_label_name_value("k1", "va");
-        RRDLABEL *stale_b = add_label_name_value("k1", "vb");
-        RRDLABEL *stale_c = add_label_name_value("k1", "vc");
-        Pvoid_t *p;
-        p = JudyLIns(&dst->JudyL, (Word_t)stale_a, PJE0);
-        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
-        p = JudyLIns(&dst->JudyL, (Word_t)stale_b, PJE0);
-        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
-        p = JudyLIns(&dst->JudyL, (Word_t)stale_c, PJE0);
-        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
-    }
+    rrdlabels_unittest_plant_dups(dst, "k1", planted_dups, 3);
     UT_EXPECT(rrdlabels_entries(dst) == 3,
               "test setup: dst should start with 3 manually-planted same-key entries");
     rrdlabels_add(src, "k1", "vc", RRDLABEL_SRC_CONFIG);
@@ -1813,13 +1804,8 @@ static int rrdlabels_unittest_change_detection(void) {
               "migrate must return true when cleanup is the only mutation (added=0, removed=0, cleaned>0)");
     UT_EXPECT(rrdlabels_entries(dst) == 1,
               "migrate must drain all stale same-key duplicates, not just the first");
-    {
-        char *v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
-        UT_EXPECT(v != NULL && strcmp(v, "vc") == 0,
-                  "migrate multi-duplicate drain should leave only the src value in dst");
-        freez(v);
-    }
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "vc"),
+              "migrate multi-duplicate drain should leave only the src value in dst");
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
@@ -1830,18 +1816,7 @@ static int rrdlabels_unittest_change_detection(void) {
     // version bump inside the cleanup loop would fail this check.
     dst = rrdlabels_create();
     src = rrdlabels_create();
-    {
-        RRDLABEL *stale_a = add_label_name_value("k1", "va");
-        RRDLABEL *stale_b = add_label_name_value("k1", "vb");
-        RRDLABEL *stale_c = add_label_name_value("k1", "vc");
-        Pvoid_t *p;
-        p = JudyLIns(&dst->JudyL, (Word_t)stale_a, PJE0);
-        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
-        p = JudyLIns(&dst->JudyL, (Word_t)stale_b, PJE0);
-        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
-        p = JudyLIns(&dst->JudyL, (Word_t)stale_c, PJE0);
-        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
-    }
+    rrdlabels_unittest_plant_dups(dst, "k1", planted_dups, 3);
     UT_EXPECT(rrdlabels_entries(dst) == 3,
               "test setup: dst should start with 3 manually-planted same-key entries (copy)");
     rrdlabels_add(src, "k1", "vc", RRDLABEL_SRC_CONFIG);
@@ -1851,13 +1826,8 @@ static int rrdlabels_unittest_change_detection(void) {
               "copy must drain all stale same-key duplicates, not just the first");
     UT_EXPECT(rrdlabels_version(dst) > copy_version_before,
               "copy must advance dst->version when cleanup is the only mutation");
-    {
-        char *v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
-        UT_EXPECT(v != NULL && strcmp(v, "vc") == 0,
-                  "copy multi-duplicate drain should leave only the src value in dst");
-        freez(v);
-    }
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "vc"),
+              "copy multi-duplicate drain should leave only the src value in dst");
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
@@ -1876,18 +1846,10 @@ static int rrdlabels_unittest_change_detection(void) {
               "migrate with mixed-key DONT_DELETE dst must return true on k1 change");
     UT_EXPECT(rrdlabels_entries(dst) == 2,
               "migrate cleanup must leave the unrelated DONT_DELETE key intact");
-    {
-        char *v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
-        UT_EXPECT(v != NULL && strcmp(v, "v3") == 0,
-                  "migrate must update k1 to the src value");
-        freez(v);
-        v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k2");
-        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
-                  "migrate must preserve the unrelated DONT_DELETE key's value");
-        freez(v);
-    }
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v3"),
+              "migrate must update k1 to the src value");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k2", "v2"),
+              "migrate must preserve the unrelated DONT_DELETE key's value");
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
@@ -1900,18 +1862,10 @@ static int rrdlabels_unittest_change_detection(void) {
     rrdlabels_copy(dst, src);
     UT_EXPECT(rrdlabels_entries(dst) == 2,
               "copy cleanup must leave the unrelated DONT_DELETE key intact");
-    {
-        char *v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
-        UT_EXPECT(v != NULL && strcmp(v, "v3") == 0,
-                  "copy must update k1 to the src value");
-        freez(v);
-        v = NULL;
-        rrdlabels_get_value_strdup_or_null(dst, &v, "k2");
-        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
-                  "copy must preserve the unrelated DONT_DELETE key's value");
-        freez(v);
-    }
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v3"),
+              "copy must update k1 to the src value");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k2", "v2"),
+              "copy must preserve the unrelated DONT_DELETE key's value");
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
