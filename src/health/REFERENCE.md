@@ -1384,7 +1384,7 @@ template: ml_5min_node
 ```text
  alarm: service_failure_event
     on: my_service.health_status
-lookup: average -10s of unhealthy
+lookup: average -10s of health_status
  every: 10s
   warn: $this > 0
    info: any failure detected in the last 10 seconds
@@ -1428,7 +1428,7 @@ lookup: max -5m unaligned
 ```text
  alarm: service_failure_rate
     on: my_service.health_status
-lookup: average -5m unaligned of status
+lookup: average -5m unaligned of health_status
  every: 1m
   warn: $this > 0.1
    crit: $this > 0.5
@@ -1438,7 +1438,9 @@ lookup: average -5m unaligned of status
 
 When the metric is 0 = healthy and 1 = failure, `average` over the window returns a value between 0.0 and 1.0 representing the fraction of time spent in failure. `warn: $this > 0.1` fires when the service was failing more than 10% of the time, and `crit: $this > 0.5` fires when failures exceeded half the window. This is useful for SLO-style alerting where occasional failures are acceptable.
 
-> **Note on `percentage`:** The `percentage` option calculates each dimension's share of the chart total — it is designed for multi-dimension charts like `system.ram` (see line 97: `lookup: average -1m percentage of used`). For a single-dimension boolean gauge, `percentage` always returns 100. Use plain `average` and compare against 0.0–1.0 thresholds instead.
+:::note
+**Note on `percentage`:** The `percentage` option calculates each dimension's share of the chart total — it is designed for multi-dimension charts like `system.ram` (see [Task 3: Create a Simple Alert](#task-3-create-a-simple-alert): `lookup: average -1m percentage of used`). For a single-dimension boolean gauge, `percentage` always returns 100. Use plain `average` and compare against 0.0–1.0 thresholds instead.
+:::
 
 **Approach 4: Instant State Check (calc, no lookup)**
 
@@ -1459,10 +1461,10 @@ Use to check only the current value without time-window aggregation. The `calc: 
 
 | Intent                                                  | Method | Lookup / Calc              | Condition    | Fires When                                |
 | ------------------------------------------------------- | ------ | -------------------------- | ------------ | ----------------------------------------- |
-| Any failure event (metric is 0 normally, 1 on failure)  | `average`  | `average -10s of unhealthy` | `$this > 0` | Metric was non-zero at any point in the window |
+| Any failure event (metric is 0 normally, 1 on failure)  | `average`  | `average -10s of health_status` | `$this > 0` | Metric was non-zero at any point in the window |
 | Any downtime (metric is 1=healthy, 0=down)              | `min`  | `min -5m unaligned`        | `$this == 0` | Metric hit 0 at any point in the window   |
 | Continuous outage (metric is 1=healthy, 0=down)         | `max`  | `max -5m unaligned`        | `$this == 0` | Metric was 0 for the entire window        |
-| Failure rate over time                                  | `average` | `average -5m unaligned of status` | `$this > 0.N`  | Failure fraction exceeds threshold (0.0–1.0) |
+| Failure rate over time                                  | `average` | `average -5m unaligned of health_status` | `$this > 0.N`  | Failure fraction exceeds threshold (0.0–1.0) |
 | Current state only                                      | `calc` | `calc: $health_status` (no lookup)   | `$this == 0` | Current value is 0 (debounce with delay)  |
 
 For a full list of available lookup methods and processing options (`average`, `min`, `max`, `sum`, `percentage`, `absolute`, etc.), see the [Alert Line `lookup`](#alert-line-lookup) section.
