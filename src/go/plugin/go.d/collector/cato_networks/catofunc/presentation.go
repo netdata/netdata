@@ -32,7 +32,7 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 				Role:      "actor",
 				Icon:      "network",
 				ColorSlot: "green",
-				Border:    &topologyv1.BorderPresentation{Enabled: topologyv1.Bool(true)},
+				Border:    &topologyv1.BorderPresentation{Enabled: new(true)},
 				Size:      &topologyv1.ActorSizePresentation{Mode: "link_count", Scale: "emphasized"},
 				Layout:    &topologyv1.ActorLayoutPresentation{Repulsion: "stronger"},
 				LabelPolicy: &topologyv1.LabelPolicy{
@@ -55,7 +55,7 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 				Role:      "actor",
 				Icon:      "cloud",
 				ColorSlot: "blue",
-				Border:    &topologyv1.BorderPresentation{Enabled: topologyv1.Bool(true)},
+				Border:    &topologyv1.BorderPresentation{Enabled: new(true)},
 				Size:      &topologyv1.ActorSizePresentation{Mode: "link_count", Scale: "normal"},
 				LabelPolicy: &topologyv1.LabelPolicy{
 					Columns:   []string{"display_name", "pop_name"},
@@ -77,7 +77,7 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 				Role:      "endpoint",
 				Icon:      "remote-endpoint",
 				ColorSlot: "orange",
-				Border:    &topologyv1.BorderPresentation{Enabled: topologyv1.Bool(true)},
+				Border:    &topologyv1.BorderPresentation{Enabled: new(true)},
 				Size:      &topologyv1.ActorSizePresentation{Mode: "fixed", Scale: "compact"},
 				LabelPolicy: &topologyv1.LabelPolicy{
 					Columns:   []string{"display_name", "remote_ip", "remote_asn"},

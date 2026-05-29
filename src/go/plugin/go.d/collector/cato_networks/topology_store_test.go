@@ -65,15 +65,13 @@ func TestTopologyStoreConcurrentPublishLoad(t *testing.T) {
 	}
 
 	for range 100 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if data, ok := store.CurrentTopology(); ok {
 				if data == nil {
 					nilLoads.Add(1)
 				}
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
