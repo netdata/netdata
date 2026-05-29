@@ -25,8 +25,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, pop_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: site_hosts
             name: hosts
@@ -37,8 +35,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, pop_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: site_connectivity_status
       - id: site_operational_status
@@ -48,8 +44,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, pop_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: site_operational_status
       - id: site_traffic
@@ -59,8 +53,6 @@ groups:
         type: area
         instances:
           by_labels: [site_id, site_name, pop_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: site_bytes_upstream_max
             name: upstream
@@ -73,8 +65,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, pop_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: site_lost_upstream_percent
             name: upstream
@@ -87,8 +77,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, pop_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: site_packets_discarded_upstream
             name: upstream
@@ -101,8 +89,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, pop_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: site_jitter_upstream_ms
             name: upstream
@@ -115,8 +101,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, pop_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: site_rtt_ms
             name: rtt
@@ -129,8 +113,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, pop_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: site_last_mile_packet_loss_percent
             name: loss
@@ -155,8 +137,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, interface_id, interface_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: interface_connection_status
       - id: interface_tunnel_uptime
@@ -166,8 +146,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, interface_id, interface_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: interface_tunnel_uptime_seconds
             name: uptime
@@ -178,8 +156,6 @@ groups:
         type: area
         instances:
           by_labels: [site_id, site_name, interface_id, interface_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: interface_bytes_upstream_max
             name: upstream
@@ -192,8 +168,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, interface_id, interface_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: interface_lost_upstream_percent
             name: upstream
@@ -206,8 +180,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, interface_id, interface_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: interface_packets_discarded_upstream
             name: upstream
@@ -220,8 +192,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, interface_id, interface_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: interface_jitter_upstream_ms
             name: upstream
@@ -234,8 +204,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, interface_id, interface_name]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: interface_rtt_ms
             name: rtt
@@ -254,8 +222,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, peer_ip, peer_asn]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: bgp_session_status
       - id: bgp_routes
@@ -265,8 +231,6 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, peer_ip, peer_asn]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: bgp_routes
             name: accepted
@@ -281,7 +245,5 @@ groups:
         type: line
         instances:
           by_labels: [site_id, site_name, peer_ip, peer_asn]
-        lifecycle:
-          expire_after_cycles: 5
         dimensions:
           - selector: bgp_routes_limit_status
