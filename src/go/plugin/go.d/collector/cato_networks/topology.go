@@ -9,19 +9,13 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cato_networks/catofunc"
 )
 
 const (
 	topologySchemaVersion = "v1"
 	topologySource        = "cato_networks"
 	topologyLayer         = "wan"
-
-	actorTypeSite    = "cato_site"
-	actorTypePop     = "cato_pop"
-	actorTypeBGPPeer = "bgp_peer"
-
-	linkTypeTunnel = "cato_tunnel"
-	linkTypeBGP    = "bgp_session"
 )
 
 func buildTopology(accountID string, sites map[string]*siteState, order []string, collectedAt time.Time) *topology.Data {
@@ -38,7 +32,7 @@ func buildTopology(accountID string, sites map[string]*siteState, order []string
 		siteActorID := catoSiteActorID(site.ID)
 		actors = append(actors, topology.Actor{
 			ActorID:   siteActorID,
-			ActorType: actorTypeSite,
+			ActorType: catofunc.ActorTypeSite,
 			Layer:     topologyLayer,
 			Source:    topologySource,
 			Match: topology.Match{
@@ -73,7 +67,7 @@ func buildTopology(accountID string, sites map[string]*siteState, order []string
 				popSeen[site.PopName] = true
 				actors = append(actors, topology.Actor{
 					ActorID:   popActorID,
-					ActorType: actorTypePop,
+					ActorType: catofunc.ActorTypePop,
 					Layer:     topologyLayer,
 					Source:    topologySource,
 					Match: topology.Match{
@@ -92,7 +86,7 @@ func buildTopology(accountID string, sites map[string]*siteState, order []string
 			link := topology.Link{
 				Layer:      topologyLayer,
 				Protocol:   "cato",
-				LinkType:   linkTypeTunnel,
+				LinkType:   catofunc.LinkTypeTunnel,
 				Direction:  "bidirectional",
 				State:      site.ConnectivityStatus,
 				SrcActorID: siteActorID,
@@ -125,7 +119,7 @@ func buildTopology(accountID string, sites map[string]*siteState, order []string
 			bgpPeerSeen[peerActorID] = true
 			actors = append(actors, topology.Actor{
 				ActorID:   peerActorID,
-				ActorType: actorTypeBGPPeer,
+				ActorType: catofunc.ActorTypeBGPPeer,
 				Layer:     topologyLayer,
 				Source:    topologySource,
 				Match:     catoBGPPeerMatch(peer.RemoteIP),
@@ -146,7 +140,7 @@ func buildTopology(accountID string, sites map[string]*siteState, order []string
 			links = append(links, topology.Link{
 				Layer:      topologyLayer,
 				Protocol:   "bgp",
-				LinkType:   linkTypeBGP,
+				LinkType:   catofunc.LinkTypeBGP,
 				Direction:  "bidirectional",
 				State:      peer.BGPSession,
 				SrcActorID: siteActorID,

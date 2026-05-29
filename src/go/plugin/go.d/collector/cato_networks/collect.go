@@ -69,10 +69,7 @@ func (c *Collector) collect(ctx context.Context) (err error) {
 
 	now := c.now()
 	topo := buildTopology(c.AccountID, sites, order, now)
-
-	c.mu.Lock()
-	c.topology = topo
-	c.mu.Unlock()
+	c.topology.Publish(topo)
 
 	c.writeMetrics(sites, order)
 

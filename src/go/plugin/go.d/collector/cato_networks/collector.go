@@ -8,13 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cato_networks/catofunc"
 )
 
 //go:embed "config_schema.json"
@@ -40,7 +40,7 @@ func init() {
 func New() *Collector {
 	store := metrix.NewCollectorStore()
 
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			UpdateEvery: defaultUpdateEvery,
 			HTTPConfig: web.HTTPConfig{
@@ -58,6 +58,8 @@ func New() *Collector {
 		newClient: newSDKAPIClient,
 		now:       time.Now,
 	}
+	c.funcRouter = catofunc.NewRouter(funcDepsAdapter{store: &c.topology})
+	return c
 }
 
 type Collector struct {
@@ -71,8 +73,8 @@ type Collector struct {
 	client     apiClient
 	newClient  func(Config, *http.Client) (apiClient, error)
 
-	mu       sync.RWMutex
-	topology *topology.Data
+	funcRouter funcapi.MethodHandler
+	topology   topologyStore
 
 	discovery discoveryState
 	bgp       bgpState
@@ -137,7 +139,10 @@ func (c *Collector) Collect(ctx context.Context) error {
 	return nil
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
 	}
@@ -146,19 +151,6 @@ func (c *Collector) Cleanup(context.Context) {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) ChartTemplateYAML() string { return chartTemplate }
-
-func (c *Collector) currentTopology() (*topology.Data, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.topology == nil {
-		return nil, false
-	}
-	data := *c.topology
-	data.Actors = append([]topology.Actor(nil), c.topology.Actors...)
-	data.Links = append([]topology.Link(nil), c.topology.Links...)
-	return &data, true
-}
 
 func contextErr(ctx context.Context) error {
 	if ctx == nil {

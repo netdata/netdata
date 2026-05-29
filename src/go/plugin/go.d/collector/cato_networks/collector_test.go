@@ -28,6 +28,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cato_networks/catofunc"
 )
 
 type fakeAPIClient struct {
@@ -182,7 +183,7 @@ func TestCollectorCollectsMetricsAndTopology(t *testing.T) {
 		"peer_asn":  "64512",
 	}, 1)
 
-	topo, ok := c.currentTopology()
+	topo, ok := c.topology.CurrentTopology()
 	require.True(t, ok)
 	require.Equal(t, topologySource, topo.Source)
 	require.Len(t, topo.Actors, 5)
@@ -393,7 +394,7 @@ func TestCheckUsesOnlyCheapProbe(t *testing.T) {
 	require.Zero(t, fake.bgpCalls)
 	require.Empty(t, c.discovery.siteIDs)
 	require.Empty(t, c.bgp.bySite)
-	_, ok := c.currentTopology()
+	_, ok := c.topology.CurrentTopology()
 	require.False(t, ok)
 	require.Empty(t, c.health.OperationFailures)
 	require.Empty(t, c.health.CollectionFailureTotals)
@@ -983,8 +984,7 @@ func TestTopologyFunctionReturnsCurrentTopology(t *testing.T) {
 	require.NoError(t, c.Collect(context.Background()))
 	cc.CommitCycleSuccess()
 
-	handler := &funcTopology{collector: c}
-	resp := handler.Handle(context.Background(), topologyMethodID, nil)
+	resp := c.funcRouter.Handle(context.Background(), catofunc.TopologyMethodID, nil)
 
 	require.Equal(t, 200, resp.Status)
 	require.Equal(t, "topology", resp.ResponseType)
@@ -1007,12 +1007,12 @@ func TestTopologyOmitsUnavailableTunnelMetrics(t *testing.T) {
 	}, []string{"1001"}, fixedCatoTestNow())
 
 	require.Len(t, data.Links, 1)
-	require.Equal(t, linkTypeTunnel, data.Links[0].LinkType)
+	require.Equal(t, catofunc.LinkTypeTunnel, data.Links[0].LinkType)
 	require.Empty(t, data.Links[0].Metrics)
 }
 
 func TestTopologyFunctionRequiresJobSelection(t *testing.T) {
-	cfg := catoTopologyMethodConfig()
+	cfg := catofunc.Methods(defaultUpdateEvery)[0]
 
 	require.False(t, cfg.AgentWide)
 }
@@ -1033,7 +1033,7 @@ func TestBuildTopologyOmitsEmptyBGPPeerIPMatch(t *testing.T) {
 
 	var peerActor *topology.Actor
 	for i := range data.Actors {
-		if data.Actors[i].ActorType == actorTypeBGPPeer {
+		if data.Actors[i].ActorType == catofunc.ActorTypeBGPPeer {
 			peerActor = &data.Actors[i]
 			break
 		}
@@ -1043,7 +1043,7 @@ func TestBuildTopologyOmitsEmptyBGPPeerIPMatch(t *testing.T) {
 
 	var bgpLink *topology.Link
 	for i := range data.Links {
-		if data.Links[i].LinkType == linkTypeBGP {
+		if data.Links[i].LinkType == catofunc.LinkTypeBGP {
 			bgpLink = &data.Links[i]
 			break
 		}
@@ -1069,13 +1069,13 @@ func TestBuildTopologyDeduplicatesBGPPeers(t *testing.T) {
 	for _, actor := range data.Actors {
 		require.False(t, actorIDs[actor.ActorID], "duplicate actor_id %q", actor.ActorID)
 		actorIDs[actor.ActorID] = true
-		if actor.ActorType == actorTypeBGPPeer {
+		if actor.ActorType == catofunc.ActorTypeBGPPeer {
 			peerActors++
 		}
 	}
 	var bgpLinks int
 	for _, link := range data.Links {
-		if link.LinkType == linkTypeBGP {
+		if link.LinkType == catofunc.LinkTypeBGP {
 			bgpLinks++
 		}
 	}

@@ -1,70 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package cato_networks
+package catofunc
 
 import (
-	"context"
-
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/topology"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-const topologyMethodID = "topology:cato_networks"
-
-type funcTopology struct {
-	collector *Collector
-}
-
-var _ funcapi.MethodHandler = (*funcTopology)(nil)
-
-func (f *funcTopology) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
-	return nil, nil
-}
-
-func (f *funcTopology) Handle(_ context.Context, method string, _ funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if method != topologyMethodID {
-		return funcapi.NotFoundResponse(method)
-	}
-	if f.collector == nil {
-		return funcapi.UnavailableResponse("Cato Networks topology data is not available yet")
-	}
-
-	data, ok := f.collector.currentTopology()
-	if !ok {
-		return funcapi.UnavailableResponse("Cato Networks topology data is not available yet")
-	}
-
-	return &funcapi.FunctionResponse{
-		Status:       200,
-		Help:         "Cato Networks site, PoP, tunnel, and BGP topology data",
-		ResponseType: "topology",
-		Data:         data,
-	}
-}
-
-func (f *funcTopology) Cleanup(context.Context) {
-	// Topology handler stores only a collector reference; the collector owns lifecycle state.
-}
-
-func catoMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{catoTopologyMethodConfig()}
-}
-
-func catoFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
-	c, ok := job.Collector().(*Collector)
-	if !ok {
-		return nil
-	}
-	return &funcTopology{collector: c}
-}
-
-func catoTopologyMethodConfig() funcapi.MethodConfig {
+func topologyMethodConfig(updateEvery int) funcapi.MethodConfig {
 	return funcapi.MethodConfig{
-		ID:           topologyMethodID,
-		Aliases:      []string{topologyMethodID},
+		ID:           TopologyMethodID,
+		Aliases:      []string{TopologyMethodID},
 		Name:         "Topology (Cato Networks)",
-		UpdateEvery:  defaultUpdateEvery,
+		UpdateEvery:  updateEvery,
 		Help:         "Cato Networks site, PoP, tunnel, and BGP topology data",
 		RequireCloud: true,
 		ResponseType: "topology",
@@ -74,7 +22,7 @@ func catoTopologyMethodConfig() funcapi.MethodConfig {
 func catoTopologyPresentation() *topology.Presentation {
 	return &topology.Presentation{
 		ActorTypes: map[string]topology.PresentationActorType{
-			actorTypeSite: {
+			ActorTypeSite: {
 				Label:     "Site",
 				ColorSlot: "green",
 				Border:    true,
@@ -122,7 +70,7 @@ func catoTopologyPresentation() *topology.Presentation {
 					{ID: "devices", Label: "Devices", Type: "table"},
 				},
 			},
-			actorTypePop: {
+			ActorTypePop: {
 				Label:     "Cato PoP",
 				ColorSlot: "blue",
 				Border:    true,
@@ -131,7 +79,7 @@ func catoTopologyPresentation() *topology.Presentation {
 					{Key: "name", Label: "Name", Sources: []string{"attributes"}},
 				},
 			},
-			actorTypeBGPPeer: {
+			ActorTypeBGPPeer: {
 				Label:     "BGP peer",
 				ColorSlot: "orange",
 				Border:    true,
@@ -144,18 +92,18 @@ func catoTopologyPresentation() *topology.Presentation {
 			},
 		},
 		LinkTypes: map[string]topology.PresentationLinkType{
-			linkTypeTunnel: {Label: "Cato tunnel", ColorSlot: "green", Width: 2},
-			linkTypeBGP:    {Label: "BGP session", ColorSlot: "orange", Width: 2},
+			LinkTypeTunnel: {Label: "Cato tunnel", ColorSlot: "green", Width: 2},
+			LinkTypeBGP:    {Label: "BGP session", ColorSlot: "orange", Width: 2},
 		},
 		Legend: topology.PresentationLegend{
 			Actors: []topology.PresentationLegendEntry{
-				{Type: actorTypeSite, Label: "Cato site"},
-				{Type: actorTypePop, Label: "Cato PoP"},
-				{Type: actorTypeBGPPeer, Label: "BGP peer"},
+				{Type: ActorTypeSite, Label: "Cato site"},
+				{Type: ActorTypePop, Label: "Cato PoP"},
+				{Type: ActorTypeBGPPeer, Label: "BGP peer"},
 			},
 			Links: []topology.PresentationLegendEntry{
-				{Type: linkTypeTunnel, Label: "Cato tunnel"},
-				{Type: linkTypeBGP, Label: "BGP session"},
+				{Type: LinkTypeTunnel, Label: "Cato tunnel"},
+				{Type: LinkTypeBGP, Label: "BGP session"},
 			},
 		},
 		ActorClickBehavior: "highlight_connections",
