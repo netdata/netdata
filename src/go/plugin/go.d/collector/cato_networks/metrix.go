@@ -50,6 +50,29 @@ type trafficMetricWriters struct {
 	lastMileLoss    metrix.SnapshotGaugeVec
 }
 
+func (w trafficMetricWriters) withHostScope(scope metrix.HostScope) trafficMetricWriters {
+	return trafficMetricWriters{
+		bytesUp:         gaugeVecWithHostScope(w.bytesUp, scope),
+		bytesDown:       gaugeVecWithHostScope(w.bytesDown, scope),
+		lostUp:          gaugeVecWithHostScope(w.lostUp, scope),
+		lostDown:        gaugeVecWithHostScope(w.lostDown, scope),
+		jitterUp:        gaugeVecWithHostScope(w.jitterUp, scope),
+		jitterDown:      gaugeVecWithHostScope(w.jitterDown, scope),
+		discardUp:       gaugeVecWithHostScope(w.discardUp, scope),
+		discardDown:     gaugeVecWithHostScope(w.discardDown, scope),
+		rtt:             gaugeVecWithHostScope(w.rtt, scope),
+		lastMileLatency: gaugeVecWithHostScope(w.lastMileLatency, scope),
+		lastMileLoss:    gaugeVecWithHostScope(w.lastMileLoss, scope),
+	}
+}
+
+func gaugeVecWithHostScope(vec metrix.SnapshotGaugeVec, scope metrix.HostScope) metrix.SnapshotGaugeVec {
+	if vec == nil {
+		return nil
+	}
+	return vec.WithHostScope(scope)
+}
+
 var siteConnectivityStates = []string{"connected", "disconnected", "degraded", "unknown"}
 var siteOperationalStates = []string{"active", "disabled", "locked", "unknown"}
 var deviceConnectionStates = []string{"connected", "disconnected"}

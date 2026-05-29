@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 type fakeAPIClient struct {
@@ -143,7 +142,22 @@ func collectOnce(t *testing.T, c *Collector) {
 
 func collectScalarSeries(t *testing.T, c *Collector) (map[string]metrix.SampleValue, error) {
 	t.Helper()
-	return collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	cc := mustCycleController(t, c.store)
+	committed := false
+	cc.BeginCycle()
+	defer func() {
+		if !committed {
+			cc.AbortCycle()
+		}
+	}()
+	if err := c.Collect(context.Background()); err != nil {
+		return nil, err
+	}
+	if err := cc.CommitCycleSuccess(); err != nil {
+		return nil, err
+	}
+	committed = true
+	return scalarSeriesFromAllHostScopes(c.store), nil
 }
 
 func collectError(t *testing.T, c *Collector) error {
@@ -449,6 +463,26 @@ func requireMetricsMissing(t *testing.T, got map[string]metrix.SampleValue, keys
 	for _, key := range keys {
 		require.NotContains(t, got, key)
 	}
+}
+
+func scalarSeriesFromAllHostScopes(store metrix.CollectorStore) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue)
+	reader := store.Read(metrix.ReadFlatten())
+	for _, scope := range reader.HostScopes() {
+		maps.Copy(out, scalarSeriesFromReader(store.Read(metrix.ReadFlatten(), metrix.ReadHostScope(scope.ScopeKey))))
+	}
+	return out
+}
+
+func scalarSeriesFromReader(reader metrix.Reader) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue)
+	if reader == nil {
+		return out
+	}
+	reader.ForEachSeries(func(name string, labels metrix.LabelView, value metrix.SampleValue) {
+		out[metricKeyFromLabelView(name, labels)] = value
+	})
+	return out
 }
 
 func metricKey(name string, labels metrix.Labels) string {

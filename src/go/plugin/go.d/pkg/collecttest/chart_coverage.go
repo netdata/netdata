@@ -58,12 +58,7 @@ func AssertChartCoverage(
 	}
 	templateYAML := collector.ChartTemplateYAML()
 
-	coverage, err := buildChartCoverage(
-		templateYAML,
-		1,
-		store.Read(metrix.ReadRaw(), metrix.ReadFlatten()),
-		exp.ExcludeContextPatterns,
-	)
+	coverage, err := buildChartCoverageFromStore(templateYAML, 1, store, exp.ExcludeContextPatterns)
 	if err != nil {
 		t.Fatalf("collecttest: build chart coverage: %v", err)
 		return
@@ -74,6 +69,56 @@ func AssertChartCoverage(
 	}
 	for contextName, dims := range exp.RequiredContexts {
 		requireContextDims(t, coverage.ActualByContext, contextName, dims)
+	}
+}
+
+func buildChartCoverageFromStore(
+	templateYAML string,
+	revision uint64,
+	store metrix.CollectorStore,
+	excludeContextPatterns []string,
+) (chartCoverage, error) {
+	reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	scopes := reader.HostScopes()
+	if len(scopes) == 0 {
+		return buildChartCoverage(templateYAML, revision, reader, excludeContextPatterns)
+	}
+
+	var out chartCoverage
+	for _, scope := range scopes {
+		reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(scope.ScopeKey))
+		coverage, err := buildChartCoverage(templateYAML, revision, reader, excludeContextPatterns)
+		if err != nil {
+			return chartCoverage{}, err
+		}
+		mergeChartCoverage(&out, coverage)
+	}
+	return out, nil
+}
+
+func mergeChartCoverage(dst *chartCoverage, src chartCoverage) {
+	if dst.ActualByContext == nil {
+		dst.ActualByContext = make(map[string]map[string]struct{})
+	}
+	if dst.ExpectedByContext == nil {
+		dst.ExpectedByContext = make(map[string][]string)
+	}
+	for contextName, dims := range src.ActualByContext {
+		existing := dst.ActualByContext[contextName]
+		if existing == nil {
+			existing = make(map[string]struct{})
+			dst.ActualByContext[contextName] = existing
+		}
+		for dimName := range dims {
+			existing[dimName] = struct{}{}
+		}
+	}
+	for contextName, dims := range src.ExpectedByContext {
+		existing := stringSetFromSlice(dst.ExpectedByContext[contextName])
+		for _, dimName := range dims {
+			existing[dimName] = struct{}{}
+		}
+		dst.ExpectedByContext[contextName] = sortedStringSet(existing)
 	}
 }
 
@@ -260,6 +305,23 @@ func collectTemplateContexts(
 		}
 	}
 	return nil
+}
+
+func stringSetFromSlice(values []string) map[string]struct{} {
+	out := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		out[value] = struct{}{}
+	}
+	return out
+}
+
+func sortedStringSet(values map[string]struct{}) []string {
+	out := make([]string, 0, len(values))
+	for value := range values {
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func collectExpectedDimensionNames(

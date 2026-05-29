@@ -14,12 +14,13 @@ func (c *Collector) writeMetrics(sites map[string]*siteState, order []string) {
 		if site == nil {
 			continue
 		}
+		scope := c.siteHostScope(site)
 		labels := []string{site.ID, site.Name, site.PopName}
 
-		observeStateSetVec(c.metrics.site.connectivityStatus, c.siteConnectivityState(site.ConnectivityStatus), labels...)
-		observeStateSetVec(c.metrics.site.operationalStatus, c.siteOperationalState(site.OperationalStatus), labels...)
-		c.metrics.site.hosts.WithLabelValues(labels...).Observe(float64(site.HostCount))
-		writeTrafficMetrics(site.Metrics, labels, c.metrics.site.traffic)
+		observeStateSetVec(c.metrics.site.connectivityStatus.WithHostScope(scope), c.siteConnectivityState(site.ConnectivityStatus), labels...)
+		observeStateSetVec(c.metrics.site.operationalStatus.WithHostScope(scope), c.siteOperationalState(site.OperationalStatus), labels...)
+		c.metrics.site.hosts.WithHostScope(scope).WithLabelValues(labels...).Observe(float64(site.HostCount))
+		writeTrafficMetrics(site.Metrics, labels, c.metrics.site.traffic.withHostScope(scope))
 
 		for _, dev := range site.Devices {
 			deviceID := stableDeviceID(dev)
@@ -31,23 +32,23 @@ func (c *Collector) writeMetrics(sites map[string]*siteState, order []string) {
 				deviceName = deviceID
 			}
 			deviceLabels := []string{site.ID, site.Name, deviceID, deviceName}
-			observeStateSetVec(c.metrics.device.connectionStatus, boolState(dev.Connected, "connected", "disconnected"), deviceLabels...)
+			observeStateSetVec(c.metrics.device.connectionStatus.WithHostScope(scope), boolState(dev.Connected, "connected", "disconnected"), deviceLabels...)
 		}
 
 		for _, iface := range site.Interfaces {
 			ifaceLabels := []string{site.ID, site.Name, iface.DeviceID, iface.DeviceName, iface.ID, iface.Name}
-			observeStateSetVec(c.metrics.iface.connectionStatus, boolState(iface.Connected || iface.LinkUp, "connected", "disconnected"), ifaceLabels...)
-			writeTrafficMetrics(iface.Metrics, ifaceLabels, c.metrics.iface.traffic)
-			c.metrics.iface.tunnelUptime.WithLabelValues(ifaceLabels...).Observe(float64(iface.TunnelUptime))
+			observeStateSetVec(c.metrics.iface.connectionStatus.WithHostScope(scope), boolState(iface.Connected || iface.LinkUp, "connected", "disconnected"), ifaceLabels...)
+			writeTrafficMetrics(iface.Metrics, ifaceLabels, c.metrics.iface.traffic.withHostScope(scope))
+			c.metrics.iface.tunnelUptime.WithHostScope(scope).WithLabelValues(ifaceLabels...).Observe(float64(iface.TunnelUptime))
 		}
 
 		for _, peer := range site.BGPPeers {
 			peerLabels := []string{site.ID, site.Name, peer.RemoteIP, peer.RemoteASN}
-			observeStateSetVec(c.metrics.bgp.sessionStatus, bgpSessionState(peer.BGPSession), peerLabels...)
-			c.metrics.bgp.routes.WithLabelValues(peerLabels...).Observe(float64(peer.RoutesCount))
-			c.metrics.bgp.routesLimit.WithLabelValues(peerLabels...).Observe(float64(peer.RoutesCountLimit))
-			observeStateSetVec(c.metrics.bgp.routesLimitState, boolState(peer.RoutesCountLimitExceeded, "exceeded", "ok"), peerLabels...)
-			c.metrics.bgp.ribOutRoutes.WithLabelValues(peerLabels...).Observe(float64(peer.RIBOutRoutes))
+			observeStateSetVec(c.metrics.bgp.sessionStatus.WithHostScope(scope), bgpSessionState(peer.BGPSession), peerLabels...)
+			c.metrics.bgp.routes.WithHostScope(scope).WithLabelValues(peerLabels...).Observe(float64(peer.RoutesCount))
+			c.metrics.bgp.routesLimit.WithHostScope(scope).WithLabelValues(peerLabels...).Observe(float64(peer.RoutesCountLimit))
+			observeStateSetVec(c.metrics.bgp.routesLimitState.WithHostScope(scope), boolState(peer.RoutesCountLimitExceeded, "exceeded", "ok"), peerLabels...)
+			c.metrics.bgp.ribOutRoutes.WithHostScope(scope).WithLabelValues(peerLabels...).Observe(float64(peer.RIBOutRoutes))
 		}
 	}
 

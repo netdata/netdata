@@ -24,6 +24,7 @@ Module: cato_networks
 This collector monitors Cato Networks accounts through the Cato GraphQL API.
 
 It discovers sites, collects site, device, and interface status, traffic and quality metrics, collects BGP peer status, and exposes Cato site/device/PoP/BGP topology data.
+Metrics for each selected site are emitted under a generated virtual node named after the Cato site and keyed by the Cato account ID and site ID. Site labels are still attached to metric series for grouping and aggregation.
 
 
 The collector uses the Cato GraphQL API endpoint with an account ID and API key.
@@ -45,7 +46,7 @@ This collector does not auto-detect Cato accounts. Configure at least one job wi
 
 #### Limits
 
-Site discovery is paginated and refreshed hourly. The optional `site_selector` filters sites before snapshot, metrics, BGP, and topology collection. Account metrics use bounded concurrent one-site API requests to preserve per-Socket device and interface attribution. BGP status uses one per-site API request for each selected site that is not currently cached as having no BGP peers.
+Site discovery is paginated and refreshed hourly. The optional `site_selector` filters sites before snapshot, metrics, BGP, topology, and generated site virtual-node creation. Account metrics use bounded concurrent one-site API requests to preserve per-Socket device and interface attribution. BGP status uses one per-site API request for each selected site that is not currently cached as having no BGP peers.
 
 
 #### Performance Impact

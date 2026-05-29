@@ -57,6 +57,19 @@ func TestCollector_Collect(t *testing.T) {
 					require.Equal(t, topologySource, topo.Producer.Source)
 					require.Equal(t, 6, topo.Actors.Rows)
 					require.Equal(t, 3, topo.Links.Rows)
+					requireSiteHostScope(t, c, "1001", "Paris Office", "POP-Paris")
+					requireSiteHostScope(t, c, "1002", "Toulouse Office", "POP-Toulouse")
+					require.Empty(t, scalarSeriesFromReader(c.store.Read(metrix.ReadFlatten(), metrix.ReadHostScope(""))))
+					scoped1001 := scalarSeriesFromReader(c.store.Read(
+						metrix.ReadFlatten(),
+						metrix.ReadHostScope(c.siteHostScope(&siteState{ID: "1001"}).ScopeKey),
+					))
+					requireMetricValues(t, scoped1001, map[string]metrix.SampleValue{
+						stateMetricKey("site_connectivity_status", "connected", siteLabels("1001", "Paris Office", "POP-Paris")):           1,
+						stateMetricKey("device_connection_status", "connected", deviceLabels("1001", "Paris Office", "dev-1", "Socket 1")): 1,
+						metricKey("interface_bytes_upstream_max", interfaceLabels("1001", "Paris Office", "", "", "", "all")):              7168,
+						stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):               1,
+					})
 					collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 				},
 			}},
@@ -617,10 +630,7 @@ func TestCollector_WriteMetrics(t *testing.T) {
 			c.writeMetrics(tc.sites, tc.order)
 			cc.CommitCycleSuccess()
 
-			got := map[string]metrix.SampleValue{}
-			c.store.Read(metrix.ReadFlatten()).ForEachSeries(func(name string, labels metrix.LabelView, value metrix.SampleValue) {
-				got[metricKeyFromLabelView(name, labels)] = value
-			})
+			got := scalarSeriesFromAllHostScopes(c.store)
 			requireMetricValues(t, got, tc.want)
 		})
 	}
@@ -713,4 +723,26 @@ func metricKeyFromLabelView(name string, labels metrix.LabelView) string {
 		return true
 	})
 	return metricKey(name, out)
+}
+
+func requireSiteHostScope(t *testing.T, c *Collector, siteID, siteName, popName string) {
+	t.Helper()
+
+	want := c.siteHostScope(&siteState{ID: siteID, Name: siteName, PopName: popName})
+	require.False(t, want.IsDefault())
+
+	for _, scope := range c.store.Read(metrix.ReadFlatten()).HostScopes() {
+		if scope.ScopeKey != want.ScopeKey {
+			continue
+		}
+		require.Equal(t, want.GUID, scope.GUID)
+		require.Equal(t, want.Hostname, scope.Hostname)
+		require.Equal(t, catoSiteScopeLabelValue, scope.Labels[catoSiteScopeLabelKey])
+		require.Equal(t, c.AccountID, scope.Labels["cato_account_id"])
+		require.Equal(t, siteID, scope.Labels["cato_site_id"])
+		require.Equal(t, siteName, scope.Labels["cato_site_name"])
+		require.Equal(t, popName, scope.Labels["cato_pop_name"])
+		return
+	}
+	t.Fatalf("missing host scope for site %s", siteID)
 }
