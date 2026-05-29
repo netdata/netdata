@@ -738,9 +738,13 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
             // Ensure at most one entry per key. The remove-unmarked sweep below
             // preserves RRDLABEL_FLAG_DONT_DELETE, so a same-key replacement
             // for a pinned entry would otherwise leave a stale duplicate
-            // (key, old-value) next to the fresh (key, new-value).
-            RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
-            if (old_label_with_same_key) {
+            // (key, old-value) next to the fresh (key, new-value). Loop in
+            // case dst arrived with multiple same-key entries from prior
+            // buggy paths -- the find helper returns the first match only.
+            for (;;) {
+                RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
+                if (!old_label_with_same_key)
+                    break;
                 int del_result = JudyLDel(&dst->JudyL, (Word_t)old_label_with_same_key, PJE0);
                 (void)del_result;
                 int64_t old_judy_mem = JudyAllocThreadPulseGetAndReset();
@@ -811,20 +815,26 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     bool update_statistics = false;
     lfe_start_nolock(src, label, ls)
     {
-        RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
         Pvoid_t *PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if(unlikely(!PValue || PValue == PJERR))
             fatal("RRDLABELS: corrupted labels array");
 
         if (!*PValue) {
-            // Write through PValue BEFORE the subsequent JudyLDel: Judy
+            // Write through PValue BEFORE any subsequent JudyLDel: Judy
             // invalidates previously-returned PValue pointers when the array
             // is modified. Same ordering as labels_add_already_sanitized().
             *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_NEW;
             dup_label(label);
             dst->version++;
             update_statistics = true;
-            if (old_label_with_key) {
+
+            // Drop any other entry sharing this key. Loop in case dst arrived
+            // with multiple same-key entries from prior buggy paths -- the
+            // find helper returns the first match only.
+            for (;;) {
+                RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
+                if (!old_label_with_key)
+                    break;
                 int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
                 (void)JudyLDel(&dst->JudyL, (Word_t)old_label_with_key, PJE0);
                 RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
