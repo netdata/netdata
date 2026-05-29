@@ -98,7 +98,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | api_key | Cato API key. |  | yes |
 | **HTTP** | timeout | HTTP request timeout. | 30 | no |
 |  | proxy_url | HTTP proxy URL. Empty value uses environment proxy variables. |  | no |
-| **Cardinality** | site_selector | Space-separated simple patterns matched against Cato site ID or site name. Use exclusions such as `!lab-* *`; exclusions win across site identity fields. | * | no |
+| **Cardinality** | site_selector | Space-separated simple patterns matched against the Cato site name when present, otherwise the site ID. Patterns use first-match ordering; put exclusions before broad includes, for example `!lab-* *`. | * | no |
 | **Virtual Node** | vnode | Associates this data collection job with a Virtual Node. |  | no |
 
 

@@ -101,6 +101,13 @@ type rawCatoResponse struct {
 	body   string
 }
 
+const (
+	operationDiscovery = "entityLookup"
+	operationSnapshot  = "accountSnapshot"
+	operationMetrics   = "accountMetrics"
+	operationBGP       = "siteBgpStatus"
+)
+
 func newTestCollector() (*Collector, *fakeAPIClient) {
 	c := New()
 	c.AccountID = "12345"

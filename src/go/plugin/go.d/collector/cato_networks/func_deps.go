@@ -4,7 +4,7 @@ package cato_networks
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cato_networks/catofunc"
 )
@@ -13,7 +13,7 @@ type funcDepsAdapter struct {
 	store *topologyStore
 }
 
-func (a funcDepsAdapter) CurrentTopology() (*topology.Data, bool) {
+func (a funcDepsAdapter) CurrentTopology() (*topologyv1.Data, bool) {
 	if a.store == nil {
 		return nil, false
 	}

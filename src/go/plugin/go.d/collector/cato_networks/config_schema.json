@@ -40,7 +40,7 @@
       },
       "site_selector": {
         "title": "Site selector",
-        "description": "Space-separated simple patterns matched against Cato site ID or site name. Use exclusions such as '!lab-* *'. Exclusions win across site identity fields.",
+        "description": "Space-separated simple patterns matched against the Cato site name when present, otherwise the site ID. Patterns use first-match ordering; put exclusions before broad includes, for example '!lab-* *'.",
         "type": "string",
         "default": "*"
       },

@@ -23,7 +23,8 @@ func TestCollector_Init(t *testing.T) {
 			check: func(t *testing.T, c *Collector, _ *fakeAPIClient) {
 				require.NotNil(t, c.client)
 				require.Equal(t, defaultEntitySelector, c.SiteSelector)
-				require.Nil(t, c.siteMatcher)
+				require.NotNil(t, c.siteMatcher)
+				require.True(t, c.siteMatcher.MatchString("any-site"))
 				require.NotNil(t, c.bgp.bySite)
 			},
 		},

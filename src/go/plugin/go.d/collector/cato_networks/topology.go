@@ -5,22 +5,25 @@ package cato_networks
 import (
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cato_networks/catofunc"
 )
 
 const (
-	topologySchemaVersion = "v1"
-	topologySource        = "cato_networks"
-	topologyLayer         = "wan"
+	topologySource = "cato_networks"
+	topologyLayer  = "network"
 )
 
-func buildTopology(accountID string, sites map[string]*siteState, order []string, collectedAt time.Time) *topology.Data {
-	actors := make([]topology.Actor, 0, len(order)*2)
-	links := make([]topology.Link, 0, len(order)*2)
+func buildTopology(accountID string, sites map[string]*siteState, order []string, collectedAt time.Time) (*topologyv1.Data, error) {
+	stringsDict := topologyv1.NewStringDictionary()
+	actors := newTopologyTableBuilder(catoTopologyActorColumns()...)
+	links := newTopologyTableBuilder(catoTopologyLinkColumns()...)
+	interfaces := newTopologyTableBuilder(catoTopologyInterfaceColumns()...)
+	devices := newTopologyTableBuilder(catoTopologyDeviceColumns()...)
+
+	actorIndexes := make(map[string]int, len(order)*2)
 	popSeen := make(map[string]bool)
 
 	for _, siteID := range order {
@@ -30,157 +33,213 @@ func buildTopology(accountID string, sites map[string]*siteState, order []string
 		}
 
 		siteActorID := catoSiteActorID(site.ID)
-		actors = append(actors, topology.Actor{
-			ActorID:   siteActorID,
-			ActorType: catofunc.ActorTypeSite,
-			Layer:     topologyLayer,
-			Source:    topologySource,
-			Match: topology.Match{
-				CloudAccountID:  accountID,
-				CloudInstanceID: site.ID,
-				Hostnames:       []string{site.Name},
-			},
-			Attributes: map[string]any{
-				"name":                site.Name,
-				"site_id":             site.ID,
-				"connectivity_status": site.ConnectivityStatus,
-				"operational_status":  site.OperationalStatus,
-				"pop_name":            site.PopName,
-				"site_type":           site.SiteType,
-				"connection_type":     site.ConnectionType,
-				"country_code":        site.CountryCode,
-				"country_name":        site.CountryName,
-				"region":              site.Region,
-				"host_count":          site.HostCount,
-			},
-			Labels: map[string]string{
-				"site_id":   site.ID,
-				"site_name": site.Name,
-				"pop_name":  site.PopName,
-			},
-			Tables: siteTopologyTables(site),
-		})
+		siteActorIndex := addSiteActor(actors, stringsDict, accountID, site, siteActorID)
+		actorIndexes[siteActorID] = siteActorIndex
+		addSiteTopologyTables(interfaces, devices, siteActorIndex, site)
 
 		if site.PopName != "" {
 			popActorID := catoPopActorID(site.PopName)
 			if !popSeen[site.PopName] {
 				popSeen[site.PopName] = true
-				actors = append(actors, topology.Actor{
-					ActorID:   popActorID,
-					ActorType: catofunc.ActorTypePop,
-					Layer:     topologyLayer,
-					Source:    topologySource,
-					Match: topology.Match{
-						CloudAccountID:  accountID,
-						CloudInstanceID: site.PopName,
-					},
-					Attributes: map[string]any{
-						"name": site.PopName,
-					},
-					Labels: map[string]string{
-						"pop_name": site.PopName,
-					},
-				})
+				actorIndexes[popActorID] = addPopActor(actors, stringsDict, accountID, site.PopName, popActorID)
 			}
-
-			link := topology.Link{
-				Layer:      topologyLayer,
-				Protocol:   "cato",
-				LinkType:   catofunc.LinkTypeTunnel,
-				Direction:  "bidirectional",
-				State:      site.ConnectivityStatus,
-				SrcActorID: siteActorID,
-				DstActorID: popActorID,
-				Src: topology.LinkEndpoint{Match: topology.Match{
-					CloudAccountID:  accountID,
-					CloudInstanceID: site.ID,
-				}},
-				Dst: topology.LinkEndpoint{Match: topology.Match{
-					CloudAccountID:  accountID,
-					CloudInstanceID: site.PopName,
-				}},
-				LastSeen: &collectedAt,
-			}
-			if metrics := topologyTrafficMetrics(site.Metrics); len(metrics) > 0 {
-				link.Metrics = metrics
-			}
-			links = append(links, link)
+			addSitePopLink(links, stringsDict, site, siteActorIndex, actorIndexes[popActorID])
 		}
 
-		bgpPeerSeen := make(map[string]bool)
-		for _, peer := range site.BGPPeers {
-			if peer.RemoteIP == "" && peer.RemoteASN == "" {
-				continue
-			}
-			peerActorID := catoBGPPeerActorID(site.ID, peer.RemoteIP, peer.RemoteASN)
-			if bgpPeerSeen[peerActorID] {
-				continue
-			}
-			bgpPeerSeen[peerActorID] = true
-			actors = append(actors, topology.Actor{
-				ActorID:   peerActorID,
-				ActorType: catofunc.ActorTypeBGPPeer,
-				Layer:     topologyLayer,
-				Source:    topologySource,
-				Match:     catoBGPPeerMatch(peer.RemoteIP),
-				Attributes: map[string]any{
-					"remote_ip":   peer.RemoteIP,
-					"remote_asn":  peer.RemoteASN,
-					"local_ip":    peer.LocalIP,
-					"local_asn":   peer.LocalASN,
-					"bgp_session": peer.BGPSession,
-				},
-				Labels: map[string]string{
-					"site_id":  site.ID,
-					"peer_ip":  peer.RemoteIP,
-					"peer_asn": peer.RemoteASN,
-				},
-			})
-
-			links = append(links, topology.Link{
-				Layer:      topologyLayer,
-				Protocol:   "bgp",
-				LinkType:   catofunc.LinkTypeBGP,
-				Direction:  "bidirectional",
-				State:      peer.BGPSession,
-				SrcActorID: siteActorID,
-				DstActorID: peerActorID,
-				Src: topology.LinkEndpoint{Match: topology.Match{
-					CloudAccountID:  accountID,
-					CloudInstanceID: site.ID,
-				}},
-				Dst:      topology.LinkEndpoint{Match: catoBGPPeerMatch(peer.RemoteIP)},
-				LastSeen: &collectedAt,
-				Metrics: map[string]any{
-					"routes":                    peer.RoutesCount,
-					"routes_limit":              peer.RoutesCountLimit,
-					"routes_limit_exceeded":     peer.RoutesCountLimitExceeded,
-					"rib_out_routes":            peer.RIBOutRoutes,
-					"incoming_connection_state": peer.IncomingState,
-					"outgoing_connection_state": peer.OutgoingState,
-				},
-			})
-		}
+		addBGPPeerTopology(actors, links, stringsDict, actorIndexes, site, siteActorIndex)
 	}
 
-	return &topology.Data{
-		SchemaVersion: topologySchemaVersion,
-		Source:        topologySource,
-		Layer:         topologyLayer,
-		AgentID:       accountID,
-		CollectedAt:   collectedAt,
-		View:          "summary",
-		Actors:        actors,
-		Links:         links,
+	actorTable, err := actors.table()
+	if err != nil {
+		return nil, fmt.Errorf("actors table: %w", err)
+	}
+	linkTable, err := links.table()
+	if err != nil {
+		return nil, fmt.Errorf("links table: %w", err)
+	}
+	interfaceTable, err := interfaces.table()
+	if err != nil {
+		return nil, fmt.Errorf("interfaces table: %w", err)
+	}
+	deviceTable, err := devices.table()
+	if err != nil {
+		return nil, fmt.Errorf("devices table: %w", err)
+	}
+
+	data := &topologyv1.Data{
+		SchemaVersion: topologyv1.SchemaVersion,
+		Producer: topologyv1.Producer{
+			Source:       topologySource,
+			Instance:     accountID,
+			Plugin:       "go.d/cato_networks",
+			Capabilities: []string{"sites", "interfaces", "bgp"},
+		},
+		CollectedAt: collectedAt,
+		View: &topologyv1.View{
+			ID:    "summary",
+			Scope: "network",
+			Mode:  "detailed",
+		},
+		Dictionaries: topologyv1.Dictionaries{
+			"strings": stringsDict.Values(),
+		},
+		Types:        catoTopologyTypes(),
+		Presentation: catofunc.TopologyPresentation(),
+		Actors:       actorTable,
+		Links:        linkTable,
+		Tables: &topologyv1.DetailTables{
+			Actor: map[string]topologyv1.DetailTable{
+				catofunc.ActorTableInterfaces: {
+					Type:  catofunc.ActorTableInterfaces,
+					Table: interfaceTable,
+				},
+				catofunc.ActorTableDevices: {
+					Type:  catofunc.ActorTableDevices,
+					Table: deviceTable,
+				},
+			},
+		},
 		Stats: map[string]any{
 			"sites": len(order),
-			"links": len(links),
+			"links": links.rows(),
 		},
+	}
+	return data, nil
+}
+
+func addSiteActor(table *topologyTableBuilder, dict *topologyv1.StringDictionary, accountID string, site *siteState, siteActorID string) int {
+	return table.add(
+		dict.Ref(catofunc.ActorTypeSite),
+		dict.Ref(topologyLayer),
+		siteActorID,
+		site.Name,
+		accountID,
+		site.ID,
+		site.PopName,
+		"",
+		"",
+		site.ConnectivityStatus,
+		site.OperationalStatus,
+		site.SiteType,
+		site.ConnectionType,
+		site.CountryCode,
+		site.CountryName,
+		site.Region,
+		site.HostCount,
+	)
+}
+
+func addPopActor(table *topologyTableBuilder, dict *topologyv1.StringDictionary, accountID, popName, popActorID string) int {
+	return table.add(
+		dict.Ref(catofunc.ActorTypePop),
+		dict.Ref(topologyLayer),
+		popActorID,
+		popName,
+		accountID,
+		"",
+		popName,
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		int64(0),
+	)
+}
+
+func addSitePopLink(table *topologyTableBuilder, dict *topologyv1.StringDictionary, site *siteState, siteActor, popActor int) {
+	table.add(
+		dict.Ref(catofunc.LinkTypeTunnel),
+		siteActor,
+		popActor,
+		dict.Ref("cato"),
+		dict.Ref(site.ConnectivityStatus),
+		dict.Ref("bidirectional"),
+		1,
+		trafficMetricValue(site.Metrics, trafficMetricBytesUpstreamMax, site.Metrics.BytesUpstreamMax),
+		trafficMetricValue(site.Metrics, trafficMetricBytesDownstreamMax, site.Metrics.BytesDownstreamMax),
+		trafficMetricValue(site.Metrics, trafficMetricLostUpstreamPercent, site.Metrics.LostUpstreamPercent),
+		trafficMetricValue(site.Metrics, trafficMetricRTTMS, site.Metrics.RTTMS),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+}
+
+func addBGPPeerTopology(actors, links *topologyTableBuilder, dict *topologyv1.StringDictionary, actorIndexes map[string]int, site *siteState, siteActor int) {
+	seen := make(map[string]bool)
+
+	for _, peer := range site.BGPPeers {
+		if peer.RemoteIP == "" && peer.RemoteASN == "" {
+			continue
+		}
+		peerActorID := catoBGPPeerActorID(site.ID, peer.RemoteIP, peer.RemoteASN)
+		if seen[peerActorID] {
+			continue
+		}
+		seen[peerActorID] = true
+		peerActor := addBGPPeerActor(actors, dict, site, peer, peerActorID)
+		actorIndexes[peerActorID] = peerActor
+		addBGPLink(links, dict, siteActor, peerActor, peer)
 	}
 }
 
-func siteTopologyTables(site *siteState) map[string][]map[string]any {
-	tables := make(map[string][]map[string]any)
+func addBGPPeerActor(table *topologyTableBuilder, dict *topologyv1.StringDictionary, site *siteState, peer bgpPeerState, peerActorID string) int {
+	displayName := peer.RemoteIP
+	if displayName == "" {
+		displayName = peer.RemoteASN
+	}
+	return table.add(
+		dict.Ref(catofunc.ActorTypeBGPPeer),
+		dict.Ref(topologyLayer),
+		peerActorID,
+		displayName,
+		"",
+		site.ID,
+		site.PopName,
+		peer.RemoteIP,
+		peer.RemoteASN,
+		peer.BGPSession,
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		int64(0),
+	)
+}
+
+func addBGPLink(table *topologyTableBuilder, dict *topologyv1.StringDictionary, siteActor, peerActor int, peer bgpPeerState) {
+	table.add(
+		dict.Ref(catofunc.LinkTypeBGP),
+		siteActor,
+		peerActor,
+		dict.Ref("bgp"),
+		dict.Ref(peer.BGPSession),
+		dict.Ref("bidirectional"),
+		1,
+		nil,
+		nil,
+		nil,
+		nil,
+		peer.RoutesCount,
+		peer.RoutesCountLimit,
+		peer.RoutesCountLimitExceeded,
+		peer.RIBOutRoutes,
+		peer.IncomingState,
+		peer.OutgoingState,
+	)
+}
+
+func addSiteTopologyTables(interfaces, devices *topologyTableBuilder, siteActor int, site *siteState) {
 	ifaceKeys := make([]string, 0, len(site.Interfaces))
 	for key := range site.Interfaces {
 		ifaceKeys = append(ifaceKeys, key)
@@ -205,54 +264,46 @@ func siteTopologyTables(site *siteState) map[string][]map[string]any {
 		if iface == nil {
 			continue
 		}
-		tables["interfaces"] = append(tables["interfaces"], map[string]any{
-			"id":                   iface.ID,
-			"name":                 iface.Name,
-			"type":                 iface.Type,
-			"connected":            iface.Connected || iface.LinkUp,
-			"pop_name":             iface.PopName,
-			"tunnel_remote_ip":     iface.TunnelRemoteIP,
-			"tunnel_uptime":        iface.TunnelUptime,
-			"upstream_bandwidth":   iface.UpstreamBandwidth,
-			"downstream_bandwidth": iface.DownstreamBandwidth,
-		})
+		interfaces.add(
+			siteActor,
+			iface.ID,
+			iface.Name,
+			iface.Type,
+			iface.Connected || iface.LinkUp,
+			iface.PopName,
+			iface.TunnelRemoteIP,
+			iface.TunnelUptime,
+			iface.UpstreamBandwidth,
+			iface.DownstreamBandwidth,
+		)
 	}
-	devices := append([]deviceState(nil), site.Devices...)
-	sort.Slice(devices, func(i, j int) bool {
-		if devices[i].Name != devices[j].Name {
-			return devices[i].Name < devices[j].Name
+
+	sortedDevices := append([]deviceState(nil), site.Devices...)
+	sort.Slice(sortedDevices, func(i, j int) bool {
+		if sortedDevices[i].Name != sortedDevices[j].Name {
+			return sortedDevices[i].Name < sortedDevices[j].Name
 		}
-		return devices[i].ID < devices[j].ID
+		return sortedDevices[i].ID < sortedDevices[j].ID
 	})
-	for _, dev := range devices {
-		tables["devices"] = append(tables["devices"], map[string]any{
-			"name":           dev.Name,
-			"type":           dev.Type,
-			"connected":      dev.Connected,
-			"ha_role":        dev.HaRole,
-			"socket_serial":  dev.SocketSerial,
-			"socket_version": dev.SocketVersion,
-			"internal_ip":    dev.InternalIP,
-		})
+	for _, dev := range sortedDevices {
+		devices.add(
+			siteActor,
+			dev.Name,
+			dev.Type,
+			dev.Connected,
+			dev.HaRole,
+			dev.SocketSerial,
+			dev.SocketVersion,
+			dev.InternalIP,
+		)
 	}
-	return tables
 }
 
-func topologyTrafficMetrics(metrics trafficMetrics) map[string]any {
-	out := make(map[string]any)
-	if metrics.has(trafficMetricBytesUpstreamMax) {
-		out["bytes_upstream_max"] = metrics.BytesUpstreamMax
+func trafficMetricValue(metrics trafficMetrics, metric trafficMetricPresence, value float64) any {
+	if !metrics.has(metric) {
+		return nil
 	}
-	if metrics.has(trafficMetricBytesDownstreamMax) {
-		out["bytes_downstream_max"] = metrics.BytesDownstreamMax
-	}
-	if metrics.has(trafficMetricLostUpstreamPercent) {
-		out["lost_upstream_percent"] = metrics.LostUpstreamPercent
-	}
-	if metrics.has(trafficMetricRTTMS) {
-		out["rtt_ms"] = metrics.RTTMS
-	}
-	return out
+	return value
 }
 
 func catoSiteActorID(siteID string) string {
@@ -263,14 +314,160 @@ func catoPopActorID(popName string) string {
 	return "cato:pop:" + popName
 }
 
-func catoBGPPeerMatch(remoteIP string) topology.Match {
-	remoteIP = strings.TrimSpace(remoteIP)
-	if remoteIP == "" {
-		return topology.Match{}
-	}
-	return topology.Match{IPAddresses: []string{remoteIP}}
-}
-
 func catoBGPPeerActorID(siteID, remoteIP, remoteASN string) string {
 	return fmt.Sprintf("cato:bgp:%s:%s:%s", siteID, remoteIP, remoteASN)
+}
+
+func catoTopologyTypes() topologyv1.TypeRegistry {
+	return topologyv1.TypeRegistry{
+		ActorTypes: catofunc.TopologyActorTypes(),
+		LinkTypes:  catofunc.TopologyLinkTypes(),
+		TableTypes: map[string]topologyv1.TableType{
+			catofunc.ActorTableInterfaces: {
+				Role:        "actor_detail",
+				Owner:       "actor",
+				Aggregation: "append",
+				Columns:     catoTopologyInterfaceColumns(),
+			},
+			catofunc.ActorTableDevices: {
+				Role:        "actor_inventory",
+				Owner:       "actor",
+				Aggregation: "append",
+				Columns:     catoTopologyDeviceColumns(),
+			},
+		},
+		AggregationScopes: map[string]topologyv1.AggregationScope{
+			"site": {
+				Columns:        []string{"site_id"},
+				EvidencePolicy: "preserve",
+			},
+			"pop": {
+				Columns:        []string{"pop_name"},
+				EvidencePolicy: "preserve",
+			},
+			"network": {
+				Columns:        []string{"type"},
+				EvidencePolicy: "preserve",
+			},
+		},
+	}
+}
+
+func catoTopologyActorColumns() []topologyv1.Column {
+	return []topologyv1.Column{
+		topologyv1.NewColumn("type", "string_ref", topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("layer", "string_ref", topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("id", "string", topologyv1.WithRole("identity")),
+		topologyv1.NewColumn("display_name", "string"),
+		topologyv1.NewColumn("account_id", "string", topologyv1.WithRole("merge_identity")),
+		topologyv1.NewColumn("site_id", "string", topologyv1.WithRole("merge_identity")),
+		topologyv1.NewColumn("pop_name", "string", topologyv1.WithRole("merge_identity")),
+		topologyv1.NewColumn("remote_ip", "ip", topologyv1.WithRole("merge_identity")),
+		topologyv1.NewColumn("remote_asn", "string", topologyv1.WithRole("merge_identity")),
+		topologyv1.NewColumn("connectivity_status", "string"),
+		topologyv1.NewColumn("operational_status", "string"),
+		topologyv1.NewColumn("site_type", "string"),
+		topologyv1.NewColumn("connection_type", "string"),
+		topologyv1.NewColumn("country_code", "string"),
+		topologyv1.NewColumn("country_name", "string"),
+		topologyv1.NewColumn("region", "string"),
+		topologyv1.NewColumn("host_count", "uint", topologyv1.WithAggregation("sum")),
+	}
+}
+
+func catoTopologyLinkColumns() []topologyv1.Column {
+	return []topologyv1.Column{
+		topologyv1.NewColumn("type", "string_ref", topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("src_actor", "actor_ref"),
+		topologyv1.NewColumn("dst_actor", "actor_ref"),
+		topologyv1.NewColumn("protocol", "string_ref", topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("state", "string_ref", topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("direction", "string_ref", topologyv1.WithDictionary("strings")),
+		topologyv1.NewColumn("evidence_count", "uint", topologyv1.WithAggregation("sum")),
+		topologyv1.NewColumn("bytes_upstream_max", "float", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("max")),
+		topologyv1.NewColumn("bytes_downstream_max", "float", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("max")),
+		topologyv1.NewColumn("lost_upstream_percent", "float", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("avg")),
+		topologyv1.NewColumn("rtt_ms", "float", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithUnit("ms"), topologyv1.WithAggregation("avg")),
+		topologyv1.NewColumn("routes", "int", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("sum")),
+		topologyv1.NewColumn("routes_limit", "int", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("max")),
+		topologyv1.NewColumn("routes_limit_exceeded", "bool", topologyv1.WithNullable()),
+		topologyv1.NewColumn("rib_out_routes", "int", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("sum")),
+		topologyv1.NewColumn("incoming_connection_state", "string", topologyv1.WithNullable()),
+		topologyv1.NewColumn("outgoing_connection_state", "string", topologyv1.WithNullable()),
+	}
+}
+
+func catoTopologyInterfaceColumns() []topologyv1.Column {
+	return []topologyv1.Column{
+		topologyv1.NewColumn("actor", "actor_ref"),
+		topologyv1.NewColumn("id", "string"),
+		topologyv1.NewColumn("name", "string"),
+		topologyv1.NewColumn("type", "string"),
+		topologyv1.NewColumn("connected", "bool"),
+		topologyv1.NewColumn("pop_name", "string"),
+		topologyv1.NewColumn("tunnel_remote_ip", "ip"),
+		topologyv1.NewColumn("tunnel_uptime", "duration"),
+		topologyv1.NewColumn("upstream_bandwidth", "int"),
+		topologyv1.NewColumn("downstream_bandwidth", "int"),
+	}
+}
+
+func catoTopologyDeviceColumns() []topologyv1.Column {
+	return []topologyv1.Column{
+		topologyv1.NewColumn("actor", "actor_ref"),
+		topologyv1.NewColumn("name", "string"),
+		topologyv1.NewColumn("type", "string"),
+		topologyv1.NewColumn("connected", "bool"),
+		topologyv1.NewColumn("ha_role", "string"),
+		topologyv1.NewColumn("socket_serial", "string"),
+		topologyv1.NewColumn("socket_version", "string"),
+		topologyv1.NewColumn("internal_ip", "ip"),
+	}
+}
+
+type topologyTableBuilder struct {
+	columns []topologyv1.Column
+	values  [][]any
+	rowsErr error
+}
+
+func newTopologyTableBuilder(columns ...topologyv1.Column) *topologyTableBuilder {
+	return &topologyTableBuilder{
+		columns: append([]topologyv1.Column(nil), columns...),
+		values:  make([][]any, len(columns)),
+	}
+}
+
+func (b *topologyTableBuilder) add(values ...any) int {
+	row := b.rows()
+	if len(values) != len(b.columns) {
+		b.rowsErr = fmt.Errorf("row has %d values for %d columns", len(values), len(b.columns))
+		return row
+	}
+	for i, value := range values {
+		b.values[i] = append(b.values[i], value)
+	}
+	return row
+}
+
+func (b *topologyTableBuilder) rows() int {
+	if len(b.values) == 0 {
+		return 0
+	}
+	return len(b.values[0])
+}
+
+func (b *topologyTableBuilder) table() (topologyv1.Table, error) {
+	if b.rowsErr != nil {
+		return topologyv1.Table{}, b.rowsErr
+	}
+	encodings := make([]topologyv1.ColumnEncoding, len(b.values))
+	for i, values := range b.values {
+		encoding := topologyv1.Values(values...)
+		if encoding.Values == nil {
+			encoding.Values = []any{}
+		}
+		encodings[i] = encoding
+	}
+	return topologyv1.NewTable(b.rows(), b.columns, encodings)
 }

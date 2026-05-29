@@ -54,9 +54,9 @@ func TestCollector_Collect(t *testing.T) {
 				check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
 					topo, ok := c.topology.CurrentTopology()
 					require.True(t, ok)
-					require.Equal(t, topologySource, topo.Source)
-					require.Len(t, topo.Actors, 5)
-					require.Len(t, topo.Links, 3)
+					require.Equal(t, topologySource, topo.Producer.Source)
+					require.Equal(t, 5, topo.Actors.Rows)
+					require.Equal(t, 3, topo.Links.Rows)
 					collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 				},
 			}},
@@ -119,6 +119,51 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			}},
 		},
+		"partial BGP failure drops stale failed site state": func() struct {
+			setup    func(*testing.T, *Collector, *fakeAPIClient)
+			skipInit bool
+			steps    []collectStep
+		} {
+			now := fixedCatoTestNow()
+			stalePeerLabels := bgpLabels("1002", "Toulouse Office", "192.0.2.20", "64513")
+			return struct {
+				setup    func(*testing.T, *Collector, *fakeAPIClient)
+				skipInit bool
+				steps    []collectStep
+			}{
+				setup: func(_ *testing.T, c *Collector, fake *fakeAPIClient) {
+					c.now = func() time.Time { return now }
+					fake.bgp["1002"] = []*catosdk.SiteBgpStatusResult{
+						{
+							RemoteIP:   "192.0.2.20",
+							RemoteASN:  "64513",
+							BGPSession: "Established",
+						},
+					}
+				},
+				steps: []collectStep{
+					{
+						name: "cache initial peer",
+						wantMetrics: map[string]metrix.SampleValue{
+							stateMetricKey("bgp_session_status", "up", stalePeerLabels): 1,
+						},
+					},
+					{
+						name: "drop failed site peer on refresh",
+						setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
+							now = now.Add(seconds(defaultBGPRefreshEvery) + time.Second)
+							fake.bgpErrSites = map[string]error{"1002": errors.New("site bgp failed")}
+						},
+						wantMetrics: map[string]metrix.SampleValue{
+							stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")): 1,
+						},
+						wantMissing: []string{
+							stateMetricKey("bgp_session_status", "up", stalePeerLabels),
+						},
+					},
+				},
+			}
+		}(),
 		"unrecognized statuses map to unknown": {
 			setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
 				fake.snapshot = &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{

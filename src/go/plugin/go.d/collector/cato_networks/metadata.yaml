@@ -99,7 +99,7 @@ modules:
               required: false
               group: HTTP
             - name: site_selector
-              description: Space-separated simple patterns matched against Cato site ID or site name. Use exclusions such as `!lab-* *`; exclusions win across site identity fields.
+              description: Space-separated simple patterns matched against the Cato site name when present, otherwise the site ID. Patterns use first-match ordering; put exclusions before broad includes, for example `!lab-* *`.
               default_value: "*"
               required: false
               group: Cardinality

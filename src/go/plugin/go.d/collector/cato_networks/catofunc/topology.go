@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 const (
@@ -17,6 +18,9 @@ const (
 
 	LinkTypeTunnel = "cato_tunnel"
 	LinkTypeBGP    = "bgp_session"
+
+	ActorTableInterfaces = "interfaces"
+	ActorTableDevices    = "devices"
 )
 
 const topologyUnavailable = "Cato Networks topology data is not available yet"
@@ -51,7 +55,7 @@ func (f *funcTopology) Handle(_ context.Context, method string, _ funcapi.Resolv
 	return &funcapi.FunctionResponse{
 		Status:       200,
 		Help:         "Cato Networks site, PoP, tunnel, and BGP topology data",
-		ResponseType: "topology",
+		ResponseType: topologyv1.ResponseType,
 		Data:         data,
 	}
 }

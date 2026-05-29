@@ -14,7 +14,6 @@ type discoveryState struct {
 	siteIDs           []string
 	siteNames         map[string]string
 	fetchedAt         time.Time
-	totalSites        int
 	skippedBySelector int
 }
 
@@ -40,17 +39,22 @@ func (c *Collector) collect(ctx context.Context) error {
 	c.pruneUnselectedSites(sites, &order)
 
 	if err := c.collectMetrics(ctx, sites); err != nil {
-		c.warnRecoverable(warningKeyMetrics, classifyCatoError(err), "account metrics collection incomplete, error_class=%s", classifyCatoError(err))
+		errorClass := classifyCatoError(err)
+		c.warnRecoverable(warningKeyMetrics, errorClass, "account metrics collection incomplete, error_class=%s", errorClass)
 	}
 
 	if err := c.collectBGP(ctx, sites, order); err != nil {
-		c.warnRecoverable(warningKeyBGP, classifyCatoError(err), "BGP status collection incomplete, error_class=%s", classifyCatoError(err))
+		errorClass := classifyCatoError(err)
+		c.warnRecoverable(warningKeyBGP, errorClass, "BGP status collection incomplete, error_class=%s", errorClass)
 	}
 
 	c.pruneUnselectedSites(sites, &order)
 
 	now := c.now()
-	topo := buildTopology(c.AccountID, sites, order, now)
+	topo, err := buildTopology(c.AccountID, sites, order, now)
+	if err != nil {
+		return fmt.Errorf("build topology: %w", err)
+	}
 	c.topology.Publish(topo)
 
 	c.writeMetrics(sites, order)
@@ -113,7 +117,6 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) error {
 		siteIDs:           selectedSiteIDs,
 		siteNames:         siteNames,
 		fetchedAt:         now,
-		totalSites:        len(siteIDs),
 		skippedBySelector: skippedBySelector,
 	}
 	if skippedBySelector > 0 {
@@ -123,13 +126,54 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) error {
 	return nil
 }
 
+func (c *Collector) selectSites(siteIDs []string, siteNames map[string]string) ([]string, int) {
+	selected := make([]string, 0, len(siteIDs))
+	var skippedSelector int
+
+	for _, siteID := range siteIDs {
+		if !c.siteMatcher.MatchString(siteSelectorValue(siteID, siteNames[siteID])) {
+			skippedSelector++
+			continue
+		}
+		selected = append(selected, siteID)
+	}
+
+	return selected, skippedSelector
+}
+
+func siteSelectorValue(siteID, siteName string) string {
+	if name := strings.TrimSpace(siteName); name != "" {
+		return name
+	}
+	return strings.TrimSpace(siteID)
+}
+
+func (c *Collector) pruneUnselectedSites(sites map[string]*siteState, order *[]string) {
+	active := make(map[string]bool, len(c.discovery.siteIDs))
+	nextOrder := make([]string, 0, len(c.discovery.siteIDs))
+	for _, siteID := range c.discovery.siteIDs {
+		if sites[siteID] == nil {
+			continue
+		}
+		active[siteID] = true
+		nextOrder = append(nextOrder, siteID)
+	}
+	for siteID := range sites {
+		if !active[siteID] {
+			delete(sites, siteID)
+		}
+	}
+	*order = nextOrder
+}
+
 func (c *Collector) useCachedDiscoveryAfterRefreshFailure(now time.Time, force bool, err error) bool {
 	if force || len(c.discovery.siteIDs) == 0 {
 		return false
 	}
 
 	c.discovery.fetchedAt = now
-	c.warnRecoverable(warningKeyDiscoveryCache, classifyCatoError(err), "entityLookup refresh failed; using cached discovery for %d site(s), error_class=%s", len(c.discovery.siteIDs), classifyCatoError(err))
+	errorClass := classifyCatoError(err)
+	c.warnRecoverable(warningKeyDiscoveryCache, errorClass, "entityLookup refresh failed; using cached discovery for %d site(s), error_class=%s", len(c.discovery.siteIDs), errorClass)
 	return true
 }
 

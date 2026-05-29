@@ -5,18 +5,20 @@ package cato_networks
 import (
 	"sync/atomic"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 type topologyStore struct {
-	data atomic.Pointer[topology.Data]
+	data atomic.Pointer[topologyv1.Data]
 }
 
-func (s *topologyStore) Publish(data *topology.Data) {
+func (s *topologyStore) Publish(data *topologyv1.Data) {
+	// Published topology snapshots are immutable; Function handlers load and
+	// marshal the pointer concurrently with later collection cycles.
 	s.data.Store(data)
 }
 
-func (s *topologyStore) CurrentTopology() (*topology.Data, bool) {
+func (s *topologyStore) CurrentTopology() (*topologyv1.Data, bool) {
 	data := s.data.Load()
 	if data == nil {
 		return nil, false

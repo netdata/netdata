@@ -10,28 +10,28 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 func TestTopologyStorePublishesCurrentSnapshot(t *testing.T) {
 	tests := map[string]struct {
-		setup func(*topologyStore) *topology.Data
-		check func(*testing.T, *topologyStore, *topology.Data)
+		setup func(*topologyStore) *topologyv1.Data
+		check func(*testing.T, *topologyStore, *topologyv1.Data)
 	}{
 		"empty store has no topology": {
-			check: func(t *testing.T, store *topologyStore, _ *topology.Data) {
+			check: func(t *testing.T, store *topologyStore, _ *topologyv1.Data) {
 				got, ok := store.CurrentTopology()
 				require.Nil(t, got)
 				require.False(t, ok)
 			},
 		},
 		"load returns published snapshot": {
-			setup: func(store *topologyStore) *topology.Data {
-				data := &topology.Data{Source: topologySource}
+			setup: func(store *topologyStore) *topologyv1.Data {
+				data := &topologyv1.Data{Producer: topologyv1.Producer{Source: topologySource}}
 				store.Publish(data)
 				return data
 			},
-			check: func(t *testing.T, store *topologyStore, data *topology.Data) {
+			check: func(t *testing.T, store *topologyStore, data *topologyv1.Data) {
 				got, ok := store.CurrentTopology()
 				require.True(t, ok)
 				require.Same(t, data, got)
@@ -42,7 +42,7 @@ func TestTopologyStorePublishesCurrentSnapshot(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			var store topologyStore
-			var data *topology.Data
+			var data *topologyv1.Data
 			if tc.setup != nil {
 				data = tc.setup(&store)
 			}
@@ -60,7 +60,7 @@ func TestTopologyStoreConcurrentPublishLoad(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			store.Publish(&topology.Data{Source: fmt.Sprintf("source-%d", i)})
+			store.Publish(&topologyv1.Data{Producer: topologyv1.Producer{Source: fmt.Sprintf("source-%d", i)}})
 		}(i)
 	}
 
@@ -80,17 +80,17 @@ func TestTopologyStoreConcurrentPublishLoad(t *testing.T) {
 
 	data, ok := store.CurrentTopology()
 	require.True(t, ok)
-	require.NotEmpty(t, data.Source)
+	require.NotEmpty(t, data.Producer.Source)
 	require.Zero(t, nilLoads.Load())
 }
 
 func TestFuncDepsAdapterWithoutTopologyStore(t *testing.T) {
 	tests := map[string]struct {
 		deps  funcDepsAdapter
-		check func(*testing.T, *topology.Data, bool)
+		check func(*testing.T, *topologyv1.Data, bool)
 	}{
 		"nil store reports unavailable": {
-			check: func(t *testing.T, data *topology.Data, ok bool) {
+			check: func(t *testing.T, data *topologyv1.Data, ok bool) {
 				require.Nil(t, data)
 				require.False(t, ok)
 			},
@@ -98,12 +98,12 @@ func TestFuncDepsAdapterWithoutTopologyStore(t *testing.T) {
 		"store delegates current topology": {
 			deps: func() funcDepsAdapter {
 				var store topologyStore
-				store.Publish(&topology.Data{Source: topologySource})
+				store.Publish(&topologyv1.Data{Producer: topologyv1.Producer{Source: topologySource}})
 				return funcDepsAdapter{store: &store}
 			}(),
-			check: func(t *testing.T, data *topology.Data, ok bool) {
+			check: func(t *testing.T, data *topologyv1.Data, ok bool) {
 				require.True(t, ok)
-				require.Equal(t, topologySource, data.Source)
+				require.Equal(t, topologySource, data.Producer.Source)
 			},
 		},
 	}

@@ -19,7 +19,6 @@ func (c *Collector) collectMetrics(ctx context.Context, sites map[string]*siteSt
 	}
 
 	var errCount int
-	var successCount int
 	var batchCount int
 	for batch := range slices.Chunk(ids, defaultMaxSitesPerQuery) {
 		batchCount++
@@ -29,7 +28,6 @@ func (c *Collector) collectMetrics(ctx context.Context, sites map[string]*siteSt
 			c.Debugf("accountMetrics batch failed for %d site(s), error_class=%s", len(batch), classifyCatoError(err))
 			continue
 		}
-		successCount++
 		for _, issue := range mergeMetrics(res, sites) {
 			c.logNormalizationIssue(normalizationSurfaceMetrics, issue)
 		}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -21,7 +22,7 @@ import (
 var configSchema string
 
 //go:embed "charts.yaml"
-var chartTemplate string
+var chartTemplateYAML string
 
 func init() {
 	collectorapi.Register("cato_networks", collectorapi.Creator{
@@ -53,10 +54,11 @@ func New() *Collector {
 			},
 			SiteSelector: defaultEntitySelector,
 		},
-		store:     store,
-		metrics:   newCollectorMetrics(store),
-		newClient: newSDKAPIClient,
-		now:       time.Now,
+		store:       store,
+		metrics:     newCollectorMetrics(store),
+		newClient:   newSDKAPIClient,
+		siteMatcher: matcher.TRUE(),
+		now:         time.Now,
 	}
 	c.funcRouter = catofunc.NewRouter(funcDepsAdapter{store: &c.topology})
 	return c
@@ -79,7 +81,7 @@ type Collector struct {
 	discovery discoveryState
 	bgp       bgpState
 
-	siteMatcher *entitySelector
+	siteMatcher matcher.Matcher
 
 	now func() time.Time
 }
@@ -91,22 +93,11 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.Config.validate(); err != nil {
 		return fmt.Errorf("config validation: %w", err)
 	}
-	if err := c.initEntitySelectors(); err != nil {
+	if err := c.initSiteSelector(); err != nil {
 		return err
 	}
-
-	if c.client == nil {
-		httpClient, err := web.NewHTTPClient(c.ClientConfig)
-		if err != nil {
-			return fmt.Errorf("init http client: %w", err)
-		}
-		c.httpClient = httpClient
-
-		client, err := c.newClient(c.Config, httpClient)
-		if err != nil {
-			return fmt.Errorf("init Cato client: %w", err)
-		}
-		c.client = client
+	if err := c.initClient(); err != nil {
+		return err
 	}
 
 	c.discovery = discoveryState{}
@@ -146,7 +137,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) ChartTemplateYAML() string { return chartTemplate }
+func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }
 
 func contextErr(ctx context.Context) error {
 	if ctx == nil {

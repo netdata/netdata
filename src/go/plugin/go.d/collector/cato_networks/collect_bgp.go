@@ -22,27 +22,22 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 		return nil
 	}
 
-	if c.bgp.bySite == nil {
-		c.bgp.bySite = make(map[string][]bgpPeerState)
-	}
-
 	limit := c.bgpSitesPerCollectionLimit(len(order))
 	if limit == 0 {
 		return nil
 	}
 
 	var errCount int
-	var successCount int
 	for i := range limit {
 		idx := (c.bgp.nextIndex + i) % len(order)
 		siteID := order[idx]
 		raw, err := c.client.SiteBgpStatus(ctx, c.AccountID, siteID)
 		if err != nil {
 			errCount++
+			delete(c.bgp.bySite, siteID)
 			c.Debugf("siteBgpStatus failed for one site, error_class=%s", classifyCatoError(err))
 			continue
 		}
-		successCount++
 		peers, issues := normalizeBGP(raw)
 		for _, issue := range issues {
 			c.logNormalizationIssue(normalizationSurfaceBGP, issue)
@@ -65,11 +60,7 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 }
 
 func (c *Collector) bgpSitesPerCollectionLimit(siteCount int) int {
-	limit := min(defaultBGPMaxSites, siteCount)
-	if limit < 0 {
-		return 0
-	}
-	return limit
+	return min(defaultBGPMaxSites, siteCount)
 }
 
 func pruneBGPState(bySite map[string][]bgpPeerState, order []string) {

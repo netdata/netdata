@@ -10,13 +10,6 @@ import (
 )
 
 const (
-	operationDiscovery = "entityLookup"
-	operationSnapshot  = "accountSnapshot"
-	operationMetrics   = "accountMetrics"
-	operationBGP       = "siteBgpStatus"
-)
-
-const (
 	normalizationSurfaceSiteConnectivity = "site_connectivity"
 	normalizationSurfaceSiteOperational  = "site_operational"
 	normalizationSurfaceMetrics          = "metrics"
@@ -28,8 +21,6 @@ const (
 	normalizationIssueUnknownTimeseriesLabel = "unknown_timeseries_label"
 	normalizationIssueEmptyPeer              = "empty_peer"
 	normalizationIssueParseInt               = "parse_int"
-	normalizationIssueAccountError           = "account_error"
-	normalizationIssuePageCap                = "page_cap"
 )
 
 type errorClasser interface {
@@ -129,6 +120,5 @@ func containsHTTPStatus(msg, code string) bool {
 	return strings.Contains(msg, "http status "+code) ||
 		strings.Contains(msg, "http "+code) ||
 		strings.Contains(msg, "status code "+code) ||
-		strings.Contains(msg, "status "+code) ||
-		strings.Contains(msg, " "+code+" ")
+		strings.Contains(msg, "status "+code)
 }

@@ -10,15 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 type fakeDeps struct {
-	data *topology.Data
+	data *topologyv1.Data
 	ok   bool
 }
 
-func (d fakeDeps) CurrentTopology() (*topology.Data, bool) {
+func (d fakeDeps) CurrentTopology() (*topologyv1.Data, bool) {
 	return d.data, d.ok
 }
 
@@ -26,12 +26,12 @@ func TestRouter_Handle(t *testing.T) {
 	tests := map[string]struct {
 		deps   fakeDeps
 		method string
-		check  func(*testing.T, *funcapi.FunctionResponse, *topology.Data)
+		check  func(*testing.T, *funcapi.FunctionResponse, *topologyv1.Data)
 	}{
 		"returns current topology": {
-			deps:   fakeDeps{data: &topology.Data{Source: "cato_networks"}, ok: true},
+			deps:   fakeDeps{data: &topologyv1.Data{Producer: topologyv1.Producer{Source: "cato_networks"}}, ok: true},
 			method: TopologyMethodID,
-			check: func(t *testing.T, resp *funcapi.FunctionResponse, data *topology.Data) {
+			check: func(t *testing.T, resp *funcapi.FunctionResponse, data *topologyv1.Data) {
 				require.Equal(t, 200, resp.Status)
 				require.Equal(t, "topology", resp.ResponseType)
 				require.Same(t, data, resp.Data)
@@ -39,13 +39,13 @@ func TestRouter_Handle(t *testing.T) {
 		},
 		"returns unavailable without snapshot": {
 			method: TopologyMethodID,
-			check: func(t *testing.T, resp *funcapi.FunctionResponse, _ *topology.Data) {
+			check: func(t *testing.T, resp *funcapi.FunctionResponse, _ *topologyv1.Data) {
 				require.Equal(t, 503, resp.Status)
 			},
 		},
 		"rejects unknown method": {
 			method: "unknown",
-			check: func(t *testing.T, resp *funcapi.FunctionResponse, _ *topology.Data) {
+			check: func(t *testing.T, resp *funcapi.FunctionResponse, _ *topologyv1.Data) {
 				require.Equal(t, 404, resp.Status)
 			},
 		},
