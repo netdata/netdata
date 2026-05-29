@@ -1775,6 +1775,84 @@ static int rrdlabels_unittest_change_detection(void) {
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
+    // ---- Multi-duplicate drain ----
+    // The fixed code path can no longer produce a (key, *) duplicate state.
+    // To verify the same-key cleanup LOOP drains arbitrarily many duplicates
+    // (not just the first), plant multiple stale entries directly into
+    // dst->JudyL via add_label_name_value() + JudyLIns(). This bypasses the
+    // public add/migrate/copy paths so the pathological starting state can
+    // be constructed for the test.
+
+    // Migrate: dst seeded with 3 pinned DONT_DELETE entries sharing "k1";
+    // src carries (k1, vc). After migrate, dst must have exactly one entry,
+    // value "vc", and the function must return true (cleanup counts as a
+    // mutation).
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    {
+        RRDLABEL *stale_a = add_label_name_value("k1", "va");
+        RRDLABEL *stale_b = add_label_name_value("k1", "vb");
+        RRDLABEL *stale_c = add_label_name_value("k1", "vstale");
+        Pvoid_t *p;
+        p = JudyLIns(&dst->JudyL, (Word_t)stale_a, PJE0);
+        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
+        p = JudyLIns(&dst->JudyL, (Word_t)stale_b, PJE0);
+        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
+        p = JudyLIns(&dst->JudyL, (Word_t)stale_c, PJE0);
+        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
+    }
+    UT_EXPECT(rrdlabels_entries(dst) == 3,
+              "test setup: dst should start with 3 manually-planted same-key entries");
+    rrdlabels_add(src, "k1", "vc", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate must return true when cleanup drains multi-duplicate state");
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "migrate must drain all stale same-key duplicates, not just the first");
+    {
+        char *v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
+        UT_EXPECT(v != NULL && strcmp(v, "vc") == 0,
+                  "migrate multi-duplicate drain should leave only the src value in dst");
+        freez(v);
+    }
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Copy: same setup, exercise the copy loop's drain behavior. The src
+    // label's (key, value) is one of the planted duplicates here, so the
+    // copy hits the else-branch (already-present) and the cleanup is the
+    // ONLY mutation -- exercises both the loop drain AND the else-branch
+    // cleanup added in this PR.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    {
+        RRDLABEL *stale_a = add_label_name_value("k1", "va");
+        RRDLABEL *stale_b = add_label_name_value("k1", "vb");
+        RRDLABEL *stale_c = add_label_name_value("k1", "vc");
+        Pvoid_t *p;
+        p = JudyLIns(&dst->JudyL, (Word_t)stale_a, PJE0);
+        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
+        p = JudyLIns(&dst->JudyL, (Word_t)stale_b, PJE0);
+        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
+        p = JudyLIns(&dst->JudyL, (Word_t)stale_c, PJE0);
+        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
+    }
+    UT_EXPECT(rrdlabels_entries(dst) == 3,
+              "test setup: dst should start with 3 manually-planted same-key entries (copy)");
+    rrdlabels_add(src, "k1", "vc", RRDLABEL_SRC_CONFIG);
+    rrdlabels_copy(dst, src);
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "copy must drain all stale same-key duplicates, not just the first");
+    {
+        char *v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
+        UT_EXPECT(v != NULL && strcmp(v, "vc") == 0,
+                  "copy multi-duplicate drain should leave only the src value in dst");
+        freez(v);
+    }
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
     // ---- rrdlabels_remove_all_unmarked_and_changed: CLABEL-commit semantics ----
     // (1) unmark + re-add identical set => no change => false
     l = rrdlabels_create();
