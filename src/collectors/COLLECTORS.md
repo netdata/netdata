@@ -248,6 +248,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [8430FT modem](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/8430ft_modem.md) | Keep track of vital metrics from the MTS 8430FT modem for streamlined network performance and diagnostics. |
 | [Access Points](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/ap/integrations/access_points.md) | This collector monitors various wireless access point metrics like connected clients, bandwidth, packets, transmit issues, signal strength, and bitrate for each device and its associated SSID. |
 | [Bird Routing Daemon](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/bird_routing_daemon.md) | Keep an eye on Bird Routing Daemon metrics for optimized network routing and management. |
+| [Cato Networks](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) | This collector monitors Cato Networks accounts through the Cato GraphQL API. |
 | [Chrony](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/chrony/integrations/chrony.md) | This collector monitors the system's clock performance and peers activity status |
 | [Clash](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/clash.md) | Keep an eye on Clash proxy server metrics for optimized network performance and management. |
 | [Conntrack](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/conntrack.md) | This integration monitors the connection tracking mechanism of Netfilter in the Linux Kernel. |
@@ -304,9 +305,11 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Starlink (SpaceX)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/starlink_spacex.md) | Monitor SpaceX Starlink satellite internet metrics for efficient internet service management and performance. |
 | [strongSwan](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/strongswan.md) | Track strongSwan VPN and IPSec metrics using the vici interface for efficient virtual private network (VPN) management and performance. |
 | [Synproxy](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/synproxy.md) | This integration provides statistics about the Synproxy netfilter module. |
+| TCP Stack | Monitor TCP stack counters and connection states on Windows systems. |
 | [tc QoS classes](https://github.com/netdata/netdata/blob/master/src/collectors/tc.plugin/integrations/tc_qos_classes.md) | Examine tc metrics to gain insights into Linux traffic control operations. |
 | [Timex](https://github.com/netdata/netdata/blob/master/src/collectors/timex.plugin/integrations/timex.md) | Examine Timex metrics to gain insights into system clock operations. |
 | [Tor](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/tor/integrations/tor.md) | Tracks Tor's download and upload traffic, as well as its uptime. |
+| UDP Stack | Monitor UDP datagram counters on Windows systems. |
 | [Ubiquiti UFiber OLT](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/ubiquiti_ufiber_olt.md) | Track Ubiquiti UFiber GPON (Gigabit Passive Optical Network) device metrics for efficient fiber-optic network management and performance. |
 | [Unbound](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/unbound/integrations/unbound.md) | This collector monitors Unbound servers. |
 | [WireGuard](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | This collector monitors WireGuard VPN devices and peers traffic. |

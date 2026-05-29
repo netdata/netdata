@@ -63,6 +63,10 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 25), // when set, data collection is not available for this chart
 
     RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 26), // this chart has at least one rrdcal linked
+
+    RRDSET_FLAG_PENDING_LABEL_RECHECK            = (1 << 27), // chart labels changed since the last health
+                                                              // prototype evaluation; the health thread must
+                                                              // detach + reattach alerts for this chart.
 } RRDSET_FLAGS;
 
 // --------------------------------------------------------------------------------------------------------------------

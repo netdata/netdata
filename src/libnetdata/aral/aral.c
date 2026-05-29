@@ -433,20 +433,20 @@ static inline struct free_space check_free_space___aral_lock_needed(ARAL *ar, AR
     f.max_page_elements = aral_max_allocation_size(ar) / ar->config.element_size;
     for(f.p = *aral_pages_head_free(ar, marked); f.p ; f.lp = f.p, f.p = f.p->aral_lock.next) {
         f.pages++;
-        internal_fatal(!f.p->aral_lock.free_elements, "page is in the free list, but does not have any elements free");
-        internal_fatal(f.p->marked != marked, "page is in the wrong mark list");
+        internal_fatal(!f.p->page_lock.free_elements, "page is in the free list, but does not have any elements free");
+        internal_fatal(f.p->aral_lock.marked != marked, "page is in the wrong mark list");
 
-        if(f.p != my_page && f.max_free_elements_on_a_page < f.p->aral_lock.free_elements)
-            f.max_free_elements_on_a_page = f.p->aral_lock.free_elements;
+        if(f.p != my_page && f.max_free_elements_on_a_page < f.p->page_lock.free_elements)
+            f.max_free_elements_on_a_page = f.p->page_lock.free_elements;
 
-        f.free_elements += f.p->aral_lock.free_elements;
+        f.free_elements += f.p->page_lock.free_elements;
         f.pages_with_free_elements++;
     }
 
     for(f.p = *aral_pages_head_full(ar, marked); f.p ; f.lp = f.p, f.p = f.p->aral_lock.next) {
         f.pages++;
-        internal_fatal(f.p->aral_lock.free_elements, "found page with free items in a full page");
-        internal_fatal(f.p->marked != marked, "page is in the wrong mark list");
+        internal_fatal(f.p->page_lock.free_elements, "found page with free items in a full page");
+        internal_fatal(f.p->aral_lock.marked != marked, "page is in the wrong mark list");
     }
 
     return f;
@@ -885,18 +885,13 @@ static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, b
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.allocators, 1, __ATOMIC_RELAXED);
 
-#ifdef NETDATA_ARAL_INTERNAL_CHECKS
-    // bool added = false;
-    struct free_space f1, f2;
-#endif
-
     ARAL_PAGE *page = NULL;
 
 retry_acquisition:
 
     while(!(page = aral_acquire_first_page(ar, marked))) {
 #ifdef NETDATA_ARAL_INTERNAL_CHECKS
-        f1 = check_free_space___aral_lock_needed(ar, NULL, marked);
+        (void)check_free_space___aral_lock_needed(ar, NULL, marked);
 #endif
 
         bool can_add = false;
@@ -926,10 +921,6 @@ retry_acquisition:
             page->aral_lock.head_ptr = head_ptr_free;
             aral_unlock(ar);
 
-            //#ifdef NETDATA_ARAL_INTERNAL_CHECKS
-            //            added = true;
-            //#endif
-
             aral_adders_lock(ar, marked);
             ar->ops[idx].adders.allocating_elements -= aral_elements_in_page_size(ar, page_allocation_size);
             aral_adders_unlock(ar, marked);
@@ -948,13 +939,6 @@ retry_acquisition:
     // we have a page
     // it is acquired
     // and aral is NOT locked
-
-    //#ifdef NETDATA_ARAL_INTERNAL_CHECKS
-    //    if(added) {
-    //        f2 = check_free_space___aral_lock_needed(ar, page, marked);
-    //        internal_fatal(f2.failed, "hey!");
-    //    }
-    //#endif
 
     internal_fatal(!page,
                    "ARAL: '%s' failed to find a page with a free element",

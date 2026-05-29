@@ -241,6 +241,12 @@
 - Add PAN-OS go.d collector ([#22389](https://github.com/netdata/netdata/issues/22389))
 - Docs: task class: improve_docs — add an faq entry to node-identities.md ([#22565](https://github.com/netdata/netdata/issues/22565))
 - Remove stale labels after host label reload ([#22571](https://github.com/netdata/netdata/issues/22571))
+- Fix health sum lookup for incremental dimensions ([#22554](https://github.com/netdata/netdata/issues/22554))
+- Fix proc interrupts name parsing ([#22556](https://github.com/netdata/netdata/issues/22556))
+- Address eBPF and Cgroup exit and messages ([#22574](https://github.com/netdata/netdata/issues/22574))
+- Cleanup ARAL code when NETDATA_ARAL_INTERNAL_CHECKS is enabled ([#22581](https://github.com/netdata/netdata/issues/22581))
+- Reapply alert prototypes when host or chart labels change ([#22570](https://github.com/netdata/netdata/issues/22570))
+- Windows Network Viewer ([#22470](https://github.com/netdata/netdata/issues/22470))
 
 ## [2.10.0] - 2026-04-09
 

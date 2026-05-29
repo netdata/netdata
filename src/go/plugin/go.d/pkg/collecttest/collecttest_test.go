@@ -215,6 +215,50 @@ groups:
 	}
 }
 
+func TestBuildChartCoveragesFromStoreKeepsHostScopesSeparate(t *testing.T) {
+	scopeA := metrix.HostScope{ScopeKey: "scope-a", GUID: "guid-a", Hostname: "host-a"}
+	scopeB := metrix.HostScope{ScopeKey: "scope-b", GUID: "guid-b", Hostname: "host-b"}
+	store := newTestCollectorStore(t, func(m metrix.SnapshotMeter) {
+		m.WithHostScope(scopeA).Gauge("metric_a").Observe(1)
+		m.WithHostScope(scopeB).Gauge("metric_b").Observe(2)
+	})
+
+	templateYAML := `
+version: v1
+context_namespace: test
+groups:
+  - family: Root
+    metrics: [metric_a, metric_b]
+    charts:
+      - title: A
+        context: a
+        units: "1"
+        dimensions:
+          - selector: metric_a
+            name: x
+      - title: B
+        context: b
+        units: "1"
+        dimensions:
+          - selector: metric_b
+            name: y
+`
+
+	coverages, err := buildChartCoveragesFromStore(templateYAML, 1, store, nil)
+	require.NoError(t, err)
+	require.Len(t, coverages, 2)
+
+	byScope := make(map[string]chartCoverage, len(coverages))
+	for _, scoped := range coverages {
+		byScope[scoped.ScopeKey] = scoped.Coverage
+	}
+
+	require.Equal(t, map[string][]string{"test.a": {"x"}}, normalizeCoverageDimsList(byScope[scopeA.ScopeKey].ExpectedByContext))
+	require.Equal(t, map[string][]string{"test.a": {"x"}}, normalizeCoverageDims(byScope[scopeA.ScopeKey].ActualByContext))
+	require.Equal(t, map[string][]string{"test.b": {"y"}}, normalizeCoverageDimsList(byScope[scopeB.ScopeKey].ExpectedByContext))
+	require.Equal(t, map[string][]string{"test.b": {"y"}}, normalizeCoverageDims(byScope[scopeB.ScopeKey].ActualByContext))
+}
+
 func TestCollectOnceAbortsCycleOnPanic(t *testing.T) {
 	store := metrix.NewCollectorStore()
 
