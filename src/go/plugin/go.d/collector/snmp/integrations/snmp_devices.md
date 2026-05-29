@@ -206,8 +206,8 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Profiles** | manual_profiles | A list of profiles to force-apply when auto-detection cannot be used. | [] | no |
 | **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
-|  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
-|  | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
+|  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the configured target hostname/IP (`hostname` option). |  | no |
+|  | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's SNMP sysName will be used, falling back to "snmp-device". |  | no |
 |  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
 
 <a id="option-snmpv3-user-level"></a>

@@ -466,12 +466,12 @@ modules:
               required: false
             - name: vnode.guid
               group: Virtual node
-              description: A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.
+              description: A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the configured target hostname/IP (`hostname` option).
               default_value: ""
               required: false
             - name: vnode.hostname
               group: Virtual node
-              description: The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.
+              description: The hostname that will be used for the Virtual Node. If not set, the device's SNMP sysName will be used, falling back to "snmp-device".
               default_value: ""
               required: false
             - name: vnode.labels

@@ -44,12 +44,12 @@
         "properties": {
           "guid": {
             "title": "GUID",
-            "description": "A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.",
+            "description": "A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the configured target hostname/IP (`hostname` option).",
             "type": "string"
           },
           "hostname": {
             "title": "Hostname",
-            "description": "The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.",
+            "description": "The hostname that will be used for the Virtual Node. If not set, the device's SNMP sysName will be used, falling back to \"snmp-device\".",
             "type": "string"
           },
           "labels": {
