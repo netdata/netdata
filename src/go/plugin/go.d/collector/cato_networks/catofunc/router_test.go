@@ -22,53 +22,99 @@ func (d fakeDeps) CurrentTopology() (*topology.Data, bool) {
 	return d.data, d.ok
 }
 
-func TestTopologyHandlerReturnsCurrentTopology(t *testing.T) {
-	data := &topology.Data{Source: "cato_networks"}
-	handler := NewRouter(fakeDeps{data: data, ok: true})
-
-	resp := handler.Handle(context.Background(), TopologyMethodID, nil)
-
-	require.Equal(t, 200, resp.Status)
-	require.Equal(t, "topology", resp.ResponseType)
-	require.Same(t, data, resp.Data)
-}
-
-func TestTopologyHandlerReturnsUnavailableWithoutSnapshot(t *testing.T) {
-	handler := NewRouter(fakeDeps{})
-
-	resp := handler.Handle(context.Background(), TopologyMethodID, nil)
-
-	require.Equal(t, 503, resp.Status)
-}
-
-func TestTopologyHandlerRejectsUnknownMethod(t *testing.T) {
-	handler := NewRouter(fakeDeps{})
-
-	resp := handler.Handle(context.Background(), "unknown", nil)
-
-	require.Equal(t, 404, resp.Status)
-}
-
-func TestRouterMethodParamsRejectsUnknownMethod(t *testing.T) {
-	handler := NewRouter(fakeDeps{})
-
-	params, err := handler.MethodParams(context.Background(), "unknown")
-
-	require.Nil(t, params)
-	require.ErrorContains(t, err, "unknown method: unknown")
-}
-
-func TestRouterCleanupForwardsToHandlers(t *testing.T) {
-	h := &cleanupHandler{}
-	r := &router{
-		handlers: map[string]funcapi.MethodHandler{
-			"test": h,
+func TestRouter_Handle(t *testing.T) {
+	tests := map[string]struct {
+		deps   fakeDeps
+		method string
+		check  func(*testing.T, *funcapi.FunctionResponse, *topology.Data)
+	}{
+		"returns current topology": {
+			deps:   fakeDeps{data: &topology.Data{Source: "cato_networks"}, ok: true},
+			method: TopologyMethodID,
+			check: func(t *testing.T, resp *funcapi.FunctionResponse, data *topology.Data) {
+				require.Equal(t, 200, resp.Status)
+				require.Equal(t, "topology", resp.ResponseType)
+				require.Same(t, data, resp.Data)
+			},
+		},
+		"returns unavailable without snapshot": {
+			method: TopologyMethodID,
+			check: func(t *testing.T, resp *funcapi.FunctionResponse, _ *topology.Data) {
+				require.Equal(t, 503, resp.Status)
+			},
+		},
+		"rejects unknown method": {
+			method: "unknown",
+			check: func(t *testing.T, resp *funcapi.FunctionResponse, _ *topology.Data) {
+				require.Equal(t, 404, resp.Status)
+			},
 		},
 	}
 
-	r.Cleanup(context.Background())
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			handler := NewRouter(tc.deps)
+			resp := handler.Handle(context.Background(), tc.method, nil)
+			tc.check(t, resp, tc.deps.data)
+		})
+	}
+}
 
-	require.True(t, h.called)
+func TestRouter_MethodParams(t *testing.T) {
+	tests := map[string]struct {
+		method  string
+		wantErr string
+	}{
+		"known topology method": {
+			method: TopologyMethodID,
+		},
+		"unknown method": {
+			method:  "unknown",
+			wantErr: "unknown method: unknown",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			handler := NewRouter(fakeDeps{})
+			params, err := handler.MethodParams(context.Background(), tc.method)
+
+			if tc.wantErr != "" {
+				require.Nil(t, params)
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Nil(t, params)
+		})
+	}
+}
+
+func TestRouter_Cleanup(t *testing.T) {
+	tests := map[string]struct {
+		handlers map[string]funcapi.MethodHandler
+		check    func(*testing.T, *cleanupHandler)
+	}{
+		"forwards cleanup to handlers": {
+			handlers: map[string]funcapi.MethodHandler{
+				"test": &cleanupHandler{},
+			},
+			check: func(t *testing.T, h *cleanupHandler) {
+				require.True(t, h.called)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			h := tc.handlers["test"].(*cleanupHandler)
+			r := &router{handlers: tc.handlers}
+
+			r.Cleanup(context.Background())
+
+			tc.check(t, h)
+		})
+	}
 }
 
 type cleanupHandler struct {
