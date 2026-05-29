@@ -1861,6 +1861,60 @@ static int rrdlabels_unittest_change_detection(void) {
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
+    // ---- Cleanup respects key boundaries ----
+    // The cleanup loop calls find_label_with_key_unsafe() which filters by
+    // STRING key pointer. Regressing that key check would make the loop
+    // delete entries with DIFFERENT keys. Plant pinned DONT_DELETE entries
+    // under TWO keys; mutate only the first key's value; the second key's
+    // entry must survive untouched.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(dst, "k2", "v2", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(src, "k1", "v3", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate with mixed-key DONT_DELETE dst must return true on k1 change");
+    UT_EXPECT(rrdlabels_entries(dst) == 2,
+              "migrate cleanup must leave the unrelated DONT_DELETE key intact");
+    {
+        char *v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
+        UT_EXPECT(v != NULL && strcmp(v, "v3") == 0,
+                  "migrate must update k1 to the src value");
+        freez(v);
+        v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k2");
+        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
+                  "migrate must preserve the unrelated DONT_DELETE key's value");
+        freez(v);
+    }
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Same scenario for rrdlabels_copy().
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(dst, "k2", "v2", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(src, "k1", "v3", RRDLABEL_SRC_CONFIG);
+    rrdlabels_copy(dst, src);
+    UT_EXPECT(rrdlabels_entries(dst) == 2,
+              "copy cleanup must leave the unrelated DONT_DELETE key intact");
+    {
+        char *v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
+        UT_EXPECT(v != NULL && strcmp(v, "v3") == 0,
+                  "copy must update k1 to the src value");
+        freez(v);
+        v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k2");
+        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
+                  "copy must preserve the unrelated DONT_DELETE key's value");
+        freez(v);
+    }
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
     // ---- rrdlabels_remove_all_unmarked_and_changed: CLABEL-commit semantics ----
     // (1) unmark + re-add identical set => no change => false
     l = rrdlabels_create();
