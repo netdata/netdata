@@ -711,28 +711,53 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     RRDLABEL *label;
     Pvoid_t *PValue;
     size_t added = 0;
+    size_t cleaned = 0;
 
     RRDLABEL_SRC ls;
     lfe_start_nolock(src, label, ls)
     {
         JudyAllocThreadPulseGetAndReset();
 
+        // labels->JudyL is keyed by the deduplicated RRDLABEL pointer produced by
+        // add_label_name_value(), which encodes BOTH key and value. A same-key
+        // value change in src therefore yields a different pointer than the one
+        // dst already has, so JudyLIns lands on an empty slot.
         PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if(unlikely(!PValue || PValue == PJERR))
             fatal("RRDLABELS migrate: corrupted labels array");
 
-        RRDLABEL_SRC flag;
         if (!*PValue) {
-            flag = (ls & ~(RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_NEW;
+            // Write through PValue BEFORE any subsequent JudyLDel: Judy
+            // invalidates previously-returned PValue pointers when the array
+            // is modified. Same ordering as labels_add_already_sanitized().
+            *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_NEW;
             dup_label(label);
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
             added++;
         }
         else
-            flag = RRDLABEL_FLAG_OLD;
+            *((RRDLABEL_SRC *)PValue) |= RRDLABEL_FLAG_OLD;
 
-        *((RRDLABEL_SRC *)PValue) |= flag;
+        // Ensure at most one entry per key. The remove-unmarked sweep below
+        // preserves RRDLABEL_FLAG_DONT_DELETE, so a stale (key, *) entry
+        // would otherwise survive next to the desired (key, value) entry.
+        // Runs in BOTH branches because the stale entry may pre-date this
+        // iteration (e.g. a duplicate left by a prior buggy path) and is
+        // independent of whether the current src label is a fresh insert
+        // or an already-present (key, value). The find helper skips the
+        // just-inserted/just-found entry via same_value=false.
+        for (;;) {
+            RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
+            if (!old_label_with_same_key)
+                break;
+            int del_result = JudyLDel(&dst->JudyL, (Word_t)old_label_with_same_key, PJE0);
+            (void)del_result;
+            int64_t old_judy_mem = JudyAllocThreadPulseGetAndReset();
+            RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, old_judy_mem, 0);
+            delete_label(old_label_with_same_key);
+            cleaned++;
+        }
     }
     lfe_done_nolock();
 
@@ -742,7 +767,12 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     spinlock_unlock(&src->spinlock);
     spinlock_unlock(&dst->spinlock);
 
-    return (added > 0) || (removed > 0);
+    // cleaned counts duplicates dropped by the same-key cleanup loop above.
+    // Without it, a stale (key,*) duplicate removed while the desired
+    // (key,value) was already present would mutate dst silently -- callers
+    // gating on this return (e.g. rrdset_update_rrdlabels setting
+    // RRDSET_FLAG_PENDING_LABEL_RECHECK) would miss the change.
+    return (added > 0) || (removed > 0) || (cleaned > 0);
 }
 
 //
@@ -794,27 +824,42 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     bool update_statistics = false;
     lfe_start_nolock(src, label, ls)
     {
-        RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
         Pvoid_t *PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if(unlikely(!PValue || PValue == PJERR))
             fatal("RRDLABELS: corrupted labels array");
 
         if (!*PValue) {
+            // Write through PValue BEFORE any subsequent JudyLDel: Judy
+            // invalidates previously-returned PValue pointers when the array
+            // is modified. Same ordering as labels_add_already_sanitized().
+            *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_NEW;
             dup_label(label);
-            ls = (ls & ~(RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_NEW;
             dst->version++;
             update_statistics = true;
-            if (old_label_with_key) {
-                int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
-                (void)JudyLDel(&dst->JudyL, (Word_t)old_label_with_key, PJE0);
-                RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
-                delete_label((RRDLABEL *)old_label_with_key);
-            }
         }
         else
-            ls = (ls & ~(RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_OLD;
+            *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_OLD;
 
-        *((RRDLABEL_SRC *)PValue) = ls;
+        // Drop any other entry sharing this key. Runs in BOTH branches so
+        // pre-existing same-key duplicates (e.g. left behind by a prior
+        // buggy path) get cleaned up even when the current src label is
+        // already present in dst. Loop because the find helper returns
+        // the first match only. The find skips the just-inserted /
+        // just-updated entry via same_value=false.
+        for (;;) {
+            RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
+            if (!old_label_with_key)
+                break;
+            (void)JudyLDel(&dst->JudyL, (Word_t)old_label_with_key, PJE0);
+            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+            RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
+            delete_label((RRDLABEL *)old_label_with_key);
+            // Cleanup is itself a state mutation: bump version and request
+            // tail-stats accounting so version-based consumers and the
+            // memory pulse stay correct even when no new insert happened.
+            dst->version++;
+            update_statistics = true;
+        }
     }
     lfe_done_nolock();
     if (update_statistics) {
@@ -1587,6 +1632,27 @@ static int rrdlabels_unittest_mark_source_as_old(void) {
     }                                                                          \
 } while (0)
 
+// Returns true when labels[key] resolves to exactly `expected`.
+static bool rrdlabels_unittest_value_is(RRDLABELS *labels, const char *key, const char *expected) {
+    char *v = NULL;
+    rrdlabels_get_value_strdup_or_null(labels, &v, key);
+    bool ok = (v != NULL && strcmp(v, expected) == 0);
+    freez(v);
+    return ok;
+}
+
+// Plant `n` pinned DONT_DELETE entries that share `key` but carry distinct
+// `values`, writing them straight into labels->JudyL. This bypasses the
+// public add/migrate/copy paths so a multi-duplicate starting state -- which
+// the fixed code can no longer produce -- can be constructed for tests.
+static void rrdlabels_unittest_plant_dups(RRDLABELS *labels, const char *key, const char *const *values, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        RRDLABEL *stale = add_label_name_value(key, values[i]);
+        Pvoid_t *p = JudyLIns(&labels->JudyL, (Word_t)stale, PJE0);
+        *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
+    }
+}
+
 static int rrdlabels_unittest_change_detection(void) {
     fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
     int errors = 0;
@@ -1647,6 +1713,159 @@ static int rrdlabels_unittest_change_detection(void) {
               "migrate where the only diff is a DONT_DELETE label should return false");
     UT_EXPECT(rrdlabels_entries(dst) == 1,
               "DONT_DELETE label should be preserved after migrate");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Value change via migrate (no DONT_DELETE): dst ends with a single entry
+    // for the key, carrying the new value.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(src, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate with a value change should return true");
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "migrate with a value change should leave one entry per key");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v2"),
+              "migrate with a value change should leave the new value in dst");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Value change via migrate where dst pinned the old value with DONT_DELETE:
+    // the stale (key, old-value) must not survive, even though DONT_DELETE
+    // would otherwise protect it from the remove-unmarked sweep.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(src, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate with a value change for a DONT_DELETE key should return true");
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "migrate must not leave a duplicate (key,old-value) when DONT_DELETE was set");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v2"),
+              "migrate with a DONT_DELETE value change should leave the new value in dst");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // ---- rrdlabels_copy: same-key cleanup path ----
+    // Value change via copy: dst ends with a single entry for the key,
+    // carrying the new value from src. Exercises the same-key cleanup loop
+    // that mirrors the migrate path.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(src, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_copy(dst, src);
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "copy with a value change should leave one entry per key");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v2"),
+              "copy with a value change should leave the new value in dst");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Value change via copy where dst pinned the old value with DONT_DELETE.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(src, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_copy(dst, src);
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "copy must not leave a duplicate (key,old-value) when DONT_DELETE was set");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v2"),
+              "copy with a DONT_DELETE value change should leave the new value in dst");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // ---- Multi-duplicate drain ----
+    // The fixed code path can no longer produce a (key, *) duplicate state.
+    // To verify the same-key cleanup LOOP drains arbitrarily many duplicates
+    // (not just the first), plant multiple stale entries directly into
+    // dst->JudyL via add_label_name_value() + JudyLIns(). This bypasses the
+    // public add/migrate/copy paths so the pathological starting state can
+    // be constructed for the test.
+
+    // Migrate (cleanup-only path): dst seeded with 3 pinned DONT_DELETE
+    // entries sharing "k1"; src carries (k1, vc) whose dedup pointer is
+    // ALREADY one of the planted entries, so JudyLIns lands on an existing
+    // slot, takes the else-branch (added stays 0), and the cleanup loop is
+    // the only mutation. Asserts that:
+    //   - the loop drains the OTHER two stale entries (not just the first);
+    //   - the function returns true even though added==0 and removed==0
+    //     (regression on the `cleaned` term in the return would fail here);
+    //   - dst ends with the single source entry.
+    static const char *const planted_dups[] = { "va", "vb", "vc" };
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_unittest_plant_dups(dst, "k1", planted_dups, 3);
+    UT_EXPECT(rrdlabels_entries(dst) == 3,
+              "test setup: dst should start with 3 manually-planted same-key entries");
+    rrdlabels_add(src, "k1", "vc", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate must return true when cleanup is the only mutation (added=0, removed=0, cleaned>0)");
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "migrate must drain all stale same-key duplicates, not just the first");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "vc"),
+              "migrate multi-duplicate drain should leave only the src value in dst");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Copy (cleanup-only path): same setup; src's (k1, vc) matches one of
+    // the planted entries so the copy takes the else-branch and the cleanup
+    // is the ONLY mutation. Asserts dst entries+value AND that
+    // dst->version advances despite no insert -- regression on the
+    // version bump inside the cleanup loop would fail this check.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_unittest_plant_dups(dst, "k1", planted_dups, 3);
+    UT_EXPECT(rrdlabels_entries(dst) == 3,
+              "test setup: dst should start with 3 manually-planted same-key entries (copy)");
+    rrdlabels_add(src, "k1", "vc", RRDLABEL_SRC_CONFIG);
+    uint32_t copy_version_before = rrdlabels_version(dst);
+    rrdlabels_copy(dst, src);
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "copy must drain all stale same-key duplicates, not just the first");
+    UT_EXPECT(rrdlabels_version(dst) > copy_version_before,
+              "copy must advance dst->version when cleanup is the only mutation");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "vc"),
+              "copy multi-duplicate drain should leave only the src value in dst");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // ---- Cleanup respects key boundaries ----
+    // The cleanup loop calls find_label_with_key_unsafe() which filters by
+    // STRING key pointer. Regressing that key check would make the loop
+    // delete entries with DIFFERENT keys. Plant pinned DONT_DELETE entries
+    // under TWO keys; mutate only the first key's value; the second key's
+    // entry must survive untouched.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(dst, "k2", "v2", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(src, "k1", "v3", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate with mixed-key DONT_DELETE dst must return true on k1 change");
+    UT_EXPECT(rrdlabels_entries(dst) == 2,
+              "migrate cleanup must leave the unrelated DONT_DELETE key intact");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v3"),
+              "migrate must update k1 to the src value");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k2", "v2"),
+              "migrate must preserve the unrelated DONT_DELETE key's value");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Same scenario for rrdlabels_copy().
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(dst, "k2", "v2", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(src, "k1", "v3", RRDLABEL_SRC_CONFIG);
+    rrdlabels_copy(dst, src);
+    UT_EXPECT(rrdlabels_entries(dst) == 2,
+              "copy cleanup must leave the unrelated DONT_DELETE key intact");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k1", "v3"),
+              "copy must update k1 to the src value");
+    UT_EXPECT(rrdlabels_unittest_value_is(dst, "k2", "v2"),
+              "copy must preserve the unrelated DONT_DELETE key's value");
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 

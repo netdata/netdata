@@ -5,6 +5,9 @@
 #include "streaming/stream.h"
 
 void rrdhost_set_is_parent_label(void) {
+    if (!localhost || !localhost->rrdlabels)
+        return;
+
     uint32_t count = stream_receivers_currently_connected();
 
     if (count == 0 || count == 1) {
